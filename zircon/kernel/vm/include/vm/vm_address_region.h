@@ -1191,6 +1191,16 @@ class VmMapping final : public VmAddressRegionOrMapping,
     return state_;
   }
 
+  uint64_t TrimmedObjectRangeLocked(uint64_t offset, uint64_t len) const TA_REQ(lock())
+      TA_REQ(object_->lock()) {
+    const uint64_t vmo_offset = object_offset_locked() + offset;
+    const uint64_t vmo_size = object_->size_locked();
+    if (vmo_offset >= vmo_size) {
+      return 0;
+    }
+    return ktl::min(vmo_size - vmo_offset, len);
+  }
+
   // used to detect recursions through the vmo fault path
   bool currently_faulting_ TA_GUARDED(object_->lock()) = false;
 

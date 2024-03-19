@@ -2736,4 +2736,26 @@ TEST(Vmar, ProtectReadIfXomUnsupported) {
   EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr)), expected);
 }
 
+// Check that map range works correctly on resizable VMOs when the mapping extends beyond the
+// current VMO size.
+TEST(Vmar, MapRangeResizable) {
+  zx::vmo vmo;
+
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), ZX_VMO_RESIZABLE, &vmo));
+
+  zx_vaddr_t vaddr = 0;
+  // In range
+  ASSERT_OK(
+      zx::vmar::root_self()->map(ZX_VM_MAP_RANGE, 0, vmo, 0, zx_system_get_page_size(), &vaddr));
+  zx::vmar::root_self()->unmap(vaddr, zx_system_get_page_size());
+  // Extend out of range
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_MAP_RANGE, 0, vmo, 0, zx_system_get_page_size() * 2,
+                                       &vaddr));
+  zx::vmar::root_self()->unmap(vaddr, zx_system_get_page_size() * 2);
+  // Start and end fully out of range
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_MAP_RANGE, 0, vmo, zx_system_get_page_size() * 2,
+                                       zx_system_get_page_size() * 2, &vaddr));
+  zx::vmar::root_self()->unmap(vaddr, zx_system_get_page_size() * 2);
+}
+
 }  // namespace

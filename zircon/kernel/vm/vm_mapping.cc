@@ -687,6 +687,13 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
     currently_faulting_ = false;
   });
 
+  // Trim our range to the current VMO size. Our mapping might exceed the VMO in the case where the
+  // VMO is resizable, and this should not be considered an error.
+  len = TrimmedObjectRangeLocked(offset, len);
+  if (len == 0) {
+    return ZX_OK;
+  }
+
   // The region to map could have multiple different current arch mmu flags, so we need to iterate
   // over them to ensure we install mappings with the correct permissions.
   return EnumerateProtectionRangesLocked(
