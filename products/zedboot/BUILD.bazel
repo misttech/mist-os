@@ -5,8 +5,8 @@
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "BUILD_TYPES",
+    "fuchsia_product",
     "fuchsia_product_configuration",
-    "fuchsia_product_image",
 )
 load("//build/bazel/assembly:zedboot_image_args.bzl", "ZEDBOOT_IMAGE_ARGS")
 
@@ -18,7 +18,7 @@ package(default_visibility = [
 
 fuchsia_product_configuration(
     name = "zedboot_with_fvm",
-    json_config = {
+    product_config_json = {
         "platform": {
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",
@@ -43,7 +43,7 @@ fuchsia_product_configuration(
 
 fuchsia_product_configuration(
     name = "zedboot",
-    json_config = {
+    product_config_json = {
         "platform": {
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",
@@ -58,12 +58,12 @@ fuchsia_product_configuration(
     },
 )
 
-[fuchsia_product_image(
+[fuchsia_product(
     name = board,
     board_config = "//boards:{}".format(board),
-    create_system_mode = ZEDBOOT_IMAGE_ARGS["create_system_mode"],
-    legacy_aib = ZEDBOOT_IMAGE_ARGS["legacy_aib"],
-    platform_aibs = ZEDBOOT_IMAGE_ARGS["platform_aibs"],
+    legacy_bundle = ZEDBOOT_IMAGE_ARGS["legacy_bundle"],
+    package_mode = ZEDBOOT_IMAGE_ARGS["package_mode"],
+    platform_artifacts = ZEDBOOT_IMAGE_ARGS["platform_artifacts"],
     # TODO(awolter): Use ZEDBOOT_IMAGE_ARGS from zedboot_images_args.bzl when
     # `configure_fshost: True` is enabled in v/g.
     product_config = "//products/zedboot:zedboot",
@@ -76,12 +76,12 @@ fuchsia_product_configuration(
 ]]
 
 # TODO(b/282896655): Remove once this is the default and OOT users have switched off of this.
-[fuchsia_product_image(
+[fuchsia_product(
     name = "{}_with_fxfs".format(board),
     board_config = "//boards:{}".format(board),
-    create_system_mode = ZEDBOOT_IMAGE_ARGS["create_system_mode"],
-    legacy_aib = ZEDBOOT_IMAGE_ARGS["legacy_aib"],
-    platform_aibs = ZEDBOOT_IMAGE_ARGS["platform_aibs"],
+    legacy_bundle = ZEDBOOT_IMAGE_ARGS["legacy_bundle"],
+    package_mode = ZEDBOOT_IMAGE_ARGS["package_mode"],
+    platform_artifacts = ZEDBOOT_IMAGE_ARGS["platform_artifacts"],
     # TODO(awolter): Use ZEDBOOT_IMAGE_ARGS from zedboot_images_args.bzl when
     # `configure_fshost: True` is enabled in v/g.
     product_config = "//products/zedboot:zedboot",
@@ -93,12 +93,12 @@ fuchsia_product_configuration(
     "riscv64",
 ]]
 
-[fuchsia_product_image(
+[fuchsia_product(
     name = "{}_with_fvm".format(board),
     board_config = "//boards:{}".format(board),
-    create_system_mode = ZEDBOOT_IMAGE_ARGS["create_system_mode"],
-    legacy_aib = ZEDBOOT_IMAGE_ARGS["legacy_aib"],
-    platform_aibs = ZEDBOOT_IMAGE_ARGS["platform_aibs"],
+    legacy_bundle = ZEDBOOT_IMAGE_ARGS["legacy_bundle"],
+    package_mode = ZEDBOOT_IMAGE_ARGS["package_mode"],
+    platform_artifacts = ZEDBOOT_IMAGE_ARGS["platform_artifacts"],
     # TODO(awolter): Use ZEDBOOT_IMAGE_ARGS from zedboot_images_args.bzl when
     # `configure_fshost: True` is enabled in v/g.
     product_config = "//products/zedboot:zedboot_with_fvm",
