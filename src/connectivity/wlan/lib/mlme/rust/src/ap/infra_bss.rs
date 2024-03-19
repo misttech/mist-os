@@ -117,11 +117,17 @@ impl InfraBss {
                 ..Default::default()
             })
             .map_err(|s| Error::Status(format!("failed to enable beaconing"), s))?;
+        ctx.device
+            .set_ethernet_up()
+            .map_err(|s| Error::Status(format!("Failed to set ethernet status to UP"), s))?;
 
         Ok(bss)
     }
 
     pub fn stop<D: DeviceOps>(&self, ctx: &mut Context<D>) -> Result<(), Error> {
+        ctx.device
+            .set_ethernet_down()
+            .map_err(|s| Error::Status(format!("Failed to set ethernet status to DOWN"), s))?;
         ctx.device
             .disable_beaconing()
             .map_err(|s| Error::Status(format!("failed to disable beaconing"), s))

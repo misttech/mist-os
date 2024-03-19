@@ -474,7 +474,7 @@ mod tests {
         super::*,
         crate::{
             buffer::FakeCBufferProvider,
-            device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState},
+            device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus},
             test_utils::MockWlanRxInfo,
         },
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -927,6 +927,7 @@ mod tests {
                 secondary80: 0,
             }
         );
+        assert_eq!(fake_device_state.lock().link_status, LinkStatus::UP);
 
         let msg = fake_device_state
             .lock()
@@ -1005,6 +1006,7 @@ mod tests {
         })
         .expect("expected Ap::handle_mlme_stop_request OK");
         assert!(ap.bss.is_none());
+        assert_eq!(fake_device_state.lock().link_status, LinkStatus::DOWN);
 
         let msg = fake_device_state
             .lock()
