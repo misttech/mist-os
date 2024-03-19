@@ -30,18 +30,15 @@ async fn paver_write_firmware(
     let res = data_sink
         .write_firmware(configuration, type_, buffer)
         .await
-        .context("while performing write_firmware call")?;
-
-    match res {
+        .context("DataSink.WriteFirmware FIDL error")?;
+    Ok(match res {
         fpaver::WriteFirmwareResult::Status(status) => {
             zx::Status::ok(status).context("firmware failed to write")?;
         }
         fpaver::WriteFirmwareResult::Unsupported(_) => {
             info!("skipping unsupported firmware type: {type_}");
         }
-    }
-
-    Ok(())
+    })
 }
 
 pub async fn paver_read_firmware(
@@ -111,22 +108,18 @@ fn classify_image(
     })
 }
 
-struct Payload {
-    display_name: String,
-    buffer: fmem::Buffer,
-}
-
-impl Payload {
-    fn clone_buffer(&self) -> Result<fmem::Buffer, zx::Status> {
-        Ok(fmem::Buffer {
-            vmo: self.buffer.vmo.create_child(
+fn clone_buffer(buffer: &fmem::Buffer) -> anyhow::Result<fmem::Buffer> {
+    Ok(fmem::Buffer {
+        vmo: buffer
+            .vmo
+            .create_child(
                 zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | zx::VmoChildOptions::RESIZABLE,
                 0,
-                self.buffer.size,
-            )?,
-            size: self.buffer.size,
-        })
-    }
+                buffer.size,
+            )
+            .context("clone_buffer: creating child VMO")?,
+        size: buffer.size,
+    })
 }
 
 /// Writes the given image to the configuration/asset location. If configuration is not given, the
@@ -135,67 +128,67 @@ async fn write_asset_to_configurations(
     data_sink: &fpaver::DataSinkProxy,
     configuration: TargetConfiguration,
     asset: fpaver::Asset,
-    payload: Payload,
+    buffer: fmem::Buffer,
 ) -> anyhow::Result<()> {
-    match configuration {
+    Ok(match configuration {
         TargetConfiguration::Single(configuration) => {
             // Devices supports ABR and/or a specific configuration (ex. Recovery) was requested.
-            paver_write_asset(data_sink, configuration, asset, payload.buffer).await?;
+            paver_write_asset(data_sink, configuration, asset, buffer).await?
         }
         TargetConfiguration::AB => {
             // Device does not support ABR, so write the image to the A partition.
             //
             // Also try to write the image to the B partition to be forwards compatible with devices
-            // that will eventually support ABR. If the device does not have a B partition yet, log the
-            // error and continue.
-
-            paver_write_asset(data_sink, fpaver::Configuration::A, asset, payload.clone_buffer()?)
-                .await?;
-
-            let res =
-                paver_write_asset(data_sink, fpaver::Configuration::B, asset, payload.buffer).await;
-            if let Err(WriteAssetError::Status(zx::Status::NOT_SUPPORTED)) = res {
-                warn!("skipping writing {} to B", payload.display_name);
-            } else {
-                res?;
+            // that will eventually support ABR. If the device does not have a B partition yet, log
+            // the error and continue.
+            let () = paver_write_asset(
+                data_sink,
+                fpaver::Configuration::A,
+                asset,
+                clone_buffer(&buffer)?,
+            )
+            .await?;
+            match paver_write_asset(data_sink, fpaver::Configuration::B, asset, buffer).await {
+                Ok(()) => (),
+                Err(WriteAssetError::Status(zx::Status::NOT_SUPPORTED)) => {
+                    warn!(
+                        "skipping write of {asset:?} to B partition, B not supported by the device"
+                    );
+                }
+                Err(e) => Err(e)?,
             }
         }
-    }
-
-    Ok(())
+    })
 }
 
 async fn write_firmware_to_configurations(
     data_sink: &fpaver::DataSinkProxy,
     configuration: TargetConfiguration,
     type_: &str,
-    payload: Payload,
+    buffer: fmem::Buffer,
 ) -> anyhow::Result<()> {
-    match configuration {
+    Ok(match configuration {
         TargetConfiguration::Single(configuration) => {
             // Devices supports ABR and/or a specific configuration (ex. Recovery) was requested.
-            paver_write_firmware(data_sink, configuration, type_, payload.buffer).await?;
+            paver_write_firmware(data_sink, configuration, type_, buffer).await?
         }
         TargetConfiguration::AB => {
             // For device that does not support ABR. There will only be one single
             // partition for that firmware. The configuration parameter should be Configuration::A.
-            paver_write_firmware(
+            let () = paver_write_firmware(
                 data_sink,
                 fpaver::Configuration::A,
                 type_,
-                payload.clone_buffer()?,
+                clone_buffer(&buffer)?,
             )
             .await?;
             // Similar to asset, we also write Configuration::B to be forwards compatible with
             // devices that will eventually support ABR. For device that does not support A/B, it
             // will log/report WriteFirmwareResult::Unsupported and the paving  will be
             // skipped.
-            paver_write_firmware(data_sink, fpaver::Configuration::B, type_, payload.buffer)
-                .await?;
+            paver_write_firmware(data_sink, fpaver::Configuration::B, type_, buffer).await?
         }
-    }
-
-    Ok(())
+    })
 }
 
 pub async fn write_image_buffer(
@@ -204,19 +197,14 @@ pub async fn write_image_buffer(
     image: &update_package::Image,
     desired_config: NonCurrentConfiguration,
 ) -> anyhow::Result<()> {
-    let target = classify_image(image, desired_config)?;
-    let payload = Payload { display_name: format!("{image:?}"), buffer };
-
-    match target {
+    Ok(match classify_image(image, desired_config)? {
         ImageTarget::Firmware { type_, configuration } => {
-            write_firmware_to_configurations(data_sink, configuration, type_, payload).await?;
+            write_firmware_to_configurations(data_sink, configuration, type_, buffer).await?;
         }
         ImageTarget::Asset { asset, configuration } => {
-            write_asset_to_configurations(data_sink, configuration, asset, payload).await?;
+            write_asset_to_configurations(data_sink, configuration, asset, buffer).await?;
         }
-    }
-
-    Ok(())
+    })
 }
 
 pub fn connect_in_namespace() -> anyhow::Result<(fpaver::DataSinkProxy, fpaver::BootManagerProxy)> {
