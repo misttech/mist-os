@@ -24,7 +24,6 @@
                 "fuchsia.kernel.Stats",
                 "fuchsia.memory.report.SnapshotProvider",
                 "fuchsia.metrics.MetricEventLoggerFactory",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
             ],
         },
