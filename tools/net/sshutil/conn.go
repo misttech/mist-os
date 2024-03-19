@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -48,12 +49,16 @@ type Conn struct {
 	byteCounter atomic.Uint64
 
 	shuttingDown chan struct{}
+	name         string
+
+	sessionLock sync.Mutex
+	numSessions int
 }
 
 // newConn creates a new ssh client to the address and launches a goroutine to
 // send keepalive pings as long as the client is connected.
-func newConn(ctx context.Context, resolver Resolver, config *ssh.ClientConfig, backoff retry.Backoff) (*Conn, error) {
-	conn, err := connect(ctx, resolver, config, backoff)
+func newConn(ctx context.Context, resolver Resolver, config *ssh.ClientConfig, backoff retry.Backoff, name string) (*Conn, error) {
+	conn, err := connect(ctx, resolver, config, backoff, name)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +81,7 @@ func newConn(ctx context.Context, resolver Resolver, config *ssh.ClientConfig, b
 	go func() {
 		defer func() {
 			if err := s.Close(); err != nil {
-				logger.Warningf(ctx, "Unexpected error closing keepalive session: %s", err)
+				logger.Warningf(ctx, "Unexpected error closing keepalive session: %s (%s)", err, conn.name)
 			}
 		}()
 
@@ -92,7 +97,7 @@ func newConn(ctx context.Context, resolver Resolver, config *ssh.ClientConfig, b
 
 // connect continuously attempts to connect to a remote server, and returns an
 // ssh client if successful, or errs out if the context is canceled.
-func connect(ctx context.Context, resolver Resolver, config *ssh.ClientConfig, backoff retry.Backoff) (*Conn, error) {
+func connect(ctx context.Context, resolver Resolver, config *ssh.ClientConfig, backoff retry.Backoff, name string) (*Conn, error) {
 	startTime := time.Now()
 
 	var addr net.Addr
@@ -103,12 +108,12 @@ func connect(ctx context.Context, resolver Resolver, config *ssh.ClientConfig, b
 		if err != nil {
 			return err
 		}
-		logger.Debugf(ctx, "trying to connect to %s...", addr)
+		logger.Debugf(ctx, "trying to connect to %s... (%s)", addr, name)
 		client, err = connectToSSH(ctx, addr, config)
 		if err != nil {
 			return err
 		}
-		logger.Debugf(ctx, "connected to %s", addr)
+		logger.Debugf(ctx, "connected to %s (%s)", addr, name)
 		return nil
 	}, nil)
 
@@ -122,6 +127,7 @@ func connect(ctx context.Context, resolver Resolver, config *ssh.ClientConfig, b
 
 	c := Conn{
 		shuttingDown: make(chan struct{}),
+		name:         name,
 	}
 	c.mu.client = client
 	return &c, nil
@@ -245,19 +251,27 @@ func (c *Conn) newSession(ctx context.Context, stdout io.Writer, stderr io.Write
 	}
 }
 
+func (c *Conn) getSessionId() string {
+	c.sessionLock.Lock()
+	defer c.sessionLock.Unlock()
+	c.numSessions++
+	return strconv.Itoa(c.numSessions - 1)
+}
+
 // Start a command on the remote device and write STDOUT and STDERR to the
 // passed in io.Writers.
 func (c *Conn) Start(ctx context.Context, command []string, stdout io.Writer, stderr io.Writer) (*Session, error) {
+	sessionId := c.getSessionId()
 	session, err := c.newSession(ctx, stdout, stderr)
 	if err != nil {
 		return nil, err
 	}
 
-	logger.Debugf(ctx, "starting over ssh: %s", command)
+	logger.Debugf(ctx, "starting over ssh: %s (%s/%s)", command, c.name, sessionId)
 
 	if err := session.Start(ctx, command); err != nil {
 		if err := session.Close(); err != nil {
-			logger.Debugf(ctx, "Error closing ssh session: %s", err)
+			logger.Debugf(ctx, "Error closing ssh session: %s (%s/%s)", err, c.name, sessionId)
 		}
 		return nil, err
 	}
@@ -267,17 +281,18 @@ func (c *Conn) Start(ctx context.Context, command []string, stdout io.Writer, st
 // Run a command to completion on the remote device and write STDOUT and STDERR
 // to the passed in io.Writers.
 func (c *Conn) Run(ctx context.Context, command []string, stdout io.Writer, stderr io.Writer) error {
+	sessionId := c.getSessionId()
 	session, err := c.newSession(ctx, stdout, stderr)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err := session.Close(); err != nil {
-			logger.Debugf(ctx, "Error closing ssh session: %s", err)
+			logger.Debugf(ctx, "Error closing ssh session: %s (%s/%s)", err, c.name, sessionId)
 		}
 	}()
 
-	logger.Debugf(ctx, "running over ssh: %v", command)
+	logger.Debugf(ctx, "running over ssh: %v (%s/%s)", command, c.name, sessionId)
 
 	if err := session.Run(ctx, command); err != nil {
 		if ctx.Err() != nil {
@@ -308,10 +323,10 @@ func (c *Conn) Run(ctx context.Context, command []string, stdout io.Writer, stde
 				}
 			}
 		}
-		logger.Logf(ctx, level, "%s. Full command: %v", log, command)
+		logger.Logf(ctx, level, "%s. Full command: %v (%s/%s)", log, command, c.name, sessionId)
 		return err
 	}
-	logger.Debugf(ctx, "successfully ran over ssh: %v", command)
+	logger.Debugf(ctx, "successfully ran over ssh: %v (%s/%s)", command, c.name, sessionId)
 	return nil
 }
 
@@ -380,7 +395,7 @@ func (c *Conn) keepalive(ctx context.Context, session *ssh.Session, ticks <-chan
 			continue
 		}
 
-		logger.Debugf(ctx, "no activity since last tick %d, sending keepAlive", lastActivity)
+		logger.Debugf(ctx, "no activity since last tick %d, sending keepAlive (%s)", lastActivity, c.name)
 
 		// SendRequest can actually hang if the server stops responding in between
 		// receiving a keepalive and sending a response (see
@@ -399,7 +414,7 @@ func (c *Conn) keepalive(ctx context.Context, session *ssh.Session, ticks <-chan
 		case <-c.shuttingDown:
 			// Ignore the keepalive result if we are shutting down.
 			if err := c.Close(); err != nil {
-				logger.Debugf(ctx, "error disconnecting: %s", err)
+				logger.Debugf(ctx, "error disconnecting: %s (%s)", err, c.name)
 			}
 
 		case err := <-ch:
@@ -413,22 +428,23 @@ func (c *Conn) keepalive(ctx context.Context, session *ssh.Session, ticks <-chan
 				default:
 					logger.Debugf(
 						ctx,
-						"error sending keepalive to %s, disconnecting: %s",
+						"error sending keepalive to %s, disconnecting: %s (%s)",
 						c.mu.client.RemoteAddr(),
 						err,
+						c.name,
 					)
 				}
 				if err := c.Close(); err != nil {
-					logger.Debugf(ctx, "error disconnecting: %s", err)
+					logger.Debugf(ctx, "error disconnecting: %s (%s)", err, c.name)
 				}
 				return
 			}
 
 		case t := <-timeout():
 			timeoutDuration := t.Sub(sendTime)
-			logger.Debugf(ctx, "ssh keepalive timed out after %.3fs, disconnecting", timeoutDuration.Seconds())
+			logger.Debugf(ctx, "ssh keepalive timed out after %.3fs, disconnecting (%s)", timeoutDuration.Seconds(), c.name)
 			if err := c.Close(); err != nil {
-				logger.Debugf(ctx, "error disconnecting: %s", err)
+				logger.Debugf(ctx, "error disconnecting: %s (%s)", err, c.name)
 			}
 			return
 		}

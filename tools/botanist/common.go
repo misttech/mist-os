@@ -68,12 +68,14 @@ func (w *LockedWriter) Close() {
 type LineWriter struct {
 	writer io.Writer
 	line   []byte
+	prefix string
 }
 
 // NewLineWriter returns a new LineWriter.
-func NewLineWriter(writer io.Writer) *LineWriter {
+func NewLineWriter(writer io.Writer, prefix string) *LineWriter {
 	return &LineWriter{
 		writer: writer,
+		prefix: prefix,
 	}
 }
 
@@ -87,8 +89,13 @@ func (w *LineWriter) Write(data []byte) (int, error) {
 	written := 0
 	for _, line := range lines {
 		if bytes.HasSuffix(line, []byte("\n")) {
-			n, err := w.writer.Write(append(w.line, line...))
-			written += int(math.Max(0, float64(n-len(w.line))))
+			toWrite := []byte{}
+			if w.prefix != "" {
+				toWrite = append(toWrite, []byte(w.prefix+": ")...)
+			}
+			toWrite = append(toWrite, w.line...)
+			n, err := w.writer.Write(append(toWrite, line...))
+			written += int(math.Max(0, float64(n-len(toWrite))))
 			if err != nil {
 				return written, err
 			}
@@ -122,9 +129,9 @@ func (w *TimestampWriter) Write(data []byte) (int, error) {
 // NewStiodWriters returns a new LineWriter for the stdout and stderr associated
 // with the provided context. It also returns a function to flush out any
 // remaining data not written by Write because it didn't end with a newline.
-func NewStdioWriters(ctx context.Context) (io.Writer, io.Writer, func()) {
-	stdoutWriter := NewLineWriter(streams.Stdout(ctx))
-	stderrWriter := NewLineWriter(streams.Stderr(ctx))
+func NewStdioWriters(ctx context.Context, id string) (io.Writer, io.Writer, func()) {
+	stdoutWriter := NewLineWriter(streams.Stdout(ctx), id)
+	stderrWriter := NewLineWriter(streams.Stderr(ctx), id)
 	flush := func() {
 		// Flush out the rest of the data stored by the writers.
 		if len(stdoutWriter.line) > 0 {

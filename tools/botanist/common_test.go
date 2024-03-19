@@ -88,8 +88,8 @@ func TestStdioWriters(t *testing.T) {
 	defer cancel()
 	ctx = streams.ContextWithStdout(ctx, NewLockedWriter(ctx, &w))
 
-	stdout1, _, flush1 := NewStdioWriters(ctx)
-	stdout2, _, flush2 := NewStdioWriters(ctx)
+	stdout1, _, flush1 := NewStdioWriters(ctx, "s1")
+	stdout2, _, flush2 := NewStdioWriters(ctx, "s2")
 
 	var wg sync.WaitGroup
 	wg.Add(2)

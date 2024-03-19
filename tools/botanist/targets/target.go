@@ -316,7 +316,7 @@ func (t *genericFuchsiaTarget) SetConnectionTimeout(timeout time.Duration) {
 
 // sshClient is a helper function that returns an SSH client connected to the
 // target, which can be found at the given address.
-func (t *genericFuchsiaTarget) sshClient(addr *net.IPAddr) (*sshutil.Client, error) {
+func (t *genericFuchsiaTarget) sshClient(addr *net.IPAddr, connName string) (*sshutil.Client, error) {
 	if len(t.sshKeys) == 0 {
 		return nil, errors.New("SSHClient() failed; no ssh keys provided")
 	}
@@ -333,7 +333,7 @@ func (t *genericFuchsiaTarget) sshClient(addr *net.IPAddr) (*sshutil.Client, err
 	if t.connectionTimeout != 0 {
 		connectBackoff = retry.WithMaxDuration(retry.NewConstantBackoff(time.Second), t.connectionTimeout)
 	}
-	return sshutil.NewClient(
+	return sshutil.NewNamedClient(
 		t.targetCtx,
 		sshutil.ConstantAddrResolver{
 			Addr: &net.TCPAddr{
@@ -344,6 +344,7 @@ func (t *genericFuchsiaTarget) sshClient(addr *net.IPAddr) (*sshutil.Client, err
 		},
 		config,
 		connectBackoff,
+		connName,
 	)
 }
 
@@ -422,7 +423,7 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 	}
 	defer f.Close()
 
-	syslogWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(f))
+	syslogWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(f), "")
 	errs := syslogger.Stream(t.targetCtx, syslogWriter)
 	for range errs {
 		if !syslogger.IsRunning() {

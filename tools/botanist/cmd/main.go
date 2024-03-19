@@ -54,7 +54,7 @@ func main() {
 
 	ctx = streams.ContextWithStdout(ctx, multiWriter)
 	ctx = streams.ContextWithStderr(ctx, lockedStderr)
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "botanist")
 	defer flush()
 	l := logger.NewLogger(level, color.NewColor(colors), stdout, stderr, "botanist ")
 	// The stdout and stderr writers already add a timestamp to each write so no need

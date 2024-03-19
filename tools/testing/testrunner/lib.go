@@ -456,6 +456,7 @@ func runAndOutputTests(
 	// would need to close the channel when it became empty. That would require
 	// a length check within the loop body anyway, and it's more robust to put
 	// the length check in the for loop condition.
+	testIndex := 0
 	for len(testQueue) > 0 {
 		test := <-testQueue
 
@@ -470,7 +471,7 @@ func runAndOutputTests(
 
 			outDir := filepath.Join(globalOutDir, url.PathEscape(strings.ReplaceAll(test.Name, ":", "")), strconv.Itoa(runIndex))
 			var testErr error
-			result, testErr = runTestOnce(ctx, test.Test, t, outDir)
+			result, testErr = runTestOnce(ctx, test.Test, t, outDir, testIndex)
 			if result == nil {
 				return testErr
 			}
@@ -478,6 +479,7 @@ func runAndOutputTests(
 			if err := outputs.Record(ctx, *result); err != nil {
 				return err
 			}
+			testIndex++
 
 			test.previousRuns++
 			test.totalDuration += result.Duration()
@@ -584,13 +586,14 @@ func runTestOnce(
 	test testsharder.Test,
 	t Tester,
 	outDir string,
+	testIndex int,
 ) (*TestResult, error) {
 	// The test case parser specifically uses stdout, so we need to have a
 	// dedicated stdout buffer.
 	stdoutForParsing := new(bytes.Buffer)
 	stdio := new(stdioBuffer)
 
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx, fmt.Sprintf("test%d", testIndex))
 	defer flush()
 	multistdout := io.MultiWriter(stdout, stdio, stdoutForParsing)
 	multistderr := io.MultiWriter(stderr, stdio)

@@ -223,7 +223,7 @@ func (t *QEMU) SSHClient() (*sshutil.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return t.sshClient(addr)
+	return t.sshClient(addr, "qemu")
 }
 
 // Start starts the QEMU target.
@@ -490,7 +490,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		if err := os.Setenv(constants.SerialLogEnvKey, logfile); err != nil {
 			logger.Debugf(ctx, "failed to set %s to %s", constants.SerialLogEnvKey, logfile)
 		}
-		serialWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(g))
+		serialWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(g), "")
 		go func() {
 			for {
 				if t.targetCtx.Err() != nil {
@@ -588,7 +588,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	}
 
 	cmd.Dir = workdir
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "qemu")
 	if t.ptm != nil {
 		cmd.Stdin = t.ptm
 		cmd.Stdout = io.MultiWriter(t.ptm, stdout)
@@ -686,7 +686,7 @@ func embedZBIWithKey(ctx context.Context, zbiImage *bootserver.Image, zbiTool st
 	}
 	logger.Debugf(ctx, "embedding %s with key %s", zbiImage.Name, authorizedKeysFile)
 	cmd := exec.CommandContext(ctx, absToolPath, "-o", zbiImage.Path, zbiImage.Path, "--entry", fmt.Sprintf("data/ssh/authorized_keys=%s", authorizedKeysFile))
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "zbi")
 	defer flush()
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
@@ -706,7 +706,7 @@ func extendFvmImage(ctx context.Context, fvmImage *bootserver.Image, fvmTool str
 	}
 	logger.Debugf(ctx, "extending fvm.blk to %d bytes", size)
 	cmd := exec.CommandContext(ctx, absToolPath, fvmImage.Path, "extend", "--length", strconv.Itoa(int(size)))
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "fvm")
 	defer flush()
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

@@ -41,6 +41,7 @@ func setUpConn(
 		},
 		server.clientConfig,
 		retry.NoRetries(),
+		"",
 	)
 	if err != nil {
 		t.Fatalf("failed to create conn: %s", err)
@@ -283,6 +284,7 @@ func TestRun(t *testing.T) {
 				},
 				clientConfig,
 				retry.NoRetries(),
+				"",
 			)
 			if client != nil {
 				if err := client.Close(); err != nil {

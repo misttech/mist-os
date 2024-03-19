@@ -168,7 +168,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 	if err != nil {
 		return cleanup, err
 	}
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "ffx")
 	defer flush()
 	ffx.SetStdoutStderr(stdout, stderr)
 	if r.ffxExperimentLevel > 0 {

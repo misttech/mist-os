@@ -213,7 +213,7 @@ func (t *Device) SSHClient() (*sshutil.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return t.sshClient(&net.IPAddr{IP: addr})
+	return t.sshClient(&net.IPAddr{IP: addr}, "device")
 }
 
 func (t *Device) mustLoadThroughZedboot() bool {
@@ -229,7 +229,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 	if err != nil {
 		return fmt.Errorf("cannot listen: %w", err)
 	}
-	stdout, _, flush := botanist.NewStdioWriters(ctx)
+	stdout, _, flush := botanist.NewStdioWriters(ctx, "device")
 	defer flush()
 	go func() {
 		defer l.Close()
@@ -443,7 +443,7 @@ func (t *Device) bootZedboot(ctx context.Context, images []bootserver.Image) err
 		return err
 	}
 	cmd := exec.CommandContext(ctx, fastboot.Path, "-s", t.config.FastbootSernum, "boot", combinedZBIVBMeta)
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "fastboot")
 	defer flush()
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

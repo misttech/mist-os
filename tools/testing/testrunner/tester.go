@@ -1025,7 +1025,7 @@ func (t *FFXTester) RunSnapshot(ctx context.Context, snapshotFile string) error 
 	return err
 }
 
-func sshToTarget(ctx context.Context, addr net.IPAddr, sshKeyFile string) (*sshutil.Client, error) {
+func sshToTarget(ctx context.Context, addr net.IPAddr, sshKeyFile, connName string) (*sshutil.Client, error) {
 	key, err := os.ReadFile(sshKeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read SSH key file: %w", err)
@@ -1035,7 +1035,7 @@ func sshToTarget(ctx context.Context, addr net.IPAddr, sshKeyFile string) (*sshu
 		return nil, fmt.Errorf("failed to create an SSH client config: %w", err)
 	}
 
-	return sshutil.NewClient(
+	return sshutil.NewNamedClient(
 		ctx,
 		sshutil.ConstantAddrResolver{
 			Addr: &net.TCPAddr{
@@ -1046,6 +1046,7 @@ func sshToTarget(ctx context.Context, addr net.IPAddr, sshKeyFile string) (*sshu
 		},
 		config,
 		sshutil.DefaultConnectBackoff(),
+		connName,
 	)
 }
 
@@ -1063,7 +1064,7 @@ type FuchsiaSSHTester struct {
 // instance of the given nodename and the private key paired with an authorized
 // one.
 func NewFuchsiaSSHTester(ctx context.Context, addr net.IPAddr, sshKeyFile, localOutputDir, serialSocketPath string) (Tester, error) {
-	client, err := sshToTarget(ctx, addr, sshKeyFile)
+	client, err := sshToTarget(ctx, addr, sshKeyFile, "test")
 	if err != nil {
 		return nil, fmt.Errorf("failed to establish an SSH connection: %w", err)
 	}

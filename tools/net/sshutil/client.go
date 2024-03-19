@@ -38,7 +38,19 @@ func NewClient(
 	config *ssh.ClientConfig,
 	connectBackoff retry.Backoff,
 ) (*Client, error) {
-	conn, err := newConn(ctx, resolver, config, connectBackoff)
+	return NewNamedClient(ctx, resolver, config, connectBackoff, "")
+}
+
+// NewNamedClient creates a new ssh client to the address with the provided
+// name.
+func NewNamedClient(
+	ctx context.Context,
+	resolver Resolver,
+	config *ssh.ClientConfig,
+	connectBackoff retry.Backoff,
+	name string,
+) (*Client, error) {
+	conn, err := newConn(ctx, resolver, config, connectBackoff, name)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +94,7 @@ func (c *Client) ReconnectWithBackoff(ctx context.Context, backoff retry.Backoff
 	// Disconnect if we are connected.
 	c.Close()
 
-	conn, err := newConn(ctx, c.resolver, c.config, backoff)
+	conn, err := newConn(ctx, c.resolver, c.config, backoff, c.conn.name)
 	if err != nil {
 		return err
 	}

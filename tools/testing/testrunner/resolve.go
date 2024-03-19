@@ -19,7 +19,7 @@ import (
 
 // ResolveTestPackages resolves all test packages serially used by the given slice of tests.
 func ResolveTestPackages(ctx context.Context, tests []testsharder.Test, addr net.IPAddr, sshKeyFile, resolveLog string) error {
-	client, err := sshToTarget(ctx, addr, sshKeyFile)
+	client, err := sshToTarget(ctx, addr, sshKeyFile, "resolve")
 	if err != nil {
 		return fmt.Errorf("failed to establish an SSH connection: %w", err)
 	}
