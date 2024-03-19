@@ -5,29 +5,24 @@
 use {
     anyhow::{anyhow, Context as _, Error},
     async_trait::async_trait,
-    epoch::EpochFile,
     fidl::endpoints::ProtocolMarker as _,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_mem::Buffer,
-    fidl_fuchsia_paver::{Asset, DataSinkProxy},
-    fidl_fuchsia_pkg::{
-        PackageCacheProxy, PackageResolverProxy, RetainedPackagesMarker, RetainedPackagesProxy,
-    },
-    fidl_fuchsia_space::ManagerProxy as SpaceManagerProxy,
-    fidl_fuchsia_update_installer_ext::{
-        FetchFailureReason, Options, PrepareFailureReason, StageFailureReason, State, UpdateInfo,
-    },
-    fuchsia_async::{Task, TimeoutExt as _},
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver,
+    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,
+    fidl_fuchsia_update_installer_ext as fupdate_installer_ext,
+    fuchsia_async::TimeoutExt as _,
     fuchsia_hash::Hash,
     fuchsia_sync::Mutex,
     fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl, PinnedAbsolutePackageUrl},
-    futures::{channel::oneshot, prelude::*, stream::FusedStream},
+    futures::{
+        channel::oneshot,
+        future::FutureExt as _,
+        stream::{FusedStream, TryStreamExt as _},
+        Future,
+    },
     include_str_from_working_dir::include_str_from_working_dir_env,
-    sha2::{Digest, Sha256},
+    sha2::Digest as _,
     std::{collections::HashSet, pin::Pin, sync::Arc, time::Duration},
-    thiserror::Error,
-    tracing::{error, info},
-    update_package::{Image, ImagePackagesSlots, UpdateImagePackage, UpdateMode, UpdatePackage},
+    tracing::{error, info, warn},
 };
 
 mod config;
@@ -62,7 +57,7 @@ const COBALT_FLUSH_TIMEOUT: Duration = Duration::from_secs(30);
 const SOURCE_EPOCH_RAW: &str = include_str_from_working_dir_env!("EPOCH_PATH");
 
 /// Error encountered in the Prepare state.
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 enum PrepareError {
     #[error("while determining source epoch: '{0:?}'")]
     ParseSourceEpochError(String, #[source] serde_json::Error),
@@ -116,20 +111,22 @@ enum PrepareError {
 }
 
 impl PrepareError {
-    fn reason(&self) -> PrepareFailureReason {
+    fn reason(&self) -> fupdate_installer_ext::PrepareFailureReason {
         match self {
             Self::ResolveUpdate(ResolveError::Error(
                 fidl_fuchsia_pkg_ext::ResolveError::NoSpace,
                 _,
-            )) => PrepareFailureReason::OutOfSpace,
-            Self::UnsupportedDowngrade { .. } => PrepareFailureReason::UnsupportedDowngrade,
-            _ => PrepareFailureReason::Internal,
+            )) => fupdate_installer_ext::PrepareFailureReason::OutOfSpace,
+            Self::UnsupportedDowngrade { .. } => {
+                fupdate_installer_ext::PrepareFailureReason::UnsupportedDowngrade
+            }
+            _ => fupdate_installer_ext::PrepareFailureReason::Internal,
         }
     }
 }
 
 /// Error encountered in the Stage state.
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 enum StageError {
     #[error("while attempting to open the image")]
     OpenImageError(#[source] update_package::OpenImageError),
@@ -145,18 +142,18 @@ enum StageError {
 }
 
 impl StageError {
-    fn reason(&self) -> StageFailureReason {
+    fn reason(&self) -> fupdate_installer_ext::StageFailureReason {
         match self {
             Self::Resolve(ResolveError::Error(fidl_fuchsia_pkg_ext::ResolveError::NoSpace, _)) => {
-                StageFailureReason::OutOfSpace
+                fupdate_installer_ext::StageFailureReason::OutOfSpace
             }
-            _ => StageFailureReason::Internal,
+            _ => fupdate_installer_ext::StageFailureReason::Internal,
         }
     }
 }
 
 /// Error encountered in the Fetch state.
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 enum FetchError {
     #[error("while resolving a package")]
     Resolve(#[source] ResolveError),
@@ -166,18 +163,18 @@ enum FetchError {
 }
 
 impl FetchError {
-    fn reason(&self) -> FetchFailureReason {
+    fn reason(&self) -> fupdate_installer_ext::FetchFailureReason {
         match self {
             Self::Resolve(ResolveError::Error(fidl_fuchsia_pkg_ext::ResolveError::NoSpace, _)) => {
-                FetchFailureReason::OutOfSpace
+                fupdate_installer_ext::FetchFailureReason::OutOfSpace
             }
-            _ => FetchFailureReason::Internal,
+            _ => fupdate_installer_ext::FetchFailureReason::Internal,
         }
     }
 }
 
 /// Error encountered during an update attempt.
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 enum AttemptError {
     #[error("during prepare state")]
     Prepare(#[from] PrepareError),
@@ -211,7 +208,7 @@ pub enum CommitAction {
 /// A trait to update the system in the given `Environment` using the provided config options.
 #[async_trait(?Send)]
 pub trait Updater {
-    type UpdateStream: FusedStream<Item = State>;
+    type UpdateStream: FusedStream<Item = fupdate_installer_ext::State>;
 
     async fn update(
         &mut self,
@@ -238,7 +235,7 @@ impl RealUpdater {
 
 #[async_trait(?Send)]
 impl Updater for RealUpdater {
-    type UpdateStream = Pin<Box<dyn FusedStream<Item = State>>>;
+    type UpdateStream = Pin<Box<dyn FusedStream<Item = fupdate_installer_ext::State>>>;
 
     async fn update(
         &mut self,
@@ -276,9 +273,9 @@ async fn update(
     reboot_controller: RebootController,
     concurrent_package_resolves: usize,
     mut cancel_receiver: oneshot::Receiver<()>,
-) -> (String, impl FusedStream<Item = State>) {
+) -> (String, impl FusedStream<Item = fupdate_installer_ext::State>) {
     let attempt_fut = history.lock().start_update_attempt(
-        Options {
+        fupdate_installer_ext::Options {
             initiator: config.initiator.into(),
             allow_attach_to_existing_attempt: config.allow_attach_to_existing_attempt,
             should_write_recovery: config.should_write_recovery,
@@ -304,7 +301,7 @@ async fn update(
 
         let mut phase = metrics::Phase::Tufupdate;
         let (mut cobalt, cobalt_forwarder_task) = env.cobalt_connector.connect();
-        let cobalt_forwarder_task = Task::spawn(cobalt_forwarder_task);
+        let cobalt_forwarder_task = fuchsia_async::Task::spawn(cobalt_forwarder_task);
 
         info!(?config, "starting system update");
         cobalt.log_ota_start(config.initiator, config.start_time);
@@ -334,7 +331,7 @@ async fn update(
         };
 
         if let Err(AttemptError::UpdateCanceled) = attempt_res.as_ref() {
-            co.yield_(State::Canceled).await;
+            co.yield_(fupdate_installer_ext::State::Canceled).await;
         }
 
         info!("system update attempt completed, logging metrics");
@@ -370,11 +367,11 @@ async fn update(
         match mode {
             // First priority: Always reboot on ForceRecovery success, even if the caller
             // asked to defer the reboot.
-            UpdateMode::ForceRecovery => {
+            update_package::UpdateMode::ForceRecovery => {
                 info!("system update in ForceRecovery mode complete, rebooting...");
             }
             // Second priority: Use the attached reboot controller.
-            UpdateMode::Normal => {
+            update_package::UpdateMode::Normal => {
                 info!("system update complete, waiting for initiator to signal reboot.");
                 match reboot_controller.wait_to_reboot().await {
                     CommitAction::Reboot => {
@@ -392,20 +389,22 @@ async fn update(
         state.enter_reboot(&mut co).await;
         target_version
     })
-    .when_done(move |last_state: Option<State>, target_version| async move {
-        let last_state = last_state.unwrap_or(State::Prepare);
+    .when_done(
+        move |last_state: Option<fupdate_installer_ext::State>, target_version| async move {
+            let last_state = last_state.unwrap_or(fupdate_installer_ext::State::Prepare);
 
-        let should_reboot = matches!(last_state, State::Reboot { .. });
+            let should_reboot = matches!(last_state, fupdate_installer_ext::State::Reboot { .. });
 
-        let attempt = attempt.finish(target_version, last_state);
-        history.lock().record_update_attempt(attempt);
-        let save_fut = history.lock().save();
-        save_fut.await;
+            let attempt = attempt.finish(target_version, last_state);
+            history.lock().record_update_attempt(attempt);
+            let save_fut = history.lock().save();
+            save_fut.await;
 
-        if should_reboot {
-            reboot::reboot(&power_state_control).await;
-        }
-    });
+            if should_reboot {
+                reboot::reboot(&power_state_control).await;
+            }
+        },
+    );
     (attempt_id, stream)
 }
 
@@ -440,7 +439,6 @@ impl ImagesToWrite {
     fn get_url_hashes(&self) -> HashSet<fuchsia_hash::Hash> {
         let mut hashes = HashSet::new();
         hashes.extend(&mut self.fuchsia.get_url_hashes().iter());
-
         hashes.extend(&mut self.recovery.get_url_hashes().iter());
 
         for firmware_hash in self.firmware.iter().filter_map(|(_, url)| url.package_url().hash()) {
@@ -484,9 +482,9 @@ impl ImagesToWrite {
 
     async fn write(
         &self,
-        pkg_resolver: &PackageResolverProxy,
+        pkg_resolver: &fpkg::PackageResolverProxy,
         desired_config: paver::NonCurrentConfiguration,
-        data_sink: &DataSinkProxy,
+        data_sink: &fpaver::DataSinkProxy,
         concurrent_package_resolves: usize,
     ) -> Result<(), StageError> {
         let package_urls = self.get_urls();
@@ -503,7 +501,7 @@ impl ImagesToWrite {
             let package_url = absolute_component_url.package_url();
             let resource = absolute_component_url.resource();
             let proxy = &url_directory_map[package_url];
-            let image = Image::Firmware { type_: filename.into() };
+            let image = update_package::Image::Firmware { type_: filename.into() };
             write_image(proxy, resource, &image, data_sink, desired_config).await?;
         }
 
@@ -511,14 +509,14 @@ impl ImagesToWrite {
             let package_url = zbi.package_url();
             let resource = zbi.resource();
             let proxy = &url_directory_map[package_url];
-            let image = Image::Zbi;
+            let image = update_package::Image::Zbi;
             write_image(proxy, resource, &image, data_sink, desired_config).await?;
         }
 
         if let Some(vbmeta) = &self.fuchsia.vbmeta {
             let package_url = vbmeta.package_url();
             let proxy = &url_directory_map[package_url];
-            let image = Image::FuchsiaVbmeta;
+            let image = update_package::Image::FuchsiaVbmeta;
             let resource = vbmeta.resource();
             write_image(proxy, resource, &image, data_sink, desired_config).await?;
         }
@@ -526,7 +524,7 @@ impl ImagesToWrite {
         if let Some(zbi) = &self.recovery.zbi {
             let package_url = zbi.package_url();
             let proxy = &url_directory_map[package_url];
-            let image = Image::Recovery;
+            let image = update_package::Image::Recovery;
             let resource = zbi.resource();
             write_image(proxy, resource, &image, data_sink, desired_config).await?;
         }
@@ -534,7 +532,7 @@ impl ImagesToWrite {
         if let Some(vbmeta) = &self.recovery.vbmeta {
             let package_url = vbmeta.package_url();
             let proxy = &url_directory_map[package_url];
-            let image = Image::RecoveryVbmeta;
+            let image = update_package::Image::RecoveryVbmeta;
             let resource = vbmeta.resource();
             write_image(proxy, resource, &image, data_sink, desired_config).await?;
         }
@@ -620,10 +618,13 @@ impl<'a> Attempt<'a> {
     // early return point.
     async fn run(
         mut self,
-        co: &mut async_generator::Yield<State>,
+        co: &mut async_generator::Yield<fupdate_installer_ext::State>,
         phase: &mut metrics::Phase,
         target_version: &mut history::Version,
-    ) -> Result<(state::WaitToReboot, UpdateMode, Vec<fio::DirectoryProxy>), AttemptError> {
+    ) -> Result<
+        (state::WaitToReboot, update_package::UpdateMode, Vec<fio::DirectoryProxy>),
+        AttemptError,
+    > {
         // Prepare
         let state = state::Prepare::enter(co).await;
 
@@ -646,7 +647,7 @@ impl<'a> Attempt<'a> {
         let mut state = state
             .enter_stage(
                 co,
-                UpdateInfo::builder().download_size(0).build(),
+                fupdate_installer_ext::UpdateInfo::builder().download_size(0).build(),
                 packages_to_fetch.len() as u64 + 1,
             )
             .await;
@@ -713,8 +714,8 @@ impl<'a> Attempt<'a> {
         target_version: &mut history::Version,
     ) -> Result<
         (
-            (UpdatePackage, Option<Hash>),
-            UpdateMode,
+            (update_package::UpdatePackage, Option<Hash>),
+            update_package::UpdateMode,
             Vec<PinnedAbsolutePackageUrl>,
             ImagesToWrite,
             paver::CurrentConfiguration,
@@ -773,8 +774,8 @@ impl<'a> Attempt<'a> {
 
         let mode = update_mode(&update_pkg).await.map_err(PrepareError::ParseUpdateMode)?;
         match mode {
-            UpdateMode::Normal => {}
-            UpdateMode::ForceRecovery => {
+            update_package::UpdateMode::Normal => {}
+            update_package::UpdateMode::ForceRecovery => {
                 if !self.config.should_write_recovery {
                     return Err(PrepareError::VerifyUpdateMode);
                 }
@@ -784,15 +785,15 @@ impl<'a> Attempt<'a> {
         verify_board(&self.env.build_info, &update_pkg).await.map_err(PrepareError::VerifyBoard)?;
 
         let packages_to_fetch = match mode {
-            UpdateMode::Normal => {
+            update_package::UpdateMode::Normal => {
                 update_pkg.packages().await.map_err(PrepareError::ParsePackages)?
             }
-            UpdateMode::ForceRecovery => vec![],
+            update_package::UpdateMode::ForceRecovery => vec![],
         };
 
         let () = validate_epoch(SOURCE_EPOCH_RAW, &update_pkg).await?;
 
-        let manifest = ImagePackagesSlots::from(
+        let manifest = update_package::ImagePackagesSlots::from(
             update_pkg.image_packages().await.map_err(PrepareError::ParseImages)?,
         );
         let () = manifest.verify(mode).map_err(PrepareError::VerifyImages)?;
@@ -807,8 +808,8 @@ impl<'a> Attempt<'a> {
                 fuchsia.zbi(),
                 current_config,
                 &self.env.data_sink,
-                Asset::Kernel,
-                &Image::Zbi,
+                fpaver::Asset::Kernel,
+                &update_package::Image::Zbi,
             )
             .await
             {
@@ -831,8 +832,8 @@ impl<'a> Attempt<'a> {
                     vbmeta_image,
                     current_config,
                     &self.env.data_sink,
-                    Asset::VerifiedBootMetadata,
-                    &Image::FuchsiaVbmeta,
+                    fpaver::Asset::VerifiedBootMetadata,
+                    &update_package::Image::FuchsiaVbmeta,
                 )
                 .await
                 {
@@ -852,7 +853,9 @@ impl<'a> Attempt<'a> {
         // Only check these images if we have to.
         if self.config.should_write_recovery {
             if let Some(recovery) = manifest.recovery() {
-                match recovery_to_write(recovery.zbi(), &self.env.data_sink, Asset::Kernel).await {
+                match recovery_to_write(recovery.zbi(), &self.env.data_sink, fpaver::Asset::Kernel)
+                    .await
+                {
                     Ok(url) => images_to_write.recovery.set_zbi(url),
                     Err(e) => {
                         error!(
@@ -870,7 +873,7 @@ impl<'a> Attempt<'a> {
                     match recovery_to_write(
                         vbmeta_image,
                         &self.env.data_sink,
-                        Asset::VerifiedBootMetadata,
+                        fpaver::Asset::VerifiedBootMetadata,
                     )
                     .await
                     {
@@ -894,7 +897,7 @@ impl<'a> Attempt<'a> {
                 imagemetadata,
                 current_config,
                 &self.env.data_sink,
-                &Image::Firmware { type_: filename.into() },
+                &update_package::Image::Firmware { type_: filename.into() },
             )
             .await
             {
@@ -925,9 +928,9 @@ impl<'a> Attempt<'a> {
     /// Pave the various raw images (zbi, firmware, vbmeta) for fuchsia and/or recovery.
     async fn stage_images(
         &mut self,
-        co: &mut async_generator::Yield<State>,
+        co: &mut async_generator::Yield<fupdate_installer_ext::State>,
         state: &mut state::Stage,
-        update_pkg: &(UpdatePackage, Option<Hash>),
+        update_pkg: &(update_package::UpdatePackage, Option<Hash>),
         current_configuration: paver::CurrentConfiguration,
         images_to_write: ImagesToWrite,
         packages_to_fetch: &[PinnedAbsolutePackageUrl],
@@ -998,10 +1001,10 @@ impl<'a> Attempt<'a> {
     /// Fetch all packages needed by the target OS.
     async fn fetch_packages(
         &mut self,
-        co: &mut async_generator::Yield<State>,
+        co: &mut async_generator::Yield<fupdate_installer_ext::State>,
         state: &mut state::Fetch,
         packages_to_fetch: Vec<PinnedAbsolutePackageUrl>,
-        mode: UpdateMode,
+        mode: update_package::UpdateMode,
         update_pkg: Option<Hash>,
     ) -> Result<Vec<fio::DirectoryProxy>, FetchError> {
         // Remove ImagesToWrite from the retained_index.
@@ -1041,10 +1044,10 @@ impl<'a> Attempt<'a> {
         }
 
         match mode {
-            UpdateMode::Normal => {
+            update_package::UpdateMode::Normal => {
                 sync_package_cache(&self.env.pkg_cache).await.map_err(FetchError::Sync)?
             }
-            UpdateMode::ForceRecovery => {}
+            update_package::UpdateMode::ForceRecovery => {}
         }
 
         Ok(packages)
@@ -1053,17 +1056,17 @@ impl<'a> Attempt<'a> {
     /// Configure the non-current configuration (or recovery) as active for the next boot.
     async fn commit_images(
         &self,
-        mode: UpdateMode,
+        mode: update_package::UpdateMode,
         current_configuration: paver::CurrentConfiguration,
     ) -> Result<(), Error> {
         let desired_config = current_configuration.to_non_current_configuration();
 
         match mode {
-            UpdateMode::Normal => {
+            update_package::UpdateMode::Normal => {
                 let () =
                     paver::set_configuration_active(&self.env.boot_manager, desired_config).await?;
             }
-            UpdateMode::ForceRecovery => {
+            update_package::UpdateMode::ForceRecovery => {
                 let () = paver::set_recovery_configuration_active(&self.env.boot_manager).await?;
             }
         }
@@ -1080,10 +1083,10 @@ impl<'a> Attempt<'a> {
 }
 
 async fn write_image(
-    proxy: &UpdateImagePackage,
+    proxy: &update_package::UpdateImagePackage,
     path: &str,
-    image: &Image,
-    data_sink: &DataSinkProxy,
+    image: &update_package::Image,
+    data_sink: &fpaver::DataSinkProxy,
     desired_config: paver::NonCurrentConfiguration,
 ) -> Result<(), StageError> {
     let buffer = proxy.open_image(path).await.map_err(StageError::OpenImageError)?;
@@ -1102,12 +1105,12 @@ async fn firmware_to_write(
     filename: &str,
     image_metadata: &update_package::ImageMetadata,
     current_config: paver::CurrentConfiguration,
-    data_sink: &DataSinkProxy,
-    image: &Image,
+    data_sink: &fpaver::DataSinkProxy,
+    image: &update_package::Image,
 ) -> Result<Option<AbsoluteComponentUrl>, PrepareError> {
     let desired_config = current_config.to_non_current_configuration();
     if let Some(non_current_config) = desired_config.to_configuration() {
-        if (does_firmware_match_hash_and_size(
+        if (get_firmware_buffer_if_hash_and_size_match(
             data_sink,
             non_current_config,
             filename,
@@ -1120,7 +1123,7 @@ async fn firmware_to_write(
         }
 
         if let Some(current_config) = current_config.to_configuration() {
-            if let Some(buffer) = does_firmware_match_hash_and_size(
+            if let Some(buffer) = get_firmware_buffer_if_hash_and_size_match(
                 data_sink,
                 current_config,
                 filename,
@@ -1146,23 +1149,32 @@ async fn firmware_to_write(
 async fn asset_to_write(
     image_metadata: &update_package::ImageMetadata,
     current_config: paver::CurrentConfiguration,
-    data_sink: &DataSinkProxy,
-    asset: Asset,
-    image: &Image,
+    data_sink: &fpaver::DataSinkProxy,
+    asset: fpaver::Asset,
+    image: &update_package::Image,
 ) -> Result<Option<AbsoluteComponentUrl>, PrepareError> {
     let desired_config = current_config.to_non_current_configuration();
     if let Some(non_current_config) = desired_config.to_configuration() {
-        if (does_asset_match_hash_and_size(data_sink, non_current_config, asset, image_metadata)
-            .await?)
+        if (get_asset_buffer_if_hash_and_size_match(
+            data_sink,
+            non_current_config,
+            asset,
+            image_metadata,
+        )
+        .await?)
             .is_some()
         {
             return Ok(None);
         }
 
         if let Some(current_config) = current_config.to_configuration() {
-            if let Some(buffer) =
-                does_asset_match_hash_and_size(data_sink, current_config, asset, image_metadata)
-                    .await?
+            if let Some(buffer) = get_asset_buffer_if_hash_and_size_match(
+                data_sink,
+                current_config,
+                asset,
+                image_metadata,
+            )
+            .await?
             {
                 paver::write_image_buffer(data_sink, buffer, image, desired_config)
                     .await
@@ -1181,12 +1193,12 @@ async fn asset_to_write(
 /// Ok(Some(url)) indicates that the asset in the update differs from what is on the device.
 async fn recovery_to_write(
     image_metadata: &update_package::ImageMetadata,
-    data_sink: &DataSinkProxy,
-    asset: Asset,
+    data_sink: &fpaver::DataSinkProxy,
+    asset: fpaver::Asset,
 ) -> Result<Option<AbsoluteComponentUrl>, PrepareError> {
-    if (does_asset_match_hash_and_size(
+    if (get_asset_buffer_if_hash_and_size_match(
         data_sink,
-        fidl_fuchsia_paver::Configuration::Recovery,
+        fpaver::Configuration::Recovery,
         asset,
         image_metadata,
     )
@@ -1198,28 +1210,36 @@ async fn recovery_to_write(
     return Ok(Some(image_metadata.url().to_owned()));
 }
 
-async fn does_firmware_match_hash_and_size(
-    data_sink: &DataSinkProxy,
-    desired_configuration: fidl_fuchsia_paver::Configuration,
+async fn get_firmware_buffer_if_hash_and_size_match(
+    data_sink: &fpaver::DataSinkProxy,
+    desired_configuration: fpaver::Configuration,
     subtype: &str,
     image: &update_package::ImageMetadata,
-) -> Result<Option<Buffer>, PrepareError> {
-    if let Ok(buffer) = paver::paver_read_firmware(data_sink, desired_configuration, subtype).await
-    {
-        let calculated_hash = calculate_hash(&buffer, image.size() as usize)?;
-        if calculated_hash == image.hash() {
-            return Ok(Some(buffer));
+) -> Result<Option<fmem::Buffer>, PrepareError> {
+    let buffer = match paver::paver_read_firmware(data_sink, desired_configuration, subtype).await {
+        Ok(buffer) => buffer,
+        Err(e) => {
+            warn!(
+                ?desired_configuration, ?image, %subtype,
+                "Error reading firmware, assuming it needs to be written: {:#}",
+                anyhow!(e)
+            );
+            return Ok(None);
         }
+    };
+    if calculate_hash(&buffer, image.size() as usize)? == image.hash() {
+        Ok(Some(buffer))
+    } else {
+        Ok(None)
     }
-    Ok(None)
 }
 
-async fn does_asset_match_hash_and_size(
-    data_sink: &DataSinkProxy,
-    configuration: fidl_fuchsia_paver::Configuration,
-    asset: Asset,
+async fn get_asset_buffer_if_hash_and_size_match(
+    data_sink: &fpaver::DataSinkProxy,
+    configuration: fpaver::Configuration,
+    asset: fpaver::Asset,
     image: &update_package::ImageMetadata,
-) -> Result<Option<Buffer>, PrepareError> {
+) -> Result<Option<fmem::Buffer>, PrepareError> {
     let buffer = paver::paver_read_asset(data_sink, configuration, asset)
         .await
         .map_err(PrepareError::PaverRead)?;
@@ -1231,8 +1251,8 @@ async fn does_asset_match_hash_and_size(
 }
 
 #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/42069090)
-fn calculate_hash(buffer: &Buffer, mut remaining: usize) -> Result<Hash, PrepareError> {
-    let mut hasher = Sha256::new();
+fn calculate_hash(buffer: &fmem::Buffer, mut remaining: usize) -> Result<Hash, PrepareError> {
+    let mut hasher = sha2::Sha256::new();
     let mut offset = 0;
 
     while remaining > 0 {
@@ -1250,7 +1270,7 @@ fn calculate_hash(buffer: &Buffer, mut remaining: usize) -> Result<Hash, Prepare
     Ok(Hash::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize())))
 }
 
-async fn sync_package_cache(pkg_cache: &PackageCacheProxy) -> Result<(), Error> {
+async fn sync_package_cache(pkg_cache: &fpkg::PackageCacheProxy) -> Result<(), Error> {
     async move {
         pkg_cache
             .sync()
@@ -1263,7 +1283,7 @@ async fn sync_package_cache(pkg_cache: &PackageCacheProxy) -> Result<(), Error> 
     .context("while flushing packages to persistent storage")
 }
 
-async fn gc(space_manager: &SpaceManagerProxy) -> Result<(), Error> {
+async fn gc(space_manager: &fspace::ManagerProxy) -> Result<(), Error> {
     let () = space_manager
         .gc()
         .await
@@ -1276,12 +1296,12 @@ async fn gc(space_manager: &SpaceManagerProxy) -> Result<(), Error> {
 // incorporating an increasingly aggressive GC and retry strategy.
 async fn write_image_packages(
     images_to_write: ImagesToWrite,
-    pkg_resolver: &PackageResolverProxy,
+    pkg_resolver: &fpkg::PackageResolverProxy,
     desired_config: paver::NonCurrentConfiguration,
-    data_sink: &DataSinkProxy,
+    data_sink: &fpaver::DataSinkProxy,
     update_pkg: Option<Hash>,
-    retained_packages: &RetainedPackagesProxy,
-    space_manager: &SpaceManagerProxy,
+    retained_packages: &fpkg::RetainedPackagesProxy,
+    space_manager: &fspace::ManagerProxy,
     concurrent_package_resolves: usize,
 ) -> Result<(), StageError> {
     match images_to_write
@@ -1318,11 +1338,11 @@ async fn write_image_packages(
 
 /// Resolve the update package, incorporating an increasingly aggressive GC and retry strategy.
 async fn resolve_update_package(
-    pkg_resolver: &PackageResolverProxy,
+    pkg_resolver: &fpkg::PackageResolverProxy,
     update_url: &AbsolutePackageUrl,
-    space_manager: &SpaceManagerProxy,
-    retained_packages: &RetainedPackagesProxy,
-) -> Result<UpdatePackage, ResolveError> {
+    space_manager: &fspace::ManagerProxy,
+    retained_packages: &fpkg::RetainedPackagesProxy,
+) -> Result<update_package::UpdatePackage, ResolveError> {
     // First, attempt to resolve the update package.
     match resolver::resolve_update_package(pkg_resolver, update_url).await {
         Ok(update_pkg) => return Ok(update_pkg),
@@ -1368,7 +1388,7 @@ async fn resolve_update_package(
     resolver::resolve_update_package(pkg_resolver, update_url).await
 }
 
-async fn verify_board<B>(build_info: &B, pkg: &UpdatePackage) -> Result<(), Error>
+async fn verify_board<B>(build_info: &B, pkg: &update_package::UpdatePackage) -> Result<(), Error>
 where
     B: BuildInfo,
 {
@@ -1380,11 +1400,11 @@ where
 }
 
 async fn update_mode(
-    pkg: &UpdatePackage,
-) -> Result<UpdateMode, update_package::ParseUpdateModeError> {
+    pkg: &update_package::UpdatePackage,
+) -> Result<update_package::UpdateMode, update_package::ParseUpdateModeError> {
     pkg.update_mode().await.map(|opt| {
         opt.unwrap_or_else(|| {
-            let mode = UpdateMode::default();
+            let mode = update_package::UpdateMode::default();
             info!("update-mode file not found, using default mode: {:?}", mode);
             mode
         })
@@ -1393,11 +1413,14 @@ async fn update_mode(
 
 /// Verify that epoch is non-decreasing. For more context, see
 /// [RFC-0071](https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0071_ota_backstop).
-async fn validate_epoch(source_epoch_raw: &str, pkg: &UpdatePackage) -> Result<(), PrepareError> {
+async fn validate_epoch(
+    source_epoch_raw: &str,
+    pkg: &update_package::UpdatePackage,
+) -> Result<(), PrepareError> {
     let src = match serde_json::from_str(source_epoch_raw)
         .map_err(|e| PrepareError::ParseSourceEpochError(source_epoch_raw.to_string(), e))?
     {
-        EpochFile::Version1 { epoch } => epoch,
+        epoch::EpochFile::Version1 { epoch } => epoch,
     };
     let target =
         pkg.epoch().await.map_err(PrepareError::ParseTargetEpochError)?.unwrap_or_else(|| {
@@ -1412,7 +1435,7 @@ async fn validate_epoch(source_epoch_raw: &str, pkg: &UpdatePackage) -> Result<(
 
 async fn replace_retained_packages(
     hashes: impl IntoIterator<Item = fuchsia_hash::Hash>,
-    retained_packages: &RetainedPackagesProxy,
+    retained_packages: &fpkg::RetainedPackagesProxy,
 ) -> Result<(), anyhow::Error> {
     let (client_end, stream) =
         fidl::endpoints::create_request_stream().context("creating request stream")?;
@@ -1426,7 +1449,11 @@ async fn replace_retained_packages(
     )
     .await
     .unwrap_or_else(|e| {
-        error!("error serving {} protocol: {:#}", RetainedPackagesMarker::DEBUG_NAME, anyhow!(e))
+        error!(
+            "error serving {} protocol: {:#}",
+            fpkg::RetainedPackagesMarker::DEBUG_NAME,
+            anyhow!(e)
+        )
     });
     replace_resp.await.context("calling RetainedPackages.Replace")
 }
@@ -1506,10 +1533,10 @@ mod tests {
         );
     }
 
-    fn write_mem_buffer(payload: Vec<u8>) -> Buffer {
+    fn write_mem_buffer(payload: Vec<u8>) -> fmem::Buffer {
         let vmo = fuchsia_zircon::Vmo::create(payload.len() as u64).expect("Creating VMO");
         vmo.write(&payload, 0).expect("writing to VMO");
-        Buffer { vmo, size: payload.len() as u64 }
+        fmem::Buffer { vmo, size: payload.len() as u64 }
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -1537,7 +1564,7 @@ mod tests {
     async fn calculate_hash_test_image_smaller_than_buffer() {
         let buffer = write_mem_buffer(vec![0; 4]);
 
-        let mut hasher = Sha256::new();
+        let mut hasher = sha2::Sha256::new();
         let mut chunk = [0; 4096];
         let chunk_len = 2_usize;
         let chunk = &mut chunk[..chunk_len];

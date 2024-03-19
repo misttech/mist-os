@@ -3,47 +3,40 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_mem::Buffer,
-    fidl_fuchsia_paver::{
-        Asset, BootManagerMarker, BootManagerProxy, Configuration, ConfigurationStatus,
-        DataSinkMarker, DataSinkProxy, PaverMarker, WriteFirmwareResult,
-    },
-    fuchsia_zircon::{Status, VmoChildOptions},
-    thiserror::Error,
+    anyhow::{anyhow, Context as _},
+    fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver, fuchsia_zircon as zx,
     tracing::{info, warn},
-    update_package::Image,
 };
 
 mod configuration;
 use configuration::TargetConfiguration;
 pub use configuration::{CurrentConfiguration, NonCurrentConfiguration};
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum WriteAssetError {
     #[error("while performing write_asset call")]
     Fidl(#[from] fidl::Error),
 
     #[error("write_asset responded with")]
-    Status(#[from] Status),
+    Status(#[from] zx::Status),
 }
 
 async fn paver_write_firmware(
-    data_sink: &DataSinkProxy,
-    configuration: Configuration,
+    data_sink: &fpaver::DataSinkProxy,
+    configuration: fpaver::Configuration,
     type_: &str,
-    buffer: Buffer,
-) -> Result<(), Error> {
+    buffer: fmem::Buffer,
+) -> anyhow::Result<()> {
     let res = data_sink
         .write_firmware(configuration, type_, buffer)
         .await
         .context("while performing write_firmware call")?;
 
     match res {
-        WriteFirmwareResult::Status(status) => {
-            Status::ok(status).context("firmware failed to write")?;
+        fpaver::WriteFirmwareResult::Status(status) => {
+            zx::Status::ok(status).context("firmware failed to write")?;
         }
-        WriteFirmwareResult::Unsupported(_) => {
+        fpaver::WriteFirmwareResult::Unsupported(_) => {
             info!("skipping unsupported firmware type: {type_}");
         }
     }
@@ -52,69 +45,66 @@ async fn paver_write_firmware(
 }
 
 pub async fn paver_read_firmware(
-    data_sink: &DataSinkProxy,
-    configuration: Configuration,
+    data_sink: &fpaver::DataSinkProxy,
+    configuration: fpaver::Configuration,
     type_: &str,
-) -> Result<Buffer, Error> {
-    let result = data_sink
+) -> anyhow::Result<fmem::Buffer> {
+    data_sink
         .read_firmware(configuration, type_)
         .await
-        .context("while performing the read_firmware call")?;
-    let buffer = result
-        .map_err(|status| anyhow!("read_firmware responded with {}", Status::from_raw(status)))?;
-    Ok(buffer)
+        .context("DataSink.ReadFirmware FIDL error")?
+        .map_err(|s| anyhow!("DataSink.ReadFirmware error {}", zx::Status::from_raw(s)))
 }
 
 async fn paver_write_asset(
-    data_sink: &DataSinkProxy,
-    configuration: Configuration,
-    asset: Asset,
-    buffer: Buffer,
+    data_sink: &fpaver::DataSinkProxy,
+    configuration: fpaver::Configuration,
+    asset: fpaver::Asset,
+    buffer: fmem::Buffer,
 ) -> Result<(), WriteAssetError> {
-    let status = data_sink.write_asset(configuration, asset, buffer).await?;
-    Status::ok(status)?;
-    Ok(())
+    Ok(zx::Status::ok(data_sink.write_asset(configuration, asset, buffer).await?)?)
 }
 
 pub async fn paver_read_asset(
-    data_sink: &DataSinkProxy,
-    configuration: Configuration,
-    asset: Asset,
-) -> Result<Buffer, Error> {
-    let result = data_sink.read_asset(configuration, asset).await?;
-    let buffer = result
-        .map_err(|status| anyhow!("read_asset responded with {}", Status::from_raw(status)))?;
-    Ok(buffer)
+    data_sink: &fpaver::DataSinkProxy,
+    configuration: fpaver::Configuration,
+    asset: fpaver::Asset,
+) -> anyhow::Result<fmem::Buffer> {
+    data_sink
+        .read_asset(configuration, asset)
+        .await
+        .context("DataSink.ReadAsset FIDL error")?
+        .map_err(|s| anyhow!("DataSink.ReadAsset error {}", zx::Status::from_raw(s)))
 }
 
 #[derive(Debug, PartialEq, Eq)]
 enum ImageTarget<'a> {
     Firmware { type_: &'a str, configuration: TargetConfiguration },
-    Asset { asset: Asset, configuration: TargetConfiguration },
+    Asset { asset: fpaver::Asset, configuration: TargetConfiguration },
 }
 
 fn classify_image(
-    image: &Image,
+    image: &update_package::Image,
     desired_config: NonCurrentConfiguration,
-) -> Result<ImageTarget<'_>, Error> {
+) -> anyhow::Result<ImageTarget<'_>> {
     Ok(match image {
-        Image::Zbi => ImageTarget::Asset {
-            asset: Asset::Kernel,
+        update_package::Image::Zbi => ImageTarget::Asset {
+            asset: fpaver::Asset::Kernel,
             configuration: desired_config.to_target_configuration(),
         },
-        Image::FuchsiaVbmeta => ImageTarget::Asset {
-            asset: Asset::VerifiedBootMetadata,
+        update_package::Image::FuchsiaVbmeta => ImageTarget::Asset {
+            asset: fpaver::Asset::VerifiedBootMetadata,
             configuration: desired_config.to_target_configuration(),
         },
-        Image::Recovery => ImageTarget::Asset {
-            asset: Asset::Kernel,
-            configuration: TargetConfiguration::Single(Configuration::Recovery),
+        update_package::Image::Recovery => ImageTarget::Asset {
+            asset: fpaver::Asset::Kernel,
+            configuration: TargetConfiguration::Single(fpaver::Configuration::Recovery),
         },
-        Image::RecoveryVbmeta => ImageTarget::Asset {
-            asset: Asset::VerifiedBootMetadata,
-            configuration: TargetConfiguration::Single(Configuration::Recovery),
+        update_package::Image::RecoveryVbmeta => ImageTarget::Asset {
+            asset: fpaver::Asset::VerifiedBootMetadata,
+            configuration: TargetConfiguration::Single(fpaver::Configuration::Recovery),
         },
-        Image::Firmware { type_ } => ImageTarget::Firmware {
+        update_package::Image::Firmware { type_ } => ImageTarget::Firmware {
             type_: &type_,
             configuration: desired_config.to_target_configuration(),
         },
@@ -123,14 +113,14 @@ fn classify_image(
 
 struct Payload {
     display_name: String,
-    buffer: Buffer,
+    buffer: fmem::Buffer,
 }
 
 impl Payload {
-    fn clone_buffer(&self) -> Result<Buffer, Status> {
-        Ok(Buffer {
+    fn clone_buffer(&self) -> Result<fmem::Buffer, zx::Status> {
+        Ok(fmem::Buffer {
             vmo: self.buffer.vmo.create_child(
-                VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | VmoChildOptions::RESIZABLE,
+                zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | zx::VmoChildOptions::RESIZABLE,
                 0,
                 self.buffer.size,
             )?,
@@ -142,11 +132,11 @@ impl Payload {
 /// Writes the given image to the configuration/asset location. If configuration is not given, the
 /// image is written to both A and B (if the B partition exists).
 async fn write_asset_to_configurations(
-    data_sink: &DataSinkProxy,
+    data_sink: &fpaver::DataSinkProxy,
     configuration: TargetConfiguration,
-    asset: Asset,
+    asset: fpaver::Asset,
     payload: Payload,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     match configuration {
         TargetConfiguration::Single(configuration) => {
             // Devices supports ABR and/or a specific configuration (ex. Recovery) was requested.
@@ -159,10 +149,12 @@ async fn write_asset_to_configurations(
             // that will eventually support ABR. If the device does not have a B partition yet, log the
             // error and continue.
 
-            paver_write_asset(data_sink, Configuration::A, asset, payload.clone_buffer()?).await?;
+            paver_write_asset(data_sink, fpaver::Configuration::A, asset, payload.clone_buffer()?)
+                .await?;
 
-            let res = paver_write_asset(data_sink, Configuration::B, asset, payload.buffer).await;
-            if let Err(WriteAssetError::Status(Status::NOT_SUPPORTED)) = res {
+            let res =
+                paver_write_asset(data_sink, fpaver::Configuration::B, asset, payload.buffer).await;
+            if let Err(WriteAssetError::Status(zx::Status::NOT_SUPPORTED)) = res {
                 warn!("skipping writing {} to B", payload.display_name);
             } else {
                 res?;
@@ -174,11 +166,11 @@ async fn write_asset_to_configurations(
 }
 
 async fn write_firmware_to_configurations(
-    data_sink: &DataSinkProxy,
+    data_sink: &fpaver::DataSinkProxy,
     configuration: TargetConfiguration,
     type_: &str,
     payload: Payload,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     match configuration {
         TargetConfiguration::Single(configuration) => {
             // Devices supports ABR and/or a specific configuration (ex. Recovery) was requested.
@@ -187,13 +179,19 @@ async fn write_firmware_to_configurations(
         TargetConfiguration::AB => {
             // For device that does not support ABR. There will only be one single
             // partition for that firmware. The configuration parameter should be Configuration::A.
-            paver_write_firmware(data_sink, Configuration::A, type_, payload.clone_buffer()?)
-                .await?;
+            paver_write_firmware(
+                data_sink,
+                fpaver::Configuration::A,
+                type_,
+                payload.clone_buffer()?,
+            )
+            .await?;
             // Similar to asset, we also write Configuration::B to be forwards compatible with
             // devices that will eventually support ABR. For device that does not support A/B, it
             // will log/report WriteFirmwareResult::Unsupported and the paving  will be
             // skipped.
-            paver_write_firmware(data_sink, Configuration::B, type_, payload.buffer).await?;
+            paver_write_firmware(data_sink, fpaver::Configuration::B, type_, payload.buffer)
+                .await?;
         }
     }
 
@@ -201,11 +199,11 @@ async fn write_firmware_to_configurations(
 }
 
 pub async fn write_image_buffer(
-    data_sink: &DataSinkProxy,
-    buffer: Buffer,
-    image: &Image,
+    data_sink: &fpaver::DataSinkProxy,
+    buffer: fmem::Buffer,
+    image: &update_package::Image,
     desired_config: NonCurrentConfiguration,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     let target = classify_image(image, desired_config)?;
     let payload = Payload { display_name: format!("{image:?}"), buffer };
 
@@ -221,14 +219,14 @@ pub async fn write_image_buffer(
     Ok(())
 }
 
-pub fn connect_in_namespace() -> Result<(DataSinkProxy, BootManagerProxy), Error> {
-    let paver = fuchsia_component::client::connect_to_protocol::<PaverMarker>()
+pub fn connect_in_namespace() -> anyhow::Result<(fpaver::DataSinkProxy, fpaver::BootManagerProxy)> {
+    let paver = fuchsia_component::client::connect_to_protocol::<fpaver::PaverMarker>()
         .context("connect to fuchsia.paver.Paver")?;
 
-    let (data_sink, server_end) = fidl::endpoints::create_proxy::<DataSinkMarker>()?;
+    let (data_sink, server_end) = fidl::endpoints::create_proxy::<fpaver::DataSinkMarker>()?;
     let () = paver.find_data_sink(server_end).context("connect to fuchsia.paver.DataSink")?;
 
-    let (boot_manager, server_end) = fidl::endpoints::create_proxy::<BootManagerMarker>()?;
+    let (boot_manager, server_end) = fidl::endpoints::create_proxy::<fpaver::BootManagerMarker>()?;
     let () = paver.find_boot_manager(server_end).context("connect to fuchsia.paver.BootManager")?;
 
     Ok((data_sink, boot_manager))
@@ -237,16 +235,17 @@ pub fn connect_in_namespace() -> Result<(DataSinkProxy, BootManagerProxy), Error
 /// Retrieve the currently-running configuration from the paver service (the configuration the
 /// device booted from) which may be distinct from the 'active' configuration.
 pub async fn query_current_configuration(
-    boot_manager: &BootManagerProxy,
-) -> Result<CurrentConfiguration, Error> {
+    boot_manager: &fpaver::BootManagerProxy,
+) -> anyhow::Result<CurrentConfiguration> {
     match boot_manager.query_current_configuration().await {
-        Ok(Ok(Configuration::A)) => Ok(CurrentConfiguration::A),
-        Ok(Ok(Configuration::B)) => Ok(CurrentConfiguration::B),
-        Ok(Ok(Configuration::Recovery)) => Ok(CurrentConfiguration::Recovery),
-        Ok(Err(status)) => {
-            Err(anyhow!("query_current_configuration responded with {}", Status::from_raw(status)))
-        }
-        Err(fidl::Error::ClientChannelClosed { status: Status::NOT_SUPPORTED, .. }) => {
+        Ok(Ok(fpaver::Configuration::A)) => Ok(CurrentConfiguration::A),
+        Ok(Ok(fpaver::Configuration::B)) => Ok(CurrentConfiguration::B),
+        Ok(Ok(fpaver::Configuration::Recovery)) => Ok(CurrentConfiguration::Recovery),
+        Ok(Err(status)) => Err(anyhow!(
+            "query_current_configuration responded with {}",
+            zx::Status::from_raw(status)
+        )),
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. }) => {
             warn!("device does not support ABR. Kernel image updates will not be atomic.");
             Ok(CurrentConfiguration::NotSupported)
         }
@@ -255,32 +254,33 @@ pub async fn query_current_configuration(
 }
 
 async fn paver_query_configuration_status(
-    boot_manager: &BootManagerProxy,
-    configuration: Configuration,
-) -> Result<ConfigurationStatus, Error> {
+    boot_manager: &fpaver::BootManagerProxy,
+    configuration: fpaver::Configuration,
+) -> anyhow::Result<fpaver::ConfigurationStatus> {
     match boot_manager.query_configuration_status(configuration).await {
         Ok(Ok(configuration_status)) => Ok(configuration_status),
-        Ok(Err(status)) => {
-            Err(anyhow!("query_configuration_status responded with {}", Status::from_raw(status)))
-        }
+        Ok(Err(status)) => Err(anyhow!(
+            "query_configuration_status responded with {}",
+            zx::Status::from_raw(status)
+        )),
         Err(err) => Err(anyhow!(err).context("while performing query_configuration_status call")),
     }
 }
 
 /// Error conditions possibly returned by prepare_partition_metadata.
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum PreparePartitionMetadataError {
     #[error(
         "current configuration ({current_configuration:?}) is not Healthy \
         (status = {current_configuration_status:?}). Refusing to perform update."
     )]
     CurrentConfigurationUnhealthy {
-        current_configuration: Configuration,
-        current_configuration_status: ConfigurationStatus,
+        current_configuration: fpaver::Configuration,
+        current_configuration_status: fpaver::ConfigurationStatus,
     },
 
     #[error(transparent)]
-    Other(#[from] Error),
+    Other(#[from] anyhow::Error),
 }
 
 /// Ensure that the partition boot metadata is in a state where we're ready to write the update.
@@ -302,7 +302,7 @@ pub enum PreparePartitionMetadataError {
 /// don't end in a bricked device when the update continues. Some devices use BootManager's flush to
 /// flush operations, and some don't. This function needs to support both strategies.
 pub async fn prepare_partition_metadata(
-    boot_manager: &BootManagerProxy,
+    boot_manager: &fpaver::BootManagerProxy,
 ) -> Result<CurrentConfiguration, PreparePartitionMetadataError> {
     // ERROR JUSTIFICATION: If we can't get the current configuration, we won't know where to write
     // the update.
@@ -335,7 +335,7 @@ pub async fn prepare_partition_metadata(
         // the non-current configuration will be bootable at this point, because we never mark it
         // `Unbootable` until after `current_config` has been marked `Healthy`). Thus, we refuse to
         // update unless `current_config` has been marked `Healthy`.
-        ConfigurationStatus::Pending | ConfigurationStatus::Unbootable => {
+        fpaver::ConfigurationStatus::Pending | fpaver::ConfigurationStatus::Unbootable => {
             Err(PreparePartitionMetadataError::CurrentConfigurationUnhealthy {
                 current_configuration,
                 current_configuration_status,
@@ -343,7 +343,7 @@ pub async fn prepare_partition_metadata(
         }
         // If the current configuration is Healthy, we mark the non-current configuration as
         // Unbootable.
-        ConfigurationStatus::Healthy => {
+        fpaver::ConfigurationStatus::Healthy => {
             // We need to flush the boot manager regardless, but if that operation succeeded while
             // set_non_current_configuration_unbootable failed, propagate the error.
             //
@@ -373,23 +373,23 @@ pub async fn prepare_partition_metadata(
 /// Sets an arbitrary configuration active. Not pub because it's possible to use this function to set a
 /// current partition or recovery partition active, which is almost certainly not what external users want.
 async fn paver_set_arbitrary_configuration_active(
-    boot_manager: &BootManagerProxy,
-    configuration: Configuration,
-) -> Result<(), Error> {
+    boot_manager: &fpaver::BootManagerProxy,
+    configuration: fpaver::Configuration,
+) -> anyhow::Result<()> {
     let status = boot_manager
         .set_configuration_active(configuration)
         .await
         .context("while performing set_configuration_active call")?;
-    Status::ok(status).context("set_configuration_active responded with")?;
+    zx::Status::ok(status).context("set_configuration_active responded with")?;
     Ok(())
 }
 
 /// Sets the given desired `configuration` as active for subsequent boot attempts. If ABR is not
 /// supported, do nothing.
 pub async fn set_configuration_active(
-    boot_manager: &BootManagerProxy,
+    boot_manager: &fpaver::BootManagerProxy,
     desired_configuration: NonCurrentConfiguration,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     if let Some(configuration) = desired_configuration.to_configuration() {
         return paver_set_arbitrary_configuration_active(boot_manager, configuration).await;
     }
@@ -399,9 +399,9 @@ pub async fn set_configuration_active(
 /// Set a non-current configuration as unbootable. Dangerous! If ABR is not supported, return an
 /// error.
 async fn set_non_current_configuration_unbootable(
-    boot_manager: &BootManagerProxy,
+    boot_manager: &fpaver::BootManagerProxy,
     configuration: NonCurrentConfiguration,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     if let Some(configuration) = configuration.to_configuration() {
         set_arbitrary_configuration_unbootable(boot_manager, configuration).await
     } else {
@@ -411,33 +411,35 @@ async fn set_non_current_configuration_unbootable(
 
 /// Set an arbitrary configuration as unbootable. Extra dangerous!
 async fn set_arbitrary_configuration_unbootable(
-    boot_manager: &BootManagerProxy,
-    configuration: Configuration,
-) -> Result<(), Error> {
+    boot_manager: &fpaver::BootManagerProxy,
+    configuration: fpaver::Configuration,
+) -> anyhow::Result<()> {
     let status = boot_manager
         .set_configuration_unbootable(configuration)
         .await
         .context("while performing set_configuration_unbootable call")?;
-    Status::ok(status).context("set_configuration_unbootable responded with")?;
+    zx::Status::ok(status).context("set_configuration_unbootable responded with")?;
     Ok(())
 }
 
 /// Sets the recovery configuration as the only valid boot option by marking the A and B
 /// configurations unbootable.
 pub async fn set_recovery_configuration_active(
-    boot_manager: &BootManagerProxy,
-) -> Result<(), Error> {
-    let () = set_arbitrary_configuration_unbootable(boot_manager, Configuration::A)
+    boot_manager: &fpaver::BootManagerProxy,
+) -> anyhow::Result<()> {
+    let () = set_arbitrary_configuration_unbootable(boot_manager, fpaver::Configuration::A)
         .await
         .context("while marking Configuration::A unbootable")?;
-    let () = set_arbitrary_configuration_unbootable(boot_manager, Configuration::B)
+    let () = set_arbitrary_configuration_unbootable(boot_manager, fpaver::Configuration::B)
         .await
         .context("while marking Configuration::B unbootable")?;
     Ok(())
 }
 
-pub async fn paver_flush_boot_manager(boot_manager: &BootManagerProxy) -> Result<(), Error> {
-    let () = Status::ok(
+pub async fn paver_flush_boot_manager(
+    boot_manager: &fpaver::BootManagerProxy,
+) -> anyhow::Result<()> {
+    let () = zx::Status::ok(
         boot_manager
             .flush()
             .await
@@ -447,8 +449,8 @@ pub async fn paver_flush_boot_manager(boot_manager: &BootManagerProxy) -> Result
     Ok(())
 }
 
-pub async fn paver_flush_data_sink(data_sink: &DataSinkProxy) -> Result<(), Error> {
-    let () = Status::ok(
+pub async fn paver_flush_data_sink(data_sink: &fpaver::DataSinkProxy) -> anyhow::Result<()> {
+    let () = zx::Status::ok(
         data_sink.flush().await.context("while performing fuchsia.paver.DataSink/Flush call")?,
     )
     .context("fuchsia.paver.DataSink/Flush responded with")?;
@@ -456,7 +458,7 @@ pub async fn paver_flush_data_sink(data_sink: &DataSinkProxy) -> Result<(), Erro
 }
 
 #[cfg(test)]
-fn make_buffer(contents: impl AsRef<[u8]>) -> Buffer {
+fn make_buffer(contents: impl AsRef<[u8]>) -> fmem::Buffer {
     use fuchsia_zircon::{Vmo, VmoOptions};
     let contents = contents.as_ref();
     let size = contents.len().try_into().unwrap();
@@ -464,7 +466,7 @@ fn make_buffer(contents: impl AsRef<[u8]>) -> Buffer {
     let vmo = Vmo::create_with_opts(VmoOptions::RESIZABLE, size).unwrap();
     vmo.write(contents, 0).unwrap();
 
-    Buffer { vmo, size }
+    fmem::Buffer { vmo, size }
 }
 
 #[cfg(test)]
@@ -478,8 +480,9 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn query_non_current_configuration_with_a_current() {
-        let paver =
-            Arc::new(MockPaverServiceBuilder::new().current_config(Configuration::A).build());
+        let paver = Arc::new(
+            MockPaverServiceBuilder::new().current_config(fpaver::Configuration::A).build(),
+        );
         let boot_manager = paver.spawn_boot_manager_service();
 
         assert_eq!(
@@ -495,8 +498,9 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn query_non_current_configuration_with_b_current() {
-        let paver =
-            Arc::new(MockPaverServiceBuilder::new().current_config(Configuration::B).build());
+        let paver = Arc::new(
+            MockPaverServiceBuilder::new().current_config(fpaver::Configuration::B).build(),
+        );
         let boot_manager = paver.spawn_boot_manager_service();
 
         assert_eq!(
@@ -513,7 +517,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn query_non_current_configuration_with_r_current() {
         let paver = Arc::new(
-            MockPaverServiceBuilder::new().current_config(Configuration::Recovery).build(),
+            MockPaverServiceBuilder::new().current_config(fpaver::Configuration::Recovery).build(),
         );
         let boot_manager = paver.spawn_boot_manager_service();
 
@@ -537,7 +541,7 @@ mod tests {
 
         assert_eq!(
             paver.take_events(),
-            vec![PaverEvent::SetConfigurationActive { configuration: Configuration::B }]
+            vec![PaverEvent::SetConfigurationActive { configuration: fpaver::Configuration::B }]
         );
     }
 
@@ -551,8 +555,8 @@ mod tests {
         assert_eq!(
             paver.take_events(),
             vec![
-                PaverEvent::SetConfigurationUnbootable { configuration: Configuration::A },
-                PaverEvent::SetConfigurationUnbootable { configuration: Configuration::B },
+                PaverEvent::SetConfigurationUnbootable { configuration: fpaver::Configuration::A },
+                PaverEvent::SetConfigurationUnbootable { configuration: fpaver::Configuration::B },
             ]
         );
     }
@@ -562,11 +566,13 @@ mod tests {
         let paver = Arc::new(MockPaverServiceBuilder::new().build());
         let boot_manager = paver.spawn_boot_manager_service();
 
-        paver_set_arbitrary_configuration_active(&boot_manager, Configuration::A).await.unwrap();
+        paver_set_arbitrary_configuration_active(&boot_manager, fpaver::Configuration::A)
+            .await
+            .unwrap();
 
         assert_eq!(
             paver.take_events(),
-            vec![PaverEvent::SetConfigurationActive { configuration: Configuration::A }]
+            vec![PaverEvent::SetConfigurationActive { configuration: fpaver::Configuration::A }]
         );
     }
 
@@ -575,11 +581,11 @@ mod tests {
         let paver = Arc::new(MockPaverServiceBuilder::new().build());
         let boot_manager = paver.spawn_boot_manager_service();
 
-        paver_query_configuration_status(&boot_manager, Configuration::B).await.unwrap();
+        paver_query_configuration_status(&boot_manager, fpaver::Configuration::B).await.unwrap();
 
         assert_eq!(
             paver.take_events(),
-            vec![PaverEvent::QueryConfigurationStatus { configuration: Configuration::B }]
+            vec![PaverEvent::QueryConfigurationStatus { configuration: fpaver::Configuration::B }]
         );
     }
 
@@ -594,8 +600,8 @@ mod tests {
     }
 
     async fn assert_prepare_partition_metadata_bails_out_with_unhealthy_current(
-        current_config: Configuration,
-        status: ConfigurationStatus,
+        current_config: fpaver::Configuration,
+        status: fpaver::ConfigurationStatus,
     ) {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
@@ -624,8 +630,8 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn prepare_partition_metadata_bails_out_if_current_pending_a() {
         assert_prepare_partition_metadata_bails_out_with_unhealthy_current(
-            Configuration::A,
-            ConfigurationStatus::Pending,
+            fpaver::Configuration::A,
+            fpaver::ConfigurationStatus::Pending,
         )
         .await;
     }
@@ -633,8 +639,8 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn prepare_partition_metadata_bails_out_if_current_unbootable_a() {
         assert_prepare_partition_metadata_bails_out_with_unhealthy_current(
-            Configuration::A,
-            ConfigurationStatus::Unbootable,
+            fpaver::Configuration::A,
+            fpaver::ConfigurationStatus::Unbootable,
         )
         .await;
     }
@@ -642,8 +648,8 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn prepare_partition_metadata_bails_out_if_current_pending_b() {
         assert_prepare_partition_metadata_bails_out_with_unhealthy_current(
-            Configuration::B,
-            ConfigurationStatus::Pending,
+            fpaver::Configuration::B,
+            fpaver::ConfigurationStatus::Pending,
         )
         .await;
     }
@@ -651,15 +657,15 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn prepare_partition_metadata_bails_out_if_current_unbootable_b() {
         assert_prepare_partition_metadata_bails_out_with_unhealthy_current(
-            Configuration::B,
-            ConfigurationStatus::Unbootable,
+            fpaver::Configuration::B,
+            fpaver::ConfigurationStatus::Unbootable,
         )
         .await;
     }
 
     async fn assert_successful_prepare_partition_metadata(
-        current_config: Configuration,
-        target_config: Configuration,
+        current_config: fpaver::Configuration,
+        target_config: fpaver::Configuration,
     ) {
         let paver = Arc::new(MockPaverServiceBuilder::new().current_config(current_config).build());
         let boot_manager = paver.spawn_boot_manager_service();
@@ -678,25 +684,36 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn prepare_partition_metadata_targets_b_in_config_a() {
-        assert_successful_prepare_partition_metadata(Configuration::A, Configuration::B).await;
+        assert_successful_prepare_partition_metadata(
+            fpaver::Configuration::A,
+            fpaver::Configuration::B,
+        )
+        .await;
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn prepare_partition_metadata_targets_a_in_config_b() {
-        assert_successful_prepare_partition_metadata(Configuration::B, Configuration::A).await;
+        assert_successful_prepare_partition_metadata(
+            fpaver::Configuration::B,
+            fpaver::Configuration::A,
+        )
+        .await;
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn prepare_partition_metadata_targets_a_in_config_r() {
-        assert_successful_prepare_partition_metadata(Configuration::Recovery, Configuration::A)
-            .await;
+        assert_successful_prepare_partition_metadata(
+            fpaver::Configuration::Recovery,
+            fpaver::Configuration::A,
+        )
+        .await;
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn prepare_partition_metadata_does_nothing_if_abr_not_supported() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
-                .boot_manager_close_with_epitaph(Status::NOT_SUPPORTED)
+                .boot_manager_close_with_epitaph(zx::Status::NOT_SUPPORTED)
                 .build(),
         );
         let boot_manager = paver.spawn_boot_manager_service();
@@ -713,13 +730,13 @@ mod tests {
         write_image_buffer(
             &data_sink,
             make_buffer("firmware contents"),
-            &Image::Firmware { type_: "".into() },
+            &update_package::Image::Firmware { type_: "".into() },
             NonCurrentConfiguration::A,
         )
         .await
         .unwrap();
 
-        let image = &Image::Firmware { type_: "foo".into() };
+        let image = &update_package::Image::Firmware { type_: "foo".into() };
 
         write_image_buffer(
             &data_sink,
@@ -734,12 +751,12 @@ mod tests {
             paver.take_events(),
             vec![
                 PaverEvent::WriteFirmware {
-                    configuration: Configuration::A,
+                    configuration: fpaver::Configuration::A,
                     firmware_type: "".to_owned(),
                     payload: b"firmware contents".to_vec()
                 },
                 PaverEvent::WriteFirmware {
-                    configuration: Configuration::B,
+                    configuration: fpaver::Configuration::B,
                     firmware_type: "foo".to_owned(),
                     payload: b"firmware_foo contents".to_vec()
                 }
@@ -752,7 +769,7 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::write_firmware(|_, _, _| {
-                    WriteFirmwareResult::Unsupported(true)
+                    fpaver::WriteFirmwareResult::Unsupported(true)
                 }))
                 .build(),
         );
@@ -761,7 +778,7 @@ mod tests {
         write_image_buffer(
             &data_sink,
             make_buffer("firmware of the future!"),
-            &Image::Firmware { type_: "unknown".into() },
+            &update_package::Image::Firmware { type_: "unknown".into() },
             NonCurrentConfiguration::A,
         )
         .await
@@ -770,7 +787,7 @@ mod tests {
         assert_eq!(
             paver.take_events(),
             vec![PaverEvent::WriteFirmware {
-                configuration: Configuration::A,
+                configuration: fpaver::Configuration::A,
                 firmware_type: "unknown".to_owned(),
                 payload: b"firmware of the future!".to_vec()
             },]
@@ -782,7 +799,7 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::write_firmware(|_, _, _| {
-                    WriteFirmwareResult::Status(Status::INTERNAL.into_raw())
+                    fpaver::WriteFirmwareResult::Status(zx::Status::INTERNAL.into_raw())
                 }))
                 .build(),
         );
@@ -792,7 +809,7 @@ mod tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("oops"),
-                &Image::Firmware{type_: "".into()},
+                &update_package::Image::Firmware{type_: "".into()},
                 NonCurrentConfiguration::A,
             )
             .await,
@@ -802,7 +819,7 @@ mod tests {
         assert_eq!(
             paver.take_events(),
             vec![PaverEvent::WriteFirmware {
-                configuration: Configuration::A,
+                configuration: fpaver::Configuration::A,
                 firmware_type: "".to_owned(),
                 payload: b"oops".to_vec()
             }]
@@ -817,7 +834,7 @@ mod tests {
         write_image_buffer(
             &data_sink,
             make_buffer("zbi contents"),
-            &Image::Zbi,
+            &update_package::Image::Zbi,
             NonCurrentConfiguration::A,
         )
         .await
@@ -826,8 +843,8 @@ mod tests {
         assert_eq!(
             paver.take_events(),
             vec![PaverEvent::WriteAsset {
-                configuration: Configuration::A,
-                asset: Asset::Kernel,
+                configuration: fpaver::Configuration::A,
+                asset: fpaver::Asset::Kernel,
                 payload: b"zbi contents".to_vec()
             }]
         );
@@ -838,7 +855,7 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::return_error(|event| match event {
-                    PaverEvent::WriteAsset { .. } => Status::INTERNAL,
+                    PaverEvent::WriteAsset { .. } => zx::Status::INTERNAL,
                     _ => panic!("Unexpected event: {event:?}"),
                 }))
                 .build(),
@@ -849,7 +866,7 @@ mod tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &Image::Zbi,
+                &update_package::Image::Zbi,
                 NonCurrentConfiguration::A,
             )
             .await,
@@ -860,7 +877,7 @@ mod tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("vbmeta contents"),
-                &Image::FuchsiaVbmeta,
+                &update_package::Image::FuchsiaVbmeta,
                 NonCurrentConfiguration::A,
             )
             .await,
@@ -871,7 +888,7 @@ mod tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &Image::Zbi,
+                &update_package::Image::Zbi,
                 NonCurrentConfiguration::B,
             )
             .await,
@@ -882,7 +899,7 @@ mod tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("vbmeta contents"),
-                &Image::FuchsiaVbmeta,
+                &update_package::Image::FuchsiaVbmeta,
                 NonCurrentConfiguration::B,
             )
             .await,
@@ -913,7 +930,7 @@ mod abr_not_supported_tests {
     async fn query_non_current_configuration_returns_not_supported() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
-                .boot_manager_close_with_epitaph(Status::NOT_SUPPORTED)
+                .boot_manager_close_with_epitaph(zx::Status::NOT_SUPPORTED)
                 .build(),
         );
         let boot_manager = paver.spawn_boot_manager_service();
@@ -933,7 +950,7 @@ mod abr_not_supported_tests {
     async fn query_current_configuration_returns_not_supported() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
-                .boot_manager_close_with_epitaph(Status::NOT_SUPPORTED)
+                .boot_manager_close_with_epitaph(zx::Status::NOT_SUPPORTED)
                 .build(),
         );
         let boot_manager = paver.spawn_boot_manager_service();
@@ -966,7 +983,7 @@ mod abr_not_supported_tests {
         write_image_buffer(
             &data_sink,
             make_buffer("zbi contents"),
-            &Image::Zbi,
+            &update_package::Image::Zbi,
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -975,7 +992,7 @@ mod abr_not_supported_tests {
         write_image_buffer(
             &data_sink,
             make_buffer("the new vbmeta"),
-            &Image::FuchsiaVbmeta,
+            &update_package::Image::FuchsiaVbmeta,
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -985,23 +1002,23 @@ mod abr_not_supported_tests {
             paver.take_events(),
             vec![
                 PaverEvent::WriteAsset {
-                    configuration: Configuration::A,
-                    asset: Asset::Kernel,
+                    configuration: fpaver::Configuration::A,
+                    asset: fpaver::Asset::Kernel,
                     payload: b"zbi contents".to_vec()
                 },
                 PaverEvent::WriteAsset {
-                    configuration: Configuration::B,
-                    asset: Asset::Kernel,
+                    configuration: fpaver::Configuration::B,
+                    asset: fpaver::Asset::Kernel,
                     payload: b"zbi contents".to_vec()
                 },
                 PaverEvent::WriteAsset {
-                    configuration: Configuration::A,
-                    asset: Asset::VerifiedBootMetadata,
+                    configuration: fpaver::Configuration::A,
+                    asset: fpaver::Asset::VerifiedBootMetadata,
                     payload: b"the new vbmeta".to_vec()
                 },
                 PaverEvent::WriteAsset {
-                    configuration: Configuration::B,
-                    asset: Asset::VerifiedBootMetadata,
+                    configuration: fpaver::Configuration::B,
+                    asset: fpaver::Asset::VerifiedBootMetadata,
                     payload: b"the new vbmeta".to_vec()
                 },
             ]
@@ -1016,7 +1033,7 @@ mod abr_not_supported_tests {
         write_image_buffer(
             &data_sink,
             make_buffer("firmware contents"),
-            &Image::Firmware { type_: "".into() },
+            &update_package::Image::Firmware { type_: "".into() },
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -1026,12 +1043,12 @@ mod abr_not_supported_tests {
             paver.take_events(),
             vec![
                 PaverEvent::WriteFirmware {
-                    configuration: Configuration::A,
+                    configuration: fpaver::Configuration::A,
                     firmware_type: "".to_owned(),
                     payload: b"firmware contents".to_vec()
                 },
                 PaverEvent::WriteFirmware {
-                    configuration: Configuration::B,
+                    configuration: fpaver::Configuration::B,
                     firmware_type: "".to_owned(),
                     payload: b"firmware contents".to_vec()
                 },
@@ -1045,11 +1062,11 @@ mod abr_not_supported_tests {
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::return_error(|event| match event {
                     PaverEvent::WriteAsset {
-                        configuration: Configuration::A,
-                        asset: Asset::Kernel,
+                        configuration: fpaver::Configuration::A,
+                        asset: fpaver::Asset::Kernel,
                         payload: _,
-                    } => Status::INTERNAL,
-                    _ => Status::OK,
+                    } => zx::Status::INTERNAL,
+                    _ => zx::Status::OK,
                 }))
                 .build(),
         );
@@ -1059,7 +1076,7 @@ mod abr_not_supported_tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &Image::Zbi,
+                &update_package::Image::Zbi,
                 NonCurrentConfiguration::NotSupported,
             )
             .await,
@@ -1069,8 +1086,8 @@ mod abr_not_supported_tests {
         assert_eq!(
             paver.take_events(),
             vec![PaverEvent::WriteAsset {
-                configuration: Configuration::A,
-                asset: Asset::Kernel,
+                configuration: fpaver::Configuration::A,
+                asset: fpaver::Asset::Kernel,
                 payload: b"zbi contents".to_vec()
             },]
         );
@@ -1082,11 +1099,11 @@ mod abr_not_supported_tests {
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::return_error(|event| match event {
                     PaverEvent::WriteAsset {
-                        configuration: Configuration::B,
-                        asset: Asset::Kernel,
+                        configuration: fpaver::Configuration::B,
+                        asset: fpaver::Asset::Kernel,
                         payload: _,
-                    } => Status::NOT_SUPPORTED,
-                    _ => Status::OK,
+                    } => zx::Status::NOT_SUPPORTED,
+                    _ => zx::Status::OK,
                 }))
                 .build(),
         );
@@ -1095,7 +1112,7 @@ mod abr_not_supported_tests {
         write_image_buffer(
             &data_sink,
             make_buffer("zbi contents"),
-            &Image::Zbi,
+            &update_package::Image::Zbi,
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -1105,13 +1122,13 @@ mod abr_not_supported_tests {
             paver.take_events(),
             vec![
                 PaverEvent::WriteAsset {
-                    configuration: Configuration::A,
-                    asset: Asset::Kernel,
+                    configuration: fpaver::Configuration::A,
+                    asset: fpaver::Asset::Kernel,
                     payload: b"zbi contents".to_vec()
                 },
                 PaverEvent::WriteAsset {
-                    configuration: Configuration::B,
-                    asset: Asset::Kernel,
+                    configuration: fpaver::Configuration::B,
+                    asset: fpaver::Asset::Kernel,
                     payload: b"zbi contents".to_vec()
                 },
             ]
@@ -1123,8 +1140,8 @@ mod abr_not_supported_tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::write_firmware(|configuration, _, _| match configuration {
-                    Configuration::B => WriteFirmwareResult::Unsupported(true),
-                    _ => WriteFirmwareResult::Status(Status::OK.into_raw()),
+                    fpaver::Configuration::B => fpaver::WriteFirmwareResult::Unsupported(true),
+                    _ => fpaver::WriteFirmwareResult::Status(zx::Status::OK.into_raw()),
                 }))
                 .build(),
         );
@@ -1133,7 +1150,7 @@ mod abr_not_supported_tests {
         write_image_buffer(
             &data_sink,
             make_buffer("firmware contents"),
-            &Image::Firmware { type_: "".into() },
+            &update_package::Image::Firmware { type_: "".into() },
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -1143,12 +1160,12 @@ mod abr_not_supported_tests {
             paver.take_events(),
             vec![
                 PaverEvent::WriteFirmware {
-                    configuration: Configuration::A,
+                    configuration: fpaver::Configuration::A,
                     firmware_type: "".to_owned(),
                     payload: b"firmware contents".to_vec()
                 },
                 PaverEvent::WriteFirmware {
-                    configuration: Configuration::B,
+                    configuration: fpaver::Configuration::B,
                     firmware_type: "".to_owned(),
                     payload: b"firmware contents".to_vec()
                 },
@@ -1162,11 +1179,11 @@ mod abr_not_supported_tests {
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::return_error(|event| match event {
                     PaverEvent::WriteAsset {
-                        configuration: Configuration::B,
-                        asset: Asset::Kernel,
+                        configuration: fpaver::Configuration::B,
+                        asset: fpaver::Asset::Kernel,
                         ..
-                    } => Status::INTERNAL,
-                    _ => Status::OK,
+                    } => zx::Status::INTERNAL,
+                    _ => zx::Status::OK,
                 }))
                 .build(),
         );
@@ -1176,7 +1193,7 @@ mod abr_not_supported_tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &Image::Zbi,
+                &update_package::Image::Zbi,
                 NonCurrentConfiguration::NotSupported,
             )
             .await,
@@ -1187,13 +1204,13 @@ mod abr_not_supported_tests {
             paver.take_events(),
             vec![
                 PaverEvent::WriteAsset {
-                    configuration: Configuration::A,
-                    asset: Asset::Kernel,
+                    configuration: fpaver::Configuration::A,
+                    asset: fpaver::Asset::Kernel,
                     payload: b"zbi contents".to_vec()
                 },
                 PaverEvent::WriteAsset {
-                    configuration: Configuration::B,
-                    asset: Asset::Kernel,
+                    configuration: fpaver::Configuration::B,
+                    asset: fpaver::Asset::Kernel,
                     payload: b"zbi contents".to_vec()
                 },
             ]
@@ -1204,7 +1221,7 @@ mod abr_not_supported_tests {
     async fn paver_flush_boot_manager_doesnt_makes_calls() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
-                .boot_manager_close_with_epitaph(Status::NOT_SUPPORTED)
+                .boot_manager_close_with_epitaph(zx::Status::NOT_SUPPORTED)
                 .build(),
         );
 
