@@ -22,9 +22,9 @@
 
 #include <virtio/virtio.h>
 
-#include "src/graphics/display/drivers/virtio-guest/v1/virtio-abi.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/lib/virtio/virtio-abi.h"
 
 #define USE_GTEST
 #include <lib/virtio/backends/fake.h>

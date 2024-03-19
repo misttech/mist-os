@@ -19,8 +19,8 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/vector.h>
 
-#include "src/graphics/display/drivers/virtio-guest/v1/virtio-abi.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
+#include "src/graphics/lib/virtio/virtio-abi.h"
 
 namespace virtio_display {
 

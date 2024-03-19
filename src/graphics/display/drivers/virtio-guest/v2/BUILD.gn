@@ -33,8 +33,6 @@ source_set("common_srcs") {
     "gpu-device-driver.h",
     "gpu-device.cc",
     "gpu-device.h",
-    "virtio-abi.cc",
-    "virtio-abi.h",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
@@ -47,6 +45,7 @@ source_set("common_srcs") {
     "//sdk/lib/driver/legacy-bind-constants",
     "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
     "//src/devices/lib/driver:driver_runtime",
+    "//src/graphics/lib/virtio:virtio-spec",
     "//src/lib/fxl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sysmem-version",

@@ -19,7 +19,7 @@
 
 #include <fbl/mutex.h>
 
-#include "src/graphics/display/drivers/virtio-guest/v2/virtio-abi.h"
+#include "src/graphics/lib/virtio/virtio-abi.h"
 
 namespace virtio_display {
 

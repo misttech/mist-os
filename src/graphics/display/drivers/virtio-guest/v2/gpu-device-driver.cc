@@ -27,7 +27,7 @@
 
 #include "lib/driver/logging/cpp/structured_logger.h"
 #include "src/graphics/display/drivers/virtio-guest/v2/gpu-device.h"
-#include "src/graphics/display/drivers/virtio-guest/v2/virtio-abi.h"
+#include "src/graphics/lib/virtio/virtio-abi.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace virtio_display {

@@ -36,7 +36,6 @@
 #include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/virtio-guest/v1/gpu-device-driver.h"
-#include "src/graphics/display/drivers/virtio-guest/v1/virtio-abi.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-gpu-device.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
@@ -44,6 +43,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/lib/virtio/virtio-abi.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace virtio_display {
