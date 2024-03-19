@@ -10,7 +10,7 @@ import unittest
 from array import array
 
 import png
-from parameterized import parameterized
+from parameterized import parameterized, param
 
 # Disabling pylint to reduce verbosity for widely used trivial types
 from honeydew.typing.screenshot_image import (  # pylint: disable=g-importing-member
@@ -164,8 +164,8 @@ class ScreenshotImageTest(unittest.TestCase):
         ):
             ScreenshotImage.load_from_path("foo.jpg")
 
-    @parameterized.expand([("png"), ("bgra")])
-    def test_load_from_resource(self, suffix) -> None:
+    @parameterized.expand([param(suffix="png"), param(suffix="bgra")])
+    def test_load_from_resource(self, suffix: str) -> None:
         # Unfortunately cannot just import the `resources` subpackage since
         # it has a different absolute package name when the test runs in `fx test`
         # (just "resources") and in `conformance.sh` (named `tests.unit_tests.affordances_tests.ui.resources`)
@@ -200,10 +200,10 @@ class ScreenshotImageTest(unittest.TestCase):
 
     @parameterized.expand(
         [
-            (2, 0),
-            (0, 2),
-            (-1, 0),
-            (0, -1),
+            param(x=2, y=0),
+            param(x=0, y=2),
+            param(x=-1, y=0),
+            param(x=0, y=-1),
         ]
     )
     def test_get_pixel_out_of_bounds(self, x, y) -> None:
@@ -229,29 +229,34 @@ class ScreenshotImageTest(unittest.TestCase):
 
     @parameterized.expand(
         [
-            (
-                [RED, WHITE, BLUE, GREEN],
-                [RED, WHITE, BLUE, GREEN],
-                1.0,
+            param(
+                pixels1=[RED, WHITE, BLUE, GREEN],
+                pixels2=[RED, WHITE, BLUE, GREEN],
+                expected_similarity=1.0,
             ),
-            (
+            param(
                 [RED, WHITE, BLUE, GREEN],
                 [RED, WHITE, BLUE, BLACK],
                 0.75,
             ),
-            (
+            param(
                 [RED, WHITE, BLUE, GREEN],
                 [WHITE, RED, GREEN, GREEN],
                 0.25,
             ),
-            (
+            param(
                 [RED, WHITE, BLUE, GREEN],
                 [WHITE, RED, GREEN, RED],
                 0.0,
             ),
         ]
     )
-    def test_pixel_similarity(self, pixels1, pixels2, expected_similarity):
+    def test_pixel_similarity(
+        self,
+        pixels1: list[Pixel],
+        pixels2: list[Pixel],
+        expected_similarity: float,
+    ):
         image1 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixels1))
         image2 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixels2))
         self.assertEqual(
@@ -268,30 +273,35 @@ class ScreenshotImageTest(unittest.TestCase):
 
     @parameterized.expand(
         [
-            (
-                [WHITE, RED, GREEN, BLUE],
-                [RED, WHITE, BLUE, GREEN],
-                1.0,
+            param(
+                pixels1=[WHITE, RED, GREEN, BLUE],
+                pixels2=[RED, WHITE, BLUE, GREEN],
+                expected_similarity=1.0,
             ),
-            (
-                [WHITE, RED, TRANSPARENT, GREEN],
-                [RED, WHITE, BLUE, BLACK],
-                0.5,
+            param(
+                pixels1=[WHITE, RED, TRANSPARENT, GREEN],
+                pixels2=[RED, WHITE, BLUE, BLACK],
+                expected_similarity=0.5,
             ),
-            (
-                [RED, RED, WHITE, WHITE],
-                [BLACK, BLACK, BLACK, RED],
-                0.25,
+            param(
+                pixels1=[RED, RED, WHITE, WHITE],
+                pixels2=[BLACK, BLACK, BLACK, RED],
+                expected_similarity=0.25,
             ),
-            (
-                [RED, WHITE, BLUE, BLUE],
-                [BLACK, GREEN, TRANSPARENT, TRANSPARENT],
-                0.0,
+            param(
+                pixels1=[RED, WHITE, BLUE, BLUE],
+                pixels2=[BLACK, GREEN, TRANSPARENT, TRANSPARENT],
+                expected_similarity=0.0,
             ),
         ]
     )
-    def test_histogram_similarity(self, pixel1, pixels2, expected_similarity):
-        image1 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixel1))
+    def test_histogram_similarity(
+        self,
+        pixels1: list[Pixel],
+        pixels2: list[Pixel],
+        expected_similarity: float,
+    ):
+        image1 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixels1))
         image2 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixels2))
         self.assertEqual(
             image1.histogram_similarity(image2),
