@@ -148,6 +148,8 @@ pub struct IpRoutines<I: IpExt, DeviceClass, RuleInfo> {
 /// the first packet in the flow.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""), Debug(bound = "DeviceClass: Debug"))]
+// TODO(https://fxbug.dev/318717702): implement NAT.
+#[allow(dead_code)]
 pub struct NatRoutines<I: IpExt, DeviceClass, RuleInfo> {
     /// Occurs for incoming traffic before a routing decision has been made.
     pub ingress: Hook<I, DeviceClass, RuleInfo>,
