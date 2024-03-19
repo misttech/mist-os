@@ -5,7 +5,6 @@
 use {
     futures::channel::mpsc,
     fuzz::fuzz,
-    tempfile::TempDir,
     wlan_common::assert_variant,
     wlancfg_lib::{
         config_management::{
@@ -60,16 +59,12 @@ async fn fuzz_saved_networks_manager_store(id: NetworkIdentifier, credential: Cr
 /// Create a saved networks manager with the specified stash ID. Stash ID should be different for
 /// each test so that they don't interfere.
 async fn create_saved_networks(stash_id: impl AsRef<str>) -> SavedNetworksManager {
-    // This file doesn't really matter, it will only be deleted if it exists.
-    let temp_dir = TempDir::new().expect("failed to create temporary directory");
-    let path = temp_dir.path().join("networks.json");
     let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
     let telemetry_sender = TelemetrySender::new(telemetry_sender);
     let stash = wlan_stash::policy::PolicyStorage::new_with_id(stash_id.as_ref())
         .await
         .expect("failed to initialize WLAN policy stash");
 
-    let saved_networks =
-        SavedNetworksManager::new_with_stash_or_paths(Some(stash), path, telemetry_sender).await;
+    let saved_networks = SavedNetworksManager::new_with_stash(Some(stash), telemetry_sender).await;
     saved_networks
 }
