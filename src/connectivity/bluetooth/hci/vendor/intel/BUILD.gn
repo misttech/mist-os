@@ -82,6 +82,7 @@ fuchsia_driver_component("driver") {
 if (internal_access) {
   resource("btintel-firmware") {
     sources = [
+      "//prebuilt/connectivity/bluetooth/firmware/intel/ibt-0041-0041.sfi",
       "//prebuilt/connectivity/bluetooth/firmware/intel/ibt-11-5.sfi",
       "//prebuilt/connectivity/bluetooth/firmware/intel/ibt-12-16.sfi",
       "//prebuilt/connectivity/bluetooth/firmware/intel/ibt-17-2.sfi",
