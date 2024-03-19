@@ -55,12 +55,12 @@ bool PrevalidateFlags(fio::OpenFlags flags) {
 }
 
 Connection::Connection(FuchsiaVfs* vfs, fbl::RefPtr<Vnode> vnode, VnodeProtocol protocol,
-                       VnodeConnectionOptions options)
+                       fuchsia_io::Rights rights)
     : vnode_is_open_(protocol != VnodeProtocol::kNode),
       vfs_(vfs),
       vnode_(std::move(vnode)),
       protocol_(protocol),
-      rights_(options.rights) {
+      rights_(rights) {
   ZX_DEBUG_ASSERT(vfs);
   ZX_DEBUG_ASSERT(vnode_);
 }

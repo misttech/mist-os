@@ -27,12 +27,8 @@ namespace fs {
 namespace internal {
 
 RemoteFileConnection::RemoteFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
-                                           VnodeProtocol protocol, VnodeConnectionOptions options,
-                                           zx_koid_t koid)
-    : FileConnection(vfs, std::move(vnode), protocol, options, koid) {
-  ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kFile);
-  ZX_DEBUG_ASSERT(!(options.flags & fuchsia_io::OpenFlags::kNodeReference));
-}
+                                           fuchsia_io::Rights rights, bool append, zx_koid_t koid)
+    : FileConnection(vfs, std::move(vnode), rights, append, koid) {}
 
 zx_status_t RemoteFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileRead] options: ", options());

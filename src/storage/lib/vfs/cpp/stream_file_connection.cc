@@ -31,12 +31,9 @@ namespace fs {
 namespace internal {
 
 StreamFileConnection::StreamFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
-                                           zx::stream stream, VnodeProtocol protocol,
-                                           VnodeConnectionOptions options, zx_koid_t koid)
-    : FileConnection(vfs, std::move(vnode), protocol, options, koid), stream_(std::move(stream)) {
-  ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kFile);
-  ZX_DEBUG_ASSERT(!(options.flags & fuchsia_io::OpenFlags::kNodeReference));
-}
+                                           fuchsia_io::Rights rights, bool append,
+                                           zx::stream stream, zx_koid_t koid)
+    : FileConnection(vfs, std::move(vnode), rights, append, koid), stream_(std::move(stream)) {}
 
 zx_status_t StreamFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileRead] options: ", options());

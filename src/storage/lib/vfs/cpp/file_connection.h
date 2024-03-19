@@ -24,8 +24,8 @@ namespace fs::internal {
 class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::File> {
  public:
   // Refer to documentation for |Connection::Connection|.
-  FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
-                 VnodeConnectionOptions options, zx_koid_t koid);
+  FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights,
+                 bool append, zx_koid_t koid);
 
   ~FileConnection() override;
 

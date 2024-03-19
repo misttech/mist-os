@@ -81,12 +81,8 @@ void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
 namespace internal {
 
 DirectoryConnection::DirectoryConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
-                                         VnodeProtocol protocol, VnodeConnectionOptions options,
-                                         zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), protocol, options), koid_(koid) {
-  ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kDirectory);
-  ZX_DEBUG_ASSERT(!(options.flags & fuchsia_io::OpenFlags::kNodeReference));
-}
+                                         fuchsia_io::Rights rights, zx_koid_t koid)
+    : Connection(vfs, std::move(vnode), fs::VnodeProtocol::kDirectory, rights), koid_(koid) {}
 
 DirectoryConnection::~DirectoryConnection() { vnode()->DeleteFileLockInTeardown(koid_); }
 

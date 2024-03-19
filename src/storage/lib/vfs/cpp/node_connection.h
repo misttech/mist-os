@@ -20,8 +20,7 @@ namespace fs::internal {
 class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_io::Node> {
  public:
   // Refer to documentation for |Connection::Connection|.
-  NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
-                 VnodeConnectionOptions options);
+  NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights);
 
   ~NodeConnection() final = default;
 

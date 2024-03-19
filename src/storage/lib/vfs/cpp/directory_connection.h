@@ -20,8 +20,8 @@ class DirectoryConnection final : public Connection,
                                   public fidl::WireServer<fuchsia_io::Directory> {
  public:
   // Refer to documentation for |Connection::Connection|.
-  DirectoryConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
-                      VnodeConnectionOptions options, zx_koid_t koid);
+  DirectoryConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights,
+                      zx_koid_t koid);
 
   ~DirectoryConnection() final;
 

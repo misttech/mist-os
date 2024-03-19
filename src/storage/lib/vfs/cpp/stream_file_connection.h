@@ -21,8 +21,8 @@ namespace fs::internal {
 class StreamFileConnection final : public FileConnection {
  public:
   // Refer to documentation for |Connection::Connection|.
-  StreamFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, zx::stream stream,
-                       VnodeProtocol protocol, VnodeConnectionOptions options, zx_koid_t koid);
+  StreamFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights,
+                       bool append, zx::stream stream, zx_koid_t koid);
 
   ~StreamFileConnection() final = default;
 

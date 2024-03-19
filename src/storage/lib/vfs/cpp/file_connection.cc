@@ -28,14 +28,10 @@ namespace fs {
 namespace internal {
 
 FileConnection::FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
-                               VnodeProtocol protocol, VnodeConnectionOptions options,
-                               zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), protocol, options),
+                               fuchsia_io::Rights rights, bool append, zx_koid_t koid)
+    : Connection(vfs, std::move(vnode), fs::VnodeProtocol::kFile, rights),
       koid_(koid),
-      append_(options.flags & fio::OpenFlags::kAppend) {
-  ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kFile);
-  ZX_DEBUG_ASSERT(!(options.flags & fuchsia_io::OpenFlags::kNodeReference));
-}
+      append_(append) {}
 
 FileConnection::~FileConnection() { vnode()->DeleteFileLockInTeardown(koid_); }
 

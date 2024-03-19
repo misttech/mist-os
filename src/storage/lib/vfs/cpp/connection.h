@@ -85,13 +85,10 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   //
   // |vfs| is the VFS which is responsible for dispatching operations to the vnode.
   // |vnode| is the vnode which will handle I/O requests.
-  // |protocol| is the (potentially negotiated) vnode protocol that will be used to interact with
-  //            the vnode over this connection.
-  // |options| are client-specified options for this connection, converted from the flags and
-  //           rights passed during the |fuchsia.io/Directory.Open| or |fuchsia.io/Node.Clone| FIDL
-  //           call.
+  // |protocol| is the type of protocol this connection uses (e.g. Node, File, Directory).
+  // |rights| are the resulting rights for this connection.
   Connection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
-             VnodeConnectionOptions options);
+             fuchsia_io::Rights rights);
 
   fuchsia_io::Rights rights() const { return rights_; }
 

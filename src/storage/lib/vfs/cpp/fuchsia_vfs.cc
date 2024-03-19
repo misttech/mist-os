@@ -347,16 +347,19 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
         return koid.error_value();
       }
       zx::result<zx::stream> stream = vnode->CreateStream(ToStreamOptions(*options));
+      // Truncate was handled when the Vnode was opened, only append mode applies to this
+      // connection. |ToStreamOptions| should handle setting the stream to append mode.
+      bool append = static_cast<bool>(options->flags & fio::OpenFlags::kAppend);
       if (stream.is_ok()) {
         connection = std::make_unique<internal::StreamFileConnection>(
-            this, std::move(vnode), std::move(*stream), protocol, *options, *koid);
+            this, std::move(vnode), options->rights, append, std::move(*stream), *koid);
         break;
       }
       if (stream.error_value() != ZX_ERR_NOT_SUPPORTED) {
         return stream.error_value();
       }
       connection = std::make_unique<internal::RemoteFileConnection>(this, std::move(vnode),
-                                                                    protocol, *options, *koid);
+                                                                    options->rights, append, *koid);
       break;
     }
     case VnodeProtocol::kDirectory: {
@@ -364,13 +367,13 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
       if (koid.is_error()) {
         return koid.error_value();
       }
-      connection = std::make_unique<internal::DirectoryConnection>(this, std::move(vnode), protocol,
-                                                                   *options, *koid);
+      connection = std::make_unique<internal::DirectoryConnection>(this, std::move(vnode),
+                                                                   options->rights, *koid);
       break;
     }
     case VnodeProtocol::kNode: {
       connection =
-          std::make_unique<internal::NodeConnection>(this, std::move(vnode), protocol, *options);
+          std::make_unique<internal::NodeConnection>(this, std::move(vnode), options->rights);
       break;
     }
     case VnodeProtocol::kService: {

@@ -17,11 +17,12 @@
 
 namespace fs::internal {
 
+// TODO(https://fxbug.dev/324112857): Merge this into FileConnection.
 class RemoteFileConnection final : public FileConnection {
  public:
   // Refer to documentation for |Connection::Connection|.
-  RemoteFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
-                       VnodeConnectionOptions options, zx_koid_t koid);
+  RemoteFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights,
+                       bool append, zx_koid_t koid);
 
   ~RemoteFileConnection() final = default;
 

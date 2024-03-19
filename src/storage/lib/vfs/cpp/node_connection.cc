@@ -26,12 +26,10 @@ namespace fs {
 namespace internal {
 
 NodeConnection::NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
-                               VnodeProtocol protocol, VnodeConnectionOptions options)
-    : Connection(vfs, std::move(vnode), protocol, options) {
-  ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kNode);
-  ZX_DEBUG_ASSERT(options.flags & fio::OpenFlags::kNodeReference);
-  // Only the GET_ATTRIBUTES right is supported for node connections.
-  ZX_DEBUG_ASSERT(!(options.rights & ~fio::Rights::kGetAttributes));
+                               fuchsia_io::Rights rights)
+    : Connection(vfs, std::move(vnode), fs::VnodeProtocol::kNode, rights) {
+  // Only Rights.GET_ATTRIBUTES is allowed for node connections.
+  ZX_DEBUG_ASSERT(!(rights - fio::Rights::kGetAttributes));
 }
 
 std::unique_ptr<Binding> NodeConnection::Bind(async_dispatcher_t* dispatcher, zx::channel channel,
