@@ -1200,14 +1200,6 @@
                 "NetdeviceTest.InterfaceFlags",
                 "NetdeviceTest.InterfaceMTU",
                 "NetdeviceTest.Loopback",
-
-                // TODO(https://fxbug.dev/329494713) re-enable when short MAP_RANGEs work
-                "ReadWriteSharedPrivate/MMapFileParamTest.MapPopulateShort/0",
-                "ReadWriteSharedPrivate/MMapFileParamTest.MapPopulateShort/1",
-                "ReadWriteSharedPrivate/MMapFileParamTest.MapPopulateShort/2",
-                "ReadWriteSharedPrivate/MMapFileParamTest.MapPopulateShort/3",
-                "ReadWriteSharedPrivate/MMapFileParamTest.MapPopulateShort/4",
-                "ReadWriteSharedPrivate/MMapFileParamTest.MapPopulateShort/5",
             ],
         },
     ],
