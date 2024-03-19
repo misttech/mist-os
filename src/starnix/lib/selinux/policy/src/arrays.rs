@@ -1113,24 +1113,42 @@ where
     }
 }
 
-pub(crate) type RangeTranslations<PS> = Vec<RangeTranslation<PS>>;
+pub(crate) type RangeTransitions<PS> = Vec<RangeTransition<PS>>;
 
-impl<PS: ParseStrategy> Validate for RangeTranslations<PS> {
+impl<PS: ParseStrategy> Validate for RangeTransitions<PS> {
     type Error = anyhow::Error;
 
-    /// TODO: Validate sequence of [`RangeTranslation`] objects.
+    /// TODO: Validate sequence of [`RangeTransition`] objects.
     fn validate(&self) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct RangeTranslation<PS: ParseStrategy> {
-    metadata: PS::Output<RangeTranslationMetadata>,
+pub(crate) struct RangeTransition<PS: ParseStrategy> {
+    metadata: PS::Output<RangeTransitionMetadata>,
     mls_range: MlsRange<PS>,
 }
 
-impl<PS: ParseStrategy> Parse<PS> for RangeTranslation<PS>
+impl<PS: ParseStrategy> RangeTransition<PS> {
+    pub fn source_type(&self) -> le::U32 {
+        PS::deref(&self.metadata).source_type
+    }
+
+    pub fn target_type(&self) -> le::U32 {
+        PS::deref(&self.metadata).target_type
+    }
+
+    pub fn target_class(&self) -> le::U32 {
+        PS::deref(&self.metadata).target_class
+    }
+
+    pub fn mls_range(&self) -> &MlsRange<PS> {
+        &self.mls_range
+    }
+}
+
+impl<PS: ParseStrategy> Parse<PS> for RangeTransition<PS>
 where
     MlsRange<PS>: Parse<PS>,
 {
@@ -1139,12 +1157,12 @@ where
     fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
-        let (metadata, tail) = PS::parse::<RangeTranslationMetadata>(tail)
-            .context("parsing range translation metadata")?;
+        let (metadata, tail) = PS::parse::<RangeTransitionMetadata>(tail)
+            .context("parsing range transition metadata")?;
 
         let (mls_range, tail) = MlsRange::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
-            .context("parsing mls range for range translation")?;
+            .context("parsing mls range for range transition")?;
 
         Ok((Self { metadata, mls_range }, tail))
     }
@@ -1152,7 +1170,7 @@ where
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct RangeTranslationMetadata {
+pub(crate) struct RangeTransitionMetadata {
     source_type: le::U32,
     target_type: le::U32,
     target_class: le::U32,

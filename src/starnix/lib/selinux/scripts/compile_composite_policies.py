@@ -64,6 +64,13 @@ _COMPOSITE_POLICY_PATHS = (
         ),
         "type_transition_policy.pp",
     ),
+    (
+        (
+            "base_policy.conf",
+            "new_file/range_transition_policy.conf",
+        ),
+        "range_transition_policy.pp",
+    ),
 )
 
 

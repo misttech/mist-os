@@ -101,6 +101,7 @@ if (is_host) {
   testdata_composite_policies = [
     "class_defaults",
     "minimal",
+    "range_transition",
     "role_transition_not_allowed",
     "role_transition",
     "type_transition",

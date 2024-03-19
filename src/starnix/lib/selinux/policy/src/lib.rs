@@ -18,7 +18,6 @@ pub use security_context::{SecurityContext, SecurityContextParseError};
 use {
     anyhow::Context as _,
     error::{NewSecurityContextError, ParseError, QueryError},
-    extensible_bitmap::ExtensibleBitmapSpan,
     index::PolicyIndex,
     metadata::HandleUnknown,
     parsed_policy::ParsedPolicy,
@@ -26,7 +25,6 @@ use {
     parser::{ByRef, ParseStrategy},
     selinux_common::{self as sc, ClassPermission as _, FileClass},
     std::{fmt::Debug, marker::PhantomData, ops::Deref},
-    symbols::MlsLevel,
     zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned},
 };
 
@@ -177,12 +175,14 @@ impl<PS: ParseStrategy> Policy<PS> {
     pub fn initial_context(&self, id: sc::InitialSid) -> security_context::SecurityContext {
         let id = le::U32::from(id as u32);
 
-        let context = self.0.parsed_policy().initial_context(id).unwrap();
-        let user = self.0.parsed_policy().user(context.user_id());
-        let role = self.0.parsed_policy().role(context.role_id());
-        let type_ = self.0.parsed_policy().type_(context.type_id());
-        let low_level = self.security_level(context.low_level());
-        let high_level = context.high_level().as_ref().map(|x| self.security_level(x));
+        let policy_index = &self.0;
+        let parsed_policy = policy_index.parsed_policy();
+        let context = parsed_policy.initial_context(id).unwrap();
+        let user = parsed_policy.user(context.user_id());
+        let role = parsed_policy.role(context.role_id());
+        let type_ = parsed_policy.type_(context.type_id());
+        let low_level = policy_index.security_level(context.low_level());
+        let high_level = context.high_level().as_ref().map(|x| policy_index.security_level(x));
 
         security_context::SecurityContext::new(
             UserId(String::from_utf8(user.name_bytes().to_vec()).unwrap()),
@@ -205,45 +205,6 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// Returns a byte string describing the supplied [`SecurityContext`].
     pub fn serialize_security_context(&self, security_context: &SecurityContext) -> Vec<u8> {
         security_context.serialize(&self.0)
-    }
-
-    /// Helper used by `security_level()` to create a `Sensitivity` instance from policy fields.
-    fn sensitivity(&self, sensitivity: le::U32) -> SensitivityId {
-        SensitivityId(
-            String::from_utf8(
-                self.0.parsed_policy().sensitivity(sensitivity).name_bytes().to_vec(),
-            )
-            .unwrap(),
-        )
-    }
-
-    /// Helper used by `category()` to create a category name from policy fields.
-    fn category_id(&self, id: le::U32) -> CategoryId {
-        CategoryId(
-            String::from_utf8(self.0.parsed_policy().category(id).name_bytes().to_vec()).unwrap(),
-        )
-    }
-
-    /// Helper used by `security_level()` to create a `Category` instance from policy fields.
-    fn category(&self, span: ExtensibleBitmapSpan) -> security_context::Category {
-        // Spans describe zero-based bit indexes, corresponding to 1-based category Ids.
-        if span.low == span.high {
-            security_context::Category::Single(self.category_id(le::U32::new(span.low + 1)))
-        } else {
-            security_context::Category::Range {
-                low: self.category_id(le::U32::new(span.low + 1)),
-                high: self.category_id(le::U32::new(span.high + 1)),
-            }
-        }
-    }
-
-    /// Helper used by `initial_context()` to create a `SecurityLevel` instance from
-    /// the policy fields.
-    fn security_level(&self, level: &MlsLevel<PS>) -> security_context::SecurityLevel {
-        security_context::SecurityLevel::new(
-            self.sensitivity(level.sensitivity()),
-            level.categories().spans().map(|span| self.category(span)).collect(),
-        )
     }
 
     /// Returns the security context that should be applied to a newly created file-like SELinux

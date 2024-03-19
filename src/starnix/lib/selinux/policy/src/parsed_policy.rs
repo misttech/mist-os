@@ -12,7 +12,7 @@ use super::{
         AccessVectors, ConditionalNodes, Context, DeprecatedFilenameTransitions,
         FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes,
         InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes,
-        Ports, RangeTranslations, RoleAllows, RoleTransitions, SimpleArray,
+        Ports, RangeTransitions, RoleAllows, RoleTransitions, SimpleArray,
         MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
     },
     error::{ParseError, QueryError},
@@ -24,7 +24,7 @@ use super::{
         Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean, Permission,
         Role, Sensitivity, SymbolList, Type, User,
     },
-    AccessVector, Parse, RoleId, TypeId, Validate,
+    AccessVector, CategoryId, Parse, RoleId, SensitivityId, TypeId, Validate,
 };
 
 use anyhow::Context as _;
@@ -81,7 +81,7 @@ pub struct ParsedPolicy<PS: ParseStrategy> {
     infinitiband_partition_keys: Option<SimpleArray<PS, InfinitiBandPartitionKeys<PS>>>,
     infinitiband_end_ports: Option<SimpleArray<PS, InfinitiBandEndPorts<PS>>>,
     generic_fs_contexts: SimpleArray<PS, GenericFsContexts<PS>>,
-    range_translations: SimpleArray<PS, RangeTranslations<PS>>,
+    range_transitions: SimpleArray<PS, RangeTransitions<PS>>,
     /// Extensible bitmaps that encode associations between types and attributes.
     attribute_maps: Vec<ExtensibleBitmap<PS>>,
 }
@@ -333,8 +333,24 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         PS::deref_slice(&self.role_transitions.data)
     }
 
+    pub(crate) fn range_transitions(&self) -> &RangeTransitions<PS> {
+        &self.range_transitions.data
+    }
+
     pub(crate) fn access_vectors(&self) -> &AccessVectors<PS> {
         &self.access_vectors.data
+    }
+
+    /// Helper used by `security_level()` to create a `Sensitivity` instance from policy fields.
+    pub(crate) fn sensitivity_id(&self, sensitivity: le::U32) -> SensitivityId {
+        SensitivityId(
+            String::from_utf8(self.sensitivity(sensitivity).name_bytes().to_vec()).unwrap(),
+        )
+    }
+
+    /// Helper used by `category()` to create a category name from policy fields.
+    pub(crate) fn category_id(&self, id: le::U32) -> CategoryId {
+        CategoryId(String::from_utf8(self.category(id).name_bytes().to_vec()).unwrap())
     }
 
     #[cfg(feature = "selinux_policy_test_api")]
@@ -404,7 +420,7 @@ where
     SimpleArray<PS, InfinitiBandPartitionKeys<PS>>: Parse<PS>,
     SimpleArray<PS, InfinitiBandEndPorts<PS>>: Parse<PS>,
     SimpleArray<PS, GenericFsContexts<PS>>: Parse<PS>,
-    SimpleArray<PS, RangeTranslations<PS>>: Parse<PS>,
+    SimpleArray<PS, RangeTransitions<PS>>: Parse<PS>,
 {
     /// A [`Policy`] may add context to underlying [`ParseError`] values.
     type Error = anyhow::Error;
@@ -547,9 +563,9 @@ where
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing generic filesystem contexts")?;
 
-        let (range_translations, tail) = SimpleArray::<PS, RangeTranslations<PS>>::parse(tail)
+        let (range_transitions, tail) = SimpleArray::<PS, RangeTransitions<PS>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
-            .context("parsing range translations")?;
+            .context("parsing range transitions")?;
 
         let primary_names_count = PS::deref(&types.metadata).primary_names_count();
         let mut attribute_maps = Vec::with_capacity(primary_names_count as usize);
@@ -597,7 +613,7 @@ where
                 infinitiband_partition_keys,
                 infinitiband_end_ports,
                 generic_fs_contexts,
-                range_translations,
+                range_transitions,
                 attribute_maps,
             },
             tail,
@@ -712,10 +728,10 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
             .validate()
             .map_err(Into::<anyhow::Error>::into)
             .context("validating generic_fs_contexts")?;
-        self.range_translations
+        self.range_transitions
             .validate()
             .map_err(Into::<anyhow::Error>::into)
-            .context("validating range_translations")?;
+            .context("validating range_transitions")?;
         self.attribute_maps
             .validate()
             .map_err(Into::<anyhow::Error>::into)
