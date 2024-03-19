@@ -17,7 +17,7 @@ use crate::{
 };
 use ebpf::MapSchema;
 use smallvec::smallvec;
-use starnix_logging::{log_trace, track_stub};
+use starnix_logging::{log_error, log_trace, track_stub};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -224,28 +224,31 @@ pub fn sys_bpf(
             let user_code = UserRef::<bpf_insn>::new(UserAddress::from(prog_attr.insns));
             let code = current_task.read_objects_to_vec(user_code, prog_attr.insn_cnt as usize)?;
 
-            let program = if current_task.kernel().features.bpf_v2 {
-                let mut log_buffer = if prog_attr.log_buf != 0 && prog_attr.log_size > 1 {
-                    UserBuffersOutputBuffer::unified_new(
-                        current_task,
-                        smallvec![UserBuffer {
-                            address: prog_attr.log_buf.into(),
-                            length: (prog_attr.log_size - 1) as usize
-                        }],
-                    )?
-                } else {
-                    UserBuffersOutputBuffer::unified_new(current_task, smallvec![])?
-                };
-                let result = Program::new(current_task, info, &mut log_buffer, code)?;
-                // Ensures the log buffer ends with a 0.
-                log_buffer.write(b"\0")?;
-                result
+            let mut log_buffer = if prog_attr.log_buf != 0 && prog_attr.log_size > 1 {
+                UserBuffersOutputBuffer::unified_new(
+                    current_task,
+                    smallvec![UserBuffer {
+                        address: prog_attr.log_buf.into(),
+                        length: (prog_attr.log_size - 1) as usize
+                    }],
+                )?
             } else {
-                // We pretend to succeed at loading the program in the basic version of bpf.
-                // Eventually we'll be able to remove this stub when we can load bpf programs
-                // accurately.
-                Program::new_stub(info)
+                UserBuffersOutputBuffer::unified_new(current_task, smallvec![])?
             };
+            let program = match Program::new(current_task, info.clone(), &mut log_buffer, code) {
+                Ok(program) => program,
+                Err(e) => {
+                    if current_task.kernel().features.bpf_v2 {
+                        return Err(e);
+                    }
+                    // if bpf_v2 is not enabled, only log the error and return a stub. In the
+                    // future, return the error unconditionally.
+                    log_error!("Unable to load bpf program: {e:?}");
+                    Program::new_stub(info)
+                }
+            };
+            // Ensures the log buffer ends with a 0.
+            log_buffer.write(b"\0")?;
 
             install_bpf_fd(current_task, program)
         }
