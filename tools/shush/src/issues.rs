@@ -26,7 +26,9 @@ impl ComponentDefs {
             let path = component
                 .path
                 .iter()
-                .fold(String::new(), |acc, x| format!("{acc}>{}", x.replace(' ', "")));
+                .map(|x| x.replace(' ', ""))
+                .reduce(|acc, x| format!("{acc}>{x}"))
+                .unwrap_or_default();
             defs.insert(path, component.id);
         }
         Ok(Self { defs })

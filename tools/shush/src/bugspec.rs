@@ -14,24 +14,45 @@ use crate::api::{Api, Component, ComponentId, CreateIssue, IssueId, UpdateIssue}
 
 pub struct Bugspec {
     path: PathBuf,
+    log_api: bool,
 }
 
 impl Bugspec {
-    pub fn new(path: PathBuf) -> Self {
-        Self { path }
+    pub fn new(path: PathBuf, log_api: bool) -> Self {
+        Self { path, log_api }
     }
 }
 
 impl Api for Bugspec {
     fn create_issue(&mut self, request: CreateIssue) -> Result<IssueId> {
-        let mut child = Command::new(&self.path).arg("create").stdin(Stdio::piped()).spawn()?;
+        if self.log_api {
+            println!("[bugspec] Creating new issue");
+        }
+
+        let mut child = Command::new(&self.path)
+            .arg("create")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
 
         let mut stdin = child.stdin.take().unwrap();
         stdin.write_all(request.to_bugspec().as_bytes())?;
+        drop(stdin);
 
         let output = child.wait_with_output()?;
 
-        Ok(IssueId::new(core::str::from_utf8(&output.stdout)?.parse()?))
+        if self.log_api {
+            println!("[bugspec] Successfully created issue");
+        }
+
+        let response = core::str::from_utf8(&output.stdout)?;
+        let id = response
+            .strip_prefix("Created issue http://b/")
+            .and_then(|r| r.strip_suffix('\n'))
+            .context(format!("Unexpected response from bugspec API: '{}'", response))?;
+
+        Ok(IssueId::new(id.parse()?))
     }
 
     fn update_issue(&mut self, request: UpdateIssue) -> Result<()> {
@@ -39,10 +60,13 @@ impl Api for Bugspec {
             .arg("edit")
             .arg(&format!("{}", request.id))
             .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .spawn()?;
 
         let mut stdin = child.stdin.take().unwrap();
         stdin.write_all(request.to_bugspec().as_bytes())?;
+        drop(stdin);
 
         child.wait()?;
 
@@ -50,16 +74,22 @@ impl Api for Bugspec {
     }
 
     fn list_components(&mut self) -> Result<Vec<Component>> {
-        let output = Command::new(&self.path).arg("list-components").output()?;
+        const FUCHSIA_COMPONENT_ID: &str = "1360843";
+
+        let output =
+            Command::new(&self.path).args(&["list-components", FUCHSIA_COMPONENT_ID]).output()?;
 
         let text = String::from_utf8(output.stdout)?;
 
         let mut results = Vec::new();
         for line in text.lines() {
             let (id, path) =
-                line.split_once(' ').context("expected component to have id and path")?;
+                line.split_once('\t').context("expected component to have id and path")?;
             results.push(Component {
-                id: ComponentId::new(id.parse()?),
+                id: ComponentId::new(
+                    id.parse()
+                        .context(format!("while parsing id `{id}` for component `{path}`"))?,
+                ),
                 path: path.split(" > ").skip(2).map(str::to_string).collect(),
             });
         }

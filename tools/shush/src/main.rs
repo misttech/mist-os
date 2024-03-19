@@ -81,10 +81,9 @@ impl Args {
     }
 
     pub fn api(&self) -> Result<Box<dyn Api>> {
-        let api = self
-            .api
-            .as_ref()
-            .map(|path| Box::new(bugspec::Bugspec::new(path.clone())) as Box<dyn Api>);
+        let api = self.api.as_ref().map(|path| {
+            Box::new(bugspec::Bugspec::new(path.clone(), self.log_api)) as Box<dyn Api>
+        });
 
         if self.dryrun || self.mock {
             Ok(Box::new(mock::Mock::new(self.log_api, api)))

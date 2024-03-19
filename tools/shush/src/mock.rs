@@ -44,7 +44,14 @@ impl Api for Mock {
         }
 
         if let Some(read_only) = self.read_only.as_mut() {
-            read_only.list_components()
+            let defs = read_only.list_components()?;
+
+            if self.log_api {
+                println!("[mock] Readonly API returned component defs:");
+                println!("{defs:?}");
+            }
+
+            Ok(defs)
         } else {
             Ok(Vec::new())
         }
