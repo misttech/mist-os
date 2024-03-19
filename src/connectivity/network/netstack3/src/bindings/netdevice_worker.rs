@@ -9,7 +9,7 @@ use std::{
 };
 
 use assert_matches::assert_matches;
-use fidl_fuchsia_hardware_network as fhardware_network;
+use fidl_fuchsia_hardware_network::{self as fhardware_network, FrameType};
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fuchsia_async as fasync;
@@ -70,6 +70,8 @@ pub(crate) enum Error {
     MacNotUnicast { mac: net_types::ethernet::Mac, port: netdevice_client::Port },
     #[error("interface named {0} already exists")]
     DuplicateName(String),
+    #[error("{port_type:?} port received unexpected frame type: {frame_type:?}")]
+    MismatchedRxFrameType { port_type: PortWireFormat, frame_type: fhardware_network::FrameType },
 }
 
 const DEFAULT_BUFFER_LENGTH: usize = 2048;
@@ -160,6 +162,20 @@ impl NetdeviceWorker {
                     continue;
                 }
                 FilterResult::Accept => (),
+            }
+
+            let frame_type = rx.frame_type().map_err(Error::Client)?;
+            match frame_type {
+                FrameType::Ethernet => {}
+                f @ FrameType::Ipv4 | f @ FrameType::Ipv6 => {
+                    // NB: When the port was attached, `Ethernet` was the only
+                    // permitted frame type; anything else here indicates a
+                    // bug in `netdevice_client` or the core netdevice driver.
+                    return Err(Error::MismatchedRxFrameType {
+                        port_type: PortWireFormat::Ethernet,
+                        frame_type: f,
+                    });
+                }
             }
 
             ctx.api().device::<EthernetLinkDevice>().receive_frame(
