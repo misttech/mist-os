@@ -117,6 +117,7 @@ action("generate_main_workspace") {
 
     # The list of content hash files
     # LINT.IfChange
+    "${bazel_main_top_dir}/workspace/generated_repository_hashes/bazel_rules_fuchsia.hash",
     "${bazel_main_top_dir}/workspace/generated_repository_hashes/boringssl.hash",
     "${bazel_main_top_dir}/workspace/generated_repository_hashes/com_google_googletest.hash",
     "${bazel_main_top_dir}/workspace/generated_repository_hashes/fuchsia_clang.hash",

@@ -447,6 +447,21 @@ def depfile_quote(path: str) -> str:
     return path.replace("\\", "\\\\").replace(" ", "\\ ")
 
 
+def find_all_files_under(path: str) -> Sequence[str]:
+    """Find all files under a specific directory path.
+
+    Args:
+      path: Source directory path.
+    Returns:
+      A list of file paths.
+    """
+    result = []
+    for root, dirs, files in os.walk(path):
+        result.extend(os.path.join(root, file) for file in files)
+
+    return result
+
+
 def find_prebuilt_python_content_files(install_path: str) -> Sequence[str]:
     """Find all prebuilt python files for content hash computation.
 
@@ -834,7 +849,7 @@ common --enable_bzlmod=false
 
     # Content hash file for @fuchsia_sdk.
     sdk_root = os.path.join(gn_output_dir, "sdk", "exported")
-    all_fuchsia_sdk_metas = all_sdk_metas(
+    all_fuchsia_idk_metas = all_sdk_metas(
         os.path.join(sdk_root, "bazel_fuchsia_sdk_idk")
     )
 
@@ -875,6 +890,8 @@ common --enable_bzlmod=false
             "crosstool.BUILD.template",
         ),
     ]
+
+    rules_fuchsia_files = find_all_files_under(rules_fuchsia_dir)
 
     python_content_files = find_prebuilt_python_content_files(
         os.path.join(
@@ -934,7 +951,11 @@ common --enable_bzlmod=false
     ]
 
     # LINT.IfChange
-    generated_repositories_inputs["fuchsia_sdk"] = all_fuchsia_sdk_metas
+    generated_repositories_inputs["fuchsia_sdk"] = all_fuchsia_idk_metas
+    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+
+    # LINT.IfChange
+    generated_repositories_inputs["bazel_rules_fuchsia"] = rules_fuchsia_files
     # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
 
     # LINT.IfChange
