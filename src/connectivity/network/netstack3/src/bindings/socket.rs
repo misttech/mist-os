@@ -673,3 +673,34 @@ impl IntoErrno for NotDualStackCapableError {
         Errno::Enoprotoopt
     }
 }
+
+/// Logs the errno, tailoring the log level to the error's severity.
+///
+/// # Syntax
+///
+/// log_errno!(errno, fmt_str, fmt_arg1, fmt_arg2, ...);
+///
+///   - errno: The error used to determine the log level. Must be an
+///     [`fidl_fuchsia_posix::Errno`].
+///   - fmt_str: An `&str` format string, e.g. "Foo Op failed: {:?}".
+///   - fmt_arg1 ... fmt_arg n: A variable length list of arguments to `fmt_st`.
+///
+/// Which is expanded into the appropriate [`tracing`] macro invocation as
+/// follows: debug!(fmt_string, fmt_arg1, fmt_arg2, ...)
+macro_rules! log_errno {
+    ($errno:expr, $fmt_str:expr, $($arg:tt)*) => {
+        match $errno {
+            // Errnos that indicate the socket API is being called incorrectly.
+            fidl_fuchsia_posix::Errno::Einval
+            | fidl_fuchsia_posix::Errno::Eafnosupport
+            | fidl_fuchsia_posix::Errno::Enoprotoopt => tracing::warn!($fmt_str, $($arg)*),
+            // Errnos that may occur under normal operation and are quite noisy.
+            fidl_fuchsia_posix::Errno::Enetunreach
+            | fidl_fuchsia_posix::Errno::Ehostunreach
+            | fidl_fuchsia_posix::Errno::Eagain => tracing::trace!($fmt_str, $($arg)*),
+            // All other errnos.
+            _ => tracing::debug!($fmt_str, $($arg)*),
+        }
+    };
+}
+pub(crate) use log_errno;
