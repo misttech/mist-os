@@ -25,7 +25,7 @@ use {
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     futures::StreamExt,
     std::rc::Rc,
-    tracing::info,
+    tracing::{error, info},
 };
 
 /// This enum allows the session to match on incoming messages.
@@ -72,14 +72,17 @@ async fn main() -> Result<(), Error> {
 
     fs.take_and_serve_directory_handle()?;
 
+    if let Err(err) = element_manager.start_persistent_elements().await {
+        error!(?err, "Unable to start persistent elements");
+    }
+
     fs.for_each_concurrent(NUM_CONCURRENT_REQUESTS, |service_request: ExposedServices| async {
         let element_manager = element_manager.clone();
         match service_request {
             ExposedServices::Manager(request_stream) => {
-                element_manager
-                    .handle_requests(request_stream)
-                    .await
-                    .expect("Failed to handle element manager requests");
+                if let Err(err) = element_manager.handle_requests(request_stream).await {
+                    error!(?err, "Failed to handle element manager requests");
+                }
             }
         }
     })
@@ -91,12 +94,13 @@ async fn main() -> Result<(), Error> {
 mod tests {
     use {
         crate::element_manager::{CollectionConfig, ElementManager},
+        fidl::endpoints::Proxy,
         fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler},
-        fidl::endpoints::{ProtocolMarker, Proxy},
         fidl_connector::Connect,
-        fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+        fidl_fuchsia_element as felement, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_zircon::sys::ZX_OK,
+        futures::{channel::mpsc, SinkExt, StreamExt},
         lazy_static::lazy_static,
         session_testing::spawn_directory_server,
         std::collections::HashMap,
@@ -109,20 +113,22 @@ mod tests {
     /// - `element_manager`: The `ElementManager` that Manager uses to launch elements.
     ///
     /// # Returns
-    /// A `ManagerProxy` to the spawned server.
-    fn spawn_manager_server(element_manager: Box<ElementManager>) -> felement::ManagerProxy {
+    /// A `ManagerProxy` to the spawned server and the spawned task.
+    fn spawn_manager_server(
+        element_manager: Box<ElementManager>,
+    ) -> (felement::ManagerProxy, fasync::Task<()>) {
         let (proxy, stream) = create_proxy_and_stream::<felement::ManagerMarker>()
             .expect("Failed to create Manager proxy and stream");
 
-        fasync::Task::spawn(async move {
-            element_manager
-                .handle_requests(stream)
-                .await
-                .expect("Failed to handle element manager requests");
-        })
-        .detach();
-
-        proxy
+        (
+            proxy,
+            fasync::Task::spawn(async move {
+                element_manager
+                    .handle_requests(stream)
+                    .await
+                    .expect("Failed to handle element manager requests");
+            }),
+        )
     }
 
     struct MockConnector<T: Proxy> {
@@ -148,7 +154,6 @@ mod tests {
     async fn propose_element_launches_element() {
         lazy_static! {
             static ref CREATE_CHILD_CALL_COUNT: Counter = Counter::new(0);
-            static ref BINDER_CONNECTION_COUNT: Counter = Counter::new(0);
         }
 
         let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
@@ -159,11 +164,6 @@ mod tests {
         };
 
         let directory_request_handler = move |directory_request| match directory_request {
-            fio::DirectoryRequest::Open { path, .. } => {
-                if path == fcomponent::BinderMarker::DEBUG_NAME {
-                    BINDER_CONNECTION_COUNT.inc();
-                }
-            }
             fio::DirectoryRequest::ReadDirents { responder, .. } => {
                 responder.send(ZX_OK, &[]).expect("Failed to service ReadDirents");
             }
@@ -182,6 +182,7 @@ mod tests {
                     responder,
                 } => {
                     assert_eq!(decl.url.unwrap(), component_url);
+                    assert_eq!(decl.startup.unwrap(), fdecl::StartupMode::Eager);
                     CREATE_CHILD_CALL_COUNT.inc();
                     let _ = responder.send(Ok(()));
                 }
@@ -217,7 +218,7 @@ mod tests {
             Some(graphical_presenter_connector),
             collection_config,
         ));
-        let manager_proxy = spawn_manager_server(element_manager);
+        let (manager_proxy, _task) = spawn_manager_server(element_manager);
 
         let result = manager_proxy
             .propose_element(
@@ -231,6 +232,180 @@ mod tests {
         assert!(result.is_ok());
 
         assert_eq!(CREATE_CHILD_CALL_COUNT.get(), 1);
-        assert_eq!(BINDER_CONNECTION_COUNT.get(), 1);
+    }
+
+    #[fuchsia::test]
+    async fn propose_persistent_element() {
+        lazy_static! {
+            static ref CREATE_CHILD_CALL_COUNT: Counter = Counter::new(0);
+        }
+
+        let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
+
+        let collection_config = CollectionConfig {
+            url_to_collection: HashMap::new(),
+            default_collection: "elements".to_string(),
+        };
+
+        let directory_request_handler = move |directory_request| match directory_request {
+            fio::DirectoryRequest::ReadDirents { responder, .. } => {
+                responder.send(ZX_OK, &[]).expect("Failed to service ReadDirents");
+            }
+            fio::DirectoryRequest::Rewind { responder } => {
+                responder.send(ZX_OK).expect("Failed to service Rewind");
+            }
+            _ => panic!("Directory handler received an unexpected request"),
+        };
+
+        let (destroy_child_sender, mut destroy_child_receiver) = mpsc::unbounded();
+
+        let realm: fcomponent::RealmProxy = spawn_stream_handler(move |realm_request| {
+            let mut destroy_child_sender = destroy_child_sender.clone();
+            async move {
+                match realm_request {
+                    fcomponent::RealmRequest::CreateChild {
+                        collection: _,
+                        decl,
+                        args: _,
+                        responder,
+                    } => {
+                        assert_eq!(decl.url.unwrap(), component_url);
+                        assert_eq!(decl.name.unwrap(), "foo");
+                        assert_eq!(decl.startup.unwrap(), fdecl::StartupMode::Eager);
+                        CREATE_CHILD_CALL_COUNT.inc();
+                        let _ = responder.send(Ok(()));
+                    }
+                    fcomponent::RealmRequest::OpenExposedDir {
+                        child: _,
+                        exposed_dir,
+                        responder,
+                    } => {
+                        spawn_directory_server(exposed_dir, directory_request_handler);
+                        let _ = responder.send(Ok(()));
+                    }
+                    fcomponent::RealmRequest::DestroyChild { child, responder } => {
+                        assert_eq!(child.name, "foo");
+                        let _ = destroy_child_sender.send(()).await;
+                        let _ = responder.send(Ok(()));
+                    }
+                    _ => {
+                        panic!("Realm handler received unexpected request");
+                    }
+                }
+            }
+        })
+        .unwrap();
+
+        let graphical_presenter: felement::GraphicalPresenterProxy =
+            spawn_stream_handler(move |graphical_presenter_request| async move {
+                match graphical_presenter_request {
+                    felement::GraphicalPresenterRequest::PresentView {
+                        view_spec: _,
+                        annotation_controller: _,
+                        view_controller_request: _,
+                        responder,
+                    } => {
+                        let _ = responder.send(Ok(()));
+                    }
+                }
+            })
+            .unwrap();
+
+        {
+            let element_manager: Box<ElementManager> = Box::new(ElementManager::new(
+                realm.clone(),
+                Some(Box::new(MockConnector::new(graphical_presenter.clone()))),
+                collection_config.clone(),
+            ));
+            let (manager_proxy, _task) = spawn_manager_server(element_manager);
+
+            let result = manager_proxy
+                .propose_element(
+                    felement::Spec {
+                        component_url: Some(component_url.to_string()),
+                        annotations: Some(vec![
+                            felement::Annotation {
+                                key: felement::AnnotationKey {
+                                    namespace: felement::MANAGER_NAMESPACE.to_string(),
+                                    value: felement::ANNOTATION_KEY_PERSIST_ELEMENT.to_string(),
+                                },
+                                value: felement::AnnotationValue::Text(String::new()),
+                            },
+                            felement::Annotation {
+                                key: felement::AnnotationKey {
+                                    namespace: felement::MANAGER_NAMESPACE.to_string(),
+                                    value: felement::ANNOTATION_KEY_NAME.to_string(),
+                                },
+                                value: felement::AnnotationValue::Text("foo".to_string()),
+                            },
+                        ]),
+                        ..Default::default()
+                    },
+                    None,
+                )
+                .await;
+            assert!(result.is_ok());
+        }
+
+        assert_eq!(CREATE_CHILD_CALL_COUNT.get(), 1);
+
+        let _ = destroy_child_receiver.next().await.expect("Expected DestroyChild");
+
+        {
+            // Launch another instance of element manager and it should launch the child again.
+            let element_manager: Box<ElementManager> = Box::new(ElementManager::new(
+                realm.clone(),
+                Some(Box::new(MockConnector::new(graphical_presenter.clone()))),
+                collection_config.clone(),
+            ));
+
+            element_manager
+                .start_persistent_elements()
+                .await
+                .expect("start_persistent_elements failed");
+
+            let (manager_proxy, _task) = spawn_manager_server(element_manager);
+
+            assert_eq!(CREATE_CHILD_CALL_COUNT.get(), 2);
+
+            // Now remove the element.
+            manager_proxy
+                .remove_element("foo")
+                .await
+                .expect("remove_element failed (fidl)")
+                .expect("remove_element failed");
+
+            // That should destroy the child.
+            let _ = destroy_child_receiver.next().await.expect("Expected DestroyChild");
+        }
+
+        {
+            // And this time, when we launch again, it should *not* launch the element.
+            let element_manager: Box<ElementManager> = Box::new(ElementManager::new(
+                realm,
+                Some(Box::new(MockConnector::new(graphical_presenter))),
+                collection_config,
+            ));
+
+            element_manager
+                .start_persistent_elements()
+                .await
+                .expect("start_persistent_elements failed");
+
+            let (manager_proxy, _task) = spawn_manager_server(element_manager);
+
+            // There should be no change in the count.
+            assert_eq!(CREATE_CHILD_CALL_COUNT.get(), 2);
+
+            // If we try and remove the element, it should report not found.
+            assert_eq!(
+                manager_proxy
+                    .remove_element("foo")
+                    .await
+                    .expect("remove_element failed (fidl)")
+                    .expect_err("remove_element succeeded"),
+                felement::ManagerError::NotFound
+            );
+        }
     }
 }

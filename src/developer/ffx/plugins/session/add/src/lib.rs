@@ -7,7 +7,10 @@ use {
     async_trait::async_trait,
     ffx_session_add_args::SessionAddCommand,
     fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_element::{ControllerMarker, ManagerProxy, Spec},
+    fidl_fuchsia_element::{
+        self as felement, Annotation, AnnotationKey, AnnotationValue, ControllerMarker,
+        ManagerProxy, Spec,
+    },
     futures::{channel::oneshot, FutureExt},
     signal_hook::{consts::signal::*, iterator::Signals},
     std::future::Future,
@@ -47,9 +50,35 @@ pub async fn add_impl<W: std::io::Write>(
         (None, None)
     };
 
+    let mut annotations = Vec::new();
+
+    if cmd.persist {
+        annotations.push(Annotation {
+            key: AnnotationKey {
+                namespace: felement::MANAGER_NAMESPACE.to_string(),
+                value: felement::ANNOTATION_KEY_PERSIST_ELEMENT.to_string(),
+            },
+            value: AnnotationValue::Text(String::new()),
+        });
+    }
+
+    if let Some(name) = cmd.name {
+        annotations.push(Annotation {
+            key: AnnotationKey {
+                namespace: felement::MANAGER_NAMESPACE.to_string(),
+                value: felement::ANNOTATION_KEY_NAME.to_string(),
+            },
+            value: AnnotationValue::Text(name.clone()),
+        });
+    }
+
     manager_proxy
         .propose_element(
-            Spec { component_url: Some(cmd.url.to_string()), ..Default::default() },
+            Spec {
+                component_url: Some(cmd.url.to_string()),
+                annotations: if annotations.is_empty() { None } else { Some(annotations) },
+                ..Default::default()
+            },
             controller_server,
         )
         .await?
@@ -77,7 +106,12 @@ fn spawn_ctrl_c_listener() -> impl Future<Output = ()> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl_fuchsia_element::ManagerRequest, futures::poll};
+    use {
+        super::*,
+        assert_matches::assert_matches,
+        fidl_fuchsia_element::{self as felement, ManagerRequest},
+        futures::poll,
+    };
 
     #[fuchsia::test]
     async fn test_add_element() {
@@ -88,9 +122,15 @@ mod test {
                 assert_eq!(spec.component_url.unwrap(), TEST_ELEMENT_URL.to_string());
                 let _ = responder.send(Ok(()));
             }
+            ManagerRequest::RemoveElement { .. } => unreachable!(),
         });
 
-        let add_cmd = SessionAddCommand { url: TEST_ELEMENT_URL.to_string(), interactive: false };
+        let add_cmd = SessionAddCommand {
+            url: TEST_ELEMENT_URL.to_string(),
+            interactive: false,
+            persist: false,
+            name: None,
+        };
         let response =
             add_impl(proxy, add_cmd, spawn_ctrl_c_listener(), &mut std::io::stdout()).await;
         assert!(response.is_ok());
@@ -104,9 +144,15 @@ mod test {
             ManagerRequest::ProposeElement { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
+            ManagerRequest::RemoveElement { .. } => unreachable!(),
         });
 
-        let add_cmd = SessionAddCommand { url: TEST_ELEMENT_URL.to_string(), interactive: false };
+        let add_cmd = SessionAddCommand {
+            url: TEST_ELEMENT_URL.to_string(),
+            interactive: false,
+            persist: false,
+            name: None,
+        };
         let response =
             add_impl(proxy, add_cmd, spawn_ctrl_c_listener(), &mut std::io::stdout()).await;
         assert!(response.is_ok());
@@ -120,9 +166,15 @@ mod test {
             ManagerRequest::ProposeElement { responder, .. } => {
                 responder.send(Ok(())).unwrap();
             }
+            ManagerRequest::RemoveElement { .. } => unreachable!(),
         });
 
-        let add_cmd = SessionAddCommand { url: TEST_ELEMENT_URL.to_string(), interactive: true };
+        let add_cmd = SessionAddCommand {
+            url: TEST_ELEMENT_URL.to_string(),
+            interactive: true,
+            persist: false,
+            name: None,
+        };
         let (ctrl_c_sender, ctrl_c_receiver) = oneshot::channel();
         let mut stdout = std::io::stdout();
         let mut add_fut =
@@ -134,5 +186,45 @@ mod test {
         ctrl_c_sender.send(()).unwrap();
         let result = add_fut.await;
         assert!(result.is_ok());
+    }
+
+    #[fuchsia::test]
+    async fn test_add_element_with_persist_and_name() {
+        const TEST_ELEMENT_URL: &str = "Test Element Url";
+
+        let proxy = fho::testing::fake_proxy(|req| match req {
+            ManagerRequest::ProposeElement { spec, responder, .. } => {
+                assert_eq!(spec.component_url.unwrap(), TEST_ELEMENT_URL.to_string());
+                let mut got_name = false;
+                let mut got_persist = false;
+                if let Some(annotations) = spec.annotations {
+                    for annotation in annotations {
+                        assert_eq!(annotation.key.namespace, felement::MANAGER_NAMESPACE);
+                        if annotation.key.value == felement::ANNOTATION_KEY_NAME {
+                            assert_matches!(annotation.value,
+                                            felement::AnnotationValue::Text(t) if t == "foo");
+                            got_name = true;
+                        } else if annotation.key.value == felement::ANNOTATION_KEY_PERSIST_ELEMENT {
+                            assert_matches!(annotation.value,
+                                            felement::AnnotationValue::Text(t) if t == "");
+                            got_persist = true;
+                        }
+                    }
+                }
+                assert!(got_name && got_persist);
+                let _ = responder.send(Ok(()));
+            }
+            ManagerRequest::RemoveElement { .. } => unreachable!(),
+        });
+
+        let add_cmd = SessionAddCommand {
+            url: TEST_ELEMENT_URL.to_string(),
+            interactive: false,
+            persist: true,
+            name: Some("foo".to_string()),
+        };
+        let response =
+            add_impl(proxy, add_cmd, spawn_ctrl_c_listener(), &mut std::io::stdout()).await;
+        assert!(response.is_ok());
     }
 }

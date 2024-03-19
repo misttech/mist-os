@@ -45,6 +45,11 @@ Once available, session manifests should instead include
             from: "parent",
             to: [ "#element_manager" ],
         },
+        {
+            storage: "data",
+            from: "parent",
+            to: "#element_manager",
+        },
     ],
     expose: [
         {

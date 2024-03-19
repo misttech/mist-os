@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_library("lib") {
   name = "stressor_lib"
@@ -51,8 +50,4 @@ fuchsia_package("stressor_package") {
 
 group("stressor") {
   deps = [ ":stressor_package" ]
-}
-
-core_shard("core_shard") {
-  shard_file = "meta/stressor.core_shard.cml"
 }

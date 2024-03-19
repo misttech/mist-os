@@ -178,7 +178,7 @@ async fn add_element(
     manager_proxy
         .propose_element(spec, None)
         .await?
-        .map_err(|err: felement::ProposeElementError| format_err!("{:?}", err))
+        .map_err(|err: felement::ManagerError| format_err!("{:?}", err))
 }
 
 #[cfg(test)]
@@ -276,7 +276,10 @@ mod tests {
         let _server_task = fasync::Task::spawn(async move {
             let propose_request =
                 manager_server.try_next().await.expect("FIDL Error").expect("Stream terminated");
-            let felement::ManagerRequest::ProposeElement { spec, responder, .. } = propose_request;
+            let felement::ManagerRequest::ProposeElement { spec, responder, .. } = propose_request
+            else {
+                unreachable!()
+            };
             assert_eq!(spec.component_url, Some(element_url.to_string()));
             let _ = responder.send(Ok(()));
         });
@@ -294,8 +297,10 @@ mod tests {
         let _server_task = fasync::Task::spawn(async move {
             let propose_request =
                 manager_server.try_next().await.expect("FIDL Error").expect("Stream terminated");
-            let felement::ManagerRequest::ProposeElement { responder, .. } = propose_request;
-            let _ = responder.send(Err(felement::ProposeElementError::InvalidArgs));
+            let felement::ManagerRequest::ProposeElement { responder, .. } = propose_request else {
+                unreachable!()
+            };
+            let _ = responder.send(Err(felement::ManagerError::InvalidArgs));
         });
 
         assert!(add_element(element_url, manager).await.is_err());

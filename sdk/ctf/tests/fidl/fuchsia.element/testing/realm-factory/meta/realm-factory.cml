@@ -17,6 +17,13 @@
         // TODO(299966655): Delete after we branch for F15.
         { protocol: "fuchsia.testing.harness.RealmProxy" },
     ],
+    offer: [
+        {
+            storage: "data",
+            from: "parent",
+            to: "#realm_builder",
+        },
+    ],
     expose: [
         {
             // TODO(299966655): Delete after we branch for F15.

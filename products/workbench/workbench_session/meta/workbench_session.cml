@@ -11,6 +11,7 @@
         {
             name: "element_manager",
             url: "element_manager#meta/element_manager.cm",
+            startup: "eager",
         },
         {
             name: "tiling_wm",
@@ -57,7 +58,10 @@
         {
             storage: "data",
             from: "parent",
-            to: "#elements",
+            to: [
+                "#element_manager",
+                "#elements",
+            ],
         },
         {
             protocol: [

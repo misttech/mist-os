@@ -1,6 +1,6 @@
 {
   "name": "add",
-  "description": "Add an element to the current session.",
+  "description": "Add an element to the current session.\n\nIf the --persist option is used, the package should be in the base or cache\npackage set as otherwise it might fail to launch after a reboot.",
   "examples": [
     "To add the `bouncing_ball.cm` component as an element:\n\n    $ ffx session add fuchsia-pkg://fuchsia.com/bouncing_ball#meta/bouncing_ball.cm"
   ],
@@ -19,6 +19,26 @@
       "long": "--interactive",
       "short": null,
       "description": "pass to keep element alive until command exits",
+      "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--persist",
+      "short": null,
+      "description": "pass to have the element persist over reboots",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "name"
+        }
+      },
+      "optionality": "optional",
+      "long": "--name",
+      "short": null,
+      "description": "name for the element which defaults to random if not specified",
       "hidden": false
     }
   ],

@@ -13,31 +13,33 @@ use {
         handle_annotation_controller_stream, AnnotationError, AnnotationHolder, WatchResponder,
     },
     crate::element::Element,
-    anyhow::{format_err, Error},
+    anyhow::{anyhow, bail, format_err, Context, Error},
     fidl::endpoints::{
         create_proxy, create_request_stream, ClientEnd, ControlHandle, Proxy, RequestStream,
         ServerEnd,
     },
     fidl_connector::Connect,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
-    fidl_fuchsia_ui_app as fuiapp,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_element as felement, fidl_fuchsia_element_manager_persistence as persistence,
+    fidl_fuchsia_io as fio, fidl_fuchsia_ui_app as fuiapp,
     fuchsia_async::{self as fasync, DurationExt},
     fuchsia_fs::directory as ffs_dir,
     fuchsia_scenic as scenic, fuchsia_zircon as zx,
-    futures::{lock::Mutex, select, FutureExt, StreamExt, TryStreamExt},
+    futures::{
+        channel::oneshot, future::Fuse, lock::Mutex, select, FutureExt, StreamExt, TryStreamExt,
+    },
     rand::{
         distributions::{Alphanumeric, DistString},
         thread_rng,
     },
-    std::{collections::HashMap, sync::Arc},
+    std::{collections::HashMap, io::Write, os::fd::AsRawFd, pin::pin, sync::Arc},
     tracing::{error, info, warn},
 };
 
+const DEFAULT_PERSISTENT_ELEMENTS_PATH: &str = "/data/persistent_elements";
+
 // Timeout duration for a ViewControllerProxy to close, in seconds.
 static VIEW_CONTROLLER_DISMISS_TIMEOUT: zx::Duration = zx::Duration::from_seconds(3_i64);
-
-// Annotations in the ElementManager namespace.
-static ELEMENT_MANAGER_NS: &'static str = "element_manager";
 
 /// Errors returned by calls to [`ElementManager`].
 #[derive(Debug, thiserror::Error, Clone, PartialEq)]
@@ -51,11 +53,6 @@ pub enum ElementManagerError {
     /// of the component instance associated with a given element.
     #[error("Element {} not bound at \"{}/{}\": {:?}", url, collection, name, err)]
     ExposedDirNotOpened { name: String, collection: String, url: String, err: fcomponent::Error },
-
-    /// Returned when the element manager fails to bind to the component instance associated with
-    /// a given element.
-    #[error("Element {} not bound at \"{}/{}\": {:?}", url, collection, name, err_str)]
-    NotBound { name: String, collection: String, url: String, err_str: String },
 }
 
 impl ElementManagerError {
@@ -84,20 +81,6 @@ impl ElementManagerError {
             collection: collection.into(),
             url: url.into(),
             err: err.into(),
-        }
-    }
-
-    pub fn not_bound(
-        name: impl Into<String>,
-        collection: impl Into<String>,
-        url: impl Into<String>,
-        err_str: impl Into<String>,
-    ) -> ElementManagerError {
-        ElementManagerError::NotBound {
-            name: name.into(),
-            collection: collection.into(),
-            url: url.into(),
-            err_str: err_str.into(),
         }
     }
 }
@@ -136,6 +119,15 @@ pub struct ElementManager {
     /// The component that is running the `ElementManager` must have a collection in its CML file
     /// for each collection listed in `collections_config`.
     collection_config: CollectionConfig,
+
+    /// The data for persistent elements.
+    persistent_elements: Mutex<persistence::PersistentElements>,
+
+    /// The path to be used for persistent elements.
+    persistent_elements_path: &'static str,
+
+    /// Running elements and the sender end of a channel to shut down.
+    running_elements: Arc<std::sync::Mutex<HashMap<String, oneshot::Sender<()>>>>,
 }
 
 impl ElementManager {
@@ -144,7 +136,14 @@ impl ElementManager {
         graphical_presenter_connector: Option<GraphicalPresenterConnector>,
         collection_config: CollectionConfig,
     ) -> ElementManager {
-        ElementManager { realm, graphical_presenter_connector, collection_config }
+        ElementManager {
+            realm,
+            graphical_presenter_connector,
+            collection_config,
+            persistent_elements: Default::default(),
+            running_elements: Default::default(),
+            persistent_elements_path: DEFAULT_PERSISTENT_ELEMENTS_PATH,
+        }
     }
 
     /// Launches a component as an element.
@@ -172,15 +171,26 @@ impl ElementManager {
             "launch_v2_element"
         );
 
-        realm_management::create_child_component(
-            &child_name,
-            &child_url,
-            collection,
-            fcomponent::CreateChildArgs::default(),
-            &self.realm,
-        )
-        .await
-        .map_err(|err: fcomponent::Error| {
+        let create_eager_child = || async {
+            let child_decl = fdecl::Child {
+                name: Some(child_name.to_string()),
+                url: Some(child_url.to_string()),
+                startup: Some(fdecl::StartupMode::Eager),
+                environment: None,
+                ..Default::default()
+            };
+
+            self.realm
+                .create_child(
+                    &fdecl::CollectionRef { name: collection.to_string() },
+                    &child_decl,
+                    fcomponent::CreateChildArgs::default(),
+                )
+                .await
+                .map_err(|_| fcomponent::Error::Internal)?
+        };
+
+        create_eager_child().await.map_err(|err| {
             ElementManagerError::not_created(child_name, collection, child_url, err)
         })?;
 
@@ -219,19 +229,6 @@ impl ElementManager {
             }
         };
 
-        // Connect to fuchsia.component.Binder in order to start the component.
-        let _ = fuchsia_component::client::connect_to_protocol_at_dir_root::<
-            fcomponent::BinderMarker,
-        >(&exposed_directory)
-        .map_err(|err| {
-            ElementManagerError::not_bound(
-                child_name,
-                collection.to_owned(),
-                child_url,
-                err.to_string(),
-            )
-        })?;
-
         Ok(Element::from_directory_channel(
             exposed_directory.into_channel().unwrap().into_zx_channel(),
             child_name,
@@ -252,13 +249,49 @@ impl ElementManager {
     pub async fn handle_requests(
         &self,
         mut stream: felement::ManagerRequestStream,
-    ) -> Result<(), fidl::Error> {
+    ) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await? {
             match request {
                 felement::ManagerRequest::ProposeElement { spec, controller, responder } => {
                     let result = self.handle_propose_element(spec, controller).await;
                     let _ = responder.send(result);
                 }
+                felement::ManagerRequest::RemoveElement { name, responder } => {
+                    let _ = responder.send(self.handle_remove_element(&name).await?);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Reads the persistent elements file and starts any persistent elements.
+    pub async fn start_persistent_elements(&self) -> Result<(), Error> {
+        let data = match std::fs::read(self.persistent_elements_path) {
+            Ok(data) => data,
+            Err(err) => {
+                // Ignore not found errors
+                if err.kind() == std::io::ErrorKind::NotFound {
+                    return Ok(());
+                } else {
+                    return Err(err).context("Failed to read persistent elements file");
+                }
+            }
+        };
+        let elements: persistence::PersistentElements = fidl::unpersist(&data)?;
+
+        let mut persistent_elements = self.persistent_elements.lock().await;
+        *persistent_elements = elements;
+
+        if let Some(elements) = &persistent_elements.elements {
+            let mut had_errors = false;
+            for element in elements {
+                if let Err(err) = self.start_persistent_element(&element).await {
+                    error!(?err, "Failed to start persistent element ({element:?})");
+                    had_errors = true;
+                }
+            }
+            if had_errors {
+                bail!("Some persistent elements failed to start");
             }
         }
         Ok(())
@@ -306,15 +339,22 @@ impl ElementManager {
         &self,
         spec: felement::Spec,
         element_controller: Option<ServerEnd<felement::ControllerMarker>>,
-    ) -> Result<(), felement::ProposeElementError> {
+    ) -> Result<(), felement::ManagerError> {
         let component_url = spec.component_url.ok_or_else(|| {
             error!("ProposeElement() failed to launch element: spec.component_url is missing");
-            felement::ProposeElementError::InvalidArgs
+            felement::ManagerError::InvalidArgs
         })?;
 
         let url_key = felement::AnnotationKey {
-            namespace: ELEMENT_MANAGER_NS.to_string(),
-            value: "url".to_string(),
+            namespace: felement::MANAGER_NAMESPACE.to_string(),
+            value: felement::ANNOTATION_KEY_URL.to_string(),
+        };
+
+        let name_key = name_key();
+
+        let persist_key = felement::AnnotationKey {
+            namespace: felement::MANAGER_NAMESPACE.to_string(),
+            value: felement::ANNOTATION_KEY_PERSIST_ELEMENT.to_string(),
         };
 
         let mut initial_annotations = match spec.annotations {
@@ -322,40 +362,133 @@ impl ElementManager {
             None => vec![],
         };
 
-        if !initial_annotations.iter().any(|annotation| annotation.key == url_key) {
+        let mut has_url = false;
+        let mut name = None;
+        let mut persist = false;
+        let mut has_non_text = false;
+
+        for annotation in &initial_annotations {
+            if annotation.key == url_key {
+                if let felement::AnnotationValue::Text(t) = &annotation.value {
+                    if t != &component_url {
+                        error!("ProposeElement() annotation URL does not match");
+                        return Err(felement::ManagerError::InvalidArgs);
+                    }
+                } else {
+                    error!("ProposeElement() bad URL annotation");
+                    return Err(felement::ManagerError::InvalidArgs);
+                }
+                has_url = true;
+            }
+            if annotation.key == name_key {
+                if let felement::AnnotationValue::Text(n) = &annotation.value {
+                    name = Some(n.clone());
+                }
+            }
+            if annotation.key == persist_key {
+                persist = true;
+            }
+            if !matches!(annotation.value, felement::AnnotationValue::Text(_)) {
+                has_non_text = true;
+            }
+        }
+
+        if !has_url {
             initial_annotations.push(felement::Annotation {
                 key: url_key,
                 value: felement::AnnotationValue::Text(component_url.to_string()),
             });
         }
 
+        // Generate a random name if we don't have one.
+        let name = name.unwrap_or_else(|| {
+            let mut name = Alphanumeric.sample_string(&mut thread_rng(), 16);
+            name.make_ascii_lowercase();
+            initial_annotations.push(felement::Annotation {
+                key: name_key,
+                value: felement::AnnotationValue::Text(name.clone()),
+            });
+            name
+        });
+
+        let persist = if persist {
+            if has_non_text {
+                error!(
+                    "ProposeElement() failed to launch element: persist_element is set with \
+                        non-text annotation values"
+                );
+                return Err(felement::ManagerError::InvalidArgs);
+            }
+            // Before we continue, check that we can write the temporary file for the persistent
+            // elements file.
+            let temp_file = match self.create_persistent_elements_temp_file() {
+                Ok(file) => file,
+                Err(err) => {
+                    error!(
+                        ?err,
+                        "Unable to write to the persistent elements file (routing error?)"
+                    );
+                    return Err(felement::ManagerError::UnableToPersist);
+                }
+            };
+            Some((
+                initial_annotations
+                    .iter()
+                    .map(|a| persistence::PersistentAnnotation {
+                        key: a.key.clone(),
+                        value: persistence::PersistentAnnotationValue::Text(
+                            if let felement::AnnotationValue::Text(t) = &a.value {
+                                t.clone()
+                            } else {
+                                unreachable!()
+                            },
+                        ),
+                    })
+                    .collect::<Vec<_>>(),
+                temp_file,
+            ))
+        } else {
+            None
+        };
+
         // Create AnnotationHolder and populate the initial annotations from the Spec.
         let mut annotation_holder = AnnotationHolder::new();
         annotation_holder.update_annotations(initial_annotations, vec![]).map_err(|err| {
             error!(?err, "ProposeElement() failed to set initial annotations");
-            felement::ProposeElementError::InvalidArgs
+            felement::ManagerError::InvalidArgs
         })?;
 
-        // If there is a name specified for the element, use it, otherwise generate a
-        // random name.
-        let child_name = match annotation_holder.get_annotation(ELEMENT_MANAGER_NS, "name") {
-            Some(felement::AnnotationValue::Text(name)) => name.clone(),
-            _ => {
-                let mut name = Alphanumeric.sample_string(&mut thread_rng(), 16);
-                name.make_ascii_lowercase();
-                name
-            }
-        };
+        self.run_element(&component_url, &name, annotation_holder, element_controller).await?;
 
-        let mut element = self.launch_element(&component_url, &child_name.clone()).await.map_err(
-            |err| match err {
-                ElementManagerError::NotCreated { .. } => felement::ProposeElementError::NotFound,
+        if let Some((annotations, temp_file)) = persist {
+            let mut persistent_elements = self.persistent_elements.lock().await;
+            persistent_elements.elements.get_or_insert_with(|| Default::default()).push(
+                persistence::Element { annotations: Some(annotations), ..Default::default() },
+            );
+            if let Err(err) = self.write_persistent_elements(&persistent_elements, temp_file) {
+                error!(?err, "Unable to write persistent elements");
+                // There's not much we can do; this shouldn't happen.  We've launched the element.
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn run_element(
+        &self,
+        component_url: &str,
+        child_name: &str,
+        annotation_holder: AnnotationHolder,
+        element_controller: Option<ServerEnd<felement::ControllerMarker>>,
+    ) -> Result<(), felement::ManagerError> {
+        let mut element =
+            self.launch_element(component_url, child_name).await.map_err(|err| match err {
+                ElementManagerError::NotCreated { .. } => felement::ManagerError::NotFound,
                 err => {
                     error!(?err, "ProposeElement() failed to launch element");
-                    felement::ProposeElementError::InvalidArgs
+                    felement::ManagerError::InvalidArgs
                 }
-            },
-        )?;
+            })?;
 
         let (annotation_controller_client_end, annotation_controller_stream) =
             create_request_stream::<felement::AnnotationControllerMarker>().unwrap();
@@ -373,7 +506,7 @@ impl ElementManager {
                     .map_err(|err| {
                         // TODO(https://fxbug.dev/42163510): ProposeElement should propagate GraphicalPresenter errors back to caller
                         error!(?err, "ProposeElement() failed to present element");
-                        felement::ProposeElementError::InvalidArgs
+                        felement::ManagerError::InvalidArgs
                     })?,
                 )
             }
@@ -387,21 +520,163 @@ impl ElementManager {
         let element_controller_stream = match element_controller {
             Some(controller) => match controller.into_stream() {
                 Ok(stream) => Ok(Some(stream)),
-                Err(_) => Err(felement::ProposeElementError::InvalidArgs),
+                Err(_) => Err(felement::ManagerError::InvalidArgs),
             },
             None => Ok(None),
         }?;
 
-        fasync::Task::local(run_element_until_closed(
-            annotation_holder,
-            element_controller_stream,
-            annotation_controller_stream,
-            view_controller_proxy,
-            child_name.clone(),
-            element.collection().to_string(),
-            self.realm.clone(),
-        ))
+        let (sender, receiver) = oneshot::channel();
+        self.running_elements.lock().unwrap().insert(child_name.to_string(), sender);
+
+        let running_elements = self.running_elements.clone();
+        let child_name = child_name.to_string();
+        let realm_proxy = self.realm.clone();
+        let collection = self.collection_config.for_url(component_url).to_string();
+
+        fasync::Task::local(async move {
+            run_element_until_closed(
+                annotation_holder,
+                element_controller_stream,
+                annotation_controller_stream,
+                view_controller_proxy,
+                receiver,
+            )
+            .await;
+
+            running_elements.lock().unwrap().remove(&child_name);
+
+            // Ignore all errors since there's nothing we can do.
+            let _: Result<_, _> =
+                realm_management::destroy_child_component(&child_name, &collection, &realm_proxy)
+                    .await;
+        })
         .detach();
+
+        Ok(())
+    }
+
+    async fn start_persistent_element(&self, element: &persistence::Element) -> Result<(), Error> {
+        // Convert the persistent annotations into the non-persistent ones.
+        let Some(persistent_annotations) = &element.annotations else {
+            bail!("Persistent element is missing annotations");
+        };
+        let mut annotations = Vec::new();
+        for a in persistent_annotations {
+            annotations.push(felement::Annotation {
+                key: a.key.clone(),
+                value: {
+                    let persistence::PersistentAnnotationValue::Text(t) = &a.value;
+                    felement::AnnotationValue::Text(t.clone())
+                },
+            });
+        }
+
+        // Create the annotation holder and then extract the URL and name.
+        let mut annotation_holder = AnnotationHolder::new();
+        annotation_holder.update_annotations(annotations, vec![])?;
+
+        let felement::AnnotationValue::Text(url) = annotation_holder
+            .get_annotation(felement::MANAGER_NAMESPACE, felement::ANNOTATION_KEY_URL)
+            .ok_or_else(|| anyhow!("Missing URL"))?
+        else {
+            unreachable!();
+        };
+        let url = url.to_string();
+
+        let felement::AnnotationValue::Text(name) = annotation_holder
+            .get_annotation(felement::MANAGER_NAMESPACE, felement::ANNOTATION_KEY_NAME)
+            .ok_or_else(|| anyhow!("Missing Name"))?
+        else {
+            unreachable!();
+        };
+        let name = name.to_string();
+
+        // Now we can try and run the element.
+        self.run_element(&url, &name, annotation_holder, None)
+            .await
+            .map_err(|e| anyhow!("Failed to run persistent element: {e:?}"))
+    }
+
+    // The outer result is for errors that should terminate the connection.  The inner result is the
+    // response for the request.
+    async fn handle_remove_element(
+        &self,
+        name: &str,
+    ) -> Result<Result<(), felement::ManagerError>, Error> {
+        let mut found = false;
+        let maybe_sender = self.running_elements.lock().unwrap().remove(name);
+        if let Some(sender) = maybe_sender {
+            let _ = sender.send(());
+            found = true;
+        }
+        if self.remove_persistent_element(name).await? {
+            found = true;
+        }
+        if found {
+            Ok(Ok(()))
+        } else {
+            Ok(Err(felement::ManagerError::NotFound))
+        }
+    }
+
+    // Returns Ok(true) if an element named `name` was found, and `Ok(false)` if an element was not
+    // found.
+    async fn remove_persistent_element(&self, name: &str) -> Result<bool, Error> {
+        let mut persistent_elements = self.persistent_elements.lock().await;
+        if let Some(elements) = &mut persistent_elements.elements {
+            let name_key = name_key();
+            for (index, element) in elements.iter().enumerate() {
+                if let Some(annotations) = &element.annotations {
+                    for annotation in annotations {
+                        if annotation.key == name_key {
+                            let persistence::PersistentAnnotationValue::Text(t) = &annotation.value;
+                            if t == name {
+                                elements.remove(index);
+                                if let Err(err) =
+                                    self.create_persistent_elements_temp_file().and_then(|f| {
+                                        self.write_persistent_elements(&persistent_elements, f)
+                                    })
+                                {
+                                    return Err(err).context("Unable to write persistent elements");
+                                }
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    fn create_persistent_elements_temp_file(&self) -> Result<std::fs::File, Error> {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(format!("{}.tmp", self.persistent_elements_path))
+            .context("Unable to create persistent elements temporary file")
+    }
+
+    fn write_persistent_elements(
+        &self,
+        elements: &persistence::PersistentElements,
+        mut temp_file: std::fs::File,
+    ) -> Result<(), Error> {
+        let data = fidl::persist(elements)?;
+
+        temp_file.write_all(&data)?;
+
+        // This fsync is required because the storage stack doesn't guarantee data is flushed before
+        // the rename.
+        fuchsia_nix::unistd::fsync(temp_file.as_raw_fd())?;
+
+        std::mem::drop(temp_file);
+
+        std::fs::rename(
+            format!("{}.tmp", self.persistent_elements_path),
+            self.persistent_elements_path,
+        )?;
 
         Ok(())
     }
@@ -424,9 +699,7 @@ async fn run_element_until_closed(
     controller_stream: Option<felement::ControllerRequestStream>,
     annotation_controller_stream: felement::AnnotationControllerRequestStream,
     view_controller_proxy: Option<felement::ViewControllerProxy>,
-    child_name: String,
-    collection: String,
-    realm: fcomponent::RealmProxy,
+    shutdown: oneshot::Receiver<()>,
 ) {
     let annotation_holder = Arc::new(Mutex::new(annotation_holder));
 
@@ -436,35 +709,40 @@ async fn run_element_until_closed(
         annotation_controller_stream,
     ));
 
-    if let Some(view_controller_proxy) = view_controller_proxy {
-        select!(
-            _ = wait_for_view_controller_close(view_controller_proxy.clone()).fuse() =>  {
-                // signals that the presenter would like to close the element.
-                // We do not need to do anything here but exit which will cause
-                // the element to be dropped and will kill the component.
-            },
-            _ = handle_element_controller_stream(annotation_holder.clone(), controller_stream).fuse() => {
-                // the proposer has decided they want to shut down the element.
-
-                // We want to allow the presenter the ability to dismiss
-                // the view so we tell it to dismiss and then wait for
-                // the view controller stream to close.
-                let _ = view_controller_proxy.dismiss();
-                let timeout = fuchsia_async::Timer::new(VIEW_CONTROLLER_DISMISS_TIMEOUT.after_now());
-                wait_for_view_controller_close_or_timeout(view_controller_proxy, timeout).await;
-            },
-        );
+    let wait_for_view_controller = if let Some(proxy) = &view_controller_proxy {
+        wait_for_view_controller_close(proxy.clone()).fuse()
     } else {
-        // The proposer has decided they want to shut down the element.
-        handle_element_controller_stream(annotation_holder.clone(), controller_stream).fuse().await;
-        if let Err(e) =
-            realm_management::destroy_child_component(&child_name, &collection, &realm).await
-        {
-            warn!(
-                "Failed to destroy child component with name \"{}\" in collection \"{}\": {:?}",
-                child_name, collection, e
-            );
+        Fuse::terminated()
+    };
+
+    select!(
+        _ = pin!(wait_for_view_controller) => {
+            // signals that the presenter would like to close the element.
+            // We do not need to do anything here but exit which will cause
+            // the element to be dropped and will kill the component.
+            return;
         }
+        _ = handle_element_controller_stream(
+                annotation_holder.clone(),
+                controller_stream
+            ).fuse() => {}
+        _ = shutdown.fuse() => {}
+    );
+
+    // the proposer has decided they want to shut down the element.
+
+    // We want to allow the presenter the ability to dismiss the view so we tell it to dismiss and
+    // then wait for the view controller stream to close.
+    if let Some(proxy) = view_controller_proxy {
+        let _ = proxy.dismiss();
+        let timeout = fuchsia_async::Timer::new(VIEW_CONTROLLER_DISMISS_TIMEOUT.after_now());
+        wait_for_view_controller_close_or_timeout(proxy, timeout).await;
+    }
+}
+
+impl Drop for ElementManager {
+    fn drop(&mut self) {
+        self.running_elements.lock().unwrap().clear();
     }
 }
 
@@ -543,14 +821,25 @@ async fn handle_element_controller_stream(
     }
 }
 
+fn name_key() -> felement::AnnotationKey {
+    felement::AnnotationKey {
+        namespace: felement::MANAGER_NAMESPACE.to_string(),
+        value: felement::ANNOTATION_KEY_NAME.to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
         super::{CollectionConfig, ElementManager, ElementManagerError},
-        fidl::{endpoints::spawn_stream_handler, prelude::*},
-        fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_zircon as zx,
-        futures::{channel::mpsc::channel, prelude::*},
+        assert_matches::assert_matches,
+        fidl::{
+            endpoints::{create_proxy_and_stream, spawn_stream_handler},
+            prelude::*,
+        },
+        fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+        fidl_fuchsia_element as felement, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+        futures::FutureExt,
         maplit::hashmap,
         session_testing::spawn_directory_server,
     };
@@ -571,15 +860,7 @@ mod tests {
         let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
         let child_name = "child";
 
-        let (directory_open_sender, directory_open_receiver) = channel::<String>(1);
         let directory_request_handler = move |directory_request| match directory_request {
-            fio::DirectoryRequest::Open { path: capability_path, .. } => {
-                let mut result_sender = directory_open_sender.clone();
-                fasync::Task::spawn(async move {
-                    let _ = result_sender.send(capability_path).await;
-                })
-                .detach()
-            }
             fio::DirectoryRequest::ReadDirents { responder, .. } => {
                 responder.send(zx::sys::ZX_OK, &[]).expect("Failed to service ReadDirents");
             }
@@ -601,6 +882,7 @@ mod tests {
                     } => {
                         assert_eq!(decl.url.unwrap(), component_url);
                         assert_eq!(decl.name.unwrap(), child_name);
+                        assert_eq!(decl.startup.unwrap(), fdecl::StartupMode::Eager);
                         assert_eq!(&collection.name, "elements");
 
                         let _ = responder.send(Ok(()));
@@ -625,8 +907,6 @@ mod tests {
         // that the directory channel received the request with the correct path.
         let (_client_channel, server_channel) = zx::Channel::create();
         let _ = element.connect_to_named_protocol_with_channel("myProtocol", server_channel);
-        let open_paths = directory_open_receiver.take(2).collect::<Vec<_>>().await;
-        assert_eq!(vec![fcomponent::BinderMarker::DEBUG_NAME, "myProtocol"], open_paths);
     }
 
     #[fuchsia::test]
@@ -634,15 +914,7 @@ mod tests {
         let component_url = "https://special_component.cm";
         let child_name = "child";
 
-        let (directory_open_sender, directory_open_receiver) = channel::<String>(1);
         let directory_request_handler = move |directory_request| match directory_request {
-            fio::DirectoryRequest::Open { path: capability_path, .. } => {
-                let mut result_sender = directory_open_sender.clone();
-                fasync::Task::spawn(async move {
-                    let _ = result_sender.send(capability_path).await;
-                })
-                .detach()
-            }
             fio::DirectoryRequest::ReadDirents { responder, .. } => {
                 responder.send(zx::sys::ZX_OK, &[]).expect("Failed to service ReadDirents");
             }
@@ -664,6 +936,7 @@ mod tests {
                     } => {
                         assert_eq!(decl.url.unwrap(), component_url);
                         assert_eq!(decl.name.unwrap(), child_name);
+                        assert_eq!(decl.startup.unwrap(), fdecl::StartupMode::Eager);
                         assert_eq!(&collection.name, "special_collection");
 
                         let _ = responder.send(Ok(()));
@@ -688,8 +961,6 @@ mod tests {
         // that the directory channel received the request with the correct path.
         let (_client_channel, server_channel) = zx::Channel::create();
         let _ = element.connect_to_named_protocol_with_channel("myProtocol", server_channel);
-        let open_paths = directory_open_receiver.take(2).collect::<Vec<_>>().await;
-        assert_eq!(vec![fcomponent::BinderMarker::DEBUG_NAME, "myProtocol"], open_paths);
     }
 
     /// Tests that launching an element which is not successfully created in the realm returns an
@@ -843,5 +1114,50 @@ mod tests {
         exposed_dir
             .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE_PAST)
             .expect("exposed_dir should be closed");
+    }
+
+    #[fuchsia::test]
+    async fn propose_persistent_element_with_bad_storage() {
+        let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
+
+        let realm: fcomponent::RealmProxy =
+            spawn_stream_handler(|_| async { unreachable!() }).unwrap();
+
+        let mut element_manager: Box<ElementManager> =
+            Box::new(ElementManager::new(realm, None, example_collection_config()));
+        element_manager.persistent_elements_path = "/does/not/exist/persistent_elements";
+
+        let (manager_proxy, stream) = create_proxy_and_stream::<felement::ManagerMarker>()
+            .expect("Failed to create Manager proxy and stream");
+
+        futures::select! {
+            _ = element_manager.handle_requests(stream).fuse() => unreachable!(),
+            result = {
+                manager_proxy
+                    .propose_element(
+                        felement::Spec {
+                            component_url: Some(component_url.to_string()),
+                            annotations: Some(vec![
+                                felement::Annotation {
+                                    key: felement::AnnotationKey {
+                                        namespace: felement::MANAGER_NAMESPACE.to_string(),
+                                        value: felement::ANNOTATION_KEY_PERSIST_ELEMENT.to_string(),
+                                    },
+                                    value: felement::AnnotationValue::Text(String::new()),
+                                },
+                                felement::Annotation {
+                                    key: felement::AnnotationKey {
+                                        namespace: felement::MANAGER_NAMESPACE.to_string(),
+                                        value: felement::ANNOTATION_KEY_NAME.to_string(),
+                                    },
+                                    value: felement::AnnotationValue::Text("foo".to_string()),
+                                },
+                            ]),
+                            ..Default::default()
+                        },
+                        None,
+                    ).fuse()
+            } => assert_matches!(result, Ok(Err(felement::ManagerError::UnableToPersist)))
+        }
     }
 }

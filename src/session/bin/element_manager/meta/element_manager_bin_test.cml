@@ -24,5 +24,9 @@
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
+        {
+            storage: "tmp",
+            path: "/data",
+        },
     ],
 }

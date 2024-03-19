@@ -48,6 +48,11 @@
             from: "framework",
             to: "#element_manager",
         },
+        {
+            storage: "data",
+            from: "parent",
+            to: "#element_manager",
+        },
     ],
     expose: [
         {

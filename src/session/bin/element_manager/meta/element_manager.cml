@@ -20,6 +20,11 @@
             protocol: "fuchsia.component.Realm",
             from: "parent",
         },
+        {
+            storage: "data",
+            path: "/data",
+            availability: "optional",
+        },
     ],
     expose: [
         {

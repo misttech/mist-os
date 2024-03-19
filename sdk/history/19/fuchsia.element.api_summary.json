@@ -1,5 +1,23 @@
 [
     {
+        "kind": "const",
+        "name": "fuchsia.element/ANNOTATION_KEY_NAME",
+        "type": "string",
+        "value": "name"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.element/ANNOTATION_KEY_PERSIST_ELEMENT",
+        "type": "string",
+        "value": "persist_element"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.element/ANNOTATION_KEY_URL",
+        "type": "string",
+        "value": "url"
+    },
+    {
         "kind": "struct/member",
         "name": "fuchsia.element/Annotation.key",
         "ordinal": "1",
@@ -209,6 +227,12 @@
     },
     {
         "kind": "const",
+        "name": "fuchsia.element/MANAGER_NAMESPACE",
+        "type": "string",
+        "value": "element_manager"
+    },
+    {
+        "kind": "const",
         "name": "fuchsia.element/MAX_ANNOTATIONS_PER_ELEMENT",
         "type": "uint32",
         "value": "1024"
@@ -233,13 +257,44 @@
         "direction": "two_way",
         "request": "fuchsia.element/ManagerProposeElementRequest",
         "response": "fuchsia.element/Manager_ProposeElement_Response",
-        "error": "fuchsia.element/ProposeElementError"
+        "error": "fuchsia.element/ManagerError"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.element/Manager.RemoveElement",
+        "strictness": "strict",
+        "ordinal": "2190392523433069394",
+        "direction": "two_way",
+        "request": "fuchsia.element/ManagerRemoveElementRequest",
+        "response": "fuchsia.element/Manager_RemoveElement_Response",
+        "error": "fuchsia.element/ManagerError"
     },
     {
         "kind": "protocol",
         "name": "fuchsia.element/Manager",
         "openness": "closed",
         "transport": "channel"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.element/ManagerError.INVALID_ARGS",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.element/ManagerError.NOT_FOUND",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.element/ManagerError.UNABLE_TO_PERSIST",
+        "value": "3"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.element/ManagerError",
+        "strictness": "strict",
+        "type": "uint32"
     },
     {
         "kind": "struct/member",
@@ -259,6 +314,16 @@
         "resourceness": "resource"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.element/ManagerRemoveElementRequest.name",
+        "ordinal": "1",
+        "type": "string"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.element/ManagerRemoveElementRequest"
+    },
+    {
         "kind": "enum/member",
         "name": "fuchsia.element/PresentViewError.INVALID_ARGS",
         "value": "1"
@@ -266,22 +331,6 @@
     {
         "kind": "enum",
         "name": "fuchsia.element/PresentViewError",
-        "strictness": "strict",
-        "type": "uint32"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.element/ProposeElementError.INVALID_ARGS",
-        "value": "1"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.element/ProposeElementError.NOT_FOUND",
-        "value": "2"
-    },
-    {
-        "kind": "enum",
-        "name": "fuchsia.element/ProposeElementError",
         "strictness": "strict",
         "type": "uint32"
     },

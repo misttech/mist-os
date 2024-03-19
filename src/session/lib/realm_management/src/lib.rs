@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
 };
 
-/// Creates a child in the specified `Realm`.
+/// Creates a (lazy) child in the specified `Realm`.
 ///
 /// # Parameters
 /// - `child_name`: The name of the child to be added.
@@ -29,7 +29,7 @@ pub async fn create_child_component(
     let child_decl = fdecl::Child {
         name: Some(child_name.to_string()),
         url: Some(child_url.to_string()),
-        startup: Some(fdecl::StartupMode::Lazy), // Dynamic children can only be started lazily.
+        startup: Some(fdecl::StartupMode::Lazy),
         environment: None,
         ..Default::default()
     };

@@ -1,6 +1,7 @@
 ffx/session.golden
 ffx/session/add.golden
 ffx/session/launch.golden
+ffx/session/remove.golden
 ffx/session/restart.golden
 ffx/session/show.golden
 ffx/session/start.golden

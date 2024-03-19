@@ -12,6 +12,7 @@ ffx_plugin("ffx_session") {
   plugin_deps = [
     "add:ffx_session_add",
     "launch:ffx_session_launch",
+    "remove:ffx_session_remove",
     "restart:ffx_session_restart",
     "show:ffx_session_show",
     "start:ffx_session_start",
@@ -27,6 +28,7 @@ group("tests") {
     ":ffx_session_tests",
     "add:ffx_session_add_tests",
     "launch:ffx_session_launch_tests",
+    "remove:ffx_session_remove_tests",
     "restart:ffx_session_restart_tests",
     "show:ffx_session_show_tests",
     "start:ffx_session_start_tests",

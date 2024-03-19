@@ -94,5 +94,10 @@ async fn create_realm(_: RealmOptions) -> Result<RealmInstance, Error> {
                 .to(Ref::parent()),
         )
         .await?;
+    builder
+        .add_route(
+            Route::new().capability(Capability::storage("data")).from(Ref::parent()).to(&session),
+        )
+        .await?;
     Ok(builder.build().await?)
 }

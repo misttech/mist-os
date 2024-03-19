@@ -32,6 +32,11 @@
                 "#test_suite",
             ],
         },
+        {
+            storage: "data",
+            from: "parent",
+            to: "#test_realm_factory",
+        },
     ],
     expose: [
         {

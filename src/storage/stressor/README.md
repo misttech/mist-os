@@ -15,12 +15,22 @@ Sparse reads and writes are heavily exercised.
 
 The aim of this variant is to exercise the filesystem in long-running healthy systems.
 
-To include it, simply add the following to your `fx set` invocation:
+To include it, you will need to use a product that includes a session, such as `workbench_eng`.
+Make sure the package is included in the base or cache set, e.g. add the following to your `fx set`
+invocation:
 
 ```
---with-base //src/storage/stressor \
---args 'core_realm_shards+=["//src/storage/stressor:core_shard"]'
+--with-base //src/storage/stressor
 ```
+
+You can then launch it with:
+
+```
+ffx session add fuchsia-pkg://fuchsia.com/storage_stressor#meta/storage_stressor.cm \
+    --name storage_stressor
+```
+
+You can add the `--persist` option to make it launch after a reboot.
 
 You can monitor its progress using `fx log`.
 
