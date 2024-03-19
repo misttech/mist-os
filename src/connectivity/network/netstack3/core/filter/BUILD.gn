@@ -65,5 +65,8 @@ fuchsia_unittest_package("netstack3-filter-test") {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":netstack3-filter-test" ]
+  public_deps = [
+    ":netstack3-filter-test",
+    ":netstack3-filter_test($host_toolchain)",
+  ]
 }
