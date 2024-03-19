@@ -15,8 +15,8 @@ __BEGIN_CDECLS
 
 // Forward declarations
 
-
 typedef uint32_t first_primitive_t;
+
 
 
 typedef struct some_struct some_struct_t;

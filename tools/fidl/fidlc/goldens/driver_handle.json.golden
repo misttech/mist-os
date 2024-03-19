@@ -549,12 +549,12 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
+    "test.driverhandle/ClientEndWrapper",
+    "test.driverhandle/DriverProtocol",
     "test.driverhandle/T",
     "test.driverhandle/HandlesInProtocolSendHandlesRequest",
     "test.driverhandle/HandlesInProtocol",
-    "test.driverhandle/ServerEndWrapper",
-    "test.driverhandle/DriverProtocol",
-    "test.driverhandle/ClientEndWrapper"
+    "test.driverhandle/ServerEndWrapper"
   ],
   "declarations": {
     "test.driverhandle/DriverProtocol": "protocol",

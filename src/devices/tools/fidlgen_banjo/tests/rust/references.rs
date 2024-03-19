@@ -19,6 +19,14 @@ pub struct SomeType {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
+pub struct MutableField {
+    pub some_string: *mut std::os::raw::c_char,
+    pub some_other_string: *const std::os::raw::c_char,
+    pub some_default_string: *const std::os::raw::c_char,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct VectorFieldInStruct {
     pub the_vector_list: *const *mut SomeType,
     pub the_vector_count: usize,
@@ -30,14 +38,6 @@ pub struct VectorFieldInStruct {
     pub the_mutable_vector_of_boxes_count: usize,
     pub the_default_vector_list: *const SomeType,
     pub the_default_vector_count: usize,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct MutableField {
-    pub some_string: *mut std::os::raw::c_char,
-    pub some_other_string: *const std::os::raw::c_char,
-    pub some_default_string: *const std::os::raw::c_char,
 }
 
 

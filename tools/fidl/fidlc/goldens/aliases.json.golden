@@ -712,14 +712,14 @@
   ],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.aliases/vec_of_strings_at_most_5",
-    "test.aliases/vec_of_strings",
     "test.aliases/u32",
+    "test.aliases/vec_of_strings",
+    "test.aliases/vec_of_strings_at_most_5",
+    "test.aliases/ReferenceMe",
     "test.aliases/obj_type",
     "test.aliases/handle",
     "test.aliases/channel",
     "test.aliases/alias_of_channel",
-    "test.aliases/ReferenceMe",
     "test.aliases/ExampleOfUseOfAliases"
   ],
   "declarations": {

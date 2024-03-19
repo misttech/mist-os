@@ -21,35 +21,33 @@
 //
 // :: Proxies ::
 //
-// ddk::OtherTypesReferenceProtocolClient is a simple wrapper around
-// other_types_reference_protocol_t. It does not own the pointers passed to it.
+// ddk::InterfaceProtocolClient is a simple wrapper around
+// interface_protocol_t. It does not own the pointers passed to it.
 //
 // :: Mixins ::
 //
-// ddk::OtherTypesReferenceProtocol is a mixin class that simplifies writing DDK drivers
-// that implement the other-types-reference protocol. It doesn't set the base protocol.
+// ddk::InterfaceProtocol is a mixin class that simplifies writing DDK drivers
+// that implement the interface protocol. It doesn't set the base protocol.
 //
 // :: Examples ::
 //
-// // A driver that implements a ZX_PROTOCOL_OTHER_TYPES_REFERENCE device.
-// class OtherTypesReferenceDevice;
-// using OtherTypesReferenceDeviceType = ddk::Device<OtherTypesReferenceDevice, /* ddk mixins */>;
+// // A driver that implements a ZX_PROTOCOL_INTERFACE device.
+// class InterfaceDevice;
+// using InterfaceDeviceType = ddk::Device<InterfaceDevice, /* ddk mixins */>;
 //
-// class OtherTypesReferenceDevice : public OtherTypesReferenceDeviceType,
-//                      public ddk::OtherTypesReferenceProtocol<OtherTypesReferenceDevice> {
+// class InterfaceDevice : public InterfaceDeviceType,
+//                      public ddk::InterfaceProtocol<InterfaceDevice> {
 //   public:
-//     OtherTypesReferenceDevice(zx_device_t* parent)
-//         : OtherTypesReferenceDeviceType(parent) {}
+//     InterfaceDevice(zx_device_t* parent)
+//         : InterfaceDeviceType(parent) {}
 //
-//     void OtherTypesReferenceStruct(const this_is_astruct_t* s, this_is_astruct_t** out_s);
+//     void InterfaceValue(const other_types_protocol_t* intf, other_types_protocol_t* out_intf);
 //
-//     void OtherTypesReferenceUnion(const this_is_aunion_t* u, this_is_aunion_t** out_u);
+//     void InterfaceReference(const other_types_protocol_t* intf, other_types_protocol_t** out_intf);
 //
-//     void OtherTypesReferenceString(const char* s, char* out_s, size_t s_capacity);
+//     void InterfaceAsync(const other_types_protocol_t* intf, interface_async_callback callback, void* cookie);
 //
-//     void OtherTypesReferenceStringSized(const char* s, char* out_s, size_t s_capacity);
-//
-//     void OtherTypesReferenceStringSized2(const char* s, char* out_s, size_t s_capacity);
+//     void InterfaceAsyncRefernce(const other_types_protocol_t* intf, interface_async_refernce_callback callback, void* cookie);
 //
 //     ...
 // };
@@ -167,33 +165,35 @@
 // };
 // :: Proxies ::
 //
-// ddk::InterfaceProtocolClient is a simple wrapper around
-// interface_protocol_t. It does not own the pointers passed to it.
+// ddk::OtherTypesReferenceProtocolClient is a simple wrapper around
+// other_types_reference_protocol_t. It does not own the pointers passed to it.
 //
 // :: Mixins ::
 //
-// ddk::InterfaceProtocol is a mixin class that simplifies writing DDK drivers
-// that implement the interface protocol. It doesn't set the base protocol.
+// ddk::OtherTypesReferenceProtocol is a mixin class that simplifies writing DDK drivers
+// that implement the other-types-reference protocol. It doesn't set the base protocol.
 //
 // :: Examples ::
 //
-// // A driver that implements a ZX_PROTOCOL_INTERFACE device.
-// class InterfaceDevice;
-// using InterfaceDeviceType = ddk::Device<InterfaceDevice, /* ddk mixins */>;
+// // A driver that implements a ZX_PROTOCOL_OTHER_TYPES_REFERENCE device.
+// class OtherTypesReferenceDevice;
+// using OtherTypesReferenceDeviceType = ddk::Device<OtherTypesReferenceDevice, /* ddk mixins */>;
 //
-// class InterfaceDevice : public InterfaceDeviceType,
-//                      public ddk::InterfaceProtocol<InterfaceDevice> {
+// class OtherTypesReferenceDevice : public OtherTypesReferenceDeviceType,
+//                      public ddk::OtherTypesReferenceProtocol<OtherTypesReferenceDevice> {
 //   public:
-//     InterfaceDevice(zx_device_t* parent)
-//         : InterfaceDeviceType(parent) {}
+//     OtherTypesReferenceDevice(zx_device_t* parent)
+//         : OtherTypesReferenceDeviceType(parent) {}
 //
-//     void InterfaceValue(const other_types_protocol_t* intf, other_types_protocol_t* out_intf);
+//     void OtherTypesReferenceStruct(const this_is_astruct_t* s, this_is_astruct_t** out_s);
 //
-//     void InterfaceReference(const other_types_protocol_t* intf, other_types_protocol_t** out_intf);
+//     void OtherTypesReferenceUnion(const this_is_aunion_t* u, this_is_aunion_t** out_u);
 //
-//     void InterfaceAsync(const other_types_protocol_t* intf, interface_async_callback callback, void* cookie);
+//     void OtherTypesReferenceString(const char* s, char* out_s, size_t s_capacity);
 //
-//     void InterfaceAsyncRefernce(const other_types_protocol_t* intf, interface_async_refernce_callback callback, void* cookie);
+//     void OtherTypesReferenceStringSized(const char* s, char* out_s, size_t s_capacity);
+//
+//     void OtherTypesReferenceStringSized2(const char* s, char* out_s, size_t s_capacity);
 //
 //     ...
 // };
@@ -201,59 +201,55 @@
 namespace ddk {
 
 template <typename D, typename Base = internal::base_mixin>
-class OtherTypesReferenceProtocol : public Base {
+class InterfaceProtocol : public Base {
 public:
-    OtherTypesReferenceProtocol() {
-        internal::CheckOtherTypesReferenceProtocolSubclass<D>();
-        other_types_reference_protocol_ops_.struct = OtherTypesReferenceStruct;
-        other_types_reference_protocol_ops_.union = OtherTypesReferenceUnion;
-        other_types_reference_protocol_ops_.string = OtherTypesReferenceString;
-        other_types_reference_protocol_ops_.string_sized = OtherTypesReferenceStringSized;
-        other_types_reference_protocol_ops_.string_sized2 = OtherTypesReferenceStringSized2;
+    InterfaceProtocol() {
+        internal::CheckInterfaceProtocolSubclass<D>();
+        interface_protocol_ops_.value = InterfaceValue;
+        interface_protocol_ops_.reference = InterfaceReference;
+        interface_protocol_ops_.async = InterfaceAsync;
+        interface_protocol_ops_.async_refernce = InterfaceAsyncRefernce;
 
         if constexpr (internal::is_base_proto<Base>::value) {
             auto dev = static_cast<D*>(this);
             // Can only inherit from one base_protocol implementation.
             ZX_ASSERT(dev->ddk_proto_id_ == 0);
-            dev->ddk_proto_id_ = ZX_PROTOCOL_OTHER_TYPES_REFERENCE;
-            dev->ddk_proto_ops_ = &other_types_reference_protocol_ops_;
+            dev->ddk_proto_id_ = ZX_PROTOCOL_INTERFACE;
+            dev->ddk_proto_ops_ = &interface_protocol_ops_;
         }
     }
 
 protected:
-    other_types_reference_protocol_ops_t other_types_reference_protocol_ops_ = {};
+    interface_protocol_ops_t interface_protocol_ops_ = {};
 
 private:
-    static void OtherTypesReferenceStruct(void* ctx, const this_is_astruct_t* s, this_is_astruct_t** out_s) {
-        static_cast<D*>(ctx)->OtherTypesReferenceStruct(s, out_s);
+    static void InterfaceValue(void* ctx, const other_types_protocol_t* intf, other_types_protocol_t* out_intf) {
+        static_cast<D*>(ctx)->InterfaceValue(intf, out_intf);
     }
-    static void OtherTypesReferenceUnion(void* ctx, const this_is_aunion_t* u, this_is_aunion_t** out_u) {
-        static_cast<D*>(ctx)->OtherTypesReferenceUnion(u, out_u);
+    static void InterfaceReference(void* ctx, const other_types_protocol_t* intf, other_types_protocol_t** out_intf) {
+        static_cast<D*>(ctx)->InterfaceReference(intf, out_intf);
     }
-    static void OtherTypesReferenceString(void* ctx, const char* s, char* out_s, size_t s_capacity) {
-        static_cast<D*>(ctx)->OtherTypesReferenceString(s, out_s, s_capacity);
+    static void InterfaceAsync(void* ctx, const other_types_protocol_t* intf, interface_async_callback callback, void* cookie) {
+        static_cast<D*>(ctx)->InterfaceAsync(intf, callback, cookie);
     }
-    static void OtherTypesReferenceStringSized(void* ctx, const char* s, char* out_s, size_t s_capacity) {
-        static_cast<D*>(ctx)->OtherTypesReferenceStringSized(s, out_s, s_capacity);
-    }
-    static void OtherTypesReferenceStringSized2(void* ctx, const char* s, char* out_s, size_t s_capacity) {
-        static_cast<D*>(ctx)->OtherTypesReferenceStringSized2(s, out_s, s_capacity);
+    static void InterfaceAsyncRefernce(void* ctx, const other_types_protocol_t* intf, interface_async_refernce_callback callback, void* cookie) {
+        static_cast<D*>(ctx)->InterfaceAsyncRefernce(intf, callback, cookie);
     }
 };
 
-class OtherTypesReferenceProtocolClient {
+class InterfaceProtocolClient {
 public:
-    using Proto = other_types_reference_protocol_t;
-    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_OTHER_TYPES_REFERENCE;
+    using Proto = interface_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_INTERFACE;
 
-    OtherTypesReferenceProtocolClient()
+    InterfaceProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
-    OtherTypesReferenceProtocolClient(const other_types_reference_protocol_t* proto)
+    InterfaceProtocolClient(const interface_protocol_t* proto)
         : ops_(proto->ops), ctx_(proto->ctx) {}
 
-    OtherTypesReferenceProtocolClient(zx_device_t* parent) {
-        other_types_reference_protocol_t proto;
-        if (device_get_protocol(parent, ZX_PROTOCOL_OTHER_TYPES_REFERENCE, &proto) == ZX_OK) {
+    InterfaceProtocolClient(zx_device_t* parent) {
+        interface_protocol_t proto;
+        if (device_get_protocol(parent, ZX_PROTOCOL_INTERFACE, &proto) == ZX_OK) {
             ops_ = proto.ops;
             ctx_ = proto.ctx;
         } else {
@@ -262,9 +258,9 @@ public:
         }
     }
 
-    OtherTypesReferenceProtocolClient(zx_device_t* parent, const char* fragment_name) {
-        other_types_reference_protocol_t proto;
-        if (device_get_fragment_protocol(parent, fragment_name, ZX_PROTOCOL_OTHER_TYPES_REFERENCE, &proto) == ZX_OK) {
+    InterfaceProtocolClient(zx_device_t* parent, const char* fragment_name) {
+        interface_protocol_t proto;
+        if (device_get_fragment_protocol(parent, fragment_name, ZX_PROTOCOL_INTERFACE, &proto) == ZX_OK) {
             ops_ = proto.ops;
             ctx_ = proto.ctx;
         } else {
@@ -273,37 +269,37 @@ public:
         }
     }
 
-    // Create a OtherTypesReferenceProtocolClient from the given parent device + "fragment".
+    // Create a InterfaceProtocolClient from the given parent device + "fragment".
     //
     // If ZX_OK is returned, the created object will be initialized in |result|.
     static zx_status_t CreateFromDevice(zx_device_t* parent,
-                                        OtherTypesReferenceProtocolClient* result) {
-        other_types_reference_protocol_t proto;
+                                        InterfaceProtocolClient* result) {
+        interface_protocol_t proto;
         zx_status_t status = device_get_protocol(
-                parent, ZX_PROTOCOL_OTHER_TYPES_REFERENCE, &proto);
+                parent, ZX_PROTOCOL_INTERFACE, &proto);
         if (status != ZX_OK) {
             return status;
         }
-        *result = OtherTypesReferenceProtocolClient(&proto);
+        *result = InterfaceProtocolClient(&proto);
         return ZX_OK;
     }
 
-    // Create a OtherTypesReferenceProtocolClient from the given parent device.
+    // Create a InterfaceProtocolClient from the given parent device.
     //
     // If ZX_OK is returned, the created object will be initialized in |result|.
     static zx_status_t CreateFromDevice(zx_device_t* parent, const char* fragment_name,
-                                        OtherTypesReferenceProtocolClient* result) {
-        other_types_reference_protocol_t proto;
+                                        InterfaceProtocolClient* result) {
+        interface_protocol_t proto;
         zx_status_t status = device_get_fragment_protocol(parent, fragment_name,
-                                 ZX_PROTOCOL_OTHER_TYPES_REFERENCE, &proto);
+                                 ZX_PROTOCOL_INTERFACE, &proto);
         if (status != ZX_OK) {
             return status;
         }
-        *result = OtherTypesReferenceProtocolClient(&proto);
+        *result = InterfaceProtocolClient(&proto);
         return ZX_OK;
     }
 
-    void GetProto(other_types_reference_protocol_t* proto) const {
+    void GetProto(interface_protocol_t* proto) const {
         proto->ctx = ctx_;
         proto->ops = ops_;
     }
@@ -315,28 +311,44 @@ public:
         ops_ = nullptr;
     }
 
-    void Struct(const this_is_astruct_t* s, this_is_astruct_t** out_s) const {
-        ops_->struct(ctx_, s, out_s);
+    void Value(void* intf_ctx, const other_types_protocol_ops_t* intf_ops, other_types_protocol_t* out_intf) const {
+        const other_types_protocol_t intf2 = {
+            .ops = intf_ops,
+            .ctx = intf_ctx,
+        };
+        const other_types_protocol_t* intf = &intf2;
+        ops_->value(ctx_, intf, out_intf);
     }
 
-    void Union(const this_is_aunion_t* u, this_is_aunion_t** out_u) const {
-        ops_->union(ctx_, u, out_u);
+    void Reference(void* intf_ctx, const other_types_protocol_ops_t* intf_ops, other_types_protocol_t** out_intf) const {
+        const other_types_protocol_t intf2 = {
+            .ops = intf_ops,
+            .ctx = intf_ctx,
+        };
+        const other_types_protocol_t* intf = &intf2;
+        ops_->reference(ctx_, intf, out_intf);
     }
 
-    void String(const char* s, char* out_s, size_t s_capacity) const {
-        ops_->string(ctx_, s, out_s, s_capacity);
+    void Async(void* intf_ctx, const other_types_protocol_ops_t* intf_ops, interface_async_callback callback, void* cookie) const {
+        const other_types_protocol_t intf2 = {
+            .ops = intf_ops,
+            .ctx = intf_ctx,
+        };
+        const other_types_protocol_t* intf = &intf2;
+        ops_->async(ctx_, intf, callback, cookie);
     }
 
-    void StringSized(const char* s, char* out_s, size_t s_capacity) const {
-        ops_->string_sized(ctx_, s, out_s, s_capacity);
-    }
-
-    void StringSized2(const char* s, char* out_s, size_t s_capacity) const {
-        ops_->string_sized2(ctx_, s, out_s, s_capacity);
+    void AsyncRefernce(void* intf_ctx, const other_types_protocol_ops_t* intf_ops, interface_async_refernce_callback callback, void* cookie) const {
+        const other_types_protocol_t intf2 = {
+            .ops = intf_ops,
+            .ctx = intf_ctx,
+        };
+        const other_types_protocol_t* intf = &intf2;
+        ops_->async_refernce(ctx_, intf, callback, cookie);
     }
 
 private:
-    const other_types_reference_protocol_ops_t* ops_;
+    const interface_protocol_ops_t* ops_;
     void* ctx_;
 };
 
@@ -804,55 +816,59 @@ private:
 };
 
 template <typename D, typename Base = internal::base_mixin>
-class InterfaceProtocol : public Base {
+class OtherTypesReferenceProtocol : public Base {
 public:
-    InterfaceProtocol() {
-        internal::CheckInterfaceProtocolSubclass<D>();
-        interface_protocol_ops_.value = InterfaceValue;
-        interface_protocol_ops_.reference = InterfaceReference;
-        interface_protocol_ops_.async = InterfaceAsync;
-        interface_protocol_ops_.async_refernce = InterfaceAsyncRefernce;
+    OtherTypesReferenceProtocol() {
+        internal::CheckOtherTypesReferenceProtocolSubclass<D>();
+        other_types_reference_protocol_ops_.struct = OtherTypesReferenceStruct;
+        other_types_reference_protocol_ops_.union = OtherTypesReferenceUnion;
+        other_types_reference_protocol_ops_.string = OtherTypesReferenceString;
+        other_types_reference_protocol_ops_.string_sized = OtherTypesReferenceStringSized;
+        other_types_reference_protocol_ops_.string_sized2 = OtherTypesReferenceStringSized2;
 
         if constexpr (internal::is_base_proto<Base>::value) {
             auto dev = static_cast<D*>(this);
             // Can only inherit from one base_protocol implementation.
             ZX_ASSERT(dev->ddk_proto_id_ == 0);
-            dev->ddk_proto_id_ = ZX_PROTOCOL_INTERFACE;
-            dev->ddk_proto_ops_ = &interface_protocol_ops_;
+            dev->ddk_proto_id_ = ZX_PROTOCOL_OTHER_TYPES_REFERENCE;
+            dev->ddk_proto_ops_ = &other_types_reference_protocol_ops_;
         }
     }
 
 protected:
-    interface_protocol_ops_t interface_protocol_ops_ = {};
+    other_types_reference_protocol_ops_t other_types_reference_protocol_ops_ = {};
 
 private:
-    static void InterfaceValue(void* ctx, const other_types_protocol_t* intf, other_types_protocol_t* out_intf) {
-        static_cast<D*>(ctx)->InterfaceValue(intf, out_intf);
+    static void OtherTypesReferenceStruct(void* ctx, const this_is_astruct_t* s, this_is_astruct_t** out_s) {
+        static_cast<D*>(ctx)->OtherTypesReferenceStruct(s, out_s);
     }
-    static void InterfaceReference(void* ctx, const other_types_protocol_t* intf, other_types_protocol_t** out_intf) {
-        static_cast<D*>(ctx)->InterfaceReference(intf, out_intf);
+    static void OtherTypesReferenceUnion(void* ctx, const this_is_aunion_t* u, this_is_aunion_t** out_u) {
+        static_cast<D*>(ctx)->OtherTypesReferenceUnion(u, out_u);
     }
-    static void InterfaceAsync(void* ctx, const other_types_protocol_t* intf, interface_async_callback callback, void* cookie) {
-        static_cast<D*>(ctx)->InterfaceAsync(intf, callback, cookie);
+    static void OtherTypesReferenceString(void* ctx, const char* s, char* out_s, size_t s_capacity) {
+        static_cast<D*>(ctx)->OtherTypesReferenceString(s, out_s, s_capacity);
     }
-    static void InterfaceAsyncRefernce(void* ctx, const other_types_protocol_t* intf, interface_async_refernce_callback callback, void* cookie) {
-        static_cast<D*>(ctx)->InterfaceAsyncRefernce(intf, callback, cookie);
+    static void OtherTypesReferenceStringSized(void* ctx, const char* s, char* out_s, size_t s_capacity) {
+        static_cast<D*>(ctx)->OtherTypesReferenceStringSized(s, out_s, s_capacity);
+    }
+    static void OtherTypesReferenceStringSized2(void* ctx, const char* s, char* out_s, size_t s_capacity) {
+        static_cast<D*>(ctx)->OtherTypesReferenceStringSized2(s, out_s, s_capacity);
     }
 };
 
-class InterfaceProtocolClient {
+class OtherTypesReferenceProtocolClient {
 public:
-    using Proto = interface_protocol_t;
-    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_INTERFACE;
+    using Proto = other_types_reference_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_OTHER_TYPES_REFERENCE;
 
-    InterfaceProtocolClient()
+    OtherTypesReferenceProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
-    InterfaceProtocolClient(const interface_protocol_t* proto)
+    OtherTypesReferenceProtocolClient(const other_types_reference_protocol_t* proto)
         : ops_(proto->ops), ctx_(proto->ctx) {}
 
-    InterfaceProtocolClient(zx_device_t* parent) {
-        interface_protocol_t proto;
-        if (device_get_protocol(parent, ZX_PROTOCOL_INTERFACE, &proto) == ZX_OK) {
+    OtherTypesReferenceProtocolClient(zx_device_t* parent) {
+        other_types_reference_protocol_t proto;
+        if (device_get_protocol(parent, ZX_PROTOCOL_OTHER_TYPES_REFERENCE, &proto) == ZX_OK) {
             ops_ = proto.ops;
             ctx_ = proto.ctx;
         } else {
@@ -861,9 +877,9 @@ public:
         }
     }
 
-    InterfaceProtocolClient(zx_device_t* parent, const char* fragment_name) {
-        interface_protocol_t proto;
-        if (device_get_fragment_protocol(parent, fragment_name, ZX_PROTOCOL_INTERFACE, &proto) == ZX_OK) {
+    OtherTypesReferenceProtocolClient(zx_device_t* parent, const char* fragment_name) {
+        other_types_reference_protocol_t proto;
+        if (device_get_fragment_protocol(parent, fragment_name, ZX_PROTOCOL_OTHER_TYPES_REFERENCE, &proto) == ZX_OK) {
             ops_ = proto.ops;
             ctx_ = proto.ctx;
         } else {
@@ -872,37 +888,37 @@ public:
         }
     }
 
-    // Create a InterfaceProtocolClient from the given parent device + "fragment".
+    // Create a OtherTypesReferenceProtocolClient from the given parent device + "fragment".
     //
     // If ZX_OK is returned, the created object will be initialized in |result|.
     static zx_status_t CreateFromDevice(zx_device_t* parent,
-                                        InterfaceProtocolClient* result) {
-        interface_protocol_t proto;
+                                        OtherTypesReferenceProtocolClient* result) {
+        other_types_reference_protocol_t proto;
         zx_status_t status = device_get_protocol(
-                parent, ZX_PROTOCOL_INTERFACE, &proto);
+                parent, ZX_PROTOCOL_OTHER_TYPES_REFERENCE, &proto);
         if (status != ZX_OK) {
             return status;
         }
-        *result = InterfaceProtocolClient(&proto);
+        *result = OtherTypesReferenceProtocolClient(&proto);
         return ZX_OK;
     }
 
-    // Create a InterfaceProtocolClient from the given parent device.
+    // Create a OtherTypesReferenceProtocolClient from the given parent device.
     //
     // If ZX_OK is returned, the created object will be initialized in |result|.
     static zx_status_t CreateFromDevice(zx_device_t* parent, const char* fragment_name,
-                                        InterfaceProtocolClient* result) {
-        interface_protocol_t proto;
+                                        OtherTypesReferenceProtocolClient* result) {
+        other_types_reference_protocol_t proto;
         zx_status_t status = device_get_fragment_protocol(parent, fragment_name,
-                                 ZX_PROTOCOL_INTERFACE, &proto);
+                                 ZX_PROTOCOL_OTHER_TYPES_REFERENCE, &proto);
         if (status != ZX_OK) {
             return status;
         }
-        *result = InterfaceProtocolClient(&proto);
+        *result = OtherTypesReferenceProtocolClient(&proto);
         return ZX_OK;
     }
 
-    void GetProto(interface_protocol_t* proto) const {
+    void GetProto(other_types_reference_protocol_t* proto) const {
         proto->ctx = ctx_;
         proto->ops = ops_;
     }
@@ -914,44 +930,28 @@ public:
         ops_ = nullptr;
     }
 
-    void Value(void* intf_ctx, const other_types_protocol_ops_t* intf_ops, other_types_protocol_t* out_intf) const {
-        const other_types_protocol_t intf2 = {
-            .ops = intf_ops,
-            .ctx = intf_ctx,
-        };
-        const other_types_protocol_t* intf = &intf2;
-        ops_->value(ctx_, intf, out_intf);
+    void Struct(const this_is_astruct_t* s, this_is_astruct_t** out_s) const {
+        ops_->struct(ctx_, s, out_s);
     }
 
-    void Reference(void* intf_ctx, const other_types_protocol_ops_t* intf_ops, other_types_protocol_t** out_intf) const {
-        const other_types_protocol_t intf2 = {
-            .ops = intf_ops,
-            .ctx = intf_ctx,
-        };
-        const other_types_protocol_t* intf = &intf2;
-        ops_->reference(ctx_, intf, out_intf);
+    void Union(const this_is_aunion_t* u, this_is_aunion_t** out_u) const {
+        ops_->union(ctx_, u, out_u);
     }
 
-    void Async(void* intf_ctx, const other_types_protocol_ops_t* intf_ops, interface_async_callback callback, void* cookie) const {
-        const other_types_protocol_t intf2 = {
-            .ops = intf_ops,
-            .ctx = intf_ctx,
-        };
-        const other_types_protocol_t* intf = &intf2;
-        ops_->async(ctx_, intf, callback, cookie);
+    void String(const char* s, char* out_s, size_t s_capacity) const {
+        ops_->string(ctx_, s, out_s, s_capacity);
     }
 
-    void AsyncRefernce(void* intf_ctx, const other_types_protocol_ops_t* intf_ops, interface_async_refernce_callback callback, void* cookie) const {
-        const other_types_protocol_t intf2 = {
-            .ops = intf_ops,
-            .ctx = intf_ctx,
-        };
-        const other_types_protocol_t* intf = &intf2;
-        ops_->async_refernce(ctx_, intf, callback, cookie);
+    void StringSized(const char* s, char* out_s, size_t s_capacity) const {
+        ops_->string_sized(ctx_, s, out_s, s_capacity);
+    }
+
+    void StringSized2(const char* s, char* out_s, size_t s_capacity) const {
+        ops_->string_sized2(ctx_, s, out_s, s_capacity);
     }
 
 private:
-    const interface_protocol_ops_t* ops_;
+    const other_types_reference_protocol_ops_t* ops_;
     void* ctx_;
 };
 

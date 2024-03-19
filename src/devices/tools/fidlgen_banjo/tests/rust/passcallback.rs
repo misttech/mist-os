@@ -21,6 +21,53 @@ pub struct Point {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Action(pub u32);
+
+impl Action {
+    pub const START: Self = Self(0x1);
+    pub const STOP: Self = Self(0x2);
+}
+
+impl std::ops::BitAnd for Action {
+    type Output = Self;
+    fn bitand(self, rhs: Self) -> Self {
+        Self(self.0 & rhs.0)
+    }
+}
+
+impl std::ops::BitAndAssign for Action {
+    fn bitand_assign(&mut self, rhs: Self) {
+        *self = Self(self.0 & rhs.0)
+    }
+}
+
+impl std::ops::BitOr for Action {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitOrAssign for Action {
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = Self(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitXor for Action {
+    type Output = Self;
+    fn bitxor(self, rhs: Self) -> Self {
+        Self(self.0 ^ rhs.0)
+    }
+}
+
+impl std::ops::BitXorAssign for Action {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        *self = Self(self.0 ^ rhs.0)
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Direction(pub u8);
 
 impl Direction {
@@ -64,53 +111,6 @@ impl std::ops::BitXor for Direction {
 }
 
 impl std::ops::BitXorAssign for Direction {
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = Self(self.0 ^ rhs.0)
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Action(pub u32);
-
-impl Action {
-    pub const START: Self = Self(0x1);
-    pub const STOP: Self = Self(0x2);
-}
-
-impl std::ops::BitAnd for Action {
-    type Output = Self;
-    fn bitand(self, rhs: Self) -> Self {
-        Self(self.0 & rhs.0)
-    }
-}
-
-impl std::ops::BitAndAssign for Action {
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = Self(self.0 & rhs.0)
-    }
-}
-
-impl std::ops::BitOr for Action {
-    type Output = Self;
-    fn bitor(self, rhs: Self) -> Self {
-        Self(self.0 | rhs.0)
-    }
-}
-
-impl std::ops::BitOrAssign for Action {
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = Self(self.0 | rhs.0)
-    }
-}
-
-impl std::ops::BitXor for Action {
-    type Output = Self;
-    fn bitxor(self, rhs: Self) -> Self {
-        Self(self.0 ^ rhs.0)
-    }
-}
-
-impl std::ops::BitXorAssign for Action {
     fn bitxor_assign(&mut self, rhs: Self) {
         *self = Self(self.0 ^ rhs.0)
     }

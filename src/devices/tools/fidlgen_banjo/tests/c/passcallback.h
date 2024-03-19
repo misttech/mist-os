@@ -14,6 +14,9 @@
 __BEGIN_CDECLS
 
 // Forward declarations
+typedef uint32_t action_t;
+#define ACTION_START UINT32_C(0x1)
+#define ACTION_STOP UINT32_C(0x2)
 typedef struct point point_t;
 typedef uint8_t direction_t;
 #define DIRECTION_UP UINT8_C(1)
@@ -23,9 +26,6 @@ typedef uint8_t direction_t;
 typedef struct action_notify action_notify_t;
 typedef struct action_protocol_protocol action_protocol_protocol_t;
 typedef struct action_protocol_protocol_ops action_protocol_protocol_ops_t;
-typedef uint32_t action_t;
-#define ACTION_START UINT32_C(0x1)
-#define ACTION_STOP UINT32_C(0x2)
 
 // Declarations
 struct point {

@@ -14,9 +14,9 @@
 __BEGIN_CDECLS
 
 // Forward declarations
-#define x INT32_C(23)
 typedef struct hello_protocol hello_protocol_t;
 typedef struct hello_protocol_ops hello_protocol_ops_t;
+#define x INT32_C(23)
 
 // Declarations
 struct hello_protocol_ops {

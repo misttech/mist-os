@@ -103,8 +103,8 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.driverservice/SomeDriverProtocol",
-    "test.driverservice/DriverOnlyService"
+    "test.driverservice/DriverOnlyService",
+    "test.driverservice/SomeDriverProtocol"
   ],
   "declarations": {
     "test.driverservice/SomeDriverProtocol": "protocol",

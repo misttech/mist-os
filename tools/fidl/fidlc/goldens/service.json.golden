@@ -242,12 +242,12 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.service/SingleMemberService",
-    "test.service/SecondProtocol",
-    "test.service/MultiHomogeneousMemberService",
-    "test.service/MultiHeterogeneousMemberService",
+    "test.service/EmptyService",
     "test.service/FirstProtocol",
-    "test.service/EmptyService"
+    "test.service/MultiHeterogeneousMemberService",
+    "test.service/MultiHomogeneousMemberService",
+    "test.service/SecondProtocol",
+    "test.service/SingleMemberService"
   ],
   "declarations": {
     "test.service/FirstProtocol": "protocol",

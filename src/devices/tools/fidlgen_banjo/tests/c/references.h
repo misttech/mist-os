@@ -15,14 +15,32 @@ __BEGIN_CDECLS
 
 // Forward declarations
 typedef struct some_type some_type_t;
-typedef struct vector_field_in_struct vector_field_in_struct_t;
-typedef struct mutable_field mutable_field_t;
 typedef struct in_out_protocol_protocol in_out_protocol_protocol_t;
 typedef struct in_out_protocol_protocol_ops in_out_protocol_protocol_ops_t;
+typedef struct mutable_field mutable_field_t;
+typedef struct vector_field_in_struct vector_field_in_struct_t;
 
 // Declarations
 struct some_type {
     uint32_t value;
+};
+
+struct in_out_protocol_protocol_ops {
+    void (*do_something)(void* ctx, some_type_t* param);
+    void (*do_some_other_thing)(void* ctx, const some_type_t* param);
+    void (*do_some_default_thing)(void* ctx, const some_type_t* param);
+};
+
+
+struct in_out_protocol_protocol {
+    const in_out_protocol_protocol_ops_t* ops;
+    void* ctx;
+};
+
+struct mutable_field {
+    char* some_string;
+    const char* some_other_string;
+    const char* some_default_string;
 };
 
 struct vector_field_in_struct {
@@ -36,24 +54,6 @@ struct vector_field_in_struct {
     size_t the_mutable_vector_of_boxes_count;
     const some_type_t* the_default_vector_list;
     size_t the_default_vector_count;
-};
-
-struct mutable_field {
-    char* some_string;
-    const char* some_other_string;
-    const char* some_default_string;
-};
-
-struct in_out_protocol_protocol_ops {
-    void (*do_something)(void* ctx, some_type_t* param);
-    void (*do_some_other_thing)(void* ctx, const some_type_t* param);
-    void (*do_some_default_thing)(void* ctx, const some_type_t* param);
-};
-
-
-struct in_out_protocol_protocol {
-    const in_out_protocol_protocol_ops_t* ops;
-    void* ctx;
 };
 
 

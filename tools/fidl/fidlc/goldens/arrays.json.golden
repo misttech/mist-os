@@ -402,12 +402,12 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.arrays/UnionSmallArray",
-    "test.arrays/UnionLargeArray",
-    "test.arrays/TableSmallArray",
-    "test.arrays/TableLargeArray",
+    "test.arrays/StructLargeArray",
     "test.arrays/StructSmallArray",
-    "test.arrays/StructLargeArray"
+    "test.arrays/TableLargeArray",
+    "test.arrays/TableSmallArray",
+    "test.arrays/UnionLargeArray",
+    "test.arrays/UnionSmallArray"
   ],
   "declarations": {
     "test.arrays/StructLargeArray": "struct",

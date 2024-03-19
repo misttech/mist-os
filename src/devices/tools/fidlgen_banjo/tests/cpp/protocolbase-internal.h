@@ -12,58 +12,6 @@
 namespace ddk {
 namespace internal {
 
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_status, SynchronousBaseStatus,
-        zx_status_t (C::*)(zx_status_t status, zx_status_t* out_status_2));
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_time, SynchronousBaseTime,
-        zx_time_t (C::*)(zx_time_t time, zx_time_t* out_time_2));
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_duration, SynchronousBaseDuration,
-        zx_duration_t (C::*)(zx_duration_t duration, zx_duration_t* out_duration_2));
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_koid, SynchronousBaseKoid,
-        zx_koid_t (C::*)(zx_koid_t koid, zx_koid_t* out_koid_2));
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_off, SynchronousBaseOff,
-        zx_off_t (C::*)(zx_off_t off, zx_off_t* out_off_2));
-
-
-template <typename D>
-constexpr void CheckSynchronousBaseProtocolSubclass() {
-    static_assert(internal::has_synchronous_base_protocol_status<D>::value,
-        "SynchronousBaseProtocol subclasses must implement "
-        "zx_status_t SynchronousBaseStatus(zx_status_t status, zx_status_t* out_status_2);");
-
-    static_assert(internal::has_synchronous_base_protocol_time<D>::value,
-        "SynchronousBaseProtocol subclasses must implement "
-        "zx_time_t SynchronousBaseTime(zx_time_t time, zx_time_t* out_time_2);");
-
-    static_assert(internal::has_synchronous_base_protocol_duration<D>::value,
-        "SynchronousBaseProtocol subclasses must implement "
-        "zx_duration_t SynchronousBaseDuration(zx_duration_t duration, zx_duration_t* out_duration_2);");
-
-    static_assert(internal::has_synchronous_base_protocol_koid<D>::value,
-        "SynchronousBaseProtocol subclasses must implement "
-        "zx_koid_t SynchronousBaseKoid(zx_koid_t koid, zx_koid_t* out_koid_2);");
-
-    static_assert(internal::has_synchronous_base_protocol_off<D>::value,
-        "SynchronousBaseProtocol subclasses must implement "
-        "zx_off_t SynchronousBaseOff(zx_off_t off, zx_off_t* out_off_2);");
-
-}
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_driver_transport_protocol_status, DriverTransportStatus,
-        zx_status_t (C::*)(zx_status_t status));
-
-
-template <typename D>
-constexpr void CheckDriverTransportProtocolSubclass() {
-    static_assert(internal::has_driver_transport_protocol_status<D>::value,
-        "DriverTransportProtocol subclasses must implement "
-        "zx_status_t DriverTransportStatus(zx_status_t status);");
-
-}
-
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_async_base_protocol_status, AsyncBaseStatus,
         void (C::*)(zx_status_t status, async_base_status_callback callback, void* cookie));
 
@@ -101,6 +49,58 @@ constexpr void CheckAsyncBaseProtocolSubclass() {
     static_assert(internal::has_async_base_protocol_off<D>::value,
         "AsyncBaseProtocol subclasses must implement "
         "void AsyncBaseOff(zx_off_t off, async_base_off_callback callback, void* cookie);");
+
+}
+
+DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_driver_transport_protocol_status, DriverTransportStatus,
+        zx_status_t (C::*)(zx_status_t status));
+
+
+template <typename D>
+constexpr void CheckDriverTransportProtocolSubclass() {
+    static_assert(internal::has_driver_transport_protocol_status<D>::value,
+        "DriverTransportProtocol subclasses must implement "
+        "zx_status_t DriverTransportStatus(zx_status_t status);");
+
+}
+
+DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_status, SynchronousBaseStatus,
+        zx_status_t (C::*)(zx_status_t status, zx_status_t* out_status_2));
+
+DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_time, SynchronousBaseTime,
+        zx_time_t (C::*)(zx_time_t time, zx_time_t* out_time_2));
+
+DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_duration, SynchronousBaseDuration,
+        zx_duration_t (C::*)(zx_duration_t duration, zx_duration_t* out_duration_2));
+
+DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_koid, SynchronousBaseKoid,
+        zx_koid_t (C::*)(zx_koid_t koid, zx_koid_t* out_koid_2));
+
+DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_off, SynchronousBaseOff,
+        zx_off_t (C::*)(zx_off_t off, zx_off_t* out_off_2));
+
+
+template <typename D>
+constexpr void CheckSynchronousBaseProtocolSubclass() {
+    static_assert(internal::has_synchronous_base_protocol_status<D>::value,
+        "SynchronousBaseProtocol subclasses must implement "
+        "zx_status_t SynchronousBaseStatus(zx_status_t status, zx_status_t* out_status_2);");
+
+    static_assert(internal::has_synchronous_base_protocol_time<D>::value,
+        "SynchronousBaseProtocol subclasses must implement "
+        "zx_time_t SynchronousBaseTime(zx_time_t time, zx_time_t* out_time_2);");
+
+    static_assert(internal::has_synchronous_base_protocol_duration<D>::value,
+        "SynchronousBaseProtocol subclasses must implement "
+        "zx_duration_t SynchronousBaseDuration(zx_duration_t duration, zx_duration_t* out_duration_2);");
+
+    static_assert(internal::has_synchronous_base_protocol_koid<D>::value,
+        "SynchronousBaseProtocol subclasses must implement "
+        "zx_koid_t SynchronousBaseKoid(zx_koid_t koid, zx_koid_t* out_koid_2);");
+
+    static_assert(internal::has_synchronous_base_protocol_off<D>::value,
+        "SynchronousBaseProtocol subclasses must implement "
+        "zx_off_t SynchronousBaseOff(zx_off_t off, zx_off_t* out_off_2);");
 
 }
 

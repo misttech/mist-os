@@ -13,8 +13,14 @@ use fuchsia_zircon_types as zircon_types;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct F {
-    pub quuz: E,
+pub struct A {
+    pub foo: *mut B,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct B {
+    pub bar: *mut A,
 }
 
 #[repr(C)]
@@ -31,26 +37,20 @@ pub struct D {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct B {
-    pub bar: *mut A,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct A {
-    pub foo: *mut B,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct H {
-    pub flags: G,
+pub struct F {
+    pub quuz: E,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct E {
     pub quux: u8,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct H {
+    pub flags: G,
 }
 
 

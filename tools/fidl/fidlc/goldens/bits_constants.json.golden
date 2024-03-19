@@ -228,10 +228,10 @@
   "new_type_declarations": [],
   "declaration_order": [
     "test.bitsconstants/BitsType",
-    "test.bitsconstants/Const3",
-    "test.bitsconstants/Const2",
+    "test.bitsconstants/Const0",
     "test.bitsconstants/Const1",
-    "test.bitsconstants/Const0"
+    "test.bitsconstants/Const2",
+    "test.bitsconstants/Const3"
   ],
   "declarations": {
     "test.bitsconstants/BitsType": "bits",

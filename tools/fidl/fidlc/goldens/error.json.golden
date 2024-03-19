@@ -291,9 +291,9 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
+    "test.error/ExampleFooRequest",
     "test.error/Example_foo_Response",
     "test.error/Example_foo_Result",
-    "test.error/ExampleFooRequest",
     "test.error/Example"
   ],
   "declarations": {

@@ -176,8 +176,8 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.struct/Simple",
-    "test.struct/BasicStruct"
+    "test.struct/BasicStruct",
+    "test.struct/Simple"
   ],
   "declarations": {
     "test.struct/BasicStruct": "struct",

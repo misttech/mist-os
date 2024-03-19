@@ -591,14 +591,14 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
+    "test.handlesintypes/EmptyResourceStruct",
+    "test.handlesintypes/EmptyResourceTable",
+    "test.handlesintypes/EmptyResourceUnion",
     "test.handlesintypes/obj_type",
     "test.handlesintypes/handle",
-    "test.handlesintypes/UnionWithHandle",
     "test.handlesintypes/TableWithHandle",
-    "test.handlesintypes/HandlesInTypes",
-    "test.handlesintypes/EmptyResourceUnion",
-    "test.handlesintypes/EmptyResourceTable",
-    "test.handlesintypes/EmptyResourceStruct"
+    "test.handlesintypes/UnionWithHandle",
+    "test.handlesintypes/HandlesInTypes"
   ],
   "declarations": {
     "test.handlesintypes/obj_type": "enum",

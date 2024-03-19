@@ -32,10 +32,15 @@ std::optional<std::string> GetSpaceBefore(std::string_view line, std::string_vie
   return std::nullopt;
 }
 
-// Erases all "platform", "location" and "maybe_attributes" fields from a JSON
-// IR string. These are the only things can change when manually decomposing a
-// library. Also removes all end-of-line commas since these can cause spurious
-// diffs. Note that this means the returned string is not valid JSON.
+// Erases fields from a JSON IR string that manual decomposition can change:
+//
+// * "platform": changes in DecompositionTests.UnversionedLibrary.
+// * "location": decomposing changes all locations.
+// * "maybe_attributes": decomposing changes @available attributes.
+// * "declaration_order": decomposing can change the DFS order.
+//
+// Also removes all end-of-line commas since these can cause spurious diffs.
+// Note that this means the returned string is not valid JSON.
 std::string ScrubJson(const std::string& json) {
   // We scan the JSON line by line, filtering out the undesired lines. To do
   // this, we rely on JsonWriter emitting correct indentation and newlines.
@@ -48,17 +53,21 @@ std::string ScrubJson(const std::string& json) {
       if (StartsWith(line, skip_until.value())) {
         skip_until = std::nullopt;
       }
+      continue;
+    }
+    if (GetSpaceBefore(line, "\"platform\": \"")) {
+      // Skip platform line.
+    } else if (auto indent = GetSpaceBefore(line, "\"location\": {")) {
+      skip_until = indent.value() + '}';
+    } else if (auto indent = GetSpaceBefore(line, "\"maybe_attributes\": [")) {
+      skip_until = indent.value() + ']';
+    } else if (auto indent = GetSpaceBefore(line, "\"declaration_order\": [")) {
+      skip_until = indent.value() + ']';
     } else {
-      if ((skip_until = GetSpaceBefore(line, "\"location\": {"))) {
-        skip_until.value().push_back('}');
-      } else if ((skip_until = GetSpaceBefore(line, "\"maybe_attributes\": ["))) {
-        skip_until.value().push_back(']');
-      } else if (!GetSpaceBefore(line, "\"platform\": \"").has_value()) {
-        if (line.back() == ',') {
-          line.pop_back();
-        }
-        output << line << '\n';
+      if (line.back() == ',') {
+        line.pop_back();
       }
+      output << line << '\n';
     }
   }
   return output.str();

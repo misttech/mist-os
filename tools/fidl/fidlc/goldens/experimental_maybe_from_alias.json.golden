@@ -1840,15 +1840,15 @@
   ],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.experimentalmaybefromalias/Vector",
-    "test.experimentalmaybefromalias/U64",
-    "test.experimentalmaybefromalias/AliasOfVectorContainingAliasOfVector",
-    "test.experimentalmaybefromalias/AliasOfArrayContainingAliasOfArray",
-    "test.experimentalmaybefromalias/MyProtocol",
-    "test.experimentalmaybefromalias/AliasOfString",
-    "test.experimentalmaybefromalias/AliasOfRequest",
-    "test.experimentalmaybefromalias/AliasOfBytes",
     "test.experimentalmaybefromalias/AliasOfArray",
+    "test.experimentalmaybefromalias/U64",
+    "test.experimentalmaybefromalias/AliasOfArrayContainingAliasOfArray",
+    "test.experimentalmaybefromalias/AliasOfBytes",
+    "test.experimentalmaybefromalias/AliasOfRequest",
+    "test.experimentalmaybefromalias/AliasOfString",
+    "test.experimentalmaybefromalias/AliasOfVectorContainingAliasOfVector",
+    "test.experimentalmaybefromalias/MyProtocol",
+    "test.experimentalmaybefromalias/Vector",
     "test.experimentalmaybefromalias/Testing"
   ],
   "declarations": {

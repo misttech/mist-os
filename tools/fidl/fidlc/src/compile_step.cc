@@ -160,6 +160,7 @@ void CompileStep::CompileDecl(Decl* decl) {
   }  // switch
   decl->state = Decl::State::kCompiled;
   decl_stack_.pop_back();
+  library()->declaration_order.push_back(decl);
 }
 
 bool CompileStep::ResolveOrOperatorConstant(Constant* constant, std::optional<const Type*> opt_type,

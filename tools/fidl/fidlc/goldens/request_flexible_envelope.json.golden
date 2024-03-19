@@ -487,12 +487,12 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
+    "test.requestflexibleenvelope/FlexibleFoo",
     "test.requestflexibleenvelope/StrictFoo",
     "test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleRequest",
-    "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictResponse",
-    "test.requestflexibleenvelope/FlexibleFoo",
     "test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleResponse",
     "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictRequest",
+    "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictResponse",
     "test.requestflexibleenvelope/Protocol"
   ],
   "declarations": {

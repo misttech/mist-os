@@ -500,9 +500,9 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
+    "test.errorsyntax/ExampleUseOfErrorSyntaxCallWhichMayFailRequest",
     "test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Response",
     "test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Result",
-    "test.errorsyntax/ExampleUseOfErrorSyntaxCallWhichMayFailRequest",
     "test.errorsyntax/ExampleUseOfErrorSyntax"
   ],
   "declarations": {

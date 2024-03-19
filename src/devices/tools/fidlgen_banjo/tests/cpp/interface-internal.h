@@ -38,6 +38,25 @@ constexpr void CheckBakerProtocolSubclass() {
 
 }
 
+DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_cookie_jarrer_protocol_place, CookieJarrerPlace,
+        void (C::*)(const char* name));
+
+DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_cookie_jarrer_protocol_take, CookieJarrerTake,
+        cookie_kind_t (C::*)(const char* name));
+
+
+template <typename D>
+constexpr void CheckCookieJarrerProtocolSubclass() {
+    static_assert(internal::has_cookie_jarrer_protocol_place<D>::value,
+        "CookieJarrerProtocol subclasses must implement "
+        "void CookieJarrerPlace(const char* name);");
+
+    static_assert(internal::has_cookie_jarrer_protocol_take<D>::value,
+        "CookieJarrerProtocol subclasses must implement "
+        "cookie_kind_t CookieJarrerTake(const char* name);");
+
+}
+
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_cookie_maker_protocol_prep, CookieMakerPrep,
         void (C::*)(cookie_kind_t cookie, cookie_maker_prep_callback callback, void* cookie));
 
@@ -61,25 +80,6 @@ constexpr void CheckCookieMakerProtocolSubclass() {
     static_assert(internal::has_cookie_maker_protocol_deliver<D>::value,
         "CookieMakerProtocol subclasses must implement "
         "zx_status_t CookieMakerDeliver(uint64_t token);");
-
-}
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_cookie_jarrer_protocol_place, CookieJarrerPlace,
-        void (C::*)(const char* name));
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_cookie_jarrer_protocol_take, CookieJarrerTake,
-        cookie_kind_t (C::*)(const char* name));
-
-
-template <typename D>
-constexpr void CheckCookieJarrerProtocolSubclass() {
-    static_assert(internal::has_cookie_jarrer_protocol_place<D>::value,
-        "CookieJarrerProtocol subclasses must implement "
-        "void CookieJarrerPlace(const char* name);");
-
-    static_assert(internal::has_cookie_jarrer_protocol_take<D>::value,
-        "CookieJarrerProtocol subclasses must implement "
-        "cookie_kind_t CookieJarrerTake(const char* name);");
 
 }
 

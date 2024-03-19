@@ -15,19 +15,19 @@ __BEGIN_CDECLS
 
 // Forward declarations
 typedef uint16_t great_type_t;
-typedef struct blabla_something_response blabla_something_response_t;
 typedef struct blabla_something_request blabla_something_request_t;
+typedef struct blabla_something_response blabla_something_response_t;
 
 // Declarations
+struct blabla_something_request {
+    uint32_t opcode;
+    uint16_t g_one;
+};
+
 struct blabla_something_response {
     zx_status_t status;
     uint64_t value;
     uint16_t g_two;
-};
-
-struct blabla_something_request {
-    uint32_t opcode;
-    uint16_t g_one;
 };
 
 

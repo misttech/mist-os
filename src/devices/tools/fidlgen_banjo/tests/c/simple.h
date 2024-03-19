@@ -14,21 +14,17 @@
 __BEGIN_CDECLS
 
 // Forward declarations
-typedef struct struct_with_zx_field struct_with_zx_field_t;
-typedef struct point point_t;
 typedef uint32_t direction_t;
 #define DIRECTION_UP UINT32_C(0)
 #define DIRECTION_DOWN UINT32_C(1)
 #define DIRECTION_LEFT UINT32_C(2)
 #define DIRECTION_RIGHT UINT32_C(3)
+typedef struct point point_t;
 typedef struct drawing_protocol drawing_protocol_t;
 typedef struct drawing_protocol_ops drawing_protocol_ops_t;
+typedef struct struct_with_zx_field struct_with_zx_field_t;
 
 // Declarations
-struct struct_with_zx_field {
-    zx_status_t status;
-};
-
 struct point {
     int32_t x;
     int32_t y;
@@ -45,6 +41,10 @@ struct drawing_protocol_ops {
 struct drawing_protocol {
     const drawing_protocol_ops_t* ops;
     void* ctx;
+};
+
+struct struct_with_zx_field {
+    zx_status_t status;
 };
 
 

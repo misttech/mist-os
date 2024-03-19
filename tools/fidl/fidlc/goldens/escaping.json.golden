@@ -368,16 +368,16 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.escaping/SMILE_UPPER",
-    "test.escaping/SMILE_LOWER",
-    "test.escaping/SMILE_LITERAL",
-    "test.escaping/SMILE_LEADING_ZERO",
-    "test.escaping/NULL",
-    "test.escaping/MAX",
-    "test.escaping/DocCommentWithQuotes",
-    "test.escaping/DOLLAR_BRACE",
+    "test.escaping/BASIC",
     "test.escaping/DOLLAR",
-    "test.escaping/BASIC"
+    "test.escaping/DOLLAR_BRACE",
+    "test.escaping/DocCommentWithQuotes",
+    "test.escaping/MAX",
+    "test.escaping/NULL",
+    "test.escaping/SMILE_LEADING_ZERO",
+    "test.escaping/SMILE_LITERAL",
+    "test.escaping/SMILE_LOWER",
+    "test.escaping/SMILE_UPPER"
   ],
   "declarations": {
     "test.escaping/BASIC": "const",

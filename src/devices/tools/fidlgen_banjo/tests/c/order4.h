@@ -14,17 +14,17 @@
 __BEGIN_CDECLS
 
 // Forward declarations
-typedef struct two two_t;
 typedef struct one one_t;
+typedef struct two two_t;
 
 // Declarations
-struct two {
-    zx_handle_t two_handle[1];
-};
-
 struct one {
     const zx_handle_t* one_handle_list;
     size_t one_handle_count;
+};
+
+struct two {
+    zx_handle_t two_handle[1];
 };
 
 

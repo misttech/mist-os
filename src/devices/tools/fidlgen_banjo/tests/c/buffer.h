@@ -14,11 +14,16 @@
 __BEGIN_CDECLS
 
 // Forward declarations
+typedef struct some_data some_data_t;
 typedef struct some_methods_protocol some_methods_protocol_t;
 typedef struct some_methods_protocol_ops some_methods_protocol_ops_t;
-typedef struct some_data some_data_t;
 
 // Declarations
+struct some_data {
+    const uint8_t* one_buffer;
+    size_t one_size;
+};
+
 struct some_methods_protocol_ops {
     void (*do_something)(void* ctx, const uint8_t* input_buffer, size_t input_size);
 };
@@ -27,11 +32,6 @@ struct some_methods_protocol_ops {
 struct some_methods_protocol {
     const some_methods_protocol_ops_t* ops;
     void* ctx;
-};
-
-struct some_data {
-    const uint8_t* one_buffer;
-    size_t one_size;
 };
 
 

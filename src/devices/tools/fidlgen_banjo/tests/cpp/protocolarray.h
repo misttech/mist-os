@@ -21,54 +21,6 @@
 //
 // :: Proxies ::
 //
-// ddk::ArrayofArraysProtocolClient is a simple wrapper around
-// arrayof_arrays_protocol_t. It does not own the pointers passed to it.
-//
-// :: Mixins ::
-//
-// ddk::ArrayofArraysProtocol is a mixin class that simplifies writing DDK drivers
-// that implement the arrayof-arrays protocol. It doesn't set the base protocol.
-//
-// :: Examples ::
-//
-// // A driver that implements a ZX_PROTOCOL_ARRAYOF_ARRAYS device.
-// class ArrayofArraysDevice;
-// using ArrayofArraysDeviceType = ddk::Device<ArrayofArraysDevice, /* ddk mixins */>;
-//
-// class ArrayofArraysDevice : public ArrayofArraysDeviceType,
-//                      public ddk::ArrayofArraysProtocol<ArrayofArraysDevice> {
-//   public:
-//     ArrayofArraysDevice(zx_device_t* parent)
-//         : ArrayofArraysDeviceType(parent) {}
-//
-//     void ArrayofArraysBool(const bool b[32][4], bool out_b[32][4]);
-//
-//     void ArrayofArraysInt8(const int8_t i8[32][4], int8_t out_i8[32][4]);
-//
-//     void ArrayofArraysInt16(const int16_t i16[32][4], int16_t out_i16[32][4]);
-//
-//     void ArrayofArraysInt32(const int32_t i32[32][4], int32_t out_i32[32][4]);
-//
-//     void ArrayofArraysInt64(const int64_t i64[32][4], int64_t out_i64[32][4]);
-//
-//     void ArrayofArraysUint8(const uint8_t u8[32][4], uint8_t out_u8[32][4]);
-//
-//     void ArrayofArraysUint16(const uint16_t u16[32][4], uint16_t out_u16[32][4]);
-//
-//     void ArrayofArraysUint32(const uint32_t u32[32][4], uint32_t out_u32[32][4]);
-//
-//     void ArrayofArraysUint64(const uint64_t u64[32][4], uint64_t out_u64[32][4]);
-//
-//     void ArrayofArraysFloat32(const float f32[32][4], float out_f32[32][4]);
-//
-//     void ArrayofArraysFloat64(const double u64[32][4], double out_f64[32][4]);
-//
-//     void ArrayofArraysHandle(const zx::handle u64[32][4], zx::handle out_f64[32][4]);
-//
-//     ...
-// };
-// :: Proxies ::
-//
 // ddk::ArrayProtocolClient is a simple wrapper around
 // array_protocol_t. It does not own the pointers passed to it.
 //
@@ -163,204 +115,56 @@
 //
 //     ...
 // };
+// :: Proxies ::
+//
+// ddk::ArrayofArraysProtocolClient is a simple wrapper around
+// arrayof_arrays_protocol_t. It does not own the pointers passed to it.
+//
+// :: Mixins ::
+//
+// ddk::ArrayofArraysProtocol is a mixin class that simplifies writing DDK drivers
+// that implement the arrayof-arrays protocol. It doesn't set the base protocol.
+//
+// :: Examples ::
+//
+// // A driver that implements a ZX_PROTOCOL_ARRAYOF_ARRAYS device.
+// class ArrayofArraysDevice;
+// using ArrayofArraysDeviceType = ddk::Device<ArrayofArraysDevice, /* ddk mixins */>;
+//
+// class ArrayofArraysDevice : public ArrayofArraysDeviceType,
+//                      public ddk::ArrayofArraysProtocol<ArrayofArraysDevice> {
+//   public:
+//     ArrayofArraysDevice(zx_device_t* parent)
+//         : ArrayofArraysDeviceType(parent) {}
+//
+//     void ArrayofArraysBool(const bool b[32][4], bool out_b[32][4]);
+//
+//     void ArrayofArraysInt8(const int8_t i8[32][4], int8_t out_i8[32][4]);
+//
+//     void ArrayofArraysInt16(const int16_t i16[32][4], int16_t out_i16[32][4]);
+//
+//     void ArrayofArraysInt32(const int32_t i32[32][4], int32_t out_i32[32][4]);
+//
+//     void ArrayofArraysInt64(const int64_t i64[32][4], int64_t out_i64[32][4]);
+//
+//     void ArrayofArraysUint8(const uint8_t u8[32][4], uint8_t out_u8[32][4]);
+//
+//     void ArrayofArraysUint16(const uint16_t u16[32][4], uint16_t out_u16[32][4]);
+//
+//     void ArrayofArraysUint32(const uint32_t u32[32][4], uint32_t out_u32[32][4]);
+//
+//     void ArrayofArraysUint64(const uint64_t u64[32][4], uint64_t out_u64[32][4]);
+//
+//     void ArrayofArraysFloat32(const float f32[32][4], float out_f32[32][4]);
+//
+//     void ArrayofArraysFloat64(const double u64[32][4], double out_f64[32][4]);
+//
+//     void ArrayofArraysHandle(const zx::handle u64[32][4], zx::handle out_f64[32][4]);
+//
+//     ...
+// };
 
 namespace ddk {
-
-template <typename D, typename Base = internal::base_mixin>
-class ArrayofArraysProtocol : public Base {
-public:
-    ArrayofArraysProtocol() {
-        internal::CheckArrayofArraysProtocolSubclass<D>();
-        arrayof_arrays_protocol_ops_.bool = ArrayofArraysBool;
-        arrayof_arrays_protocol_ops_.int8 = ArrayofArraysInt8;
-        arrayof_arrays_protocol_ops_.int16 = ArrayofArraysInt16;
-        arrayof_arrays_protocol_ops_.int32 = ArrayofArraysInt32;
-        arrayof_arrays_protocol_ops_.int64 = ArrayofArraysInt64;
-        arrayof_arrays_protocol_ops_.uint8 = ArrayofArraysUint8;
-        arrayof_arrays_protocol_ops_.uint16 = ArrayofArraysUint16;
-        arrayof_arrays_protocol_ops_.uint32 = ArrayofArraysUint32;
-        arrayof_arrays_protocol_ops_.uint64 = ArrayofArraysUint64;
-        arrayof_arrays_protocol_ops_.float32 = ArrayofArraysFloat32;
-        arrayof_arrays_protocol_ops_.float64 = ArrayofArraysFloat64;
-        arrayof_arrays_protocol_ops_.handle = ArrayofArraysHandle;
-
-        if constexpr (internal::is_base_proto<Base>::value) {
-            auto dev = static_cast<D*>(this);
-            // Can only inherit from one base_protocol implementation.
-            ZX_ASSERT(dev->ddk_proto_id_ == 0);
-            dev->ddk_proto_id_ = ZX_PROTOCOL_ARRAYOF_ARRAYS;
-            dev->ddk_proto_ops_ = &arrayof_arrays_protocol_ops_;
-        }
-    }
-
-protected:
-    arrayof_arrays_protocol_ops_t arrayof_arrays_protocol_ops_ = {};
-
-private:
-    static void ArrayofArraysBool(void* ctx, const bool b[32][4], bool out_b[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysBool(b, out_b);
-    }
-    static void ArrayofArraysInt8(void* ctx, const int8_t i8[32][4], int8_t out_i8[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysInt8(i8, out_i8);
-    }
-    static void ArrayofArraysInt16(void* ctx, const int16_t i16[32][4], int16_t out_i16[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysInt16(i16, out_i16);
-    }
-    static void ArrayofArraysInt32(void* ctx, const int32_t i32[32][4], int32_t out_i32[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysInt32(i32, out_i32);
-    }
-    static void ArrayofArraysInt64(void* ctx, const int64_t i64[32][4], int64_t out_i64[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysInt64(i64, out_i64);
-    }
-    static void ArrayofArraysUint8(void* ctx, const uint8_t u8[32][4], uint8_t out_u8[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysUint8(u8, out_u8);
-    }
-    static void ArrayofArraysUint16(void* ctx, const uint16_t u16[32][4], uint16_t out_u16[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysUint16(u16, out_u16);
-    }
-    static void ArrayofArraysUint32(void* ctx, const uint32_t u32[32][4], uint32_t out_u32[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysUint32(u32, out_u32);
-    }
-    static void ArrayofArraysUint64(void* ctx, const uint64_t u64[32][4], uint64_t out_u64[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysUint64(u64, out_u64);
-    }
-    static void ArrayofArraysFloat32(void* ctx, const float f32[32][4], float out_f32[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysFloat32(f32, out_f32);
-    }
-    static void ArrayofArraysFloat64(void* ctx, const double u64[32][4], double out_f64[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysFloat64(u64, out_f64);
-    }
-    static void ArrayofArraysHandle(void* ctx, const zx_handle_t u64[32][4], zx_handle_t out_f64[32][4]) {
-        static_cast<D*>(ctx)->ArrayofArraysHandle(u64, out_f64);
-    }
-};
-
-class ArrayofArraysProtocolClient {
-public:
-    using Proto = arrayof_arrays_protocol_t;
-    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_ARRAYOF_ARRAYS;
-
-    ArrayofArraysProtocolClient()
-        : ops_(nullptr), ctx_(nullptr) {}
-    ArrayofArraysProtocolClient(const arrayof_arrays_protocol_t* proto)
-        : ops_(proto->ops), ctx_(proto->ctx) {}
-
-    ArrayofArraysProtocolClient(zx_device_t* parent) {
-        arrayof_arrays_protocol_t proto;
-        if (device_get_protocol(parent, ZX_PROTOCOL_ARRAYOF_ARRAYS, &proto) == ZX_OK) {
-            ops_ = proto.ops;
-            ctx_ = proto.ctx;
-        } else {
-            ops_ = nullptr;
-            ctx_ = nullptr;
-        }
-    }
-
-    ArrayofArraysProtocolClient(zx_device_t* parent, const char* fragment_name) {
-        arrayof_arrays_protocol_t proto;
-        if (device_get_fragment_protocol(parent, fragment_name, ZX_PROTOCOL_ARRAYOF_ARRAYS, &proto) == ZX_OK) {
-            ops_ = proto.ops;
-            ctx_ = proto.ctx;
-        } else {
-            ops_ = nullptr;
-            ctx_ = nullptr;
-        }
-    }
-
-    // Create a ArrayofArraysProtocolClient from the given parent device + "fragment".
-    //
-    // If ZX_OK is returned, the created object will be initialized in |result|.
-    static zx_status_t CreateFromDevice(zx_device_t* parent,
-                                        ArrayofArraysProtocolClient* result) {
-        arrayof_arrays_protocol_t proto;
-        zx_status_t status = device_get_protocol(
-                parent, ZX_PROTOCOL_ARRAYOF_ARRAYS, &proto);
-        if (status != ZX_OK) {
-            return status;
-        }
-        *result = ArrayofArraysProtocolClient(&proto);
-        return ZX_OK;
-    }
-
-    // Create a ArrayofArraysProtocolClient from the given parent device.
-    //
-    // If ZX_OK is returned, the created object will be initialized in |result|.
-    static zx_status_t CreateFromDevice(zx_device_t* parent, const char* fragment_name,
-                                        ArrayofArraysProtocolClient* result) {
-        arrayof_arrays_protocol_t proto;
-        zx_status_t status = device_get_fragment_protocol(parent, fragment_name,
-                                 ZX_PROTOCOL_ARRAYOF_ARRAYS, &proto);
-        if (status != ZX_OK) {
-            return status;
-        }
-        *result = ArrayofArraysProtocolClient(&proto);
-        return ZX_OK;
-    }
-
-    void GetProto(arrayof_arrays_protocol_t* proto) const {
-        proto->ctx = ctx_;
-        proto->ops = ops_;
-    }
-    bool is_valid() const {
-        return ops_ != nullptr;
-    }
-    void clear() {
-        ctx_ = nullptr;
-        ops_ = nullptr;
-    }
-
-    void Bool(const bool b[32][4], bool out_b[32][4]) const {
-        ops_->bool(ctx_, b, out_b);
-    }
-
-    void Int8(const int8_t i8[32][4], int8_t out_i8[32][4]) const {
-        ops_->int8(ctx_, i8, out_i8);
-    }
-
-    void Int16(const int16_t i16[32][4], int16_t out_i16[32][4]) const {
-        ops_->int16(ctx_, i16, out_i16);
-    }
-
-    void Int32(const int32_t i32[32][4], int32_t out_i32[32][4]) const {
-        ops_->int32(ctx_, i32, out_i32);
-    }
-
-    void Int64(const int64_t i64[32][4], int64_t out_i64[32][4]) const {
-        ops_->int64(ctx_, i64, out_i64);
-    }
-
-    void Uint8(const uint8_t u8[32][4], uint8_t out_u8[32][4]) const {
-        ops_->uint8(ctx_, u8, out_u8);
-    }
-
-    void Uint16(const uint16_t u16[32][4], uint16_t out_u16[32][4]) const {
-        ops_->uint16(ctx_, u16, out_u16);
-    }
-
-    void Uint32(const uint32_t u32[32][4], uint32_t out_u32[32][4]) const {
-        ops_->uint32(ctx_, u32, out_u32);
-    }
-
-    void Uint64(const uint64_t u64[32][4], uint64_t out_u64[32][4]) const {
-        ops_->uint64(ctx_, u64, out_u64);
-    }
-
-    void Float32(const float f32[32][4], float out_f32[32][4]) const {
-        ops_->float32(ctx_, f32, out_f32);
-    }
-
-    void Float64(const double u64[32][4], double out_f64[32][4]) const {
-        ops_->float64(ctx_, u64, out_f64);
-    }
-
-    void Handle(const zx::handle u64[32][4], zx::handle out_f64[32][4]) const {
-        ops_->handle(ctx_, u64, out_f64);
-    }
-
-private:
-    const arrayof_arrays_protocol_ops_t* ops_;
-    void* ctx_;
-};
 
 template <typename D, typename Base = internal::base_mixin>
 class ArrayProtocol : public Base {
@@ -751,6 +555,202 @@ public:
 
 private:
     const array2_protocol_ops_t* ops_;
+    void* ctx_;
+};
+
+template <typename D, typename Base = internal::base_mixin>
+class ArrayofArraysProtocol : public Base {
+public:
+    ArrayofArraysProtocol() {
+        internal::CheckArrayofArraysProtocolSubclass<D>();
+        arrayof_arrays_protocol_ops_.bool = ArrayofArraysBool;
+        arrayof_arrays_protocol_ops_.int8 = ArrayofArraysInt8;
+        arrayof_arrays_protocol_ops_.int16 = ArrayofArraysInt16;
+        arrayof_arrays_protocol_ops_.int32 = ArrayofArraysInt32;
+        arrayof_arrays_protocol_ops_.int64 = ArrayofArraysInt64;
+        arrayof_arrays_protocol_ops_.uint8 = ArrayofArraysUint8;
+        arrayof_arrays_protocol_ops_.uint16 = ArrayofArraysUint16;
+        arrayof_arrays_protocol_ops_.uint32 = ArrayofArraysUint32;
+        arrayof_arrays_protocol_ops_.uint64 = ArrayofArraysUint64;
+        arrayof_arrays_protocol_ops_.float32 = ArrayofArraysFloat32;
+        arrayof_arrays_protocol_ops_.float64 = ArrayofArraysFloat64;
+        arrayof_arrays_protocol_ops_.handle = ArrayofArraysHandle;
+
+        if constexpr (internal::is_base_proto<Base>::value) {
+            auto dev = static_cast<D*>(this);
+            // Can only inherit from one base_protocol implementation.
+            ZX_ASSERT(dev->ddk_proto_id_ == 0);
+            dev->ddk_proto_id_ = ZX_PROTOCOL_ARRAYOF_ARRAYS;
+            dev->ddk_proto_ops_ = &arrayof_arrays_protocol_ops_;
+        }
+    }
+
+protected:
+    arrayof_arrays_protocol_ops_t arrayof_arrays_protocol_ops_ = {};
+
+private:
+    static void ArrayofArraysBool(void* ctx, const bool b[32][4], bool out_b[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysBool(b, out_b);
+    }
+    static void ArrayofArraysInt8(void* ctx, const int8_t i8[32][4], int8_t out_i8[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysInt8(i8, out_i8);
+    }
+    static void ArrayofArraysInt16(void* ctx, const int16_t i16[32][4], int16_t out_i16[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysInt16(i16, out_i16);
+    }
+    static void ArrayofArraysInt32(void* ctx, const int32_t i32[32][4], int32_t out_i32[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysInt32(i32, out_i32);
+    }
+    static void ArrayofArraysInt64(void* ctx, const int64_t i64[32][4], int64_t out_i64[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysInt64(i64, out_i64);
+    }
+    static void ArrayofArraysUint8(void* ctx, const uint8_t u8[32][4], uint8_t out_u8[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysUint8(u8, out_u8);
+    }
+    static void ArrayofArraysUint16(void* ctx, const uint16_t u16[32][4], uint16_t out_u16[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysUint16(u16, out_u16);
+    }
+    static void ArrayofArraysUint32(void* ctx, const uint32_t u32[32][4], uint32_t out_u32[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysUint32(u32, out_u32);
+    }
+    static void ArrayofArraysUint64(void* ctx, const uint64_t u64[32][4], uint64_t out_u64[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysUint64(u64, out_u64);
+    }
+    static void ArrayofArraysFloat32(void* ctx, const float f32[32][4], float out_f32[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysFloat32(f32, out_f32);
+    }
+    static void ArrayofArraysFloat64(void* ctx, const double u64[32][4], double out_f64[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysFloat64(u64, out_f64);
+    }
+    static void ArrayofArraysHandle(void* ctx, const zx_handle_t u64[32][4], zx_handle_t out_f64[32][4]) {
+        static_cast<D*>(ctx)->ArrayofArraysHandle(u64, out_f64);
+    }
+};
+
+class ArrayofArraysProtocolClient {
+public:
+    using Proto = arrayof_arrays_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_ARRAYOF_ARRAYS;
+
+    ArrayofArraysProtocolClient()
+        : ops_(nullptr), ctx_(nullptr) {}
+    ArrayofArraysProtocolClient(const arrayof_arrays_protocol_t* proto)
+        : ops_(proto->ops), ctx_(proto->ctx) {}
+
+    ArrayofArraysProtocolClient(zx_device_t* parent) {
+        arrayof_arrays_protocol_t proto;
+        if (device_get_protocol(parent, ZX_PROTOCOL_ARRAYOF_ARRAYS, &proto) == ZX_OK) {
+            ops_ = proto.ops;
+            ctx_ = proto.ctx;
+        } else {
+            ops_ = nullptr;
+            ctx_ = nullptr;
+        }
+    }
+
+    ArrayofArraysProtocolClient(zx_device_t* parent, const char* fragment_name) {
+        arrayof_arrays_protocol_t proto;
+        if (device_get_fragment_protocol(parent, fragment_name, ZX_PROTOCOL_ARRAYOF_ARRAYS, &proto) == ZX_OK) {
+            ops_ = proto.ops;
+            ctx_ = proto.ctx;
+        } else {
+            ops_ = nullptr;
+            ctx_ = nullptr;
+        }
+    }
+
+    // Create a ArrayofArraysProtocolClient from the given parent device + "fragment".
+    //
+    // If ZX_OK is returned, the created object will be initialized in |result|.
+    static zx_status_t CreateFromDevice(zx_device_t* parent,
+                                        ArrayofArraysProtocolClient* result) {
+        arrayof_arrays_protocol_t proto;
+        zx_status_t status = device_get_protocol(
+                parent, ZX_PROTOCOL_ARRAYOF_ARRAYS, &proto);
+        if (status != ZX_OK) {
+            return status;
+        }
+        *result = ArrayofArraysProtocolClient(&proto);
+        return ZX_OK;
+    }
+
+    // Create a ArrayofArraysProtocolClient from the given parent device.
+    //
+    // If ZX_OK is returned, the created object will be initialized in |result|.
+    static zx_status_t CreateFromDevice(zx_device_t* parent, const char* fragment_name,
+                                        ArrayofArraysProtocolClient* result) {
+        arrayof_arrays_protocol_t proto;
+        zx_status_t status = device_get_fragment_protocol(parent, fragment_name,
+                                 ZX_PROTOCOL_ARRAYOF_ARRAYS, &proto);
+        if (status != ZX_OK) {
+            return status;
+        }
+        *result = ArrayofArraysProtocolClient(&proto);
+        return ZX_OK;
+    }
+
+    void GetProto(arrayof_arrays_protocol_t* proto) const {
+        proto->ctx = ctx_;
+        proto->ops = ops_;
+    }
+    bool is_valid() const {
+        return ops_ != nullptr;
+    }
+    void clear() {
+        ctx_ = nullptr;
+        ops_ = nullptr;
+    }
+
+    void Bool(const bool b[32][4], bool out_b[32][4]) const {
+        ops_->bool(ctx_, b, out_b);
+    }
+
+    void Int8(const int8_t i8[32][4], int8_t out_i8[32][4]) const {
+        ops_->int8(ctx_, i8, out_i8);
+    }
+
+    void Int16(const int16_t i16[32][4], int16_t out_i16[32][4]) const {
+        ops_->int16(ctx_, i16, out_i16);
+    }
+
+    void Int32(const int32_t i32[32][4], int32_t out_i32[32][4]) const {
+        ops_->int32(ctx_, i32, out_i32);
+    }
+
+    void Int64(const int64_t i64[32][4], int64_t out_i64[32][4]) const {
+        ops_->int64(ctx_, i64, out_i64);
+    }
+
+    void Uint8(const uint8_t u8[32][4], uint8_t out_u8[32][4]) const {
+        ops_->uint8(ctx_, u8, out_u8);
+    }
+
+    void Uint16(const uint16_t u16[32][4], uint16_t out_u16[32][4]) const {
+        ops_->uint16(ctx_, u16, out_u16);
+    }
+
+    void Uint32(const uint32_t u32[32][4], uint32_t out_u32[32][4]) const {
+        ops_->uint32(ctx_, u32, out_u32);
+    }
+
+    void Uint64(const uint64_t u64[32][4], uint64_t out_u64[32][4]) const {
+        ops_->uint64(ctx_, u64, out_u64);
+    }
+
+    void Float32(const float f32[32][4], float out_f32[32][4]) const {
+        ops_->float32(ctx_, f32, out_f32);
+    }
+
+    void Float64(const double u64[32][4], double out_f64[32][4]) const {
+        ops_->float64(ctx_, u64, out_f64);
+    }
+
+    void Handle(const zx::handle u64[32][4], zx::handle out_f64[32][4]) const {
+        ops_->handle(ctx_, u64, out_f64);
+    }
+
+private:
+    const arrayof_arrays_protocol_ops_t* ops_;
     void* ctx_;
 };
 

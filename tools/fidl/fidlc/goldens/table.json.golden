@@ -2123,14 +2123,14 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.table/TableWithAttributes",
-    "test.table/SimpleTable",
-    "test.table/ReverseOrdinalTable",
-    "test.table/OlderSimpleTable",
-    "test.table/NewerSimpleTable",
+    "test.table/EmptyTable",
     "test.table/ExtensionTable",
+    "test.table/NewerSimpleTable",
+    "test.table/OlderSimpleTable",
+    "test.table/ReverseOrdinalTable",
+    "test.table/SimpleTable",
     "test.table/SixtyFourOrdinalTable",
-    "test.table/EmptyTable"
+    "test.table/TableWithAttributes"
   ],
   "declarations": {
     "test.table/EmptyTable": "table",

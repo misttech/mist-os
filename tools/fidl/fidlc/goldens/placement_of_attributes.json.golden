@@ -595,15 +595,15 @@
   ],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.placementofattributes/ExampleUnion",
-    "test.placementofattributes/ExampleTable",
-    "test.placementofattributes/ExampleStruct",
+    "test.placementofattributes/Alias",
+    "test.placementofattributes/EXAMPLE_CONST",
+    "test.placementofattributes/ExampleBits",
+    "test.placementofattributes/ExampleEnum",
     "test.placementofattributes/ExampleProtocolMethodRequest",
     "test.placementofattributes/ExampleProtocol",
-    "test.placementofattributes/ExampleEnum",
-    "test.placementofattributes/ExampleBits",
-    "test.placementofattributes/EXAMPLE_CONST",
-    "test.placementofattributes/Alias"
+    "test.placementofattributes/ExampleStruct",
+    "test.placementofattributes/ExampleTable",
+    "test.placementofattributes/ExampleUnion"
   ],
   "declarations": {
     "test.placementofattributes/ExampleBits": "bits",

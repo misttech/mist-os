@@ -1457,13 +1457,13 @@
   ],
   "new_type_declarations": [],
   "declaration_order": [
+    "test.handles/DriverProtocol",
+    "test.handles/FdfHandles",
+    "test.handles/aliased_plain_handle",
     "test.handles/aliased_subtype_handle",
     "test.handles/aliased_rights_handle",
-    "test.handles/aliased_plain_handle",
     "test.handles/Handles",
-    "test.handles/SomeProtocol",
-    "test.handles/FdfHandles",
-    "test.handles/DriverProtocol"
+    "test.handles/SomeProtocol"
   ],
   "declarations": {
     "test.handles/DriverProtocol": "protocol",

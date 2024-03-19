@@ -17,104 +17,91 @@
 
 namespace ddk {
 
-// This class mocks a device by providing a other_types_reference_protocol_t.
+// This class mocks a device by providing a interface_protocol_t.
 // Users can set expectations on how the protocol ops are called and what values they return. After
 // the test, use VerifyAndClear to reset the object and verify that all expectations were satisfied.
 // See the following example test:
 //
-// ddk::MockOtherTypesReference other_types_reference;
+// ddk::MockInterface interface;
 //
-// /* Set some expectations on the device by calling other_types_reference.Expect... methods. */
+// /* Set some expectations on the device by calling interface.Expect... methods. */
 //
-// SomeDriver dut(other_types_reference.GetProto());
+// SomeDriver dut(interface.GetProto());
 //
 // EXPECT_OK(dut.SomeMethod());
-// ASSERT_NO_FATAL_FAILURES(other_types_reference.VerifyAndClear());
+// ASSERT_NO_FATAL_FAILURES(interface.VerifyAndClear());
 //
 // Note that users must provide the equality operator for struct types, for example:
 // bool operator==(const a_struct_type& lhs, const a_struct_type& rhs)
 
-class MockOtherTypesReference : ddk::OtherTypesReferenceProtocol<MockOtherTypesReference> {
+class MockInterface : ddk::InterfaceProtocol<MockInterface> {
 public:
-    MockOtherTypesReference() : proto_{&other_types_reference_protocol_ops_, this} {}
+    MockInterface() : proto_{&interface_protocol_ops_, this} {}
 
-    virtual ~MockOtherTypesReference() {}
+    virtual ~MockInterface() {}
 
-    const other_types_reference_protocol_t* GetProto() const { return &proto_; }
+    const interface_protocol_t* GetProto() const { return &proto_; }
 
-    virtual MockOtherTypesReference& ExpectStruct(this_is_astruct_t s, this_is_astruct_t out_s) {
-        mock_struct_.ExpectCall({out_s}, s);
+    virtual MockInterface& ExpectValue(other_types_protocol_t intf, other_types_protocol_t out_intf) {
+        mock_value_.ExpectCall({out_intf}, intf);
         return *this;
     }
 
-    virtual MockOtherTypesReference& ExpectUnion(this_is_aunion_t u, this_is_aunion_t out_u) {
-        mock_union_.ExpectCall({out_u}, u);
+    virtual MockInterface& ExpectReference(other_types_protocol_t intf, other_types_protocol_t out_intf) {
+        mock_reference_.ExpectCall({out_intf}, intf);
         return *this;
     }
 
-    virtual MockOtherTypesReference& ExpectString(std::string s, std::string s) {
-        mock_string_.ExpectCall({std::move(out_s)}, std::move(s));
+    virtual MockInterface& ExpectAsync(other_types_protocol_t intf, other_types_protocol_t out_intf) {
+        mock_async_.ExpectCall({out_intf}, intf);
         return *this;
     }
 
-    virtual MockOtherTypesReference& ExpectStringSized(std::string s, std::string s) {
-        mock_string_sized_.ExpectCall({std::move(out_s)}, std::move(s));
-        return *this;
-    }
-
-    virtual MockOtherTypesReference& ExpectStringSized2(std::string s, std::string s) {
-        mock_string_sized2_.ExpectCall({std::move(out_s)}, std::move(s));
+    virtual MockInterface& ExpectAsyncRefernce(other_types_protocol_t intf, other_types_protocol_t out_intf) {
+        mock_async_refernce_.ExpectCall({out_intf}, intf);
         return *this;
     }
 
     void VerifyAndClear() {
-        mock_struct_.VerifyAndClear();
-        mock_union_.VerifyAndClear();
-        mock_string_.VerifyAndClear();
-        mock_string_sized_.VerifyAndClear();
-        mock_string_sized2_.VerifyAndClear();
+        mock_value_.VerifyAndClear();
+        mock_reference_.VerifyAndClear();
+        mock_async_.VerifyAndClear();
+        mock_async_refernce_.VerifyAndClear();
     }
 
-    virtual void OtherTypesReferenceStruct(const this_is_astruct_t* s, this_is_astruct_t** out_s) {
-        std::tuple<this_is_astruct_t> ret = mock_struct_.Call(*s);
-        *out_s = std::get<0>(ret);
+    virtual void InterfaceValue(const other_types_protocol_t* intf, other_types_protocol_t* out_intf) {
+        std::tuple<other_types_protocol_t> ret = mock_value_.Call(*intf);
+        *out_intf = std::get<0>(ret);
     }
 
-    virtual void OtherTypesReferenceUnion(const this_is_aunion_t* u, this_is_aunion_t** out_u) {
-        std::tuple<this_is_aunion_t> ret = mock_union_.Call(*u);
-        *out_u = std::get<0>(ret);
+    virtual void InterfaceReference(const other_types_protocol_t* intf, other_types_protocol_t** out_intf) {
+        std::tuple<other_types_protocol_t> ret = mock_reference_.Call(*intf);
+        *out_intf = std::get<0>(ret);
     }
 
-    virtual void OtherTypesReferenceString(const char* s, char* out_s, size_t s_capacity) {
-        std::tuple<std::string> ret = mock_string_.Call(std::string(s));
-        strncpy(out_s, std::get<0>(ret).c_str(), s_capacity));
+    virtual void InterfaceAsync(const other_types_protocol_t* intf, interface_async_callback callback, void* cookie) {
+        std::tuple<other_types_protocol_t> ret = mock_async_.Call(*intf);
+        callback(cookie, std::get<0>(ret));
     }
 
-    virtual void OtherTypesReferenceStringSized(const char* s, char* out_s, size_t s_capacity) {
-        std::tuple<std::string> ret = mock_string_sized_.Call(std::string(s));
-        strncpy(out_s, std::get<0>(ret).c_str(), s_capacity));
+    virtual void InterfaceAsyncRefernce(const other_types_protocol_t* intf, interface_async_refernce_callback callback, void* cookie) {
+        std::tuple<other_types_protocol_t> ret = mock_async_refernce_.Call(*intf);
+        callback(cookie, std::get<0>(ret));
     }
 
-    virtual void OtherTypesReferenceStringSized2(const char* s, char* out_s, size_t s_capacity) {
-        std::tuple<std::string> ret = mock_string_sized2_.Call(std::string(s));
-        strncpy(out_s, std::get<0>(ret).c_str(), s_capacity));
-    }
-
-    mock_function::MockFunction<std::tuple<this_is_astruct_t>, this_is_astruct_t>& mock_struct() { return mock_struct_; }
-    mock_function::MockFunction<std::tuple<this_is_aunion_t>, this_is_aunion_t>& mock_union() { return mock_union_; }
-    mock_function::MockFunction<std::tuple<std::string>, std::string>& mock_string() { return mock_string_; }
-    mock_function::MockFunction<std::tuple<std::string>, std::string>& mock_string_sized() { return mock_string_sized_; }
-    mock_function::MockFunction<std::tuple<std::string>, std::string>& mock_string_sized2() { return mock_string_sized2_; }
+    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t>& mock_value() { return mock_value_; }
+    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t>& mock_reference() { return mock_reference_; }
+    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t>& mock_async() { return mock_async_; }
+    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t>& mock_async_refernce() { return mock_async_refernce_; }
 
 protected:
-    mock_function::MockFunction<std::tuple<this_is_astruct_t>, this_is_astruct_t> mock_struct_;
-    mock_function::MockFunction<std::tuple<this_is_aunion_t>, this_is_aunion_t> mock_union_;
-    mock_function::MockFunction<std::tuple<std::string>, std::string> mock_string_;
-    mock_function::MockFunction<std::tuple<std::string>, std::string> mock_string_sized_;
-    mock_function::MockFunction<std::tuple<std::string>, std::string> mock_string_sized2_;
+    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t> mock_value_;
+    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t> mock_reference_;
+    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t> mock_async_;
+    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t> mock_async_refernce_;
 
 private:
-    const other_types_reference_protocol_t proto_;
+    const interface_protocol_t proto_;
 };
 
 // This class mocks a device by providing a other_types_protocol_t.
@@ -482,91 +469,104 @@ private:
     const other_types_async_reference_protocol_t proto_;
 };
 
-// This class mocks a device by providing a interface_protocol_t.
+// This class mocks a device by providing a other_types_reference_protocol_t.
 // Users can set expectations on how the protocol ops are called and what values they return. After
 // the test, use VerifyAndClear to reset the object and verify that all expectations were satisfied.
 // See the following example test:
 //
-// ddk::MockInterface interface;
+// ddk::MockOtherTypesReference other_types_reference;
 //
-// /* Set some expectations on the device by calling interface.Expect... methods. */
+// /* Set some expectations on the device by calling other_types_reference.Expect... methods. */
 //
-// SomeDriver dut(interface.GetProto());
+// SomeDriver dut(other_types_reference.GetProto());
 //
 // EXPECT_OK(dut.SomeMethod());
-// ASSERT_NO_FATAL_FAILURES(interface.VerifyAndClear());
+// ASSERT_NO_FATAL_FAILURES(other_types_reference.VerifyAndClear());
 //
 // Note that users must provide the equality operator for struct types, for example:
 // bool operator==(const a_struct_type& lhs, const a_struct_type& rhs)
 
-class MockInterface : ddk::InterfaceProtocol<MockInterface> {
+class MockOtherTypesReference : ddk::OtherTypesReferenceProtocol<MockOtherTypesReference> {
 public:
-    MockInterface() : proto_{&interface_protocol_ops_, this} {}
+    MockOtherTypesReference() : proto_{&other_types_reference_protocol_ops_, this} {}
 
-    virtual ~MockInterface() {}
+    virtual ~MockOtherTypesReference() {}
 
-    const interface_protocol_t* GetProto() const { return &proto_; }
+    const other_types_reference_protocol_t* GetProto() const { return &proto_; }
 
-    virtual MockInterface& ExpectValue(other_types_protocol_t intf, other_types_protocol_t out_intf) {
-        mock_value_.ExpectCall({out_intf}, intf);
+    virtual MockOtherTypesReference& ExpectStruct(this_is_astruct_t s, this_is_astruct_t out_s) {
+        mock_struct_.ExpectCall({out_s}, s);
         return *this;
     }
 
-    virtual MockInterface& ExpectReference(other_types_protocol_t intf, other_types_protocol_t out_intf) {
-        mock_reference_.ExpectCall({out_intf}, intf);
+    virtual MockOtherTypesReference& ExpectUnion(this_is_aunion_t u, this_is_aunion_t out_u) {
+        mock_union_.ExpectCall({out_u}, u);
         return *this;
     }
 
-    virtual MockInterface& ExpectAsync(other_types_protocol_t intf, other_types_protocol_t out_intf) {
-        mock_async_.ExpectCall({out_intf}, intf);
+    virtual MockOtherTypesReference& ExpectString(std::string s, std::string s) {
+        mock_string_.ExpectCall({std::move(out_s)}, std::move(s));
         return *this;
     }
 
-    virtual MockInterface& ExpectAsyncRefernce(other_types_protocol_t intf, other_types_protocol_t out_intf) {
-        mock_async_refernce_.ExpectCall({out_intf}, intf);
+    virtual MockOtherTypesReference& ExpectStringSized(std::string s, std::string s) {
+        mock_string_sized_.ExpectCall({std::move(out_s)}, std::move(s));
+        return *this;
+    }
+
+    virtual MockOtherTypesReference& ExpectStringSized2(std::string s, std::string s) {
+        mock_string_sized2_.ExpectCall({std::move(out_s)}, std::move(s));
         return *this;
     }
 
     void VerifyAndClear() {
-        mock_value_.VerifyAndClear();
-        mock_reference_.VerifyAndClear();
-        mock_async_.VerifyAndClear();
-        mock_async_refernce_.VerifyAndClear();
+        mock_struct_.VerifyAndClear();
+        mock_union_.VerifyAndClear();
+        mock_string_.VerifyAndClear();
+        mock_string_sized_.VerifyAndClear();
+        mock_string_sized2_.VerifyAndClear();
     }
 
-    virtual void InterfaceValue(const other_types_protocol_t* intf, other_types_protocol_t* out_intf) {
-        std::tuple<other_types_protocol_t> ret = mock_value_.Call(*intf);
-        *out_intf = std::get<0>(ret);
+    virtual void OtherTypesReferenceStruct(const this_is_astruct_t* s, this_is_astruct_t** out_s) {
+        std::tuple<this_is_astruct_t> ret = mock_struct_.Call(*s);
+        *out_s = std::get<0>(ret);
     }
 
-    virtual void InterfaceReference(const other_types_protocol_t* intf, other_types_protocol_t** out_intf) {
-        std::tuple<other_types_protocol_t> ret = mock_reference_.Call(*intf);
-        *out_intf = std::get<0>(ret);
+    virtual void OtherTypesReferenceUnion(const this_is_aunion_t* u, this_is_aunion_t** out_u) {
+        std::tuple<this_is_aunion_t> ret = mock_union_.Call(*u);
+        *out_u = std::get<0>(ret);
     }
 
-    virtual void InterfaceAsync(const other_types_protocol_t* intf, interface_async_callback callback, void* cookie) {
-        std::tuple<other_types_protocol_t> ret = mock_async_.Call(*intf);
-        callback(cookie, std::get<0>(ret));
+    virtual void OtherTypesReferenceString(const char* s, char* out_s, size_t s_capacity) {
+        std::tuple<std::string> ret = mock_string_.Call(std::string(s));
+        strncpy(out_s, std::get<0>(ret).c_str(), s_capacity));
     }
 
-    virtual void InterfaceAsyncRefernce(const other_types_protocol_t* intf, interface_async_refernce_callback callback, void* cookie) {
-        std::tuple<other_types_protocol_t> ret = mock_async_refernce_.Call(*intf);
-        callback(cookie, std::get<0>(ret));
+    virtual void OtherTypesReferenceStringSized(const char* s, char* out_s, size_t s_capacity) {
+        std::tuple<std::string> ret = mock_string_sized_.Call(std::string(s));
+        strncpy(out_s, std::get<0>(ret).c_str(), s_capacity));
     }
 
-    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t>& mock_value() { return mock_value_; }
-    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t>& mock_reference() { return mock_reference_; }
-    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t>& mock_async() { return mock_async_; }
-    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t>& mock_async_refernce() { return mock_async_refernce_; }
+    virtual void OtherTypesReferenceStringSized2(const char* s, char* out_s, size_t s_capacity) {
+        std::tuple<std::string> ret = mock_string_sized2_.Call(std::string(s));
+        strncpy(out_s, std::get<0>(ret).c_str(), s_capacity));
+    }
+
+    mock_function::MockFunction<std::tuple<this_is_astruct_t>, this_is_astruct_t>& mock_struct() { return mock_struct_; }
+    mock_function::MockFunction<std::tuple<this_is_aunion_t>, this_is_aunion_t>& mock_union() { return mock_union_; }
+    mock_function::MockFunction<std::tuple<std::string>, std::string>& mock_string() { return mock_string_; }
+    mock_function::MockFunction<std::tuple<std::string>, std::string>& mock_string_sized() { return mock_string_sized_; }
+    mock_function::MockFunction<std::tuple<std::string>, std::string>& mock_string_sized2() { return mock_string_sized2_; }
 
 protected:
-    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t> mock_value_;
-    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t> mock_reference_;
-    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t> mock_async_;
-    mock_function::MockFunction<std::tuple<other_types_protocol_t>, other_types_protocol_t> mock_async_refernce_;
+    mock_function::MockFunction<std::tuple<this_is_astruct_t>, this_is_astruct_t> mock_struct_;
+    mock_function::MockFunction<std::tuple<this_is_aunion_t>, this_is_aunion_t> mock_union_;
+    mock_function::MockFunction<std::tuple<std::string>, std::string> mock_string_;
+    mock_function::MockFunction<std::tuple<std::string>, std::string> mock_string_sized_;
+    mock_function::MockFunction<std::tuple<std::string>, std::string> mock_string_sized2_;
 
 private:
-    const interface_protocol_t proto_;
+    const other_types_reference_protocol_t proto_;
 };
 
 } // namespace ddk

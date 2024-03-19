@@ -995,7 +995,7 @@ struct Library final : public Element {
   // Populated by ConsumeStep, and then rewritten by ResolveStep.
   Declarations declarations;
   // Contains the same decls as `declarations`, but in a topologically sorted
-  // order, i.e. later decls only depend on earlier ones. Populated by SortStep.
+  // order (later decls only depend on earlier ones). Populated in CompileStep.
   std::vector<const Decl*> declaration_order;
   // Raw AST objects pointed to by certain flat AST nodes. We store them on the
   // Library because there is no unique ownership (e.g. multiple Table::Member

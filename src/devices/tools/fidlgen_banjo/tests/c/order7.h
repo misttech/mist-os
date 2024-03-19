@@ -14,16 +14,16 @@
 __BEGIN_CDECLS
 
 // Forward declarations
-typedef struct two two_t;
 typedef struct one one_t;
+typedef struct two two_t;
 
 // Declarations
-struct two {
-    uint32_t two_field;
-};
-
 struct one {
     uint64_t one_field;
+};
+
+struct two {
+    uint32_t two_field;
 };
 
 

@@ -34,7 +34,6 @@ source_set("lib") {
     "src/reference.cc",
     "src/reporter.cc",
     "src/resolve_step.cc",
-    "src/sort_step.cc",
     "src/source_file.cc",
     "src/source_manager.cc",
     "src/source_span.cc",

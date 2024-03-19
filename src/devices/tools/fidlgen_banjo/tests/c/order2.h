@@ -14,22 +14,12 @@
 __BEGIN_CDECLS
 
 // Forward declarations
-typedef struct foo_protocol foo_protocol_t;
-typedef struct foo_protocol_ops foo_protocol_ops_t;
 typedef struct bar_protocol bar_protocol_t;
 typedef struct bar_protocol_ops bar_protocol_ops_t;
+typedef struct foo_protocol foo_protocol_t;
+typedef struct foo_protocol_ops foo_protocol_ops_t;
 
 // Declarations
-struct foo_protocol_ops {
-    void (*hello)(void* ctx);
-};
-
-
-struct foo_protocol {
-    const foo_protocol_ops_t* ops;
-    void* ctx;
-};
-
 struct bar_protocol_ops {
     void (*world)(void* ctx, const foo_protocol_t* foo);
 };
@@ -40,12 +30,18 @@ struct bar_protocol {
     void* ctx;
 };
 
+struct foo_protocol_ops {
+    void (*hello)(void* ctx);
+};
+
+
+struct foo_protocol {
+    const foo_protocol_ops_t* ops;
+    void* ctx;
+};
+
 
 // Helpers
-static inline void foo_hello(const foo_protocol_t* proto) {
-    proto->ops->hello(proto->ctx);
-}
-
 static inline void bar_world(const bar_protocol_t* proto, void* foo_ctx, const foo_protocol_ops_t* foo_ops) {
     const foo_protocol_t foo2 = {
         .ops = foo_ops,
@@ -53,6 +49,10 @@ static inline void bar_world(const bar_protocol_t* proto, void* foo_ctx, const f
     };
     const foo_protocol_t* foo = &foo2;
     proto->ops->world(proto->ctx, foo);
+}
+
+static inline void foo_hello(const foo_protocol_t* proto) {
+    proto->ops->hello(proto->ctx);
 }
 
 

@@ -384,12 +384,12 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.protocolrequest/ParentTakeChildRequestRequest",
-    "test.protocolrequest/ParentTakeChildRequest",
+    "test.protocolrequest/Child",
     "test.protocolrequest/ParentGetChildResponse",
     "test.protocolrequest/ParentGetChildRequestResponse",
-    "test.protocolrequest/Parent",
-    "test.protocolrequest/Child"
+    "test.protocolrequest/ParentTakeChildRequest",
+    "test.protocolrequest/ParentTakeChildRequestRequest",
+    "test.protocolrequest/Parent"
   ],
   "declarations": {
     "test.protocolrequest/Child": "protocol",

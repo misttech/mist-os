@@ -326,12 +326,12 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.stringarrays/UnionSmallArray",
-    "test.stringarrays/UnionLargeArray",
-    "test.stringarrays/TableSmallArray",
-    "test.stringarrays/TableLargeArray",
+    "test.stringarrays/StructLargeArray",
     "test.stringarrays/StructSmallArray",
-    "test.stringarrays/StructLargeArray"
+    "test.stringarrays/TableLargeArray",
+    "test.stringarrays/TableSmallArray",
+    "test.stringarrays/UnionLargeArray",
+    "test.stringarrays/UnionSmallArray"
   ],
   "declarations": {
     "test.stringarrays/StructLargeArray": "struct",

@@ -561,13 +561,13 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.overlay/ReverseOrdinalOverlay",
-    "test.overlay/Pizza",
-    "test.overlay/Pasta",
-    "test.overlay/PizzaOrPasta",
-    "test.overlay/OverlayWithAttributes",
     "test.overlay/Overlay",
-    "test.overlay/OverlayStruct"
+    "test.overlay/OverlayStruct",
+    "test.overlay/OverlayWithAttributes",
+    "test.overlay/Pasta",
+    "test.overlay/Pizza",
+    "test.overlay/PizzaOrPasta",
+    "test.overlay/ReverseOrdinalOverlay"
   ],
   "declarations": {
     "test.overlay/OverlayStruct": "struct",

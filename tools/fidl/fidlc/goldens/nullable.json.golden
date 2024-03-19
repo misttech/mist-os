@@ -783,18 +783,18 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.nullable/StructWithNullableVector",
-    "test.nullable/StructWithNullableUnion",
-    "test.nullable/StructWithNullableStruct",
-    "test.nullable/StructWithNullableString",
-    "test.nullable/StructWithNullableRequest",
-    "test.nullable/StructWithNullableProtocol",
-    "test.nullable/StructWithNullableHandle",
-    "test.nullable/SimpleUnion",
-    "test.nullable/SimpleProtocolAddResponse",
+    "test.nullable/Int32Wrapper",
     "test.nullable/SimpleProtocolAddRequest",
+    "test.nullable/SimpleProtocolAddResponse",
     "test.nullable/SimpleProtocol",
-    "test.nullable/Int32Wrapper"
+    "test.nullable/SimpleUnion",
+    "test.nullable/StructWithNullableHandle",
+    "test.nullable/StructWithNullableProtocol",
+    "test.nullable/StructWithNullableRequest",
+    "test.nullable/StructWithNullableString",
+    "test.nullable/StructWithNullableStruct",
+    "test.nullable/StructWithNullableUnion",
+    "test.nullable/StructWithNullableVector"
   ],
   "declarations": {
     "test.nullable/SimpleProtocol": "protocol",

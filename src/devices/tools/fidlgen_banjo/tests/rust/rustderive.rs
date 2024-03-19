@@ -10,18 +10,28 @@
 
 
 
-pub const SMALL_ARRAY_SIZE: u32 = 8;
 pub const LARGE_ARRAY_SIZE: u32 = 2048;
+pub const SMALL_ARRAY_SIZE: u32 = 8;
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct UnionParentStruct {
-    pub some_union: SomeUnion,
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Bar {
+    pub bar: *mut Foo,
+    pub baz: *mut Baz,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-pub struct UnionGrandParentStruct {
-    pub field: UnionParentStruct,
+pub struct Bar2 {
+    pub bar: *mut Foo2,
+    pub baz: *mut Baz2,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Baz {
+    pub foo: *mut Foo,
+    pub bar: *mut Bar,
+    pub baz: *mut Baz,
 }
 
 #[repr(C)]
@@ -31,6 +41,12 @@ pub struct Baz2 {
     pub bar: *mut Bar2,
     pub baz: *mut Baz2,
     pub some_union: SomeUnion,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct BigArrayStruct {
+    pub big_array: [u8; 2048 as usize],
 }
 
 #[repr(C)]
@@ -47,29 +63,8 @@ pub struct EnumGrandParentStruct {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct SmallArrayStruct {
-    pub small_array: [u8; 8 as usize],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct BigArrayStruct {
-    pub big_array: [u8; 2048 as usize],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Baz {
-    pub foo: *mut Foo,
-    pub bar: *mut Bar,
-    pub baz: *mut Baz,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct Bar2 {
-    pub bar: *mut Foo2,
-    pub baz: *mut Baz2,
+pub struct Foo {
+    pub bar: Bar,
 }
 
 #[repr(C)]
@@ -80,15 +75,20 @@ pub struct Foo2 {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Bar {
-    pub bar: *mut Foo,
-    pub baz: *mut Baz,
+pub struct SmallArrayStruct {
+    pub small_array: [u8; 8 as usize],
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Foo {
-    pub bar: Bar,
+#[derive(Copy, Clone, Debug)]
+pub struct UnionParentStruct {
+    pub some_union: SomeUnion,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct UnionGrandParentStruct {
+    pub field: UnionParentStruct,
 }
 
 

@@ -233,10 +233,10 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.enum/MyStrictEnum",
-    "test.enum/MyFlexibleEnumWithCustomUnknown",
+    "test.enum/MyEmptyFlexibleEnum",
     "test.enum/MyFlexibleEnum",
-    "test.enum/MyEmptyFlexibleEnum"
+    "test.enum/MyFlexibleEnumWithCustomUnknown",
+    "test.enum/MyStrictEnum"
   ],
   "declarations": {
     "test.enum/MyEmptyFlexibleEnum": "enum",

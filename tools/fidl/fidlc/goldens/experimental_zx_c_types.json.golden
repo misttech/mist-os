@@ -502,15 +502,15 @@
   ],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.experimentalzxctypes/USIZE_CONST",
-    "test.experimentalzxctypes/UINTPTR_CONST",
-    "test.experimentalzxctypes/UCHAR_CONST",
+    "test.experimentalzxctypes/AliasOfUchar",
+    "test.experimentalzxctypes/AliasOfUint32Pointer",
+    "test.experimentalzxctypes/AliasOfUintptr",
+    "test.experimentalzxctypes/AliasOfUsize",
     "test.experimentalzxctypes/Struct",
     "test.experimentalzxctypes/StructOfExperimentalZxCTypes",
-    "test.experimentalzxctypes/AliasOfUsize",
-    "test.experimentalzxctypes/AliasOfUintptr",
-    "test.experimentalzxctypes/AliasOfUint32Pointer",
-    "test.experimentalzxctypes/AliasOfUchar"
+    "test.experimentalzxctypes/UCHAR_CONST",
+    "test.experimentalzxctypes/UINTPTR_CONST",
+    "test.experimentalzxctypes/USIZE_CONST"
   ],
   "declarations": {
     "test.experimentalzxctypes/UCHAR_CONST": "const",

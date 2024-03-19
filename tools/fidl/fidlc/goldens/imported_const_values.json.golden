@@ -397,11 +397,11 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.importedconstvalues/MyStruct",
-    "test.importedconstvalues/ENUM_MEMBER_PRIMITIVE",
-    "test.importedconstvalues/ENUM_MEMBER",
+    "test.importedconstvalues/BITS_MEMBER",
     "test.importedconstvalues/BITS_MEMBER_PRIMITIVE",
-    "test.importedconstvalues/BITS_MEMBER"
+    "test.importedconstvalues/ENUM_MEMBER",
+    "test.importedconstvalues/ENUM_MEMBER_PRIMITIVE",
+    "test.importedconstvalues/MyStruct"
   ],
   "declarations": {
     "test.importedconstvalues/BITS_MEMBER": "const",

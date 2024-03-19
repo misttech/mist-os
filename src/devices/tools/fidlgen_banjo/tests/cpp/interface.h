@@ -51,6 +51,65 @@
 // };
 
 namespace ddk {
+// An interface for storing cookies.
+
+template <typename D>
+class CookieJarrerProtocol : public internal::base_mixin {
+public:
+    CookieJarrerProtocol() {
+        internal::CheckCookieJarrerProtocolSubclass<D>();
+        cookie_jarrer_protocol_ops_.place = CookieJarrerPlace;
+        cookie_jarrer_protocol_ops_.take = CookieJarrerTake;
+    }
+
+protected:
+    cookie_jarrer_protocol_ops_t cookie_jarrer_protocol_ops_ = {};
+
+private:
+    // Place a cookie in the named jar. If no jar with the supplied name exists, one is created.
+    static void CookieJarrerPlace(void* ctx, const char* name) {
+        static_cast<D*>(ctx)->CookieJarrerPlace(name);
+    }
+    // Who took a cookie from the cookie jar?
+    static cookie_kind_t CookieJarrerTake(void* ctx, const char* name) {
+        auto ret = static_cast<D*>(ctx)->CookieJarrerTake(name);
+        return ret;
+    }
+};
+
+class CookieJarrerProtocolClient {
+public:
+    CookieJarrerProtocolClient()
+        : ops_(nullptr), ctx_(nullptr) {}
+    CookieJarrerProtocolClient(const cookie_jarrer_protocol_t* proto)
+        : ops_(proto->ops), ctx_(proto->ctx) {}
+
+    void GetProto(cookie_jarrer_protocol_t* proto) const {
+        proto->ctx = ctx_;
+        proto->ops = ops_;
+    }
+    bool is_valid() const {
+        return ops_ != nullptr;
+    }
+    void clear() {
+        ctx_ = nullptr;
+        ops_ = nullptr;
+    }
+
+    // Place a cookie in the named jar. If no jar with the supplied name exists, one is created.
+    void Place(const char* name) const {
+        ops_->place(ctx_, name);
+    }
+
+    // Who took a cookie from the cookie jar?
+    cookie_kind_t Take(const char* name) const {
+        return ops_->take(ctx_, name);
+    }
+
+private:
+    const cookie_jarrer_protocol_ops_t* ops_;
+    void* ctx_;
+};
 // An interface for a device that's able to create and deliver cookies!
 
 template <typename D>
@@ -122,65 +181,6 @@ public:
 
 private:
     const cookie_maker_protocol_ops_t* ops_;
-    void* ctx_;
-};
-// An interface for storing cookies.
-
-template <typename D>
-class CookieJarrerProtocol : public internal::base_mixin {
-public:
-    CookieJarrerProtocol() {
-        internal::CheckCookieJarrerProtocolSubclass<D>();
-        cookie_jarrer_protocol_ops_.place = CookieJarrerPlace;
-        cookie_jarrer_protocol_ops_.take = CookieJarrerTake;
-    }
-
-protected:
-    cookie_jarrer_protocol_ops_t cookie_jarrer_protocol_ops_ = {};
-
-private:
-    // Place a cookie in the named jar. If no jar with the supplied name exists, one is created.
-    static void CookieJarrerPlace(void* ctx, const char* name) {
-        static_cast<D*>(ctx)->CookieJarrerPlace(name);
-    }
-    // Who took a cookie from the cookie jar?
-    static cookie_kind_t CookieJarrerTake(void* ctx, const char* name) {
-        auto ret = static_cast<D*>(ctx)->CookieJarrerTake(name);
-        return ret;
-    }
-};
-
-class CookieJarrerProtocolClient {
-public:
-    CookieJarrerProtocolClient()
-        : ops_(nullptr), ctx_(nullptr) {}
-    CookieJarrerProtocolClient(const cookie_jarrer_protocol_t* proto)
-        : ops_(proto->ops), ctx_(proto->ctx) {}
-
-    void GetProto(cookie_jarrer_protocol_t* proto) const {
-        proto->ctx = ctx_;
-        proto->ops = ops_;
-    }
-    bool is_valid() const {
-        return ops_ != nullptr;
-    }
-    void clear() {
-        ctx_ = nullptr;
-        ops_ = nullptr;
-    }
-
-    // Place a cookie in the named jar. If no jar with the supplied name exists, one is created.
-    void Place(const char* name) const {
-        ops_->place(ctx_, name);
-    }
-
-    // Who took a cookie from the cookie jar?
-    cookie_kind_t Take(const char* name) const {
-        return ops_->take(ctx_, name);
-    }
-
-private:
-    const cookie_jarrer_protocol_ops_t* ops_;
     void* ctx_;
 };
 // Protocol for a baker who outsources all of it's baking duties to others.

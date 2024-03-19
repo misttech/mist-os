@@ -244,8 +244,8 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.drivertwoway/TwoWayAddResponse",
     "test.drivertwoway/TwoWayAddRequest",
+    "test.drivertwoway/TwoWayAddResponse",
     "test.drivertwoway/TwoWay"
   ],
   "declarations": {

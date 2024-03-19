@@ -270,10 +270,10 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.bits/StrictBits",
-    "test.bits/MyBits",
+    "test.bits/EmptyBits",
     "test.bits/FlexibleBits",
-    "test.bits/EmptyBits"
+    "test.bits/MyBits",
+    "test.bits/StrictBits"
   ],
   "declarations": {
     "test.bits/EmptyBits": "bits",

@@ -1530,17 +1530,17 @@
   ],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.versions/Union",
-    "test.versions/Table",
-    "test.versions/Struct",
-    "test.versions/Service",
+    "test.versions/ADDED_AT_HEAD",
+    "test.versions/Alias",
+    "test.versions/Bits",
+    "test.versions/Const",
+    "test.versions/Enum",
     "test.versions/OtherProtocol",
     "test.versions/Protocol",
-    "test.versions/Enum",
-    "test.versions/Const",
-    "test.versions/Bits",
-    "test.versions/Alias",
-    "test.versions/ADDED_AT_HEAD"
+    "test.versions/Service",
+    "test.versions/Struct",
+    "test.versions/Table",
+    "test.versions/Union"
   ],
   "declarations": {
     "test.versions/Bits": "bits",

@@ -574,10 +574,10 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.encapsulatedstructs/NonInlineStructTestStruct",
-    "test.encapsulatedstructs/Int8Int32",
     "test.encapsulatedstructs/Int16Int8",
     "test.encapsulatedstructs/ArrayInt16Int8",
+    "test.encapsulatedstructs/Int8Int32",
+    "test.encapsulatedstructs/NonInlineStructTestStruct",
     "test.encapsulatedstructs/StructPaddingTestStruct",
     "test.encapsulatedstructs/TopLevelStruct"
   ],

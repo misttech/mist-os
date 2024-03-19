@@ -13,15 +13,15 @@ use fuchsia_zircon_types as zircon_types;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct StructWithZxField {
-    pub status: zircon_types::zx_status_t,
+pub struct Point {
+    pub x: i32,
+    pub y: i32,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Point {
-    pub x: i32,
-    pub y: i32,
+pub struct StructWithZxField {
+    pub status: zircon_types::zx_status_t,
 }
 
 

@@ -743,15 +743,15 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.unionsandwich/UnionSize8Alignment4",
-    "test.unionsandwich/SandwichUnionSize8Alignment4",
-    "test.unionsandwich/UnionSize36Alignment4",
-    "test.unionsandwich/SandwichUnionSize36Alignment4",
     "test.unionsandwich/UnionSize12Alignment4",
     "test.unionsandwich/SandwichUnionSize12Alignment4",
     "test.unionsandwich/StructSize16Alignment8",
     "test.unionsandwich/UnionSize24Alignment8",
-    "test.unionsandwich/SandwichUnionSize24Alignment8"
+    "test.unionsandwich/SandwichUnionSize24Alignment8",
+    "test.unionsandwich/UnionSize36Alignment4",
+    "test.unionsandwich/SandwichUnionSize36Alignment4",
+    "test.unionsandwich/UnionSize8Alignment4",
+    "test.unionsandwich/SandwichUnionSize8Alignment4"
   ],
   "declarations": {
     "test.unionsandwich/SandwichUnionSize12Alignment4": "struct",

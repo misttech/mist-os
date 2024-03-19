@@ -1473,17 +1473,17 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.doccomments/Table",
-    "test.doccomments/Struct",
-    "test.doccomments/StrictUnion",
-    "test.doccomments/Service",
-    "test.doccomments/MyStrictEnum",
-    "test.doccomments/MyStrictBits",
-    "test.doccomments/MyFlexibleEnum",
-    "test.doccomments/MyFlexibleBits",
-    "test.doccomments/Interface",
+    "test.doccomments/C",
     "test.doccomments/FlexibleUnion",
-    "test.doccomments/C"
+    "test.doccomments/Interface",
+    "test.doccomments/MyFlexibleBits",
+    "test.doccomments/MyFlexibleEnum",
+    "test.doccomments/MyStrictBits",
+    "test.doccomments/MyStrictEnum",
+    "test.doccomments/Service",
+    "test.doccomments/StrictUnion",
+    "test.doccomments/Struct",
+    "test.doccomments/Table"
   ],
   "declarations": {
     "test.doccomments/MyFlexibleBits": "bits",

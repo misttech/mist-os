@@ -284,8 +284,8 @@
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [
-    "test.inheritance/SuperFooResponse",
     "test.inheritance/SuperFooRequest",
+    "test.inheritance/SuperFooResponse",
     "test.inheritance/super",
     "test.inheritance/sub"
   ],

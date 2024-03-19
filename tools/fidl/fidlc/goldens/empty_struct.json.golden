@@ -379,9 +379,9 @@
   "declaration_order": [
     "test.emptystruct/Empty",
     "test.emptystruct/EmptyProtocolSendRequest",
-    "test.emptystruct/EmptyProtocolSendAndReceiveResponse",
-    "test.emptystruct/EmptyProtocolSendAndReceiveRequest",
     "test.emptystruct/EmptyProtocolReceiveRequest",
+    "test.emptystruct/EmptyProtocolSendAndReceiveRequest",
+    "test.emptystruct/EmptyProtocolSendAndReceiveResponse",
     "test.emptystruct/EmptyProtocol"
   ],
   "declarations": {
