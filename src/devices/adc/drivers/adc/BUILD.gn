@@ -60,9 +60,8 @@ test("adc-test-bin") {
   sources = [ "adc-test.cc" ]
   deps = [
     ":common",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/testing/cpp:cpp",
-    "//zircon/system/ulib/zxtest",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
+    "//src/lib/fxl/test:gtest_main",
   ]
 }
 

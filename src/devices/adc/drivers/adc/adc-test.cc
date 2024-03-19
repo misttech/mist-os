@@ -4,153 +4,111 @@
 
 #include "src/devices/adc/drivers/adc/adc.h"
 
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
+#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 
-#include <fbl/auto_lock.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/lib/fidl-metadata/adc.h"
 
 namespace {
 
-struct IncomingNamespace {
-  fdf_testing::TestNode node_{std::string("root")};
-  fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
-  compat::DeviceServer device_server_;
-
-  class FakeAdcImplServer : public fdf::Server<fuchsia_hardware_adcimpl::Device> {
-   public:
-    ~FakeAdcImplServer() {
-      for (const auto& [_, expected] : expected_samples_) {
-        EXPECT_TRUE(expected.empty());
-      }
-    }
-
-    void set_resolution(uint8_t resolution) { resolution_ = resolution; }
-    void ExpectGetSample(uint32_t channel, uint32_t sample) {
-      expected_samples_[channel].push(sample);
-    }
-
-    void GetResolution(GetResolutionCompleter::Sync& completer) override {
-      completer.Reply(fit::ok(resolution_));
-    }
-    void GetSample(GetSampleRequest& request, GetSampleCompleter::Sync& completer) override {
-      ASSERT_FALSE(expected_samples_.empty());
-      ASSERT_NE(expected_samples_.find(request.channel_id()), expected_samples_.end());
-      ASSERT_FALSE(expected_samples_.at(request.channel_id()).empty());
-      completer.Reply(fit::ok(expected_samples_.at(request.channel_id()).front()));
-      expected_samples_.at(request.channel_id()).pop();
-    }
-
-    fuchsia_hardware_adcimpl::Service::InstanceHandler GetInstanceHandler() {
-      return fuchsia_hardware_adcimpl::Service::InstanceHandler({
-          .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
-                                            fidl::kIgnoreBindingClosure),
-      });
-    }
-
-   private:
-    uint8_t resolution_ = 0;
-    std::map<uint32_t, std::queue<uint32_t>> expected_samples_;
-
-    fdf::ServerBindingGroup<fuchsia_hardware_adcimpl::Device> bindings_;
-  };
-  FakeAdcImplServer fake_adc_impl_server_;
-};
-
-class AdcTest : public zxtest::Test {
+class FakeAdcImplServer : public fdf::Server<fuchsia_hardware_adcimpl::Device> {
  public:
-  zx::result<> Init(std::vector<fidl_metadata::adc::Channel> kAdcChannels) {
-    fuchsia_driver_framework::DriverStartArgs start_args;
-    incoming_.SyncCall([&](IncomingNamespace* incoming) {
-      auto start_args_result = incoming->node_.CreateStartArgsAndServe();
-      ASSERT_TRUE(start_args_result.is_ok());
-      start_args = std::move(start_args_result->start_args);
-      outgoing_directory_client_ = std::move(start_args_result->outgoing_directory_client);
-
-      auto init_result =
-          incoming->env_.Initialize(std::move(start_args_result->incoming_directory_server));
-      ASSERT_TRUE(init_result.is_ok());
-
-      incoming->device_server_.Init(component::kDefaultInstance, "");
-
-      // Serve metadata.
-      auto metadata = fidl_metadata::adc::AdcChannelsToFidl(kAdcChannels);
-      ASSERT_TRUE(metadata.is_ok());
-      auto status = incoming->device_server_.AddMetadata(DEVICE_METADATA_ADC, metadata->data(),
-                                                         metadata->size());
-      EXPECT_OK(status);
-      status = incoming->device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                              &incoming->env_.incoming_directory());
-      EXPECT_OK(status);
-
-      // Serve fake_adc_impl_server_.
-      auto result =
-          incoming->env_.incoming_directory().AddService<fuchsia_hardware_adcimpl::Service>(
-              std::move(incoming->fake_adc_impl_server_.GetInstanceHandler()));
-      ASSERT_TRUE(result.is_ok());
-    });
-
-    // Start dut_.
-    return runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<adc::Adc>::Start, std::move(start_args)));
+  ~FakeAdcImplServer() {
+    for (const auto& [_, expected] : expected_samples_) {
+      EXPECT_TRUE(expected.empty());
+    }
   }
 
-  fidl::ClientEnd<fuchsia_hardware_adc::Device> GetClient(uint32_t channel) {
-    // Connect to Adc.
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
-
-    zx_status_t status = fdio_open_at(outgoing_directory_client_.handle()->get(), "/svc",
-                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints->server.TakeChannel().release());
-    EXPECT_EQ(ZX_OK, status);
-
-    auto connect_result = component::ConnectAtMember<fuchsia_hardware_adc::Service::Device>(
-        svc_endpoints->client, std::to_string(channel));
-    EXPECT_TRUE(connect_result.is_ok());
-    return std::move(connect_result.value());
+  void set_resolution(uint8_t resolution) { resolution_ = resolution; }
+  void ExpectGetSample(uint32_t channel, uint32_t sample) {
+    expected_samples_[channel].push(sample);
   }
 
-  void TearDown() override {
-    zx::result result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<adc::Adc>::PrepareStop));
-    ASSERT_EQ(ZX_OK, result.status_value());
+  void GetResolution(GetResolutionCompleter::Sync& completer) override {
+    completer.Reply(fit::ok(resolution_));
+  }
+  void GetSample(GetSampleRequest& request, GetSampleCompleter::Sync& completer) override {
+    ASSERT_FALSE(expected_samples_.empty());
+    ASSERT_NE(expected_samples_.find(request.channel_id()), expected_samples_.end());
+    ASSERT_FALSE(expected_samples_.at(request.channel_id()).empty());
+    completer.Reply(fit::ok(expected_samples_.at(request.channel_id()).front()));
+    expected_samples_.at(request.channel_id()).pop();
+  }
 
-    incoming_.SyncCall([](IncomingNamespace* incoming) {
-      auto result =
-          incoming->env_.incoming_directory().RemoveService<fuchsia_hardware_adcimpl::Service>();
-      EXPECT_TRUE(result.is_ok());
+  fuchsia_hardware_adcimpl::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_adcimpl::Service::InstanceHandler({
+        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
+                                          fidl::kIgnoreBindingClosure),
     });
   }
 
  private:
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
-  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
+  uint8_t resolution_ = 0;
+  std::map<uint32_t, std::queue<uint32_t>> expected_samples_;
 
-  fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client_;
+  fdf::ServerBindingGroup<fuchsia_hardware_adcimpl::Device> bindings_;
+};
 
- protected:
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{
-      env_dispatcher_->async_dispatcher(), std::in_place};
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<adc::Adc>> dut_{
-      driver_dispatcher_->async_dispatcher(), std::in_place};
+class AdcTestEnvironment : fdf_testing::Environment {
+ public:
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    device_server_.Init(component::kDefaultInstance, "");
+    device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
+
+    return to_driver_vfs.AddService<fuchsia_hardware_adcimpl::Service>(
+        fake_adc_impl_server_.GetInstanceHandler());
+  }
+
+  void Init(std::vector<fidl_metadata::adc::Channel> kAdcChannels) {
+    auto metadata = fidl_metadata::adc::AdcChannelsToFidl(kAdcChannels);
+    ASSERT_TRUE(metadata.is_ok());
+    auto status =
+        device_server_.AddMetadata(DEVICE_METADATA_ADC, metadata->data(), metadata->size());
+    ASSERT_EQ(ZX_OK, status);
+  }
+
+  FakeAdcImplServer& fake_adc_impl_server() { return fake_adc_impl_server_; }
+
+ private:
+  compat::DeviceServer device_server_;
+  FakeAdcImplServer fake_adc_impl_server_;
+};
+
+class AdcTestConfig final {
+ public:
+  static constexpr bool kDriverOnForeground = false;
+  static constexpr bool kAutoStartDriver = false;
+  static constexpr bool kAutoStopDriver = true;
+
+  using DriverType = adc::Adc;
+  using EnvironmentType = AdcTestEnvironment;
+};
+
+class AdcTest : public fdf_testing::DriverTestFixture<AdcTestConfig> {
+ public:
+  zx::result<> Init(const std::vector<fidl_metadata::adc::Channel>& kAdcChannels) {
+    RunInEnvironmentTypeContext(
+        [kAdcChannels](AdcTestEnvironment& env) { env.Init(kAdcChannels); });
+    return StartDriver();
+  }
+  fidl::ClientEnd<fuchsia_hardware_adc::Device> GetClient(uint32_t channel) {
+    // Connect to Adc.
+    auto result = Connect<fuchsia_hardware_adc::Service::Device>(std::to_string(channel));
+    EXPECT_EQ(ZX_OK, result.status_value());
+    return std::move(result.value());
+  }
 };
 
 TEST_F(AdcTest, CreateDevicesTest) {
   auto result = Init({DECL_ADC_CHANNEL(1), DECL_ADC_CHANNEL(4)});
   ASSERT_TRUE(result.is_ok());
 
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    ASSERT_EQ(incoming->node_.children().size(), 2);
-    EXPECT_NE(incoming->node_.children().find("1"), incoming->node_.children().end());
-    EXPECT_NE(incoming->node_.children().find("4"), incoming->node_.children().end());
+  RunInNodeContext([](fdf_testing::TestNode& node) {
+    ASSERT_EQ(node.children().size(), 2ul);
+    EXPECT_NE(node.children().find("1"), node.children().end());
+    EXPECT_NE(node.children().find("4"), node.children().end());
   });
 }
 
@@ -161,8 +119,8 @@ TEST_F(AdcTest, OverlappingChannelsTest) {
 }
 
 TEST_F(AdcTest, GetResolutionTest) {
-  incoming_.SyncCall(
-      [](IncomingNamespace* incoming) { incoming->fake_adc_impl_server_.set_resolution(12); });
+  RunInEnvironmentTypeContext(
+      [](AdcTestEnvironment& env) { env.fake_adc_impl_server().set_resolution(12); });
   auto result = Init({DECL_ADC_CHANNEL(1), DECL_ADC_CHANNEL(4)});
   ASSERT_TRUE(result.is_ok());
 
@@ -176,18 +134,18 @@ TEST_F(AdcTest, GetSampleTest) {
   auto result = Init({DECL_ADC_CHANNEL(1), DECL_ADC_CHANNEL(4)});
   ASSERT_TRUE(result.is_ok());
 
-  incoming_.SyncCall(
-      [](IncomingNamespace* incoming) { incoming->fake_adc_impl_server_.ExpectGetSample(1, 20); });
+  RunInEnvironmentTypeContext(
+      [](AdcTestEnvironment& env) { env.fake_adc_impl_server().ExpectGetSample(1, 20); });
   auto sample = fidl::WireCall(GetClient(1))->GetSample();
   ASSERT_TRUE(sample.ok());
   ASSERT_TRUE(sample->is_ok());
-  EXPECT_EQ(sample.value()->value, 20);
+  EXPECT_EQ(sample.value()->value, 20u);
 }
 
 TEST_F(AdcTest, GetNormalizedSampleTest) {
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->fake_adc_impl_server_.set_resolution(2);
-    incoming->fake_adc_impl_server_.ExpectGetSample(4, 9);
+  RunInEnvironmentTypeContext([](AdcTestEnvironment& env) {
+    env.fake_adc_impl_server().set_resolution(2);
+    env.fake_adc_impl_server().ExpectGetSample(4, 9);
   });
 
   auto result = Init({DECL_ADC_CHANNEL(1), DECL_ADC_CHANNEL(4)});
@@ -203,8 +161,8 @@ TEST_F(AdcTest, ChannelOutOfBoundsTest) {
   auto result = Init({DECL_ADC_CHANNEL(1), DECL_ADC_CHANNEL(4)});
   ASSERT_TRUE(result.is_ok());
 
-  incoming_.SyncCall(
-      [](IncomingNamespace* incoming) { incoming->fake_adc_impl_server_.set_resolution(12); });
+  RunInEnvironmentTypeContext(
+      [](AdcTestEnvironment& env) { env.fake_adc_impl_server().set_resolution(12); });
   auto resolution = fidl::WireCall(GetClient(3))->GetResolution();
   ASSERT_FALSE(resolution.ok());
 }
