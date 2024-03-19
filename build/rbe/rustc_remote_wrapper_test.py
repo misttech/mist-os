@@ -56,7 +56,7 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
     raise TypeError(f"Unhandled sequence type: {t}")
 
 
-class TestAccompanyRlibWithSo(unittest.TestCase):
+class AccompanyRlibWithSoTests(unittest.TestCase):
     def test_not_rlib(self):
         deps = Path("../path/to/foo.rs")
         self.assertEqual(
@@ -84,6 +84,44 @@ class TestAccompanyRlibWithSo(unittest.TestCase):
                 [deps, Path("obj/build/foo.so")],
             )
             mock_isfile.assert_called_once()
+
+
+class ExpandDepsForRlibCompileTests(unittest.TestCase):
+    def test_proc_macro(self):
+        deps = list(
+            rustc_remote_wrapper.expand_deps_for_rlib_compile(
+                [Path("foo/barmac.so")]
+            )
+        )
+        self.assertEqual(deps, [Path("foo/barmac.so")])
+
+    def test_rlib(self):
+        deps = list(
+            rustc_remote_wrapper.expand_deps_for_rlib_compile(
+                [Path("foo/bar.rlib")]
+            )
+        )
+        self.assertEqual(deps, [Path("foo/bar.rlib")])
+
+    def test_rmeta_missing_rlib(self):
+        deps = list(
+            rustc_remote_wrapper.expand_deps_for_rlib_compile(
+                [Path("foo/bar.rmeta")]
+            )
+        )
+        self.assertEqual(deps, [Path("foo/bar.rmeta")])
+
+    def test_rmeta_with_coexisting_rlib(self):
+        with mock.patch.object(
+            Path, "exists", return_value=True
+        ) as mock_rlib_exists:
+            deps = list(
+                rustc_remote_wrapper.expand_deps_for_rlib_compile(
+                    [Path("foo/bar.rmeta")]
+                )
+            )
+        mock_rlib_exists.assert_called_once_with()
+        self.assertEqual(deps, [Path("foo/bar.rmeta"), Path("foo/bar.rlib")])
 
 
 class RustRemoteActionPrepareTests(unittest.TestCase):
@@ -237,7 +275,14 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         with contextlib.ExitStack() as stack:
             for m in mocks:
                 stack.enter_context(m)
-            prepare_status = r.prepare()
+            # 'expand_rmetas' checks for file existence
+            # specificially co-existence of .rlib with .rmeta
+            with mock.patch.object(
+                Path, "exists", return_value=True
+            ) as mock_rlib_exists:
+                prepare_status = r.prepare()
+
+            mock_rlib_exists.assert_called()
 
         self.assertEqual(prepare_status, 0)  # success
         a = r.remote_action

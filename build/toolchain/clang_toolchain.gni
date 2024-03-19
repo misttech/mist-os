@@ -782,20 +782,36 @@ template("clang_toolchain") {
 
         forward_variables_from(_rust_link_common, "*", [ "outputs" ])
 
-        # Expand UNSTRIPPED_OUTFILE
         if (invoker.toolchain_cpu == "wasm32") {
           unstripped_outfile += ".wasm"
         }
+        _unstripped_dir = "exe.unstripped"
+        _outputs = _rust_link_common.outputs
+
+        if (rust_emit_rmeta) {
+          rmeta = "$unstripped_outfile.rmeta"
+
+          # Even though rmeta is not needed as an output,
+          # we use emit=metadata to signal to the
+          # remote wrapper that rmetas should be used
+          # for dependency scanning, as opposed to
+          # complete rlibs.
+          command =
+              string_replace(command, "{{EMIT_RMETA}}", ",metadata=$rmeta")
+          _outputs += [ rmeta ]
+        } else {
+          command = string_replace(command, "{{EMIT_RMETA}}", "")
+        }
+
+        # Expand UNSTRIPPED_OUTFILE
         command = string_replace(command,
                                  "{{UNSTRIPPED_OUTFILE}}",
                                  unstripped_outfile)
-        command = string_replace(command, "{{EMIT_RMETA}}", "")
 
         # Expand UNSTRIPPED_DIR
-        _unstripped_dir = "exe.unstripped"
         command = string_replace(command, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
         outputs = []
-        foreach(output, _rust_link_common.outputs) {
+        foreach(output, _outputs) {
           output = string_replace(output,
                                   "{{UNSTRIPPED_OUTFILE}}",
                                   unstripped_outfile)
@@ -868,7 +884,9 @@ template("clang_toolchain") {
 
       tool("rust_staticlib") {
         forward_variables_from(_rust_concurrent_jobs, "*")
-        depfile = "{{output}}.d"
+        _main_output =
+            "{{output_dir}}/{{target_output_name}}{{output_extension}}"
+        depfile = "$_main_output.d"
 
         # Overwrite an existing output file only if its contents have changed.
         command = string_replace(_restat_rustc_prefix, "{{DEPFILE}}", depfile)
@@ -879,10 +897,10 @@ template("clang_toolchain") {
 
         # TODO(https://fxbug.dev/42124325): Replacement for rustenv
         command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
-        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
-        command += " -o {{output}} "
+        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link{{EMIT_RMETA}} -Zdep-info-omit-d-target {{rustflags}}"
+        command += " -o $_main_output "
         if (rustc_use_response_files) {
-          rspfile = "{{output}}.rsp"
+          rspfile = "$_main_output.rsp"
           rspfile_content = "{{rustdeps}} {{externs}}"
           command += " -Zshell-argfiles @shell:" + rspfile
         } else {
@@ -893,12 +911,21 @@ template("clang_toolchain") {
 
         description = "RUST {{output}}"
 
-        outputs =
-            [ "{{output_dir}}/{{target_output_name}}{{output_extension}}" ]
+        outputs = [ _main_output ]
         default_output_dir = "{{target_out_dir}}"
         default_output_extension = ".a"
         output_prefix = "lib"
         rust_sysroot = "$rebased_rustc_prefix"
+
+        # emit=metadata signals to scan dependencies using only .rmetas
+        if (rust_emit_rmeta) {
+          rmeta = "{{output_dir}}/{{target_output_name}}.rmeta"
+          command =
+              string_replace(command, "{{EMIT_RMETA}}", ",metadata=$rmeta")
+          outputs += [ rmeta ]
+        } else {
+          command = string_replace(command, "{{EMIT_RMETA}}", "")
+        }
       }
 
       tool("rust_cdylib") {
@@ -907,7 +934,16 @@ template("clang_toolchain") {
         description = "RUST {{output}}"
         default_output_dir = "{{target_out_dir}}"
         output_prefix = "lib"
-        command = string_replace(command, "{{EMIT_RMETA}}", "")
+
+        # emit=metadata signals to scan dependencies using only .rmetas
+        if (rust_emit_rmeta) {
+          rmeta = "{{output_dir}}/{{target_output_name}}.rmeta"
+          command =
+              string_replace(command, "{{EMIT_RMETA}}", ",metadata=$rmeta")
+          outputs += [ rmeta ]
+        } else {
+          command = string_replace(command, "{{EMIT_RMETA}}", "")
+        }
       }
 
       tool("rust_dylib") {
@@ -928,7 +964,9 @@ template("clang_toolchain") {
 
       tool("rust_macro") {
         forward_variables_from(_rust_concurrent_jobs, "*")
-        depfile = "{{output}}.d"
+        _main_output =
+            "{{output_dir}}/{{target_output_name}}{{output_extension}}"
+        depfile = "$_main_output.d"
 
         # Overwrite an existing output file only if its contents have changed.
         command = string_replace(_restat_rustc_prefix, "{{DEPFILE}}", depfile)
@@ -939,8 +977,8 @@ template("clang_toolchain") {
 
         # TODO(https://fxbug.dev/42124325): Replacement for rustenv
         command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}} "
-        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
-        command += " -o {{output}} --extern proc_macro"
+        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link{{EMIT_RMETA}} -Zdep-info-omit-d-target {{rustflags}}"
+        command += " -o $_main_output --extern proc_macro"
         if (rustc_use_response_files) {
           rspfile = "{{output}}.rsp"
           rspfile_content = "{{rustdeps}} {{externs}}"
@@ -952,13 +990,21 @@ template("clang_toolchain") {
             " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 
         description = "RUST {{output}}"
-        outputs =
-            [ "{{output_dir}}/{{target_output_name}}{{output_extension}}" ]
+        outputs = [ _main_output ]
 
         default_output_dir = "{{root_out_dir}}"
         default_output_extension = _dylib_extension
         output_prefix = "lib"
         rust_sysroot = "$rebased_rustc_prefix"
+
+        if (rust_emit_rmeta) {
+          rmeta = "{{output_dir}}/{{target_output_name}}.rmeta"
+          command =
+              string_replace(command, "{{EMIT_RMETA}}", ",metadata=$rmeta")
+          outputs += [ rmeta ]
+        } else {
+          command = string_replace(command, "{{EMIT_RMETA}}", "")
+        }
       }
     }
 

@@ -547,7 +547,7 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(set(r.extern_paths()), _paths({"path/to/that_lib"}))
 
-    def test_dep_only_command(self):
+    def test_dep_only_command_without_metadata(self):
         new_depfile = "some/where/new-foo.rlib.d.other"
         emit_opts = (
             ["--emit=link"],
@@ -564,6 +564,7 @@ class RustActionTests(unittest.TestCase):
                 + opts
                 + ["../foo/lib.rs", "-o", "foo.rlib"]
             )
+            self.assertFalse(r.emit_metadata)
             self.assertEqual(
                 list(r.dep_only_command(new_depfile)),
                 [
@@ -577,21 +578,184 @@ class RustActionTests(unittest.TestCase):
                 ],
             )
 
+        r2 = rustc.RustAction(
+            ["../tools/rustc", "../foo/lib.rs", "-o", "foo.rlib"]
+        )
+        self.assertFalse(r2.emit_metadata)
+        self.assertEqual(
+            list(r2.dep_only_command(new_depfile)),
+            [
+                "../tools/rustc",
+                "../foo/lib.rs",
+                "-o",
+                "foo.rlib",
+                f"--emit=dep-info={new_depfile}",
+                "-Z",
+                "binary-dep-depinfo",
+            ],
+        )
+
+    def test_dep_only_command_with_metadata(self):
+        new_depfile = "some/where/new-foo.rlib.d.other"
+        rmeta_output = "foo34.rmeta"
+        emit_opts = (
+            ["--emit=link,metadata=unused.rmeta"],
+            ["--emit=metadata,dep-info=not-going-to-use-this.d"],
+            [
+                "--emit=metadata,link",
+                "--emit=dep-info=not-going-to-use-this.d,metadata=discarded.rmeta",
+            ],
+            ["--emit=link,metadata,dep-info=not-going-to-use-this.d"],
+            [
+                "--emit=dep-info=not-going-to-use-this.d,metadata=ignore.rmeta,link"
+            ],
+        )
+        for opts in emit_opts:
             r = rustc.RustAction(
-                ["../tools/rustc", "../foo/lib.rs", "-o", "foo.rlib"]
+                [
+                    "../tools/rustc",
+                ]
+                + opts
+                + ["../foo/lib.rs", "-o", "foo34.rlib"]
             )
+            self.assertTrue(r.emit_metadata)
             self.assertEqual(
                 list(r.dep_only_command(new_depfile)),
                 [
                     "../tools/rustc",
-                    "../foo/lib.rs",
-                    "-o",
-                    "foo.rlib",
-                    f"--emit=dep-info={new_depfile}",
+                    f"--emit=metadata,dep-info={new_depfile}",
                     "-Z",
                     "binary-dep-depinfo",
+                    "../foo/lib.rs",
+                    "-o",
+                    rmeta_output,
                 ],
             )
+
+    def test_dep_only_command_no_metadata_with_externs(self):
+        new_depfile = "some/where/new-foo.rlib.d.other"
+        emit_opts = ["--emit=link"]
+        r = rustc.RustAction(
+            [
+                "../tools/rustc",
+            ]
+            + emit_opts
+            + ["../foo/lib.rs", "-o", "foo35.rlib", "--extern", "extdep"]
+        )
+        self.assertTrue(r.emit_metadata)
+        self.assertEqual(
+            list(r.dep_only_command(new_depfile)),
+            [
+                "../tools/rustc",
+                f"--emit=dep-info={new_depfile}",
+                "-Z",
+                "binary-dep-depinfo",
+                "../foo/lib.rs",
+                "-o",
+                "foo35.rlib",
+                "--extern",
+                "extdep",
+            ],
+        )
+
+    def test_dep_only_command_no_metadata_with_externs(self):
+        new_depfile = "some/where/new-foo.rlib.d.other"
+        rmeta_output = "foo36.rmeta"
+        emit_opts = ["--emit=link,metadata=unused.rmeta"]
+        r = rustc.RustAction(
+            [
+                "../tools/rustc",
+            ]
+            + emit_opts
+            + ["../foo/lib.rs", "-o", "foo36.rlib", "--extern", "extdep"]
+        )
+        self.assertTrue(r.emit_metadata)
+        self.assertEqual(
+            list(r.dep_only_command(new_depfile)),
+            [
+                "../tools/rustc",
+                f"--emit=metadata,dep-info={new_depfile}",
+                "-Z",
+                "binary-dep-depinfo",
+                "../foo/lib.rs",
+                "-o",
+                rmeta_output,
+                "--extern",
+                "extdep",
+            ],
+        )
+
+    def test_dep_only_command_no_metadata_with_extern_rlib(self):
+        new_depfile = "some/where/new-foo.rlib.d.other"
+        rmeta_output = "foo37.rmeta"
+        emit_opts = ["--emit=link,metadata=unused.rmeta"]
+        r = rustc.RustAction(
+            [
+                "../tools/rustc",
+            ]
+            + emit_opts
+            + [
+                "../foo/lib.rs",
+                "-o",
+                "foo37.rlib",
+                "--extern",
+                "extdep=build/extdep.rlib",
+            ]
+        )
+        self.assertTrue(r.emit_metadata)
+        with mock.patch.object(
+            Path, "exists", return_value=True
+        ) as mock_rlib_exists:
+            dep_only_command = list(r.dep_only_command(new_depfile))
+        mock_rlib_exists.assert_called_once_with()
+        self.assertEqual(
+            dep_only_command,
+            [
+                "../tools/rustc",
+                f"--emit=metadata,dep-info={new_depfile}",
+                "-Z",
+                "binary-dep-depinfo",
+                "../foo/lib.rs",
+                "-o",
+                rmeta_output,
+                "--extern",
+                "extdep=build/extdep.rmeta",  # transformed to .rmeta
+            ],
+        )
+
+    def test_dep_only_command_no_metadata_with_extern_proc_macro(self):
+        new_depfile = "some/where/new-foo.rlib.d.other"
+        rmeta_output = "foo38.rmeta"
+        emit_opts = ["--emit=link,metadata=unused.rmeta"]
+        r = rustc.RustAction(
+            [
+                "../tools/rustc",
+            ]
+            + emit_opts
+            + [
+                "../foo/lib.rs",
+                "-o",
+                "foo38.rlib",
+                "--extern",
+                "extdep=build/extdep.so",
+            ]
+        )
+        self.assertTrue(r.emit_metadata)
+        dep_only_command = list(r.dep_only_command(new_depfile))
+        self.assertEqual(
+            dep_only_command,
+            [
+                "../tools/rustc",
+                f"--emit=metadata,dep-info={new_depfile}",
+                "-Z",
+                "binary-dep-depinfo",
+                "../foo/lib.rs",
+                "-o",
+                rmeta_output,
+                "--extern",
+                "extdep=build/extdep.so",  # preserved as .so
+            ],
+        )
 
 
 if __name__ == "__main__":

@@ -147,6 +147,35 @@ def accompany_rlib_with_so(deps: Iterable[Path]) -> Iterable[Path]:
                 yield so_file
 
 
+def expand_deps_for_rlib_compile(paths: Iterable[Path]) -> Iterable[Path]:
+    """Expand a list of rmeta deps to be suitable for full (rlib) compilation.
+
+    Depending on the rustc options used for scanning for dependencies,
+    the deps may contain list the .rmeta metadata file for some
+    entries (because only metadata is needed for fast operations like
+    dep-scanning).  However, for the purposes of compiling a real .rlib
+    (or other rust artifact) we need to interpret this as requiring the
+    corresponding .rlib.
+    The implied .rlib need not necessarily exist on disk with real
+    contents; it is permitted to be a download stub from an earlier
+    remote build.
+
+    Yields:
+      possibly modified deps.
+    """
+    for path in paths:
+        yield path
+        if path.name.endswith(".rmeta"):
+            f = path.with_suffix(".rlib")
+            if f.exists():  # ok to exist as download stub
+                yield f
+                continue
+
+            # .so proc macros already appear as deps in the depfile
+            # so there is no need to repeat them here.
+            pass
+
+
 class RemoteInputProcessingError(RuntimeError):
     def __init__(self, message: str):
         super().__init__(message)
@@ -437,10 +466,8 @@ class RustRemoteAction(object):
     @property
     def dep_only_command(self) -> Sequence[str]:
         return cl_utils.auto_env_prefix_command(
-            list(
-                _filter_local_command(
-                    self._rust_action.dep_only_command(self.local_depfile)
-                )
+            _filter_local_command(
+                self._rust_action.dep_only_command(self.local_depfile)
             )
         )
 
@@ -505,10 +532,10 @@ class RustRemoteAction(object):
         self._cleanup_files.append(self.local_depfile)
 
         dep_only_command = self.dep_only_command
-        self.vmsg(f"scan-deps-only command: {dep_only_command}")
+        cmd_str = cl_utils.command_quoted_str(dep_only_command)
+        self.vmsg(f"scan-deps-only command: {cmd_str}")
         dep_status = _make_local_depfile(dep_only_command)
         if dep_status != 0:
-            cmd_str = cl_utils.command_quoted_str(dep_only_command)
             self._prepare_status = dep_status
             if self.verbose:
                 # This is really a lot of information, which is only interesting
@@ -530,18 +557,10 @@ class RustRemoteAction(object):
             target for paths in target_paths for target in paths
         ]
 
-        # Depending on the rustc options used for scanning for dependencies,
-        # the depfile may contain only the .rmeta metadata file for some
-        # entries (because only metadata is needed for fast operations like
-        # dep-scanning).  However, we need to interpret this as the remote
-        # compile/link needing the actual .rlib.
-        def expand_rmetas(paths: Path) -> Iterable[Path]:
-            for path in paths:
-                yield path
-                if path.name.endswith(".rmeta"):
-                    yield path.with_suffix(".rlib")
-
-        expanded_remote_inputs = list(expand_rmetas(remote_depfile_inputs))
+        # Expand some .rmeta deps for .rlib compilation.
+        expanded_remote_inputs = list(
+            expand_deps_for_rlib_compile(remote_depfile_inputs)
+        )
 
         # TODO: if needed, transform the rust std lib paths, depending on
         #   Fuchsia directory layout of Rust prebuilt libs.
