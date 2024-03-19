@@ -252,7 +252,6 @@ config("no_download") {
     rustflags = [ "--remote-flag=--download_outputs=false" ]
   }
 }
-
 # Unstable features
 #
 # These configs enable unstable Rust features. Configs that enable unstable
@@ -261,18 +260,3 @@ config("no_download") {
 #
 # When adding a new config, make sure to add a TODO with a link to the tracking
 # issue.
-
-# TODO(https://fxbug.dev/42176110)
-config("allow_simd") {
-  rustflags = [ "-Zallow-features=stdsimd,aarch64_target_feature" ]
-}
-
-# TODO(https://fxbug.dev/42074445)
-config("async_fn_in_trait") {
-  rustflags = [ "-Zallow-features=async_fn_in_trait" ]
-
-  # Per https://fxbug.dev/42074445#c1, any additions to this list must also
-  # include a point of contact for assisting with refactors or removal of usages
-  # of the feature.
-  visibility = []
-}
