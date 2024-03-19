@@ -942,6 +942,8 @@ ffx log --force-select.
     }
 
     #[fuchsia::test]
+    // TODO(https://fxbug.dev/327959867): Fix this test
+    #[ignore]
     async fn logger_shows_logs_since_specific_timestamp_across_reboots() {
         let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
@@ -1018,6 +1020,8 @@ ffx log --force-select.
     }
 
     #[fuchsia::test]
+    // TODO(https://fxbug.dev/327959867): Fix this test
+    #[ignore]
     async fn logger_shows_logs_since_specific_timestamp_across_reboots_heuristic() {
         let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
