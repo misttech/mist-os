@@ -5,7 +5,7 @@
 use anyhow::{Context, Error};
 use ffx_config::global_env_context;
 use futures::{ready, select, FutureExt, Stream, StreamExt};
-use log_command::log_formatter::{LogData, LogEntry, Symbolize};
+use log_command::log_formatter::{LogEntry, Symbolize};
 use pin_project::pin_project;
 use std::{
     borrow::Cow,
@@ -93,7 +93,7 @@ where
                 self.disabled.set(true);
                 let error = error.to_string();
                 eprintln!("Internal symbolizer error: {error}. Symbolization has been disabled.");
-                Some(LogEntry { timestamp, data: LogData::MalformedTargetLog(error) })
+                None
             }
         }
     }
@@ -541,6 +541,7 @@ mod tests {
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
     use fuchsia_sync::Mutex;
     use futures::Future;
+    use log_command::log_formatter::LogData;
     use std::fmt::Write;
     use std::{
         sync::Arc,
@@ -802,12 +803,7 @@ mod tests {
         // TXN should complete with error
         assert_eq!(
             fake_waker.clone().poll_while_woke(symbolize_task_0.as_mut()),
-            Poll::Ready(Some(LogEntry {
-                data: LogData::MalformedTargetLog(
-                    "Unexpected message received before a valid transaction ID".into()
-                ),
-                timestamp: Timestamp::from(0),
-            }))
+            Poll::Ready(None)
         );
         // Symbolizer should be disabled by the error
         assert_eq!(

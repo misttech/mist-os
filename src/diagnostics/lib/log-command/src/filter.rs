@@ -101,8 +101,6 @@ impl LogFilterCriteria {
             LogEntry { data: LogData::SymbolizedTargetLog(data, _), .. } => {
                 self.match_filters_to_log_data(data)
             }
-            LogEntry { data: LogData::FfxEvent(_), .. } => true,
-            LogEntry { data: LogData::MalformedTargetLog(_), .. } => true,
         }
     }
 
@@ -234,7 +232,7 @@ mod test {
     use selectors::parse_log_interest_selector;
     use std::time::Duration;
 
-    use crate::{log_formatter::EventType, DumpCommand, LogSubCommand};
+    use crate::{DumpCommand, LogSubCommand};
 
     use super::*;
 
@@ -516,11 +514,6 @@ mod test {
             .build()
             .into()
         )));
-
-        let allowed_cmd = LogCommand { ..empty_dump_command() };
-        let allowed_criteria = LogFilterCriteria::try_from(allowed_cmd).unwrap();
-        assert!(allowed_criteria
-            .matches(&make_log_entry(LogData::FfxEvent(EventType::LoggingStarted),)));
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -838,10 +831,5 @@ mod test {
         );
 
         assert!(!criteria.matches(&entry));
-
-        assert!(criteria.matches(&make_log_entry(LogData::FfxEvent(EventType::LoggingStarted))));
-
-        let entry = make_log_entry(LogData::MalformedTargetLog("malformed".to_string()));
-        assert!(criteria.matches(&entry));
     }
 }

@@ -7,9 +7,8 @@ use crate::{
     log_socket_stream::{JsonDeserializeError, LogsDataStream},
     DetailedDateTime, LogCommand, TimeFormat,
 };
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
-use chrono::{Local, TimeZone};
 use diagnostics_data::{
     Data, LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogTimeDisplayFormat, Logs,
     LogsData, Timestamp, Timezone,
@@ -17,18 +16,10 @@ use diagnostics_data::{
 use ffx_writer::ToolIO;
 use futures_util::{future::Either, select, stream::FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::Display,
-    io::Write,
-    time::{Duration, SystemTime},
-};
+use std::{fmt::Display, io::Write, time::Duration};
 use thiserror::Error;
 
 pub const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
-const NANOS_IN_SECOND: i64 = 1_000_000_000;
-const MALFORMED_TARGET_LOG: &str = "malformed target log: ";
-const LOGGER_STARTED: &str = "logger started.";
-const LOGGER_DISCONNECTED: &str = "Logger lost connection to target. Retrying...";
 
 /// Type of an FFX event
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -46,10 +37,6 @@ pub enum LogData {
     TargetLog(LogsData),
     /// A symbolized log (Original log, Symbolizer output)
     SymbolizedTargetLog(LogsData, String),
-    /// A malformed log (invalid JSON)
-    MalformedTargetLog(String),
-    /// An FFX event
-    FfxEvent(EventType),
 }
 
 impl LogData {
@@ -310,26 +297,6 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/42079693): Add unit tests once this is possible
-// to test.
-fn get_timestamp() -> Result<Timestamp> {
-    Ok(Timestamp::from(
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .context("system time before Unix epoch")?
-            .as_nanos() as i64,
-    ))
-}
-
-fn format_ffx_event(msg: &str, timestamp: Option<Timestamp>) -> String {
-    let ts: i64 = timestamp.unwrap_or_else(|| get_timestamp().unwrap()).into();
-    let dt = Local
-        .timestamp(ts / NANOS_IN_SECOND, (ts % NANOS_IN_SECOND) as u32)
-        .format(TIMESTAMP_FORMAT)
-        .to_string();
-    format!("[{}][<ffx>]: {}", dt, msg)
-}
-
 /// Object which contains a Writer that can be borrowed
 pub trait WriterContainer<W>
 where
@@ -457,23 +424,6 @@ where
                 }
                 writeln!(self.writer, "{}", LogTextPresenter::new(&data, text_options))?;
             }
-            LogEntry { data: LogData::MalformedTargetLog(raw), timestamp } => {
-                writeln!(
-                    self.writer,
-                    "{}",
-                    format_ffx_event(&format!("{MALFORMED_TARGET_LOG}{}", raw), Some(timestamp))
-                )?;
-            }
-            LogEntry { data: LogData::FfxEvent(etype), timestamp, .. } => match etype {
-                EventType::LoggingStarted => {
-                    writeln!(self.writer, "{}", format_ffx_event(LOGGER_STARTED, Some(timestamp)))?;
-                }
-                EventType::TargetDisconnected => writeln!(
-                    self.writer,
-                    "{}",
-                    format_ffx_event(LOGGER_DISCONNECTED, Some(timestamp),)
-                )?,
-            },
         })
     }
 }
@@ -1012,23 +962,6 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_default_formatter_disconnect_event() {
-        let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
-        let options = LogFormatterOptions::default();
-        let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
-        let mut entry = log_entry();
-        entry.data = LogData::FfxEvent(EventType::TargetDisconnected);
-        formatter.push_log(entry).await.unwrap();
-        drop(formatter);
-        assert_eq!(
-            buffers.into_stdout_str(),
-            format!("[1970-01-01 00:00:00.000][<ffx>]: {LOGGER_DISCONNECTED}\n")
-        );
-    }
-
-    #[fuchsia::test]
     async fn test_raw_omits_symbolized_output() {
         let symbolizer = FakeFuchsiaSymbolizer;
         let buffers = TestBuffers::default();
@@ -1103,39 +1036,5 @@ mod test {
     #[test]
     fn test_device_or_local_timestamp_returns_none_if_now_is_passed() {
         assert_matches!(DeviceOrLocalTimestamp::new(Some(&parse_time("now").unwrap()), None), None);
-    }
-
-    #[fuchsia::test]
-    async fn test_default_formatter_started_event() {
-        let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
-        let options = LogFormatterOptions::default();
-        let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
-        let mut entry = log_entry();
-        entry.data = LogData::FfxEvent(EventType::LoggingStarted);
-        formatter.push_log(entry).await.unwrap();
-        drop(formatter);
-        assert_eq!(
-            buffers.into_stdout_str(),
-            "[1970-01-01 00:00:00.000][<ffx>]: logger started.\n"
-        );
-    }
-
-    #[fuchsia::test]
-    async fn test_default_formatter_malformed_log() {
-        let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
-        let options = LogFormatterOptions::default();
-        let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
-        let mut entry = log_entry();
-        entry.data = LogData::MalformedTargetLog("Invalid log".to_string());
-        formatter.push_log(entry).await.unwrap();
-        drop(formatter);
-        assert_eq!(
-            buffers.into_stdout_str(),
-            format!("[1970-01-01 00:00:00.000][<ffx>]: {MALFORMED_TARGET_LOG}Invalid log\n")
-        );
     }
 }
