@@ -241,6 +241,7 @@ user_platform_aib_names =
 _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          # Needed by both eng and userdebug products, but contains things disallowed in
                          # user.
+                         "adb_support",
                          "core_realm_development_access",
                          "core_realm_development_access_rcs_no_usb",
                          "core_realm_development_access_rcs_usb",
@@ -298,9 +299,6 @@ eng_only_platform_aib_names =
 
       # Bluetooth testing support
       "bluetooth_pandora",
-
-      # ADB support. ADB drivers (and no daemon) for Starnix and development.
-      "adb_support",
     ]
 eng_platform_aib_names =
     userdebug_platform_aib_names + eng_only_platform_aib_names
@@ -317,6 +315,33 @@ required_user_aib_names = [
 
 required_userdebug_aib_names =
     required_user_aib_names + [ "bootstrap_userdebug" ]
+
+# If an AIB is added to this experimental list, it does not require security
+# review, but will be banned from user builds. These AIBs may still be used
+# on userdebug builds as long as scrutiny is not run on those builds.
+experimental_aib_names = [ "adb_support" ]
+
+# Ensure that we do not list any experimental AIBs as required
+_experimental_required_aibs = required_userdebug_aib_names -
+                              (required_userdebug_aib_names +
+                               experimental_aib_names - experimental_aib_names)
+if (_experimental_required_aibs != []) {
+  print(
+      "We found experimental AIBs that are marked required. This is not allowed.")
+  print(_experimental_required_aibs)
+  assert(false, "experimental AIBs cannot be marked required")
+}
+
+# Ensure that we do not allow any experimental AIBs in user builds
+_experimental_user_aibs =
+    user_platform_aib_names -
+    (user_platform_aib_names + experimental_aib_names - experimental_aib_names)
+if (_experimental_user_aibs != []) {
+  print(
+      "We found experimental AIBs that are allowed in user builds. This is not allowed.")
+  print(_experimental_user_aibs)
+  assert(false, "experimental AIBs cannot be used in user builds")
+}
 
 bringup_platform_aib_labels = []
 bringup_platform_aib_files = []
@@ -365,6 +390,14 @@ foreach(name, required_userdebug_aib_names) {
   label = "//bundles/assembly:${name}"
   _target_out_dir = get_label_info(label, "target_out_dir")
   required_userdebug_platform_aib_files +=
+      [ "${_target_out_dir}/${name}/assembly_config.json" ]
+}
+
+experimental_aib_files = []
+foreach(name, experimental_aib_names) {
+  label = "//bundles/assembly:${name}"
+  _target_out_dir = get_label_info(label, "target_out_dir")
+  experimental_aib_files +=
       [ "${_target_out_dir}/${name}/assembly_config.json" ]
 }
 

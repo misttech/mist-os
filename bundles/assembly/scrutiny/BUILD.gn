@@ -21,7 +21,8 @@ generate_scrutiny_configs("user") {
 }
 
 generate_scrutiny_configs("userdebug") {
-  assembly_input_bundles = userdebug_platform_aib_files
+  assembly_input_bundles = userdebug_platform_aib_files +
+                           experimental_aib_files - experimental_aib_files
   required_assembly_input_bundles = required_userdebug_platform_aib_files
   assembly_build_type = "userdebug"
   deps = userdebug_platform_aib_labels
