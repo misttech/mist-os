@@ -5,12 +5,13 @@
 use {
     anyhow::{Error, Result},
     blobfs_ramdisk::BlobfsRamdisk,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
+    fidl_fuchsia_pkg_test::*,
     fidl_fuchsia_testing_harness::{OperationError, RealmProxy_RequestStream},
-    fuchsia_component::server::ServiceFs,
+    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
     fuchsia_zircon as zx,
-    futures::{StreamExt, TryFutureExt},
+    futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt},
     realm_proxy::service::serve_with_proxy,
     tracing::{error, info},
 };
@@ -26,6 +27,7 @@ static BLOB_IMPLEMENTATION: blobfs_ramdisk::Implementation =
 
 enum IncomingService {
     RealmProxy(RealmProxy_RequestStream),
+    RealmFactory(RealmFactoryRequestStream),
 }
 
 #[fuchsia::main(logging = true)]
@@ -58,15 +60,55 @@ async fn main() -> Result<(), Error> {
 
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(IncomingService::RealmProxy);
+    fs.dir("svc").add_fidl_service(IncomingService::RealmFactory);
     fs.take_and_serve_directory_handle()?;
 
-    fs.for_each_concurrent(None, move |IncomingService::RealmProxy(stream)| {
-        let realm_proxy = PkgdirTestRealmProxy::new(Clone::clone(&client));
-        serve_with_proxy(realm_proxy, stream)
-            .unwrap_or_else(|e| error!("handling realm_proxy request stream{:?}", e))
+    fs.for_each_concurrent(None, move |req| match req {
+        IncomingService::RealmProxy(stream) => {
+            let realm_proxy = PkgdirTestRealmProxy::new(Clone::clone(&client));
+            serve_with_proxy(realm_proxy, stream)
+                .unwrap_or_else(|e| error!("handling realm_proxy request stream{:?}", e))
+                .boxed()
+        }
+        IncomingService::RealmFactory(stream) => serve_factory(Clone::clone(&client), stream)
+            .unwrap_or_else(|e: crate::Error| error!("handling realm_proxy request stream{:?}", e))
+            .boxed(),
     })
     .await;
 
+    Ok(())
+}
+
+async fn serve_factory(
+    directory: fio::DirectoryProxy,
+    mut stream: RealmFactoryRequestStream,
+) -> Result<(), crate::Error> {
+    let factory = connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
+    while let Ok(Some(request)) = stream.try_next().await {
+        match request {
+            RealmFactoryRequest::CreateRealm { options: _, dictionary, responder } => {
+                let (client_end, server_end) = fidl::endpoints::create_endpoints();
+                if let Err(e) = directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end) {
+                    error!("{:?}", e);
+                    let _ = responder.send(Err(OperationError::Failed));
+                    continue;
+                }
+                // TODO(https://fxbug.dev/329496030): We have to use this factory method instead
+                // of creating a Capability::Directory directly - see the bug for details.
+                let client_end = client_end.into_channel();
+                let value = factory.create_directory(client_end.into()).await.unwrap();
+                let output_dict_entries =
+                    vec![fsandbox::DictionaryItem { key: "pkg".into(), value }];
+                let () = factory
+                    .create_dictionary(output_dict_entries, dictionary)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                responder.send(Ok(()))?;
+            }
+            RealmFactoryRequest::_UnknownMethod { .. } => unreachable!(),
+        }
+    }
     Ok(())
 }
 

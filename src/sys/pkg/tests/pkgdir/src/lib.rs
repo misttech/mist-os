@@ -5,8 +5,10 @@
 #![allow(clippy::let_unit_value)]
 
 use {
-    fidl::endpoints::create_proxy, fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
-    fidl_fuchsia_testing_harness::RealmProxy_Marker,
+    fidl::endpoints::create_proxy,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_io as fio,
+    fidl_fuchsia_pkg_test::{RealmFactoryMarker, RealmOptions},
     fuchsia_component::client::connect_to_protocol,
 };
 
@@ -21,17 +23,29 @@ fn repeat_by_n(seed: char, n: usize) -> String {
 async fn dirs_to_test() -> impl Iterator<Item = PackageSource> {
     // Bind to parent to ensure driver test realm is started
     let _ = connect_to_protocol::<fcomponent::BinderMarker>().unwrap();
-    let realm_proxy = connect_to_protocol::<RealmProxy_Marker>().expect("connect to realm_proxy");
-    let connect = || {
-        let realm_proxy = Clone::clone(&realm_proxy);
-        async move {
-            let (client, server) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy");
-            let _ = realm_proxy
-                .connect_to_named_protocol("fuchsia.io.Directory", server.into_channel())
-                .await
-                .expect("connect to fuchsia.io.Directory");
-            PackageSource { dir: client }
-        }
+    let realm_factory =
+        connect_to_protocol::<RealmFactoryMarker>().expect("connect to realm_factory");
+    let (dictionary, dict_server) = create_proxy().expect("create_proxy");
+    realm_factory
+        .create_realm(RealmOptions::default(), dict_server)
+        .await
+        .expect("create_realm fidl failed")
+        .expect("create_realm failed");
+    let cap = dictionary
+        .get("pkg")
+        .await
+        .expect("Dictionary/Get fidl failed")
+        .expect("Dictionary/Get failed");
+    let fsandbox::Capability::Directory(directory) = cap else {
+        panic!("unexpected capability at pkg");
+    };
+    let directory = directory.into_proxy().unwrap();
+    let connect = || async move {
+        let (client, server) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy");
+        directory
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())
+            .expect("clone failed");
+        PackageSource { dir: client }
     };
     IntoIterator::into_iter([connect().await])
 }

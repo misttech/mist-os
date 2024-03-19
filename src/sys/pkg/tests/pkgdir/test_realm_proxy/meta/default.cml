@@ -11,7 +11,14 @@
         runner: "elf",
         binary: "bin/test_realm_proxy",
     },
+    capabilities: [
+        { protocol: "fuchsia.pkg.test.RealmFactory" },
+    ],
     use: [
+        {
+            protocol: "fuchsia.component.sandbox.Factory",
+            from: "framework",
+        },
         {
             protocol: [
                 "fuchsia.blobfs.internal.DecompressorCreator",
@@ -24,6 +31,12 @@
             from: "parent",
             rights: [ "r*" ],
             path: "/dev",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.pkg.test.RealmFactory",
+            from: "self",
         },
     ],
 }

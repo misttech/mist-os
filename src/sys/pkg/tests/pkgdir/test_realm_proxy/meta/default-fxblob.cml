@@ -11,7 +11,14 @@
         runner: "elf",
         binary: "bin/test_realm_proxy_fxblob",
     },
+    capabilities: [
+        { protocol: "fuchsia.pkg.test.RealmFactory" },
+    ],
     use: [
+        {
+            protocol: "fuchsia.component.sandbox.Factory",
+            from: "framework",
+        },
         {
             protocol: [ "fuchsia.process.Launcher" ],
             from: "parent",
@@ -21,6 +28,12 @@
             from: "parent",
             rights: [ "r*" ],
             path: "/dev",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.pkg.test.RealmFactory",
+            from: "self",
         },
     ],
 }

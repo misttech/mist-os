@@ -1,0 +1,20 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.pkg.test;
+
+using fuchsia.component.sandbox;
+using fuchsia.testing.harness;
+
+/// RealmOptions tells the RealmFactory protocol how to create the test realm.
+type RealmOptions = resource table {};
+
+@discoverable
+open protocol RealmFactory {
+    /// Creates a new realm and returns a dictionary containing its exposed capabilities.
+    flexible CreateRealm(resource struct {
+        options RealmOptions;
+        dictionary server_end:fuchsia.component.sandbox.Dictionary;
+    }) -> () error fuchsia.testing.harness.OperationError;
+};

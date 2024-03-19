@@ -9,7 +9,7 @@
     ],
     children: [
         {
-            name: "test_realm_proxy",
+            name: "test_realm_factory",
             url: "test_realm_proxy#meta/default.cm",
         },
         {
@@ -25,21 +25,24 @@
         {
             directory: "dev-topological",
             from: "#storage_driver_test_realm",
-            to: [ "#test_realm_proxy" ],
+            to: "#test_realm_factory",
         },
         {
-            protocol: [ "fuchsia.process.Launcher" ],
+            protocol: "fuchsia.process.Launcher",
             from: "parent",
-            to: [ "#test_realm_proxy" ],
+            to: "#test_realm_factory",
         },
         {
             storage: "tmp",
             from: "parent",
-            to: [ "#test_realm_proxy" ],
+            to: "#test_realm_factory",
         },
         {
-            protocol: [ "fuchsia.testing.harness.RealmProxy" ],
-            from: "#test_realm_proxy",
+            protocol: [
+                "fuchsia.pkg.test.RealmFactory",
+                "fuchsia.testing.harness.RealmProxy",
+            ],
+            from: "#test_realm_factory",
             to: "#test_suite",
         },
         {
@@ -50,7 +53,7 @@
         {
             protocol: "fuchsia.blobfs.internal.DecompressorCreator",
             from: "#decompressor-sandbox",
-            to: "#test_realm_proxy",
+            to: "#test_realm_factory",
         },
     ],
     expose: [
