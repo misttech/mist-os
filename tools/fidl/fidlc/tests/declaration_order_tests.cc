@@ -4,8 +4,6 @@
 
 #include <zircon/assert.h>
 
-#include <algorithm>
-#include <map>
 #include <random>
 #include <string>
 
@@ -13,74 +11,97 @@
 #include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/src/flat_ast.h"
-#include "tools/fidl/fidlc/src/names.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace fidlc {
 namespace {
 
-using ::testing::HasSubstr;
+const int kRepeatTestCount = 10;
 
-// The calculated declaration order is a product of both the inter-type dependency relationships,
-// and an ordering among the type names. To eliminate the effect of name ordering and exclusively
-// test dependency ordering, this utility manufactures random names for the types tested.
-class Namer {
+struct DeclarationOrderTests : public testing::Test {
  public:
-  Namer() = default;
-
-  std::string mangle(std::string input) {
-    std::size_t start_pos = 0;
-    std::size_t max_length = 0;
-    while ((start_pos = input.find_first_of('#', start_pos)) != std::string::npos) {
-      std::size_t end_pos = input.find_first_of('#', start_pos + 1);
-      ZX_ASSERT(end_pos != std::string::npos);
-      std::size_t key_len = end_pos - start_pos;
-      max_length = std::max(max_length, key_len);
-      start_pos = end_pos + 1;
-    }
-    std::size_t normalize_length = max_length + 5;
-    while ((start_pos = input.find_first_of('#')) != std::string::npos) {
-      std::size_t end_pos = input.find_first_of('#', start_pos + 1);
-      auto key = input.substr(start_pos + 1, end_pos - start_pos - 1);
-      if (vars_.find(key) == vars_.end()) {
-        vars_[key] = random_prefix(key, normalize_length);
-      }
-      auto replacement = vars_.at(key);
-      input.replace(start_pos, end_pos - start_pos + 1, replacement);
+  // Adds random prefixes to names surrounded by "#" characters. For example,
+  // "#Foo#" might become "W__Foo". This helps to eliminate the effect of
+  // lexicographical name ordering and exclusively test dependency ordering.
+  std::string Mangle(std::string input) {
+    size_t start = 0;
+    std::map<std::string, char> letters;
+    std::uniform_int_distribution<size_t> distribution(0, 25);
+    while ((start = input.find_first_of('#', start)) != std::string::npos) {
+      auto end = input.find_first_of('#', start + 1);
+      auto key = input.substr(start + 1, end - start - 1);
+      auto [it, inserted] = letters.emplace(key, 0);
+      if (inserted)
+        it->second = static_cast<char>('A' + distribution(rng_));
+      char letter = it->second;
+      input.replace(start, end - start + 1, std::string(1, letter) + "__" + key);
     }
     return input;
   }
 
-  const char* of(std::string_view key) const { return vars_.find(key)->second.c_str(); }
-
- private:
-  std::string random_prefix(std::string label, std::size_t up_to) {
-    // normalize any name to at least |up_to| characters, by adding random prefix
-    static std::string characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    constexpr size_t kSeed = 1337;
-    static std::default_random_engine gen(kSeed);
-    static std::uniform_int_distribution<size_t> distribution(0, characters.size() - 1);
-    if (label.size() < up_to - 1) {
-      label = "_" + label;
+  // Given a vector of decls, returns a vector of their unmangled names.
+  std::vector<std::string_view> Unmangle(const std::vector<const Decl*>& decls) {
+    std::vector<std::string_view> result;
+    for (auto& decl : decls) {
+      auto name = decl->name.decl_name();
+      auto idx = name.find("__");
+      if (decl->name.as_anonymous()) {
+        // Anonymous type names are converted to CamelCase with underscores removed.
+        ZX_ASSERT_MSG(idx == std::string::npos, "%s", std::string(name).c_str());
+        result.push_back(name.substr(1));
+      } else {
+        ZX_ASSERT_MSG(idx == 1, "%s", std::string(name).c_str());
+        result.push_back(name.substr(idx + 2));
+      }
     }
-    while (label.size() < up_to) {
-      label.insert(0, 1, characters[distribution(gen)]);
-    }
-    return label;
+    return result;
   }
 
-  // Use transparent comparator std::less<> to allow std::string_view lookups.
-  std::map<std::string, std::string, std::less<>> vars_;
+ private:
+  static const size_t kSeed = 1337;
+  std::default_random_engine rng_{kSeed};
 };
 
-constexpr int kRepeatTestCount = 100;
+// Checks if an order (vector of strings) is the union of a set of suborders.
+MATCHER_P(IsUnionOf, suborders, "union of suborders " + testing::PrintToString(suborders)) {
+  std::vector<bool> used(arg.size(), false);
+  for (auto& suborder : suborders) {
+    std::optional<std::string_view> prev;
+    size_t prev_index = 0;
+    for (auto& name : suborder) {
+      auto it = std::find(arg.begin(), arg.end(), name);
+      if (it == arg.end()) {
+        *result_listener << "'" << name << "' not found";
+        return false;
+      }
+      size_t index = it - arg.begin();
+      if (used[index]) {
+        *result_listener << "'" << name << "' used twice";
+        return false;
+      }
+      used[index] = true;
+      if (prev && index < prev_index) {
+        *result_listener << "'" << name << "' came before '" << *prev << "'";
+        return false;
+      }
+      prev = name;
+      prev_index = index;
+    }
+  }
+  for (size_t i = 0; i < arg.size(); i++) {
+    if (!used[i]) {
+      *result_listener << "unexpected '" << arg[i] << "'";
+      return false;
+    }
+  }
+  return true;
+}
 
 // This test ensures that there are no unused anonymous structs in the
 // declaration order output.
-TEST(DeclarationOrderTests, GoodNoUnusedAnonymousNames) {
+TEST_F(DeclarationOrderTests, GoodNoUnusedAnonymousNames) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
+    auto source = Mangle(R"FIDL(
 library example;
 
 protocol #Protocol# {
@@ -89,16 +110,14 @@ protocol #Protocol# {
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
-    auto decl_order = library.declaration_order();
-    ASSERT_EQ(decl_order.size(), 1u);
-    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Protocol"));
+    std::vector<std::string_view> expected = {"Protocol"};
+    ASSERT_EQ(Unmangle(library.declaration_order()), expected);
   }
 }
 
-TEST(DeclarationOrderTests, GoodNonnullableRef) {
+TEST_F(DeclarationOrderTests, GoodNonnullableRef) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
+    auto source = Mangle(R"FIDL(
 library example;
 
 type #Request# = struct {
@@ -113,19 +132,19 @@ protocol #Protocol# {
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
-    auto decl_order = library.declaration_order();
-    ASSERT_EQ(4u, decl_order.size());
-    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Element"));
-    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Request"));
-    ASSERT_THAT(decl_order[2]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
-    ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Protocol"));
+    std::vector<std::string_view> expected = {
+        "Element",
+        "Request",
+        "ProtocolSomeMethodRequest",
+        "Protocol",
+    };
+    ASSERT_EQ(Unmangle(library.declaration_order()), expected);
   }
 }
 
-TEST(DeclarationOrderTests, GoodNullableRefBreaksDependency) {
+TEST_F(DeclarationOrderTests, GoodNullableRefBreaksDependency) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
+    auto source = Mangle(R"FIDL(
 library example;
 
 type #Request# = resource struct {
@@ -142,35 +161,17 @@ protocol #Protocol# {
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
-    auto decl_order = library.declaration_order();
-    ASSERT_EQ(4u, decl_order.size());
-
-    // Since the Element struct contains a Protocol handle, it does not
-    // have any dependencies, and we therefore have two independent
-    // declaration sub-graphs:
-    //   a. Element
-    //   b. Request <- ProtocolSomeMethodRequest <- Protocol
-    // Because of random prefixes, either (a) or (b) will be selected to
-    // be first in the declaration order.
-    bool element_is_first = decl_order[0]->name.decl_name() == namer.of("Element");
-    if (element_is_first) {
-      ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Element"));
-      ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Request"));
-      ASSERT_THAT(decl_order[2]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
-      ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Protocol"));
-    } else {
-      ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Request"));
-      ASSERT_THAT(decl_order[1]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
-      ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Protocol"));
-      ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Element"));
-    }
+    std::vector<std::vector<std::string_view>> expected_suborders = {
+        {"Element"},
+        {"Request", "ProtocolSomeMethodRequest", "Protocol"},
+    };
+    ASSERT_THAT(Unmangle(library.declaration_order()), IsUnionOf(expected_suborders));
   }
 }
 
-TEST(DeclarationOrderTests, GoodRequestTypeBreaksDependencyGraph) {
+TEST_F(DeclarationOrderTests, GoodRequestTypeBreaksDependencyGraph) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
+    auto source = Mangle(R"FIDL(
 library example;
 
 type #Request# = resource struct {
@@ -183,18 +184,14 @@ protocol #Protocol# {
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
-    auto decl_order = library.declaration_order();
-    ASSERT_EQ(3u, decl_order.size());
-    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Request"));
-    ASSERT_THAT(decl_order[1]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
-    ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Protocol"));
+    std::vector<std::string_view> expected = {"Request", "ProtocolSomeMethodRequest", "Protocol"};
+    ASSERT_EQ(Unmangle(library.declaration_order()), expected);
   }
 }
 
-TEST(DeclarationOrderTests, GoodNonnullableUnion) {
+TEST_F(DeclarationOrderTests, GoodNonnullableUnion) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
+    auto source = Mangle(R"FIDL(
 library example;
 
 type #Union# = resource union {
@@ -212,19 +209,19 @@ type #Payload# = struct {
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
-    auto decl_order = library.declaration_order();
-    ASSERT_EQ(4u, decl_order.size());
-    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Payload"));
-    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Union"));
-    ASSERT_THAT(decl_order[2]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
-    ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Protocol"));
+    std::vector<std::string_view> expected = {
+        "Payload",
+        "Union",
+        "ProtocolSomeMethodRequest",
+        "Protocol",
+    };
+    ASSERT_EQ(Unmangle(library.declaration_order()), expected);
   }
 }
 
-TEST(DeclarationOrderTests, GoodNullableUnion) {
+TEST_F(DeclarationOrderTests, GoodNullableUnion) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
+    auto source = Mangle(R"FIDL(
 library example;
 
 type #Union# = resource union {
@@ -242,35 +239,17 @@ type #Payload# = struct {
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
-    auto decl_order = library.declaration_order();
-    ASSERT_EQ(4u, decl_order.size());
-
-    // Since the Union argument is nullable, Protocol does not have any
-    // dependencies, and we therefore have two independent declaration
-    // sub-graphs:
-    //   a. Payload <- Union
-    //   b. ProtocolSomeMethodRequest <- Protocol
-    // Because of random prefixes, either (a) or (b) will be selected to
-    // be first in the declaration order.
-    bool payload_is_first = decl_order[0]->name.decl_name() == namer.of("Payload");
-    if (payload_is_first) {
-      ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Payload"));
-      ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Union"));
-      ASSERT_THAT(decl_order[2]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
-      ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Protocol"));
-    } else {
-      ASSERT_THAT(decl_order[0]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
-      ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Protocol"));
-      ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Payload"));
-      ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Union"));
-    }
+    std::vector<std::vector<std::string_view>> expected_suborders = {
+        {"Payload", "Union"},
+        {"ProtocolSomeMethodRequest", "Protocol"},
+    };
+    ASSERT_THAT(Unmangle(library.declaration_order()), IsUnionOf(expected_suborders));
   }
 }
 
-TEST(DeclarationOrderTests, GoodNonnullableUnionInStruct) {
+TEST_F(DeclarationOrderTests, GoodNonnullableUnionInStruct) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
+    auto source = Mangle(R"FIDL(
 library example;
 
 type #Payload# = struct {
@@ -291,20 +270,16 @@ type #Union# = union {
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
-    auto decl_order = library.declaration_order();
-    ASSERT_EQ(5u, decl_order.size());
-    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Payload"));
-    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Union"));
-    ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Request"));
-    ASSERT_THAT(decl_order[3]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
-    ASSERT_EQ(decl_order[4]->name.decl_name(), namer.of("Protocol"));
+    std::vector<std::string_view> expected = {
+        "Payload", "Union", "Request", "ProtocolSomeMethodRequest", "Protocol",
+    };
+    ASSERT_EQ(Unmangle(library.declaration_order()), expected);
   }
 }
 
-TEST(DeclarationOrderTests, GoodNullableUnionInStruct) {
+TEST_F(DeclarationOrderTests, GoodNullableUnionInStruct) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
+    auto source = Mangle(R"FIDL(
 library example;
 
 type #Payload# = struct {
@@ -325,74 +300,56 @@ type #Union# = union {
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
-    auto decl_order = library.declaration_order();
-    ASSERT_EQ(5u, decl_order.size());
-
-    // Since the Union field is nullable, Request does not have any
-    // dependencies, and we therefore have two independent declaration
-    // sub-graphs:
-    //   a. Payload <- Union
-    //   b. Request <- ProtocolSomeMethodRequest <- Protocol
-    // Because of random prefixes, either (a) or (b) will be selected to
-    // be first in the declaration order.
-    bool payload_is_first = decl_order[0]->name.decl_name() == namer.of("Payload");
-    if (payload_is_first) {
-      ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Payload"));
-      ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Union"));
-      ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Request"));
-      ASSERT_THAT(decl_order[3]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
-      ASSERT_EQ(decl_order[4]->name.decl_name(), namer.of("Protocol"));
-    } else {
-      ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Request"));
-      ASSERT_THAT(decl_order[1]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
-      ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Protocol"));
-      ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Payload"));
-      ASSERT_EQ(decl_order[4]->name.decl_name(), namer.of("Union"));
-    }
+    std::vector<std::vector<std::string_view>> expected_suborders = {
+        {"Payload", "Union"},
+        {"Request", "ProtocolSomeMethodRequest", "Protocol"},
+    };
+    ASSERT_THAT(Unmangle(library.declaration_order()), IsUnionOf(expected_suborders));
   }
 }
 
-TEST(DeclarationOrderTests, GoodMultipleLibraries) {
+TEST_F(DeclarationOrderTests, GoodMultipleLibraries) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    SharedAmongstLibraries shared;
-    TestLibrary dependency(&shared, "dependency.fidl", R"FIDL(
+    auto sources = Mangle(R"FIDL(
+// dependency.fidl
 library dependency;
 
-type ExampleDecl1 = struct {};
-)FIDL");
-    ASSERT_COMPILED(dependency);
+type #Decl1# = struct {};
 
-    TestLibrary library(&shared, "example.fidl", R"FIDL(
+// example.fidl
 library example;
 
 using dependency;
 
-type ExampleDecl0 = struct {};
-type ExampleDecl2 = struct {};
+type #Decl0# = struct {};
+type #Decl2# = struct {};
 
-protocol ExampleDecl1 {
-  Method(struct { arg dependency.ExampleDecl1; });
+protocol #Decl1# {
+  Method(struct { arg dependency.#Decl1#; });
 };
 )FIDL");
+    auto index = sources.find("// example.fidl");
+    SharedAmongstLibraries shared;
+    TestLibrary dependency(&shared, "dependency.fidl", sources.substr(0, index));
+    ASSERT_COMPILED(dependency);
+    TestLibrary library(&shared, "example.fidl", sources.substr(index));
     ASSERT_COMPILED(library);
 
-    auto dependency_decl_order = dependency.declaration_order();
-    ASSERT_EQ(1u, dependency_decl_order.size());
-    ASSERT_EQ(NameFlatName(dependency_decl_order[0]->name), "dependency/ExampleDecl1");
+    std::vector<std::string_view> expected = {"Decl1"};
+    ASSERT_EQ(Unmangle(dependency.declaration_order()), expected);
 
-    auto library_decl_order = library.declaration_order();
-    ASSERT_EQ(4u, library_decl_order.size());
-    ASSERT_EQ(NameFlatName(library_decl_order[0]->name), "example/ExampleDecl2");
-    ASSERT_EQ(NameFlatName(library_decl_order[1]->name), "example/ExampleDecl1MethodRequest");
-    ASSERT_EQ(NameFlatName(library_decl_order[2]->name), "example/ExampleDecl1");
-    ASSERT_EQ(NameFlatName(library_decl_order[3]->name), "example/ExampleDecl0");
+    std::vector<std::vector<std::string_view>> expected_suborders = {
+        {"Decl0"},
+        {"Decl2"},
+        {"Decl1MethodRequest", "Decl1"},
+    };
+    ASSERT_THAT(Unmangle(library.declaration_order()), IsUnionOf(expected_suborders));
   }
 }
 
-TEST(DeclarationOrderTests, GoodConstTypeComesFirst) {
+TEST_F(DeclarationOrderTests, GoodConstTypeComesFirst) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
+    auto source = Mangle(R"FIDL(
 library example;
 
 const #Constant# #Alias# = 42;
@@ -401,17 +358,14 @@ alias #Alias# = uint32;
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
-    auto decl_order = library.declaration_order();
-    ASSERT_EQ(2u, decl_order.size());
-    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Alias"));
-    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Constant"));
+    std::vector<std::string_view> expected = {"Alias", "Constant"};
+    ASSERT_EQ(Unmangle(library.declaration_order()), expected);
   }
 }
 
-TEST(DeclarationOrderTests, GoodEnumOrdinalTypeComesFirst) {
+TEST_F(DeclarationOrderTests, GoodEnumOrdinalTypeComesFirst) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
+    auto source = Mangle(R"FIDL(
 library example;
 
 type #Enum# = enum : #Alias# { A = 1; };
@@ -420,17 +374,14 @@ alias #Alias# = uint32;
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
-    auto decl_order = library.declaration_order();
-    ASSERT_EQ(2u, decl_order.size());
-    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Alias"));
-    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Enum"));
+    std::vector<std::string_view> expected = {"Alias", "Enum"};
+    ASSERT_EQ(Unmangle(library.declaration_order()), expected);
   }
 }
 
-TEST(DeclarationOrderTests, GoodBitsOrdinalTypeComesFirst) {
+TEST_F(DeclarationOrderTests, GoodBitsOrdinalTypeComesFirst) {
   for (int i = 0; i < kRepeatTestCount; i++) {
-    Namer namer;
-    auto source = namer.mangle(R"FIDL(
+    auto source = Mangle(R"FIDL(
 library example;
 
 type #Bits# = bits : #Alias# { A = 1; };
@@ -439,10 +390,8 @@ alias #Alias# = uint32;
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
-    auto decl_order = library.declaration_order();
-    ASSERT_EQ(2u, decl_order.size());
-    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Alias"));
-    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Bits"));
+    std::vector<std::string_view> expected = {"Alias", "Bits"};
+    ASSERT_EQ(Unmangle(library.declaration_order()), expected);
   }
 }
 
