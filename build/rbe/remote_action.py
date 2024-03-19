@@ -2117,6 +2117,7 @@ def download_input_stub_paths_batch(
     downloader: remotetool.RemoteTool,
     stub_paths: Sequence[Path],
     working_dir_abs: Path,
+    parallel: bool = False,  # TODO(b/42085186): default True to parallelize
     verbose: bool = False,
 ) -> Dict[Path, cl_utils.SubprocessResult]:
     """Downloads artifacts from a collection of stubs in parallel."""
@@ -2128,18 +2129,23 @@ def download_input_stub_paths_batch(
     if not download_args:
         return {}
 
-    try:
-        with multiprocessing.Pool() as pool:
-            statuses = pool.map(_download_input_for_mp, download_args)
-    except OSError as e:  # in case /dev/shm is not writeable (required)
-        if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
-            e.errno == errno.EROFS
-        ):
-            if len(download_args) > 1:
-                msg("Warning: downloading sequentially instead of in parallel.")
-            statuses = map(_download_input_for_mp, download_args)
-        else:
-            raise e  # Some other error
+    if parallel:
+        try:
+            with multiprocessing.Pool() as pool:
+                statuses = pool.map(_download_input_for_mp, download_args)
+        except OSError as e:  # in case /dev/shm is not writeable (required)
+            if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
+                e.errno == errno.EROFS
+            ):
+                if len(download_args) > 1:
+                    msg(
+                        "Warning: downloading sequentially instead of in parallel."
+                    )
+                statuses = map(_download_input_for_mp, download_args)
+            else:
+                raise e  # Some other error
+    else:
+        statuses = map(_download_input_for_mp, download_args)
 
     return {path: status for path, status in statuses}
 
@@ -2148,6 +2154,7 @@ def download_output_stub_infos_batch(
     downloader: remotetool.RemoteTool,
     stub_infos: Sequence[DownloadStubInfo],
     working_dir_abs: Path,
+    parallel: bool = False,  # TODO(b/42085186): default True to parallelize
     verbose: bool = False,
 ) -> Dict[Path, cl_utils.SubprocessResult]:
     """Downloads artifacts from a collection of stubs in parallel."""
@@ -2159,18 +2166,23 @@ def download_output_stub_infos_batch(
     if not download_args:
         return {}
 
-    try:
-        with multiprocessing.Pool() as pool:
-            statuses = pool.map(_download_output_for_mp, download_args)
-    except OSError as e:  # in case /dev/shm is not writeable (required)
-        if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
-            e.errno == errno.EROFS
-        ):
-            if len(download_args) > 1:
-                msg("Warning: downloading sequentially instead of in parallel.")
-            statuses = map(_download_output_for_mp, download_args)
-        else:
-            raise e  # Some other error
+    if parallel:
+        try:
+            with multiprocessing.Pool() as pool:
+                statuses = pool.map(_download_output_for_mp, download_args)
+        except OSError as e:  # in case /dev/shm is not writeable (required)
+            if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
+                e.errno == errno.EROFS
+            ):
+                if len(download_args) > 1:
+                    msg(
+                        "Warning: downloading sequentially instead of in parallel."
+                    )
+                statuses = map(_download_output_for_mp, download_args)
+            else:
+                raise e  # Some other error
+    else:
+        statuses = map(_download_output_for_mp, download_args)
 
     return {path: status for path, status in statuses}
 
