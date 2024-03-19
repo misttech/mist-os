@@ -5,7 +5,7 @@
 use crate::{
     bpf::{
         fs::{get_bpf_object, BpfHandle},
-        helpers::{HelperFunctionContext, HelperFunctionContextMarker, BPF_HELPERS},
+        helpers::{get_bpf_args, HelperFunctionContext, HelperFunctionContextMarker, BPF_HELPERS},
         map::Map,
     },
     task::CurrentTask,
@@ -19,16 +19,27 @@ use ebpf::{
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{BpfHelperOps, LockBefore, Locked};
 use starnix_uapi::{
-    bpf_attr__bindgen_ty_4, bpf_insn, bpf_prog_type_BPF_PROG_TYPE_KPROBE,
-    bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, errno, error, errors::Errno,
+    bpf_attr__bindgen_ty_4, bpf_insn, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB,
+    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
+    bpf_prog_type_BPF_PROG_TYPE_KPROBE, bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT,
+    bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS, bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER,
+    bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT, bpf_prog_type_BPF_PROG_TYPE_XDP, errno, error,
+    errors::Errno,
 };
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
 /// The different type of BPF programs.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProgramType {
     SocketFilter,
     KProbe,
+    SchedCls,
+    SchedAct,
+    TracePoint,
+    Xdp,
+    CgroupSkb,
+    CgroupSock,
+    CgroupSockAddr,
     /// Unhandled program type.
     Unknown(u32),
 }
@@ -39,6 +50,13 @@ impl From<u32> for ProgramType {
             #![allow(non_upper_case_globals)]
             bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER => Self::SocketFilter,
             bpf_prog_type_BPF_PROG_TYPE_KPROBE => Self::KProbe,
+            bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS => Self::SchedCls,
+            bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT => Self::SchedAct,
+            bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT => Self::TracePoint,
+            bpf_prog_type_BPF_PROG_TYPE_XDP => Self::Xdp,
+            bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB => Self::CgroupSkb,
+            bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK => Self::CgroupSock,
+            bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR => Self::CgroupSockAddr,
             program_type @ _ => {
                 track_stub!(
                     TODO("https://fxbug.dev/324043750"),
@@ -51,7 +69,7 @@ impl From<u32> for ProgramType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ProgramInfo {
     pub program_type: ProgramType,
 }
@@ -69,7 +87,7 @@ pub struct Program {
 }
 
 fn map_ebpf_error(e: EbpfError) -> Errno {
-    log_error!("Failed to load eBPF program: {:?}", e);
+    log_error!("Failed to load eBPF program: {e:?}");
     errno!(EINVAL)
 }
 
@@ -89,6 +107,7 @@ impl Program {
             for helper in BPF_HELPERS.iter() {
                 builder.register(helper)?;
             }
+            builder.set_args(get_bpf_args(&info.program_type));
             let mut logger = BufferVeriferLogger::new(logger);
             builder.load(code, &mut logger)
         })()
