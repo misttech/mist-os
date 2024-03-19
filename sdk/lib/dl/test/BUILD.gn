@@ -25,6 +25,7 @@ test("dl-unittests") {
     "dl-tests.cc",
   ]
   deps = [
+    "..:diagnostics",
     "..:error",
     "//src/lib/elfldltl/testing",
     "//src/lib/fxl/test:gtest_main",

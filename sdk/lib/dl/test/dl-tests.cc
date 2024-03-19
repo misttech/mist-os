@@ -5,9 +5,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#ifdef __ELF__
+#include "../diagnostics.h"
 #include "dl-impl-tests.h"
-#endif
 #include "dl-system-tests.h"
 
 namespace {
@@ -23,12 +22,46 @@ using DlTests = Fixture;
 // linker. These tests ensure that both dynamic linker implementations meet
 // expectations and behave the same way, with exceptions noted within the test.
 using TestTypes = ::testing::Types<
-#ifdef __ELF__
+#ifdef __ELF__  // Hard to generate usable test modules for non-ELF host.
     dl::testing::DlImplTests,
 #endif
     dl::testing::DlSystemTests>;
 
 TYPED_TEST_SUITE(DlTests, TestTypes);
+
+TEST(DlTests, Diagnostics) {
+  {
+    dl::Diagnostics diag;
+    fit::result<dl::Error, void*> result = diag.ok(nullptr);
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    EXPECT_EQ(result.value(), nullptr);
+  }
+  {
+    dl::Diagnostics diag;
+    fit::result<dl::Error> result = diag.ok();
+    EXPECT_TRUE(result.is_ok()) << result.error_value();
+  }
+  {
+    dl::Diagnostics diag;
+    // Injects the prefix on diag.FormatError while in scope.
+    ld::ScopedModuleDiagnostics module_diag{diag, "foo"};
+    EXPECT_FALSE(diag.FormatError("some error", elfldltl::FileOffset{0x123u}));
+    fit::result<dl::Error, int> result = diag.take_error();
+    EXPECT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().take_str(), "foo: some error at file offset 0x123");
+  }
+  {
+    dl::Diagnostics diag;
+    {
+      // No effect after it goes out of scope again.
+      ld::ScopedModuleDiagnostics module_diag{diag, "foo"};
+    }
+    EXPECT_FALSE(diag.FormatError("some error"));
+    fit::result<dl::Error> result = diag.take_error();
+    EXPECT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().take_str(), "some error");
+  }
+}
 
 TYPED_TEST(DlTests, NotFound) {
   auto result = this->DlOpen("does_not_exist.so", RTLD_NOW | RTLD_LOCAL);

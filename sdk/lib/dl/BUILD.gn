@@ -24,6 +24,12 @@ source_set("error") {
   sources = [ "error.cc" ]
 }
 
+source_set("diagnostics") {
+  public = [ "diagnostics.h" ]
+  public_deps = [ ":error" ]
+  sources = [ "diagnostics.cc" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ "test:tests" ]

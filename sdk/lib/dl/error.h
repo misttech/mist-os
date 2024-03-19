@@ -86,6 +86,22 @@ class Error {
   // X-or the other of take_str() and take_c_str() must be called exactly once.
   const char* take_c_str() { return take_str().data(); }
 
+  // This just returns this object as an rvalue like std::move, but it's an
+  // assertion failure if this object is in default-constructed, moved-from, or
+  // taken state.  It must be set but not yet taken.
+  Error&& take() && {
+    assert(size_ != kUnused);
+    assert(size_ != kTaken);
+    assert(size_ != kMovedFrom);
+    if (buffer_) {
+      assert(size_ != kAllocationFailure);
+      assert(size_ < kSpecialSize);
+    } else {
+      assert(size_ >= kSpecialSize);
+    }
+    return std::move(*this);
+  }
+
   ~Error() {
     // Must be taken or moved-from.  If moved-from, buffer_ must be nullptr.
     if (size_ != kTaken) {
@@ -99,12 +115,17 @@ class Error {
         assert(size_ == kMovedFrom);
       }
     }
+    // Note that if assertions are disabled this always avoids leaks anyway
+    // even if other invariants have been violated (unless buffer_ has been
+    // freed without being cleared).
     if (buffer_) {
       free(buffer_);
     }
   }
 
  private:
+  friend class DiagnosticsReport;
+
   // One of these values must be in size_ when buffer_ is nullptr.  When
   // buffer_ is set, size_ may be kTaken instead of the string's length.
   enum SpecialSize : size_t {
@@ -117,6 +138,12 @@ class Error {
     kAllocationFailure,
   };
 
+  void DisarmAndAssertUnused() {
+    assert(size_ == kUnused);
+    assert(!buffer_);
+    size_ = kMovedFrom;
+  }
+
   char* buffer_ = nullptr;
   size_t size_ = kUnused;
 };
@@ -124,7 +151,7 @@ class Error {
 // This makes ostream << things like gtest macros take dl::Error destructively.
 template <typename Ostream, typename T,
           typename = std::enable_if_t<std::is_same_v<Error, std::decay_t<T>>>>
-constexpr decltype(auto) operator<<(Ostream&& os, Error&& error) {
+constexpr decltype(auto) operator<<(Ostream&& os, T&& error) {
   return std::forward<Ostream>(os) << error.take_str();
 }
 
