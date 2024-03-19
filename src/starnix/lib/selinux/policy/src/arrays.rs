@@ -26,6 +26,10 @@ pub(crate) const MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY: u32 = 31;
 /// comes from an `allow [source] [target]:[class] { [permissions] };` policy statement.
 pub(crate) const ACCESS_VECTOR_TYPE_ALLOW_MASK: u16 = 1;
 
+/// Mask for [`AccessVectorMetadata`] `access_vector_type` that indicates whether the access vector
+/// comes from an `allow [source] [target]:[class] { [permissions] };` policy statement.
+pub(crate) const ACCESS_VECTOR_TYPE_TYPE_TRANSITION_MASK: u16 = 16;
+
 #[allow(type_alias_bounds)]
 pub(crate) type SimpleArray<PS: ParseStrategy, T> = Array<PS, PS::Output<le::U32>, T>;
 
@@ -175,6 +179,12 @@ impl<PS: ParseStrategy> AccessVector<PS> {
         PS::deref(&self.metadata).is_allow()
     }
 
+    /// Returns whether this access vector compes from a
+    /// `type_transtion [source] [target]:[class] [new_type];` policy statement.
+    pub fn is_type_transition(&self) -> bool {
+        PS::deref(&self.metadata).is_type_transition()
+    }
+
     /// Returns the source type id in this access vector. This id corresponds to the
     /// [`super::symbols::Type`] `id()` of some type or attribute in the same policy.
     pub fn source_type(&self) -> le::U16 {
@@ -202,6 +212,15 @@ impl<PS: ParseStrategy> AccessVector<PS> {
             _ => None,
         }
     }
+
+    /// A numeric type id that corresponds to a the `[new_type]` in a
+    /// `type_transtion [source] [target]:[class] [new_type];` policy statement.
+    pub fn new_type(&self) -> Option<le::U32> {
+        match &self.extended_permissions {
+            ExtendedPermissions::NewType(new_type) => Some(*PS::deref(new_type)),
+            _ => None,
+        }
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for AccessVector<PS> {
@@ -218,8 +237,9 @@ impl<PS: ParseStrategy> Parse<PS> for AccessVector<PS> {
                 num_bytes,
             })?;
 
-        let (extended_permissions, tail) = if PS::deref(&metadata).access_vector_type()
-            & EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK
+        let access_vector_type = PS::deref(&metadata).access_vector_type();
+        let (extended_permissions, tail) = if (access_vector_type
+            & EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK)
             != 0
         {
             let num_bytes = tail.len();
@@ -232,13 +252,17 @@ impl<PS: ParseStrategy> Parse<PS> for AccessVector<PS> {
             (ExtendedPermissions::SpecifiedDriverPermissions(specified_driver_permissions), tail)
         } else {
             let num_bytes = tail.len();
-            let (permission_mask, tail) =
+            let (extended_permissions, tail) =
                 PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
                     type_name: "ExtendedPermissions::PermissionMask",
                     type_size: std::mem::size_of::<le::U32>(),
                     num_bytes,
                 })?;
-            (ExtendedPermissions::PermissionMask(permission_mask), tail)
+            if (access_vector_type & ACCESS_VECTOR_TYPE_TYPE_TRANSITION_MASK) != 0 {
+                (ExtendedPermissions::NewType(extended_permissions), tail)
+            } else {
+                (ExtendedPermissions::PermissionMask(extended_permissions), tail)
+            }
         };
 
         Ok((Self { metadata, extended_permissions }, tail))
@@ -266,12 +290,19 @@ impl AccessVectorMetadata {
     pub fn is_allow(&self) -> bool {
         (self.access_vector_type() & ACCESS_VECTOR_TYPE_ALLOW_MASK) != 0
     }
+
+    /// Returns whether this access vector compes from a
+    /// `type_transtion [source] [target]:[class] [new_type];` policy statement.
+    pub fn is_type_transition(&self) -> bool {
+        (self.access_vector_type() & ACCESS_VECTOR_TYPE_TYPE_TRANSITION_MASK) != 0
+    }
 }
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum ExtendedPermissions<PS: ParseStrategy> {
     SpecifiedDriverPermissions(PS::Output<SpecifiedDriverPermissions>),
     PermissionMask(PS::Output<le::U32>),
+    NewType(PS::Output<le::U32>),
 }
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]

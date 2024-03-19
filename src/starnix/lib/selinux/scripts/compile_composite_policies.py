@@ -57,6 +57,13 @@ _COMPOSITE_POLICY_PATHS = (
         ),
         "role_transition_not_allowed_policy.pp",
     ),
+    (
+        (
+            "base_policy.conf",
+            "new_file/type_transition_policy.conf",
+        ),
+        "type_transition_policy.pp",
+    ),
 )
 
 

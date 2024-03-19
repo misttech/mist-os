@@ -333,6 +333,10 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         PS::deref_slice(&self.role_transitions.data)
     }
 
+    pub(crate) fn access_vectors(&self) -> &AccessVectors<PS> {
+        &self.access_vectors.data
+    }
+
     #[cfg(feature = "selinux_policy_test_api")]
     pub fn validate(&self) -> Result<(), anyhow::Error> {
         Validate::validate(self)

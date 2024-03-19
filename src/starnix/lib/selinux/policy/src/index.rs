@@ -9,12 +9,14 @@ use super::{
     parser::ParseStrategy,
     symbols::{
         Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, Permission,
+        Type,
     },
     ParsedPolicy, RoleId, SecurityContext, TypeId,
 };
 
 use selinux_common::{self as sc, ClassPermission as _};
 use std::collections::HashMap;
+use zerocopy::little_endian as le;
 
 /// An index for facilitating fast lookup of common abstractions inside parsed binary policy data
 /// structures. Typically, data is indexed by an enum that describes a well-known value and the
@@ -187,15 +189,25 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // type_transition rule was specified in the policy (policy version 25 allows a filename
         // type_transition rule and version 28 allows a default_type of source or target to be
         // defined for each object class).
-        //
-        // TODO(b/322353836): Implement `type_transition` handling.
-        let type_ = match class_defaults.type_() {
-            ClassDefault::Source => source.type_(),
-            ClassDefault::Target => target.type_(),
-            // The "parent directory" in this context is the target. (The source is the process
-            // creating the file-like object.)
-            _ => target.type_(),
-        };
+        let source_type = self.parsed_policy.find_type_alias_or_attribute(source.type_());
+        let computed_type =
+            match self.type_transition_new_type(source_type, target.type_(), policy_class) {
+                Some(new_type) => new_type,
+                None => {
+                    self.parsed_policy.find_type_alias_or_attribute(match class_defaults.type_() {
+                        ClassDefault::Source => source.type_(),
+                        ClassDefault::Target => target.type_(),
+                        // The "parent directory" in this context is the target. (The source is the
+                        // process creating the file-like object.)
+                        _ => target.type_(),
+                    })
+                }
+            };
+        let type_ = TypeId(
+            std::str::from_utf8(computed_type.name_bytes())
+                .expect("valid type name in policy")
+                .to_owned(),
+        );
 
         // The SELinux notebook states:
         //
@@ -226,7 +238,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // TODO(b/322353836): Implement transitions for `*_transition` rules based on initial
         // `user`, `role`, `type_`, `range` values.
         // TODO(b/319232900): Ensure that the generated Context has e.g. valid security range.
-        Ok(SecurityContext::new(user.clone(), role, type_.clone(), low_level, high_level))
+        Ok(SecurityContext::new(user.clone(), role, type_, low_level, high_level))
     }
 
     pub(crate) fn parsed_policy(&self) -> &ParsedPolicy<PS> {
@@ -235,16 +247,16 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
     fn role_transition_new_role(
         &self,
-        current_role: &Role<PS>,
-        type_id: &TypeId,
+        source_role: &Role<PS>,
+        target_type_id: &TypeId,
         class: &Class<PS>,
     ) -> Option<&Role<PS>> {
-        let type_ = self.parsed_policy.find_type_alias_or_attribute(type_id);
+        let target_type = self.parsed_policy.find_type_alias_or_attribute(target_type_id);
         let role_transitions = self.parsed_policy.role_transitions();
 
         for role_transition in role_transitions {
-            if role_transition.current_role() == current_role.id()
-                && role_transition.type_() == type_.id()
+            if role_transition.current_role() == source_role.id()
+                && role_transition.type_() == target_type.id()
                 && role_transition.class() == class.id()
             {
                 let new_role =
@@ -270,6 +282,36 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         }
 
         false
+    }
+
+    fn type_transition_new_type(
+        &self,
+        source_type: &Type<PS>,
+        target_type_id: &TypeId,
+        class: &Class<PS>,
+    ) -> Option<&Type<PS>> {
+        let target_type = self.parsed_policy.find_type_alias_or_attribute(target_type_id);
+        let access_vectors = self.parsed_policy.access_vectors();
+        let source_type_id: le::U16 = source_type.id().try_into().expect("type id as u16");
+        let target_type_id: le::U16 = target_type.id().try_into().expect("type id as u16");
+        let target_class_id: le::U16 = class.id().try_into().expect("class id as u16");
+
+        if let Some(access_vector) = access_vectors.into_iter().find(|access_vector| {
+            access_vector.is_type_transition()
+                && access_vector.source_type() == source_type_id
+                && access_vector.target_type() == target_type_id
+                && access_vector.target_class() == target_class_id
+        }) {
+            // Return first match. The `checkpolicy` tool will not compile a policy that has
+            // multiple matches, so behavior on multiple matches is undefined.
+            let new_type_id = access_vector
+                .new_type()
+                .expect("new_type extended permissions on type_transition access vector");
+            let new_type = self.parsed_policy.type_(new_type_id);
+            return Some(new_type);
+        }
+
+        None
     }
 }
 

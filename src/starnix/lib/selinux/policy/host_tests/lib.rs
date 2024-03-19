@@ -387,3 +387,31 @@ fn new_file_security_context_role_transition_not_allowed() {
         actual
     );
 }
+
+#[test]
+fn new_file_security_context_type_transition() {
+    let policy_path = format!(
+        "{}/{}/compiled/type_transition_policy.pp",
+        TESTDATA_DIR, COMPOSITE_POLICIES_SUBDIR
+    );
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    let source = policy
+        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .expect("valid source security context");
+    let target = policy
+        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .expect("valid target security context");
+
+    let actual = policy
+        .new_file_security_context(&source, &target, &FileClass::File)
+        .expect("compute new context for new file");
+    let expected: SecurityContext = policy
+        .parse_security_context("source_u:object_r:transition_t:s0:c0".as_bytes())
+        .expect("valid expected security context");
+
+    assert_eq!(expected, actual);
+}
