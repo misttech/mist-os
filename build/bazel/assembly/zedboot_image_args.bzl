@@ -13,5 +13,8 @@ ZEDBOOT_IMAGE_ARGS = {
     "create_system_mode": "bootfs",
     "legacy_aib": "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     "platform_aibs": "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
+    "package_mode": "bootfs",
+    "legacy_bundle": "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
+    "platform_artifacts": "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
     "product_config": "//build/bazel/assembly/product_configurations:zedboot",
 }
