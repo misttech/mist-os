@@ -35,6 +35,8 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2/usb-peripheral",
+      "sys/platform/pwm-ffd1b000/aml-pwm-device",
+      "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-4/pwm-init_group/aml-pwm-init",
 
       // EMMC
       "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc",
@@ -56,6 +58,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-011/block",
       "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-012/block",
       "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-013/block",
+
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

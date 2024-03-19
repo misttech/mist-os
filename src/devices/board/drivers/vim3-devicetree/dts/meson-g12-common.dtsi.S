@@ -160,6 +160,24 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 			};
+
+
+		};
+
+		pwm: pwm@ffd1b000 {
+			compatible = "amlogic,meson-g12a-ee-pwm";
+			reg = <0x0 0xffd1b000 0x0 0x1000>, //PWM_AB
+				<0x0 0xffd1a000 0x0 0x1000>, //PWM_CD
+				<0x0 0xffd19000 0x0 0x1000>, //PWM_EF
+				<0x0 0xff807000 0x0 0x1000>, //PWM_A0_AB
+				<0x0 0xff802000 0x0 0x1000>; //PWM_A0_CD
+			#pwm-cells = <2>;
+		};
+
+		pwm-init {
+			pwms = <&pwm 4 0>; //A311D_PWM_E
+			gpios = <&gpio A311D_GPIOX(16) 0 &gpio A311D_GPIOX(17) 0>;
+			gpio-names = "WIFI_LPO", "BT_REG_ON";
 		};
 
 		usb_phy: phy@ffe09000 {
