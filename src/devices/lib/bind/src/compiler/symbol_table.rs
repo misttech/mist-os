@@ -36,6 +36,22 @@ impl fmt::Display for Symbol {
     }
 }
 
+// This struct contains bind library declaration data that's used for inserting symbol
+// table entries.
+struct SymbolTableDeclaration {
+    pub declaration: bind_library::Declaration,
+
+    // Key-value qualified identifiers that are namespaced to the highest dependency that
+    // defined the declaration.
+    pub qualified_k: CompoundIdentifier,
+    pub qualified_v: CompoundIdentifier,
+
+    // Key-value qualified identifiers that are namespaced to the library that defined the
+    // declaration.
+    pub local_qualified_k: CompoundIdentifier,
+    pub local_qualified_v: CompoundIdentifier,
+}
+
 pub fn get_symbol_table_from_libraries<'a>(
     using: &Vec<Include>,
     libraries: &[String],
@@ -133,6 +149,64 @@ fn find_qualified_identifier(
     Ok(local_qualified.clone())
 }
 
+// Insert entries from |declaration_data| into |symbol_table|.
+fn insert_symbol_entries(
+    symbol_table: &mut SymbolTable,
+    declaration_data: SymbolTableDeclaration,
+) -> Result<(), CompilerError> {
+    let SymbolTableDeclaration {
+        declaration,
+        qualified_k,
+        qualified_v,
+        local_qualified_k,
+        local_qualified_v,
+    } = declaration_data;
+
+    // Type-check the qualified name against the existing symbols, and check that extended
+    // keys are previously defined and that non-extended keys are not.
+    match symbol_table.get(&qualified_k) {
+        Some(Symbol::Key(_, value_type)) => {
+            if !declaration.extends {
+                return Err(CompilerError::DuplicateIdentifier(qualified_k));
+            }
+            if declaration.value_type != *value_type {
+                return Err(CompilerError::TypeMismatch(qualified_k));
+            }
+        }
+        Some(Symbol::DeprecatedKey(_)) => (),
+        Some(_) => {
+            return Err(CompilerError::TypeMismatch(qualified_k));
+        }
+        None => {
+            if declaration.extends {
+                return Err(CompilerError::UndeclaredKey(qualified_k));
+            }
+            symbol_table
+                .insert(qualified_k, Symbol::Key(qualified_v.to_string(), declaration.value_type));
+        }
+    }
+
+    // Insert each value associated with the declaration into the symbol table, taking care
+    // to scope each identifier under the locally qualified identifier of the key. We don't
+    // need to type-check values here since the parser has already done that.
+    for value in &declaration.values {
+        let qualified_value_k = local_qualified_k.nest(value.identifier().to_string());
+        let qualified_value_v = local_qualified_v.nest(value.identifier().to_string());
+        if symbol_table.contains_key(&qualified_value_k) {
+            return Err(CompilerError::DuplicateIdentifier(qualified_value_k));
+        }
+
+        let value_symbol = match value {
+            bind_library::Value::Number(_, value) => Symbol::NumberValue(*value),
+            bind_library::Value::Str(_, value) => Symbol::StringValue(value.clone()),
+            bind_library::Value::Bool(_, value) => Symbol::BoolValue(*value),
+            bind_library::Value::Enum(_) => Symbol::EnumValue(qualified_value_v.to_string()),
+        };
+        symbol_table.insert(qualified_value_k, value_symbol);
+    }
+    Ok(())
+}
+
 /// Construct a map of every key and value defined by `libraries`. The identifiers in the symbol
 /// table will be fully qualified, i.e. they will contain their full namespace. A symbol is
 /// namespaced according to the name of the library it is defined in. If a library defines a value
@@ -142,7 +216,12 @@ pub fn construct_symbol_table(
     libraries: impl Iterator<Item = impl Deref<Target = bind_library::Ast>>,
     aliases: HashMap<CompoundIdentifier, String>,
 ) -> Result<SymbolTable, CompilerError> {
-    let mut symbol_table = get_deprecated_symbols();
+    let mut symbol_table: HashMap<CompoundIdentifier, Symbol> = get_deprecated_symbols();
+
+    // Cache extended declarations and insert them into the symbol table after we resolve all
+    // library declarations.
+    let mut extended_declarations: Vec<SymbolTableDeclaration> = vec![];
+
     for lib in libraries {
         let bind_library::Ast { name, using, declarations } = &*lib;
 
@@ -156,78 +235,52 @@ pub fn construct_symbol_table(
             // library, discarding any other qualifiers. This identifier is used to scope values
             // defined under this key. We have separate entries for symbol table keys (k) and
             // values (v) because the key might be aliased.
-            let local_qualified_v = name.nest(declaration.identifier.name.clone());
-            let local_qualified_k = match &aliased_name {
-                Some(alias) => alias.nest(declaration.identifier.name.clone()),
-                None => local_qualified_v.clone(),
-            };
+            let local_qualified_id = name.nest(declaration.identifier.name.clone());
 
             // Attempt to match the namespace of the key to an include of the current library, or if
             // it is unqualified use the local qualified name. Also do a first pass at checking
             // whether the extend keyword is used correctly. Once again keep separate entries for
             // symbol table keys (k) and values (v) because the key might be aliased.
-            let qualified_v = find_qualified_identifier(declaration, using, &local_qualified_v)?;
-            let qualified_k = if aliased_name.is_some() {
-                find_qualified_identifier(declaration, using, &local_qualified_k)?
-            } else {
-                qualified_v.clone()
+            let qualified_id = find_qualified_identifier(declaration, using, &local_qualified_id)?;
+
+            if let Some(alias) = aliased_name.as_ref() {
+                let alias_local_qualified_id = alias.nest(declaration.identifier.name.clone());
+                let alias_qualified_id =
+                    find_qualified_identifier(declaration, using, &alias_local_qualified_id)?;
+
+                let entry_data = SymbolTableDeclaration {
+                    declaration: declaration.clone(),
+                    qualified_k: alias_qualified_id,
+                    qualified_v: qualified_id.clone(),
+                    local_qualified_k: alias_local_qualified_id.clone(),
+                    local_qualified_v: local_qualified_id.clone(),
+                };
+
+                if declaration.extends {
+                    extended_declarations.push(entry_data);
+                } else {
+                    insert_symbol_entries(&mut symbol_table, entry_data)?;
+                }
+            }
+
+            let entry_data = SymbolTableDeclaration {
+                declaration: declaration.clone(),
+                qualified_k: qualified_id.clone(),
+                qualified_v: qualified_id,
+                local_qualified_k: local_qualified_id.clone(),
+                local_qualified_v: local_qualified_id,
             };
 
-            // Type-check the qualified name against the existing symbols, and check that extended
-            // keys are previously defined and that non-extended keys are not.
-            match symbol_table.get(&qualified_k) {
-                Some(Symbol::Key(_, value_type)) => {
-                    if !declaration.extends {
-                        return Err(CompilerError::DuplicateIdentifier(qualified_k));
-                    }
-                    if declaration.value_type != *value_type {
-                        return Err(CompilerError::TypeMismatch(qualified_k));
-                    }
-                }
-                Some(Symbol::DeprecatedKey(_)) => (),
-                Some(_) => {
-                    return Err(CompilerError::TypeMismatch(qualified_k));
-                }
-                None => {
-                    if declaration.extends {
-                        return Err(CompilerError::UndeclaredKey(qualified_k));
-                    }
-                    symbol_table.insert(
-                        qualified_k,
-                        Symbol::Key(qualified_v.to_string(), declaration.value_type),
-                    );
-                }
-            }
-
-            // Insert each value associated with the declaration into the symbol table, taking care
-            // to scope each identifier under the locally qualified identifier of the key. We don't
-            // need to type-check values here since the parser has already done that.
-            for value in &declaration.values {
-                let qualified_value_k = local_qualified_k.nest(value.identifier().to_string());
-                let qualified_value_v = local_qualified_v.nest(value.identifier().to_string());
-                if symbol_table.contains_key(&qualified_value_k) {
-                    return Err(CompilerError::DuplicateIdentifier(qualified_value_k));
-                }
-
-                match value {
-                    bind_library::Value::Number(_, value) => {
-                        symbol_table.insert(qualified_value_k, Symbol::NumberValue(*value));
-                    }
-                    bind_library::Value::Str(_, value) => {
-                        symbol_table.insert(qualified_value_k, Symbol::StringValue(value.clone()));
-                    }
-                    bind_library::Value::Bool(_, value) => {
-                        symbol_table.insert(qualified_value_k, Symbol::BoolValue(*value));
-                    }
-                    bind_library::Value::Enum(_) => {
-                        symbol_table.insert(
-                            qualified_value_k,
-                            Symbol::EnumValue(qualified_value_v.to_string()),
-                        );
-                    }
-                };
+            if declaration.extends {
+                extended_declarations.push(entry_data);
+            } else {
+                insert_symbol_entries(&mut symbol_table, entry_data)?;
             }
         }
+    }
+
+    for declaration in extended_declarations.into_iter() {
+        insert_symbol_entries(&mut symbol_table, declaration)?;
     }
 
     Ok(symbol_table)
@@ -679,6 +732,46 @@ mod test {
         }
 
         #[test]
+        fn extension_with_dependency_defined_after_library() {
+            let libraries = vec![
+                bind_library::Ast {
+                    name: make_identifier!("lib_b"),
+                    using: vec![Include { name: make_identifier!("lib_a"), alias: None }],
+                    declarations: vec![bind_library::Declaration {
+                        identifier: make_identifier!["lib_a", "symbol"],
+                        value_type: bind_library::ValueType::Number,
+                        extends: true,
+                        values: vec![(bind_library::Value::Number("y".to_string(), 2))],
+                    }],
+                },
+                bind_library::Ast {
+                    name: make_identifier!("lib_a"),
+                    using: vec![],
+                    declarations: vec![bind_library::Declaration {
+                        identifier: make_identifier!["symbol"],
+                        value_type: bind_library::ValueType::Number,
+                        extends: false,
+                        values: vec![(bind_library::Value::Number("x".to_string(), 1))],
+                    }],
+                },
+            ];
+
+            let st = construct_symbol_table(libraries.iter(), HashMap::new()).unwrap();
+            assert_eq!(
+                st.get(&make_identifier!("lib_a", "symbol")),
+                Some(&Symbol::Key("lib_a.symbol".to_string(), bind_library::ValueType::Number))
+            );
+            assert_eq!(
+                st.get(&make_identifier!("lib_a", "symbol", "x")),
+                Some(&Symbol::NumberValue(1))
+            );
+            assert_eq!(
+                st.get(&make_identifier!("lib_b", "symbol", "y")),
+                Some(&Symbol::NumberValue(2))
+            );
+        }
+
+        #[test]
         fn aliased_extension() {
             let libraries = vec![
                 bind_library::Ast {
@@ -776,17 +869,26 @@ mod test {
                 st.get(&make_identifier!("opaque", "symbol", "y")),
                 Some(&Symbol::NumberValue(2))
             );
-            assert_eq!(st.get(&make_identifier!("lib_b", "symbol", "y")), None);
+            assert_eq!(
+                st.get(&make_identifier!("lib_b", "symbol", "y")),
+                Some(&Symbol::NumberValue(2))
+            );
             assert_eq!(
                 st.get(&make_identifier!("opaque", "enum_symbol")),
                 Some(&Symbol::Key("lib_b.enum_symbol".to_string(), bind_library::ValueType::Enum))
             );
-            assert_eq!(st.get(&make_identifier!("lib_b", "enum_symbol")), None);
+            assert_eq!(
+                st.get(&make_identifier!("lib_b", "enum_symbol")),
+                Some(&Symbol::Key("lib_b.enum_symbol".to_string(), bind_library::ValueType::Enum))
+            );
             assert_eq!(
                 st.get(&make_identifier!("opaque", "enum_symbol", "the_val")),
                 Some(&Symbol::EnumValue("lib_b.enum_symbol.the_val".to_string()))
             );
-            assert_eq!(st.get(&make_identifier!("lib_b", "enum_symbol", "the_val")), None);
+            assert_eq!(
+                st.get(&make_identifier!("lib_b", "enum_symbol", "the_val")),
+                Some(&Symbol::EnumValue("lib_b.enum_symbol.the_val".to_string()))
+            );
         }
 
         #[test]

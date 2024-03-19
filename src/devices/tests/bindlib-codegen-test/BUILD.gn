@@ -62,7 +62,7 @@ bind_library("bindlibparent.codegen.testlib") {
 bind_library("bindlib.codegen.testlib") {
   source = "testbindlib.bind"
   public_deps = [
-    # TODO(https://fxbug.dev/42177994): depend on bindlibparent when we start using it.
+    ":bindlibparent.codegen.testlib",
     "//src/devices/bind/fuchsia.pci",
   ]
 }

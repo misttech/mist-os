@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/42177994): Extend parent items when extending non-deprecated works.
-
 library bindlib.codegen.testlib;
 
 using fuchsia.pci;
+using bindlibparent.codegen.testlib;
 
 string kinglet;
 uint bobolink;
@@ -22,4 +21,8 @@ bool flag {
 
 extend uint fuchsia.BIND_PCI_VID {
   PIE = 0x314,
+};
+
+extend uint bindlibparent.codegen.testlib.Grit {
+  FINE = 200,
 };

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/42177994): Use extended values on the right when extending is fixed.
-
 using bindlib.codegen.testlib;
 using bindlibparent.codegen.testlib as parent;
 using fuchsia.test;
@@ -16,4 +14,4 @@ fuchsia.BIND_PCI_VID == bindlib.codegen.testlib.BIND_PCI_VID.PIE;
 bindlib.codegen.testlib.flag == bindlib.codegen.testlib.flag.ENABLE;
 
 parent.Pizza == parent.Pizza.Pepperoni;
-parent.Grit == parent.Grit.Coarse;
+parent.Grit == bindlib.codegen.testlib.Grit.FINE;

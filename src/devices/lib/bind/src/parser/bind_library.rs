@@ -22,7 +22,7 @@ pub struct Ast {
     pub declarations: Vec<Declaration>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Declaration {
     pub identifier: CompoundIdentifier,
     pub value_type: ValueType,
@@ -38,7 +38,7 @@ pub enum ValueType {
     Enum,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Number(String, u64),
     Str(String, String),

@@ -49,7 +49,7 @@ static zx_status_t bind_func(void* ctx, zx_device_t* parent) {
       zx_device_str_prop_t{.key = parent::PIZZA.c_str(),
                            .property_value = str_prop_str_val(parent::PIZZA_PEPPERONI.c_str())},
       zx_device_str_prop_t{.key = parent::GRIT.c_str(),
-                           .property_value = str_prop_int_val(parent::GRIT_COARSE)},
+                           .property_value = str_prop_int_val(lib::GRIT_FINE)},
   };
 
   args.str_props = str_props;
