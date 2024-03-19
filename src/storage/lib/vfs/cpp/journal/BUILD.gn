@@ -63,7 +63,6 @@ static_library("journal") {
     ]
     public_deps += [
       "//src/storage/lib/disk_inspector",
-      "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/range",
       "//zircon/system/ulib/storage/buffer",
       "//zircon/system/ulib/storage/operation",
@@ -119,6 +118,7 @@ test("journal-unit") {
     "//src/storage/lib/block_client/cpp:fake_device",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/cksum",

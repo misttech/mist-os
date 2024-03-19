@@ -161,8 +161,8 @@ class PagedVnode : public Vnode, public fbl::Recyclable<PagedVnode> {
   // alive. The caller should ensure that this reference (if non-null) is safely released outside of
   // the Vnode's mutex_.
   //
-  // TODO(https://fxbug.dev/42128267) make the return value a PagedVnode. Using the base class here allows
-  // the blobfs conversion to the new pager easier.
+  // TODO(https://fxbug.dev/42128267) make the return value a PagedVnode. Using the base class here
+  // allows the blobfs conversion to the new pager easier.
   [[nodiscard]] fbl::RefPtr<Vnode> FreePagedVmo() __TA_REQUIRES(mutex_);
 
   // Implementors of this class can override this function to response to the event that there

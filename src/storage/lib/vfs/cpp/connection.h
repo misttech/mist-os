@@ -10,7 +10,6 @@
 #endif
 
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/wire/transaction.h>
 #include <lib/fit/function.h>

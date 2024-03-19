@@ -31,12 +31,8 @@ static_library("cpp") {
     "//sdk/lib/fdio:constants",
     "//sdk/lib/fit",
     "//zircon/system/ulib/fbl",
-
-    # <fs/vnode.h> has #include <lib/zx/result.h>
     "//zircon/system/ulib/zx",
   ]
-
-  deps = [ "//zircon/system/ulib/fbl" ]
 
   # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
@@ -55,11 +51,9 @@ static_library("cpp") {
       "queue.h",
       "ref_counted.h",
       "remote_dir.h",
-      "remote_file.h",
       "service.h",
       "synchronous_vfs.h",
       "ticker.h",
-      "tracked_remote_dir.h",
       "vmo_file.h",
       "watcher.h",
     ]
@@ -83,33 +77,32 @@ static_library("cpp") {
       "pseudo_dir.cc",
       "pseudo_file.cc",
       "remote_dir.cc",
-      "remote_file.cc",
       "remote_file_connection.cc",
       "remote_file_connection.h",
       "service.cc",
       "stream_file_connection.cc",
       "stream_file_connection.h",
       "synchronous_vfs.cc",
-      "tracked_remote_dir.cc",
       "vfs_types.cc",
       "vmo_file.cc",
       "watcher.cc",
     ]
     public_deps += [
+      # Required for fs::FilesystemInfo
       "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
+
+      # Required for fs::Vnode
       "//sdk/lib/file-lock:cpp",
+
+      # Required for fs::FuchsiaVfs and fs::Connection
       "//zircon/system/ulib/async",
 
-      # <fs/tracked_remote_dir.h> has #include <lib/async/cpp/wait.h>.
+      # Required for fs::PagedVnode
       "//zircon/system/ulib/async:async-cpp",
-      "//zircon/system/ulib/zx",
     ]
-    deps += [
+    deps = [
       "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp",
       "//sdk/lib/fidl",
-      "//sdk/lib/fit",
-      "//zircon/system/ulib/fbl",
-      "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/sync",
     ]
   }
@@ -141,10 +134,8 @@ test("fs-vnode-test") {
     "pseudo_dir_tests.cc",
     "pseudo_file_tests.cc",
     "remote_dir_tests.cc",
-    "remote_file_tests.cc",
     "service_tests.cc",
     "teardown_tests.cc",
-    "tracked_remote_dir_tests.cc",
     "vfs_tests.cc",
     "vfs_types_tests.cc",
     "vmo_file_tests.cc",
