@@ -134,6 +134,9 @@ import("//build/toolchain/rbe.gni")
 #     See build/toolchain/toolchain_tags.gni and build/toolchain/variant_tags.gni
 #     for a list of common tags.
 #
+#   link_args (optional)
+#     List of arguments to pass to the linker via "-Clink-args=...".
+#
 #   assert_no_deps (optional)
 #     Ensure no deps on these targets, see [assert_no_deps](https://gn.googlesource.com/gn/+/main/docs/reference.md#var_assert_no_deps)
 
@@ -275,6 +278,7 @@ template("rustc_binary") {
                              "enforce_source_listing",
                              "features",
                              "inputs",
+                             "link_args",
                              "pool",
                              "rustenv",
                              "sources",

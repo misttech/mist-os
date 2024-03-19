@@ -79,6 +79,9 @@ import("//build/toolchain/rbe.gni")
 #     Set to true to force this target to build locally, overriding the global
 #     `rust_rbe_enable`.
 #
+#   link_args (optional)
+#     List of arguments to pass to the linker via "-Clink-args=...".
+#
 #   disable_clippy (optional)
 #     Don't run clippy on this target.
 #
@@ -288,6 +291,12 @@ template("rustc_artifact") {
       # Opting out of strict sources check requires that the package is present
       # in a global allow-list.
       deps += [ "//build/rust:disable_strict_sources_check_allowlist" ]
+    }
+
+    if (defined(invoker.link_args)) {
+      foreach(link_arg, invoker.link_args) {
+        rustflags += [ "-Clink-args=" + link_arg ]
+      }
     }
 
     rustenv = []
