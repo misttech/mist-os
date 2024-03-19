@@ -332,8 +332,8 @@ where
             }
 
             ManagerRequest::PerformPendingReboot { responder } => {
-                info!("Received PerformPendingRebootRequest");
                 if server.borrow().state.manager_state == state_machine::State::WaitingForReboot {
+                    info!("Received PerformPendingRebootRequest. Rebooting.");
                     connect_to_protocol::<fidl_fuchsia_hardware_power_statecontrol::AdminMarker>()?
                         .reboot(RebootReason::SystemUpdate)
                         .await?
@@ -342,6 +342,7 @@ where
 
                     responder.send(true)?;
                 } else {
+                    info!("Received PerformPendingRebootRequest. Not waiting for one so ignoring");
                     responder.send(false)?;
                 }
             }
