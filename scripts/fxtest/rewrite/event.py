@@ -180,7 +180,7 @@ class EventGroupPayload:
 
     # An optional count of events queued on the group.
     # If set, this value can be used to create a progress bar for this event group.
-    queued_events: int | None
+    queued_events: int | None = None
 
     # If true, instructs console displays to hide children.
     hide_children: bool = False
