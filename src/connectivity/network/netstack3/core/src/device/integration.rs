@@ -250,10 +250,16 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         cb: F,
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
-        let Devices { ethernet, pure_ip: _, loopback } = &*devices;
+        let Devices { ethernet, pure_ip, loopback } = &*devices;
 
-        // TODO(https://fxbug.dev/42051633): Include pure IP devices.
-        cb(DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }, locked)
+        cb(
+            DevicesIter {
+                ethernet: ethernet.values(),
+                pure_ip: pure_ip.values(),
+                loopback: loopback.iter(),
+            },
+            locked,
+        )
     }
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
@@ -535,10 +541,16 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         cb: F,
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
-        let Devices { ethernet, pure_ip: _, loopback } = &*devices;
+        let Devices { ethernet, pure_ip, loopback } = &*devices;
 
-        // TODO(https://fxbug.dev/42051633): Include pure IP devices.
-        cb(DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }, locked)
+        cb(
+            DevicesIter {
+                ethernet: ethernet.values(),
+                pure_ip: pure_ip.values(),
+                loopback: loopback.iter(),
+            },
+            locked,
+        )
     }
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {

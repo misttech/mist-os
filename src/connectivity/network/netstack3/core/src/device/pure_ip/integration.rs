@@ -316,7 +316,10 @@ mod tests {
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
-    use net_types::{ip::Mtu, Witness};
+    use net_types::{
+        ip::{AddrSubnet, IpAddress as _, Mtu},
+        Witness, ZonedAddr,
+    };
     use packet_formats::ip::{IpPacketBuilder, IpProto};
     use test_case::test_case;
 
@@ -481,5 +484,35 @@ mod tests {
         assert_eq!(found_device, device.downgrade());
         assert_eq!(version, I::VERSION);
         assert_eq!(packet, default_ip_packet::<I>().into_inner());
+    }
+
+    #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
+    #[ip_test]
+    // Verify that a socket can listen on an IP address that is assigned to a
+    // pure IP device.
+    fn available_to_socket_layer<I: Ip + TestIpExt + crate::IpExt>() {
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx
+            .core_api()
+            .device::<PureIpDevice>()
+            .add_device_with_default_state(
+                PureIpDeviceCreationProperties { mtu: MTU },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        crate::device::testutil::enable_device(&mut ctx, &device);
+
+        let prefix = I::Addr::BYTES * 8;
+        let addr = AddrSubnet::new(I::FAKE_CONFIG.local_ip.get(), prefix).unwrap();
+        ctx.core_api()
+            .device_ip::<I>()
+            .add_ip_addr_subnet(&device, addr)
+            .expect("add address should succeed");
+
+        let socket = ctx.core_api().udp::<I>().create();
+        ctx.core_api()
+            .udp::<I>()
+            .listen(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), None)
+            .expect("listen should succeed");
     }
 }

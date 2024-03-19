@@ -105,6 +105,8 @@ impl<D, I: Ip> RecvIpFrameMeta<D, I> {
 pub struct DevicesIter<'s, BC: BindingsContext> {
     pub(super) ethernet:
         alloc::collections::hash_map::Values<'s, EthernetDeviceId<BC>, EthernetPrimaryDeviceId<BC>>,
+    pub(super) pure_ip:
+        alloc::collections::hash_map::Values<'s, PureIpDeviceId<BC>, PureIpPrimaryDeviceId<BC>>,
     pub(super) loopback: core::option::Iter<'s, LoopbackPrimaryDeviceId<BC>>,
 }
 
@@ -112,9 +114,10 @@ impl<'s, BC: BindingsContext> Iterator for DevicesIter<'s, BC> {
     type Item = DeviceId<BC>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { ethernet, loopback } = self;
+        let Self { ethernet, pure_ip, loopback } = self;
         ethernet
             .map(|primary| primary.clone_strong().into())
+            .chain(pure_ip.map(|primary| primary.clone_strong().into()))
             .chain(loopback.map(|primary| primary.clone_strong().into()))
             .next()
     }
