@@ -18,7 +18,7 @@ const ELEMENT_NAME: &str = "timekeeper-pe";
 const POWER_ON: u8 = 0xff;
 const POWER_OFF: u8 = 0x00;
 
-const REQUIRED_LEVEL: u8 = fps::EXECUTION_STATE_WAKE_HANDLING;
+const REQUIRED_LEVEL: u8 = fps::ExecutionStateLevel::WakeHandling.into_primitive();
 
 pub async fn manage(activity_signal: mpsc::Sender<()>) -> Result<fasync::Task<()>> {
     let governor_proxy = client::connect_to_protocol::<fps::ActivityGovernorMarker>()

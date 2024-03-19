@@ -71,14 +71,10 @@ async fn test_activity_governor_returns_expected_power_elements() -> Result<()> 
     assert!(!es_token.is_invalid_handle());
 
     let aa_element = power_elements.application_activity.unwrap();
-    let aa_passive_token = aa_element.passive_dependency_token.unwrap();
-    assert!(!aa_passive_token.is_invalid_handle());
     let aa_active_token = aa_element.active_dependency_token.unwrap();
     assert!(!aa_active_token.is_invalid_handle());
 
     let wh_element = power_elements.wake_handling.unwrap();
-    let wh_passive_token = wh_element.passive_dependency_token.unwrap();
-    assert!(!wh_passive_token.is_invalid_handle());
     let wh_active_token = wh_element.active_dependency_token.unwrap();
     assert!(!wh_active_token.is_invalid_handle());
 

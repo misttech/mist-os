@@ -396,10 +396,10 @@ fit::result<Error, TokenMap> GetDependencyTokens(
       } break;
       case fuchsia_hardware_power::SagElement::kApplicationActivity: {
         if (elements->has_application_activity() &&
-            elements->application_activity().has_passive_dependency_token()) {
+            elements->application_activity().has_active_dependency_token()) {
           zx::event copy;
-          elements->application_activity().passive_dependency_token().duplicate(
-              ZX_RIGHT_SAME_RIGHTS, &copy);
+          elements->application_activity().active_dependency_token().duplicate(ZX_RIGHT_SAME_RIGHTS,
+                                                                               &copy);
           tokens.emplace(std::make_pair(parent, std::move(copy)));
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);

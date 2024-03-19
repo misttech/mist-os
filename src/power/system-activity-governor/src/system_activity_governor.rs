@@ -8,9 +8,7 @@ use fidl_fuchsia_hardware_suspend as fhsuspend;
 use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system::{
-    self as fsystem, APPLICATION_ACTIVITY_ACTIVE, APPLICATION_ACTIVITY_INACTIVE,
-    EXECUTION_STATE_ACTIVE, EXECUTION_STATE_INACTIVE, EXECUTION_STATE_WAKE_HANDLING,
-    WAKE_HANDLING_ACTIVE, WAKE_HANDLING_INACTIVE,
+    self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, WakeHandlingLevel,
 };
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
@@ -178,7 +176,11 @@ impl SystemActivityGovernor {
         let execution_state = PowerElementContext::builder(
             topology,
             "execution_state",
-            &[EXECUTION_STATE_INACTIVE, EXECUTION_STATE_WAKE_HANDLING, EXECUTION_STATE_ACTIVE],
+            &[
+                ExecutionStateLevel::Inactive.into_primitive(),
+                ExecutionStateLevel::WakeHandling.into_primitive(),
+                ExecutionStateLevel::Active.into_primitive(),
+            ],
         )
         .build()
         .await
@@ -187,13 +189,16 @@ impl SystemActivityGovernor {
         let application_activity = PowerElementContext::builder(
             topology,
             "application_activity",
-            &[APPLICATION_ACTIVITY_INACTIVE, APPLICATION_ACTIVITY_ACTIVE],
+            &[
+                ApplicationActivityLevel::Inactive.into_primitive(),
+                ApplicationActivityLevel::Active.into_primitive(),
+            ],
         )
         .dependencies(vec![fbroker::LevelDependency {
             dependency_type: fbroker::DependencyType::Active,
-            dependent_level: APPLICATION_ACTIVITY_ACTIVE,
+            dependent_level: ApplicationActivityLevel::Active.into_primitive(),
             requires_token: execution_state.active_dependency_token(),
-            requires_level: EXECUTION_STATE_ACTIVE,
+            requires_level: ExecutionStateLevel::Active.into_primitive(),
         }])
         .build()
         .await
@@ -202,13 +207,16 @@ impl SystemActivityGovernor {
         let wake_handling = PowerElementContext::builder(
             topology,
             "wake_handling",
-            &[WAKE_HANDLING_INACTIVE, WAKE_HANDLING_ACTIVE],
+            &[
+                WakeHandlingLevel::Inactive.into_primitive(),
+                WakeHandlingLevel::Active.into_primitive(),
+            ],
         )
         .dependencies(vec![fbroker::LevelDependency {
             dependency_type: fbroker::DependencyType::Active,
-            dependent_level: WAKE_HANDLING_ACTIVE,
+            dependent_level: WakeHandlingLevel::Active.into_primitive(),
             requires_token: execution_state.active_dependency_token(),
-            requires_level: EXECUTION_STATE_WAKE_HANDLING,
+            requires_level: ExecutionStateLevel::WakeHandling.into_primitive(),
         }])
         .build()
         .await
@@ -318,7 +326,7 @@ impl SystemActivityGovernor {
             let sag = this.clone();
             Self::run_power_element(
                 &this.execution_state,
-                EXECUTION_STATE_INACTIVE,
+                ExecutionStateLevel::Inactive.into_primitive(),
                 execution_state_node,
                 None,
                 Some(Box::new(move |new_power_level: fbroker::PowerLevel| {
@@ -330,7 +338,7 @@ impl SystemActivityGovernor {
                     let listeners_done_signaller = listeners_done_signaller.clone();
 
                     async move {
-                        if new_power_level == EXECUTION_STATE_INACTIVE {
+                        if new_power_level == ExecutionStateLevel::Inactive.into_primitive() {
                             tracing::debug!("beginning suspend process for execution_state");
                             sag.suspend_allowed.set(true);
                             if sag.notify_resume_pending.get() {
@@ -363,7 +371,7 @@ impl SystemActivityGovernor {
         fasync::Task::local(async move {
             Self::run_power_element(
                 &this.application_activity,
-                APPLICATION_ACTIVITY_INACTIVE,
+                ApplicationActivityLevel::Inactive.into_primitive(),
                 application_activity_node,
                 None,
                 None,
@@ -380,7 +388,7 @@ impl SystemActivityGovernor {
         fasync::Task::local(async move {
             Self::run_power_element(
                 &this.wake_handling,
-                WAKE_HANDLING_INACTIVE,
+                WakeHandlingLevel::Inactive.into_primitive(),
                 wake_handling_node,
                 None,
                 None,
@@ -615,18 +623,12 @@ impl SystemActivityGovernor {
                             ..Default::default()
                         }),
                         application_activity: Some(fsystem::ApplicationActivity {
-                            passive_dependency_token: Some(
-                                self.application_activity.passive_dependency_token(),
-                            ),
                             active_dependency_token: Some(
                                 self.application_activity.active_dependency_token(),
                             ),
                             ..Default::default()
                         }),
                         wake_handling: Some(fsystem::WakeHandling {
-                            passive_dependency_token: Some(
-                                self.wake_handling.passive_dependency_token(),
-                            ),
                             active_dependency_token: Some(
                                 self.wake_handling.active_dependency_token(),
                             ),

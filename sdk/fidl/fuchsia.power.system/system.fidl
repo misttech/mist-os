@@ -1,29 +1,89 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+/// The system activity governor (SAG) is a subsystem of the power framework
+/// that manages the execution and suspend state of the hardware platform. It
+/// also allows observers to watch for suspend/resume transitions of the
+/// platform.
+///
+/// Other components can create dependencies on SAG's power elements with
+/// [`fuchsia.power.broker/ElementControl`] to influence SAG's behavior
+/// including preventing system suspension and/or changing the platform resume
+/// latency for the next suspension.
+///
+/// The power elements that SAG creates and manages are as follows:
+/// * [`fuchsia.power.system/ExecutionState`]
+/// * [`fuchsia.power.system/ExecutionResumeLatency`]
+/// * [`fuchsia.power.system/WakeHandling`]
+/// * [`fuchsia.power.system/ApplicationActivity`]
+///
+/// # Internal Dependency Diagram
+/// ```
+/// +--------------------+                  +---------------------------------+
+/// | **ExecutionState** |                  |     **ApplicationActivity**     |
+/// +--------------------+                  +---------------------------------+
+/// |       ACTIVE       |<-----------------|             ACTIVE              |
+/// +--------------------+                  +---------------------------------+
+/// |   WAKE_HANDLING    |<--------+        |            INACTIVE             |
+/// +--------------------+         |        +---------------------------------+
+/// |      INACTIVE      |         |
+/// +--------------------+         |        +---------------------------------+
+///                                |        |         **WakeHandling**        |
+///                                |        +---------------------------------+
+///                                +--------|             ACTIVE              |
+///                                         +---------------------------------+
+///                                         |            INACTIVE             |
+///                                         +---------------------------------+
+///
+/// +---------------------------------+
+/// |   **ExecutionResumeLatency**    |
+/// +---------------------------------+
+/// |         SUSPEND_STATE_N         |
+/// +---------------------------------+
+/// |               ...               |
+/// +---------------------------------+
+/// |         SUSPEND_STATE_1         |
+/// +---------------------------------+
+/// |         SUSPEND_STATE_0         |
+/// +---------------------------------+
+/// ```
+///
+/// # Usage
+///
+/// To prevent system suspension, a component can create an active dependency
+/// using the `active_dependency_token` from `ApplicationActivity` or
+/// `WakeHandling`. If the dependency causes the power level of
+/// `ApplicationActivity` and/or `WakeHandling` to be raised to
+/// [`fuchsia.power.system/ApplicationActivityPowerLevel.ACTIVE`] and/or
+/// [`fuchsia.power.system/WakeHandlingPowerLevel.ACTIVE`], respectively, SAG
+/// will not trigger system suspension until their power levels drop to
+/// `INACTIVE`.
+///
+/// To change the platform resume latency, a component can create an active
+/// dependency using the `active_dependency_token` from
+/// `ExecutionResumeLatency`. If the dependency causes the power level of
+/// `ExecutionResumeLatency` to be raised, SAG will request a suspend state with
+/// an appropriate resume latency for that power level.
+///
+/// If a component is managing a power element that requires the platform to be
+/// in a specific state, a passive dependency can be created on
+/// `ExecutionState`. When `ExecutionState` changes its power level, all
+/// dependent power elements will power down first. Ideally, this forces the
+/// entire system into a configuration with a lower power consumption as the
+/// power level of `ExecutionState` decreases.
 @available(added=HEAD)
 library fuchsia.power.system;
+
 using fuchsia.power.broker;
 using zx;
 
-// Execution state power levels
-const EXECUTION_STATE_ACTIVE fuchsia.power.broker.PowerLevel = 2;
-const EXECUTION_STATE_WAKE_HANDLING fuchsia.power.broker.PowerLevel = 1;
-const EXECUTION_STATE_INACTIVE fuchsia.power.broker.PowerLevel = 0;
-
-// Application activity power levels
-const APPLICATION_ACTIVITY_ACTIVE fuchsia.power.broker.PowerLevel = 1;
-const APPLICATION_ACTIVITY_INACTIVE fuchsia.power.broker.PowerLevel = 0;
-
-// Wake handling power levels
-const WAKE_HANDLING_ACTIVE fuchsia.power.broker.PowerLevel = 1;
-const WAKE_HANDLING_INACTIVE fuchsia.power.broker.PowerLevel = 0;
-
 /// Holds a token to the execution state power element.
 ///
-/// The execution state power element represents the execution state of the
-/// hardware platform. Power elements may only create passive dependencies on
-/// this power element.
+/// Power elements intentionally cannot take active dependencies on this power
+/// element. Elements that need to force the execution state to ACTIVE can use
+/// ApplicationActivity which provides more semantic meaning to the
+/// dependencies.
 ///
 /// The execution state power element supports the following power levels:
 ///   * [`fuchsia.power.system/EXECUTION_STATE_INACTIVE`]: The hardware platform has little to no capability to execute code.
@@ -31,6 +91,23 @@ const WAKE_HANDLING_INACTIVE fuchsia.power.broker.PowerLevel = 0;
 ///   * [`fuchsia.power.system/EXECUTION_STATE_ACTIVE`]: The hardware platform is fully capable of executing code.
 type ExecutionState = resource table {
     1: passive_dependency_token fuchsia.power.broker.DependencyToken;
+};
+
+/// Execution state power levels
+///
+/// Elements should take a passive dependency on `ExecutionStateLevel::ACTIVE`
+/// to ensure that the element will be suspended when the rest of the system
+/// suspends.
+///
+/// Drivers can take a passive dependency on either
+/// `ExecutionStateLevel::WAKE_HANDLING` or `ExecutionStateLevel::ACTIVE` and
+/// request a persistent lease on this state to ensure that their element's
+/// power level is always activated when the system comes out of a suspend
+/// state.
+type ExecutionStateLevel = flexible enum : uint8 {
+    INACTIVE = 0;
+    WAKE_HANDLING = 1;
+    ACTIVE = 2;
 };
 
 /// Holds tokens to the execution resume latency power element and its
@@ -52,32 +129,42 @@ type ExecutionResumeLatency = resource table {
 
 /// Holds tokens to the wake handling power element.
 ///
-/// The wake handling power element represents the wake handling state of the
-/// hardware platform. Driver power elements are expected to claim the active
-/// power level of this power element until they have fully handled wake
-/// triggers during system resume.
-///
 /// The wake handling power element supports the following power levels:
 ///   * [`fuchsia.power.system/WAKE_HANDLING_INACTIVE`]: The hardware platform is not handling a wakeup event.
 ///   * [`fuchsia.power.system/WAKE_HANDLING_ACTIVE`]: The hardware platform is currently handling a wakeup event.
 type WakeHandling = resource table {
-    1: passive_dependency_token fuchsia.power.broker.DependencyToken;
-    2: active_dependency_token fuchsia.power.broker.DependencyToken;
+    1: active_dependency_token fuchsia.power.broker.DependencyToken;
+};
+
+/// Wake handling power levels
+///
+/// Driver power elements should take an active dependency on
+/// `WakeHandlingLevel::ACTIVE`. While the drivers are handling a wake event
+/// they should request a lease to pull the state to Active, and drop the
+/// release once the event is fully handled.
+type WakeHandlingLevel = flexible enum : uint8 {
+    INACTIVE = 0;
+    ACTIVE = 1;
 };
 
 /// Holds tokens to the application activity power element.
-///
-/// The application activity power element represents the activity state of
-/// application-level components in the system. Components that require the
-/// hardware platform to stay active may take a claim on this power element in
-/// order to prevent platform suspension.
 ///
 /// The application activity power element supports the following power levels:
 ///   * [`fuchsia.power.system/APPLICATION_ACTIVITY_INACTIVE`]: The application layer is not running an execution sensitive operation.
 ///   * [`fuchsia.power.system/APPLICATION_ACTIVITY_ACTIVE`]: The application layer is running an execution sensitive operation.
 type ApplicationActivity = resource table {
-    1: passive_dependency_token fuchsia.power.broker.DependencyToken;
-    2: active_dependency_token fuchsia.power.broker.DependencyToken;
+    1: active_dependency_token fuchsia.power.broker.DependencyToken;
+};
+
+/// Application activity power levels
+///
+/// Elements that need to keep the system from suspending should take an active
+/// dependency on `ApplicationActivityLevel::ACTIVE`. When these components are
+/// performing work, they should request a lease to ensure the system remains
+/// active, and drop the lease when they are done.
+type ApplicationActivityLevel = flexible enum : uint8 {
+    INACTIVE = 0;
+    ACTIVE = 1;
 };
 
 /// A collection of power elements that are managed by the activity governor.

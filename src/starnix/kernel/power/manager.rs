@@ -105,7 +105,7 @@ impl SuspendResumeManager {
                         dependency_type: fbroker::DependencyType::Active,
                         dependent_level: POWER_ON_LEVEL,
                         requires_token: application_activity_token,
-                        requires_level: fsystem::APPLICATION_ACTIVITY_ACTIVE,
+                        requires_level: fsystem::ApplicationActivityLevel::Active.into_primitive(),
                     }],
                     vec![],
                     vec![],
