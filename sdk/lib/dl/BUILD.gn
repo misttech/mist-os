@@ -30,6 +30,15 @@ source_set("diagnostics") {
   sources = [ "diagnostics.cc" ]
 }
 
+source_set("stateful-error") {
+  public = [ "stateful-error.h" ]
+  public_deps = [
+    ":error",
+    "//sdk/lib/fit",
+  ]
+  sources = [ "stateful-error.cc" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ "test:tests" ]

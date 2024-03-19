@@ -12,6 +12,9 @@
 
 namespace dl {
 
+class DiagnosticsReport;  // diagnostics.h
+class StatefulError;      // stateful-error.h
+
 // The dl::Error object is created to hold an error string.  It's not created
 // at all if there's no error.
 //
@@ -51,8 +54,12 @@ class Error {
   Error& operator=(const Error&) = delete;
 
   Error& operator=(Error&& other) {
+    if (size_ != kUnused) {
+      assert(size_ >= kSpecialSize);
+      assert(size_ == kMovedFrom || size_ == kTaken);
+    }
     assert(!buffer_);
-    buffer_ = std::exchange(other.buffer_, nullptr);
+    buffer_ = std::exchange(other.buffer_, buffer_);
     size_ = std::exchange(other.size_, kMovedFrom);
     return *this;
   }
@@ -89,7 +96,7 @@ class Error {
   // This just returns this object as an rvalue like std::move, but it's an
   // assertion failure if this object is in default-constructed, moved-from, or
   // taken state.  It must be set but not yet taken.
-  Error&& take() && {
+  [[nodiscard]] Error&& take() && {
     assert(size_ != kUnused);
     assert(size_ != kTaken);
     assert(size_ != kMovedFrom);
@@ -124,7 +131,8 @@ class Error {
   }
 
  private:
-  friend class DiagnosticsReport;
+  friend DiagnosticsReport;
+  friend StatefulError;
 
   // One of these values must be in size_ when buffer_ is nullptr.  When
   // buffer_ is set, size_ may be kTaken instead of the string's length.
@@ -143,6 +151,34 @@ class Error {
     assert(!buffer_);
     size_ = kMovedFrom;
   }
+
+  // This does operator= but with no constraints on the old state.
+  void ClearAndAssign(Error&& other) {
+    if (buffer_) {
+      free(buffer_);
+    }
+    buffer_ = std::exchange(other.buffer_, nullptr);
+    size_ = std::exchange(other.size_, kMovedFrom);
+  }
+
+  // This does take_c_str() but always resets to default-constructed state.
+  // Returns nullptr if the object is either unused or already taken, which
+  // would cause assertion failures in take_c_str().
+  const char* take_c_str_or_clear() {
+    if (size_ == kUnused) {
+      assert(!buffer_);
+      return nullptr;
+    }
+    if (size_ == kTaken) {
+      // Free the old buffer and return to kUnused state.
+      ClearAndAssign(Error{});
+      return nullptr;
+    }
+    return take_c_str();
+  }
+
+  // Allow safe destruction in any state.
+  void clear() { size_ = kTaken; }
 
   char* buffer_ = nullptr;
   size_t size_ = kUnused;
