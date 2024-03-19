@@ -77,7 +77,7 @@ TEST(DlTests, StatefuLError) {
   EXPECT_EQ(error_state.GetAndClearLastError(), nullptr);
 
   // Called with error.
-  EXPECT_EQ(error_state(fit::result<dl::Error, void*>{fit::error<dl::Error>{"foo"}}, nullptr),
+  EXPECT_EQ(error_state(fit::result<dl::Error, void*>{fit::error{dl::Error{"foo"}}}, nullptr),
             nullptr);
 
   // Returns error.
@@ -87,9 +87,9 @@ TEST(DlTests, StatefuLError) {
   EXPECT_EQ(error_state.GetAndClearLastError(), nullptr);
 
   // Two errors without checking in between.
-  EXPECT_EQ(error_state(fit::result<dl::Error, void*>{fit::error<dl::Error>{"foo"}}, nullptr),
+  EXPECT_EQ(error_state(fit::result<dl::Error, void*>{fit::error{dl::Error{"foo"}}}, nullptr),
             nullptr);
-  EXPECT_EQ(error_state(fit::result<dl::Error, int>{fit::error<dl::Error>{"bar"}}, -1), -1);
+  EXPECT_EQ(error_state(fit::result<dl::Error, int>{fit::error{dl::Error{"bar"}}}, -1), -1);
 
   // Returns error.
   EXPECT_STREQ(error_state.GetAndClearLastError(), "bar");

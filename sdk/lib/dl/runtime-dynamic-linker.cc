@@ -19,12 +19,12 @@ Module* RuntimeDynamicLinker::FindModule(const Soname& name) {
 
 fit::result<Error, void*> RuntimeDynamicLinker::Open(const char* file, int mode) {
   if (mode & ~(kOpenSymbolScopeMask | kOpenBindingModeMask | kOpenFlagsMask)) {
-    return fit::error{"invalid mode parameter"};
+    return fit::error{Error{"invalid mode parameter"}};
   }
 
   if (!file) {
-    return fit::error{
-        "TODO(https://fxbug.dev/324136831): return modules list that includes startup modules"};
+    return fit::error{Error{
+        "TODO(https://fxbug.dev/324136831): return modules list that includes startup modules"}};
   }
 
   Soname name{file};

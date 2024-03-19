@@ -48,7 +48,7 @@ class Error {
   Error(Error&& other) noexcept { *this = std::move(other); }
 
   // This is like default-constructing and calling Printf.
-  explicit Error(const char* format, ...);
+  [[gnu::format(printf, 2, 3)]] explicit Error(const char* format, ...);
   explicit Error(const char* format, va_list args) { Printf(format, args); }
 
   Error& operator=(const Error&) = delete;
@@ -66,7 +66,7 @@ class Error {
 
   // This must be called exactly once after default construction and before
   // anything else (except moving from or into the object).
-  void Printf(const char* format, ...);
+  [[gnu::format(printf, 2, 3)]] void Printf(const char* format, ...);
   void Printf(const char* format, va_list args);
 
   // This must be called exactly once after Printf has been called (or after
