@@ -56,8 +56,8 @@ static POWER_ON_LEVEL: fbroker::PowerLevel = 4;
 pub struct SuspendResumeManagerInner {
     suspend_stats: SuspendStats,
     sync_on_suspend_enabled: bool,
-    /// Lease control to hold the system power state as active.
-    lease_control: Option<fbroker::LeaseControlSynchronousProxy>,
+    /// Lease control channel to hold the system power state as active.
+    lease_control_channel: Option<zx::Channel>,
 }
 
 pub type SuspendResumeManagerHandle = Arc<SuspendResumeManager>;
@@ -118,10 +118,10 @@ impl SuspendResumeManager {
             let power_on_control = lessor
                 .lease(POWER_ON_LEVEL, zx::Time::INFINITE)?
                 .map_err(|e| anyhow!("PowerBroker::LeaseError({e:?})"))?
-                .into_sync_proxy();
+                .into_channel();
 
             self.power_mode_lessor.set(lessor).expect("Power Mode should be uninitialized");
-            self.lock().lease_control = Some(power_on_control);
+            self.lock().lease_control_channel = Some(power_on_control);
         };
 
         Ok(())
@@ -238,7 +238,7 @@ impl SuspendResumeManager {
             // power level.
             match lessor.lease(level, zx::Time::INFINITE) {
                 Ok(Ok(res)) => {
-                    self.lock().lease_control = Some(res.into_sync_proxy());
+                    self.lock().lease_control_channel = Some(res.into_channel());
                     Ok(())
                 }
                 Ok(Err(err)) => {
