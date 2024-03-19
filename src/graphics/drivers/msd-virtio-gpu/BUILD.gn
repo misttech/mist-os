@@ -1,0 +1,31 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/drivers.gni")
+
+fuchsia_driver_package("msd-virtio-gpu") {
+  driver_components = [ ":msd-virtio-driver-component" ]
+}
+
+fuchsia_driver_component("msd-virtio-driver-component") {
+  component_name = "msd_virtio"
+  deps = [ ":msd-virtio-gpu-driver" ]
+  info = "msd-virtio-info.json"
+  manifest = "meta/msd_virtio.cml"
+}
+
+driver_bind_rules("msd-virtio-bind") {
+  rules = "msd-virtio.bind"
+  deps = [ "//sdk/fidl/fuchsia.gpu.virtio:fuchsia.gpu.virtio_bindlib" ]
+}
+
+fuchsia_driver("msd-virtio-gpu-driver") {
+  output_name = "msd-virtio"
+  deps = [
+    ":msd-virtio-bind",
+    "src",
+    "//src/graphics/magma/lib/magma/platform/zircon:logger_for_dfv2",
+  ]
+}

@@ -118,6 +118,7 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/libmsd_intel_test.cm",
     "#meta/libmsd_vsi.cm",
     "#meta/libmsd_vsi_test.cm",
+    "#meta/msd_virtio.cm",
     "#meta/machina.cm",
     "#meta/max98373.cm",
     "#meta/mock-device.cm",

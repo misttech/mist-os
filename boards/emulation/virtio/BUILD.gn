@@ -61,6 +61,11 @@ board_input_bundle("virtio") {
       driver_components = [ "meta/goldfish_sync.cm" ]
     },
     {
+      package_target = "//src/graphics/drivers/msd-virtio-gpu"
+      package_set = "base"
+      driver_components = [ "meta/msd_virtio.cm" ]
+    },
+    {
       package_target =
           "//src/graphics/display/drivers/goldfish-display:goldfish_display"
       package_set = "bootfs"
