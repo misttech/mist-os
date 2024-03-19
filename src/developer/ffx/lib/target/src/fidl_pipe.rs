@@ -2,43 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::overnet_connector::OvernetConnector;
+use crate::ssh_connector::SshConnector;
 use anyhow::Result;
 use async_channel::Receiver;
 use compat_info::CompatibilityInfo;
 use ffx_config::EnvironmentContext;
-use ffx_ssh::ssh::build_ssh_command_with_env;
 use fuchsia_async::Task;
 use futures::FutureExt;
 use futures_lite::stream::StreamExt;
-use nix::{
-    sys::{
-        signal::{kill, Signal::SIGKILL},
-        wait::waitpid,
-    },
-    unistd::Pid,
-};
-use std::future::Future;
+use std::fmt::Debug;
 use std::io;
 use std::net::SocketAddr;
-use std::pin::Pin;
-use std::process::Stdio;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::Child;
-
-const BUFFER_SIZE: usize = 65536;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 /// Represents a FIDL-piping connection to a Fuchsia target.
 ///
 /// To connect a FIDL pipe, the user must know the IP address of the Fuchsia target being connected
 /// to. This may or may not include a port number.
 pub struct FidlPipe {
-    process: Child,
     address: SocketAddr,
     task: Option<Task<()>>,
-    error_queue: Receiver<Option<anyhow::Error>>,
-    circuit_id: u64,
+    error_queue: Receiver<anyhow::Error>,
     compat: Option<CompatibilityInfo>,
 }
 
@@ -50,8 +36,9 @@ enum FidlPipeError {
     InternalError(String, String),
 }
 
-/// creates the socket for overnet. IoError is possible from socket operations.
-pub fn overnet_pipe(node: Arc<overnet_core::Router>) -> Result<fidl::AsyncSocket, io::Error> {
+pub fn create_overnet_socket(
+    node: Arc<overnet_core::Router>,
+) -> Result<fidl::AsyncSocket, io::Error> {
     let (local_socket, remote_socket) = fidl::Socket::create_stream();
     let local_socket = fidl::AsyncSocket::from_socket(local_socket);
     let (errors_sender, errors) = futures::channel::mpsc::unbounded();
@@ -92,69 +79,6 @@ pub fn overnet_pipe(node: Arc<overnet_core::Router>) -> Result<fidl::AsyncSocket
     Ok(local_socket)
 }
 
-type PipeFut<'a> = Pin<Box<dyn Future<Output = ()> + 'a>>;
-
-struct PipeTasks<'a> {
-    pipe_rx: PipeFut<'a>,
-    pipe_tx: PipeFut<'a>,
-    pipe_err: PipeFut<'a>,
-    compat: Option<CompatibilityInfo>,
-}
-
-async fn create_pipe_tasks<'a>(
-    cmd: &mut Child,
-    node: Arc<overnet_core::Router>,
-    error_sender: async_channel::Sender<Option<anyhow::Error>>,
-) -> Result<PipeTasks<'a>> {
-    let (pipe_rx, mut pipe_tx) = tokio::io::split(overnet_pipe(node).map_err(|e| {
-        FidlPipeError::InternalError(
-            format!("Unable to create overnet_pipe from {e:?}"),
-            format!("{cmd:?}"),
-        )
-    })?);
-    let mut stdout = BufReader::with_capacity(
-        BUFFER_SIZE,
-        cmd.stdout.take().expect("process should have stdout"),
-    );
-    let mut stderr = BufReader::with_capacity(
-        BUFFER_SIZE,
-        cmd.stderr.take().expect("process should have stderr"),
-    );
-    let (_addr, compat) = ffx_ssh::parse::parse_ssh_output(&mut stdout, &mut stderr, false).await?;
-    let mut stdin = cmd.stdin.take().expect("process should have stdin");
-    let err_clone = error_sender.clone();
-    let copy_in = async move {
-        if let Err(e) = tokio::io::copy_buf(&mut stdout, &mut pipe_tx).await {
-            let _ = err_clone.send(Some(anyhow::anyhow!("SSH stdout read failure: {e:?}"))).await;
-        };
-    };
-    let err_clone = error_sender.clone();
-    let copy_out = async move {
-        if let Err(e) =
-            tokio::io::copy_buf(&mut BufReader::with_capacity(BUFFER_SIZE, pipe_rx), &mut stdin)
-                .await
-        {
-            let _ = err_clone.send(Some(anyhow::anyhow!("SSH stdin write failure: {e:?}"))).await;
-        }
-    };
-    let mut stderr = BufReader::new(stderr).lines();
-    let stderr_reader = async move {
-        while let Ok(Some(line)) = stderr.next_line().await {
-            match error_sender.send(Some(anyhow::anyhow!("SSH stderr: {line}"))).await {
-                Err(_e) => break,
-                Ok(_) => {}
-            }
-        }
-    };
-    Ok(PipeTasks {
-        pipe_rx: Box::pin(copy_in),
-        pipe_tx: Box::pin(copy_out),
-        pipe_err: Box::pin(stderr_reader),
-        compat,
-    })
-}
-
-// TODO(b/327683942): The error handling code needs better test coverage.
 impl FidlPipe {
     /// Creates a new FIDL pipe to the Fuchsia target.
     ///
@@ -167,64 +91,48 @@ impl FidlPipe {
         target: SocketAddr,
         overnet_node: Arc<overnet_core::Router>,
     ) -> Result<Self> {
-        Self::run_ssh(target, env_context, overnet_node).await
+        let ssh_connector = SshConnector::new(target, &env_context)
+            .await
+            .map_err(|e| FidlPipeError::SpawnError(e.to_string()))?;
+        let socket = create_overnet_socket(overnet_node).map_err(|e| {
+            FidlPipeError::InternalError(
+                format!("Unable to create overnet_pipe from {e:?}"),
+                format!("{:?}", ssh_connector),
+            )
+        })?;
+        let (overnet_reader, overnet_writer) = tokio::io::split(socket);
+        Self::start_internal(target, overnet_reader, overnet_writer, ssh_connector).await
     }
 
     pub fn compatibility_info(&self) -> Option<CompatibilityInfo> {
         self.compat.clone()
     }
 
-    pub fn circuit_id(&self) -> u64 {
-        self.circuit_id
-    }
-
-    async fn run_ssh(
+    // This constructor is relied upon for testing in target/src/lib.rs
+    // For testing RCS knock.
+    pub(crate) async fn start_internal<C, W, R>(
         target: SocketAddr,
-        env_context: EnvironmentContext,
-        overnet_node: Arc<overnet_core::Router>,
-    ) -> Result<Self> {
-        let rev: u64 =
-            version_history::HISTORY.get_misleading_version_for_ffx().abi_revision.as_u64();
-        let abi_revision = format!("{}", rev);
-        // Converting milliseconds since unix epoch should have enough bits for u64. As of writing
-        // it takes up 43 of the 128 bits to represent the number.
-        let circuit_id =
-            SystemTime::now().duration_since(UNIX_EPOCH).expect("system time").as_millis() as u64;
-        let circuit_id_str = format!("{}", circuit_id);
-        let args = vec![
-            "remote_control_runner",
-            "--circuit",
-            &circuit_id_str,
-            "--abi-revision",
-            &abi_revision,
-        ];
-        let (errors_sender, errors_receiver) = async_channel::unbounded();
-        // Use ssh from the environment.
-        let ssh_path = "ssh";
-        let mut ssh = tokio::process::Command::from(
-            build_ssh_command_with_env(ssh_path, target, &env_context, args).await?,
-        );
-        let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
-        let mut ssh = ssh_cmd.spawn().map_err(|e| FidlPipeError::SpawnError(e.to_string()))?;
-        let PipeTasks { pipe_rx, pipe_tx, pipe_err, compat } =
-            create_pipe_tasks(&mut ssh, overnet_node, errors_sender.clone()).await?;
-        let errors_clone = errors_sender.clone();
+        overnet_reader: R,
+        overnet_writer: W,
+        mut connector: C,
+    ) -> Result<Self>
+    where
+        C: OvernetConnector + 'static,
+        R: AsyncRead + Unpin + 'static,
+        W: AsyncWrite + Unpin + 'static,
+    {
+        let overnet_connection = connector.connect().await?;
+        let (error_sender, error_queue) = async_channel::unbounded();
+        let compat = overnet_connection.compat.clone();
         let main_task = async move {
-            let copy_fut = futures_lite::future::zip(pipe_rx, pipe_tx);
-            let _ = futures_lite::future::zip(copy_fut, pipe_err).await;
-            let _ = errors_clone.send(None).await;
+            overnet_connection.run(overnet_writer, overnet_reader, error_sender).await;
+            // Explicit drop to force the struct into the closure.
+            drop(connector);
         };
-        Ok(Self {
-            address: target,
-            process: ssh,
-            task: Some(Task::local(main_task)),
-            error_queue: errors_receiver,
-            circuit_id,
-            compat,
-        })
+        Ok(Self { address: target, task: Some(Task::local(main_task)), error_queue, compat })
     }
 
-    pub fn error_stream(&self) -> Receiver<Option<anyhow::Error>> {
+    pub fn error_stream(&self) -> Receiver<anyhow::Error> {
         return self.error_queue.clone();
     }
 
@@ -235,26 +143,56 @@ impl FidlPipe {
 
 impl Drop for FidlPipe {
     fn drop(&mut self) {
-        let pid = Pid::from_raw(self.process.id().unwrap() as i32);
-        match self.process.try_wait() {
-            Ok(Some(result)) => {
-                tracing::info!("FidlPipe exited with {}", result);
-            }
-            Ok(None) => {
-                let _ = kill(pid, SIGKILL)
-                    .map_err(|e| tracing::warn!("failed to kill FidlPipe command: {:?}", e));
-                let _ = waitpid(pid, None)
-                    .map_err(|e| tracing::warn!("failed to clean up FidlPipe command: {:?}", e));
-            }
-            Err(e) => {
-                tracing::warn!("failed to soft-wait FidlPipe command: {:?}", e);
-                let _ = kill(pid, SIGKILL)
-                    .map_err(|e| tracing::warn!("failed to kill FidlPipe command: {:?}", e));
-                let _ = waitpid(pid, None)
-                    .map_err(|e| tracing::warn!("failed to clean up FidlPipe command: {:?}", e));
-            }
-        };
         self.error_queue.close();
         drop(self.task.take());
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::overnet_connector::OvernetConnection;
+    use tokio::io::BufReader;
+
+    #[derive(Debug)]
+    struct AutoFailConnector;
+
+    impl OvernetConnector for AutoFailConnector {
+        async fn connect(&mut self) -> Result<OvernetConnection> {
+            let (sock1, sock2) = fidl::Socket::create_stream();
+            let sock1 = fidl::AsyncSocket::from_socket(sock1);
+            let sock2 = fidl::AsyncSocket::from_socket(sock2);
+            let (error_tx, error_rx) = async_channel::unbounded();
+            let error_task = Task::local(async move {
+                let _ = error_tx.send(anyhow::anyhow!("boom")).await;
+            });
+            Ok(OvernetConnection {
+                output: Box::new(BufReader::new(sock1)),
+                input: Box::new(sock2),
+                errors: error_rx,
+                compat: None,
+                main_task: Some(error_task),
+            })
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_error_queue() {
+        // These sockets will do nothing of import.
+        let (local_socket, _remote_socket) = fidl::Socket::create_stream();
+        let local_socket = fidl::AsyncSocket::from_socket(local_socket);
+        let (reader, writer) = tokio::io::split(local_socket);
+        let fidl_pipe = FidlPipe::start_internal(
+            "127.0.0.1:22".parse().unwrap(),
+            reader,
+            writer,
+            AutoFailConnector,
+        )
+        .await
+        .unwrap();
+        let mut errors = fidl_pipe.error_stream();
+        let err = errors.next().await.unwrap();
+        assert_eq!(anyhow::anyhow!("boom").to_string(), err.to_string());
     }
 }

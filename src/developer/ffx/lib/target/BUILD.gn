@@ -46,7 +46,9 @@ if (is_host) {
       "src/desc.rs",
       "src/fidl_pipe.rs",
       "src/lib.rs",
+      "src/overnet_connector.rs",
       "src/query.rs",
+      "src/ssh_connector.rs",
     ]
   }
 }

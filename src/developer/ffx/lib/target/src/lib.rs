@@ -29,12 +29,14 @@ use tracing::{debug, info};
 
 mod desc;
 mod fidl_pipe;
+mod overnet_connector;
 mod query;
+mod ssh_connector;
 
 const SSH_PORT_DEFAULT: u16 = 22;
 
 pub use desc::{Description, FastbootInterface};
-pub use fidl_pipe::overnet_pipe;
+pub use fidl_pipe::create_overnet_socket;
 pub use fidl_pipe::FidlPipe;
 pub use query::TargetInfoQuery;
 
@@ -410,6 +412,13 @@ pub async fn knock_target_daemonless(
     let node = overnet_core::Router::new(None)?;
     let fidl_pipe =
         FidlPipe::new(context.clone(), addr, node.clone()).await.context("starting fidl pipe")?;
+    knock_target_daemonless_with(node, fidl_pipe).await
+}
+
+async fn knock_target_daemonless_with(
+    node: Arc<overnet_core::Router>,
+    fidl_pipe: FidlPipe,
+) -> Result<Option<CompatibilityInfo>, KnockError> {
     let error_stream = fidl_pipe.error_stream();
     let client = OvernetClient { node };
     // These are the two places where errors can propagate to the user. For other code using the FIDL
@@ -424,7 +433,7 @@ pub async fn knock_target_daemonless(
         Ok(()) => Ok(fidl_pipe.compatibility_info()),
         Err(e) => {
             let mut pipe_errors = Vec::new();
-            while let Ok(Some(err)) = error_stream.try_recv() {
+            while let Ok(err) = error_stream.try_recv() {
                 pipe_errors.push(err);
             }
             if !pipe_errors.is_empty() {
@@ -433,7 +442,7 @@ pub async fn knock_target_daemonless(
                     pipe_errors
                 )));
             }
-            Err(KnockError::NonCriticalError(anyhow::anyhow!("{:?}", e).into()))
+            Err(KnockError::NonCriticalError(anyhow::anyhow!("{:?}", e)).into())
         }
     }
 }
@@ -503,9 +512,51 @@ pub async fn add_manual_target(
 
 #[cfg(test)]
 mod test {
-    use ffx_config::{macro_deps::serde_json::Value, test_init, ConfigLevel};
-
     use super::*;
+    use crate::overnet_connector::{OvernetConnection, OvernetConnector};
+    use async_channel::Receiver;
+    use ffx_config::{macro_deps::serde_json::Value, test_init, ConfigLevel};
+    use fidl_fuchsia_developer_remotecontrol as rcs;
+    use fuchsia_async::Task;
+
+    fn create_overnet_circuit(router: Arc<overnet_core::Router>) -> fidl::AsyncSocket {
+        let (local_socket, remote_socket) = fidl::Socket::create_stream();
+        let local_socket = fidl::AsyncSocket::from_socket(local_socket);
+
+        let socket = fidl::AsyncSocket::from_socket(remote_socket);
+        let (mut rx, mut tx) = futures::AsyncReadExt::split(socket);
+        Task::spawn(async move {
+            let (errors_sender, errors) = futures::channel::mpsc::unbounded();
+            if let Err(e) = futures::future::join(
+                circuit::multi_stream::multi_stream_node_connection_to_async(
+                    router.circuit_node(),
+                    &mut rx,
+                    &mut tx,
+                    true,
+                    circuit::Quality::NETWORK,
+                    errors_sender,
+                    "client".to_owned(),
+                ),
+                errors
+                    .map(|e| {
+                        eprintln!("A client circuit stream failed: {e:?}");
+                    })
+                    .collect::<()>(),
+            )
+            .map(|(result, ())| result)
+            .await
+            {
+                if let circuit::Error::ConnectionClosed(msg) = e {
+                    eprintln!("testing overnet link closed: {:?}", msg);
+                } else {
+                    eprintln!("error handling Overnet link: {:?}", e);
+                }
+            }
+        })
+        .detach();
+
+        local_socket
+    }
 
     #[fuchsia::test]
     async fn test_get_empty_default_target() {
@@ -575,5 +626,130 @@ mod test {
         let target = get_default_target(&env.context).await.unwrap();
         assert_eq!(target, Some("t1".to_owned()));
         std::env::remove_var("MY_LITTLE_TMPKEY");
+    }
+
+    #[derive(Debug, Clone, Eq, PartialEq)]
+    enum FakeOvernetBehavior {
+        CloseRcsImmediately,
+        KeepRcsOpen,
+    }
+
+    #[derive(Debug)]
+    struct FakeOvernet {
+        circuit_node: Arc<overnet_core::Router>,
+        error_receiver: Receiver<anyhow::Error>,
+        behavior: FakeOvernetBehavior,
+    }
+
+    impl FakeOvernet {
+        async fn handle_transaction(
+            req: rcs::RemoteControlRequest,
+            behavior: &FakeOvernetBehavior,
+        ) {
+            match req {
+                rcs::RemoteControlRequest::OpenCapability { server_channel, responder, .. } => {
+                    match behavior {
+                        FakeOvernetBehavior::KeepRcsOpen => {
+                            // We're just going to assume this capability is always going to be
+                            // RCS, and avoid string matching for the sake of avoiding changes
+                            // to monikers and/or capability connecting.
+                            let mut stream = rcs::RemoteControlRequestStream::from_channel(
+                                fidl::AsyncChannel::from_channel(server_channel),
+                            );
+                            // This task is here to ensure the channel stays open, but won't
+                            // necessarily do anything.
+                            Task::spawn(async move {
+                                while let Ok(Some(req)) = stream.try_next().await {
+                                    eprintln!("Got a request: {req:?}");
+                                }
+                            })
+                            .detach();
+                        }
+                        FakeOvernetBehavior::CloseRcsImmediately => {
+                            drop(server_channel);
+                        }
+                    }
+                    responder.send(Ok(())).unwrap();
+                }
+                _ => panic!("Received an unexpected request: {req:?}"),
+            }
+        }
+    }
+
+    impl OvernetConnector for FakeOvernet {
+        async fn connect(&mut self) -> Result<OvernetConnection> {
+            let circuit_socket = create_overnet_circuit(self.circuit_node.clone());
+            let (rcs_sender, rcs_receiver) = async_channel::unbounded();
+            self.circuit_node
+                .register_service(
+                    rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(),
+                    move |channel| {
+                        let _ = rcs_sender.try_send(channel).unwrap();
+                        Ok(())
+                    },
+                )
+                .await
+                .unwrap();
+            let behavior = self.behavior.clone();
+            let rcs_task = Task::local(async move {
+                while let Ok(channel) = rcs_receiver.recv().await {
+                    let mut stream = rcs::RemoteControlRequestStream::from_channel(
+                        fidl::AsyncChannel::from_channel(channel),
+                    );
+                    while let Ok(Some(req)) = stream.try_next().await {
+                        Self::handle_transaction(req, &behavior).await;
+                    }
+                }
+            });
+            let (circuit_reader, circuit_writer) = tokio::io::split(circuit_socket);
+            Ok(OvernetConnection {
+                output: Box::new(tokio::io::BufReader::new(circuit_reader)),
+                input: Box::new(circuit_writer),
+                errors: self.error_receiver.clone(),
+                compat: None,
+                main_task: Some(rcs_task),
+            })
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_overnet_rcs_knock() {
+        let node = overnet_core::Router::new(None).unwrap();
+        let overnet_socket = create_overnet_socket(node.clone()).unwrap();
+        let (reader, writer) = tokio::io::split(overnet_socket);
+        let circuit_node = overnet_core::Router::new(None).unwrap();
+        let (_sender, error_receiver) = async_channel::unbounded();
+        let circuit = FakeOvernet {
+            circuit_node,
+            error_receiver,
+            behavior: FakeOvernetBehavior::KeepRcsOpen,
+        };
+        let fidl_pipe =
+            FidlPipe::start_internal("127.0.0.1:22".parse().unwrap(), reader, writer, circuit)
+                .await
+                .unwrap();
+        assert!(knock_target_daemonless_with(node, fidl_pipe).await.is_ok());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_overnet_rcs_knock_failure_disconnect() {
+        let node = overnet_core::Router::new(None).unwrap();
+        let overnet_socket = create_overnet_socket(node.clone()).unwrap();
+        let (reader, writer) = tokio::io::split(overnet_socket);
+        let circuit_node = overnet_core::Router::new(None).unwrap();
+        let (error_sender, error_receiver) = async_channel::unbounded();
+        let circuit = FakeOvernet {
+            circuit_node: circuit_node.clone(),
+            error_receiver,
+            behavior: FakeOvernetBehavior::CloseRcsImmediately,
+        };
+        let fidl_pipe =
+            FidlPipe::start_internal("[::1]:22".parse().unwrap(), reader, writer, circuit)
+                .await
+                .unwrap();
+        error_sender.send(anyhow::anyhow!("kaboom")).await.unwrap();
+        let err = knock_target_daemonless_with(node, fidl_pipe).await;
+        assert!(err.is_err());
+        assert!(err.unwrap_err().to_string().contains("kaboom"));
     }
 }

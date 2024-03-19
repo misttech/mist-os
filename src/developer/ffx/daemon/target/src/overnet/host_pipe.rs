@@ -307,7 +307,7 @@ impl HostPipeChild {
         let mut ssh = ssh_cmd.spawn().map_err(|e| PipeError::SpawnError(e.to_string()))?;
 
         let (pipe_rx, mut pipe_tx) =
-            tokio::io::split(ffx_target::overnet_pipe(node).map_err(|e| {
+            tokio::io::split(ffx_target::create_overnet_socket(node).map_err(|e| {
                 PipeError::PipeCreationFailed(
                     format!("creating local overnet pipe: {e}"),
                     addr.to_string(),
