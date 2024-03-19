@@ -24,19 +24,31 @@ struct RoutinePriority {
     installation_order: usize,
 }
 
-type CoreRule<I> =
-    netstack3_core::filter::Rule<I, fnet_filter::DeviceClass, fnet_filter_ext::RuleId>;
-type CoreRoutine<I> =
-    netstack3_core::filter::Routine<I, fnet_filter::DeviceClass, fnet_filter_ext::RuleId>;
+type CoreRule<I> = netstack3_core::filter::Rule<
+    I,
+    fnet_filter::DeviceClass,
+    netstack3_core::filter::ValidationInfo<fnet_filter_ext::RuleId>,
+>;
+type CoreRoutine<I> = netstack3_core::filter::Routine<
+    I,
+    fnet_filter::DeviceClass,
+    netstack3_core::filter::ValidationInfo<fnet_filter_ext::RuleId>,
+>;
 type CoreUninstalledRoutine<I> = netstack3_core::filter::UninstalledRoutine<
     I,
     fnet_filter::DeviceClass,
-    fnet_filter_ext::RuleId,
+    netstack3_core::filter::ValidationInfo<fnet_filter_ext::RuleId>,
 >;
-type CoreHook<I> =
-    netstack3_core::filter::Hook<I, fnet_filter::DeviceClass, fnet_filter_ext::RuleId>;
-type CoreState<I> =
-    netstack3_core::filter::State<I, fnet_filter::DeviceClass, fnet_filter_ext::RuleId>;
+type CoreHook<I> = netstack3_core::filter::Hook<
+    I,
+    fnet_filter::DeviceClass,
+    netstack3_core::filter::ValidationInfo<fnet_filter_ext::RuleId>,
+>;
+type CoreState<I> = netstack3_core::filter::State<
+    I,
+    fnet_filter::DeviceClass,
+    netstack3_core::filter::ValidationInfo<fnet_filter_ext::RuleId>,
+>;
 
 #[derive(Clone, Debug, Default, GenericOverIp)]
 #[generic_over_ip(I, Ip)]

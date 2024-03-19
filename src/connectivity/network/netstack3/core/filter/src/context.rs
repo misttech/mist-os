@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::fmt::Debug;
-
 use net_types::ip::{Ipv4, Ipv6};
 use packet_formats::ip::IpExt;
 
@@ -16,7 +14,7 @@ use crate::state::validation::ValidState;
 /// Core to have Bindings provide the type since it is platform-specific.
 pub trait FilterBindingsTypes {
     /// The device class type for devices installed in the netstack.
-    type DeviceClass: Clone + Debug;
+    type DeviceClass;
 }
 
 /// The IP version-specific execution context for packet filtering.
@@ -49,7 +47,7 @@ pub trait FilterContext<BT: FilterBindingsTypes> {
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
-    use crate::state::{IpRoutines, State};
+    use crate::state::{validation::ValidationInfo, IpRoutines, State};
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     pub enum FakeDeviceClass {
@@ -66,7 +64,9 @@ pub(crate) mod testutil {
     pub struct FakeCtx<I: IpExt>(ValidState<I, FakeDeviceClass>);
 
     impl<I: IpExt> FakeCtx<I> {
-        pub fn with_ip_routines(routines: IpRoutines<I, FakeDeviceClass, ()>) -> Self {
+        pub fn with_ip_routines(
+            routines: IpRoutines<I, FakeDeviceClass, ValidationInfo<()>>,
+        ) -> Self {
             let state = ValidState::new(State { ip_routines: routines, ..Default::default() })
                 .expect("invalid state");
             Self(state)
