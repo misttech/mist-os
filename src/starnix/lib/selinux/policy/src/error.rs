@@ -107,6 +107,19 @@ pub enum QueryError {
 #[derive(Debug, Error, PartialEq)]
 pub enum NewSecurityContextError {
     #[error(
+        r#"role transition declared in policy, but not allowed by policy:
+source security context: {source_security_context:#?}
+target security context: {target_security_context:#?}
+source role: {source_role:?}
+new role: {new_role:?}"#
+    )]
+    RoleTransitionNotAllowed {
+        source_security_context: SecurityContext,
+        target_security_context: SecurityContext,
+        source_role: String,
+        new_role: String,
+    },
+    #[error(
         r#"failed to parse security context computed for new object:
 source security context: {source_security_context:#?}
 target security context: {target_security_context:#?}

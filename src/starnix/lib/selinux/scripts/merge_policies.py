@@ -80,7 +80,7 @@ def _negative_filter_lines(lines, pattern):
     return tuple(line for line in lines if pattern.match(line) is None)
 
 
-def _compile_text_policy_to_binary_policy(
+def compile_text_policy_to_binary_policy(
     checkpolicy_executable_path, input_file_path, output_file_path
 ):
     subprocess.run(

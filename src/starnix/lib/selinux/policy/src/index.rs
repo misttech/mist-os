@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::symbols::{find_role_by_id, Role};
+
 use super::{
     error::NewSecurityContextError,
     parser::ParseStrategy,
     symbols::{
         Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, Permission,
     },
-    ParsedPolicy, RoleId, SecurityContext,
+    ParsedPolicy, RoleId, SecurityContext, TypeId,
 };
 
 use selinux_common::{self as sc, ClassPermission as _};
@@ -142,11 +144,42 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // The role component generally defaults to the object_r role (policy version 26 allows a
         // role_transition and version 27 allows a default_role of source or target to be defined
         // for each object class).
-        let role = match class_defaults.role() {
-            ClassDefault::Source => source.role().clone(),
-            ClassDefault::Target => target.role().clone(),
-            _ => RoleId("object_r".to_string()),
-        };
+        let source_role = self.parsed_policy.find_role(source.role());
+        let computed_role =
+            match self.role_transition_new_role(source_role, target.type_(), policy_class) {
+                Some(new_role) => {
+                    if !self.role_transition_is_explicitly_allowed(source_role, new_role) {
+                        return Err(NewSecurityContextError::RoleTransitionNotAllowed {
+                            source_security_context: source.clone(),
+                            target_security_context: target.clone(),
+                            source_role: std::str::from_utf8(source_role.name_bytes())
+                                .expect("valid role name in policy")
+                                .to_string(),
+                            new_role: std::str::from_utf8(new_role.name_bytes())
+                                .expect("valid role name in policy")
+                                .to_string(),
+                        });
+                    }
+
+                    new_role
+                }
+                None => {
+                    match class_defaults.role() {
+                        ClassDefault::Source => self.parsed_policy.find_role(source.role()),
+                        ClassDefault::Target => self.parsed_policy.find_role(target.role()),
+                        _ => {
+                            // TODO: This special role should probably be cached somewhere.
+                            let object_r = RoleId("object_r".to_string());
+                            self.parsed_policy.find_role(&object_r)
+                        }
+                    }
+                }
+            };
+        let role = RoleId(
+            std::str::from_utf8(computed_role.name_bytes())
+                .expect("valid role name in policy")
+                .to_owned(),
+        );
 
         // The SELinux notebook states:
         //
@@ -154,6 +187,8 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // type_transition rule was specified in the policy (policy version 25 allows a filename
         // type_transition rule and version 28 allows a default_type of source or target to be
         // defined for each object class).
+        //
+        // TODO(b/322353836): Implement `type_transition` handling.
         let type_ = match class_defaults.type_() {
             ClassDefault::Source => source.type_(),
             ClassDefault::Target => target.type_(),
@@ -168,6 +203,8 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // matching range_transition rule was specified in the policy (policy version 27 allows a
         // default_range of source or target with the selected range being low, high or low-high to
         // be defined for each object class).
+        //
+        // TODO(b/322353836): Implement `range_transition` handling.
         let (low_level, high_level) = match class_defaults.range() {
             ClassDefaultRange::SourceLow => (source.low_level().clone(), None),
             ClassDefaultRange::SourceHigh => {
@@ -194,6 +231,45 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
     pub(crate) fn parsed_policy(&self) -> &ParsedPolicy<PS> {
         &self.parsed_policy
+    }
+
+    fn role_transition_new_role(
+        &self,
+        current_role: &Role<PS>,
+        type_id: &TypeId,
+        class: &Class<PS>,
+    ) -> Option<&Role<PS>> {
+        let type_ = self.parsed_policy.find_type_alias_or_attribute(type_id);
+        let role_transitions = self.parsed_policy.role_transitions();
+
+        for role_transition in role_transitions {
+            if role_transition.current_role() == current_role.id()
+                && role_transition.type_() == type_.id()
+                && role_transition.class() == class.id()
+            {
+                let new_role =
+                    find_role_by_id(self.parsed_policy.roles(), role_transition.new_role())?;
+                return Some(new_role);
+            }
+        }
+
+        None
+    }
+
+    fn role_transition_is_explicitly_allowed(
+        &self,
+        source_role: &Role<PS>,
+        new_role: &Role<PS>,
+    ) -> bool {
+        for role_allow in self.parsed_policy.role_allowlist() {
+            if role_allow.source_role() == source_role.id()
+                && role_allow.new_role() == new_role.id()
+            {
+                return true;
+            }
+        }
+
+        false
     }
 }
 

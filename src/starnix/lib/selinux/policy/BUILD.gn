@@ -90,15 +90,30 @@ if (is_host) {
 
   micro_policy_files = []
   foreach(file, testdata_micro_policies) {
-    micro_policy_files += [
-      "../testdata/micro_policies/${file}_policy.conf",
-      "../testdata/micro_policies/${file}_policy.pp",
-    ]
+    micro_policy_files += [ "../testdata/micro_policies/${file}_policy.pp" ]
   }
 
   host_test_data("testdata_micro_policies") {
     sources = micro_policy_files
     outputs = [ "$target_out_dir/testdata/micro_policies/{{source_file_part}}" ]
+  }
+
+  testdata_composite_policies = [
+    "class_defaults",
+    "minimal",
+    "role_transition_not_allowed",
+    "role_transition",
+  ]
+
+  composite_policy_files = []
+  foreach(file, testdata_composite_policies) {
+    composite_policy_files +=
+        [ "../testdata/composite_policies/compiled/${file}_policy.pp" ]
+  }
+
+  host_test_data("testdata_composite_policies") {
+    sources = composite_policy_files
+    outputs = [ "$target_out_dir/testdata/composite_policies/compiled/{{source_file_part}}" ]
   }
 
   config("host_test_config") {
@@ -112,6 +127,7 @@ if (is_host) {
     sources = [ "host_tests/lib.rs" ]
     deps = [
       ":policy_for_host_tests",
+      ":testdata_composite_policies",
       ":testdata_expectations",
       ":testdata_micro_policies",
       ":testdata_policies",

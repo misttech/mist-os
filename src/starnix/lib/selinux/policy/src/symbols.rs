@@ -622,10 +622,10 @@ impl<PS: ParseStrategy> Class<PS> {
     /// Returns the id associated with this class. The id is used to index into collections
     /// and bitmaps associated with this class. The id is 1-indexed, whereas most collections and
     /// bitmaps are 0-indexed, so clients of this API will usually use `id - 1`.
-    pub fn id(&self) -> u32 {
+    pub fn id(&self) -> le::U32 {
         let class_metadata: &ClassMetadata =
             &PS::deref(&self.constraints.metadata.metadata.metadata.metadata);
-        class_metadata.id.get()
+        class_metadata.id
     }
 
     /// Returns whether this class inherits from a named `common` policy statement. For example,
@@ -1076,6 +1076,34 @@ impl Validate for RoleStaticMetadata {
     }
 }
 
+pub(crate) fn find_role_by_name<'a, PS: ParseStrategy>(
+    roles: &'a Vec<Role<PS>>,
+    name: &str,
+) -> Option<&'a Role<PS>> {
+    let name_bytes = name.as_bytes();
+
+    for role in roles.into_iter() {
+        if role.name_bytes() == name_bytes {
+            return Some(role);
+        }
+    }
+
+    None
+}
+
+pub(crate) fn find_role_by_id<'a, PS: ParseStrategy>(
+    roles: &'a Vec<Role<PS>>,
+    id: le::U32,
+) -> Option<&'a Role<PS>> {
+    for role in roles.into_iter() {
+        if role.id() == id {
+            return Some(role);
+        }
+    }
+
+    None
+}
+
 /// Returns a type or type alias or attribute named `name`, if one exists in the collection,
 /// `types`.
 pub(crate) fn find_type_alias_or_attribute_by_name<'a, PS: ParseStrategy>(
@@ -1137,8 +1165,8 @@ impl<PS: ParseStrategy> Type<PS> {
     /// Returns the id associated with this type. The id is used to index into collections and
     /// bitmaps associated with this type. The id is 1-indexed, whereas most collections and
     /// bitmaps are 0-indexed, so clients of this API will usually use `id - 1`.
-    pub fn id(&self) -> u32 {
-        PS::deref(&self.metadata).id.get()
+    pub fn id(&self) -> le::U32 {
+        PS::deref(&self.metadata).id
     }
 
     /// Returns whether this type is from a `type [name];` policy statement.

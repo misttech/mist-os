@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{
+    arrays::{RoleAllow, RoleTransition},
+    symbols::find_role_by_name,
+};
+
 use super::{
     arrays::{
         AccessVectors, ConditionalNodes, Context, DeprecatedFilenameTransitions,
@@ -19,7 +24,7 @@ use super::{
         Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean, Permission,
         Role, Sensitivity, SymbolList, Type, User,
     },
-    AccessVector, Parse, TypeId, Validate,
+    AccessVector, Parse, RoleId, TypeId, Validate,
 };
 
 use anyhow::Context as _;
@@ -61,7 +66,9 @@ pub struct ParsedPolicy<PS: ParseStrategy> {
     /// The set of access vectors referenced by this policy.
     access_vectors: SimpleArray<PS, AccessVectors<PS>>,
     conditional_lists: SimpleArray<PS, ConditionalNodes<PS>>,
+    /// The set of role transitions to apply when instantiating new objects.
     role_transitions: RoleTransitions<PS>,
+    /// The set of role transitions allowed by policy.
     role_allowlist: RoleAllows<PS>,
     filename_transition_list: FilenameTransitionList<PS>,
     initial_sids: SimpleArray<PS, InitialSids<PS>>,
@@ -144,7 +151,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
             // Concern ourselves only with `allow [source-type] [target-type]:[class] [...];`
             // policy statements where `[class]` matches `target_class_id`.
-            if access_vector.target_class() != target_class_id as u16 {
+            let target_class_id: le::U16 = target_class_id.try_into().expect("class id as u16");
+            if access_vector.target_class() != target_class_id {
                 continue;
             }
 
@@ -153,7 +161,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             // where `permission_bit` refers to one of `[permissions]`.
             match access_vector.permission_mask() {
                 Some(mask) => {
-                    if (mask & permission_bit) == 0 {
+                    if (mask.get() & permission_bit) == 0 {
                         continue;
                     }
                 }
@@ -168,16 +176,16 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             // Concern ourselves only with `allow [source-type] [...];` policy statements where
             // `[source-type]` is associated with `source_type_id`.
             let source_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(source_type_id - 1) as usize];
-            if !source_attribute_bitmap.is_set((access_vector.source_type() - 1) as u32) {
+                &self.attribute_maps[(source_type_id.get() - 1) as usize];
+            if !source_attribute_bitmap.is_set((access_vector.source_type().get() - 1) as u32) {
                 continue;
             }
 
             // Concern ourselves only with `allow [source-type] [target-type][...];` policy
             // statements where `[target-type]` is associated with `target_type_id`.
             let target_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(target_type_id - 1) as usize];
-            if !target_attribute_bitmap.is_set((access_vector.target_type() - 1) as u32) {
+                &self.attribute_maps[(target_type_id.get() - 1) as usize];
+            if !target_attribute_bitmap.is_set((access_vector.target_type().get() - 1) as u32) {
                 continue;
             }
 
@@ -228,7 +236,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
             // Concern ourselves only with `allow [source-type] [target-type]:[class] [...];`
             // policy statements where `[class]` matches `target_class_id`.
-            if access_vector.target_class() != target_class_id as u16 {
+            let target_class_id: le::U16 = target_class_id.try_into().expect("class id as u16");
+            if access_vector.target_class() != target_class_id {
                 continue;
             }
 
@@ -240,23 +249,23 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             // Concern ourselves only with `allow [source-type] [...];` policy statements where
             // `[source-type]` is associated with `source_type_id`.
             let source_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(source_type_id - 1) as usize];
-            if !source_attribute_bitmap.is_set((access_vector.source_type() - 1) as u32) {
+                &self.attribute_maps[(source_type_id.get() - 1) as usize];
+            if !source_attribute_bitmap.is_set((access_vector.source_type().get() - 1) as u32) {
                 continue;
             }
 
             // Concern ourselves only with `allow [source-type] [target-type][...];` policy
             // statements where `[target-type]` is associated with `target_type_id`.
             let target_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(target_type_id - 1) as usize];
-            if !target_attribute_bitmap.is_set((access_vector.target_type() - 1) as u32) {
+                &self.attribute_maps[(target_type_id.get() - 1) as usize];
+            if !target_attribute_bitmap.is_set((access_vector.target_type().get() - 1) as u32) {
                 continue;
             }
 
             // Multiple attributes may be associated with source/target types. Accumulate
             // explicitly allowed permissions into `computed_access_vector`.
             if let Some(permission_mask) = access_vector.permission_mask() {
-                computed_access_vector |= AccessVector::from_raw(permission_mask);
+                computed_access_vector |= AccessVector::from_raw(permission_mask.get());
             }
         }
 
@@ -285,7 +294,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// Returns the `Type` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
     pub(crate) fn type_(&self, id: le::U32) -> &Type<PS> {
-        &self.types.data.iter().find(|x| x.id() == id.get()).unwrap()
+        &self.types.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the `Sensitivity` structure for the requested Id. Valid policies include definitions
@@ -312,6 +321,18 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self.conditional_booleans.data
     }
 
+    pub(crate) fn roles(&self) -> &Vec<Role<PS>> {
+        &self.roles.data
+    }
+
+    pub(crate) fn role_allowlist(&self) -> &[RoleAllow] {
+        PS::deref_slice(&self.role_allowlist.data)
+    }
+
+    pub(crate) fn role_transitions(&self) -> &[RoleTransition] {
+        PS::deref_slice(&self.role_transitions.data)
+    }
+
     #[cfg(feature = "selinux_policy_test_api")]
     pub fn validate(&self) -> Result<(), anyhow::Error> {
         Validate::validate(self)
@@ -322,9 +343,14 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         TypeId(name.to_string())
     }
 
-    /// Returns the type, alias, or attribute for an Id obtained from this policy.
-    fn find_type_alias_or_attribute(&self, type_: &TypeId) -> &Type<PS> {
+    /// Returns the type, alias, or attribute for a [`TypeId`] obtained from this policy.
+    pub(crate) fn find_type_alias_or_attribute(&self, type_: &TypeId) -> &Type<PS> {
         find_type_alias_or_attribute_by_name(&self.types.data, type_.0.as_str()).unwrap()
+    }
+
+    /// Returns the role for a [`RoleId`] obtained from this policy.
+    pub(crate) fn find_role(&self, role: &RoleId) -> &Role<PS> {
+        find_role_by_name(&self.roles.data, role.0.as_str()).unwrap()
     }
 }
 

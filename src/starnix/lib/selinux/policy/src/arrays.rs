@@ -177,28 +177,28 @@ impl<PS: ParseStrategy> AccessVector<PS> {
 
     /// Returns the source type id in this access vector. This id corresponds to the
     /// [`super::symbols::Type`] `id()` of some type or attribute in the same policy.
-    pub fn source_type(&self) -> u16 {
-        PS::deref(&self.metadata).source_type.get()
+    pub fn source_type(&self) -> le::U16 {
+        PS::deref(&self.metadata).source_type
     }
 
     /// Returns the target type id in this access vector. This id corresponds to the
     /// [`super::symbols::Type`] `id()` of some type or attribute in the same policy.
-    pub fn target_type(&self) -> u16 {
-        PS::deref(&self.metadata).target_type.get()
+    pub fn target_type(&self) -> le::U16 {
+        PS::deref(&self.metadata).target_type
     }
 
     /// Returns the target class id in this access vector. This id corresponds to the
     /// [`super::symbols::Class`] `id()` of some class in the same policy.
-    pub fn target_class(&self) -> u16 {
-        PS::deref(&self.metadata).class.get()
+    pub fn target_class(&self) -> le::U16 {
+        PS::deref(&self.metadata).class
     }
 
     /// A bit mask that corresponds to the permissions in this access vector. Permission bits are
     /// specified using a [`super::symbols::Permission`] `id()` as follows:
     /// `1 << (Permission::id() - 1)`.
-    pub fn permission_mask(&self) -> Option<u32> {
+    pub fn permission_mask(&self) -> Option<le::U32> {
         match &self.extended_permissions {
-            ExtendedPermissions::PermissionMask(mask) => Some(PS::deref(mask).get()),
+            ExtendedPermissions::PermissionMask(mask) => Some(*PS::deref(mask)),
             _ => None,
         }
     }
@@ -307,6 +307,24 @@ pub(crate) struct RoleTransition {
     tclass: le::U32,
 }
 
+impl RoleTransition {
+    pub(crate) fn current_role(&self) -> le::U32 {
+        self.role
+    }
+
+    pub(crate) fn type_(&self) -> le::U32 {
+        self.role_type
+    }
+
+    pub(crate) fn class(&self) -> le::U32 {
+        self.tclass
+    }
+
+    pub(crate) fn new_role(&self) -> le::U32 {
+        self.new_role
+    }
+}
+
 impl Validate for [RoleTransition] {
     type Error = anyhow::Error;
 
@@ -337,6 +355,16 @@ impl<PS: ParseStrategy> ValidateArray<le::U32, RoleAllow> for RoleAllows<PS> {
 pub(crate) struct RoleAllow {
     role: le::U32,
     new_role: le::U32,
+}
+
+impl RoleAllow {
+    pub(crate) fn source_role(&self) -> le::U32 {
+        self.role
+    }
+
+    pub(crate) fn new_role(&self) -> le::U32 {
+        self.new_role
+    }
 }
 
 impl Validate for [RoleAllow] {
