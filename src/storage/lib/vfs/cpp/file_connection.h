@@ -31,8 +31,13 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
 
   zx::result<fs::VnodeRepresentation> NodeGetRepresentation() const override;
 
+ protected:
+  bool& append() { return append_; }
+  bool append() const { return append_; }
+  fuchsia_io::OpenFlags NodeGetFlags() const final;
+
  private:
-  std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) override;
+  std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) final;
 
   //
   // |fuchsia.io/Node| operations.
@@ -45,6 +50,8 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   void Sync(SyncCompleter::Sync& completer) final;
   void GetAttr(GetAttrCompleter::Sync& completer) final;
   void SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) final;
+  void GetFlags(GetFlagsCompleter::Sync& completer) override;
+  void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) override;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
   void GetAttributes(fuchsia_io::wire::Node2GetAttributesRequest* request,
                      GetAttributesCompleter::Sync& completer) final {
@@ -112,6 +119,7 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   zx_status_t GetBackingMemoryInternal(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo);
 
   const zx_koid_t koid_;
+  bool append_;
 };
 
 }  // namespace fs::internal

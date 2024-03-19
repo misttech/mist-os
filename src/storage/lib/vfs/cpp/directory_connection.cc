@@ -118,7 +118,7 @@ void DirectoryConnection::Query(QueryCompleter::Sync& completer) {
 
 void DirectoryConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
   fidl::Arena arena;
-  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(options().rights).Build());
+  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(rights()).Build());
 }
 
 void DirectoryConnection::Sync(SyncCompleter::Sync& completer) {
@@ -150,22 +150,12 @@ void DirectoryConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::
 }
 
 void DirectoryConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
-  zx::result result = Connection::NodeGetFlags();
-  if (result.is_error()) {
-    completer.Reply(result.status_value(), {});
-  } else {
-    completer.Reply(ZX_OK, result.value());
-  }
+  completer.Reply(ZX_OK, Connection::NodeGetFlags());
 }
 
 void DirectoryConnection::SetFlags(SetFlagsRequestView request,
                                    SetFlagsCompleter::Sync& completer) {
-  zx::result result = Connection::NodeSetFlags(request->flags);
-  if (result.is_error()) {
-    completer.Reply(result.status_value());
-  } else {
-    completer.Reply(ZX_OK);
-  }
+  completer.Reply(ZX_ERR_NOT_SUPPORTED);
 }
 
 void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
@@ -216,31 +206,26 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
   // the Open() chain, we remove that POSIX flag preventing it from being inherited down the line
   // (this applies both for local and remote mount points, as the latter may be served using
   // a connection with vastly greater rights).
-  if (!(options().rights & fio::Rights::kWriteBytes)) {
+  if (!(rights() & fio::Rights::kWriteBytes)) {
     open_options.flags &= ~fio::OpenFlags::kPosixWritable;
   }
-  if (!(options().rights & fio::Rights::kExecute)) {
+  if (!(rights() & fio::Rights::kExecute)) {
     open_options.flags &= ~fio::OpenFlags::kPosixExecutable;
   }
   // Return ACCESS_DENIED if the client asked for a right the parent connection doesn't have.
-  if (open_options.rights - options().rights) {
+  if (open_options.rights - rights()) {
     write_error(std::move(request->object), ZX_ERR_ACCESS_DENIED);
     return;
   }
 
-  OpenAt(vfs(), vnode(), std::move(request->object), path, open_options, options().rights);
+  OpenAt(vfs(), vnode(), std::move(request->object), path, open_options, rights());
 }
 
 void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryUnlink] our options: ", options(), ", name: ", request->name);
-
-  if (options().flags & fuchsia_io::OpenFlags::kNodeReference) {
-    completer.ReplyError(ZX_ERR_BAD_HANDLE);
-    return;
-  }
   // TODO(https://fxbug.dev/324080764): This operation should require ENUMERATE and MODIFY_DIRECTORY
   // rights, instead of WRITE_BYTES.
-  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
+  if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     completer.ReplyError(ZX_ERR_BAD_HANDLE);
     return;
   }
@@ -286,7 +271,7 @@ void DirectoryConnection::Rewind(RewindCompleter::Sync& completer) {
 void DirectoryConnection::GetToken(GetTokenCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryGetToken] our options: ", options());
   // TODO(https://fxbug.dev/324080764): This io1 operation should need ENUMERATE or another right.
-  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
+  if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     completer.Reply(ZX_ERR_BAD_HANDLE, zx::handle());
     return;
   }
@@ -304,7 +289,7 @@ void DirectoryConnection::Rename(RenameRequestView request, RenameCompleter::Syn
   }
   // TODO(https://fxbug.dev/324080764): This operation should require the MODIFY_DIRECTORY right
   // instead of the WRITE_BYTES right.
-  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
+  if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     completer.ReplyError(ZX_ERR_BAD_HANDLE);
     return;
   }
@@ -329,7 +314,7 @@ void DirectoryConnection::Link(LinkRequestView request, LinkCompleter::Sync& com
   }
   // TODO(https://fxbug.dev/324080764): This operation should require the MODIFY_DIRECTORY right
   // instead of the WRITE_BYTES right.
-  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
+  if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     completer.Reply(ZX_ERR_BAD_HANDLE);
     return;
   }

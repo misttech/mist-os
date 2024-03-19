@@ -54,14 +54,6 @@ fio::OpenFlags VnodeConnectionOptions::ToIoV1Flags() const {
   return fidl_flags;
 }
 
-VnodeConnectionOptions VnodeConnectionOptions::FilterForNewConnection(
-    VnodeConnectionOptions options) {
-  VnodeConnectionOptions result;
-  result.flags = options.flags & (fio::OpenFlags::kAppend | fio::OpenFlags::kNodeReference);
-  result.rights = options.rights;
-  return result;
-}
-
 fio::wire::NodeAttributes VnodeAttributes::ToIoV1NodeAttributes() const {
   return fio::wire::NodeAttributes{.mode = mode,
                                    .id = inode,

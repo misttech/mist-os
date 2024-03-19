@@ -40,7 +40,7 @@ StreamFileConnection::StreamFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::
 
 zx_status_t StreamFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileRead] options: ", options());
-  if (!(options().rights & fuchsia_io::Rights::kReadBytes)) {
+  if (!(rights() & fuchsia_io::Rights::kReadBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   if (len > fio::wire::kMaxBuf) {
@@ -71,7 +71,7 @@ void StreamFileConnection::Read(ReadRequestView request, ReadCompleter::Sync& co
 zx_status_t StreamFileConnection::ReadAtInternal(void* data, size_t len, size_t offset,
                                                  size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileReadAt] options: ", options());
-  if (!(options().rights & fuchsia_io::Rights::kReadBytes)) {
+  if (!(rights() & fuchsia_io::Rights::kReadBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   if (len > fio::wire::kMaxBuf) {
@@ -101,7 +101,7 @@ void StreamFileConnection::ReadAt(ReadAtRequestView request, ReadAtCompleter::Sy
 
 zx_status_t StreamFileConnection::WriteInternal(const void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileWrite] options: ", options());
-  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
+  if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   zx_iovec_t vector = {
@@ -129,7 +129,7 @@ void StreamFileConnection::Write(WriteRequestView request, WriteCompleter::Sync&
 zx_status_t StreamFileConnection::WriteAtInternal(const void* data, size_t len, size_t offset,
                                                   size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileWriteAt] options: ", options());
-  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
+  if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   zx_iovec_t vector = {
@@ -168,45 +168,35 @@ void StreamFileConnection::Seek(SeekRequestView request, SeekCompleter::Sync& co
 }
 
 void StreamFileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
-  zx::result result = GetFlagsInternal();
-  if (result.is_error()) {
-    completer.Reply(result.status_value(), {});
-  } else {
-    completer.Reply(ZX_OK, result.value());
+  if constexpr (ZX_DEBUG_ASSERT_IMPLEMENTED) {
+    // Validate that the connection's append mode matches the flags.
+    if (append()) {
+      ZX_ASSERT_MSG(NodeGetFlags() & fio::OpenFlags::kAppend, "Append mode set but missing flag!");
+    }
+    // Validate that the connection's append mode and the stream's append mode match.
+    uint8_t mode_append;
+    if (zx_status_t status = stream_.get_prop_mode_append(&mode_append); status != ZX_OK) {
+      completer.Reply(status, {});
+      return;
+    }
+    bool stream_append = static_cast<bool>(mode_append);
+    ZX_ASSERT_MSG(stream_append == append(), "stream append: %d flags append: %d", stream_append,
+                  append());
   }
+  completer.Reply(ZX_OK, NodeGetFlags());
 }
 
 void StreamFileConnection::SetFlags(SetFlagsRequestView request,
                                     SetFlagsCompleter::Sync& completer) {
-  completer.Reply(SetFlagsInternal(request->flags).status_value());
-}
-
-zx::result<fuchsia_io::wire::OpenFlags> StreamFileConnection::GetFlagsInternal() {
-  zx::result flags = NodeGetFlags();
-  if constexpr (ZX_DEBUG_ASSERT_IMPLEMENTED) {
-    // Validate that the connection's append mode and the stream's append mode match.
-    if (flags.is_ok()) {
-      uint8_t mode_append;
-      if (zx_status_t status = stream_.get_prop_mode_append(&mode_append); status != ZX_OK) {
-        return zx::error(status);
-      }
-      bool stream_append = mode_append;
-      bool flags_append = static_cast<bool>(flags.value() & fuchsia_io::wire::OpenFlags::kAppend);
-      ZX_ASSERT_MSG(stream_append == flags_append, "stream append: %d flags append: %d",
-                    stream_append, flags_append);
+  bool set_append = static_cast<bool>(request->flags & fio::OpenFlags::kAppend);
+  if (set_append != append()) {
+    if (zx_status_t status = stream_.set_prop_mode_append(set_append); status != ZX_OK) {
+      completer.Reply(status);
+      return;
     }
+    append() = set_append;
   }
-  return flags;
-}
-
-zx::result<> StreamFileConnection::SetFlagsInternal(fuchsia_io::wire::OpenFlags flags) {
-  auto new_options = VnodeConnectionOptions::FromIoV1Flags(flags);
-  bool append = static_cast<bool>(new_options.flags & fuchsia_io::OpenFlags::kAppend);
-  auto status = zx::make_result(stream_.set_prop_mode_append(append));
-  if (status.is_ok()) {
-    set_append(append);
-  }
-  return status;
+  completer.Reply(ZX_OK);
 }
 
 zx::result<fs::VnodeRepresentation> StreamFileConnection::NodeGetRepresentation() const {

@@ -94,27 +94,11 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   Connection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
              VnodeConnectionOptions options);
 
-  const VnodeConnectionOptions& options() const { return options_; }
-
-  void set_append(bool append) {
-    if (append) {
-      options_.flags |= fuchsia_io::OpenFlags::kAppend;
-    } else {
-      options_.flags -= fuchsia_io::OpenFlags::kAppend;
-    }
-  }
+  fuchsia_io::Rights rights() const { return rights_; }
 
   FuchsiaVfs* vfs() const { return vfs_; }
 
   zx::event& token() { return token_; }
-
-  // Flags which can be modified by SetFlags.
-  constexpr static fuchsia_io::wire::OpenFlags kSettableStatusFlags =
-      fuchsia_io::wire::OpenFlags::kAppend;
-
-  // All flags which indicate state of the connection (excluding rights).
-  constexpr static fuchsia_io::wire::OpenFlags kStatusFlags =
-      kSettableStatusFlags | fuchsia_io::wire::OpenFlags::kNodeReference;
 
   // Node operations. Note that these provide the shared implementation of |fuchsia.io/Node|
   // methods, used by all connection subclasses.
@@ -130,8 +114,7 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   zx::result<VnodeAttributes> NodeGetAttr();
   zx::result<> NodeSetAttr(fuchsia_io::wire::NodeAttributeFlags flags,
                            const fuchsia_io::wire::NodeAttributes& attributes);
-  zx::result<fuchsia_io::wire::OpenFlags> NodeGetFlags();
-  zx::result<> NodeSetFlags(fuchsia_io::wire::OpenFlags flags);
+  virtual fuchsia_io::OpenFlags NodeGetFlags() const;
   zx::result<fuchsia_io::wire::FilesystemInfo> NodeQueryFilesystem();
 
  private:
@@ -153,12 +136,9 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   // The operational protocol that is used to interact with the vnode over this connection.
   VnodeProtocol protocol_;
 
-  // Client-specified connection options containing flags and rights passed during the
-  // |fuchsia.io/Directory.Open| or |fuchsia.io/Node.Clone| FIDL call. Permissions on the underlying
-  // Vnode are granted on a per-connection basis, and accessible from |options_.rights|.
-  // Importantly, rights are hierarchical over Open/Clone. It is never allowed to derive a
-  // Connection with more rights than the originating connection.
-  VnodeConnectionOptions options_;
+  // Rights are hierarchical over Open/Clone. It is never allowed to derive a Connection with more
+  // rights than the originating connection.
+  fuchsia_io::Rights rights_;
 
   // Handle to event which allows client to refer to open vnodes in multi-path operations (see:
   // link, rename). Defaults to ZX_HANDLE_INVALID. Validated on the server-side using cookies.

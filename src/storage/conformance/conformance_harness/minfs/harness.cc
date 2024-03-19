@@ -100,8 +100,8 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     if (root.has_entries()) {
       PopulateDirectory(root.entries(), *directory);
     }
-
-    auto options = directory->ValidateOptions(GetConnectionOptions(flags));
+    zx::result options = directory->ValidateOptions(fs::VnodeConnectionOptions::FromIoV1Flags(
+        fuchsia_io::OpenFlags{static_cast<uint32_t>(flags)}));
     ZX_ASSERT_MSG(options.is_ok(), "Invalid directory flags: %s", options.status_string());
     zx_status_t status =
         runner_->Serve(std::move(directory), directory_request.TakeChannel(), options.value());
@@ -178,13 +178,6 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     auto directory = fbl::RefPtr<Directory>::Downcast(std::move(vnode));
     ZX_ASSERT_MSG(directory != nullptr, "A vnode of the wrong type was created");
     return directory;
-  }
-
-  static fs::VnodeConnectionOptions GetConnectionOptions(fuchsia::io::OpenFlags flags) {
-    fs::VnodeConnectionOptions options = fs::VnodeConnectionOptions::FromIoV1Flags(
-        static_cast<fuchsia_io::wire::OpenFlags>(static_cast<uint32_t>(flags)));
-    options = fs::VnodeConnectionOptions::FilterForNewConnection(options);
-    return options;
   }
 
  private:

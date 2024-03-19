@@ -168,20 +168,15 @@ TEST_F(ConnectionTest, NodeGetSetFlagsOnDirectory) {
                                                fio::wire::OpenFlags::kRightWritable),
                          dc->server.TakeChannel().release()));
 
-  // Read/write/read directory flags; same as for file
+  // Directories don't have settable flags, only report RIGHT_* flags.
   auto dir_get_result = fidl::WireCall(dc->client)->GetFlags();
   EXPECT_OK(dir_get_result->s);
   EXPECT_EQ(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable,
             dir_get_result->flags);
 
+  // Directories do not support setting flags.
   auto dir_set_result = fidl::WireCall(dc->client)->SetFlags(fio::wire::OpenFlags::kAppend);
-  EXPECT_OK(dir_set_result->s);
-
-  auto dir_get_result_2 = fidl::WireCall(dc->client)->GetFlags();
-  EXPECT_OK(dir_get_result_2->s);
-  EXPECT_EQ(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable |
-                fio::wire::OpenFlags::kAppend,
-            dir_get_result_2->flags);
+  EXPECT_EQ(dir_set_result->s, ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST_F(ConnectionTest, PosixFlagDirectoryRightExpansion) {

@@ -30,7 +30,9 @@ namespace internal {
 FileConnection::FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                VnodeProtocol protocol, VnodeConnectionOptions options,
                                zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), protocol, options), koid_(koid) {
+    : Connection(vfs, std::move(vnode), protocol, options),
+      koid_(koid),
+      append_(options.flags & fio::OpenFlags::kAppend) {
   ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kFile);
   ZX_DEBUG_ASSERT(!(options.flags & fuchsia_io::OpenFlags::kNodeReference));
 }
@@ -46,7 +48,12 @@ std::unique_ptr<Binding> FileConnection::Bind(async_dispatcher_t* dispatcher, zx
 }
 
 void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
-  Connection::NodeClone(request->flags, std::move(request->object));
+  fio::OpenFlags inherited_flags = {};
+  // The APPEND flag should be preserved when cloning a file connection.
+  if (append()) {
+    inherited_flags |= fio::OpenFlags::kAppend;
+  }
+  Connection::NodeClone(request->flags | inherited_flags, std::move(request->object));
 }
 
 void FileConnection::Close(CloseCompleter::Sync& completer) {
@@ -91,10 +98,10 @@ void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& complet
   // filter out unsupported rights. Although the protocol currently allows rights to exceed the
   // abilities of a node, this can be confusing. Instead, we can make it such that rights can
   // only be downscoped, and can only be requested if the node type supports or allows it.
-  fio::Rights rights = options().rights & ~(fio::Rights::kConnect | fio::Rights::kModifyDirectory |
-                                            fio::Rights::kEnumerate | fio::Rights::kTraverse);
+  fio::Rights file_rights = rights() & ~(fio::Rights::kConnect | fio::Rights::kModifyDirectory |
+                                         fio::Rights::kEnumerate | fio::Rights::kTraverse);
   fidl::Arena arena;
-  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(rights).Build());
+  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(file_rights).Build());
 }
 
 void FileConnection::Sync(SyncCompleter::Sync& completer) {
@@ -125,6 +132,15 @@ void FileConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
   }
 }
 
+void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
+  completer.Reply(ZX_OK, NodeGetFlags());
+}
+
+void FileConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
+  append() = static_cast<bool>(request->flags & fio::OpenFlags::kAppend);
+  completer.Reply(ZX_OK);
+}
+
 void FileConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) {
   zx::result result = Connection::NodeQueryFilesystem();
   completer.Reply(result.status_value(),
@@ -135,7 +151,7 @@ void FileConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) 
 
 zx_status_t FileConnection::ResizeInternal(uint64_t length) {
   FS_PRETTY_TRACE_DEBUG("[FileTruncate] options: ", options());
-  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
+  if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   return vnode()->Truncate(length);
@@ -154,13 +170,13 @@ zx_status_t FileConnection::GetBackingMemoryInternal(fio::wire::VmoFlags flags, 
   if ((flags & fio::VmoFlags::kPrivateClone) && (flags & fio::VmoFlags::kSharedBuffer)) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if ((flags & fio::VmoFlags::kRead) && !(options().rights & fio::Rights::kReadBytes)) {
+  if ((flags & fio::VmoFlags::kRead) && !(rights() & fio::Rights::kReadBytes)) {
     return ZX_ERR_ACCESS_DENIED;
   }
-  if ((flags & fio::VmoFlags::kWrite) && !(options().rights & fio::Rights::kWriteBytes)) {
+  if ((flags & fio::VmoFlags::kWrite) && !(rights() & fio::Rights::kWriteBytes)) {
     return ZX_ERR_ACCESS_DENIED;
   }
-  if ((flags & fio::VmoFlags::kExecute) && !(options().rights & fio::Rights::kExecute)) {
+  if ((flags & fio::VmoFlags::kExecute) && !(rights() & fio::Rights::kExecute)) {
     return ZX_ERR_ACCESS_DENIED;
   }
   return vnode()->GetVmo(flags, out_vmo);
@@ -187,6 +203,14 @@ void FileConnection::AdvisoryLock(fidl::WireServer<fio::File>::AdvisoryLockReque
       });
 
   advisory_lock(koid_, vnode(), true, request->request, std::move(callback));
+}
+
+fio::OpenFlags FileConnection::NodeGetFlags() const {
+  fio::OpenFlags flags = Connection::NodeGetFlags();
+  if (append()) {
+    flags |= fio::OpenFlags::kAppend;
+  }
+  return flags;
 }
 
 }  // namespace internal

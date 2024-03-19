@@ -26,8 +26,8 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   ~NodeConnection() final = default;
 
  private:
-  std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) override;
-  zx::result<fs::VnodeRepresentation> NodeGetRepresentation() const override {
+  std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) final;
+  zx::result<fs::VnodeRepresentation> NodeGetRepresentation() const final {
     return zx::ok(fuchsia_io::ConnectorInfo{});
   }
 

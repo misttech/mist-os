@@ -60,7 +60,7 @@ Connection::Connection(FuchsiaVfs* vfs, fbl::RefPtr<Vnode> vnode, VnodeProtocol 
       vfs_(vfs),
       vnode_(std::move(vnode)),
       protocol_(protocol),
-      options_(VnodeConnectionOptions::FilterForNewConnection(options)) {
+      rights_(options.rights) {
   ZX_DEBUG_ASSERT(vfs);
   ZX_DEBUG_ASSERT(vnode_);
 }
@@ -115,16 +115,13 @@ void Connection::NodeClone(fio::OpenFlags flags, fidl::ServerEnd<fio::Node> serv
   FS_PRETTY_TRACE_DEBUG("[NodeClone] our options: ", options(),
                         ", incoming options: ", clone_options);
 
-  // These two flags are always preserved.
-  clone_options.flags |=
-      options().flags & (fio::OpenFlags::kAppend | fio::OpenFlags::kNodeReference);
   // If CLONE_SAME_RIGHTS is requested, cloned connection will inherit the same rights as those from
   // the originating connection.
   if (clone_options.flags & fio::OpenFlags::kCloneSameRights) {
-    clone_options.rights = options().rights;
+    clone_options.rights = rights_;
   } else {
     // Return ACCESS_DENIED if the client asked for a right the parent connection doesn't have.
-    if (clone_options.rights - options().rights) {
+    if (clone_options.rights - rights_) {
       write_error(std::move(server_end), ZX_ERR_ACCESS_DENIED);
       return;
     }
@@ -199,7 +196,7 @@ zx::result<VnodeAttributes> Connection::NodeGetAttr() {
 zx::result<> Connection::NodeSetAttr(fio::NodeAttributeFlags flags,
                                      const fio::wire::NodeAttributes& attributes) {
   FS_PRETTY_TRACE_DEBUG("[NodeSetAttr] our options: ", options(), ", incoming flags: ", flags);
-  if (!(options().rights & fio::Rights::kUpdateAttributes)) {
+  if (!(rights_ & fio::Rights::kUpdateAttributes)) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
   fs::VnodeAttributesUpdate update;
@@ -212,17 +209,23 @@ zx::result<> Connection::NodeSetAttr(fio::NodeAttributeFlags flags,
   return zx::make_result(vnode_->SetAttributes(update));
 }
 
-zx::result<fio::OpenFlags> Connection::NodeGetFlags() {
-  return zx::ok(options().ToIoV1Flags() & (kStatusFlags | fio::kOpenRights));
-}
-
-zx::result<> Connection::NodeSetFlags(fio::wire::OpenFlags flags) {
-  if (protocol_ == VnodeProtocol::kNode) {
-    return zx::error(ZX_ERR_BAD_HANDLE);
+fio::OpenFlags Connection::NodeGetFlags() const {
+  fio::OpenFlags flags = {};
+  // Map io2 rights to io1 flags only if all constituent io2 rights are present.
+  if ((rights_ & fio::kRStarDir) == fio::kRStarDir) {
+    flags |= fio::OpenFlags::kRightReadable;
   }
-  auto options = VnodeConnectionOptions::FromIoV1Flags(flags);
-  set_append(static_cast<bool>(options.flags & fio::OpenFlags::kAppend));
-  return zx::ok();
+  if ((rights_ & fio::kWStarDir) == fio::kWStarDir) {
+    flags |= fio::OpenFlags::kRightWritable;
+  }
+  if ((rights_ & fio::kXStarDir) == fio::kXStarDir) {
+    flags |= fio::OpenFlags::kRightExecutable;
+  }
+  // Handle node reference.
+  if (protocol_ == VnodeProtocol::kNode) {
+    flags |= fio::OpenFlags::kNodeReference;
+  }
+  return flags;
 }
 
 zx::result<fio::wire::FilesystemInfo> Connection::NodeQueryFilesystem() {

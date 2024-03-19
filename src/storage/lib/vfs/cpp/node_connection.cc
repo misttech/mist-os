@@ -43,7 +43,9 @@ std::unique_ptr<Binding> NodeConnection::Bind(async_dispatcher_t* dispatcher, zx
 }
 
 void NodeConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
-  Connection::NodeClone(request->flags, std::move(request->object));
+  // The NODE_REFERENCE flag should be preserved when cloning a node connection.
+  Connection::NodeClone(request->flags | fio::OpenFlags::kNodeReference,
+                        std::move(request->object));
 }
 
 void NodeConnection::Close(CloseCompleter::Sync& completer) {
@@ -57,7 +59,7 @@ void NodeConnection::Query(QueryCompleter::Sync& completer) {
 
 void NodeConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
   fidl::Arena arena;
-  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(options().rights).Build());
+  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(rights()).Build());
 }
 
 void NodeConnection::Sync(SyncCompleter::Sync& completer) {
@@ -78,13 +80,11 @@ void NodeConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
 }
 
 void NodeConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
-  zx::result result = Connection::NodeGetFlags();
-  completer.Reply(result.status_value(), result.is_ok() ? result.value() : fio::wire::OpenFlags{});
+  completer.Reply(ZX_OK, Connection::NodeGetFlags());
 }
 
 void NodeConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
-  zx::result<> result = Connection::NodeSetFlags(request->flags);
-  completer.Reply(result.status_value());
+  completer.Reply(ZX_ERR_BAD_HANDLE);
 }
 
 void NodeConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) {

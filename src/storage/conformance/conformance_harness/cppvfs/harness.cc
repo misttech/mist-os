@@ -84,10 +84,10 @@ class TestHarness : public fio_test::Io1Harness {
       }
     }
 
-    fs::VnodeConnectionOptions options = fs::VnodeConnectionOptions::FromIoV1Flags(
-        static_cast<fuchsia_io::wire::OpenFlags>(static_cast<uint32_t>(flags)));
-    options = fs::VnodeConnectionOptions::FilterForNewConnection(options);
-    zx_status_t status = vfs_->Serve(std::move(dir), directory_request.TakeChannel(), options);
+    zx::result options = dir->ValidateOptions(fs::VnodeConnectionOptions::FromIoV1Flags(
+        fuchsia_io::OpenFlags{static_cast<uint32_t>(flags)}));
+    ZX_ASSERT_MSG(options.is_ok(), "Invalid directory flags: %s", options.status_string());
+    zx_status_t status = vfs_->Serve(std::move(dir), directory_request.TakeChannel(), *options);
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "Serving directory failed: " << zx_status_get_string(status);
       return;

@@ -175,11 +175,6 @@ struct VnodeConnectionOptions {
 
   // Converts from |VnodeConnectionOptions| to fuchsia.io flags.
   fuchsia_io::OpenFlags ToIoV1Flags() const;
-
-  // Some flags (e.g. POSIX) only affect the interpretation of rights at the time of Open/Clone, and
-  // should have no effects thereafter. Hence we filter them here.
-  // TODO(https://fxbug.dev/324080864): Remove this when removing OpenFlags from fuchsia.io.
-  static VnodeConnectionOptions FilterForNewConnection(VnodeConnectionOptions options);
 #endif  // __Fuchsia__
 };
 
