@@ -321,6 +321,10 @@ pub struct ProductArgs {
     /// one in the platform AIBs.
     #[argh(option)]
     pub custom_kernel_aib: Option<Utf8PathBuf>,
+
+    /// path to a file specifying developer-level overrides for assembly.
+    #[argh(option)]
+    pub developer_overrides: Option<Utf8PathBuf>,
 }
 
 #[derive(Debug, Default, PartialEq)]

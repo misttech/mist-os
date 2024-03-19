@@ -1,0 +1,114 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/product_assembly_config_file_impl.gni")
+
+# Define developer overrides for product assembly
+#
+# Params (all are optional):
+#
+#   developer_only_options
+#     [scope] This is a set of flags and settings for product assembly that are
+#     only available as developer overrides, they are not available to products
+#     via the 'product_assembly_configuration()' template.  It's a scope with
+#     the following fields (all optional):
+#
+#     all_packages_in_base (optional; default=[])
+#       [bool] If set to true, all packages are moved from cache to base, and
+#       all platform-defined universe packages (such as shell commands) are as
+#       well.
+#
+#
+template("assembly_developer_overrides") {
+  labels = {
+    # So it can be reused.
+    target_name = target_name
+
+    assembly_overrides = "${target_name}.product_assembly_overrides.json"
+
+    # This is a second target created by the product_assembly_config_file()
+    # template that wraps up all the input file labels found in the product and
+    # platform config with the deps that are passed to this template.
+    assembly_overrides_inputs = "${assembly_overrides}.inputs"
+  }
+
+  files = {
+    outdir = "$target_out_dir/$target_name"
+    assembly_config_file = "$outdir/product_assembly_overrides.json"
+  }
+
+  _assembly_overrides = {
+    forward_variables_from(invoker, [ "developer_only_options" ])
+  }
+
+  # Generate the overrides configuration file itself.
+  #
+  # This uses the product_assembly_config_file() template to properly convert
+  # any file paths in the 'platform' and 'product' sections that need to be
+  # converted from GN paths into rebased file paths.  See the templat's file for
+  # more information on those paths.
+  #
+  product_assembly_config_file(labels.assembly_overrides) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "public_deps",
+                             "testonly",
+                           ])
+    visibility = [ ":${labels.target_name}" ]
+    outputs = [ files.assembly_config_file ]
+    product_assembly_config = _assembly_overrides
+  }
+
+  group(labels.target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    public_deps = [
+      ":${labels.assembly_overrides_inputs}",
+      ":${labels.assembly_overrides}",
+    ]
+
+    # Block all metadata walks for packages, distribution entries, etc.  These
+    # inputs should not exist in metadata walks, as they are added via the paths
+    # in the assembly config itself.
+    metadata = {
+      package_barrier = []
+      assembly_package_barrier = []
+      config_package_barrier = []
+      driver_package_barrier = []
+      system_image_package_barrier = []
+      distribution_entries_barrier = []
+    }
+  }
+}
+
+declare_args() {
+  # This GN arg enables developer overrides for the given assembly targets
+  #
+  # This is a list of scopes that take two fields:
+  #  - assembly: (GN label pattern) the GN label(s) to apply the overrides to
+  #  - overrides (GN label) the label of a set of developer overrides
+  #
+  # Example:
+  #
+  #  product_assembly_overrides = [
+  #    {
+  #      assembly = "//build/images/fuchsia/*"
+  #      overrides = "//local:my_assembly_overrides"
+  #    }
+  #  ]
+  product_assembly_overrides = []
+}
+
+foreach(overrides_def, product_assembly_overrides) {
+  assert(
+      defined(overrides_def.assembly),
+      "'product_assembly_overrides' must specify an assembly target to override using 'assembly'")
+  assert(
+      defined(overrides_def.overrides),
+      "'product_assembly_overrides' must specify an overrides target using 'overrides'")
+}

@@ -225,6 +225,9 @@
     // This significantly speeds up search and avoids polluting results with
     // build output, third party code, and prebuilt binaries.
     "search.exclude": {
+      // Don't exclude local files used for overrides
+      "local/**": false,
+
       // There are some files in third_party we want to be accessible from search.
       // Due to https://github.com/Microsoft/vscode/issues/869 we can't use a
       // blanket exclude and then "un-exclude" the files we want, so instead we

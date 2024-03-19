@@ -130,6 +130,18 @@
       "short": null,
       "description": "path to an AIB containing a customized kernel zbi to use instead of the one in the platform AIBs.",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "developer-overrides"
+        }
+      },
+      "optionality": "optional",
+      "long": "--developer-overrides",
+      "short": null,
+      "description": "path to a file specifying developer-level overrides for assembly.",
+      "hidden": false
     }
   ],
   "notes": [],

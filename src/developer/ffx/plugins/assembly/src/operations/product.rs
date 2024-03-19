@@ -7,6 +7,7 @@ use anyhow::{bail, Context, Result};
 use assembly_config_schema::assembly_config::{
     AdditionalPackageContents, CompiledPackageDefinition,
 };
+use assembly_config_schema::developer_overrides::DeveloperOverrides;
 use assembly_config_schema::{
     AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSupportLevel,
 };
@@ -33,7 +34,16 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         package_validation,
         mode,
         custom_kernel_aib,
+        developer_overrides,
     } = args;
+
+    let _overrides = if let Some(overrides_path) = developer_overrides {
+        let overrides = read_config(&overrides_path).context("Reading developer overrides")?;
+        print_developer_overrides_banner(&overrides);
+        Some(overrides)
+    } else {
+        None
+    };
 
     info!("Reading configuration files.");
     info!("  product: {}", product);
@@ -245,4 +255,13 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
 fn make_bundle_path(bundles_dir: &Utf8PathBuf, name: &str) -> Utf8PathBuf {
     bundles_dir.join(name).join("assembly_config.json")
+}
+
+fn print_developer_overrides_banner(overrides: &DeveloperOverrides) {
+    println!();
+    println!("WARNING:  Adding the following via developer overrides!");
+    if overrides.developer_only_options.all_packages_in_base {
+        println!("  all_packages_in_base: enabled")
+    }
+    println!();
 }

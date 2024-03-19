@@ -51,6 +51,7 @@ rustc_library("config_schema") {
     "src/assembly_config.rs",
     "src/board_config.rs",
     "src/common.rs",
+    "src/developer_overrides.rs",
     "src/image_assembly_config.rs",
     "src/lib.rs",
     "src/platform_config.rs",

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/developer_overrides.gni")
 import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/kernel_aib.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
@@ -788,6 +789,28 @@ template("assembled_system") {
 
       metadata = {
         assembly_input_archives_barrier = []
+      }
+
+      # See if there are any developer overrides enabled for this target, and
+      # if so, pass them to assembly.
+      foreach(overrides_def, product_assembly_overrides) {
+        # This is done by seeing if the target_name matches each of the defined
+        # label patterns that are to have overrides.
+        if (label_matches(":$target_name", [ overrides_def.assembly ])) {
+          # The overrides are given by label, which is used to compute the path
+          # to the file created by the developer overrides template.
+          overrides_file =
+              get_label_info(overrides_def.overrides, "target_out_dir") + "/" +
+              get_label_info(overrides_def.overrides, "name") +
+              "/product_assembly_overrides.json"
+
+          args += [
+            "--developer-overrides",
+            rebase_path(overrides_file, root_build_dir),
+          ]
+          inputs += [ overrides_file ]
+          deps += [ overrides_def.overrides ]
+        }
       }
     }
 

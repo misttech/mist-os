@@ -8,6 +8,7 @@ pub mod assembly_config;
 pub mod board_config;
 
 pub mod common;
+pub mod developer_overrides;
 pub mod image_assembly_config;
 pub mod platform_config;
 pub mod product_config;
