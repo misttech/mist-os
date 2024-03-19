@@ -26,9 +26,6 @@
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListenerPeek/*",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListenerRead/*",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListener/*",
-
-                // TODO(https://fxbug.dev/328690451) Re-enable once flake is resolved.
-                "InotifyTest.InotifyAndTargetDestructionDoNotDeadlock",
             ],
         },
     ],

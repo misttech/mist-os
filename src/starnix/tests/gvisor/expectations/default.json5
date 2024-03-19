@@ -1200,6 +1200,9 @@
                 "NetdeviceTest.InterfaceFlags",
                 "NetdeviceTest.InterfaceMTU",
                 "NetdeviceTest.Loopback",
+
+                // TODO(https://fxbug.dev/328690451) Re-enable once flake is resolved.
+                "InotifyTest.InotifyAndTargetDestructionDoNotDeadlock",
             ],
         },
     ],
