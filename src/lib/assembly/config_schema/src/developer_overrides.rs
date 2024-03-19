@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct DeveloperOverrides {
+    /// The label of the target used to define the overrides.
+    pub target_name: Option<String>,
+
     /// Special overrides-only flags to pass to assembly.  These features cannot
     /// be used by products, only by developers that need to override the standard
     /// behavior of assembly.
@@ -16,6 +19,12 @@ pub struct DeveloperOverrides {
     /// Using these will generate warnings.
     #[serde(default)]
     pub developer_only_options: DeveloperOnlyOptions,
+
+    /// Developer overrides for the kernel.
+    ///
+    /// Using these will generate warnings.
+    #[serde(default)]
+    pub kernel: KernelOptions,
 }
 
 /// Special flags for assembly that can only be used in the context of developer
@@ -30,4 +39,13 @@ pub struct DeveloperOnlyOptions {
     /// or universe packages in a context where networking is unavailable or
     /// a package server cannot be run.
     pub all_packages_in_base: bool,
+}
+
+/// Kernel options and settings that are only to be used in the context of local
+/// developer overrides.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct KernelOptions {
+    /// Additional kernel command line args to add to the assembled ZBI.
+    pub command_line_args: Vec<String>,
 }

@@ -9,6 +9,7 @@ use assembly_config_schema::{
     assembly_config::{AssemblyInputBundle, CompiledPackageDefinition, ShellCommands},
     board_config::{BoardInputBundle, HardwareInfo},
     common::PackagedDriverDetails,
+    developer_overrides::{DeveloperOnlyOptions, DeveloperOverrides},
     image_assembly_config::{BoardDriverArguments, KernelConfig},
     platform_config::BuildType,
     product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
@@ -91,7 +92,11 @@ pub struct ImageAssemblyConfigBuilder {
     /// Data passed to the board's Board Driver, if provided.
     board_driver_arguments: Option<BoardDriverArguments>,
 
+    /// Configuration capabilities to add to a configuration component/package.
     configuration_capabilities: Option<assembly_config_capabilities::CapabilityNamedMap>,
+
+    /// Developer override options
+    developer_only_options: Option<DeveloperOnlyOptions>,
 }
 
 impl ImageAssemblyConfigBuilder {
@@ -118,7 +123,25 @@ impl ImageAssemblyConfigBuilder {
             packages_to_compile: BTreeMap::default(),
             board_driver_arguments: None,
             configuration_capabilities: None,
+            developer_only_options: None,
         }
+    }
+
+    /// Add developer overrides to the builder
+    pub fn add_developer_overrides(
+        &mut self,
+        developer_overrides: DeveloperOverrides,
+    ) -> Result<()> {
+        let DeveloperOverrides { developer_only_options, kernel, target_name: _ } =
+            developer_overrides;
+
+        // Set the developer-only options for the buidler to use.
+        self.developer_only_options = Some(developer_only_options);
+
+        // Add the kernel command line args from the developer
+        self.kernel_args.extend(kernel.command_line_args.into_iter());
+
+        Ok(())
     }
 
     /// Add an Assembly Input Bundle to the builder, via the path to its
@@ -680,6 +703,7 @@ impl ImageAssemblyConfigBuilder {
             packages_to_compile,
             board_driver_arguments,
             configuration_capabilities,
+            developer_only_options: _,
         } = self;
 
         let cmc_tool = tools.get_tool("cmc")?;

@@ -37,10 +37,11 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         developer_overrides,
     } = args;
 
-    let _overrides = if let Some(overrides_path) = developer_overrides {
-        let overrides = read_config(&overrides_path).context("Reading developer overrides")?;
-        print_developer_overrides_banner(&overrides);
-        Some(overrides)
+    let developer_overrides = if let Some(overrides_path) = developer_overrides {
+        let developer_overrides =
+            read_config(&overrides_path).context("Reading developer overrides")?;
+        print_developer_overrides_banner(&developer_overrides, &overrides_path);
+        Some(developer_overrides)
     } else {
         None
     };
@@ -200,6 +201,13 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         builder.add_product_packages(additional_packages).context("Adding additional packages")?;
     }
 
+    // Finally, set the developer overrides
+    if let Some(developer_overrides) = developer_overrides {
+        builder
+            .add_developer_overrides(developer_overrides)
+            .context("Setting developer overrides")?;
+    }
+
     // Get the tool set.
     let tools = SdkToolProvider::try_new()?;
 
@@ -257,11 +265,26 @@ fn make_bundle_path(bundles_dir: &Utf8PathBuf, name: &str) -> Utf8PathBuf {
     bundles_dir.join(name).join("assembly_config.json")
 }
 
-fn print_developer_overrides_banner(overrides: &DeveloperOverrides) {
+fn print_developer_overrides_banner(overrides: &DeveloperOverrides, overrides_path: &Utf8PathBuf) {
+    let overrides_target = if let Some(target_name) = &overrides.target_name {
+        target_name.as_str()
+    } else {
+        overrides_path.as_str()
+    };
     println!();
-    println!("WARNING:  Adding the following via developer overrides!");
+    println!("WARNING!:  Adding the following via developer overrides from: {overrides_target}");
+
     if overrides.developer_only_options.all_packages_in_base {
-        println!("  all_packages_in_base: enabled")
+        println!();
+        println!("  Options:");
+        println!("    all_packages_in_base: enabled")
+    }
+    if !overrides.kernel.command_line_args.is_empty() {
+        println!();
+        println!("  Additional kernel command line arguments:");
+        for arg in &overrides.kernel.command_line_args {
+            println!("    {arg}");
+        }
     }
     println!();
 }
