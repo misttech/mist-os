@@ -120,7 +120,7 @@ class LittleEndianBitField {
 
   template <unsigned int first_bit_idx_in_cell, size_t len>
   constexpr static uint64_t mask() {
-    if (len + first_bit_idx_in_cell == 64) {
+    if constexpr (len + first_bit_idx_in_cell == 64) {
       return ~0ull << first_bit_idx_in_cell;
     }
     return ((1ull << len) - 1) << first_bit_idx_in_cell;
