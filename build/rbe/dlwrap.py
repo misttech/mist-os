@@ -89,7 +89,7 @@ _MAIN_ARG_PARSER = _main_arg_parser()
 
 
 def download_artifacts(
-    stub_paths: Iterable[Path],
+    stub_paths: Sequence[Path],
     downloader: remotetool.RemoteTool,
     working_dir_abs: Path,
     verbose: bool = False,
@@ -101,10 +101,12 @@ def download_artifacts(
       stub_paths: paths that point to either download stubs or real artifacts.
         Real artifacts are ignored automatically.
     """
-    stub_infos = remote_action.paths_to_download_stubs(stub_paths)
-    download_statuses = remote_action.download_stub_infos_batch(
+    # The download_input_* variant is needed because in this script
+    # we are not guaranteed exclusive access to stubs, so downloads
+    # must be guarded by locking for mutual exclusion.
+    download_statuses = remote_action.download_input_stub_paths_batch(
         downloader=downloader,
-        stub_infos=stub_infos,
+        stub_paths=stub_paths,
         working_dir_abs=working_dir_abs,
         verbose=verbose,
     )

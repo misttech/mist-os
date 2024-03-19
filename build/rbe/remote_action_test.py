@@ -58,7 +58,7 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
     raise TypeError(f"Unhandled sequence type: {t}")
 
 
-def _fake_download(
+def _fake_download_output(
     packed_args: Tuple[
         remote_action.DownloadStubInfo,
         remotetool.RemoteTool,
@@ -66,14 +66,14 @@ def _fake_download(
         bool,
     ]
 ) -> Tuple[Path, cl_utils.SubprocessResult]:
-    # For mocking remote_action._download_for_mp.
+    # For mocking remote_action._download_output_for_mp.
     # defined because multiprocessing cannot serialize mocks
     stub_info, downloader, working_dir_abs, verbose = packed_args
     # Don't actually try to download.
     return (stub_info.path, cl_utils.SubprocessResult(0))
 
 
-def _fake_download_fail(
+def _fake_download_output_fail(
     packed_args: Tuple[
         remote_action.DownloadStubInfo,
         remotetool.RemoteTool,
@@ -81,14 +81,44 @@ def _fake_download_fail(
         bool,
     ]
 ) -> Tuple[Path, cl_utils.SubprocessResult]:
-    # For mocking remote_action._download_for_mp.
+    # For mocking remote_action._download_output_for_mp.
     # defined because multiprocessing cannot serialize mocks
     stub_info, downloader, working_dir_abs, verbose = packed_args
     # Don't actually try to download.
     return (stub_info.path, cl_utils.SubprocessResult(1))
 
 
-class PathsToDownloadStubsTests(unittest.TestCase):
+def _fake_download_input(
+    packed_args: Tuple[
+        Path,
+        remotetool.RemoteTool,
+        Path,
+        bool,
+    ]
+) -> Tuple[Path, cl_utils.SubprocessResult]:
+    # For mocking remote_action._download_input_for_mp.
+    # defined because multiprocessing cannot serialize mocks
+    stub_path, downloader, working_dir_abs, verbose = packed_args
+    # Don't actually try to download.
+    return (stub_path, cl_utils.SubprocessResult(0))
+
+
+def _fake_download_input_fail(
+    packed_args: Tuple[
+        Path,
+        remotetool.RemoteTool,
+        Path,
+        bool,
+    ]
+) -> Tuple[Path, cl_utils.SubprocessResult]:
+    # For mocking remote_action._download_input_for_mp.
+    # defined because multiprocessing cannot serialize mocks
+    stub_path, downloader, working_dir_abs, verbose = packed_args
+    # Don't actually try to download.
+    return (stub_path, cl_utils.SubprocessResult(1))
+
+
+class PathToDownloadStubTests(unittest.TestCase):
     def test_is_stub(self):
         path = Path("obj/stubby.stub")
         fake_stub_info = remote_action.DownloadStubInfo(
@@ -106,8 +136,8 @@ class PathsToDownloadStubsTests(unittest.TestCase):
                 "read_from_file",
                 return_value=fake_stub_info,
             ) as mock_read_stub:
-                stubs = remote_action.paths_to_download_stubs([path])
-        self.assertEqual(stubs, [fake_stub_info])
+                stub = remote_action.path_to_download_stub(path)
+        self.assertEqual(stub, fake_stub_info)
         mock_check_stub.assert_called_once_with(path)
         mock_read_stub.assert_called_once_with(path)
 
@@ -116,10 +146,25 @@ class PathsToDownloadStubsTests(unittest.TestCase):
         with mock.patch.object(
             remote_action, "is_download_stub_file", return_value=False
         ) as mock_check_stub:
-            stubs = remote_action.paths_to_download_stubs([path])
+            stub = remote_action.path_to_download_stub(path)
 
-        self.assertEqual(stubs, [])
+        self.assertIsNone(stub)
         mock_check_stub.assert_called_once_with(path)
+
+
+class DownloadFromStubPathTests(unittest.TestCase):
+    def test_stub_does_not_exist_ignored(self):
+        with tempfile.TemporaryDirectory() as td:
+            stub_path = Path(td) / "stub-not-exist"
+            with mock.patch.object(
+                Path, "exists", return_value=False
+            ) as mock_exists:
+                subprocess_result = remote_action.download_from_stub_path(
+                    stub_path,
+                    downloader=None,  # not needed
+                    working_dir_abs=Path(td),
+                )
+        self.assertEqual(subprocess_result.returncode, 0)
 
 
 class UndownloadTests(unittest.TestCase):
@@ -171,9 +216,9 @@ class UndownloadTests(unittest.TestCase):
             self.assertTrue(remote_action.is_download_stub_file(tdp / path))
 
 
-class DownloadStubInfosBatchTests(unittest.TestCase):
+class DownloadOutputStubInfosBatchTests(unittest.TestCase):
     def test_empty_list(self):
-        statuses = remote_action.download_stub_infos_batch(
+        statuses = remote_action.download_output_stub_infos_batch(
             downloader=_FAKE_DOWNLOADER,
             stub_infos=[],
             working_dir_abs=Path("."),
@@ -190,9 +235,9 @@ class DownloadStubInfosBatchTests(unittest.TestCase):
             build_id="random-id987198129",
         )
         with mock.patch.object(
-            remote_action, "_download_for_mp", new=_fake_download
+            remote_action, "_download_output_for_mp", new=_fake_download_output
         ) as mock_download:  # success
-            statuses = remote_action.download_stub_infos_batch(
+            statuses = remote_action.download_output_stub_infos_batch(
                 downloader=_FAKE_DOWNLOADER,
                 stub_infos=[fake_stub_info],
                 working_dir_abs=Path("."),
@@ -210,9 +255,11 @@ class DownloadStubInfosBatchTests(unittest.TestCase):
             build_id="random-id987198129",
         )
         with mock.patch.object(
-            remote_action, "_download_for_mp", new=_fake_download_fail
+            remote_action,
+            "_download_output_for_mp",
+            new=_fake_download_output_fail,
         ) as mock_download:
-            statuses = remote_action.download_stub_infos_batch(
+            statuses = remote_action.download_output_stub_infos_batch(
                 downloader=_FAKE_DOWNLOADER,
                 stub_infos=[fake_stub_info],
                 working_dir_abs=Path("."),
@@ -240,11 +287,64 @@ class DownloadStubInfosBatchTests(unittest.TestCase):
             ),
         ]
         with mock.patch.object(
-            remote_action, "_download_for_mp", new=_fake_download
+            remote_action, "_download_output_for_mp", new=_fake_download_output
         ) as mock_download:  # success
-            statuses = remote_action.download_stub_infos_batch(
+            statuses = remote_action.download_output_stub_infos_batch(
                 downloader=_FAKE_DOWNLOADER,
                 stub_infos=fake_stub_infos,
+                working_dir_abs=Path("."),
+            )
+
+        self.assertEqual(statuses[path1].returncode, 0)
+        self.assertEqual(statuses[path2].returncode, 0)
+
+
+class DownloadInputStubPathsBatchTests(unittest.TestCase):
+    def test_empty_list(self):
+        statuses = remote_action.download_input_stub_paths_batch(
+            downloader=_FAKE_DOWNLOADER,
+            stub_paths=[],
+            working_dir_abs=Path("."),
+        )
+        self.assertEqual(statuses, {})
+
+    def test_one_download_path_downloaded_success(self):
+        path = Path("foo/bar.o")
+        with mock.patch.object(
+            remote_action, "_download_input_for_mp", new=_fake_download_input
+        ) as mock_download:  # success
+            statuses = remote_action.download_input_stub_paths_batch(
+                downloader=_FAKE_DOWNLOADER,
+                stub_paths=[path],
+                working_dir_abs=Path("."),
+            )
+
+        self.assertEqual(statuses[path].returncode, 0)
+
+    def test_one_download_path_downloaded_failure(self):
+        path = Path("foo/bar.o")
+        with mock.patch.object(
+            remote_action,
+            "_download_input_for_mp",
+            new=_fake_download_input_fail,
+        ) as mock_download:
+            statuses = remote_action.download_input_stub_paths_batch(
+                downloader=_FAKE_DOWNLOADER,
+                stub_paths=[path],
+                working_dir_abs=Path("."),
+            )
+
+        self.assertEqual(statuses[path].returncode, 1)
+
+    def test_multiple_download_stub_downloaded_success(self):
+        path1 = Path("foo/bar.o")
+        path2 = Path("baz/quux.o")
+        with mock.patch.object(
+            remote_action, "_download_input_for_mp", new=_fake_download_input
+        ) as mock_download:  # success
+            statuses = remote_action.download_input_stub_paths_batch(
+                downloader=_FAKE_DOWNLOADER,
+                stub_paths=[path1, path2],
                 working_dir_abs=Path("."),
             )
 
@@ -2405,7 +2505,7 @@ remote_metadata: {{
                 remotetool.RemoteTool, "download_blob", new=fake_download_file
             ) as mock_download:
                 with mock.patch.object(Path, "rename") as mock_rename:
-                    remote_action.download_from_stub(
+                    remote_action.download_from_stub_path(
                         destination,
                         downloader=_FAKE_DOWNLOADER,
                         working_dir_abs=tdp,
@@ -2455,7 +2555,7 @@ remote_metadata: {{
                 remotetool.RemoteTool, "download_dir", new=fake_download_dir
             ) as mock_download:
                 with mock.patch.object(Path, "rename") as mock_rename:
-                    remote_action.download_from_stub(
+                    remote_action.download_from_stub_path(
                         destination,
                         downloader=_FAKE_DOWNLOADER,
                         working_dir_abs=tdp,
@@ -2757,22 +2857,14 @@ remote_metadata: {{
         ) as mock_downloader:
             with mock.patch.object(
                 remote_action,
-                "paths_to_download_stubs",
-                return_value=[fake_stub_info],
-            ) as mock_make_stubs:
-                with mock.patch.object(
-                    remote_action,
-                    "download_stub_infos_batch",
-                    return_value={input_file: cl_utils.SubprocessResult(0)},
-                ) as mock_download:
-                    download_statuses = action.download_inputs(
-                        lambda path: True
-                    )
+                "download_input_stub_paths_batch",
+                return_value={input_file: cl_utils.SubprocessResult(0)},
+            ) as mock_download:
+                download_statuses = action.download_inputs(lambda path: True)
 
         self.assertIn(input_file, download_statuses)
         self.assertEqual(download_statuses[input_file].returncode, 0)
         mock_downloader.assert_called_once_with()
-        mock_make_stubs.assert_called_once_with([input_file])
         mock_download.assert_called_once()
 
     def test_no_download_stubs_for_local_execution(self):
@@ -3198,8 +3290,8 @@ remote_metadata: {{
                     remote_action.DownloadStubInfo, "create"
                 ) as mock_write_stub:
                     with mock.patch.object(
-                        remote_action.RemoteAction,
-                        "_download_batch",
+                        remote_action,
+                        "download_output_stub_infos_batch",
                         return_value={output: cl_utils.SubprocessResult(0)},
                     ) as mock_download:
                         with mock.patch.object(
@@ -3207,13 +3299,19 @@ remote_metadata: {{
                             "_run_maybe_remotely",
                             return_value=cl_utils.SubprocessResult(0),
                         ) as mock_run:
-                            exit_code = action.run()
+                            with mock.patch.object(
+                                remote_action.RemoteAction,
+                                "downloader",
+                                return_value=_FAKE_DOWNLOADER,
+                            ) as mock_downloader:
+                                exit_code = action.run()
         self.assertEqual(exit_code, 0)
         mock_run.assert_called()
         mock_log_dir.assert_called_with()
         mock_write_stub.assert_called_with(working_dir)
         mock_parse_log.assert_called_with(Path(str(output) + ".rrpl"))
         mock_download.assert_called_once()
+        mock_downloader.assert_called_once_with()
 
     def test_explicit_always_download_with_real_proxy_logdir(self):
         with tempfile.TemporaryDirectory() as td:
@@ -3278,18 +3376,24 @@ completion_status: STATUS_CACHE_HIT
                 remote_action, "_reproxy_log_dir", return_value=logdir
             ) as mock_log_dir:
                 with mock.patch.object(
-                    remote_action.RemoteAction,
-                    "_download_batch",
+                    remote_action,
+                    "download_output_stub_infos_batch",
                     return_value={},
                 ) as mock_download:
                     with mock.patch(
                         "remote_action.RemoteAction._run_maybe_remotely",
                         new=fake_run_remote,
                     ) as mock_run:
-                        exit_code = action.run()
+                        with mock.patch.object(
+                            remote_action.RemoteAction,
+                            "downloader",
+                            return_value=_FAKE_DOWNLOADER,
+                        ) as mock_downloader:
+                            exit_code = action.run()
             self.assertEqual(exit_code, 0)
             mock_log_dir.assert_called_once()
             mock_download.assert_called_once()
+            mock_downloader.assert_called_once_with()
 
 
 class RbeDiagnosticsTests(unittest.TestCase):

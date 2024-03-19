@@ -761,6 +761,12 @@ class DownloadStubInfo(object):
         The stub file is backed up to "<name>.dl-stub".
         Permissions on the stub file are applied to the downloaded result.
 
+        This interface is suitable when it is guaranteed that
+        nothing else will try to download the same file concurrently,
+        e.g. the build system guarantees that action outputs
+        are exclusive.  If exclusion is needed, use download_from_stub_path().
+
+
         Args:
           downloader: 'remotetool' instance to use to download.
           working_dir_abs: working dir.
@@ -811,16 +817,6 @@ def is_download_stub_file(path: Path) -> bool:
         return _file_starts_with(path, _RBE_DOWNLOAD_STUB_IDENTIFIER)
 
 
-def paths_to_download_stubs(
-    paths: Iterable[Path],
-) -> Sequence[DownloadStubInfo]:
-    return [
-        DownloadStubInfo.read_from_file(path)
-        for path in paths
-        if is_download_stub_file(path)
-    ]
-
-
 def undownload(path: Path) -> bool:
     """If a backup download stub exists, restore it (for debugging).
 
@@ -838,8 +834,15 @@ def undownload(path: Path) -> bool:
     return False
 
 
-def download_from_stub(
-    stub: Path, downloader: remotetool.RemoteTool, working_dir_abs: Path
+def path_to_download_stub(stub_path: Path) -> Optional[DownloadStubInfo]:
+    if not is_download_stub_file(stub_path):
+        return None
+
+    return DownloadStubInfo.read_from_file(stub_path)
+
+
+def download_from_stub_path(
+    stub_path: Path, downloader: remotetool.RemoteTool, working_dir_abs: Path
 ) -> cl_utils.SubprocessResult:
     """Possibly downloads a file over a stub link.
 
@@ -848,7 +851,7 @@ def download_from_stub(
     download requests via file-lock.
 
     Args:
-      stub: is a path to a possible download stub.
+      stub_path: is a path to a possible download stub.
       downloader: remotetool instance used to download.
       working_dir_abs: current working dir.
 
@@ -857,25 +860,21 @@ def download_from_stub(
     """
     # Use lock file to safely handle potentially concurrent
     # download requests to the same artifact.
-    lock_file = Path(str(stub) + ".dl-lock")
+    # If there are concurrent requests to download the same stub,
+    # the lock will be granted to one caller, while the other waits.
+    lock_file = Path(str(stub_path) + ".dl-lock")
     with cl_utils.BlockingFileLock(lock_file) as lock:
         ok_result = cl_utils.SubprocessResult(0)
-        if not stub.exists():
-            msg(f"Ignoring request to download nonexistent stub: {stub}")
+        if not stub_path.exists():
+            msg(f"Ignoring request to download nonexistent stub: {stub_path}")
             return ok_result
 
-        # If there are concurrent requests to download the same stub,
-        # the lock will be granted to one caller, while the other waits.
-        if not is_download_stub_file(stub):
+        stub_info = path_to_download_stub(stub_path)
+        if not stub_info:
             return ok_result
 
-        stub_info = DownloadStubInfo.read_from_file(stub)
-
-        # Download replaces the stub.
         return stub_info.download(
-            downloader=downloader,
-            working_dir_abs=working_dir_abs,
-            dest=stub,
+            downloader=downloader, working_dir_abs=working_dir_abs
         )
 
 
@@ -1458,18 +1457,22 @@ class RemoteAction(object):
             for path, stub_info in stub_infos.items()
             if path in always_download
         }
-        return self._download_batch(available_downloads.values())
 
-    def _download_batch(
-        self, stub_infos: Sequence[DownloadStubInfo]
-    ) -> Dict[Path, cl_utils.SubprocessResult]:
-        downloader = self.downloader()
-        return download_stub_infos_batch(
-            downloader=downloader,
-            stub_infos=stub_infos,
-            working_dir_abs=self.working_dir,
-            verbose=self.verbose,
-        )
+        path_strs = [str(path) for path in available_downloads.keys()]
+        outputs = self.output_files_relative_to_working_dir
+        target = outputs[0] if len(outputs) > 0 else "unknown-target"
+        try:
+            self.vmsg(f"Downloading outputs for {target}: {path_strs}")
+            download_statuses = download_output_stub_infos_batch(
+                downloader=self.downloader(),
+                stub_infos=available_downloads.values(),
+                working_dir_abs=self.working_dir,
+                verbose=self.verbose,
+            )
+        finally:
+            self.vmsg(f"  Downloaded outputs for {target} ({len(stub_infos)}).")
+
+        return download_statuses
 
     def download_inputs(
         self, keep_filter: Callable[[Path], bool]
@@ -1478,15 +1481,29 @@ class RemoteAction(object):
         may have come from the outputs of remote actions that opted to
         not download their outputs.
         """
-        filtered_inputs = [
+        stub_paths = [
             path
             for path in self.inputs_relative_to_working_dir
             if keep_filter(path)
         ]
-        download_args = paths_to_download_stubs(filtered_inputs)
-        paths = [stub.path for stub in download_args]
-        self.vmsg(f"Downloading inputs: {paths}")
-        return self._download_batch(download_args)
+
+        outputs = self.output_files_relative_to_working_dir
+        target = outputs[0] if len(outputs) > 0 else "unknown-target"
+        try:
+            self.vmsg(f"Downloading inputs for {target}: {stub_paths}")
+            # Download locks needed because different actions could
+            # share the same set of inputs.
+            download_statuses = download_input_stub_paths_batch(
+                downloader=self.downloader(),
+                stub_paths=stub_paths,
+                working_dir_abs=self.working_dir,
+                verbose=self.verbose,
+            )
+        finally:
+            self.vmsg(
+                f"Downloads of inputs for {target} complete ({len(stub_paths)})."
+            )
+        return download_statuses
 
     def _update_stub(self, stub_info: DownloadStubInfo):
         """Write a download stub (or not, depending on conditions)."""
@@ -2060,22 +2077,74 @@ class RemoteAction(object):
 
 # For multiprocessing, mapped function must be serializable.
 # Module-scope functions are serializable.
-def _download_for_mp(
+# Arguments are packed into a tuple to be map()-able.
+def _download_input_for_mp(
+    packed_args: Tuple[Path, remotetool.RemoteTool, Path, bool]
+) -> Tuple[Path, cl_utils.SubprocessResult]:
+    path, downloader, working_dir_abs, verbose = packed_args
+    if verbose:
+        msg(f"  Downloading input {path}")
+
+    status = download_from_stub_path(path, downloader, working_dir_abs)
+    if status.returncode != 0:  # alert, but do not fail
+        msg(f"Unable to download input {path}.")
+
+    if verbose:
+        msg(f"    downloaded input {path} (status: {status.returncode})")
+    return path, status
+
+
+def _download_output_for_mp(
     packed_args: Tuple[DownloadStubInfo, remotetool.RemoteTool, Path, bool]
 ) -> Tuple[Path, cl_utils.SubprocessResult]:
     stub_info, downloader, working_dir_abs, verbose = packed_args
     path = stub_info.path
     if verbose:
-        msg(f"Downloading {path}")
+        msg(f"  Downloading output {path}")
     status = stub_info.download(
         downloader=downloader, working_dir_abs=working_dir_abs
     )
+
     if status.returncode != 0:  # alert, but do not fail
-        msg(f"Unable to download {path}.")
+        msg(f"Unable to download output {path}.")
+
+    if verbose:
+        msg(f"    downloaded output {path} (status: {status.returncode})")
     return path, status
 
 
-def download_stub_infos_batch(
+def download_input_stub_paths_batch(
+    downloader: remotetool.RemoteTool,
+    stub_paths: Sequence[Path],
+    working_dir_abs: Path,
+    verbose: bool = False,
+) -> Dict[Path, cl_utils.SubprocessResult]:
+    """Downloads artifacts from a collection of stubs in parallel."""
+    download_args = [
+        # args for _download_input_for_mp
+        (stub_path, downloader, working_dir_abs, verbose)
+        for stub_path in stub_paths
+    ]
+    if not download_args:
+        return {}
+
+    try:
+        with multiprocessing.Pool() as pool:
+            statuses = pool.map(_download_input_for_mp, download_args)
+    except OSError as e:  # in case /dev/shm is not writeable (required)
+        if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
+            e.errno == errno.EROFS
+        ):
+            if len(download_args) > 1:
+                msg("Warning: downloading sequentially instead of in parallel.")
+            statuses = map(_download_input_for_mp, download_args)
+        else:
+            raise e  # Some other error
+
+    return {path: status for path, status in statuses}
+
+
+def download_output_stub_infos_batch(
     downloader: remotetool.RemoteTool,
     stub_infos: Sequence[DownloadStubInfo],
     working_dir_abs: Path,
@@ -2083,22 +2152,23 @@ def download_stub_infos_batch(
 ) -> Dict[Path, cl_utils.SubprocessResult]:
     """Downloads artifacts from a collection of stubs in parallel."""
     download_args = [
-        # args for _download_for_mp
+        # args for _download_output_for_mp
         (stub_info, downloader, working_dir_abs, verbose)
         for stub_info in stub_infos
     ]
     if not download_args:
         return {}
+
     try:
         with multiprocessing.Pool() as pool:
-            statuses = pool.map(_download_for_mp, download_args)
+            statuses = pool.map(_download_output_for_mp, download_args)
     except OSError as e:  # in case /dev/shm is not writeable (required)
         if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
             e.errno == errno.EROFS
         ):
             if len(download_args) > 1:
                 msg("Warning: downloading sequentially instead of in parallel.")
-            statuses = map(_download_for_mp, download_args)
+            statuses = map(_download_output_for_mp, download_args)
         else:
             raise e  # Some other error
 
