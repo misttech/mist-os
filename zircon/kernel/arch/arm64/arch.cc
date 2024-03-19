@@ -143,27 +143,73 @@ zx_status_t arm64_free_secondary_stack(cpu_num_t cpu_num) {
   return _init_thread[cpu_num - 1].stack().Teardown();
 }
 
-static VbarFunction* arm64_select_vbar_via_smccc(arch::ArmSmcccFunction function) {
-  // TODO(https://fxbug.dev/322202704): Auto-selection logic based on
-  // SMCCC_ARCH_FEATURES query.  In auto-selection mode, we should only get
-  // here if the physboot-time auto-selection detected that the given SMCCC
-  // function is supported by the firmware.  That means that on each individual
-  // CPU, the query will report whether the call is needed or not on that CPU.
-  // So that query will be done here to decide for this CPU.
-  dprintf(INFO,
-          "CPU %u using SMCCC_ARCH_WORKAROUND function %#" PRIx32 " by boot option override\n",
-          arch_curr_cpu_num(), static_cast<uint32_t>(function));
-  return arm64_el1_exception_smccc11_workaround;
+static VbarFunction* arm64_select_vbar_via_smccc11(arch::ArmSmcccFunction function) {
+  constexpr auto no_workaround = []() -> VbarFunction* {
+    // No mitigation is needed on this CPU.
+    WRITE_PERCPU_FIELD(should_invalidate_bp_on_el0_exception, false);
+    WRITE_PERCPU_FIELD(should_invalidate_bp_on_context_switch, false);
+    return nullptr;
+  };
+
+  constexpr auto use_workaround = []() -> VbarFunction* {
+    // The workaround replaces the other EL0 entry mitigations.
+    WRITE_PERCPU_FIELD(should_invalidate_bp_on_el0_exception, false);
+
+    // The EL0->EL1 entry mitigation is sufficient without the context-switch
+    // mitigation too.
+    WRITE_PERCPU_FIELD(should_invalidate_bp_on_context_switch, false);
+
+    return arm64_el1_exception_smccc11_workaround;
+  };
+
+  const unsigned int cpu_num = arch_curr_cpu_num();
+
+  if (gBootOptions->arm64_alternate_vbar != Arm64AlternateVbar::kAuto) {
+    dprintf(INFO,
+            "CPU %u using SMCCC_ARCH_WORKAROUND function %#" PRIx32 " by boot option override\n",
+            cpu_num, static_cast<uint32_t>(function));
+    return use_workaround();
+  }
+
+  // The workaround call is supported by the firmware on all CPUs.
+  // Check on each individual CPU whether it needs to be used or not.
+  uint64_t value =
+      ArmSmcccCall(arch::ArmSmcccFunction::kSmcccArchFeatures, static_cast<uint32_t>(function));
+
+  switch (value) {
+    case 0:
+      dprintf(INFO, "CPU %u firmware requires SMCCC_ARCH_WORKAROUND function %#" PRIx32 "\n",
+              cpu_num, static_cast<uint32_t>(function));
+      return use_workaround();
+
+    case 1:
+      dprintf(INFO,
+              "CPU %u firmware reports SMCCC_ARCH_WORKAROUND function %#" PRIx32 " not needed\n",
+              cpu_num, static_cast<uint32_t>(function));
+      return no_workaround();
+
+    default:
+      dprintf(CRITICAL,
+              "WARNING: Possible SMCCC firmware bug: "
+              " SMCCC_ARCH_FEATURES reports %" PRId64 " for %#" PRIx32
+              " on CPU %u but boot CPU reported it supported!\n",
+              ktl::bit_cast<int64_t>(value), static_cast<uint32_t>(function), cpu_num);
+  }
+
+  return nullptr;
 }
 
-// Select the exception vector to use for the current CPU.
+// Select the alternate exception vector to use for the current CPU.
+// Returns nullptr to keep using the default one.
 static VbarFunction* arm64_select_vbar() {
+  // In auto mode, the physboot detection code has "selected" a firmware option
+  // if it's available generally.  The logic here then chooses whether this
+  // particular CPU needs to use that firmware option by asking the firmware.
   switch (gPhysHandoff->arch_handoff.alternate_vbar) {
-    // TODO(https://fxbug.dev/322202704): per-CPU auto-selection logic
     case Arm64AlternateVbar::kArchWorkaround3:
-      return arm64_select_vbar_via_smccc(arch::ArmSmcccFunction::kSmcccArchWorkaround3);
+      return arm64_select_vbar_via_smccc11(arch::ArmSmcccFunction::kSmcccArchWorkaround3);
     case Arm64AlternateVbar::kArchWorkaround1:
-      return arm64_select_vbar_via_smccc(arch::ArmSmcccFunction::kSmcccArchWorkaround1);
+      return arm64_select_vbar_via_smccc11(arch::ArmSmcccFunction::kSmcccArchWorkaround1);
     case Arm64AlternateVbar::kPsciVersion:
       // TODO(https://fxbug.dev/322202704): Auto-select based on core IDs?
       dprintf(INFO, "CPU %u using SMCCC 1.1 PSCI_VERSION in lieu of SMCCC_ARCH_WORKAROUND\n",
@@ -175,12 +221,21 @@ static VbarFunction* arm64_select_vbar() {
               arch_curr_cpu_num());
       return arm64_el1_exception_smccc10_workaround;
     case Arm64AlternateVbar::kNone:
+      if (gBootOptions->arm64_alternate_vbar == Arm64AlternateVbar::kNone) {
+        dprintf(INFO, "CPU %u not using any workaround by explicit boot option\n",
+                arch_curr_cpu_num());
+        break;
+      }
+      ZX_ASSERT(gBootOptions->arm64_alternate_vbar == Arm64AlternateVbar::kAuto);
       // TODO(https://fxbug.dev/322202704): fall back to branch loop?
       // Just panic on known cores with issues when firmware is lacking?
       dprintf(INFO, "CPU %u has no SMCCC workaround function configured\n", arch_curr_cpu_num());
       break;
+    case Arm64AlternateVbar::kAuto:
+      ZX_PANIC("physboot handoff should have performed auto-selection!");
+      break;
   }
-  return arm64_el1_exception;
+  return nullptr;
 }
 
 // Set the vector base.
@@ -274,12 +329,15 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 void arch_late_init_percpu(void) {
-  arm64_read_percpu_ptr()->should_invalidate_bp_on_context_switch =
+  const bool need_spectre_v2_mitigation =
       !gBootOptions->arm64_disable_spec_mitigations && arm64_uarch_needs_spectre_v2_mitigation();
 
+  // These may be reset in arm64_select_vbar() when something better is chosen.
+  WRITE_PERCPU_FIELD(should_invalidate_bp_on_context_switch, need_spectre_v2_mitigation);
+  WRITE_PERCPU_FIELD(should_invalidate_bp_on_el0_exception, need_spectre_v2_mitigation);
+
   // Decide if this CPU needs an alternative exception vector table.
-  VbarFunction* vector_table = arm64_select_vbar();
-  if (vector_table != arm64_el1_exception) {
+  if (VbarFunction* vector_table = arm64_select_vbar()) {
     arm64_install_vbar(vector_table);
   }
 }

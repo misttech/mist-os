@@ -17,6 +17,8 @@
 #include <arch/arm64/feature.h>
 #include <kernel/align.h>
 #include <kernel/cpu.h>
+#include <ktl/bit.h>
+#include <ktl/type_traits.h>
 
 // bits for mpidr register
 #define MPIDR_AFF0_MASK 0xFFULL
@@ -55,9 +57,13 @@ struct arm64_percpu {
   // Microarchitecture of this cpu (ex: Cortex-A53)
   arm64_microarch microarch;
 
-  // True if the branch predictor should be invalidated during context switch or on suspicious
-  // entries to EL2 to mitigate Spectre V2 attacks.
+  // True if the branch predictor should be invalidated during context switch
+  // to mitigate Spectre V2 attacks.
   bool should_invalidate_bp_on_context_switch;
+
+  // True if the branch predictor should be invalidated on suspicious entries
+  // to EL1 from EL0 to mitigate Spectre V2 attacks.
+  bool should_invalidate_bp_on_el0_exception;
 
   // A pointer providing fast access to the high-level arch-agnostic per-cpu struct.
   percpu* high_level_percpu;
@@ -98,10 +104,37 @@ inline struct arm64_percpu* arm64_read_percpu_ptr() {
 template <typename T, size_t Offset>
 [[gnu::always_inline]] inline T arm64_read_percpu_field() {
   static_assert((Offset & (alignof(T) - 1)) == 0, "Bad offset alignment");
+
+  // The `ldr` instruction is 64 bits or 32 bits depending on the register name
+  // used.  All the load instructions for sizes smaller that 64 bits use the
+  // 32-bit register form, but sizes smaller than 32 bits have their own load
+  // instructions: `ldrh` for 16 bits, `ldrb` for 8 bits.  These still write a
+  // full 32-bit register, so the output operand is uint32_t.  Narrow the
+  // result to the actual value type.
+  constexpr auto narrow = [](uint32_t value) -> T {
+    if constexpr (sizeof(T) > sizeof(uint32_t)) {
+      PANIC("unreachable");
+      return {};
+    } else if constexpr (ktl::is_signed_v<T>) {
+      using U = ktl::make_unsigned_t<T>;
+      return ktl::bit_cast<T>(static_cast<U>(value));
+    } else {
+      return static_cast<T>(value);
+    }
+  };
+
   if constexpr (sizeof(T) == sizeof(uint32_t)) {
     T value;
     __asm__ volatile("ldr %w[val], [x20, %[offset]]" : [val] "=r"(value) : [offset] "Ir"(Offset));
     return value;
+  } else if constexpr (sizeof(T) == sizeof(uint16_t)) {
+    uint32_t value;
+    __asm__ volatile("ldrh %w[val], [x20, %[offset]]" : [val] "=r"(value) : [offset] "Ir"(Offset));
+    return narrow(value);
+  } else if constexpr (sizeof(T) == sizeof(uint8_t)) {
+    uint32_t value;
+    __asm__ volatile("ldrb %w[val], [x20, %[offset]]" : [val] "=r"(value) : [offset] "Ir"(Offset));
+    return narrow(value);
   } else {
     static_assert(sizeof(T) == sizeof(uint64_t));
     T value;
@@ -115,12 +148,46 @@ template <typename T, size_t Offset>
 template <typename T, size_t Offset>
 [[gnu::always_inline]] inline void arm64_write_percpu_field(T value) {
   static_assert((Offset & (alignof(T) - 1)) == 0, "Bad offset alignment");
+
+  // The `str` instruction is 64 bits or 32 bits depending on the register name
+  // used.  All the store instructions for sizes smaller that 64 bits use the
+  // 32-bit register form, but sizes smaller than 32 bits have their own store
+  // instructions: `strh` for 16 bits, `strb` for 8 bits.  In all cases the
+  // "unused" bits of the register are ignored.  But just in case, zero-extend
+  // the value from its actual bit width up to uint32_t since the asm operand
+  // uses uint32_t to reflect that the 32-bit operand register appears in asm.
+  constexpr auto widen = [](T value) -> uint32_t {
+    if constexpr (sizeof(T) > sizeof(uint32_t)) {
+      PANIC("unreachable");
+      return 0;
+    } else if constexpr (ktl::is_signed_v<T>) {
+      using U = ktl::make_unsigned_t<T>;
+      return ktl::bit_cast<U>(value);
+    } else {
+      return value;
+    }
+  };
+
   if constexpr (sizeof(T) == sizeof(uint32_t)) {
-    __asm__ volatile("str %w[val], [x20, %[offset]]" ::[val] "r"(value), [offset] "Ir"(Offset)
+    __asm__ volatile("str %w[val], [x20, %[offset]]"
+                     :
+                     : [val] "r"(value), [offset] "Ir"(Offset)
+                     : "memory");
+  } else if constexpr (sizeof(T) == sizeof(uint16_t)) {
+    __asm__ volatile("strh %w[val], [x20, %[offset]]"
+                     :
+                     : [val] "r"(widen(value)), [offset] "Ir"(Offset)
+                     : "memory");
+  } else if constexpr (sizeof(T) == sizeof(uint8_t)) {
+    __asm__ volatile("strb %w[val], [x20, %[offset]]"
+                     :
+                     : [val] "r"(widen(value)), [offset] "Ir"(Offset)
                      : "memory");
   } else {
     static_assert(sizeof(T) == sizeof(uint64_t));
-    __asm__ volatile("str %[val], [x20, %[offset]]" ::[val] "r"(value), [offset] "Ir"(Offset)
+    __asm__ volatile("str %[val], [x20, %[offset]]"
+                     :
+                     : [val] "r"(value), [offset] "Ir"(Offset)
                      : "memory");
   }
 }

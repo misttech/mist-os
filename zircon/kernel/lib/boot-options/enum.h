@@ -124,6 +124,7 @@ template <>
 inline constexpr auto Enum<Arm64AlternateVbar> = [](auto&& Switch) {
   return Switch  //
       .Case("none", Arm64AlternateVbar::kNone)
+      .Case("auto", Arm64AlternateVbar::kAuto)
       .Case("arch3", Arm64AlternateVbar::kArchWorkaround3)
       .Case("arch1", Arm64AlternateVbar::kArchWorkaround1)
       .Case("psci", Arm64AlternateVbar::kPsciVersion)

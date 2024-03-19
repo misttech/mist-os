@@ -18,8 +18,8 @@ using cpp20::is_unbounded_array_v;
 using std::is_array;
 using std::is_array_v;
 
-using std::true_type;
 using std::false_type;
+using std::true_type;
 
 using std::conjunction;
 using std::conjunction_v;
@@ -121,6 +121,11 @@ using std::is_unsigned_v;
 
 using std::is_void;
 using std::is_void_v;
+
+using std::make_signed;
+using std::make_signed_t;
+using std::make_unsigned;
+using std::make_unsigned_t;
 
 using std::remove_all_extents;
 using std::remove_all_extents_t;

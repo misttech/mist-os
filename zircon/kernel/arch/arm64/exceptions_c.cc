@@ -190,7 +190,8 @@ static void arm64_brk_handler(iframe_t* iframe, uint exception_flags, uint32_t e
   // Spectre V2: If we took a BRK exception from EL0, but the ELR address is not a user address,
   // invalidate the branch predictor. User code may be attempting to mistrain indirect branch
   // prediction structures.
-  if (unlikely(!is_user_accessible(iframe->elr)) && arm64_uarch_needs_spectre_v2_mitigation()) {
+  if (unlikely(!is_user_accessible(iframe->elr)) &&
+      READ_PERCPU_FIELD(should_invalidate_bp_on_el0_exception)) {
     arm64_uarch_do_spectre_v2_mitigation();
   }
   try_dispatch_user_exception(ZX_EXCP_SW_BREAKPOINT, iframe, esr);
@@ -278,7 +279,8 @@ static void arm64_instruction_abort_handler(iframe_t* iframe, uint exception_fla
   // Spectre V2: If we took an instruction abort in EL0 but the faulting address is not a user
   // address, invalidate the branch predictor. The $PC may have been updated before the abort is
   // delivered, user code may be attempting to mistrain indirect branch prediction structures.
-  if (unlikely(is_user && !is_user_accessible(far)) && arm64_uarch_needs_spectre_v2_mitigation()) {
+  if (unlikely(is_user && !is_user_accessible(far)) &&
+      READ_PERCPU_FIELD(should_invalidate_bp_on_el0_exception)) {
     arm64_uarch_do_spectre_v2_mitigation();
   }
 
@@ -519,7 +521,7 @@ extern "C" void arm64_irq(iframe_t* iframe, uint exception_flags) {
   // Spectre V2: If we took an interrupt while in EL0 but $PC was not a user address, invalidate
   // the branch predictor. User code may be attempting to mistrain an indirect branch predictor.
   if (unlikely(is_user && !is_user_accessible(iframe->elr)) &&
-      arm64_uarch_needs_spectre_v2_mitigation()) {
+      READ_PERCPU_FIELD(should_invalidate_bp_on_el0_exception)) {
     arm64_uarch_do_spectre_v2_mitigation();
   }
 

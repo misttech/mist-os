@@ -21,6 +21,7 @@ enum class Arm64PhysPsciReset {
 
 enum class Arm64AlternateVbar {
   kNone,
+  kAuto,
   kArchWorkaround3,
   kArchWorkaround1,
   kPsciVersion,

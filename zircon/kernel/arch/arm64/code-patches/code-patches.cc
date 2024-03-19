@@ -72,6 +72,9 @@ bool ArchPatchCode(code_patching::Patcher& patcher, const ArchPatchInfo& info,
           // The code won't actually be used.  To ensure that, the unpatched
           // instruction is a fatal trap.
           break;
+        case Arm64AlternateVbar::kAuto:
+          ZX_PANIC("should have been decided already");
+          break;
       }
       print({"CPU workaround SMCCC function is "sv, choice});
       return true;

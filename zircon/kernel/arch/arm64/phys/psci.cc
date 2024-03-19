@@ -33,6 +33,7 @@ void ArmPsciSetup(const zbi_dcfg_arm_psci_driver_t* cfg) {
     return;
   }
 
+  gArchPhysInfo->smccc_disabled = false;
   gArchPhysInfo->smccc_use_hvc = cfg->use_hvc && arch::ArmCurrentEl::Read().el() < 2;
 
   const uint64_t* reset_args = nullptr;
