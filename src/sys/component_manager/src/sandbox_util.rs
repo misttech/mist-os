@@ -102,6 +102,15 @@ pub trait DictExt {
 
     /// Removes the capability at the path, if it exists.
     fn remove_capability<'a>(&self, path: impl Iterator<Item = &'a str>);
+
+    /// Looks up the element at `path`. When encountering an intermediate router, use `request`
+    /// to request the underlying capability from it. In contrast, `get_capability` will return
+    /// `None`.
+    async fn get_with_request<'a>(
+        &self,
+        path: impl Iterator<Item = &'a str>,
+        request: Request,
+    ) -> Result<Option<Capability>, BedrockError>;
 }
 
 impl DictExt for Dict {
@@ -211,28 +220,28 @@ impl DictExt for Dict {
             }
         }
     }
-}
 
-// Attempt to look up `path` within `dict`. If any of the capbilities along the `path` field are
-// routers, then get the underlying capability by using `request`.
-pub async fn walk_dict_resolve_routers(
-    dict: &Dict,
-    path: Vec<String>,
-    request: Request,
-) -> Option<Capability> {
-    let mut current_capability: Capability = dict.clone().into();
-    for next_name in path {
-        // We have another name but no subdictionary, so exit.
-        let Capability::Dictionary(current_dict) = &current_capability else {
-            return None;
-        };
+    async fn get_with_request<'a>(
+        &self,
+        path: impl Iterator<Item = &'a str>,
+        request: Request,
+    ) -> Result<Option<Capability>, BedrockError> {
+        let mut current_capability: Capability = self.clone().into();
+        for next_name in path {
+            // We have another name but no subdictionary, so exit.
+            let Capability::Dictionary(current_dict) = &current_capability else { return Ok(None) };
 
-        // Get the capability.
-        let capability = current_dict.lock_entries().get(&next_name.to_string())?.clone();
-        // Resolve the capability, this is a noop if it's not a resolver.
-        current_capability = capability.route(request.clone()).await.ok()?;
+            // Get the capability.
+            let capability = current_dict.lock_entries().get(&next_name.to_string()).cloned();
+
+            // The capability doesn't exist.
+            let Some(capability) = capability else { return Ok(None) };
+
+            // Resolve the capability, this is a noop if it's not a router.
+            current_capability = capability.route(request.clone()).await?;
+        }
+        Ok(Some(current_capability))
     }
-    Some(current_capability)
 }
 
 /// Waits for a new message on a receiver, and launches a new async task on a `WeakTaskGroup` to
@@ -375,9 +384,11 @@ impl Routable for Arc<LaunchTaskOnReceive> {
 pub mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use bedrock_error::DowncastErrorForTest;
+    use cm_rust::Availability;
     use fidl::endpoints::ClientEnd;
     use futures::StreamExt;
-    use sandbox::Receiver;
+    use sandbox::{Data, Receiver};
 
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_node_reference_and_describe() {
@@ -488,5 +499,104 @@ pub mod tests {
 
         test_dict.remove_capability(iter::once("foo"));
         assert!(test_dict.get_capability(["foo"].into_iter()).is_none());
+    }
+
+    #[fuchsia::test]
+    async fn get_with_request_ok() {
+        let bar = Dict::new();
+        let data = Data::String("hello".to_owned());
+        bar.insert_capability(iter::once("data"), data.into());
+        // Put bar behind a few layers of Router for good measure.
+        let bar_router = Router::new_ok(bar);
+        let bar_router = Router::new_ok(bar_router);
+        let bar_router = Router::new_ok(bar_router);
+
+        let foo = Dict::new();
+        foo.insert_capability(iter::once("bar"), bar_router.into());
+        let foo_router = Router::new_ok(foo);
+
+        let dict = Dict::new();
+        dict.insert_capability(iter::once("foo"), foo_router.into());
+
+        let cap = dict
+            .get_with_request(
+                ["foo", "bar", "data"].into_iter(),
+                Request {
+                    availability: Availability::Required,
+                    target: WeakComponentInstance::invalid(),
+                },
+            )
+            .await;
+        assert_matches!(cap, Ok(Some(Capability::Data(Data::String(str)))) if str == "hello");
+    }
+
+    #[fuchsia::test]
+    async fn get_with_request_error() {
+        let dict = Dict::new();
+        let foo = Router::new_error(RoutingError::SourceCapabilityIsVoid);
+        dict.insert_capability(iter::once("foo"), foo.into());
+        let cap = dict
+            .get_with_request(
+                ["foo", "bar"].into_iter(),
+                Request {
+                    availability: Availability::Required,
+                    target: WeakComponentInstance::invalid(),
+                },
+            )
+            .await;
+        assert_matches!(
+            cap,
+            Err(BedrockError::RoutingError(err))
+            if matches!(
+                err.downcast_for_test::<RoutingError>(),
+                RoutingError::SourceCapabilityIsVoid
+            )
+        );
+    }
+
+    #[fuchsia::test]
+    async fn get_with_request_missing() {
+        let dict = Dict::new();
+        let cap = dict
+            .get_with_request(
+                ["foo", "bar"].into_iter(),
+                Request {
+                    availability: Availability::Required,
+                    target: WeakComponentInstance::invalid(),
+                },
+            )
+            .await;
+        assert_matches!(cap, Ok(None));
+    }
+
+    #[fuchsia::test]
+    async fn get_with_request_missing_deep() {
+        let dict = Dict::new();
+
+        let foo = Dict::new();
+        let foo = Router::new_ok(foo);
+        dict.insert_capability(iter::once("foo"), foo.into());
+
+        let cap = dict
+            .get_with_request(
+                ["foo"].into_iter(),
+                Request {
+                    availability: Availability::Required,
+                    target: WeakComponentInstance::invalid(),
+                },
+            )
+            .await;
+        assert_matches!(cap, Ok(Some(Capability::Dictionary(_))));
+
+        let cap = dict
+            .get_with_request(
+                ["foo", "bar"].into_iter(),
+                Request {
+                    availability: Availability::Required,
+                    target: WeakComponentInstance::invalid(),
+                },
+            )
+            .await;
+        assert_matches!(cap, Ok(None));
     }
 }

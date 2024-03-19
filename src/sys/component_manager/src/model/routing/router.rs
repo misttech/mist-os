@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::CapabilitySource;
 use crate::model::component::WeakComponentInstance;
-use crate::sandbox_util::walk_dict_resolve_routers;
+use crate::{capability::CapabilitySource, sandbox_util::DictExt};
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
 use bedrock_error::{BedrockError, Explain};
@@ -124,16 +123,15 @@ impl Router {
             async move {
                 match router.route(request.clone()).await? {
                     Capability::Dictionary(dict) => {
-                        match walk_dict_resolve_routers(&dict, segments.clone(), request.clone())
-                            .await
+                        match dict
+                            .get_with_request(segments.iter().map(AsRef::as_ref), request.clone())
+                            .await?
                         {
                             Some(cap) => cap.route(request).await,
-                            None => {
-                                return Err(RoutingError::BedrockNotPresentInDictionary {
-                                    name: segments.join("/"),
-                                }
-                                .into());
+                            None => Err(RoutingError::BedrockNotPresentInDictionary {
+                                name: segments.join("/"),
                             }
+                            .into()),
                         }
                     }
                     Capability::Open(open) => {
