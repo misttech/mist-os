@@ -85,6 +85,11 @@ board_input_bundle("main_bundle") {
       package_set = "bootfs"
       driver_components = [ "meta/simple.nv.cm" ]
     },
+    {
+      package_target = "//src/connectivity/bluetooth/hci/vendor/intel:intel"
+      package_set = "base"
+      driver_components = [ "meta/bt-hci-intel.cm" ]
+    },
   ]
   base_packages = [
     "//src/graphics/bin/vulkan_loader",
