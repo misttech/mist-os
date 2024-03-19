@@ -4,7 +4,7 @@
 
 #![cfg(test)]
 
-use std::{fmt::Debug, num::NonZeroU64, ops::RangeInclusive};
+use std::num::NonZeroU64;
 
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_filter as fnet_filter;
@@ -19,7 +19,7 @@ use crate::ingress::{
     IcmpSocket, IrrelevantToTest, Ports, SocketType, Subnets, TcpSocket, UdpSocket,
 };
 
-pub(crate) trait Matcher: Copy + Debug {
+pub(crate) trait Matcher: Copy {
     type SocketType: SocketType;
 
     async fn matcher<I: Ip>(
@@ -30,13 +30,13 @@ pub(crate) trait Matcher: Copy + Debug {
     ) -> Matchers;
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) enum Inversion {
     Default,
     InverseMatch,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct AllTraffic;
 
 impl Matcher for AllTraffic {
@@ -52,7 +52,7 @@ impl Matcher for AllTraffic {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct InterfaceId;
 
 impl Matcher for InterfaceId {
@@ -75,7 +75,7 @@ impl Matcher for InterfaceId {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct InterfaceName;
 
 impl Matcher for InterfaceName {
@@ -98,7 +98,7 @@ impl Matcher for InterfaceName {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct InterfaceDeviceClass;
 
 impl Matcher for InterfaceDeviceClass {
@@ -126,7 +126,7 @@ impl Matcher for InterfaceDeviceClass {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct SrcAddressSubnet(pub(crate) Inversion);
 
 impl Matcher for SrcAddressSubnet {
@@ -163,7 +163,7 @@ impl Matcher for SrcAddressSubnet {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct SrcAddressRange(pub(crate) Inversion);
 
 impl Matcher for SrcAddressRange {
@@ -202,7 +202,7 @@ impl Matcher for SrcAddressRange {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct DstAddressSubnet(pub(crate) Inversion);
 
 impl Matcher for DstAddressSubnet {
@@ -239,7 +239,7 @@ impl Matcher for DstAddressSubnet {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct DstAddressRange(pub(crate) Inversion);
 
 impl Matcher for DstAddressRange {
@@ -278,18 +278,7 @@ impl Matcher for DstAddressRange {
     }
 }
 
-fn unique_ephemeral_port(exclude: &[u16]) -> u16 {
-    // RFC 6335 section 6 defines 49152-65535 as the ephemeral port range.
-    const RANGE: RangeInclusive<u16> = 49152..=65535;
-    for port in RANGE {
-        if !exclude.contains(&port) {
-            return port;
-        }
-    }
-    panic!("could not find an available port in the ephemeral range")
-}
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct Tcp;
 
 impl Matcher for Tcp {
@@ -311,7 +300,7 @@ impl Matcher for Tcp {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct TcpSrcPort(pub(crate) Inversion);
 
 impl Matcher for TcpSrcPort {
@@ -334,8 +323,7 @@ impl Matcher for TcpSrcPort {
                             .expect("should be valid port range")
                     }
                     Inversion::InverseMatch => {
-                        let port = unique_ephemeral_port(&[src, dst]);
-                        PortMatcher::new(port, port, /* invert */ true)
+                        PortMatcher::new(dst, dst, /* invert */ true)
                             .expect("should be valid port range")
                     }
                 }),
@@ -346,7 +334,7 @@ impl Matcher for TcpSrcPort {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct TcpDstPort(pub(crate) Inversion);
 
 impl Matcher for TcpDstPort {
@@ -370,8 +358,7 @@ impl Matcher for TcpDstPort {
                             .expect("should be valid port range")
                     }
                     Inversion::InverseMatch => {
-                        let port = unique_ephemeral_port(&[src, dst]);
-                        PortMatcher::new(port, port, /* invert */ true)
+                        PortMatcher::new(src, src, /* invert */ true)
                             .expect("should be valid port range")
                     }
                 }),
@@ -381,7 +368,7 @@ impl Matcher for TcpDstPort {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct Udp;
 
 impl Matcher for Udp {
@@ -403,7 +390,7 @@ impl Matcher for Udp {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct UdpSrcPort(pub(crate) Inversion);
 
 impl Matcher for UdpSrcPort {
@@ -426,8 +413,7 @@ impl Matcher for UdpSrcPort {
                             .expect("should be valid port range")
                     }
                     Inversion::InverseMatch => {
-                        let port = unique_ephemeral_port(&[src, dst]);
-                        PortMatcher::new(port, port, /* invert */ true)
+                        PortMatcher::new(dst, dst, /* invert */ true)
                             .expect("should be valid port range")
                     }
                 }),
@@ -438,7 +424,7 @@ impl Matcher for UdpSrcPort {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct UdpDstPort(pub(crate) Inversion);
 
 impl Matcher for UdpDstPort {
@@ -462,8 +448,7 @@ impl Matcher for UdpDstPort {
                             .expect("should be valid port range")
                     }
                     Inversion::InverseMatch => {
-                        let port = unique_ephemeral_port(&[src, dst]);
-                        PortMatcher::new(port, port, /* invert */ true)
+                        PortMatcher::new(src, src, /* invert */ true)
                             .expect("should be valid port range")
                     }
                 }),
@@ -473,7 +458,7 @@ impl Matcher for UdpDstPort {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(crate) struct Icmp;
 
 impl Matcher for Icmp {
