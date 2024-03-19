@@ -5,18 +5,19 @@
 import("//build/components.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
+import("//src/lib/testing/sharding/fuchsia_sharded_test_package.gni")
 
 group("tests") {
   testonly = true
   deps = [
     ":netstack-error-fidl-tests",
     ":netstack-fidl-tests",
+    ":netstack-filter-fidl-tests",
   ]
 }
 
 tests = [
   "debug",
-  "filter",
   "interfaces",
   "interfaces-admin",
   "neighbor",
@@ -98,4 +99,26 @@ fuchsia_test_package("netstack-error-fidl-tests") {
     }
   }
   deps = _common_test_package_deps
+}
+
+fuchsia_sharded_test_package("netstack-filter-fidl-tests") {
+  test_components = [
+    {
+      name = "netstack-filter-fidl-test"
+      manifest = "meta/netstack-filter-fidl-test.cml"
+      deps = _common_test_package_deps + [
+               "filter",
+               "//src/lib/testing/expectation:expectation_comparer",
+             ]
+      expectations = "expectations/filter.json5"
+      num_shards = 2
+
+      # Matches the first two '::'-delimited parts of the test name, or just the
+      # whole name if there are no occurrences of '::'. For example, from
+      # "ingress::drop_incoming_local_ingress_v4::incoming_interface_device_class"
+      # matches "ingress::drop_incoming_local_ingress_v4", and matches all of
+      # "drop_controller_removes_resources".
+      shard_part_regex = "([^::]+(?:::[^::]+)?).*"
+    },
+  ]
 }

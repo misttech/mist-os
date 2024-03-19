@@ -26,7 +26,7 @@ use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
 use netemul::{RealmTcpListener as _, RealmUdpSocket as _};
 use netstack_testing_common::{
     realms::{Netstack3, TestSandboxExt as _},
-    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
@@ -36,6 +36,8 @@ use matchers::{
     InterfaceName, Inversion, Matcher, SrcAddressRange, SrcAddressSubnet, Tcp, TcpDstPort,
     TcpSrcPort, Udp, UdpDstPort, UdpSrcPort,
 };
+
+const NEGATIVE_CHECK_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(1);
 
 #[derive(Clone, Copy)]
 enum ExpectedConnectivity {
@@ -186,7 +188,7 @@ impl SocketType for TcpSocket {
                 ExpectedConnectivity::None | ExpectedConnectivity::ClientToServerOnly => {
                     match server
                         .next()
-                        .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || None)
+                        .on_timeout(NEGATIVE_CHECK_TIMEOUT.after_now(), || None)
                         .await
                         .transpose()
                         .expect("accept connection")
@@ -233,7 +235,7 @@ impl SocketType for TcpSocket {
                     match fasync::net::TcpStream::connect_from_raw(client, server_addr)
                         .expect("create connector from socket")
                         .map_ok(Some)
-                        .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || Ok(None))
+                        .on_timeout(NEGATIVE_CHECK_TIMEOUT.after_now(), || Ok(None))
                         .await
                         .expect("connect to server")
                     {
@@ -317,7 +319,7 @@ impl SocketType for UdpSocket {
                     match server
                         .recv_from(&mut buf[..])
                         .map_ok(Some)
-                        .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || Ok(None))
+                        .on_timeout(NEGATIVE_CHECK_TIMEOUT.after_now(), || Ok(None))
                         .await
                         .expect("call recvfrom")
                     {
@@ -359,7 +361,7 @@ impl SocketType for UdpSocket {
                     match client
                         .recv_from(&mut buf[..])
                         .map_ok(Some)
-                        .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || Ok(None))
+                        .on_timeout(NEGATIVE_CHECK_TIMEOUT.after_now(), || Ok(None))
                         .await
                         .expect("recvfrom failed")
                     {
@@ -437,7 +439,7 @@ impl SocketType for IcmpSocket {
                 .realm
                 .ping_once::<I>(addr, SEQ)
                 .map_ok(Some)
-                .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || Ok(None))
+                .on_timeout(NEGATIVE_CHECK_TIMEOUT.after_now(), || Ok(None))
                 .await
                 .expect("send ping")
             {
