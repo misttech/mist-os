@@ -7,13 +7,16 @@
 load(":providers.bzl", "FuchsiaProductImageInfo")
 
 def _fuchsia_elf_sizes_impl(ctx):
-    images_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
+    if ctx.attr.product:
+        images_out = ctx.attr.product[FuchsiaProductImageInfo].images_out
+    else:
+        images_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
     zbi = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"].zbi
 
     extracted_zbi_bootfs_dir = ctx.actions.declare_directory(ctx.label.name + "_extracted_zbi_bootfs")
     extracted_zbi_json = ctx.actions.declare_file(ctx.label.name + "_extracted_zbi_bootfs.json")
     ctx.actions.run_shell(
-        inputs = [zbi] + ctx.files.product_image,
+        inputs = [zbi] + ctx.files.product + ctx.files.product_image,
         outputs = [
             extracted_zbi_bootfs_dir,
             extracted_zbi_json,
