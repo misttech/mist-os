@@ -5,7 +5,7 @@
 #[cfg(test)]
 pub mod test {
     use crate::{
-        new_bpf_type_identifier, EbpfHelper, EbpfProgramBuilder, FunctionSignature,
+        new_bpf_type_identifier, BpfValue, EbpfHelper, EbpfProgramBuilder, FunctionSignature,
         NullVerifierLogger, Type, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_B, BPF_CALL,
         BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_H, BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT,
         BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE,
@@ -436,78 +436,80 @@ pub mod test {
 
     fn gather_bytes(
         _context: &mut (),
-        a: *mut u8,
-        b: *mut u8,
-        c: *mut u8,
-        d: *mut u8,
-        e: *mut u8,
-    ) -> *mut u8 {
-        let a = (a as u64) & 0xff;
-        let b = (b as u64) & 0xff;
-        let c = (c as u64) & 0xff;
-        let d = (d as u64) & 0xff;
-        let e = (e as u64) & 0xff;
-        ((a << 32) | (b << 24) | (c << 16) | (d << 8) | e) as *mut u8
+        a: BpfValue,
+        b: BpfValue,
+        c: BpfValue,
+        d: BpfValue,
+        e: BpfValue,
+    ) -> BpfValue {
+        let a = a.as_u64() & 0xff;
+        let b = b.as_u64() & 0xff;
+        let c = c.as_u64() & 0xff;
+        let d = d.as_u64() & 0xff;
+        let e = e.as_u64() & 0xff;
+        BpfValue::from((a << 32) | (b << 24) | (c << 16) | (d << 8) | e)
     }
 
     fn memfrob(
         _context: &mut (),
-        ptr: *mut u8,
-        n: *mut u8,
-        _: *mut u8,
-        _: *mut u8,
-        _: *mut u8,
-    ) -> *mut u8 {
-        let n = n as usize;
-        let slice = unsafe { std::slice::from_raw_parts_mut(ptr, n) };
+        ptr: BpfValue,
+        n: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+    ) -> BpfValue {
+        let n = n.as_usize();
+        let slice = unsafe { std::slice::from_raw_parts_mut(ptr.as_ptr::<u8>(), n) };
         for c in slice.iter_mut() {
             *c ^= 42;
         }
-        slice.as_mut_ptr()
+        slice.as_mut_ptr().into()
     }
 
     fn trash_registers(
         _context: &mut (),
-        _: *mut u8,
-        _: *mut u8,
-        _: *mut u8,
-        _: *mut u8,
-        _: *mut u8,
-    ) -> *mut u8 {
-        0 as *mut u8
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+    ) -> BpfValue {
+        0.into()
     }
 
     fn sqrti(
         _context: &mut (),
-        v: *mut u8,
-        _: *mut u8,
-        _: *mut u8,
-        _: *mut u8,
-        _: *mut u8,
-    ) -> *mut u8 {
-        (((v as u64) as f64).sqrt() as u64) as *mut u8
+        v: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+    ) -> BpfValue {
+        BpfValue::from((v.as_u64() as f64).sqrt() as u64)
     }
 
     fn strcmp_ext(
         _context: &mut (),
-        mut s1: *mut u8,
-        mut s2: *mut u8,
-        _: *mut u8,
-        _: *mut u8,
-        _: *mut u8,
-    ) -> *mut u8 {
+        s1: BpfValue,
+        s2: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+    ) -> BpfValue {
+        let mut s1 = s1.as_ptr::<u8>();
+        let mut s2 = s2.as_ptr::<u8>();
         loop {
             let c1 = unsafe { *s1 };
             let c2 = unsafe { *s2 };
             if c1 != c2 {
                 if c2 > c1 {
-                    return 1 as *mut u8;
+                    return 1.into();
                 } else {
-                    return u64::MAX as *mut u8;
+                    return u64::MAX.into();
                 }
             }
             if c1 == 0 {
-                return 0 as *mut u8;
+                return 0.into();
             }
             s1 = unsafe { s1.offset(1) };
             s2 = unsafe { s2.offset(1) };

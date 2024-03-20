@@ -4,7 +4,7 @@
 
 use crate::{
     visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source},
-    EbpfProgram, EpbfRunContext, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
+    BpfValue, EbpfProgram, EpbfRunContext, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use std::{mem::MaybeUninit, pin::Pin};
@@ -60,70 +60,9 @@ fn execute_impl<C: EpbfRunContext>(
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-struct BpfValue(*mut u8);
-
-static_assertions::const_assert_eq!(std::mem::size_of::<BpfValue>(), std::mem::size_of::<u64>());
-
-impl Default for BpfValue {
-    fn default() -> Self {
-        Self::from(0)
-    }
-}
-
-impl From<i32> for BpfValue {
-    fn from(v: i32) -> Self {
-        Self(((v as u32) as u64) as *mut u8)
-    }
-}
-
-impl From<u8> for BpfValue {
-    fn from(v: u8) -> Self {
-        Self::from(v as u64)
-    }
-}
-
-impl From<u16> for BpfValue {
-    fn from(v: u16) -> Self {
-        Self::from(v as u64)
-    }
-}
-
-impl From<u32> for BpfValue {
-    fn from(v: u32) -> Self {
-        Self::from(v as u64)
-    }
-}
-
-impl From<u64> for BpfValue {
-    fn from(v: u64) -> Self {
-        Self(v as *mut u8)
-    }
-}
-
-impl From<usize> for BpfValue {
-    fn from(v: usize) -> Self {
-        Self(v as *mut u8)
-    }
-}
-
-impl From<*mut u8> for BpfValue {
-    fn from(v: *mut u8) -> Self {
-        Self(v)
-    }
-}
-
 impl BpfValue {
-    fn as_u64(&self) -> u64 {
-        self.0 as u64
-    }
-
-    fn as_u8_ptr(&self) -> *mut u8 {
-        self.0
-    }
-
     fn add(&self, offset: u64) -> Self {
-        Self((self.0 as u64).overflowing_add(offset).0 as *mut u8)
+        Self::from(self.as_u64().overflowing_add(offset).0)
     }
 }
 
@@ -179,20 +118,12 @@ impl<C: EpbfRunContext> ComputationContext<'_, C> {
         //
         // The address has been verified by the verifier that ensured the memory is valid for
         // writing.
-        let addr = addr.add(instruction_offset).as_u8_ptr();
+        let addr = addr.add(instruction_offset);
         match width {
-            DataWidth::U8 => unsafe {
-                std::ptr::write_unaligned(addr, width.cast(value.as_u64()) as u8)
-            },
-            DataWidth::U16 => unsafe {
-                std::ptr::write_unaligned(addr as *mut u16, width.cast(value.as_u64()) as u16)
-            },
-            DataWidth::U32 => unsafe {
-                std::ptr::write_unaligned(addr as *mut u32, width.cast(value.as_u64()) as u32)
-            },
-            DataWidth::U64 => unsafe {
-                std::ptr::write_unaligned(addr as *mut *mut u8, value.as_u8_ptr())
-            },
+            DataWidth::U8 => unsafe { std::ptr::write_unaligned(addr.as_ptr(), value.as_u8()) },
+            DataWidth::U16 => unsafe { std::ptr::write_unaligned(addr.as_ptr(), value.as_u16()) },
+            DataWidth::U32 => unsafe { std::ptr::write_unaligned(addr.as_ptr(), value.as_u32()) },
+            DataWidth::U64 => unsafe { std::ptr::write_unaligned(addr.as_ptr(), value.as_u64()) },
         }
     }
 
@@ -201,17 +132,19 @@ impl<C: EpbfRunContext> ComputationContext<'_, C> {
         //
         // The address has been verified by the verifier that ensured the memory is valid for
         // reading.
-        let addr = addr.add(instruction_offset).as_u8_ptr();
+        let addr = addr.add(instruction_offset);
         match width {
-            DataWidth::U8 => BpfValue::from(unsafe { std::ptr::read_unaligned(addr) }),
+            DataWidth::U8 => {
+                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u8>()) })
+            }
             DataWidth::U16 => {
-                BpfValue::from(unsafe { std::ptr::read_unaligned(addr as *const u16) })
+                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u16>()) })
             }
             DataWidth::U32 => {
-                BpfValue::from(unsafe { std::ptr::read_unaligned(addr as *const u32) })
+                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u32>()) })
             }
             DataWidth::U64 => {
-                BpfValue::from(unsafe { std::ptr::read_unaligned(addr as *const *mut u8) })
+                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u64>()) })
             }
         }
     }
@@ -509,14 +442,14 @@ impl<C: EpbfRunContext> BpfVisitor for ComputationContext<'_, C> {
         let helper = &self.program.helpers[&index];
         let result = (helper.function_pointer)(
             context,
-            self.reg(1).as_u8_ptr(),
-            self.reg(2).as_u8_ptr(),
-            self.reg(3).as_u8_ptr(),
-            self.reg(4).as_u8_ptr(),
-            self.reg(5).as_u8_ptr(),
+            self.reg(1),
+            self.reg(2),
+            self.reg(3),
+            self.reg(4),
+            self.reg(5),
         );
         self.next();
-        self.set_reg(0, result.into());
+        self.set_reg(0, result);
         Ok(())
     }
 

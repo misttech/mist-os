@@ -7,7 +7,7 @@ use crate::{
     task::CurrentTask,
 };
 use ebpf::{
-    new_bpf_type_identifier, EbpfHelper, EpbfRunContext, FieldMapping, FieldType,
+    new_bpf_type_identifier, BpfValue, EbpfHelper, EpbfRunContext, FieldMapping, FieldType,
     FunctionSignature, Type,
 };
 use linux_uapi::{
@@ -35,50 +35,53 @@ const MAP_LOOKUP_ELEM_NAME: &'static str = "map_lookup_elem";
 
 fn bpf_map_lookup_elem(
     context: &mut HelperFunctionContext<'_>,
-    map: *mut u8,
-    key: *mut u8,
-    _: *mut u8,
-    _: *mut u8,
-    _: *mut u8,
-) -> *mut u8 {
-    let map: &Map = unsafe { &*(map as *const Map) };
-    let key = unsafe { std::slice::from_raw_parts(key as *const u8, map.schema.key_size as usize) };
+    map: BpfValue,
+    key: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    let map: &Map = unsafe { &*map.as_ptr::<Map>() };
+    let key =
+        unsafe { std::slice::from_raw_parts(key.as_ptr::<u8>(), map.schema.key_size as usize) };
 
     let key = key.to_owned();
-    map.get_raw(context.locked, &key).map(|v| v as *mut u8).unwrap_or(0 as *mut u8)
+    map.get_raw(context.locked, &key).map(BpfValue::from).unwrap_or_else(BpfValue::default)
 }
 
 const MAP_UPDATE_ELEM_NAME: &'static str = "map_update_elem";
 
 fn bpf_map_update_elem(
     context: &mut HelperFunctionContext<'_>,
-    map: *mut u8,
-    key: *mut u8,
-    value: *mut u8,
-    flags: *mut u8,
-    _: *mut u8,
-) -> *mut u8 {
-    let map: &Map = unsafe { &*(map as *const Map) };
-    let key = unsafe { std::slice::from_raw_parts(key, map.schema.key_size as usize) };
-    let value = unsafe { std::slice::from_raw_parts(value, map.schema.value_size as usize) };
-    let flags = flags as u64;
+    map: BpfValue,
+    key: BpfValue,
+    value: BpfValue,
+    flags: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    let map: &Map = unsafe { &*map.as_ptr::<Map>() };
+    let key =
+        unsafe { std::slice::from_raw_parts(key.as_ptr::<u8>(), map.schema.key_size as usize) };
+    let value =
+        unsafe { std::slice::from_raw_parts(value.as_ptr::<u8>(), map.schema.value_size as usize) };
+    let flags = flags.as_u64();
 
     let key = key.to_owned();
-    map.update(context.locked, key, value, flags).map(|_| 0).unwrap_or(u64::MAX) as *mut u8
+    map.update(context.locked, key, value, flags).map(|_| 0).unwrap_or(u64::MAX).into()
 }
 
 const MAP_DELETE_ELEM_NAME: &'static str = "map_delete_elem";
 
 fn bpf_map_delete_elem(
     _context: &mut HelperFunctionContext<'_>,
-    _map: *mut u8,
-    _key: *mut u8,
-    _: *mut u8,
-    _: *mut u8,
-    _: *mut u8,
-) -> *mut u8 {
+    _map: BpfValue,
+    _key: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
     track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_map_delete_elem");
-    u64::MAX as *mut u8
+    u64::MAX.into()
 }
 
 pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Lazy::new(|| {

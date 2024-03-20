@@ -32,11 +32,98 @@ impl EpbfRunContext for () {
     type Context<'a> = ();
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct BpfValue(u64);
+
+static_assertions::const_assert_eq!(
+    std::mem::size_of::<BpfValue>(),
+    std::mem::size_of::<*const u8>()
+);
+
+impl Default for BpfValue {
+    fn default() -> Self {
+        Self::from(0)
+    }
+}
+
+impl From<i32> for BpfValue {
+    fn from(v: i32) -> Self {
+        Self((v as u32) as u64)
+    }
+}
+
+impl From<u8> for BpfValue {
+    fn from(v: u8) -> Self {
+        Self::from(v as u64)
+    }
+}
+
+impl From<u16> for BpfValue {
+    fn from(v: u16) -> Self {
+        Self::from(v as u64)
+    }
+}
+
+impl From<u32> for BpfValue {
+    fn from(v: u32) -> Self {
+        Self::from(v as u64)
+    }
+}
+impl From<u64> for BpfValue {
+    fn from(v: u64) -> Self {
+        Self(v)
+    }
+}
+
+impl From<usize> for BpfValue {
+    fn from(v: usize) -> Self {
+        Self(v as u64)
+    }
+}
+
+impl<T> From<*const T> for BpfValue {
+    fn from(v: *const T) -> Self {
+        Self(v as u64)
+    }
+}
+
+impl<T> From<*mut T> for BpfValue {
+    fn from(v: *mut T) -> Self {
+        Self(v as u64)
+    }
+}
+
+impl BpfValue {
+    pub fn as_u8(&self) -> u8 {
+        self.0 as u8
+    }
+
+    pub fn as_u16(&self) -> u16 {
+        self.0 as u16
+    }
+
+    pub fn as_u32(&self) -> u32 {
+        self.0 as u32
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        self.0
+    }
+
+    pub fn as_usize(&self) -> usize {
+        self.0 as usize
+    }
+
+    pub fn as_ptr<T>(&self) -> *mut T {
+        self.0 as *mut T
+    }
+}
+
 pub struct EbpfHelper<C: EpbfRunContext> {
     pub index: u32,
     pub name: &'static str,
     pub function_pointer: Arc<
-        dyn Fn(&mut C::Context<'_>, *mut u8, *mut u8, *mut u8, *mut u8, *mut u8) -> *mut u8
+        dyn Fn(&mut C::Context<'_>, BpfValue, BpfValue, BpfValue, BpfValue, BpfValue) -> BpfValue
             + Send
             + Sync,
     >,

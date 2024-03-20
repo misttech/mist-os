@@ -70,15 +70,6 @@ impl DataWidth {
         }
     }
 
-    pub fn cast(&self, value: u64) -> u64 {
-        match self {
-            Self::U8 => (value as u8) as u64,
-            Self::U16 => (value as u16) as u64,
-            Self::U32 => (value as u32) as u64,
-            Self::U64 => value,
-        }
-    }
-
     pub fn instruction_bits(&self) -> u8 {
         match self {
             Self::U8 => BPF_B,
