@@ -352,6 +352,7 @@ pub fn sys_membarrier(
     match cmd {
         uapi::membarrier_cmd_MEMBARRIER_CMD_QUERY => Ok(0),
         uapi::membarrier_cmd_MEMBARRIER_CMD_PRIVATE_EXPEDITED_RSEQ => Ok(0),
+        uapi::membarrier_cmd_MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_RSEQ => Ok(0),
         _ => error!(EINVAL),
     }
 }
