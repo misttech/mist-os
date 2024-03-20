@@ -81,7 +81,6 @@
                 "stdio_nofortify.tmpfile_TMPDIR",
                 "stdlib.getloadavg",
                 "sys_msg.smoke",
-                "sys_prctl.pr_cap_ambient",
                 "sys_ptrace.hardware_breakpoint",
                 "sys_ptrace.watchpoint_imprecise",
                 "sys_ptrace.watchpoint_stress",

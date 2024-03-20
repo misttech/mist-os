@@ -108,6 +108,7 @@ fn create_kernel_task_and_unlocked_with_fs_and_selinux<'l>(
         init_pid,
         CString::new("test-task").unwrap(),
         fs.clone(),
+        &[],
     )
     .expect("failed to create first task");
     let system_task =

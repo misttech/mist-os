@@ -45,6 +45,8 @@ use starnix_uapi::{
     open_flags::OpenFlags,
     ownership::{release_on_error, OwnedRef, Releasable, TempRef, WeakRef},
     pid_t,
+    resource_limits::Resource,
+    rlimit,
     signals::{SigSet, Signal, SIGBUS, SIGCHLD, SIGILL, SIGSEGV, SIGTRAP},
     sock_filter, sock_fprog,
     user_address::{UserAddress, UserRef},
@@ -1192,6 +1194,7 @@ impl CurrentTask {
         pid: pid_t,
         initial_name: CString,
         fs: Arc<FsContext>,
+        rlimits: &[(Resource, u64)],
     ) -> Result<TaskBuilder, Errno>
     where
         L: LockBefore<TaskRelease>,
@@ -1216,6 +1219,8 @@ impl CurrentTask {
                     &initial_name_bytes,
                 )
             },
+            Credentials::root(),
+            rlimits,
         )
     }
 
@@ -1282,6 +1287,8 @@ impl CurrentTask {
             initial_name,
             root_fs,
             task_info_factory,
+            Credentials::root(),
+            &[],
         )
     }
 
@@ -1293,6 +1300,8 @@ impl CurrentTask {
         initial_name: CString,
         root_fs: Arc<FsContext>,
         task_info_factory: F,
+        creds: Credentials,
+        rlimits: &[(Resource, u64)],
     ) -> Result<TaskBuilder, Errno>
     where
         F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
@@ -1322,7 +1331,7 @@ impl CurrentTask {
                 FdTable::default(),
                 memory_manager,
                 root_fs,
-                Credentials::root(),
+                creds,
                 Arc::clone(&kernel.default_abstract_socket_namespace),
                 Arc::clone(&kernel.default_abstract_vsock_namespace),
                 Some(SIGCHLD),
@@ -1341,6 +1350,13 @@ impl CurrentTask {
         release_on_error!(builder, locked, {
             let temp_task = TempRef::from(&builder.task);
             builder.thread_group.add(&temp_task)?;
+            for (resource, limit) in rlimits {
+                builder
+                    .thread_group
+                    .limits
+                    .lock()
+                    .set(*resource, rlimit { rlim_cur: *limit, rlim_max: *limit });
+            }
 
             pids.add_task(&temp_task);
             pids.add_thread_group(&builder.thread_group);

@@ -361,7 +361,7 @@ impl Credentials {
             fsgid: gid,
             cap_permitted: caps,
             cap_effective: caps,
-            cap_inheritable: caps,
+            cap_inheritable: Capabilities::empty(),
             cap_bounding: Capabilities::all(),
             cap_ambient: Capabilities::empty(),
             securebits: SecureBits::empty(),

@@ -36,7 +36,7 @@ use starnix_core::{
         create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
     },
     fs::{layeredfs::LayeredFs, tmpfs::TmpFs},
-    task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task, TaskBuilder},
+    task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task},
     time::utc::update_utc_clock,
     vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount},
 };
@@ -46,13 +46,10 @@ use starnix_logging::{
 };
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::{
-    auth::Credentials,
     errno,
     errors::{SourceContext, ENOENT},
     mount_flags::MountFlags,
     open_flags::OpenFlags,
-    ownership::release_on_error,
-    pid_t,
     resource_limits::Resource,
     rlimit,
 };
@@ -420,8 +417,23 @@ async fn create_container(
         .open_file(locked, argv[0].as_bytes().into(), OpenFlags::RDONLY)
         .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
 
-    let init_task = create_init_task(locked, &kernel, init_pid, Arc::clone(&fs_context), config)
-        .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
+    let initial_name = if config.init.is_empty() {
+        CString::default()
+    } else {
+        CString::new(config.init[0].clone())?
+    };
+
+    let rlimits = parse_rlimits(&config.rlimits)?;
+    let init_task = CurrentTask::create_init_process(
+        locked,
+        &kernel,
+        init_pid,
+        initial_name,
+        Arc::clone(&fs_context),
+        &rlimits,
+    )
+    .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
+
     execute_task_with_prerun_result(
         init_task,
         move |locked, init_task| {
@@ -513,26 +525,21 @@ pub fn set_rlimits(task: &Task, rlimits: &[String]) -> Result<(), Error> {
     Ok(())
 }
 
-fn create_init_task(
-    locked: &mut Locked<'_, Unlocked>,
-    kernel: &Arc<Kernel>,
-    pid: pid_t,
-    fs_context: Arc<FsContext>,
-    config: &ConfigWrapper,
-) -> Result<TaskBuilder, Error> {
-    let credentials = Credentials::root();
-    let initial_name = if config.init.is_empty() {
-        CString::default()
-    } else {
-        CString::new(config.init[0].clone())?
-    };
-    let task = CurrentTask::create_init_process(locked, kernel, pid, initial_name, fs_context)?;
-    release_on_error!(task, locked, {
-        task.set_creds(credentials);
-        set_rlimits(&task, &config.rlimits)?;
-        Ok(())
-    });
-    Ok(task)
+fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
+    let mut res = Vec::new();
+
+    for rlimit in rlimits {
+        let (key, value) =
+            rlimit.split_once('=').ok_or_else(|| anyhow!("Invalid rlimit: {rlimit}"))?;
+        let value = value.parse::<u64>()?;
+        let kv = match key {
+            "RLIMIT_NOFILE" => (Resource::NOFILE, value),
+            _ => bail!("Unknown rlimit: {key}"),
+        };
+        res.push(kv);
+    }
+
+    Ok(res)
 }
 
 fn mount_filesystems<L>(

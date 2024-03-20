@@ -1412,8 +1412,8 @@ mod test {
     use super::*;
     use crate::testing::*;
     use starnix_uapi::{
-        auth::CAP_SYS_ADMIN, resource_limits::Resource, rlimit, signals::SIGCHLD, CLONE_SIGHAND,
-        CLONE_THREAD, CLONE_VM,
+        auth::Capabilities, auth::CAP_SYS_ADMIN, resource_limits::Resource, rlimit,
+        signals::SIGCHLD, CLONE_SIGHAND, CLONE_THREAD, CLONE_VM,
     };
 
     #[::fuchsia::test]
@@ -1452,6 +1452,8 @@ mod test {
     async fn test_root_capabilities() {
         let (_kernel, current_task) = create_kernel_and_task();
         assert!(current_task.creds().has_capability(CAP_SYS_ADMIN));
+        assert_eq!(current_task.creds().cap_inheritable, Capabilities::empty());
+
         current_task.set_creds(Credentials::with_ids(1, 1));
         assert!(!current_task.creds().has_capability(CAP_SYS_ADMIN));
     }
