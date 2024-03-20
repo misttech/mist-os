@@ -17,7 +17,8 @@
 #include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
 
-#include <memory>
+#include <fbl/ref_counted.h>
+#include <fbl/ref_ptr.h>
 
 namespace ld {
 
@@ -68,11 +69,12 @@ using RemoteDecodedModuleBase =
                   elfldltl::SegmentWithVmo::Copy>;
 
 template <class Elf = elfldltl::Elf<>>
-class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
+class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
+                            public fbl::RefCounted<RemoteDecodedModule<Elf>> {
  public:
   // ld::RemoteDecodedModule is usually used only via const pointer.
   // Only the Init method is called on a mutable ld::RemoteDecodedModule.
-  using Ptr = std::unique_ptr<const RemoteDecodedModule>;
+  using Ptr = fbl::RefPtr<const RemoteDecodedModule>;
 
   using Base = RemoteDecodedModuleBase<Elf>;
   static_assert(std::is_move_constructible_v<Base>);
@@ -134,7 +136,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
   // VMO handle is consumed.
   template <class Diagnostics>
   static Ptr Create(Diagnostics& diag, zx::vmo vmo, size_type page_size) {
-    auto decoded = std::make_unique<RemoteDecodedModule>(std::move(vmo));
+    auto decoded = fbl::MakeRefCounted<RemoteDecodedModule>(std::move(vmo));
     if (!decoded->Init(diag, page_size)) {
       decoded.reset();
     }

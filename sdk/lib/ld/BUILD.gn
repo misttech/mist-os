@@ -37,6 +37,11 @@ library_headers("headers") {
       "lib/ld/remote-load-module.h",
     ]
 
+    public_deps += [
+      # <lib/ld/remote-decoded-module.h> has `#include <fbl/ref_ptr.h>`.
+      "//zircon/system/ulib/fbl",
+    ]
+
     # Make sure that there's no transitive deps on libzircon, so header-only
     # use of the library doesn't affect dynamic linking dependencies.
     if (zircon_toolchain == false) {
