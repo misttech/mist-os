@@ -5,6 +5,7 @@
 mod availability;
 mod config;
 mod dictionary;
+mod directory;
 mod lifecycle;
 mod policy;
 mod rights;

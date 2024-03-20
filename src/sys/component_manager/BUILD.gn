@@ -248,6 +248,7 @@ rustc_binary("bin") {
     "src/model/tests/availability.rs",
     "src/model/tests/config.rs",
     "src/model/tests/dictionary.rs",
+    "src/model/tests/directory.rs",
     "src/model/tests/lifecycle.rs",
     "src/model/tests/mod.rs",
     "src/model/tests/policy.rs",
