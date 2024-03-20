@@ -22,7 +22,7 @@ pub use ffx_command::{
 
 // Re-expose the ffx_writer::Writer as the 'simple writer'
 pub use ffx_writer::{
-    MachineWriter, SimpleWriter, TestBuffer, TestBuffers, ToolIO, VerifiedMachineWriter,
+    Format, MachineWriter, SimpleWriter, TestBuffer, TestBuffers, ToolIO, VerifiedMachineWriter,
 };
 
 #[doc(hidden)]
