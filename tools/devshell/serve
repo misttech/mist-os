@@ -236,6 +236,34 @@ else
   fi
 fi
 
+# Heads-up for the upcoming removal of pm
+if [[ "${server_mode}" = "pm" ]] ; then
+  fx-warn "Serving repositories with pm is going away, targeted for 2024 Q2."
+  fx-warn "Please consider switching to serving via ffx, and report any issues."
+  fx-warn "To help make the transition as smooth as possible, you can use the"
+  fx-warn "following command to delete your settings overrides and use the"
+  fx-warn "default server mode:"
+  fx-warn ""
+  fx-warn "$ ffx config remove repository.server.mode"
+  fx-warn ""
+fi
+
+# pm and foreground repo server are mutually incompatible
+if [[ "${server_mode}" = "pm" ]] && is_feature_enabled "foreground_repo_server"; then
+  fx-error "The ffx foreground repo server and pm are mutually incompatible."
+  fx-error "If you want to serve via pm (please note that is is going away soon,"
+  fx-error "see above), you can export the following shell variable to disable"
+  fx-error "foreground serving:"
+  fx-error ""
+  fx-error "$ export FUCHSIA_DISABLED_foreground_repo_server=1"
+  fx-error ""
+  fx-error "But please consider using the foreground server instead of pm as"
+  fx-error "described above, and report any issues to help make the transition"
+  fx-error "away from pm as smooth as possible. Thank you."
+  fx-error ""
+  exit 1
+fi
+
 # Default the port to 8083 if it is unset.
 if [[ "${server_mode}" = "pm" ]] || is_feature_enabled "foreground_repo_server"; then
   if [[ -z "${port}" ]]; then
