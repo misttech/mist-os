@@ -19,7 +19,6 @@
         { service: "fuchsia.hardware.network.driver.Service" },
         {
             protocol: [
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
             ],
         },
