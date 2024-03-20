@@ -5,6 +5,7 @@
 use anyhow::{anyhow, Context, Error};
 use bstr::BString;
 use fuchsia_zircon as zx;
+use gpu::gpu_device_init;
 use gralloc::gralloc_device_init;
 use magma_device::magma_device_init;
 use selinux::security_server;
@@ -146,7 +147,7 @@ pub fn run_container_features(
         magma_device_init(locked, system_task);
     }
     if features.gfxstream {
-        return Err(anyhow!("gfxstream unsupported"));
+        gpu_device_init(locked, system_task);
     }
     if let Some(socket_path) = features.perfetto.clone() {
         start_perfetto_consumer_thread(kernel, socket_path)
