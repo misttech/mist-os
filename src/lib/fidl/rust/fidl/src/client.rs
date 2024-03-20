@@ -703,10 +703,11 @@ impl ClientInner {
                 return Ok(*epitaph_lock);
             }
 
+            let mut interests = self.interests.lock();
+
             // Epitaph handling is done, so the lock is no longer required.
             drop(epitaph_lock);
 
-            let mut interests = self.interests.lock();
             assert!(interests.pending > 0, "{}", header.tx_id);
             if header.tx_id == 0 {
                 if let Some(waker) = interests.push_event(buf) {
