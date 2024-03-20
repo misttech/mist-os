@@ -66,17 +66,24 @@ class ExecutionEnvironment:
             )
 
         # Get the build directory.
-        # We could use fx status, but it's slow to execute now. We
-        # don't actually need all of the status contents to find the
-        # build directory, it is stored at this file path in the root
-        # Fuchsia directory during build time.
-        build_dir_file = os.path.join(fuchsia_dir, ".fx-build-dir")
-        if not os.path.isfile(build_dir_file):
-            raise EnvironmentError(
-                f"Expected file .fx-build-dir at {build_dir_file}"
-            )
-        with open(build_dir_file) as f:
-            out_dir = os.path.join(fuchsia_dir, f.readline().strip())
+        out_dir: str
+        if dir_from_fx := os.getenv("FUCHSIA_BUILD_DIR_FROM_FX"):
+            # We were passed a build directory path from fx itself, use
+            # that one.
+            out_dir = dir_from_fx
+        else:
+            # Use the FUCHSIA_DIR to find the build directory.
+            # We could use fx status, but it's slow to execute now. We
+            # don't actually need all of the status contents to find the
+            # build directory, it is stored at this file path in the root
+            # Fuchsia directory during build time.
+            build_dir_file = os.path.join(fuchsia_dir, ".fx-build-dir")
+            if not os.path.isfile(build_dir_file):
+                raise EnvironmentError(
+                    f"Expected file .fx-build-dir at {build_dir_file}"
+                )
+            with open(build_dir_file) as f:
+                out_dir = os.path.join(fuchsia_dir, f.readline().strip())
         if not os.path.isdir(out_dir):
             raise EnvironmentError(f"Expected directory at {out_dir}")
 

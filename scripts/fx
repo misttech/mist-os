@@ -249,6 +249,8 @@ while [[ $# -ne 0 ]]; do
       export _FX_BUILD_DIR="$1"
       if [[ "$_FX_BUILD_DIR" == //* ]]; then
         _FX_BUILD_DIR="${fuchsia_dir}/${_FX_BUILD_DIR#//}"
+      else
+        export FUCHSIA_BUILD_DIR_FROM_FX="${_FX_BUILD_DIR}"
       fi
       ;;
     --disable)
