@@ -64,7 +64,33 @@ pub struct PackageBuilder {
 
 impl PackageBuilder {
     /// Create a new PackageBuilder.
-    pub fn new(name: impl AsRef<str>) -> Self {
+    ///
+    /// The ABI revision is included in the package exactly as given - we don't
+    /// validate it here.
+    pub fn new(name: impl AsRef<str>, abi_revision: AbiRevision) -> Self {
+        let mut result = Self::new_without_abi_revision(name);
+        result.deprecated_abi_revision(abi_revision);
+        result
+    }
+
+    /// Create a new PackageBuilder with the platform-internal ABI revision.
+    ///
+    /// The platform-internal ABI revision is only appropriate for packages that
+    /// are only ever read by binaries from the exact same release. For packages
+    /// that can be built by tools from one release and then run on an OS from a
+    /// different release, a different ABI revision that defines the
+    /// compatibility guarantees must be selected.
+    pub fn new_platform_internal_package(name: impl AsRef<str>) -> Self {
+        PackageBuilder::new(
+            name,
+            version_history::HISTORY.get_abi_revision_for_platform_components(),
+        )
+    }
+
+    /// Create a new PackageBuilder without specifying an ABI revision.
+    ///
+    /// Deprecated. Use `PackageBuilder::new` instead.
+    pub fn new_without_abi_revision(name: impl AsRef<str>) -> Self {
         PackageBuilder {
             name: name.as_ref().to_string(),
             abi_revision: None,
@@ -92,12 +118,12 @@ impl PackageBuilder {
 
         ensure!(meta_package.variant().is_zero(), "package variant must be zero");
 
-        let mut builder = PackageBuilder::new(meta_package.name());
+        let mut builder = PackageBuilder::new_without_abi_revision(meta_package.name());
 
         // Read the abi revision from `meta/fuchsia.abi/abi-revision`, or error out if it's missing.
         if let Some(path) = manifest.far_contents().get("meta/fuchsia.abi/abi-revision") {
             let abi_revision = std::fs::read(path).with_context(|| format!("reading {path}"))?;
-            builder.abi_revision(AbiRevision::try_from(abi_revision.as_slice())?);
+            builder.deprecated_abi_revision(AbiRevision::try_from(abi_revision.as_slice())?);
         }
 
         for (at_path, file) in manifest.external_contents() {
@@ -154,8 +180,8 @@ impl PackageBuilder {
         let abi_rev = abi_rev.ok_or_else(|| anyhow!("did not find {}", ABI_REVISION_FILE_PATH))?;
         let inner_name = inner_name.ok_or_else(|| anyhow!("did not find {}", MetaPackage::PATH))?;
 
-        let mut builder = PackageBuilder::new(inner_name);
-        builder.abi_revision(abi_rev);
+        let mut builder = PackageBuilder::new_without_abi_revision(inner_name);
+        builder.deprecated_abi_revision(abi_rev);
         builder.published_name(original_manifest.name());
         if let Some(repository) = original_manifest.repository() {
             builder.repository(repository);
@@ -383,9 +409,11 @@ impl PackageBuilder {
 
     /// Set the API Level that should be included in the package. This will return an error if there
     /// is no ABI revision that corresponds with this API Level.
-    pub fn api_level(&mut self, api_level: ApiLevel) -> Result<()> {
+    ///
+    /// Deprecated. Pass an ABI revision to `PackageBuilder::new` instead.
+    pub fn deprecated_api_level(&mut self, api_level: ApiLevel) -> Result<()> {
         if let Some(v) = version_history::HISTORY.version_from_api_level(api_level) {
-            self.abi_revision(v.abi_revision);
+            self.deprecated_abi_revision(v.abi_revision);
             return Ok(());
         }
 
@@ -393,7 +421,9 @@ impl PackageBuilder {
     }
 
     /// Set the ABI Revision that should be included in the package.
-    pub fn abi_revision(&mut self, abi_revision: AbiRevision) {
+    ///
+    /// Deprecated. Pass an ABI revision to `PackageBuilder::new` instead.
+    pub fn deprecated_abi_revision(&mut self, abi_revision: AbiRevision) {
         self.abi_revision = Some(abi_revision);
     }
 
@@ -670,7 +700,7 @@ mod tests {
         let subpackage_package_manifest_path = "subpackages/package_manifest.json";
 
         // Create the builder
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder
             .add_file_as_blob("some/blob", blob_source_file_path.path().path_to_string().unwrap())
             .unwrap();
@@ -727,14 +757,14 @@ mod tests {
 
         // Create an initial package with non-default outputs for generated files
         let inner_name = "some_pkg_name";
-        let mut first_builder = PackageBuilder::new(inner_name);
+        let mut first_builder = PackageBuilder::new_without_abi_revision(inner_name);
         // Set a different published name
         let published_name = "some_other_pkg_name";
         first_builder.published_name(published_name);
         // Set a non-default ABI revision
         let fake_abi_revision =
             AbiRevision::from_u64(HISTORY.get_default_abi_revision_for_swd().as_u64() + 1);
-        first_builder.abi_revision(fake_abi_revision);
+        first_builder.deprecated_abi_revision(fake_abi_revision);
 
         // Create a file to write to the package metafar
         let first_far_source_file_path = NamedTempFile::new_in(&first_outdir).unwrap();
@@ -893,7 +923,7 @@ mod tests {
     #[test]
     fn test_removes() {
         let gendir = TempDir::new().unwrap();
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         assert!(builder.add_contents_to_far("meta/foo", "foo", gendir.path()).is_ok());
         assert!(builder.add_contents_to_far("meta/bar", "bar", gendir.path()).is_ok());
 
@@ -945,21 +975,21 @@ mod tests {
 
     #[test]
     fn test_build_rejects_meta_contents() {
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         assert!(builder.add_file_to_far("meta/contents", "some/src/file").is_err());
         assert!(builder.add_file_as_blob("meta/contents", "some/src/file").is_err());
     }
 
     #[test]
     fn test_build_rejects_meta_package() {
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         assert!(builder.add_file_to_far("meta/package", "some/src/file").is_err());
         assert!(builder.add_file_as_blob("meta/package", "some/src/file").is_err());
     }
 
     #[test]
     fn test_build_rejects_abi_revision() {
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         assert!(builder.add_file_to_far("meta/fuchsia.abi/abi-revision", "some/src/file").is_err());
         assert!(builder
             .add_file_as_blob("meta/fuchsia.abi/abi-revision", "some/src/file")
@@ -968,14 +998,14 @@ mod tests {
 
     #[test]
     fn test_builder_rejects_path_in_far_when_existing_path_in_far() {
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder.add_file_to_far("some/far/file", "some/src/file").unwrap();
         assert!(builder.add_file_to_far("some/far/file", "some/src/file").is_err());
     }
 
     #[test]
     fn test_builder_allows_overwrite_path_in_far_when_flag_set() {
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder.overwrite_files(true);
         builder.add_file_to_far("some/far/file", "some/src/file").unwrap();
         assert!(builder.add_file_to_far("some/far/file", "some/src/file").is_ok());
@@ -983,7 +1013,7 @@ mod tests {
 
     #[test]
     fn test_builder_rejects_path_as_blob_when_existing_path_in_far() {
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder.add_file_to_far("some/far/file", "some/src/file").unwrap();
         assert!(builder.add_file_as_blob("some/far/file", "some/src/file").is_err());
     }
@@ -991,7 +1021,7 @@ mod tests {
     #[test]
     fn test_builder_rejects_path_as_blob_when_existing_path_in_far_and_overwrite_set() {
         // even if we set the overwrite flag, we shouldn't allow a blob to overwrite a file in the far
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder.overwrite_files(true);
         builder.add_file_to_far("some/far/file", "some/src/file").unwrap();
         assert!(builder.add_file_as_blob("some/far/file", "some/src/file").is_err());
@@ -999,7 +1029,7 @@ mod tests {
 
     #[test]
     fn test_builder_rejects_path_in_far_when_existing_path_as_blob() {
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder.add_file_as_blob("some/far/file", "some/src/file").unwrap();
         assert!(builder.add_file_to_far("some/far/file", "some/src/file").is_err());
     }
@@ -1007,7 +1037,7 @@ mod tests {
     #[test]
     fn test_builder_rejects_path_in_far_when_existing_path_as_blob_and_overwrite_set() {
         // even if we set the overwrite flag, we shouldn't allow a far file to overwrite a blob
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder.overwrite_files(true);
         builder.add_file_as_blob("some/far/file", "some/src/file").unwrap();
         assert!(builder.add_file_to_far("some/far/file", "some/src/file").is_err());
@@ -1015,14 +1045,14 @@ mod tests {
 
     #[test]
     fn test_builder_rejects_path_in_blob_when_existing_path_as_blob() {
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder.add_file_as_blob("some/far/file", "some/src/file").unwrap();
         assert!(builder.add_file_as_blob("some/far/file", "some/src/file").is_err());
     }
 
     #[test]
     fn test_builder_allows_overwrite_path_as_blob_when_flag_set() {
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder.overwrite_files(true);
         builder.add_file_as_blob("some/far/file", "some/src/file").unwrap();
         assert!(builder.add_file_as_blob("some/far/file", "some/src/file").is_ok());
@@ -1047,7 +1077,7 @@ mod tests {
         std::fs::write(&blob_source_file_path, blob_contents).unwrap();
 
         // Create the builder
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder.add_file_as_blob("some/blob", &blob_source_file_path).unwrap();
         builder
             .add_file_to_far(
@@ -1079,7 +1109,7 @@ mod tests {
         let outdir = TempDir::new().unwrap();
         let metafar_path = outdir.path().join("meta.far");
 
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
 
         let pkg1_url = "pkg1".parse::<RelativePackageUrl>().unwrap();
         let pkg1_hash = Hash::from([0; fuchsia_hash::HASH_SIZE]);
@@ -1114,7 +1144,7 @@ mod tests {
         let hash2 = Hash::from([0; fuchsia_hash::HASH_SIZE]);
         let package_manifest_path2 = PathBuf::from("path2/package_manifest.json");
 
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder.add_subpackage(&url, hash1, package_manifest_path1).unwrap();
         assert!(builder.add_subpackage(&url, hash2, package_manifest_path2).is_err());
     }

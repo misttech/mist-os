@@ -607,8 +607,8 @@ mod tests {
         let package_name = format!("pkg{i}");
         let pkg_dir = dir.join(&package_name);
 
-        let mut builder = PackageBuilder::new(&package_name);
-        builder.api_level(7.into()).unwrap();
+        let mut builder = PackageBuilder::new_without_abi_revision(&package_name);
+        builder.deprecated_api_level(7.into()).unwrap();
 
         builder
             .add_contents_as_blob(format!("bin/{package_name}"), content.as_bytes(), &pkg_dir)

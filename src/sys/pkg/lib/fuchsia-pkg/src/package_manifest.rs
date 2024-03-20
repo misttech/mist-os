@@ -1500,7 +1500,7 @@ mod tests {
         std::fs::write(&sub_blob_source_file_path2, blob_contents).unwrap();
 
         // Create the sub builder
-        let mut sub_builder = PackageBuilder::new("some_pkg_name");
+        let mut sub_builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         sub_builder
             .add_file_as_blob(
                 "sub_blob_a",
@@ -1552,7 +1552,7 @@ mod tests {
         std::fs::write(&blob_source_file_path2, blob_contents).unwrap();
 
         // Create the builder
-        let mut builder = PackageBuilder::new("some_pkg_name");
+        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
         builder
             .add_file_as_blob("blob_c", blob_source_file_path.as_path().path_to_string().unwrap())
             .unwrap();

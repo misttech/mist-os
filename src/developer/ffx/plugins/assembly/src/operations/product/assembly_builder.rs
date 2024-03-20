@@ -1009,7 +1009,7 @@ mod tests {
         repo: Option<&str>,
     ) -> PackageManifestPathBuf {
         let path = path.as_ref();
-        let mut builder = PackageBuilder::new(name);
+        let mut builder = PackageBuilder::new_without_abi_revision(name);
         let manifest_path = path.join(name);
         builder.manifest_path(&manifest_path);
         if let Some(repo_name) = repo {

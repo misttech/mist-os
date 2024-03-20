@@ -39,13 +39,14 @@ impl ShellCommandsBuilder {
     /// the builder instance
     pub fn build(self, out_dir: impl AsRef<Utf8Path>) -> Result<ShellCommandsManifestPath> {
         let mut package_builder =
-            PackageBuilder::new(PackageDestination::ShellCommands.to_string());
+            PackageBuilder::new_without_abi_revision(PackageDestination::ShellCommands.to_string());
 
         // The shell-commands package is never produced by assembly tools from
         // one Fuchsia release and then read by binaries from another Fuchsia
         // release. Give it the platform ABI revision.
-        package_builder
-            .abi_revision(version_history::HISTORY.get_abi_revision_for_platform_components());
+        package_builder.deprecated_abi_revision(
+            version_history::HISTORY.get_abi_revision_for_platform_components(),
+        );
 
         let packages_dir = out_dir.as_ref().join(PackageDestination::ShellCommands.to_string());
         let manifest_path = packages_dir.join(SHELL_COMMANDS_MANIFEST_FILE_NAME);

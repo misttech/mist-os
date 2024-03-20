@@ -211,8 +211,8 @@ pub fn make_package_manifest_with_api_level(
 ) -> (PathBuf, PackageManifest) {
     let package_path = build_path.join(name);
 
-    let mut builder = PackageBuilder::new(name);
-    builder.api_level(api_level).unwrap();
+    let mut builder = PackageBuilder::new_without_abi_revision(name);
+    builder.deprecated_api_level(api_level).unwrap();
 
     builder
         .add_contents_as_blob(

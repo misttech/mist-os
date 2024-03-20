@@ -535,7 +535,7 @@ impl PackageBuilder {
 
         fs::create_dir(artifacts.join("contents")).expect("create /packages/contents");
 
-        let mut builder = fuchsia_pkg::PackageBuilder::new(&name);
+        let mut builder = fuchsia_pkg::PackageBuilder::new_without_abi_revision(&name);
         builder.manifest_path(artifacts.join("manifest.json"));
         builder.repository("fuchsia.com");
         builder.manifest_blobs_relative_to(fuchsia_pkg::RelativeTo::File);
@@ -561,7 +561,7 @@ impl PackageBuilder {
     pub fn abi_revision(mut self, abi_revision: AbiRevision) -> Self {
         assert_eq!(self.abi_revision, None);
         self.abi_revision = Some(abi_revision);
-        self.builder.abi_revision(abi_revision);
+        self.builder.deprecated_abi_revision(abi_revision);
         self
     }
 
@@ -687,7 +687,7 @@ impl PackageBuilder {
         // If an ABI revision wasn't specified, default to a pinned one so that merkles won't
         // change when we create a new ABI revision.
         if self.abi_revision == None {
-            self.builder.abi_revision(0xECCEA2F70ACD6FC0.into());
+            self.builder.deprecated_abi_revision(0xECCEA2F70ACD6FC0.into());
         }
 
         // self.artifacts contains outputs from package creation (manifest.json/meta.far) as well

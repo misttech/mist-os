@@ -198,12 +198,12 @@ mod tests {
         let meta_package = MetaPackage::from_name(pkg2_name.clone());
         meta_package.serialize(File::create(&pkg2_meta_package_file).unwrap()).unwrap();
 
-        let mut builder = PackageBuilder::new(&pkg1_name);
+        let mut builder = PackageBuilder::new_without_abi_revision(&pkg1_name);
         builder.manifest_path(&pkg1_package_manifest_file);
         let manifest = builder.build(dir, pkg1_meta_far_file).unwrap();
         let pkg1_hash = manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;
 
-        let mut builder = PackageBuilder::new(&pkg2_name);
+        let mut builder = PackageBuilder::new_without_abi_revision(&pkg2_name);
         builder.manifest_path(&pkg2_package_manifest_file);
         let manifest = builder.build(dir, pkg2_meta_far_file).unwrap();
         let pkg2_hash = manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;
@@ -297,7 +297,7 @@ mod tests {
         );
 
         // It should work once we write the files.
-        let mut builder = PackageBuilder::new("pkg");
+        let mut builder = PackageBuilder::new_without_abi_revision("pkg");
         builder.manifest_path(&pkg_package_manifest_file);
         let package_manifest = builder.build(dir, pkg_meta_far_file).unwrap();
         let pkg_hash = package_manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;
@@ -348,7 +348,7 @@ mod tests {
         );
 
         // It should work once we write the files.
-        let mut builder = PackageBuilder::new("pkg");
+        let mut builder = PackageBuilder::new_without_abi_revision("pkg");
         builder.manifest_path(&pkg_package_manifest_file);
         let package_manifest = builder.build(dir, pkg_meta_far_file).unwrap();
         let pkg_hash = package_manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;

@@ -92,12 +92,14 @@ pub fn build_config_capability_package(
     std::fs::create_dir_all(&outdir).with_context(|| format!("creating directory {}", &outdir))?;
 
     // Build the package.
-    let mut builder = PackageBuilder::new("config");
+    let mut builder = PackageBuilder::new_without_abi_revision("config");
 
     // Config capability packages built by assembly are never produced by
     // assembly tools from one Fuchsia release and then read by binaries from
     // another Fuchsia release.  Give them the platform ABI revision.
-    builder.abi_revision(version_history::HISTORY.get_abi_revision_for_platform_components());
+    builder.deprecated_abi_revision(
+        version_history::HISTORY.get_abi_revision_for_platform_components(),
+    );
 
     let manifest_path = outdir.join("package_manifest.json");
     let metafar_path = outdir.join("meta.far");

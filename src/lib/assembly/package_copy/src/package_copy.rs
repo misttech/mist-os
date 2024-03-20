@@ -284,7 +284,7 @@ mod tests {
 
         std::fs::create_dir_all(&gendir).with_context(|| format!("creating dir: {}", gendir))?;
 
-        let mut builder = PackageBuilder::new(name);
+        let mut builder = PackageBuilder::new_without_abi_revision(name);
         builder.manifest_path(&manifest_path);
 
         for file in files {

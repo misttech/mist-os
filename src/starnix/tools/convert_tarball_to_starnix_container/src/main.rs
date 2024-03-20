@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
         .context("the output filename must end with .far")?;
 
     // Create a new Fuchsia package.
-    let mut package_builder = PackageBuilder::new(package_name);
+    let mut package_builder = PackageBuilder::new_without_abi_revision(package_name);
     let temp_dir = TempDir::new()?;
     let input_file = File::open(&cmd.input_path)?;
     // Extract the container TAR image and add all files to package builder.

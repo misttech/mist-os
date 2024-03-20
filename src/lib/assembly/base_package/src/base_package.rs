@@ -85,7 +85,8 @@ impl BasePackageBuilder {
 
         // All base packages are named 'system-image' internally, for
         // consistency on the platform.
-        let mut builder = PackageBuilder::new(PackageDestination::Base.to_string());
+        let mut builder =
+            PackageBuilder::new_without_abi_revision(PackageDestination::Base.to_string());
         // However, they can have different published names.  And the name here
         // is the name to publish it under (and to include in the generated
         // package manifest).
@@ -98,7 +99,9 @@ impl BasePackageBuilder {
         // for platform components seems appropriate.
         //
         // TODO(https://fxbug.dev/329125882): Clarify what this means.
-        builder.abi_revision(version_history::HISTORY.get_abi_revision_for_platform_components());
+        builder.deprecated_abi_revision(
+            version_history::HISTORY.get_abi_revision_for_platform_components(),
+        );
 
         for (destination, source) in &external_contents {
             builder.add_file_as_blob(destination, source)?;

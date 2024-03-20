@@ -40,7 +40,7 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
         })?;
 
     if let Some(abi_revision) = get_abi_revision(&cmd)? {
-        builder.abi_revision(abi_revision);
+        builder.deprecated_abi_revision(abi_revision);
     }
 
     if let Some(published_name) = &cmd.published_name {
