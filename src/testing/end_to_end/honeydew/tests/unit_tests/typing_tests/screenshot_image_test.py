@@ -10,7 +10,7 @@ import unittest
 from array import array
 
 import png
-from parameterized import parameterized, param
+from parameterized import param, parameterized
 
 # Disabling pylint to reduce verbosity for widely used trivial types
 from honeydew.typing.screenshot_image import (  # pylint: disable=g-importing-member
