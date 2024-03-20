@@ -255,7 +255,7 @@ do the following:
    for example:
 
    ```cpp
-   driver::Connect<fuchsia_example::Service::MyProtocol>
+   incoming()->Connect<fuchsia_example::Service::MyProtocol>();
    ```
 
    You also need to update the component manifest (`.cml`) file to use
@@ -269,35 +269,31 @@ do the following:
 
 1. Update the parent driver.
 
-   Your parent driver needs to create a `driver::OutgoingDirectory` object.
-   You can use the `driver::OutgoingDirectory::Create()` method or the
-   `driver::DriverBase` class. With the `driver::OutgoingDirectory` object,
-   you must use services rather than protocols.
+   Your parent driver needs to use the `fdf::DriverBase`'s `outgoing()` function to get the
+   `fdf::OutgoingDirectory` object. Note that you must use services rather than protocols.
+   If your driver isn't using `fdf::DriverBase` you must create and serve an
+   `fdf::OutgoingDirectory` on your own.
 
    Then you need to add the runtime service to your outgoing directory.
-   The example below is a driver that inherits from the `driver::DriverBase`
+   The example below is a driver that inherits from the `fdf::DriverBase`
    class:
 
    ```cpp
    zx::status<> Start() override {
      auto protocol = [this](
          fdf::ServerEnd<fuchsia_example::MyProtocol> server_end) mutable {
-       fdf::BindServer(dispatcher()->get(), std::move(server_end), this);
+       // bindings_ is a class field with type fdf::ServerBindingGroup<fuchsia_example::MyProtocol>
+       bindings_.AddBinding(
+         dispatcher()->get(), std::move(server_end), this, fidl::kIgnoreBindingClosure);
      };
 
      fuchsia_example::Service::InstanceHandler handler(
           {.my_protocol = std::move(protocol)});
 
      auto status =
-           context().outgoing().AddService<fuchsia_wlan_phyimpl::Service>(
-               std::move(handler));
+           outgoing()->AddService<fuchsia_wlan_phyimpl::Service>(std::move(handler));
      if (status.is_error()) {
        return status.take_error();
-     }
-
-     auto result = outgoing_dir_.Serve(std::move(server_end));
-     if (result.is_error()) {
-       return result.take_error();
      }
 
      return zx::ok();
@@ -588,11 +584,11 @@ However, the DFv2 inspect does not require passing the VMO of
 ## Use the DFv2 logger {:#use-the-dfv2-logger}
 
 Instead of using `zxlogf()` (which is deprecated in DFv2), the new
-logging mechanism in DFv2 depends on the `driver::Logger` object,
+logging mechanism in DFv2 depends on the `fdf::Logger` object,
 which is passed from the driver host through `DriverStartArgs`
 when starting the driver.
 
-The `driver::DriverBase` class wraps `driver::Logger` and the driver
+The `fdf::DriverBase` class wraps `fdf::Logger` and the driver
 can get its reference by calling the `logger()` method (see this
 [`wlantap-driver`][wlantap-driver] driver example). With this reference,
 you can print out logs using the `logger.logf()` function or using these

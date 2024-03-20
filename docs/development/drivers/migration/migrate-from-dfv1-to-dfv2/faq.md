@@ -78,7 +78,7 @@ significantly.
 
 In DFv2, using a FIDL service is required to establish a protocol
 connection. The parent driver adds a FIDL service to the
-`driver::OutgoingDirectory` object and serves it to the child node,
+`fdf::OutgoingDirectory` object and serves it to the child node,
 which then enables the parent driver to offer the service to the
 child node.
 
@@ -86,7 +86,7 @@ DFv1 and DFv2 drivers do this differently in the following ways:
 
 - In DFv1, the driver sets and passes the offer from the
   `DeviceAddArgs::set_runtime_service_offers()` call. Then the driver
-  creates an `driver::OutgoingDirectory` object and passes the client
+  creates an `fdf::OutgoingDirectory` object and passes the client
   end handle through the `DeviceAddArgs::set_outgoing_dir()` call.
 
 - In DFv2, the driver sets and passes the offer from the
@@ -99,11 +99,10 @@ DFv1 and DFv2 drivers do this differently in the following ways:
 On the child driver side, DFv1 and DFv2 drivers also connect to the
 protocol providing the service in different ways:
 
-- A DFv1 driver calls the `DdkConnectRuntimeProtocol<ProtocolName>()`
+- A DFv1 driver calls the `DdkConnectRuntimeProtocol<ServiceInstanceName>()`
   method.
-- A DFv2 driver calls the `driver::Connect<ProtocolName>()` method
-  (or `context().incoming()->Connect<ProtocolName>()` if the
-  `DriverBase` class is used).
+- A DFv2 driver calls `incoming()->Connect<ServiceInstanceName>()` if the
+  `DriverBase` class is used.
 
   For more information, see
   [Use the DFv2 service discovery][use-service-discovery].
