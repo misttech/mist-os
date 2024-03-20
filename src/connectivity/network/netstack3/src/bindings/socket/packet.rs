@@ -393,6 +393,28 @@ impl<'a> RequestHandler<'a> {
         self,
         request: fppacket::SocketRequest,
     ) -> ControlFlow<fppacket::SocketCloseResponder, Option<fppacket::SocketRequestStream>> {
+        // On Error, logs the `Errno` with additional debugging context.
+        //
+        // The provided result is passed through unchanged.
+        //
+        // Implemented as a macro to avoid erasing the callsite information.
+        macro_rules! maybe_log_error {
+            ($operation:expr, $result:expr) => {
+                match $result {
+                    Ok(val) => Ok(val),
+                    Err(errno) => {
+                        crate::bindings::socket::log_errno!(
+                            errno,
+                            "packet socket failed to handle {}: {:?}",
+                            $operation,
+                            errno
+                        );
+                        Err(errno)
+                    }
+                }
+            };
+        }
+
         match request {
             fppacket::SocketRequest::Clone2 { request, control_handle: _ } => {
                 let channel = fidl::AsyncChannel::from_channel(request.into_channel());
@@ -457,9 +479,7 @@ impl<'a> RequestHandler<'a> {
                 respond_not_supported!("packet::GetNoCheck", responder)
             }
             fppacket::SocketRequest::SetLinger { linger: _, length_secs: _, responder } => {
-                responder
-                    .send(Err(fposix::Errno::Eopnotsupp))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                respond_not_supported!("packet::SetLinger", responder)
             }
             fppacket::SocketRequest::GetLinger { responder } => {
                 respond_not_supported!("packet::GetLinger", responder)
@@ -491,10 +511,10 @@ impl<'a> RequestHandler<'a> {
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fppacket::SocketRequest::Bind { protocol, bound_interface_id, responder } => responder
-                .send(self.bind(protocol, bound_interface_id))
+                .send(maybe_log_error!("bind", self.bind(protocol, bound_interface_id)))
                 .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             fppacket::SocketRequest::GetInfo { responder } => responder
-                .send(match self.get_info() {
+                .send(match maybe_log_error!("get_info", self.get_info()) {
                     Ok((kind, ref protocol, ref iface)) => Ok((kind, protocol.as_ref(), iface)),
                     Err(e) => Err(e),
                 })
@@ -508,16 +528,20 @@ impl<'a> RequestHandler<'a> {
             } => {
                 let params = RecvMsgParams { want_packet_info, data_len, want_control, flags };
                 responder
-                    .send(match self.receive().map(|r| params.apply_to(r)) {
-                        Ok((ref packet_info, ref data, ref control, truncated)) => {
-                            Ok((packet_info.as_ref(), data.as_slice(), control, truncated))
-                        }
-                        Err(e) => Err(e),
-                    })
+                    .send(
+                        match maybe_log_error!("receive", self.receive())
+                            .map(|r| params.apply_to(r))
+                        {
+                            Ok((ref packet_info, ref data, ref control, truncated)) => {
+                                Ok((packet_info.as_ref(), data.as_slice(), control, truncated))
+                            }
+                            Err(e) => Err(e),
+                        },
+                    )
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fppacket::SocketRequest::SendMsg { packet_info, data, control, flags, responder } => {
-                if ![
+                let result = if ![
                     fppacket::SendControlData::default(),
                     fppacket::SendControlData {
                         socket: Some(fpsocket::SocketSendControlData::default()),
@@ -527,19 +551,16 @@ impl<'a> RequestHandler<'a> {
                 .contains(&control)
                 {
                     tracing::warn!("unsupported control data: {:?}", control);
-                    responder
-                        .send(Err(fposix::Errno::Eopnotsupp))
-                        .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    Err(fposix::Errno::Eopnotsupp)
                 } else if flags != fpsocket::SendMsgFlags::empty() {
                     tracing::warn!("unsupported control flags: {:?}", flags);
-                    responder
-                        .send(Err(fposix::Errno::Eopnotsupp))
-                        .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    Err(fposix::Errno::Eopnotsupp)
                 } else {
-                    responder
-                        .send(self.send_msg(packet_info, data))
-                        .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
-                }
+                    self.send_msg(packet_info, data)
+                };
+                responder
+                    .send(maybe_log_error!("sendmsg", result))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
         }
         ControlFlow::Continue(None)
