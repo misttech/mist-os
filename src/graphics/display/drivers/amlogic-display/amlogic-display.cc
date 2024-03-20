@@ -47,6 +47,7 @@
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
+#include "src/graphics/display/drivers/amlogic-display/vsync-receiver.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
@@ -611,19 +612,7 @@ void AmlogicDisplay::DdkResume(ddk::ResumeTxn txn) {
 }
 
 void AmlogicDisplay::DdkRelease() {
-  if (vsync_irq_.is_valid()) {
-    zx_status_t status = vsync_irq_.destroy();
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Vsync IRQ destroy failed: %s", zx_status_get_string(status));
-    }
-  }
-  if (vsync_thread_) {
-    int status = thrd_join(*vsync_thread_, nullptr);
-    if (status != thrd_success) {
-      zxlogf(ERROR, "Vsync thread join failed: %s",
-             zx_status_get_string(thrd_status_to_zx_status(status)));
-    }
-  }
+  vsync_receiver_.reset();
 
   // TODO(https://fxbug.dev/42082206): Power off should occur after all threads are
   // destroyed. Otherwise other threads may still write to the VPU MMIO which
@@ -997,28 +986,16 @@ bool AmlogicDisplay::DisplayControllerImplIsCaptureCompleted() {
   return (current_capture_target_image_ == nullptr);
 }
 
-void AmlogicDisplay::VSyncThreadEntryPoint() {
-  while (true) {
-    zx::time timestamp;
-    zx_status_t status = vsync_irq_.wait(&timestamp);
-    if (status == ZX_ERR_CANCELED) {
-      zxlogf(INFO, "Vsync interrupt wait is cancelled. Stopping Vsync thread.");
-      break;
-    }
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "VSync interrupt wait failed: %s", zx_status_get_string(status));
-      break;
-    }
-    display::ConfigStamp current_config_stamp = display::kInvalidConfigStamp;
-    if (fully_initialized()) {
-      current_config_stamp = video_input_unit_->GetLastConfigStampApplied();
-    }
-    fbl::AutoLock lock(&display_mutex_);
-    if (dc_intf_.is_valid() && display_attached_) {
-      const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(current_config_stamp);
-      dc_intf_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_), timestamp.get(),
-                              &banjo_config_stamp);
-    }
+void AmlogicDisplay::OnVsync(zx::time timestamp) {
+  display::ConfigStamp current_config_stamp = display::kInvalidConfigStamp;
+  if (fully_initialized()) {
+    current_config_stamp = video_input_unit_->GetLastConfigStampApplied();
+  }
+  fbl::AutoLock lock(&display_mutex_);
+  if (dc_intf_.is_valid() && display_attached_) {
+    const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(current_config_stamp);
+    dc_intf_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_), timestamp.get(),
+                            &banjo_config_stamp);
   }
 }
 
@@ -1167,7 +1144,6 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
   ZX_ASSERT(!sysmem_.is_valid());
   ZX_ASSERT(!canvas_.is_valid());
   ZX_ASSERT(!bti_.is_valid());
-  ZX_ASSERT(!vsync_irq_.is_valid());
 
   static constexpr char kPdevFragmentName[] = "pdev";
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
@@ -1209,13 +1185,6 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
   }
   bti_ = std::move(bti_result).value();
 
-  zx::result<zx::interrupt> vsync_interrupt_result =
-      GetInterrupt(InterruptResourceIndex::kViu1Vsync, pdev_.client_end());
-  if (vsync_interrupt_result.is_error()) {
-    return vsync_interrupt_result.error_value();
-  }
-  vsync_irq_ = std::move(vsync_interrupt_result).value();
-
   return ZX_OK;
 }
 
@@ -1236,32 +1205,6 @@ zx_status_t AmlogicDisplay::InitializeSysmemAllocator() {
     zxlogf(ERROR, "Failed to set sysmem allocator debug info: %s",
            set_debug_status.status_string());
     return set_debug_status.status();
-  }
-  return ZX_OK;
-}
-
-zx_status_t AmlogicDisplay::StartVsyncInterruptHandlerThread() {
-  ZX_ASSERT(!vsync_thread_.has_value());
-  thrd_t vsync_thread;
-  int vsync_thread_create_status = thrd_create_with_name(
-      &vsync_thread,
-      [](void* arg) {
-        reinterpret_cast<AmlogicDisplay*>(arg)->VSyncThreadEntryPoint();
-        return 0;
-      },
-      /*arg=*/this, /*name=*/"vsync_thread");
-  if (vsync_thread_create_status != thrd_success) {
-    zx_status_t status = thrd_status_to_zx_status(vsync_thread_create_status);
-    zxlogf(ERROR, "Failed to create Vsync thread: %s", zx_status_get_string(status));
-    return status;
-  }
-  vsync_thread_.emplace(vsync_thread);
-  // Set scheduler role for vsync thread.
-  const char* kRoleName = "fuchsia.graphics.display.drivers.amlogic-display.vsync";
-  zx_status_t status = device_set_profile_by_role(parent(), thrd_get_zx_handle(*vsync_thread_),
-                                                  kRoleName, strlen(kRoleName));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to apply role: %s", zx_status_get_string(status));
   }
   return ZX_OK;
 }
@@ -1335,11 +1278,14 @@ zx_status_t AmlogicDisplay::Bind() {
     return status;
   }
 
-  status = StartVsyncInterruptHandlerThread();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start Vsync interrupt handler threads: %s",
-           zx_status_get_string(status));
-    return status;
+  {
+    zx::result<std::unique_ptr<VsyncReceiver>> vsync_receiver_result = VsyncReceiver::Create(
+        parent(), pdev_.client_end(), fit::bind_member<&AmlogicDisplay::OnVsync>(this));
+    if (vsync_receiver_result.is_error()) {
+      // Create() already logged the error.
+      return vsync_receiver_result.error_value();
+    }
+    vsync_receiver_ = std::move(vsync_receiver_result).value();
   }
 
   {

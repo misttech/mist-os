@@ -38,6 +38,7 @@
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
+#include "src/graphics/display/drivers/amlogic-display/vsync-receiver.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
@@ -166,11 +167,10 @@ class AmlogicDisplay
   }
 
  private:
-  void VSyncThreadEntryPoint();
-  void CaptureThreadEntryPoint();
   void PopulatePanelType() TA_REQ(display_mutex_);
 
   void OnHotPlugStateChange(HotPlugDetectionState current_state);
+  void OnVsync(zx::time timestamp);
   void OnCaptureComplete();
 
   // TODO(https://fxbug.dev/42082357): Currently, AmlogicDisplay has a multi-step
@@ -215,13 +215,6 @@ class AmlogicDisplay
   // `vout_` must not be allocated nor initialized.
   zx_status_t InitializeHdmiVout();
 
-  // Starts the Vsync interrupt handler thread.
-  //
-  // Must be called once and only once per driver binding procedure.
-  //  `GetCommonProtocolsAndResources()` must be called to acquire the Vsync
-  // interrupt before this is called.
-  zx_status_t StartVsyncInterruptHandlerThread();
-
   // Acquires the hotplug display detection hardware resources (GPIO protocol
   // and interrupt for the hotplug detection GPIO pin) from parent nodes, and
   // starts the interrupt handler thread.
@@ -256,17 +249,11 @@ class AmlogicDisplay
   // Zircon handles
   zx::bti bti_;
 
-  // Thread handles
-  std::optional<thrd_t> vsync_thread_;
-
   // Protocol handles used in by this driver
   fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_;
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
-
-  // Interrupts
-  zx::interrupt vsync_irq_;
 
   // Locks used by the display driver
   fbl::Mutex display_mutex_;  // general display state (i.e. display_id)
@@ -317,6 +304,7 @@ class AmlogicDisplay
 
   std::unique_ptr<HotPlugDetection> hot_plug_detection_;
   std::unique_ptr<Capture> capture_;
+  std::unique_ptr<VsyncReceiver> vsync_receiver_;
 
   fit::function<bool(fuchsia_images2::wire::PixelFormat format)> format_support_check_ = nullptr;
 };

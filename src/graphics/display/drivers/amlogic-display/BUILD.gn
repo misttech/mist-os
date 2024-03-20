@@ -88,6 +88,8 @@ source_set("common_srcs") {
     "vpu-regs.h",
     "vpu.cc",
     "vpu.h",
+    "vsync-receiver.cc",
+    "vsync-receiver.h",
   ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
