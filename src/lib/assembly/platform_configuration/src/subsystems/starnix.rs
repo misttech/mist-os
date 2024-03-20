@@ -18,6 +18,10 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                 *context.feature_set_level == FeatureSupportLevel::Standard,
                 "Starnix is only supported in the default feature set level"
             );
+            ensure!(
+                *context.build_type != BuildType::User,
+                "Starnix is not supported on user builds."
+            );
             builder.platform_bundle("starnix_support");
 
             let has_fullmac = context.board_info.provides_feature("fuchsia::wlan_fullmac");
@@ -31,18 +35,13 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                     .package("starnix")
                     .component("meta/starnix_runner.cm")?
                     .field("enable_data_collection", *context.build_type == BuildType::UserDebug)?;
+                builder.platform_bundle("adb_support");
             } else {
                 builder
                     .package("starnix")
                     .component("meta/starnix_runner.cm")?
                     .field("enable_data_collection", false)?;
             }
-
-            // TODO(https://fxbug.dev/330159122): Re-enable this in the starnix configuration once
-            // a more precise mechanism for including aibs exists.
-            // if *context.build_type == BuildType::Eng {
-            //    builder.platform_bundle("adb_support");
-            // }
         }
         Ok(())
     }
