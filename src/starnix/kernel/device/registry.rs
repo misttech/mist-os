@@ -481,7 +481,7 @@ impl Default for DeviceRegistry {
 
 #[derive(Default)]
 struct DynRegistry {
-    dyn_devices: BTreeMap<u32, Box<dyn DeviceOps>>,
+    dyn_devices: BTreeMap<u32, Arc<Box<dyn DeviceOps>>>,
     next_dynamic_minor: u32,
 }
 
@@ -494,7 +494,7 @@ impl DynRegistry {
             return error!(ENOMEM);
         }
         self.next_dynamic_minor += 1;
-        self.dyn_devices.insert(minor, Box::new(device));
+        self.dyn_devices.insert(minor, Arc::new(Box::new(device)));
         Ok(DeviceType::new(DYN_MAJOR, minor))
     }
 }
@@ -508,9 +508,8 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
         node: &FsNode,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        // TODO(mariagl): Does this lock need to be held while calling .open?
-        let state = self.read();
-        let device = state.dyn_devices.get(&id.minor()).ok_or_else(|| errno!(ENODEV))?;
+        let device =
+            Arc::clone(self.read().dyn_devices.get(&id.minor()).ok_or_else(|| errno!(ENODEV))?);
         device.open(locked, current_task, id, node, flags)
     }
 }
