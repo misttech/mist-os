@@ -75,6 +75,82 @@ TEST_F(ScsiCommandTest, Read10) {
   ASSERT_EQ(memcmp(GetVirtualAddress(), buf, kMockBlockSize), 0);
 }
 
+TEST_F(ScsiCommandTest, Read10Exception) {
+  const uint8_t kTestLun = 0;
+  uint32_t block_offset = 0;
+
+  // Write test data to the mock device
+  char buf[kMockBlockSize];
+  std::memset(buf, 0xf0, sizeof(buf));
+
+  ASSERT_OK(mock_device_->BufferWrite(kTestLun, buf, GetBlockCount(), block_offset));
+
+  {
+    // Make READ 10 CDB
+    scsi::Read10CDB cdb = {};
+    cdb.opcode = scsi::Opcode::READ_10;
+    cdb.logical_block_address = htobe32(block_offset);
+    cdb.transfer_length = htobe16(GetBlockCount());
+    cdb.set_force_unit_access(false);
+
+    // TODO(https://fxbug.dev/42075643): remove "reinterpret_cast" after parameter type of the
+    // constructor of |ScsiCommandUpiu| is modified.
+    ScsiCommandUpiu upiu(reinterpret_cast<const uint8_t *>(&cdb), sizeof(cdb),
+                         DataDirection::kDeviceToHost, GetBlockCount() * GetBlockSize());
+    ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::READ_10);
+
+    // The command should be failed with not-created vmo.
+    zx::vmo not_created_vmo;
+    auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(
+        upiu, kTestLun, zx::unowned_vmo(not_created_vmo));
+    ASSERT_EQ(response.status_value(), ZX_ERR_BAD_HANDLE);
+  }
+
+  {
+    // Make READ 10 CDB
+    scsi::Read10CDB cdb = {};
+    cdb.opcode = scsi::Opcode::READ_10;
+    cdb.logical_block_address = htobe32(block_offset);
+    cdb.transfer_length = htobe16(GetBlockCount());
+    cdb.set_force_unit_access(false);
+
+    // TODO(https://fxbug.dev/42075643): remove "reinterpret_cast" after parameter type of the
+    // constructor of |ScsiCommandUpiu| is modified.
+    ScsiCommandUpiu upiu(reinterpret_cast<const uint8_t *>(&cdb), sizeof(cdb),
+                         DataDirection::kDeviceToHost, GetBlockCount() * GetBlockSize());
+    ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::READ_10);
+
+    // The command should be failed with not-exist LUN.
+    const uint8_t kTestFailureLun = 1;
+    auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestFailureLun,
+                                                                     zx::unowned_vmo(GetVmo()));
+    ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
+  }
+
+  {
+    // Make READ 10 CDB with address exceeding device size.
+    scsi::Read10CDB cdb = {};
+    cdb.opcode = scsi::Opcode::READ_10;
+    const uint32_t invalid_block_address = htobe32(kMockTotalDeviceCapacity / kMockBlockSize);
+    cdb.logical_block_address = invalid_block_address;
+    cdb.transfer_length = htobe16(GetBlockCount());
+    cdb.set_force_unit_access(false);
+
+    // TODO(https://fxbug.dev/42075643): remove "reinterpret_cast" after parameter type of the
+    // constructor of |ScsiCommandUpiu| is modified.
+    ScsiCommandUpiu upiu(reinterpret_cast<const uint8_t *>(&cdb), sizeof(cdb),
+                         DataDirection::kDeviceToHost, GetBlockCount() * GetBlockSize());
+    ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::READ_10);
+
+    // The command should be failed with address exceeding device size.
+    auto response =
+        ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo()));
+    // TODO(https://fxbug.dev/42075643): Modify status code after
+    // |TransferRequestProcessor::GetResponseStatus()| is refactored.
+    ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
+  }
+}
+
 TEST_F(ScsiCommandTest, Write10) {
   const uint8_t kTestLun = 0;
   uint32_t block_offset = 0;
@@ -102,6 +178,78 @@ TEST_F(ScsiCommandTest, Write10) {
 
   // Check the written data
   ASSERT_EQ(memcmp(GetVirtualAddress(), buf, kMockBlockSize), 0);
+}
+
+TEST_F(ScsiCommandTest, Write10Exception) {
+  const uint8_t kTestLun = 0;
+  uint32_t block_offset = 0;
+
+  std::memset(static_cast<char *>(GetVirtualAddress()), 0xf0, kMockBlockSize);
+
+  {
+    // Make WRITE 10 CDB
+    scsi::Write10CDB cdb = {};
+    cdb.opcode = scsi::Opcode::WRITE_10;
+    cdb.logical_block_address = htobe32(block_offset);
+    cdb.transfer_length = htobe16(GetBlockCount());
+    cdb.set_force_unit_access(false);
+
+    // TODO(https://fxbug.dev/42075643): remove "reinterpret_cast" after parameter type of the
+    // constructor of |ScsiCommandUpiu| is modified.
+    ScsiCommandUpiu upiu(reinterpret_cast<const uint8_t *>(&cdb), sizeof(cdb),
+                         DataDirection::kHostToDevice, GetBlockCount() * GetBlockSize());
+    ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::WRITE_10);
+
+    // The command should be failed with not-created vmo.
+    zx::vmo not_created_vmo;
+    auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(
+        upiu, kTestLun, zx::unowned_vmo(not_created_vmo));
+    ASSERT_EQ(response.status_value(), ZX_ERR_BAD_HANDLE);
+  }
+
+  {
+    // Make WRITE 10 CDB
+    scsi::Write10CDB cdb = {};
+    cdb.opcode = scsi::Opcode::WRITE_10;
+    cdb.logical_block_address = htobe32(block_offset);
+    cdb.transfer_length = htobe16(GetBlockCount());
+    cdb.set_force_unit_access(false);
+
+    // TODO(https://fxbug.dev/42075643): remove "reinterpret_cast" after parameter type of the
+    // constructor of |ScsiCommandUpiu| is modified.
+    ScsiCommandUpiu upiu(reinterpret_cast<const uint8_t *>(&cdb), sizeof(cdb),
+                         DataDirection::kHostToDevice, GetBlockCount() * GetBlockSize());
+    ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::WRITE_10);
+
+    // The command should be failed with not-exist LUN.
+    const uint8_t kTestFailureLun = 1;
+    auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestFailureLun,
+                                                                     zx::unowned_vmo(GetVmo()));
+    // TODO(https://fxbug.dev/42075643): Modify status code after
+    // |TransferRequestProcessor::GetResponseStatus()| is refactored.
+    ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
+  }
+
+  {
+    // Make WRITE 10 CDB with address exceeding device size.
+    scsi::Write10CDB cdb = {};
+    cdb.opcode = scsi::Opcode::WRITE_10;
+    const uint32_t invalid_block_address = htobe32(kMockTotalDeviceCapacity / kMockBlockSize);
+    cdb.logical_block_address = invalid_block_address;
+    cdb.transfer_length = htobe16(GetBlockCount());
+    cdb.set_force_unit_access(false);
+
+    // TODO(https://fxbug.dev/42075643): remove "reinterpret_cast" after parameter type of the
+    // constructor of |ScsiCommandUpiu| is modified.
+    ScsiCommandUpiu upiu(reinterpret_cast<const uint8_t *>(&cdb), sizeof(cdb),
+                         DataDirection::kHostToDevice, GetBlockCount() * GetBlockSize());
+    ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::WRITE_10);
+
+    // The command should be failed with address exceeding device size.
+    auto response =
+        ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo()));
+    ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
+  }
 }
 
 TEST_F(ScsiCommandTest, TestUnitReady) {
