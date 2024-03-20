@@ -215,7 +215,7 @@ pub trait RoutingTestModel {
 
     /// Checks that a use declaration of `path` at `moniker` can be opened with
     /// Fuchsia file operations.
-    async fn check_open_file(&self, moniker: Moniker, path: cm_types::Path);
+    async fn check_open_node(&self, moniker: Moniker, path: cm_types::Path);
 
     /// Create a file with the given contents in the test dir, along with any subdirectories
     /// required.
@@ -449,7 +449,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 },
             )
             .await;
-        model.check_open_file(vec!["b"].try_into().unwrap(), "/svc/device".parse().unwrap()).await;
+        model.check_open_node(vec!["b"].try_into().unwrap(), "/svc/device".parse().unwrap()).await;
     }
 
     ///   a

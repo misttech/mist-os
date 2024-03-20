@@ -30,7 +30,7 @@ use {
     std::iter,
     std::sync::{self, Arc},
     tracing::warn,
-    vfs::{execution_scope::ExecutionScope, ToObjectRequest},
+    vfs::{execution_scope::ExecutionScope, service::endpoint, ToObjectRequest},
 };
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
@@ -280,27 +280,9 @@ impl LaunchTaskOnReceive {
     }
 
     pub fn into_open(self: Arc<Self>, target: WeakComponentInstance) -> Open {
-        Open::new(
-            move |_scope: ExecutionScope,
-                  flags: fio::OpenFlags,
-                  path: vfs::path::Path,
-                  server_end: zx::Channel| {
-                let Some(server_end) = unwrap_server_end_or_serve_node(server_end, flags) else {
-                    return;
-                };
-                if !path.is_empty() {
-                    let moniker = &target.moniker;
-                    warn!(
-                        "{moniker} accessed a protocol capability with non-empty path {path:?}. \
-                    This is not supported."
-                    );
-                    let _ = server_end.close_with_epitaph(zx::Status::NOT_DIR);
-                    return;
-                }
-                self.launch_task(server_end, target.clone());
-            },
-            fio::DirentType::Service,
-        )
+        Open::new(endpoint(move |_scope: ExecutionScope, server_end: AsyncChannel| {
+            self.launch_task(server_end.into_zx_channel(), target.clone());
+        }))
     }
 
     pub fn into_router(self) -> Router {
@@ -392,30 +374,34 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_node_reference_and_describe() {
-        let (receiver, sender) = Receiver::new();
-        let open: Open = sender.into();
-        let (client_end, server_end) = zx::Channel::create();
-        let scope = ExecutionScope::new();
-        open.open(
-            scope,
-            fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE,
-            ".",
-            server_end,
-        );
-        let message = receiver.receive().await.unwrap();
+        let receiver = {
+            let (receiver, sender) = Receiver::new();
+            let open: Open = sender.into();
+            let (client_end, server_end) = zx::Channel::create();
+            let scope = ExecutionScope::new();
+            open.open(
+                scope,
+                fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE,
+                ".",
+                server_end,
+            );
 
-        // We never get the channel because it was intercepted by the VFS.
-        assert_matches!(message.payload.unwrap_server_end_or_serve_node(), None);
+            // The NODE_REFERENCE connection should be terminated on the sender side.
+            let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
+            let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+            let result = node.take_event_stream().next().await.unwrap();
+            assert_matches!(
+                result,
+                Ok(fio::NodeEvent::OnOpen_ { s, info })
+                    if s == zx::Status::OK.into_raw()
+                    && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
+            );
 
-        let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
-        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
-        let result = node.take_event_stream().next().await.unwrap();
-        assert_matches!(
-            result,
-            Ok(fio::NodeEvent::OnOpen_ { s, info })
-            if s == zx::Status::OK.into_raw()
-            && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
-        );
+            receiver
+        };
+
+        // After closing the sender, the receiver should be done.
+        assert_matches!(receiver.receive().await, None);
     }
 
     #[fuchsia::test]

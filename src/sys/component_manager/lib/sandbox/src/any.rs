@@ -5,8 +5,8 @@ use crate::{CapabilityTrait, ConversionError, Open};
 use crate_local::ObjectSafeCapability;
 use dyn_clone::{clone_trait_object, DynClone};
 use fidl_fuchsia_component_sandbox as fsandbox;
-use std::any::Any;
-use std::fmt::Debug;
+use std::{any::Any, fmt::Debug, sync::Arc};
+use vfs::directory::entry::DirectoryEntry;
 
 /// An object-safe version of [Capability] that represents a type-erased capability.
 ///
@@ -38,6 +38,8 @@ pub(crate) mod crate_local {
         fn into_fidl(self: Box<Self>) -> fsandbox::Capability;
 
         fn try_into_open(self: Box<Self>) -> Result<Open, ConversionError>;
+
+        fn try_into_directory(self: Box<Self>) -> Result<Arc<dyn DirectoryEntry>, ConversionError>;
     }
 
     impl<T: CapabilityTrait> ObjectSafeCapability for T {
@@ -47,6 +49,10 @@ pub(crate) mod crate_local {
 
         fn try_into_open(self: Box<Self>) -> Result<Open, ConversionError> {
             (*self).try_into_open()
+        }
+
+        fn try_into_directory(self: Box<Self>) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+            (*self).try_into_directory()
         }
     }
 }
@@ -84,7 +90,7 @@ mod tests {
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;
     use std::sync::mpsc;
-    use vfs::execution_scope::ExecutionScope;
+    use vfs::{execution_scope::ExecutionScope, service::endpoint};
 
     /// Tests that [AnyCapability] can be converted to a FIDL Capability.
     ///
@@ -102,18 +108,12 @@ mod tests {
     ///
     /// This exercises that the [try_into_open] implementation delegates to the the underlying
     /// Capability's [try_into_open] through [ObjectSafeCapability].
-    #[test]
-    fn test_any_try_into_open() {
+    #[fuchsia::test]
+    async fn test_any_try_into_open() {
         let (tx, rx) = mpsc::channel::<()>();
-        let open = Open::new(
-            move |_scope: ExecutionScope,
-                  _flags: fio::OpenFlags,
-                  _relative_path: vfs::path::Path,
-                  _server_end: zx::Channel| {
-                tx.send(()).unwrap();
-            },
-            fio::DirentType::Unknown,
-        );
+        let open = Open::new(endpoint(move |_scope, _server_end| {
+            tx.send(()).unwrap();
+        }));
         let any: AnyCapability = Box::new(open);
 
         // Convert the Any back to Open.

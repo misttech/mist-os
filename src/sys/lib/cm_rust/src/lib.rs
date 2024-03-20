@@ -2110,6 +2110,23 @@ impl From<&CapabilityDecl> for CapabilityTypeName {
     }
 }
 
+impl From<CapabilityTypeName> for fio::DirentType {
+    fn from(value: CapabilityTypeName) -> Self {
+        match value {
+            CapabilityTypeName::Directory => fio::DirentType::Directory,
+            CapabilityTypeName::EventStream => fio::DirentType::Service,
+            CapabilityTypeName::Protocol => fio::DirentType::Service,
+            CapabilityTypeName::Service => fio::DirentType::Directory,
+            CapabilityTypeName::Storage => fio::DirentType::Directory,
+            CapabilityTypeName::Dictionary => fio::DirentType::Service,
+            // The below don't appear in exposed or used dir
+            CapabilityTypeName::Resolver
+            | CapabilityTypeName::Runner
+            | CapabilityTypeName::Config => fio::DirentType::Unknown,
+        }
+    }
+}
+
 // TODO: Runners and third parties can use this to parse `facets`.
 impl FidlIntoNative<HashMap<String, DictionaryValue>> for fdata::Dictionary {
     fn fidl_into_native(self) -> HashMap<String, DictionaryValue> {

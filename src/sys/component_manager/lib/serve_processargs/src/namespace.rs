@@ -9,7 +9,7 @@ use namespace::{Entry as NamespaceEntry, Namespace, NamespaceError, Path as Name
 use sandbox::{Capability, Dict};
 use std::sync::Arc;
 use thiserror::Error;
-use vfs::execution_scope::ExecutionScope;
+use vfs::{directory::entry::serve_directory, execution_scope::ExecutionScope};
 
 /// A builder object for assembling a program's incoming namespace.
 pub struct NamespaceBuilder {
@@ -38,6 +38,13 @@ pub enum BuildNamespaceError {
         path: NamespacePath,
         #[source]
         err: Arc<sandbox::ConversionError>,
+    },
+
+    #[error("unable to serve `{path}` after converting to directory: {err}")]
+    Serve {
+        path: NamespacePath,
+        #[source]
+        err: fidl::Status,
     },
 }
 
@@ -103,14 +110,21 @@ impl NamespaceBuilder {
                 let directory = match cap {
                     Capability::Directory(d) => d,
                     cap => {
-                        let open =
-                            cap.try_into_open().map_err(|err| BuildNamespaceError::Conversion {
+                        let directory = cap.try_into_directory().map_err(|err| {
+                            BuildNamespaceError::Conversion {
                                 path: path.clone(),
                                 err: Arc::new(err),
-                            })?;
-                        open.into_directory(
-                            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-                            self.scope.clone(),
+                            }
+                        })?;
+                        sandbox::Directory::new(
+                            serve_directory(
+                                directory,
+                                &self.scope,
+                                fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
+                            )
+                            .map_err(|err| {
+                                BuildNamespaceError::Serve { path: path.clone(), err }
+                            })?,
                         )
                     }
                 };

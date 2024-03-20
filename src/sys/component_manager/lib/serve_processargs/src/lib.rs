@@ -180,15 +180,17 @@ fn validate_handle_type(handle_type: HandleType) -> Result<(), DeliveryError> {
 #[cfg(test)]
 mod test_util {
     use {
+        fidl::endpoints::ServerEnd,
         fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
         fuchsia_zircon::HandleBased,
         sandbox::{OneShotHandle, Open},
+        std::sync::Arc,
         vfs::{
+            directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
             execution_scope::ExecutionScope,
             path::Path,
+            remote::RemoteLike,
             service,
-            service::{ServiceLike, ServiceOptions},
-            ToObjectRequest,
         },
     };
 
@@ -204,36 +206,46 @@ mod test_util {
                 let _ = sender.send(capability).await;
             });
         };
-        let service = service::endpoint(open_fn);
 
-        let open_fn = move |scope: ExecutionScope,
-                            flags: fio::OpenFlags,
-                            _path: vfs::path::Path,
-                            server_end: zx::Channel| {
-            flags
-                .to_object_request(server_end)
-                .handle(|object_request| service.connect(scope, ServiceOptions, object_request));
-        };
-
-        let open = Open::new(open_fn, fio::DirentType::Service);
+        let open = Open::new(service::endpoint(open_fn));
 
         (open, Receiver(receiver))
     }
 
-    pub fn open() -> (Open, async_channel::Receiver<(Path, zx::Channel)>) {
+    pub fn mock_dir() -> (Arc<impl DirectoryEntry>, async_channel::Receiver<(Path, zx::Channel)>) {
         let (sender, receiver) = async_channel::unbounded::<(Path, zx::Channel)>();
-        let open_fn = move |scope: ExecutionScope,
-                            _flags: fio::OpenFlags,
-                            relative_path: Path,
-                            server_end: zx::Channel| {
-            let sender = sender.clone();
-            scope.spawn(async move {
-                sender.send((relative_path, server_end)).await.unwrap();
-            })
-        };
-        let open = Open::new(open_fn, fio::DirentType::Directory);
 
-        (open, receiver)
+        struct Sender(async_channel::Sender<(Path, zx::Channel)>);
+
+        impl DirectoryEntry for Sender {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+            }
+
+            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+                request.open_remote(self)
+            }
+        }
+
+        impl RemoteLike for Sender {
+            fn open(
+                self: Arc<Self>,
+                scope: ExecutionScope,
+                _flags: fio::OpenFlags,
+                relative_path: Path,
+                server_end: ServerEnd<fio::NodeMarker>,
+            ) {
+                scope.spawn(async move {
+                    self.0.send((relative_path, server_end.into_channel())).await.unwrap();
+                })
+            }
+
+            fn lazy(&self, path: &Path) -> bool {
+                path.is_empty()
+            }
+        }
+
+        (Arc::new(Sender(sender)), receiver)
     }
 }
 
@@ -254,7 +266,8 @@ mod tests {
         sandbox::OneShotHandle,
         std::pin::pin,
         std::str::FromStr,
-        test_util::{multishot, open},
+        test_util::{mock_dir, multishot},
+        vfs::directory::entry::serve_directory,
     };
 
     #[fuchsia::test]
@@ -599,12 +612,14 @@ mod tests {
     fn test_namespace_entry_end_to_end() -> Result<()> {
         use futures::task::Poll;
         let mut exec = fasync::TestExecutor::new();
-        let (open, receiver) = open();
-        let directory = open.into_directory(fio::OpenFlags::DIRECTORY, ExecutionScope::new());
+        let (dir, receiver) = mock_dir();
+        let scope = ExecutionScope::new();
+        let dir_proxy = serve_directory(dir, &scope, fio::OpenFlags::DIRECTORY).unwrap();
 
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();
-        dict.lock_entries().insert("data".to_string(), Capability::Directory(directory));
+        dict.lock_entries()
+            .insert("data".to_string(), Capability::Directory(sandbox::Directory::new(dir_proxy)));
         let delivery_map = hashmap! {
             "data".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::NamespaceEntry(cm_types::Path::from_str("/data").unwrap())

@@ -31,7 +31,7 @@ use {
                 service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
                 RoutingError,
             },
-            routing_fns::route_fn,
+            routing_fns::RouteEntry,
             start::Start,
             token::{InstanceToken, InstanceTokenState},
         },
@@ -54,7 +54,6 @@ use {
     },
     async_trait::async_trait,
     async_utils::async_once::Once,
-    bedrock_error::Explain,
     clonable_error::ClonableError,
     cm_fidl_validator::error::DeclType,
     cm_logger::scoped::ScopedLogger,
@@ -67,10 +66,7 @@ use {
     cm_util::{channel, TaskGroup},
     component_id_index::InstanceId,
     config_encoder::ConfigFields,
-    fidl::{
-        endpoints::{self, ServerEnd},
-        epitaph::ChannelEpitaphExt,
-    },
+    fidl::endpoints::{self, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
@@ -92,7 +88,10 @@ use {
     },
     tracing::{debug, warn},
     version_history::AbiRevision,
-    vfs::{directory::immutable::simple as pfs, execution_scope::ExecutionScope, path::Path},
+    vfs::{
+        directory::immutable::simple as pfs, execution_scope::ExecutionScope, path::Path,
+        remote::GetRemoteDir,
+    },
 };
 
 pub type WeakComponentInstance = WeakComponentInstanceInterface<ComponentInstance>;
@@ -766,7 +765,7 @@ impl ComponentInstance {
         };
 
         let stop_result = {
-            if let Some(ref mut runtime) = runtime {
+            if let Some(runtime) = &mut runtime {
                 let stop_timer = Box::pin(async move {
                     let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
                         self.environment.stop_timeout(),
@@ -1015,30 +1014,27 @@ impl ComponentInstance {
     /// Returns an [`Open`] representation of the outgoing directory of the component. It performs
     /// the same checks as `open_outgoing`, but errors are surfaced at the server endpoint.
     pub fn get_outgoing(self: &Arc<Self>) -> Open {
-        let weak_component = WeakComponentInstance::from(self);
-        Open::new(
-            move |scope: ExecutionScope,
-                  flags: fio::OpenFlags,
-                  path: vfs::path::Path,
-                  mut server_end: zx::Channel| {
-                let component = match weak_component.upgrade() {
-                    Ok(component) => component,
-                    Err(err) => {
-                        let _ = server_end.close_with_epitaph(err.as_zx_status());
-                        return;
-                    }
-                };
-                scope.spawn(async move {
-                    match component.open_outgoing(flags, path.as_ref(), &mut server_end) {
-                        Ok(()) => {}
-                        Err(err) => {
-                            let _ = server_end.close_with_epitaph(err.as_zx_status());
-                        }
-                    }
-                });
-            },
-            fio::DirentType::Directory,
-        )
+        struct GetOutgoing {
+            component: WeakComponentInstance,
+        }
+
+        impl GetRemoteDir for GetOutgoing {
+            fn get_remote_dir(&self) -> Result<fio::DirectoryProxy, zx::Status> {
+                let component = self.component.upgrade().map_err(|e| e.as_zx_status())?;
+                let outgoing_dir = Clone::clone(
+                    component
+                        .lock_execution()
+                        .runtime
+                        .as_ref()
+                        .and_then(|r| r.outgoing_dir())
+                        .ok_or(zx::Status::NOT_FOUND)?,
+                );
+                Ok(outgoing_dir)
+            }
+        }
+
+        let get_remote_dir = Arc::new(GetOutgoing { component: WeakComponentInstance::from(self) });
+        Open::new(get_remote_dir)
     }
 
     /// Connects `server_chan` to this instance's exposed directory if it has
@@ -1765,9 +1761,18 @@ impl ResolvedInstanceState {
             };
             let name = capability.name().as_str();
             let path = fuchsia_fs::canonicalize_path(path.as_str());
-            let sender = sandbox::Sender::new_sendable(
-                outgoing_dir.clone().downscope_path(sandbox::Path::new(path)),
-            );
+            let Some(open) = outgoing_dir.clone().downscope_path(
+                Path::validate_and_split(path).unwrap(),
+                ComponentCapability::from(capability.clone()).type_name().into(),
+            ) else {
+                warn!(
+                    moniker = %component.moniker,
+                    "Dropping non-directory like capability `{name}` for outgoing program \
+                     dictionary"
+                );
+                continue;
+            };
+            let sender = sandbox::Sender::new_sendable(open);
             let router = Capability::Sender(sender)
                 .with_capability_requested_hook(weak_component.clone(), capability.name().clone());
             dict.insert_capability(iter::once(name), router.into());
@@ -1914,20 +1919,7 @@ impl ResolvedInstanceState {
                 Some(r) => r,
                 None => continue,
             };
-            let routing_fn = route_fn(component.clone(), request);
-            let dirent_type = match type_name {
-                CapabilityTypeName::Directory => fio::DirentType::Directory,
-                CapabilityTypeName::EventStream => fio::DirentType::Service,
-                CapabilityTypeName::Protocol => fio::DirentType::Service,
-                CapabilityTypeName::Service => fio::DirentType::Directory,
-                CapabilityTypeName::Storage => fio::DirentType::Directory,
-                CapabilityTypeName::Dictionary => fio::DirentType::Service,
-                // The below don't appear in exposed or used dir
-                CapabilityTypeName::Resolver
-                | CapabilityTypeName::Runner
-                | CapabilityTypeName::Config => fio::DirentType::Unknown,
-            };
-            let open = Open::new(routing_fn, dirent_type);
+            let open = Open::new(RouteEntry::new(component.clone(), request, type_name.into()));
             target_dict.insert_capability(iter::once(target_name), open.into());
         }
     }

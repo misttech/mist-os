@@ -8,6 +8,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::TryStreamExt;
 use std::sync::{Arc, Mutex};
+use vfs::service::endpoint;
 
 use crate::{registry, CapabilityTrait, ConversionError, Open};
 
@@ -84,23 +85,16 @@ impl CapabilityTrait for OneShotHandle {
 
         let openable = ClientEnd::<fio::OpenableMarker>::from(handle).into_proxy().unwrap();
 
-        Ok(Open::new(
-            move |_scope: vfs::execution_scope::ExecutionScope,
-                  flags: fio::OpenFlags,
-                  relative_path: vfs::path::Path,
-                  server_end: zx::Channel| {
-                // TODO(b/306037927): Calling Open on a channel that doesn't speak Openable may
-                // inadvertently close the channel.
-                let _ = openable.open(
-                    flags,
-                    fio::ModeType::empty(),
-                    relative_path.as_str(),
-                    server_end.into(),
-                );
-            },
-            // TODO(b/298112397): Determine a more accurate dirent type.
-            fio::DirentType::Unknown,
-        ))
+        Ok(Open::new(endpoint(move |_scope, server_end| {
+            // TODO(b/306037927): Calling Open on a channel that doesn't speak Openable may
+            // inadvertently close the channel.
+            let _ = openable.open(
+                fio::OpenFlags::empty(),
+                fio::ModeType::empty(),
+                ".",
+                server_end.into_zx_channel().into(),
+            );
+        })))
     }
 }
 

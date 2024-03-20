@@ -5,8 +5,9 @@ use crate::{AnyCapability, AnyCast, Open};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use from_enum::FromEnum;
 use fuchsia_zircon::{AsHandleRef, HandleRef};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 use thiserror::Error;
+use vfs::directory::entry::DirectoryEntry;
 
 #[derive(Error, Debug, Clone)]
 pub enum ConversionError {
@@ -80,6 +81,19 @@ impl Capability {
             Capability::Unit(s) => s.into_fidl(),
             Capability::Directory(s) => s.into_fidl(),
             Capability::OneShotHandle(s) => s.into_fidl(),
+        }
+    }
+
+    pub fn try_into_directory(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+        match self {
+            Capability::Sender(s) => s.try_into_directory(),
+            Capability::Open(s) => s.try_into_directory(),
+            Capability::Router(s) => s.try_into_directory(),
+            Capability::Dictionary(s) => s.try_into_directory(),
+            Capability::Data(s) => s.try_into_directory(),
+            Capability::Unit(s) => s.try_into_directory(),
+            Capability::Directory(s) => s.try_into_directory(),
+            Capability::OneShotHandle(s) => s.try_into_directory(),
         }
     }
 }
@@ -176,12 +190,19 @@ pub trait CapabilityTrait:
 {
     /// Attempt to convert `self` to a capability of type [Open].
     ///
-    /// The default implementation always returns an error
+    /// The default implementation forwards to `try_into_directory`.
     fn try_into_open(self) -> Result<Open, ConversionError> {
-        Err(ConversionError::NotSupported)
+        Ok(Open::new(self.try_into_directory()?))
     }
 
     fn into_fidl(self) -> fsandbox::Capability {
         self.into()
+    }
+
+    /// Attempt to convert `self` to a fuchsia.io directory.
+    ///
+    /// The default implementation always returns an error.
+    fn try_into_directory(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+        Err(ConversionError::NotSupported)
     }
 }

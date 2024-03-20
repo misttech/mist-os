@@ -4,7 +4,6 @@
 use derivative::Derivative;
 use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::TryStreamExt;
@@ -16,13 +15,10 @@ use tracing::warn;
 use vfs::{
     directory::{
         entry::DirectoryEntry,
-        entry_container::Directory as VfsDirectory,
         helper::{AlreadyExists, DirectlyMutable},
         immutable::simple as pfs,
     },
-    execution_scope::ExecutionScope,
     name::Name,
-    path::Path,
 };
 
 use crate::{registry, Capability, CapabilityTrait, ConversionError, Open};
@@ -240,10 +236,7 @@ impl From<Dict> for fsandbox::Capability {
 }
 
 impl CapabilityTrait for Dict {
-    /// Convert this [Dict] capability into [Open] by recursively converting the entries
-    /// to [Open], then building a VFS directory where each entry is a remote VFS node.
-    /// The resulting [Open] capability will speak `fuchsia.io/Directory` when remoted.
-    fn try_into_open(self: Self) -> Result<Open, ConversionError> {
+    fn try_into_directory(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         let dir = pfs::simple();
         for (key, value) in self.lock_entries().iter() {
             let remote: Arc<dyn DirectoryEntry> = match value {
@@ -267,15 +260,7 @@ impl CapabilityTrait for Dict {
         dir.clone().set_not_found_handler(Box::new(move |path| {
             not_found(path.to_owned());
         }));
-        Ok(Open::new(
-            move |scope: ExecutionScope,
-                  flags: fio::OpenFlags,
-                  relative_path: Path,
-                  server_end: zx::Channel| {
-                dir.clone().open(scope.clone(), flags, relative_path, server_end.into())
-            },
-            fio::DirentType::Directory,
-        ))
+        Ok(dir)
     }
 }
 
@@ -322,12 +307,22 @@ mod tests {
     use anyhow::{Error, Result};
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream, Proxy};
+    use fidl_fuchsia_io as fio;
     use fidl_fuchsia_unknown as funknown;
     use fuchsia_fs::directory::DirEntry;
     use futures::try_join;
-    use lazy_static::lazy_static;
     use test_util::Counter;
-    use vfs::{pseudo_directory, remote::RemoteLike};
+    use vfs::{
+        directory::{
+            entry::{serve_directory, EntryInfo, OpenRequest, SubNode},
+            entry_container::Directory as VfsDirectory,
+        },
+        execution_scope::ExecutionScope,
+        path::Path,
+        pseudo_directory,
+        remote::{remote_dir, RemoteLike},
+        service::endpoint,
+    };
 
     const CAP_KEY: &str = "cap";
 
@@ -679,15 +674,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn try_into_open_error_invalid_name() {
-        let placeholder_open = Open::new(
-            move |_scope: ExecutionScope,
-                  _flags: fio::OpenFlags,
-                  _relative_path: Path,
-                  _server_end: zx::Channel| {
-                unreachable!();
-            },
-            fio::DirentType::Directory,
-        );
+        let (proxy, _server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let placeholder_open = Open::new(remote_dir(proxy));
         let dict = Dict::new();
         // This string is too long to be a valid fuchsia.io name.
         let bad_name = "a".repeat(10000);
@@ -695,66 +683,60 @@ mod tests {
         assert_matches!(dict.try_into_open(), Err(ConversionError::ParseName(_)));
     }
 
+    struct MockDir(Counter);
+    impl DirectoryEntry for MockDir {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+        }
+
+        fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+            request.open_remote(self)
+        }
+    }
+    impl RemoteLike for MockDir {
+        fn open(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            _flags: fio::OpenFlags,
+            relative_path: Path,
+            _server_end: ServerEnd<fio::NodeMarker>,
+        ) {
+            assert_eq!(relative_path.as_ref(), "bar");
+            self.0.inc();
+        }
+    }
+
     /// Convert a dict `{ CAP_KEY: open }` to [Open].
     #[fuchsia::test]
     async fn try_into_open_success() {
-        lazy_static! {
-            static ref OPEN_COUNT: Counter = Counter::new(0);
-        }
-
-        let open = Open::new(
-            move |_scope: ExecutionScope,
-                  _flags: fio::OpenFlags,
-                  relative_path: Path,
-                  server_end: zx::Channel| {
-                assert_eq!(relative_path.into_string(), "bar");
-                OPEN_COUNT.inc();
-                drop(server_end);
-            },
-            fio::DirentType::Directory,
-        );
         let dict = Dict::new();
-        dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Open(open));
+        let mock_dir = Arc::new(MockDir(Counter::new(0)));
+        dict.lock_entries()
+            .insert(CAP_KEY.to_string(), Capability::Open(Open::new(mock_dir.clone())));
         let dict_open = dict.try_into_open().expect("convert dict into Open capability");
 
         let remote = dict_open.into_remote();
         let scope = ExecutionScope::new();
-        let (dir_client_end, dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
-        remote.clone().open(
-            scope.clone(),
-            fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            dir_server_end.into_channel().into(),
-        );
 
-        assert_eq!(OPEN_COUNT.get(), 0);
+        let dir_client_end =
+            serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY).unwrap();
+
+        assert_eq!(mock_dir.0.get(), 0);
         let (client_end, server_end) = zx::Channel::create();
         let dir = dir_client_end.channel();
         fdio::service_connect_at(dir, &format!("{CAP_KEY}/bar"), server_end).unwrap();
         fasync::Channel::from_channel(client_end).on_closed().await.unwrap();
-        assert_eq!(OPEN_COUNT.get(), 1);
+        assert_eq!(mock_dir.0.get(), 1);
     }
 
     /// Convert a dict `{ CAP_KEY: { CAP_KEY: open } }` to [Open].
     #[fuchsia::test]
     async fn try_into_open_success_nested() {
-        lazy_static! {
-            static ref OPEN_COUNT: Counter = Counter::new(0);
-        }
-
-        let open = Open::new(
-            move |_scope: ExecutionScope,
-                  _flags: fio::OpenFlags,
-                  relative_path: Path,
-                  server_end: zx::Channel| {
-                assert_eq!(relative_path.into_string(), "bar");
-                OPEN_COUNT.inc();
-                drop(server_end);
-            },
-            fio::DirentType::Directory,
-        );
         let inner_dict = Dict::new();
-        inner_dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Open(open));
+        let mock_dir = Arc::new(MockDir(Counter::new(0)));
+        inner_dict
+            .lock_entries()
+            .insert(CAP_KEY.to_string(), Capability::Open(Open::new(mock_dir.clone())));
         let dict = Dict::new();
         dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Dictionary(inner_dict));
 
@@ -762,13 +744,9 @@ mod tests {
 
         let remote = dict_open.into_remote();
         let scope = ExecutionScope::new();
-        let (dir_client_end, dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
-        remote.clone().open(
-            scope.clone(),
-            fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            dir_server_end.into_channel().into(),
-        );
+
+        let dir_client_end =
+            serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY).unwrap();
 
         // List the outer directory and verify the contents.
         let dir = dir_client_end.into_proxy().unwrap();
@@ -778,12 +756,12 @@ mod tests {
         );
 
         // Open the inner most capability.
-        assert_eq!(OPEN_COUNT.get(), 0);
+        assert_eq!(mock_dir.0.get(), 0);
         let (client_end, server_end) = zx::Channel::create();
         let dir = dir.into_channel().unwrap().into_zx_channel();
         fdio::service_connect_at(&dir, &format!("{CAP_KEY}/{CAP_KEY}/bar"), server_end).unwrap();
         fasync::Channel::from_channel(client_end).on_closed().await.unwrap();
-        assert_eq!(OPEN_COUNT.get(), 1)
+        assert_eq!(mock_dir.0.get(), 1)
     }
 
     fn serve_vfs_dir(root: Arc<impl VfsDirectory>) -> ClientEnd<fio::DirectoryMarker> {
@@ -800,13 +778,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn try_into_open_with_directory() {
-        let open = Open::new(
-            move |_scope: ExecutionScope,
-                  _flags: fio::OpenFlags,
-                  _relative_path: Path,
-                  _server_end: zx::Channel| {},
-            fio::DirentType::Service,
-        );
+        let open = Open::new(endpoint(|_scope, _channel| {}));
         let fs = pseudo_directory! {
             "a" => open.clone().into_remote(),
             "b" => open.clone().into_remote(),
@@ -820,27 +792,30 @@ mod tests {
         let remote = dict_open.into_remote();
 
         // List the inner directory and verify its contents.
+        let scope = ExecutionScope::new();
         {
-            let (dir_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-            remote.clone().open(
-                ExecutionScope::new(),
-                fio::OpenFlags::DIRECTORY,
-                vfs::path::Path::dot(),
-                server_end.into_channel().into(),
-            );
+            let dir_proxy = serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY)
+                .unwrap()
+                .into_proxy()
+                .unwrap();
             assert_eq!(
                 fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap(),
                 vec![DirEntry { name: CAP_KEY.to_string(), kind: fio::DirentType::Directory },]
             );
         }
         {
-            let (dir_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-            remote.clone().open(
-                ExecutionScope::new(),
+            let dir_proxy = serve_directory(
+                Arc::new(SubNode::new(
+                    remote,
+                    CAP_KEY.try_into().unwrap(),
+                    fio::DirentType::Directory,
+                )),
+                &scope,
                 fio::OpenFlags::DIRECTORY,
-                CAP_KEY.try_into().unwrap(),
-                server_end.into_channel().into(),
-            );
+            )
+            .unwrap()
+            .into_proxy()
+            .unwrap();
             assert_eq!(
                 fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap(),
                 vec![

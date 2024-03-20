@@ -131,7 +131,9 @@ impl NamespaceCapabilityHost {
                 NamespaceError::Duplicate(_) => fcomponent::NamespaceError::Duplicate,
                 NamespaceError::EntryError(_) => fcomponent::NamespaceError::BadEntry,
             },
-            BuildNamespaceError::Conversion { .. } => fcomponent::NamespaceError::Conversion,
+            BuildNamespaceError::Conversion { .. } | BuildNamespaceError::Serve { .. } => {
+                fcomponent::NamespaceError::Conversion
+            }
         }
     }
 

@@ -137,13 +137,15 @@ mod tests {
     use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;
-    use futures::channel::{mpsc, oneshot};
+    use futures::channel::mpsc;
     use futures::StreamExt;
-    use lazy_static::lazy_static;
-    use std::sync::Mutex;
-    use test_util::Counter;
     use vfs::{
-        directory::entry_container::Directory as VfsDirectory, path::Path, pseudo_directory,
+        directory::{
+            entry::{EntryInfo, OpenRequest},
+            entry_container::Directory as VfsDirectory,
+        },
+        path::Path,
+        pseudo_directory,
     };
 
     fn serve_vfs_dir(root: Arc<impl VfsDirectory>) -> ClientEnd<fio::DirectoryMarker> {
@@ -159,74 +161,34 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_remote_from_open() {
-        let (open_tx, open_rx) = oneshot::channel::<()>();
-        let open_tx = Mutex::new(Some(open_tx));
-
-        let open = Open::new(
-            move |_scope: ExecutionScope,
-                  flags: fio::OpenFlags,
-                  relative_path: Path,
-                  _server_end: zx::Channel| {
-                assert_eq!(relative_path.into_string(), "");
-                assert_eq!(flags, fio::OpenFlags::DIRECTORY);
-                open_tx.lock().unwrap().take().unwrap().send(()).unwrap();
-            },
-            fio::DirentType::Directory,
-        );
-
-        let directory = open.into_directory(fio::OpenFlags::DIRECTORY, ExecutionScope::new());
-        let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
-        zx::Channel::from(client_end)
-            .write(&[1], &mut [])
-            .expect("should be able to write to the client endpoint");
-
-        open_rx.await.unwrap();
-    }
-
-    #[fuchsia::test]
-    async fn test_remote_from_open_not_used_if_not_written_to() {
-        lazy_static! {
-            static ref OPEN_COUNT: Counter = Counter::new(0);
-        }
-
-        let open = Open::new(
-            move |_scope: ExecutionScope,
-                  flags: fio::OpenFlags,
-                  relative_path: Path,
-                  server_end: zx::Channel| {
-                assert_eq!(relative_path.into_string(), "");
-                assert_eq!(flags, fio::OpenFlags::DIRECTORY);
-                OPEN_COUNT.inc();
-                drop(server_end);
-            },
-            fio::DirentType::Directory,
-        );
-
-        assert_eq!(OPEN_COUNT.get(), 0);
-        let directory = open.into_directory(fio::OpenFlags::DIRECTORY, ExecutionScope::new());
-        let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
-        drop(client_end);
-        assert_eq!(OPEN_COUNT.get(), 0);
-    }
-
-    #[fuchsia::test]
     async fn test_clone() {
         let (open_tx, mut open_rx) = mpsc::channel::<()>(1);
-        let open_tx = Arc::new(Mutex::new(open_tx));
 
-        let open_tx = open_tx.clone();
-        let open = Open::new(
-            move |_scope: ExecutionScope,
-                  flags: fio::OpenFlags,
-                  relative_path: Path,
-                  _server_end: zx::Channel| {
+        struct MockDir(mpsc::Sender<()>);
+        impl DirectoryEntry for MockDir {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+            }
+
+            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+                request.open_remote(self)
+            }
+        }
+        impl RemoteLike for MockDir {
+            fn open(
+                self: Arc<Self>,
+                _scope: ExecutionScope,
+                flags: fio::OpenFlags,
+                relative_path: Path,
+                _server_end: ServerEnd<fio::NodeMarker>,
+            ) {
                 assert_eq!(relative_path.into_string(), "");
                 assert_eq!(flags, fio::OpenFlags::DIRECTORY);
-                open_tx.lock().unwrap().try_send(()).unwrap();
-            },
-            fio::DirentType::Directory,
-        );
+                self.0.clone().try_send(()).unwrap();
+            }
+        }
+
+        let open = Open::new(Arc::new(MockDir(open_tx)));
 
         let fs = pseudo_directory! {
             "foo" => open.into_remote(),

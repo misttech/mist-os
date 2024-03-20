@@ -3,14 +3,13 @@
 // found in the LICENSE file.
 use crate::{registry, CapabilityTrait, ConversionError, Open};
 use fidl::endpoints::{create_request_stream, ClientEnd, ControlHandle, RequestStream, ServerEnd};
-use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{channel::mpsc, TryStreamExt};
 use std::fmt::Debug;
 use tracing::warn;
-use vfs::execution_scope::ExecutionScope;
+use vfs::service::endpoint;
 
 #[derive(Debug)]
 pub struct Message {
@@ -112,18 +111,10 @@ impl Sender {
 
 impl From<Sender> for Open {
     fn from(sender: Sender) -> Self {
-        let open_fn = move |_scope: ExecutionScope,
-                            flags: fio::OpenFlags,
-                            path: vfs::path::Path,
-                            server_end: zx::Channel| {
-            if !path.is_empty() {
-                // Only an empty path is valid.
-                let _ = server_end.close_with_epitaph(zx::Status::NOT_DIR);
-                return;
-            }
-            let _ = sender.send_channel(server_end.into(), flags);
-        };
-        Self::new(open_fn, fio::DirentType::Service)
+        Self::new(endpoint(move |_scope, server_end| {
+            let _ =
+                sender.send_channel(server_end.into_zx_channel().into(), fio::OpenFlags::empty());
+        }))
     }
 }
 

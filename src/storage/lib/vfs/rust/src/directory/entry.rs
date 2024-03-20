@@ -15,10 +15,11 @@ use crate::{
     path::Path,
     service::{self, ServiceLike},
     symlink::{self, Symlink},
-    ObjectRequestRef,
+    ObjectRequestRef, ToObjectRequest,
 };
 
 use {
+    fidl::endpoints::{create_endpoints, ClientEnd},
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
     std::{fmt, sync::Arc},
@@ -305,6 +306,24 @@ impl<T: DirectoryEntry + ?Sized> DirectoryEntry for SubNode<T> {
         request.path = request.path.with_prefix(&self.path);
         self.parent.clone().open_entry(request)
     }
+}
+
+/// Serves a directory with the given rights.  Returns a client end.  This takes a DirectoryEntry
+/// so that it works for remotes.
+pub fn serve_directory(
+    dir: Arc<impl DirectoryEntry + ?Sized>,
+    scope: &ExecutionScope,
+    flags: fio::OpenFlags,
+) -> Result<ClientEnd<fio::DirectoryMarker>, Status> {
+    assert_eq!(dir.entry_info().type_(), fio::DirentType::Directory);
+    let (client, server) = create_endpoints::<fio::DirectoryMarker>();
+    flags
+        .to_object_request(server)
+        .handle(|object_request| {
+            Ok(dir.open_entry(OpenRequest::new(scope.clone(), flags, Path::dot(), object_request)))
+        })
+        .unwrap()?;
+    Ok(client)
 }
 
 #[cfg(all(test, target_os = "fuchsia"))]

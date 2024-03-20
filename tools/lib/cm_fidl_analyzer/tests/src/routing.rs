@@ -495,7 +495,7 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
     //
     // All file and directory operations are no-ops for the static model.
     #[allow(unused_variables)]
-    async fn check_open_file(&self, moniker: Moniker, path: cm_types::Path) {}
+    async fn check_open_node(&self, moniker: Moniker, path: cm_types::Path) {}
 
     #[allow(unused_variables)]
     async fn create_static_file(&self, path: &Path, contents: &str) -> Result<(), anyhow::Error> {

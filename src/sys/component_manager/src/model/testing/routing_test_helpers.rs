@@ -910,13 +910,13 @@ impl RoutingTestModel for RoutingTest {
         self.model.root().find_and_maybe_resolve(&moniker).await.map_err(|err| anyhow!(err))
     }
 
-    async fn check_open_file(&self, moniker: Moniker, path: cm_types::Path) {
+    async fn check_open_node(&self, moniker: Moniker, path: cm_types::Path) {
         let component_name =
             self.start_instance_and_wait_start(&moniker).await.expect("start instance failed");
         let component_resolved_url = Self::resolved_url(&component_name);
         Self::check_namespace(component_name, &self.mock_runner, self.components.clone()).await;
         let namespace = self.mock_runner.get_namespace(&component_resolved_url).unwrap();
-        capability_util::call_file_svc_from_namespace(&namespace, path).await;
+        capability_util::call_node_svc_from_namespace(&namespace, path).await;
     }
 
     async fn create_static_file(&self, path: &Path, contents: &str) -> Result<(), anyhow::Error> {
@@ -1316,12 +1316,12 @@ pub mod capability_util {
     /// Looks up `resolved_url` in the namespace, and attempts to use `path`.
     /// Expects the service to work like a fuchsia.io service, and respond with
     /// an OnOpen event when opened with OPEN_FLAG_DESCRIBE.
-    pub async fn call_file_svc_from_namespace(namespace: &ManagedNamespace, path: cm_types::Path) {
+    pub async fn call_node_svc_from_namespace(namespace: &ManagedNamespace, path: cm_types::Path) {
         let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
-        let _file_proxy =
-            fuchsia_fs::directory::open_file(&dir_proxy, path.basename(), fio::OpenFlags::empty())
+        let _node_proxy =
+            fuchsia_fs::directory::open_node(&dir_proxy, path.basename(), fio::OpenFlags::empty())
                 .await
-                .expect("failed to open file");
+                .expect("failed to open node");
     }
 
     /// Attempts to read ${path}/hippo in `moniker`'s exposed directory. The file should

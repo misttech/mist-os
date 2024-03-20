@@ -9,15 +9,20 @@ use async_trait::async_trait;
 use bedrock_error::{BedrockError, Explain};
 use cm_types::Availability;
 use cm_util::TaskGroup;
-use fidl::epitaph::ChannelEpitaphExt;
+use fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use sandbox::{AnyCapability, Capability, CapabilityTrait, Dict, Open, Path};
+use sandbox::{AnyCapability, Capability, CapabilityTrait, Dict, Open};
 use std::{fmt, sync::Arc};
-use vfs::execution_scope::ExecutionScope;
+use vfs::{
+    directory::entry::{self, DirectoryEntry, EntryInfo},
+    execution_scope::ExecutionScope,
+    path,
+    remote::RemoteLike,
+};
 use zx::HandleBased;
 
 /// Types that implement [`Routable`] let the holder asynchronously request
@@ -134,9 +139,6 @@ impl Router {
                             .into()),
                         }
                     }
-                    Capability::Open(open) => {
-                        Ok(open.downscope_path(Path::new(&segments.join("/")).into()).into())
-                    }
                     _ => Err(RoutingError::BedrockUnsupportedCapability.into()),
                 }
             }
@@ -239,54 +241,92 @@ impl Router {
         routing_task_group: TaskGroup,
         errors_fn: impl Fn(ErrorCapsule) + Send + Sync + 'static,
     ) -> Open {
-        let router = self.clone();
-        let errors_fn = Arc::new(errors_fn);
-        Open::new(
-            move |scope: ExecutionScope,
-                  flags: fio::OpenFlags,
-                  relative_path: vfs::path::Path,
-                  server_end: zx::Channel| {
-                let request = request.clone();
-                let target = request.target.clone();
-                let router = router.clone();
-                let routing_task_group_clone = routing_task_group.clone();
-                let errors_fn = errors_fn.clone();
-                routing_task_group.spawn(async move {
+        struct RouterEntry<F> {
+            router: Router,
+            request: Request,
+            entry_type: fio::DirentType,
+            routing_task_group: TaskGroup,
+            errors_fn: F,
+        }
+
+        impl<F: Fn(ErrorCapsule) + Send + Sync + 'static> DirectoryEntry for RouterEntry<F> {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
+            }
+
+            fn open_entry(
+                self: Arc<Self>,
+                request: entry::OpenRequest<'_>,
+            ) -> Result<(), zx::Status> {
+                request.open_remote(self)
+            }
+        }
+
+        impl<F: Fn(ErrorCapsule) + Send + Sync + 'static> RemoteLike for RouterEntry<F> {
+            fn open(
+                self: Arc<Self>,
+                scope: ExecutionScope,
+                flags: fio::OpenFlags,
+                relative_path: path::Path,
+                server_end: ServerEnd<fio::NodeMarker>,
+            ) {
+                let this = self.clone();
+                self.routing_task_group.spawn(async move {
                     // Request a capability from the `router`.
-                    let result = router.route(request).await;
+                    let result = this.router.route(this.request.clone()).await;
                     match result {
                         Ok(capability) => {
                             // HACK: Dict needs special casing because [Dict::try_into_open]
                             // is unaware of [Router].
                             let capability = match capability {
-                                Capability::Dictionary(d) => Self::dict_routers_to_open(
-                                    &target,
+                                Capability::Dictionary(d) => Router::dict_routers_to_open(
+                                    &this.request.target,
                                     &d,
-                                    routing_task_group_clone,
+                                    this.routing_task_group.clone(),
                                 )
                                 .into(),
                                 cap => cap,
                             };
                             match super::capability_into_open(capability.clone()) {
-                                Ok(open) => open.open(scope, flags, relative_path, server_end),
-                                Err(error) => errors_fn(ErrorCapsule {
+                                Ok(open) => open.open(
+                                    scope,
+                                    flags,
+                                    relative_path,
+                                    server_end.into_channel(),
+                                ),
+                                Err(error) => (this.errors_fn)(ErrorCapsule {
                                     error: error.into(),
-                                    open_request: OpenRequest { flags, relative_path, server_end },
+                                    open_request: OpenRequest {
+                                        flags,
+                                        relative_path,
+                                        server_end: server_end.into_channel(),
+                                    },
                                 }),
                             }
                         }
                         Err(error) => {
                             // Routing failed (e.g. broken route).
-                            errors_fn(ErrorCapsule {
+                            (this.errors_fn)(ErrorCapsule {
                                 error,
-                                open_request: OpenRequest { flags, relative_path, server_end },
+                                open_request: OpenRequest {
+                                    flags,
+                                    relative_path,
+                                    server_end: server_end.into_channel(),
+                                },
                             });
                         }
                     }
                 });
-            },
+            }
+        }
+
+        Open::new(Arc::new(RouterEntry {
+            router: self.clone(),
+            request,
             entry_type,
-        )
+            routing_task_group,
+            errors_fn,
+        }))
     }
 }
 

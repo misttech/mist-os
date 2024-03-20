@@ -23,7 +23,10 @@ use {
     cm_rust::{ComponentDecl, UseDecl, UseStorageDecl},
     cm_types::IterablePath,
     cm_util::TaskGroup,
-    fidl::{endpoints::ClientEnd, prelude::*},
+    fidl::{
+        endpoints::{ClientEnd, ServerEnd},
+        prelude::*,
+    },
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
@@ -33,7 +36,14 @@ use {
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
-    vfs::{execution_scope::ExecutionScope, path::Path},
+    vfs::{
+        directory::entry::{serve_directory, DirectoryEntry, EntryInfo, OpenRequest},
+        execution_scope::ExecutionScope,
+        path::Path,
+        remote::RemoteLike,
+        service::endpoint,
+        ToObjectRequest,
+    },
 };
 
 /// Creates a component's namespace.
@@ -221,35 +231,69 @@ fn directory_use(
     // devfs attempts to open the directory as a service, which is not what is desired here.
     let flags = flags | fio::OpenFlags::DIRECTORY;
 
-    let use_ = use_.clone();
-    let open_fn = move |_scope: vfs::execution_scope::ExecutionScope,
-                        flags: fio::OpenFlags,
-                        relative_path: vfs::path::Path,
-                        server_end: zx::Channel| {
-        let target = match component.upgrade() {
-            Ok(component) => component,
-            Err(e) => {
-                error!(
-                    "failed to upgrade WeakComponentInstance routing use \
-                        decl `{:?}`: {:?}",
-                    &use_, e
-                );
-                return;
-            }
-        };
-        // Spawn a separate task to perform routing in the blocking scope. This way it won't
-        // block namespace teardown, but it will block component destruction.
-        target.blocking_task_group().spawn(route_directory(
-            target,
-            use_.clone(),
-            relative_path.into_string(),
-            flags,
-            server_end,
-        ));
-    };
+    struct RouteDirectory {
+        component: WeakComponentInstance,
+        use_decl: UseDecl,
+    }
 
-    let open = Open::new(open_fn, fio::DirentType::Directory);
-    open.into_directory(flags, scope)
+    impl DirectoryEntry for RouteDirectory {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+        }
+
+        fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+            request.open_remote(self)
+        }
+    }
+
+    impl RemoteLike for RouteDirectory {
+        fn open(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            flags: fio::OpenFlags,
+            path: Path,
+            server_end: ServerEnd<fio::NodeMarker>,
+        ) {
+            flags.to_object_request(server_end).handle(|object_request| {
+                let target = match self.component.upgrade() {
+                    Ok(component) => component,
+                    Err(e) => {
+                        error!(
+                            "failed to upgrade WeakComponentInstance routing use \
+                             decl `{:?}`: {:?}",
+                            &self.use_decl, e
+                        );
+                        return Err(e.as_zx_status());
+                    }
+                };
+                // Spawn a separate task to perform routing in the blocking scope. This way it won't
+                // block namespace teardown, but it will block component destruction.
+                target.blocking_task_group().spawn(route_directory(
+                    target,
+                    self.use_decl.clone(),
+                    path.into_string(),
+                    flags,
+                    object_request.take().into_channel(),
+                ));
+
+                Ok(())
+            });
+        }
+
+        fn lazy(&self, path: &Path) -> bool {
+            // Open the directory lazily if the path is empty.
+            path.is_empty()
+        }
+    }
+
+    sandbox::Directory::new(
+        serve_directory(
+            Arc::new(RouteDirectory { component, use_decl: use_.clone() }),
+            &scope,
+            flags,
+        )
+        .unwrap(),
+    )
 }
 
 async fn route_directory(
@@ -294,100 +338,150 @@ fn service_or_protocol_use(
     program_input_dict: &Dict,
     blocking_task_group: TaskGroup,
 ) -> Open {
-    // Bedrock routing.
-    if let UseDecl::Protocol(use_protocol_decl) = &use_ {
-        let request = Request {
-            availability: use_protocol_decl.availability.clone(),
-            target: component.clone(),
-        };
-        let Some(capability) =
-            program_input_dict.get_capability(use_protocol_decl.target_path.iter_segments())
-        else {
-            panic!("router for capability {:?} is missing from program input dictionary for component {}", use_protocol_decl.target_path, component.moniker);
-        };
-        let Capability::Router(router) = &capability else {
-            panic!("program input dictionary for component {} had an entry with an unexpected type: {:?}", component.moniker, capability);
-        };
-        let router = Router::from_any(router.clone());
-        let legacy_request = RouteRequest::UseProtocol(use_protocol_decl.clone());
-
-        // When there are router errors, they are sent to the error handler,
-        // which reports errors and may attempt routing again via legacy.
-        let errors_fn = move |err: ErrorCapsule| {
-            let legacy_request = legacy_request.clone();
-            let Ok(target) = component.upgrade() else {
-                return;
+    match use_ {
+        // Bedrock routing.
+        UseDecl::Protocol(use_protocol_decl) => {
+            let request = Request {
+                availability: use_protocol_decl.availability.clone(),
+                target: component.clone(),
             };
-            target.blocking_task_group().spawn(async move {
-                let (error, open_request) = err.manually_handle();
-                routing::report_routing_failure(
-                    &legacy_request,
-                    &target,
-                    error.clone(),
-                    open_request.server_end,
-                )
-                .await
-            });
-        };
+            let Some(capability) =
+                program_input_dict.get_capability(use_protocol_decl.target_path.iter_segments())
+            else {
+                panic!("router for capability {:?} is missing from program input dictionary for component {}", use_protocol_decl.target_path, component.moniker);
+            };
+            let Capability::Router(router) = &capability else {
+                panic!("program input dictionary for component {} had an entry with an unexpected type: {:?}", component.moniker, capability);
+            };
+            let router = Router::from_any(router.clone());
+            let legacy_request = RouteRequest::UseProtocol(use_protocol_decl.clone());
 
-        let open =
-            router.into_open(request, fio::DirentType::Service, blocking_task_group, errors_fn);
-        return open;
-    };
+            // When there are router errors, they are sent to the error handler,
+            // which reports errors and may attempt routing again via legacy.
+            let errors_fn = move |err: ErrorCapsule| {
+                let legacy_request = legacy_request.clone();
+                let Ok(target) = component.upgrade() else {
+                    return;
+                };
+                target.blocking_task_group().spawn(async move {
+                    let (error, open_request) = err.manually_handle();
+                    routing::report_routing_failure(
+                        &legacy_request,
+                        &target,
+                        error,
+                        open_request.server_end,
+                    )
+                    .await
+                });
+            };
 
-    // Legacy routing.
-    let route_open_fn = move |_scope: ExecutionScope,
-                              flags: fio::OpenFlags,
-                              relative_path: Path,
-                              mut server_end: zx::Channel| {
-        let use_ = use_.clone();
-        let component = match component.upgrade() {
-            Ok(component) => component,
-            Err(e) => {
-                error!(
-                    "failed to upgrade WeakComponentInstance routing use \
-                            decl `{:?}`: {:?}",
-                    &use_, e
-                );
-                return;
+            router.into_open(request, fio::DirentType::Service, blocking_task_group, errors_fn)
+        }
+
+        // Legacy routing.
+        UseDecl::Service(use_service_decl) => {
+            struct Service {
+                component: WeakComponentInstance,
+                use_service_decl: cm_rust::UseServiceDecl,
             }
-        };
-        let target = component.clone();
-        let task = async move {
-            let (route_request, open_options) = {
-                match &use_ {
-                    UseDecl::Service(use_service_decl) => {
-                        (RouteRequest::UseService(use_service_decl.clone()),
-                             OpenOptions{
-                                 flags,
-                                 relative_path: relative_path.into_string(),
-                                 server_chan: &mut server_end
-                             }
-                         )
-                    },
-                    UseDecl::EventStream(stream)=> {
-                        (RouteRequest::UseEventStream(stream.clone()),
-                             OpenOptions{
-                                 flags,
-                                 relative_path: stream.target_path.to_string(),
-                                 server_chan: &mut server_end,
-                             }
-                         )
-                    },
-                    _ => panic!("add_service_or_protocol_use called with non-service or protocol capability"),
+            impl DirectoryEntry for Service {
+                fn entry_info(&self) -> EntryInfo {
+                    EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
                 }
-            };
 
-            let res =
-                routing::route_and_open_capability(&route_request, &target, open_options).await;
-            if let Err(e) = res {
-                routing::report_routing_failure(&route_request, &target, e, server_end).await;
+                fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+                    request.open_remote(self)
+                }
             }
-        };
-        component.blocking_task_group().spawn(task)
-    };
+            impl RemoteLike for Service {
+                fn open(
+                    self: Arc<Self>,
+                    _scope: ExecutionScope,
+                    flags: fio::OpenFlags,
+                    relative_path: Path,
+                    server_end: ServerEnd<fio::NodeMarker>,
+                ) {
+                    let component = match self.component.upgrade() {
+                        Ok(component) => component,
+                        Err(e) => {
+                            error!(
+                                "failed to upgrade WeakComponentInstance routing use \
+                                 decl `{:?}`: {:?}",
+                                self.use_service_decl, e
+                            );
+                            return;
+                        }
+                    };
 
-    Open::new(route_open_fn, fio::DirentType::Service)
+                    let target = component.clone();
+
+                    component.blocking_task_group().spawn(async move {
+                        let mut server_end = server_end.into_channel();
+                        let route_request = RouteRequest::UseService(self.use_service_decl.clone());
+                        let open_options = OpenOptions {
+                            flags,
+                            relative_path: relative_path.into_string(),
+                            server_chan: &mut server_end,
+                        };
+                        let res = routing::route_and_open_capability(
+                            &route_request,
+                            &target,
+                            open_options,
+                        )
+                        .await;
+                        if let Err(e) = res {
+                            routing::report_routing_failure(&route_request, &target, e, server_end)
+                                .await;
+                        }
+                    });
+                }
+
+                fn lazy(&self, path: &Path) -> bool {
+                    // Open the directory lazily if the path is empty.
+                    path.is_empty()
+                }
+            }
+            Open::new(Arc::new(Service { component, use_service_decl }))
+        }
+
+        UseDecl::EventStream(stream) => {
+            Open::new(endpoint(move |_scope: ExecutionScope, server_end| {
+                let mut server_end = server_end.into_zx_channel();
+                let component = match component.upgrade() {
+                    Ok(component) => component,
+                    Err(e) => {
+                        error!(
+                            "failed to upgrade WeakComponentInstance routing use \
+                             decl `{:?}`: {:?}",
+                            stream, e
+                        );
+                        return;
+                    }
+                };
+                let target = component.clone();
+                let stream = stream.clone();
+
+                component.blocking_task_group().spawn(async move {
+                    let relative_path = stream.target_path.to_string();
+                    let route_request = RouteRequest::UseEventStream(stream);
+                    let open_options = OpenOptions {
+                        flags: fio::OpenFlags::empty(),
+                        relative_path,
+                        server_chan: &mut server_end,
+                    };
+                    let res =
+                        routing::route_and_open_capability(&route_request, &target, open_options)
+                            .await;
+                    if let Err(e) = res {
+                        routing::report_routing_failure(&route_request, &target, e, server_end)
+                            .await;
+                    }
+                });
+            }))
+        }
+
+        _ => panic!("add_service_or_protocol_use called with non-service or protocol capability"),
+    }
 }
 
 fn not_found_logging(component: &Arc<ComponentInstance>) -> UnboundedSender<String> {
