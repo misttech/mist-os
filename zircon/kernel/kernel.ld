@@ -85,7 +85,7 @@ SECTIONS
     }
 
     .text : {
-        *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.text*)))
+        *(SORT_BY_ALIGNMENT(.text*))
     }
 
     PROVIDE_HIDDEN(__code_end = .);
@@ -138,7 +138,7 @@ SECTIONS
     } :rodata :note
 
     .rodata : {
-        *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.rodata*)))
+        *(SORT_BY_ALIGNMENT(.rodata*))
     } :rodata
 
     BootCpuidLeaf : {
@@ -257,7 +257,7 @@ SECTIONS
         *(.data.cpu_align_exclusive)
         . = ALIGN(128);
 
-        *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.data*)))
+        *(SORT_BY_ALIGNMENT(.data*))
 
         /*
          * NOTE!  When any of the various special sections listed below
@@ -371,7 +371,7 @@ SECTIONS
                (kcountdesc_end - kcountdesc_begin) * 8 * SMP_MAX_CPUS / 64,
                "kcounters_arena size mismatch");
 
-        *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.bss*)))
+        *(SORT_BY_ALIGNMENT(.bss*))
     }
 
     /*

@@ -77,7 +77,7 @@ SECTIONS {
   /*
    * This is the remainder of miscellaneous RODATA.
    */
-  .rodata : { *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.rodata*))) }
+  .rodata : { *(SORT_BY_ALIGNMENT(.rodata*)) }
 
   /*
    * The named sections starting with kcountdesc are sorted by name so that
@@ -126,7 +126,7 @@ SECTIONS {
    * Sorting by alignment minimizes intersection padding; secondarily sorting
    * by name groups prefixes like `.text.hot.*` or `.text.cold.*` together.
    */
-  .text : { *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.text*))) }
+  .text : { *(SORT_BY_ALIGNMENT(.text*)) }
 
   PROVIDE_HIDDEN(__code_end = .);
 
@@ -185,7 +185,7 @@ SECTIONS {
     *(.data.cpu_align_exclusive)
     . = ALIGN(128);
 
-    *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.data*)))
+    *(SORT_BY_ALIGNMENT(.data*))
   }
 
   /*
@@ -234,7 +234,7 @@ SECTIONS {
            (kcountdesc_end - kcountdesc_begin) * 8 * SMP_MAX_CPUS / 64,
            "kcounters_arena size mismatch");
 
-    *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.bss*)))
+    *(SORT_BY_ALIGNMENT(.bss*))
   }
 
   /*
