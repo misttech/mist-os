@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Error};
 use ffx_config::global_env_context;
-use futures::{ready, select, FutureExt, Stream, StreamExt};
+use futures::{ready, select, Future, FutureExt, Stream, StreamExt};
 use log_command::log_formatter::{LogEntry, Symbolize};
 use pin_project::pin_project;
 use std::{
@@ -12,15 +12,16 @@ use std::{
     cell::{Cell, RefCell},
     collections::VecDeque,
     fmt::{Debug, Display},
+    future::poll_fn,
     mem::swap,
     ops::Deref,
-    pin::Pin,
+    pin::{pin, Pin},
     process::Stdio,
     task::Poll,
 };
 use symbol_index::ensure_symbol_index_registered;
 use tokio::{
-    io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader, Lines},
+    io::{AsyncBufReadExt, AsyncRead, AsyncWrite, BufReader, Lines},
     process::{Child, ChildStdin, ChildStdout, Command},
 };
 
@@ -43,7 +44,9 @@ where
     T: SymbolizerProcess,
 {
     stdin: T::Stdin,
-    stdout: AsyncTransactionReader<T::Stdout>,
+    stdout: Option<AsyncTransactionReader<T::Stdout>>,
+    /// Pending write buffer if kernel write buffer is full.
+    pending_buffer: Option<(String, usize)>,
 }
 
 impl<T> SymbolizerState<T>
@@ -53,7 +56,7 @@ where
     T: SymbolizerProcess,
 {
     fn new(stdin: T::Stdin, stdout: T::Stdout) -> Self {
-        Self { stdin, stdout: AsyncTransactionReader::new(stdout) }
+        Self { stdin, stdout: Some(AsyncTransactionReader::new(stdout)), pending_buffer: None }
     }
 }
 
@@ -338,13 +341,22 @@ where
         // Write any pending lines to the symbolizer and check for incoming messages
         // from the device.
         let (txn_id, msg) = loop {
-            self.write_lines_to_symbolizer(&mut state).await?;
             // Check for incoming lines from the device, and output from the symbolizer concurrently.
+            // Write lines to the symbolizer as space becomes available in the write buffer.
+            // This Future is polled when one of the following happens:
+            // * Space is available in the kernel write buffer to write to the symbolizer
+            // * A new line is available from the device
+            // * The symbolizer generates an output line.
             // Ordering doesn't matter here so select! is OK instead of select_biased!.
+
+            // Take out stdout so state isn't borrowed mutably twice.
+            let mut stdout = state.stdout.take().unwrap();
             let v = select! {
-                res = state.stdout.next().fuse() => res,
+                res = stdout.next().fuse() => res,
                 _ = self.line_available_event.clone().fuse() => None,
+                _ = self.write_lines_to_symbolizer(&mut state).fuse() => None,
             };
+            state.stdout = Some(stdout);
             if let Some(v) = v {
                 break v;
             }
@@ -368,15 +380,49 @@ where
         Ok(entry)
     }
 
+    /// Performs a write to the symbolizer. If the write would block, returns 0.
+    async fn try_nonblocking_write(
+        &self,
+        buffer: &[u8],
+        state: &mut SymbolizerState<T>,
+    ) -> Result<usize, ReadError> {
+        Ok(poll_fn(|context| match Pin::new(&mut state.stdin).poll_write(context, buffer) {
+            Poll::Pending => Poll::Ready(Ok(0)),
+            Poll::Ready(output) => Poll::Ready(output),
+        })
+        .await?)
+    }
+
     /// Writes pending lines to the symbolizer
     async fn write_lines_to_symbolizer(
         &self,
         state: &mut SymbolizerState<T>,
     ) -> Result<(), ReadError> {
-        while let Some(line) = self.pop_pending_line() {
-            state.stdin.write_all(line.as_bytes()).await?;
+        'outer: loop {
+            if let Some((line, written)) = state.pending_buffer.take() {
+                let buffer = &line.as_bytes()[written..];
+                let bytes_written = self.try_nonblocking_write(buffer, state).await?;
+                if bytes_written < buffer.len() {
+                    state.pending_buffer = Some((line, bytes_written + written));
+                    if bytes_written == 0 {
+                        // No bytes written, indicating the buffer is full
+                        // and it's necessary to wait.
+                        Yielder::default().await;
+                    }
+                    continue;
+                }
+            }
+            while let Some(line) = self.pop_pending_line() {
+                let buffer = line.as_bytes();
+                let bytes_written = self.try_nonblocking_write(buffer, state).await?;
+                if bytes_written < buffer.len() {
+                    state.pending_buffer = Some((line, bytes_written));
+                    continue 'outer;
+                }
+            }
+            // No lines available, wait for them to come in.
+            Yielder::default().await;
         }
-        Ok(())
     }
 
     /// Pops a pending line if one is available.
@@ -417,6 +463,25 @@ enum TransactionState<'a> {
 impl<'a> Default for TransactionState<'a> {
     fn default() -> Self {
         Self::Start
+    }
+}
+
+/// Yields to the runtime until a wakeup happens.
+#[derive(Default)]
+struct Yielder {
+    woke: bool,
+}
+
+impl Future for Yielder {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+        if self.woke {
+            Poll::Ready(())
+        } else {
+            self.woke = true;
+            Poll::Pending
+        }
     }
 }
 
@@ -538,16 +603,15 @@ where
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
+    use diagnostics_data::{BuilderArgs, Data, Logs, LogsDataBuilder, Severity, Timestamp};
     use fuchsia_sync::Mutex;
-    use futures::Future;
     use log_command::log_formatter::LogData;
     use std::fmt::Write;
     use std::{
         sync::Arc,
         task::{Context, Wake},
     };
-    use tokio::io::{duplex, DuplexStream};
+    use tokio::io::{duplex, AsyncWriteExt, DuplexStream};
 
     /// Size of duplex buffer
     const DUPLEX_BUFFER_SIZE: usize = 4096;
@@ -662,44 +726,73 @@ mod tests {
         assert_eq!(output, "Hello world!\n\n\nTest line 2\nTXN:0:nothing");
     }
 
-    #[fuchsia::test]
-    async fn read_transacted_integration_test() {
-        let fake_waker = Arc::new(FakeWaker::default());
+    #[pin_project]
+    struct RunWith<A, B> {
+        #[pin]
+        main_future: A,
+        #[pin]
+        other_future: B,
+    }
+
+    impl<A, B> Future for RunWith<A, B>
+    where
+        A: Future,
+        B: Future,
+    {
+        type Output = A::Output;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            // Ignore the other future
+            let this = self.project();
+            let _ = this.other_future.poll(cx);
+            this.main_future.poll(cx)
+        }
+    }
+
+    trait FutureTestExt {
+        /// Runs this future concurrently with another future. The result of the
+        /// other future is ignored.
+        fn run_with<T>(self, other: T) -> RunWith<Self, T>
+        where
+            Self: Sized;
+    }
+
+    impl<F> FutureTestExt for F
+    where
+        F: Future,
+    {
+        fn run_with<OtherFuture>(self, other: OtherFuture) -> RunWith<Self, OtherFuture> {
+            RunWith { main_future: self, other_future: other }
+        }
+    }
+
+    fn create_target_log_entry(msg: impl Into<String>, timestamp: i32) -> (LogEntry, Data<Logs>) {
         let txn = LogEntry {
-            timestamp: 0.into(),
+            timestamp: timestamp.into(),
             data: LogData::TargetLog(
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
                     moniker: "ffx".into(),
                     severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(0),
+                    timestamp_nanos: Timestamp::from(timestamp),
                 })
                 .set_pid(1)
                 .set_tid(2)
-                .set_message("Hello world!")
+                .set_message(msg)
                 .build(),
             ),
         };
-        let mut txn_data = assert_matches!(txn.data.as_target_log(), Some(value) => value).clone();
-        let txn_2 = LogEntry {
-            timestamp: 1.into(),
-            data: LogData::TargetLog(
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(1),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Unused world!")
-                .build(),
-            ),
-        };
-        let mut txn_data_2 =
-            assert_matches!(txn_2.data.as_target_log(), Some(value) => value).clone();
-        let (stdin_sender, stdin_receiver) = duplex(DUPLEX_BUFFER_SIZE);
-        let (mut stdout_sender, stdout_receiver) = duplex(DUPLEX_BUFFER_SIZE);
+        let txn_data = assert_matches!(txn.data.as_target_log(), Some(value) => value).clone();
+        (txn, txn_data)
+    }
+
+    async fn transacted_integration_test_common(buffer_size: usize) {
+        let fake_waker = Arc::new(FakeWaker::default());
+        let (txn, mut txn_data) = create_target_log_entry("Hello world!", 0);
+        let (txn_2, mut txn_data_2) = create_target_log_entry("Unused world!", 1);
+
+        let (stdin_sender, stdin_receiver) = duplex(buffer_size);
+        let (mut stdout_sender, stdout_receiver) = duplex(buffer_size);
         let symbolizer = assert_matches!(
             TransactionalSymbolizer::new(FakeProcess::new(stdin_sender, stdout_receiver)),
             Ok(value) => value
@@ -711,9 +804,28 @@ mod tests {
         assert_eq!(fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()), Poll::Pending);
 
         let mut reader = BufReader::new(stdin_receiver).lines();
-        assert_matches!(reader.next_line().await, Ok(Some(value)) if value == "TXN:0:");
-        assert_matches!(reader.next_line().await, Ok(Some(value)) if value == "Hello world!");
-        assert_matches!(stdout_sender.write_all("TXN:0:start\nHello world!\n\n\nTest line 2\nRTXN:0:nothing\nTXN-COMMIT:0:COMMIT\n".as_bytes()).await, Ok(()));
+        assert_matches!(
+            reader.next_line().run_with(&mut symbolize_task_0).await,
+            Ok(Some(value)) if value == "TXN:0:"
+        );
+        assert_matches!(
+            reader.next_line().run_with(&mut symbolize_task_0).await,
+            Ok(Some(value)) if value == "Hello world!"
+        );
+        assert_matches!(
+            stdout_sender
+                .write_all(
+                    concat!(
+                        "TXN:0:start\nHello world!\n\n\n",
+                        "Test line 2\nRTXN:0:nothing\n",
+                        "TXN-COMMIT:0:COMMIT\n"
+                    )
+                    .as_bytes()
+                )
+                .run_with(&mut symbolize_task_0)
+                .await,
+            Ok(())
+        );
         // TXN 1 shouldn't be completed
         assert_eq!(fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()), Poll::Pending);
         // TXN 0 should be completed
@@ -732,6 +844,7 @@ mod tests {
         assert_matches!(
             stdout_sender
                 .write_all("TXN:1:start\nHello world 2!\nTXN-COMMIT:1:COMMIT\n".as_bytes())
+                .run_with(&mut symbolize_task_1)
                 .await,
             Ok(())
         );
@@ -749,38 +862,20 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn read_transacted_integration_test() {
+        transacted_integration_test_common(DUPLEX_BUFFER_SIZE).await;
+    }
+
+    #[fuchsia::test]
+    async fn read_transacted_integration_test_with_small_buffer() {
+        transacted_integration_test_common(5).await;
+    }
+
+    #[fuchsia::test]
     async fn read_transacted_malformed_input_test() {
         let fake_waker = Arc::new(FakeWaker::default());
-        let txn = LogEntry {
-            timestamp: 0.into(),
-            data: LogData::TargetLog(
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(0),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-            ),
-        };
-        let txn_2 = LogEntry {
-            timestamp: 1.into(),
-            data: LogData::TargetLog(
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(1),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Not symbolized")
-                .build(),
-            ),
-        };
+        let (txn, _) = create_target_log_entry("Hello world!", 0);
+        let (txn_2, _) = create_target_log_entry("Not symbolized", 1);
         let txn_2_clone = txn_2.clone();
         let (stdin_sender, stdin_receiver) = duplex(DUPLEX_BUFFER_SIZE);
         let (mut stdout_sender, stdout_receiver) = duplex(DUPLEX_BUFFER_SIZE);
@@ -815,21 +910,7 @@ mod tests {
     #[fuchsia::test]
     async fn read_transacted_should_discard_empty_lines_test() {
         let fake_waker = Arc::new(FakeWaker::default());
-        let txn = LogEntry {
-            timestamp: 0.into(),
-            data: LogData::TargetLog(
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(0),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-            ),
-        };
+        let (txn, _) = create_target_log_entry("Hello world!", 0);
         let (stdin_sender, stdin_receiver) = duplex(DUPLEX_BUFFER_SIZE);
         let (mut stdout_sender, stdout_receiver) = duplex(DUPLEX_BUFFER_SIZE);
         let symbolizer = assert_matches!(
