@@ -301,12 +301,6 @@ def fuchsia_product(
         name,
         board_config,
         product_config,
-        # TODO: Deprecated. Use platform_artifacts.
-        platform_aibs = None,
-        # TODO: Deprecated. Use legacy_bundle.
-        legacy_aib = None,
-        # TODO: Deprecated. Use package_mode.
-        create_system_mode = None,
         package_mode = None,
         platform_artifacts = None,
         legacy_bundle = None,
@@ -315,14 +309,14 @@ def fuchsia_product(
         name = name + "_product_assembly",
         board_config = board_config,
         product_config = product_config,
-        platform_artifacts = platform_artifacts or platform_aibs,
-        legacy_bundle = legacy_bundle or legacy_aib,
-        package_mode = package_mode or create_system_mode,
+        platform_artifacts = platform_artifacts,
+        legacy_bundle = legacy_bundle,
+        package_mode = package_mode,
     )
 
     _fuchsia_product_create_system(
         name = name,
         product_assembly = ":" + name + "_product_assembly",
-        package_mode = package_mode or create_system_mode,
+        package_mode = package_mode,
         **kwargs
     )

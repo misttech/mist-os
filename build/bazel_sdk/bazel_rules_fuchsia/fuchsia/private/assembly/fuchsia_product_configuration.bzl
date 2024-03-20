@@ -170,8 +170,6 @@ _fuchsia_product_configuration = rule(
 
 def fuchsia_product_configuration(
         name,
-        # Deprecated.
-        json_config = None,
         product_config_json = None,
         base_packages = None,
         cache_packages = None,
@@ -208,8 +206,8 @@ def fuchsia_product_configuration(
         **kwarg: Common bazel rule args passed through to the implementation rule.
     """
 
-    json_config = product_config_json or json_config
-    if not json_config:
+    json_config = product_config_json
+    if not product_config_json:
         json_config = {}
     if type(json_config) != "dict":
         fail("expecting a dictionary")

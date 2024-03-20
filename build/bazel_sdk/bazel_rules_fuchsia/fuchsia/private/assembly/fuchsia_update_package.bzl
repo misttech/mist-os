@@ -15,15 +15,12 @@ load(
 def _fuchsia_update_package_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     partitions_configuration = ctx.attr.partitions_config[FuchsiaAssemblyConfigInfo].config
-    if ctx.attr.main:
-        system_a_out = ctx.attr.main[FuchsiaProductImageInfo].images_out
-    else:
-        system_a_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
+    system_a_out = ctx.attr.main[FuchsiaProductImageInfo].images_out
 
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
-    inputs = get_ffx_assembly_inputs(fuchsia_toolchain) + [partitions_configuration, ctx.file.update_version_file] + ctx.files.product_image + ctx.files.main + ctx.files.partitions_config
+    inputs = get_ffx_assembly_inputs(fuchsia_toolchain) + [partitions_configuration, ctx.file.update_version_file] + ctx.files.main + ctx.files.partitions_config
     outputs = [out_dir, ffx_isolate_dir]
 
     # Gather all the arguments to pass to ffx.
@@ -48,16 +45,13 @@ def _fuchsia_update_package_impl(ctx):
         system_a_out.path + "/images.json",
     ]
 
-    if ctx.attr.recovery_image:
-        if ctx.attr.recovery:
-            system_r_out = ctx.attr.recovery[FuchsiaProductImageInfo].images_out
-        else:
-            system_r_out = ctx.attr.recovery_image[FuchsiaProductImageInfo].images_out
+    if ctx.attr.recovery:
+        system_r_out = ctx.attr.recovery[FuchsiaProductImageInfo].images_out
         ffx_invocation += [
             "--system-r",
             system_r_out.path + "/images.json",
         ]
-        inputs += ctx.files.recovery_image + ctx.files.recovery
+        inputs += ctx.files.recovery
 
     script_lines = [
         "set -e",
@@ -89,16 +83,6 @@ fuchsia_update_package = rule(
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     provides = [FuchsiaUpdatePackageInfo],
     attrs = {
-        # Deprecated.
-        "product_image": attr.label(
-            doc = "fuchsia_product_image target to put in slot A.",
-            providers = [FuchsiaProductImageInfo],
-        ),
-        # Deprecated.
-        "recovery_image": attr.label(
-            doc = "fuchsia product to put in slot R.",
-            providers = [FuchsiaProductImageInfo],
-        ),
         "main": attr.label(
             doc = "fuchsia product to put in slot A.",
             providers = [FuchsiaProductImageInfo],

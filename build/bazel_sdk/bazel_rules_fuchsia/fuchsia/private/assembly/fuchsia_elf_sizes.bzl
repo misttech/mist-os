@@ -7,16 +7,13 @@
 load(":providers.bzl", "FuchsiaProductImageInfo")
 
 def _fuchsia_elf_sizes_impl(ctx):
-    if ctx.attr.product:
-        images_out = ctx.attr.product[FuchsiaProductImageInfo].images_out
-    else:
-        images_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
+    images_out = ctx.attr.product[FuchsiaProductImageInfo].images_out
     zbi = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"].zbi
 
     extracted_zbi_bootfs_dir = ctx.actions.declare_directory(ctx.label.name + "_extracted_zbi_bootfs")
     extracted_zbi_json = ctx.actions.declare_file(ctx.label.name + "_extracted_zbi_bootfs.json")
     ctx.actions.run_shell(
-        inputs = [zbi] + ctx.files.product + ctx.files.product_image,
+        inputs = [zbi] + ctx.files.product,
         outputs = [
             extracted_zbi_bootfs_dir,
             extracted_zbi_json,
@@ -38,7 +35,7 @@ def _fuchsia_elf_sizes_impl(ctx):
     elf_sizes_json = ctx.actions.declare_file(ctx.label.name + "_elf_sizes.json")
 
     ctx.actions.run(
-        inputs = ctx.files.product_image + ctx.files.product + [
+        inputs = ctx.files.product + [
             extracted_zbi_bootfs_dir,
             extracted_zbi_json,
         ],
@@ -67,11 +64,6 @@ fuchsia_elf_sizes = rule(
     implementation = _fuchsia_elf_sizes_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
-        # Deprecated.
-        "product_image": attr.label(
-            doc = "The fuchsia_lroduct to check the size of.",
-            providers = [FuchsiaProductImageInfo],
-        ),
         "product": attr.label(
             doc = "The fuchsia product to check the size of.",
             providers = [FuchsiaProductImageInfo],

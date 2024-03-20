@@ -31,10 +31,7 @@ fuchsia_platform_artifacts = rule(
 )
 
 def _fuchsia_legacy_bundle_impl(ctx):
-    if ctx.attr.directory:
-        directory = ctx.file.directory.path
-    else:
-        directory = ctx.file.config.dirname
+    directory = ctx.file.directory.path
     return [FuchsiaProductAssemblyBundleInfo(
         root = directory,
         files = ctx.files.files,
@@ -45,11 +42,6 @@ fuchsia_legacy_bundle = rule(
     implementation = _fuchsia_legacy_bundle_impl,
     provides = [FuchsiaProductAssemblyBundleInfo],
     attrs = {
-        # Deprecated. Use directory.
-        "config": attr.label(
-            doc = "The assembly_config.json file located at the root of this prebuilt AIB directory.",
-            allow_single_file = True,
-        ),
         "directory": attr.label(
             doc = "The directory of the prebuilt legacy bundle.",
             allow_single_file = True,

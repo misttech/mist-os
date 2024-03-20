@@ -107,7 +107,7 @@ fuchsia_product_configuration(
     base_driver_packages = [
         ":prebuilt_driver",
     ],
-    json_config = {
+    product_config_json = {
         "platform": {
             "build_type": "user",
             "connectivity": {"wlan": {
@@ -160,7 +160,7 @@ fuchsia_product_configuration_test(
 
 fuchsia_product_configuration(
     name = "testing_product_config_with_labels",
-    json_config = {
+    product_config_json = {
         "platform": {
             "foo": "LABEL(test_data/foo.txt)",
         },
@@ -323,12 +323,12 @@ fuchsia_product_ota_config(
 
 fuchsia_product_configuration(
     name = "test_product_configuration_with_ota_config",
-    json_config = {
+    ota_configuration = ":test_ota_config",
+    product_config_json = {
         "platform": {
             "build_type": "userdebug",
         },
     },
-    ota_configuration = ":test_ota_config",
 )
 
 fuchsia_product_configuration_test(
