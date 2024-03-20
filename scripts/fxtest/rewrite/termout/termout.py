@@ -162,11 +162,6 @@ def write_lines(
         write_buffer = io.StringIO()
 
         if _last_line_count:
-            if len(lines) > _last_line_count:
-                # Create extra space
-                for _ in range(len(lines) - _last_line_count):
-                    print("", file=write_buffer)
-                _last_line_count = len(lines)
             write_buffer.write(
                 "\r"
                 + colorama.Cursor.UP(_last_line_count - 1)
@@ -198,7 +193,8 @@ def write_lines(
                 "\r" + line[:max_index] + colorama.Style.RESET_ALL
             )
 
-        write_buffer.write("\n".join(formatted_lines))
+        write_buffer.writelines(["\n".join(formatted_lines)])
+        write_buffer.flush()
         sys.stdout.writelines([write_buffer.getvalue()])
         sys.stdout.flush()
         _last_line_count = len(lines)
