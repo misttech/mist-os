@@ -6,7 +6,7 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <fidl/fuchsia.hardware.spiimpl/cpp/driver/wire.h>
-#include <fidl/fuchsia.scheduler/cpp/wire.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fit/function.h>
@@ -229,7 +229,6 @@ class AmlSpi : public fdf::WireServer<fuchsia_hardware_spiimpl::SpiImpl> {
   bool need_reset_ = false;
   zx::interrupt interrupt_;
   const amlogic_spi::amlspi_config_t config_;
-  bool apply_scheduler_role_ = true;
   zx::bti bti_;
   DmaBuffer tx_buffer_;
   DmaBuffer rx_buffer_;
@@ -293,6 +292,8 @@ class AmlSpiDriver : public fdf::DriverBase {
       fidl::WireClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id);
 
  private:
+  void OnGetSchedulerRoleName(fdf::StartCompleter completer,
+                              zx::result<fuchsia_scheduler::RoleName> scheduler_role_name);
   void OnCompatServerInitialized(fdf::StartCompleter completer);
   void AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_config_t& config,
                zx::interrupt interrupt, zx::bti bti, fdf::StartCompleter completer);

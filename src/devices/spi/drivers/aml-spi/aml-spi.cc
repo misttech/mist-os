@@ -28,6 +28,8 @@
 
 namespace spi {
 
+constexpr char kDefaultRoleName[] = "fuchsia.devices.spi.drivers.aml-spi.transaction";
+
 constexpr size_t kNelsonRadarBurstSize = 23224;
 
 // The TX and RX buffer size to allocate for DMA (only if a BTI is provided). This value is set to
@@ -232,44 +234,6 @@ void AmlSpi::Exchange64(const uint8_t* txdata, uint8_t* out_rxdata, size_t size)
   Exchange8(txdata, out_rxdata, size);
 }
 
-void AmlSpi::SetThreadProfile() {
-  if (!apply_scheduler_role_) {
-    return;
-  }
-
-  apply_scheduler_role_ = false;
-
-  if (!profile_provider_) {
-    FDF_LOG(WARNING, "No profile provider, can't apply scheduler profile");
-    return;
-  }
-
-  zx::thread duplicate_thread;
-  zx_status_t status =
-      zx::thread::self()->duplicate(ZX_RIGHT_TRANSFER | ZX_RIGHT_MANAGE_THREAD, &duplicate_thread);
-  if (status != ZX_OK) {
-    FDF_LOG(WARNING, "Failed to duplicate thread");
-    return;
-  }
-
-  async::PostTask(
-      dispatcher_->async_dispatcher(), [this, thread = std::move(duplicate_thread)]() mutable {
-        // Set profile for bus transaction thread.
-        const char* role_name = "fuchsia.devices.spi.drivers.aml-spi.transaction";
-        profile_provider_
-            ->SetProfileByRole(std::move(thread), fidl::StringView::FromExternal(role_name))
-            .Then([](auto& result) {
-              if (!result.ok()) {
-                FDF_LOG(WARNING, "Call to apply scheduler profile failed: %s",
-                        result.status_string());
-              } else if (result->status != ZX_OK) {
-                FDF_LOG(WARNING, "Failed to apply scheduler profile: %s",
-                        zx_status_get_string(result->status));
-              }
-            });
-      });
-}
-
 void AmlSpi::WaitForTransferComplete() {
   auto statreg = StatReg::Get().FromValue(0);
   while (!statreg.ReadFrom(&mmio_).tc()) {
@@ -368,8 +332,6 @@ bool AmlSpi::StartExchange(SpiRequest request) {
                       "txdata and rxdata have different sizes");
 
   current_request_.emplace(std::move(request));
-
-  SetThreadProfile();
 
   const bool use_dma = UseDma(current_request_->size());
 
@@ -879,17 +841,68 @@ void AmlSpiDriver::Start(fdf::StartCompleter completer) {
     compat_.Bind(*std::move(compat_client), dispatcher());
   }
 
+  fpromise::bridge<> bridge;
+
+  auto task = compat::GetMetadataAsync<fuchsia_scheduler::RoleName>(
+      fdf::Dispatcher::GetCurrent()->async_dispatcher(), incoming(),
+      DEVICE_METADATA_SCHEDULER_ROLE_NAME,
+      [this, start_completer = std::move(completer), completer = std::move(bridge.completer)](
+          zx::result<fuchsia_scheduler::RoleName> result) mutable {
+        OnGetSchedulerRoleName(std::move(start_completer), result);
+        completer.complete_ok();
+      },
+      "pdev");
+
+  auto promise = bridge.consumer.promise().then(
+      [task = std::move(task)](fpromise::result<>& result) mutable {});
+  executor_.schedule_task(std::move(promise));
+}
+
+void AmlSpiDriver::OnGetSchedulerRoleName(
+    fdf::StartCompleter completer, zx::result<fuchsia_scheduler::RoleName> scheduler_role_name) {
+  std::unordered_set<compat::MetadataKey> forward_metadata({DEVICE_METADATA_SPI_CHANNELS});
+
+  std::vector<uint8_t> role_name;
+
+  // If we have scheduler role metadata, forward it to our child and let them apply it with the
+  // expectation that their calls to us will be inlined. If we don't have scheduler role metadata,
+  // then add the default role name as metadata instead.
+  if (scheduler_role_name.is_ok()) {
+    forward_metadata.emplace(DEVICE_METADATA_SCHEDULER_ROLE_NAME);
+  } else {
+    const fuchsia_scheduler::RoleName role{kDefaultRoleName};
+
+    fit::result result = fidl::Persist(role);
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to persist scheduler role: %s",
+              result.error_value().FormatDescription().c_str());
+      return completer(zx::error(result.error_value().status()));
+    }
+
+    role_name = *std::move(result);
+  }
+
   compat_server_.Begin(
       incoming(), outgoing(), node_name(), component::kDefaultInstance,
-      [this, completer = std::move(completer)](zx::result<> result) mutable {
+      [this, completer = std::move(completer),
+       role_name = std::move(role_name)](zx::result<> result) mutable {
         if (result.is_error()) {
           FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
           return completer(result.take_error());
         }
 
+        if (!role_name.empty()) {
+          zx_status_t status = compat_server_.inner().AddMetadata(
+              DEVICE_METADATA_SCHEDULER_ROLE_NAME, role_name.data(), role_name.size());
+          if (status != ZX_OK) {
+            FDF_LOG(ERROR, "Failed to add role metadata: %s", zx_status_get_string(status));
+            return completer(zx::error(status));
+          }
+        }
+
         OnCompatServerInitialized(std::move(completer));
       },
-      compat::ForwardMetadata::Some({DEVICE_METADATA_SPI_CHANNELS}));
+      compat::ForwardMetadata::Some(std::move(forward_metadata)));
 }
 
 void AmlSpiDriver::OnCompatServerInitialized(fdf::StartCompleter completer) {

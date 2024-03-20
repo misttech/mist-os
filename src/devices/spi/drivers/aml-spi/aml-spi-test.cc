@@ -5,6 +5,7 @@
 #include "aml-spi.h"
 
 #include <endian.h>
+#include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
@@ -88,14 +89,8 @@ class AmlSpiTest : public zxtest::Test {
 
   virtual bool SetupResetRegister() { return true; }
 
-  virtual amlogic_spi::amlspi_config_t GetAmlSpiMetadata() {
-    return amlogic_spi::amlspi_config_t{
-        .bus_id = 0,
-        .cs_count = 3,
-        .cs = {5, 3, amlogic_spi::amlspi_config_t::kCsClientManaged},
-        .clock_divider_register_value = 0,
-        .use_enhanced_clock_mode = false,
-    };
+  virtual void SetMetadata(compat::DeviceServer& compat) {
+    EXPECT_OK(compat.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &kSpiConfig, sizeof(kSpiConfig)));
   }
 
   void SetUp() override {
@@ -126,10 +121,14 @@ class AmlSpiTest : public zxtest::Test {
         pdev_server_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()), "pdev");
     ASSERT_TRUE(result.is_ok());
 
-    const auto metadata = GetAmlSpiMetadata();
-    EXPECT_OK(compat_.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &metadata, sizeof(metadata)));
+    SetMetadata(compat_);
     compat_.Init("pdev", {});
     EXPECT_OK(compat_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &directory));
+
+    // Servec a second compat instance at default in order to satisfy AmlSpiDriver's compat server.
+    // Without this, metadata doesn't get forwarded.
+    compat_default_.Init("default", {});
+    EXPECT_OK(compat_default_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &directory));
 
     result = directory.AddService<fuchsia_hardware_gpio::Service>(gpio_.CreateInstanceHandler(),
                                                                   "gpio-cs-2");
@@ -209,6 +208,73 @@ class AmlSpiTest : public zxtest::Test {
         svc_endpoints->client, component::kDefaultInstance);
   }
 
+  zx::result<fuchsia_scheduler::RoleName> GetSchedulerRoleName() {
+    zx::result svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    if (svc_endpoints.is_error()) {
+      return svc_endpoints.take_error();
+    }
+
+    EXPECT_OK(fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
+                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                           svc_endpoints->server.TakeChannel().release()));
+
+    zx::result compat_client_end = component::ConnectAt<fuchsia_driver_compat::Device>(
+        svc_endpoints->client,
+        component::MakeServiceMemberPath<fuchsia_driver_compat::Service::Device>(
+            component::kDefaultInstance));
+    if (compat_client_end.is_error()) {
+      return compat_client_end.take_error();
+    }
+
+    fidl::WireClient<fuchsia_driver_compat::Device> client(
+        *std::move(compat_client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+    zx::result<fuchsia_scheduler::RoleName> scheduler_role_name = zx::error(ZX_ERR_NOT_FOUND);
+
+    client->GetMetadata().Then(
+        [&](fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetMetadata>& result) {
+          if (!result.ok()) {
+            scheduler_role_name = zx::error(result.status());
+            return;
+          }
+          if (result->is_error()) {
+            scheduler_role_name = result->take_error();
+            return;
+          }
+
+          for (auto& metadata : result->value()->metadata) {
+            if (metadata.type != DEVICE_METADATA_SCHEDULER_ROLE_NAME) {
+              continue;
+            }
+
+            size_t size = 0;
+            zx_status_t status = metadata.data.get_prop_content_size(&size);
+            if (status != ZX_OK) {
+              continue;
+            }
+
+            std::vector<uint8_t> data(size);
+            status = metadata.data.read(data.data(), 0, data.size());
+            if (status != ZX_OK) {
+              continue;
+            }
+
+            auto role_name = fidl::Unpersist<fuchsia_scheduler::RoleName>(std::move(data));
+            if (role_name.is_error()) {
+              continue;
+            }
+
+            scheduler_role_name = zx::ok(*std::move(role_name));
+            break;
+          }
+
+          runtime_.Quit();
+        });
+    runtime_.Run();
+
+    return scheduler_role_name;
+  }
+
   fdf_testing::DriverRuntime runtime_;
   fake_pdev::FakePDevFidl pdev_server_;
   mock_registers::MockRegisters registers_;
@@ -231,6 +297,7 @@ class AmlSpiTest : public zxtest::Test {
   zx::interrupt interrupt_;
   fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
   compat::DeviceServer compat_;
+  compat::DeviceServer compat_default_;
 };
 
 zx_koid_t GetVmoKoid(const zx::vmo& vmo) {
@@ -1084,15 +1151,16 @@ TEST_F(AmlSpiTest, ReleaseVmosAfterClientsUnbind) {
 
 class AmlSpiNormalClockModeTest : public AmlSpiTest {
  public:
-  amlogic_spi::amlspi_config_t GetAmlSpiMetadata() override {
-    return amlogic_spi::amlspi_config_t{
+  void SetMetadata(compat::DeviceServer& compat) override {
+    constexpr amlogic_spi::amlspi_config_t kSpiConfig{
         .bus_id = 0,
         .cs_count = 2,
         .cs = {5, 3},
         .clock_divider_register_value = 0x5,
         .use_enhanced_clock_mode = false,
-
     };
+
+    EXPECT_OK(compat.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &kSpiConfig, sizeof(kSpiConfig)));
   }
 };
 
@@ -1120,8 +1188,8 @@ TEST_F(AmlSpiNormalClockModeTest, Test) {
 
 class AmlSpiEnhancedClockModeTest : public AmlSpiTest {
  public:
-  amlogic_spi::amlspi_config_t GetAmlSpiMetadata() override {
-    return amlogic_spi::amlspi_config_t{
+  void SetMetadata(compat::DeviceServer& compat) override {
+    constexpr amlogic_spi::amlspi_config_t kSpiConfig{
         .bus_id = 0,
         .cs_count = 2,
         .cs = {5, 3},
@@ -1129,6 +1197,8 @@ class AmlSpiEnhancedClockModeTest : public AmlSpiTest {
         .use_enhanced_clock_mode = true,
         .delay_control = 0b00'11'00,
     };
+
+    EXPECT_OK(compat.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &kSpiConfig, sizeof(kSpiConfig)));
   }
 };
 
@@ -1163,14 +1233,16 @@ TEST_F(AmlSpiEnhancedClockModeTest, Test) {
 
 class AmlSpiNormalClockModeInvalidDividerTest : public AmlSpiTest {
  public:
-  amlogic_spi::amlspi_config_t GetAmlSpiMetadata() override {
-    return amlogic_spi::amlspi_config_t{
+  void SetMetadata(compat::DeviceServer& compat) override {
+    constexpr amlogic_spi::amlspi_config_t kSpiConfig{
         .bus_id = 0,
         .cs_count = 2,
         .cs = {5, 3},
         .clock_divider_register_value = 0xa5,
         .use_enhanced_clock_mode = false,
     };
+
+    EXPECT_OK(compat.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &kSpiConfig, sizeof(kSpiConfig)));
   }
 };
 
@@ -1181,14 +1253,16 @@ TEST_F(AmlSpiNormalClockModeInvalidDividerTest, Test) {
 
 class AmlSpiEnhancedClockModeInvalidDividerTest : public AmlSpiTest {
  public:
-  amlogic_spi::amlspi_config_t GetAmlSpiMetadata() override {
-    return amlogic_spi::amlspi_config_t{
+  void SetMetadata(compat::DeviceServer& compat) override {
+    constexpr amlogic_spi::amlspi_config_t kSpiConfig{
         .bus_id = 0,
         .cs_count = 2,
         .cs = {5, 3},
         .clock_divider_register_value = 0x1a5,
         .use_enhanced_clock_mode = true,
     };
+
+    EXPECT_OK(compat.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &kSpiConfig, sizeof(kSpiConfig)));
   }
 };
 
@@ -1371,8 +1445,8 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
 
 class AmlSpiExchangeDmaClientReversesBufferTest : public AmlSpiBtiPaddrTest {
  public:
-  amlogic_spi::amlspi_config_t GetAmlSpiMetadata() override {
-    return amlogic_spi::amlspi_config_t{
+  void SetMetadata(compat::DeviceServer& compat) override {
+    constexpr amlogic_spi::amlspi_config_t kSpiConfig{
         .bus_id = 0,
         .cs_count = 3,
         .cs = {5, 3, amlogic_spi::amlspi_config_t::kCsClientManaged},
@@ -1380,6 +1454,8 @@ class AmlSpiExchangeDmaClientReversesBufferTest : public AmlSpiBtiPaddrTest {
         .use_enhanced_clock_mode = false,
         .client_reverses_dma_transfers = true,
     };
+
+    EXPECT_OK(compat.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &kSpiConfig, sizeof(kSpiConfig)));
   }
 };
 
@@ -1594,6 +1670,52 @@ TEST_F(AmlSpiNoIrqTest, InterruptRequired) {
   // Bind should fail if no interrupt was provided.
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   EXPECT_TRUE(start_result.is_error());
+}
+
+TEST_F(AmlSpiTest, DefaultRoleMetadata) {
+  constexpr char kExpectedRoleName[] = "fuchsia.devices.spi.drivers.aml-spi.transaction";
+
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
+
+  zx::result<fuchsia_scheduler::RoleName> metadata = GetSchedulerRoleName();
+  ASSERT_TRUE(metadata.is_ok());
+  EXPECT_STREQ(metadata->role(), kExpectedRoleName);
+}
+
+class AmlSpiForwardRoleMetadataTest : public AmlSpiTest {
+ public:
+  void SetMetadata(compat::DeviceServer& compat) override {
+    constexpr amlogic_spi::amlspi_config_t kSpiConfig = {
+        .bus_id = 0,
+        .cs_count = 3,
+        .cs = {5, 3, amlogic_spi::amlspi_config_t::kCsClientManaged},
+        .clock_divider_register_value = 0,
+        .use_enhanced_clock_mode = false,
+    };
+
+    EXPECT_OK(compat.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &kSpiConfig, sizeof(kSpiConfig)));
+
+    const fuchsia_scheduler::wire::RoleName role{kExpectedRoleName};
+
+    fit::result result = fidl::Persist(role);
+    ASSERT_TRUE(result.is_ok());
+
+    EXPECT_OK(
+        compat.AddMetadata(DEVICE_METADATA_SCHEDULER_ROLE_NAME, result->data(), result->size()));
+  }
+
+ protected:
+  static constexpr char kExpectedRoleName[] = "no.such.scheduler.role";
+};
+
+TEST_F(AmlSpiForwardRoleMetadataTest, Test) {
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
+
+  zx::result<fuchsia_scheduler::RoleName> metadata = GetSchedulerRoleName();
+  ASSERT_TRUE(metadata.is_ok());
+  EXPECT_STREQ(metadata->role(), kExpectedRoleName);
 }
 
 }  // namespace spi
