@@ -669,10 +669,16 @@ impl MockPaverService {
                     responder.send(Status::OK.into_raw())
                 }
                 paver::DataSinkRequest::ReadAsset { responder, .. } => {
-                    responder.send(Ok(write_mem_buffer(vec![])))
+                    // In normal operation the paver will return a VMO large enough to contain
+                    // whatever image we happen to be looking for (the "images" used in tests are
+                    // small).
+                    responder.send(Ok(write_mem_buffer(vec![0u8; 4096])))
                 }
                 paver::DataSinkRequest::ReadFirmware { responder, .. } => {
-                    responder.send(Ok(write_mem_buffer(vec![])))
+                    // In normal operation the paver will return a VMO large enough to contain
+                    // whatever image we happen to be looking for (the "images" used in tests are
+                    // small).
+                    responder.send(Ok(write_mem_buffer(vec![0u8; 4096])))
                 }
                 request => panic!("Unhandled method Paver::{}", request.method_name()),
             };
