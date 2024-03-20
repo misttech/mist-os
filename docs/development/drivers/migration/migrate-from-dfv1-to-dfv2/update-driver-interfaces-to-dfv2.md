@@ -3,11 +3,6 @@
 This page provides instructions, best practices, and examples related to
 updating a DFv1 driver to start using DFv2 interfaces.
 
-However, if this DFv1 driver talks to other DFv1 drivers that haven't yet migrated
-to DFv2, you need to use the
-[compatibility shim](#update-dependencies-for-the-compatibility-shim) to
-enable your now-DFv2 driver to talk to other DFv1 drivers in the system.
-
 ## Update dependencies from DDK to DFv2 {:#update-dependencies-from-ddk-to-dfv2}
 
 DFv1 drivers use the DDK library (`//src/lib/ddk`). For DFv2 drivers,
@@ -26,28 +21,10 @@ interfaces:
 #include <lib/driver/component/cpp/driver_base.h>
 ```
 
-Note: After updating dependencies from DDK to DFv2, your driver won't
+After updating dependencies from DDK to DFv2, your driver won't
 compile until you complete the next
 [Update the driver interfaces from DFv1 to DFv2](#update-the-driver-interfaces-from-dfv1-to-dfv2)
 section.
-
-## (Optional) Update dependencies for the compatibility shim {:#update-dependencies-for-the-compatibility-shim}
-
-**For DFv1 drivers that need to talk to DFv2 drivers**, you need the
-following packages for the compatibility shim:
-
-```none
-//sdk/lib/driver/compat/cpp:cpp
-//sdk/lib/driver/compat/cpp:symbols
-```
-
-In header files, you need the following libraries for the compatibility shim:
-
-```cpp
-#include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/compat/cpp/symbols.h>
-#include <lib/driver/compat/cpp/connect.h>
-```
 
 ## Update the driver interfaces from DFv1 to DFv2 {:#update-the-driver-interfaces-from-dfv1-to-dfv2}
 
@@ -175,7 +152,26 @@ between DFv1 and DFv2:
 | `zx_protocol_device::service_connect()`</br></br>`device_service_connect()`</br></br>`DdkServiceConnect()` | **None**. This is an old-fashioned approach for drivers to establish FIDL connections with each other. For more information, see [Use the DFv2 service discovery](#use-the-dfv2-service-discovery). |
 | `Device_connect_runtime_protocol()`</br></br>`DdkConnectRuntimeProtocol()` | **None**. These are newly added methods for service and protocol discovery in DFv1. For more information, see [Use the DFv2 service discovery](#use-the-dfv2-service-discovery). |
 
-Also, aside from updating the interfaces, you need to change the macro
+### Use the DFv2 logger {:#use-the-dfv2-logger}
+
+Instead of using `zxlogf()` (which is deprecated in DFv2), the new
+logging mechanism in DFv2 depends on the `fdf::Logger` object,
+which is passed from the driver host through `DriverStartArgs`
+when starting the driver.
+
+The `fdf::DriverBase` class wraps `fdf::Logger` and the driver
+can get its reference by calling the `logger()` method (see this
+[`wlantap-driver`][wlantap-driver] driver example). With this reference,
+you can print out logs using the `logger.logf()` function or using these
+[macros][logger-h], for example:
+
+```cpp
+FDF_LOG(INFO, "Example log message here");
+```
+
+### Update the macro {:#update-the-macro}
+
+Aside from updating the interfaces, you need to change the macro
 that populates your driver interface functions:
 
 - From:
@@ -189,6 +185,15 @@ that populates your driver interface functions:
   ```none
   FUCHSIA_DRIVER_EXPORT()
   ```
+
+### Set up the compat device server {:#set-up-the-compat-device-server}
+
+If your DFv1 driver talks to other DFv1 drivers that haven't yet migrated
+to DFv2, you need to use the compatibility shim to enable your now-DFv2 driver to
+talk to other DFv1 drivers in the system. For more information on setting up and
+using this compatibility shim in a DFv2 driver, see the
+[Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
+guide.
 
 ## Use the DFv2 service discovery {:#use-the-dfv2-service-discovery}
 
@@ -580,23 +585,6 @@ three input items:
 
 However, the DFv2 inspect does not require passing the VMO of
 `inspect::Inspector` to the driver framework.
-
-## Use the DFv2 logger {:#use-the-dfv2-logger}
-
-Instead of using `zxlogf()` (which is deprecated in DFv2), the new
-logging mechanism in DFv2 depends on the `fdf::Logger` object,
-which is passed from the driver host through `DriverStartArgs`
-when starting the driver.
-
-The `fdf::DriverBase` class wraps `fdf::Logger` and the driver
-can get its reference by calling the `logger()` method (see this
-[`wlantap-driver`][wlantap-driver] driver example). With this reference,
-you can print out logs using the `logger.logf()` function or using these
-[macros][logger-h], for example:
-
-```cpp
-FDF_LOG(INFO, "Example log message here");
-```
 
 ## (Optional) Implement your own load_firmware method {:#implement-your-own-load-firmware-method}
 

@@ -14,26 +14,27 @@ DFv1 drivers to live in DFv2.
 
 If your target driver talks to other DFv1 drivers that still use
 [Banjo][banjo] and those drivers won't be migrated to DFv2 all at once,
-you need to [use this compatibility shim][update-dep-for-compat-shim]
-(by manually creating `compat::DeviceServer`) for enabling the drivers
-in different framework versions to talk to each other.
+you need to use this compatibility shim (by manually creating
+`compat::DeviceServer`) for enabling the drivers in different framework
+versions to talk to each other.
+
+For more details on using the compatibility shim in a DFv2 driver
+to talk to its descendant DFv1 drivers, see the
+[Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
+guide.
 
 ## Can DFv2 drivers talk to Banjo protocols using the compatibility shim?
 
 While it's strongly recommended that your DFv1 driver is migrated from
 Banjo to FIDL, if it is necessary for a DFv2 driver to talk
-to some existing Banjo protocols, the compatibility shim provides the
+to some existing Banjo protocols, the
+[compatibility shim][set-up-compat-device-server] provides the
 following features:
 
 - `compat::BanjoServer` makes it easier to serve Banjo
   (see [`banjo_server.h`][banjo-server-h]).
 - `compat::ConnectBanjo` makes it easier to connect to Banjo
   (see [`banjo_client.h`][banjo-client-h]).
-
-Note: For more details on using the compatibility shim in a DFv2 driver
-to talk to its descendant DFv1 drivers, see the
-[Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
-guide under the Extension section.
 
 ## Can DFv2 drivers use the compatibility shim for composite nodes?
 
@@ -237,7 +238,6 @@ contains most of the new APIs).
 [banjo-client-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/banjo_client.h
 [set-up-compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md
 [driver-interfaces]: update-driver-interfaces-to-dfv2.md#update-the-driver-interfaces-from-dfv1-to-dfv2
-[compat-shim]: update-driver-interfaces-to-dfv2.md#update-dependencies-for-the-compatibility-shim
 [update-dependencies]: update-driver-interfaces-to-dfv2.md#update-dependencies-from-ddk-to-dfv2
 [update-dep-for-compat-shim]: update-driver-interfaces-to-dfv2.md#update-dependencies-for-the-compatibility-shim
 [update-driver-interfaces]: update-driver-interfaces-to-dfv2.md#update-the-driver-interfaces-from-dfv1-to-dfv2
