@@ -215,8 +215,7 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
             }
         }
 
-        let access_vector =
-            self.delegate.query(source_sid.clone(), target_sid.clone(), target_class.clone());
+        let access_vector = self.delegate.query(source_sid, target_sid, target_class.clone());
 
         self.insert(QueryAndResult { source_sid, target_sid, target_class, access_vector });
 

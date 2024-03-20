@@ -19,7 +19,7 @@ pub(crate) fn check_task_create_access(
 ) -> Result<(), Errno> {
     // When creating a process there is no transition involved, the source and target SIDs
     // are the current SID.
-    let target_sid = task_sid.clone();
+    let target_sid = task_sid;
     check_permission(permission_check, task_sid, target_sid, ProcessPermission::Fork)
 }
 
@@ -30,8 +30,8 @@ pub(crate) fn check_exec_access(
     selinux_state: &Option<SeLinuxThreadGroupState>,
 ) -> Result<Option<SeLinuxResolvedElfState>, Errno> {
     return selinux_state.as_ref().map_or(Ok(None), |selinux_state| {
-        let current_sid = &selinux_state.current_sid;
-        let new_sid = if let Some(exec_sid) = &selinux_state.exec_sid {
+        let current_sid = selinux_state.current_sid;
+        let new_sid = if let Some(exec_sid) = selinux_state.exec_sid {
             // Use the proc exec SID if set.
             exec_sid
         } else {
@@ -46,11 +46,8 @@ pub(crate) fn check_exec_access(
             // rights to the executable file.
         } else {
             // Domain transition, check that transition is allowed.
-            if !permission_check.has_permission(
-                current_sid.clone(),
-                new_sid.clone(),
-                ProcessPermission::Transition,
-            ) {
+            if !permission_check.has_permission(current_sid, new_sid, ProcessPermission::Transition)
+            {
                 return error!(EACCES);
             }
             // TODO(http://b/320436714): Check executable permissions:
@@ -59,7 +56,7 @@ pub(crate) fn check_exec_access(
             // - allow rule from `current_sid` to the executable's security context for read
             //   and execute permissions
         }
-        return Ok(Some(SeLinuxResolvedElfState { sid: new_sid.clone() }));
+        return Ok(Some(SeLinuxResolvedElfState { sid: new_sid }));
     });
 }
 
@@ -72,8 +69,8 @@ pub(crate) fn update_state_on_exec(
     // TODO(http://b/316181721): check if the previous state needs to be updated regardless.
     if let Some(elf_selinux_state) = elf_selinux_state {
         selinux_state.as_mut().map(|selinux_state| {
-            selinux_state.previous_sid = selinux_state.current_sid.clone();
-            selinux_state.current_sid = elf_selinux_state.sid.clone();
+            selinux_state.previous_sid = selinux_state.current_sid;
+            selinux_state.current_sid = elf_selinux_state.sid;
             selinux_state
         });
     }
@@ -288,8 +285,8 @@ mod tests {
             .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0")
             .expect("invalid security context");
         let selinux_state = Some(SeLinuxThreadGroupState {
-            current_sid: current_sid.clone(),
-            exec_sid: Some(exec_sid.clone()),
+            current_sid: current_sid,
+            exec_sid: Some(exec_sid),
             fscreate_sid: None,
             keycreate_sid: None,
             previous_sid: current_sid,
@@ -312,7 +309,7 @@ mod tests {
             .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0")
             .expect("invalid security context");
         let selinux_state = Some(SeLinuxThreadGroupState {
-            current_sid: current_sid.clone(),
+            current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
             keycreate_sid: None,
@@ -343,7 +340,7 @@ mod tests {
         let elf_sid = security_server
             .security_context_to_sid(b"u:object_r:test_valid_t:s0")
             .expect("invalid security context");
-        let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
+        let elf_state = SeLinuxResolvedElfState { sid: elf_sid };
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut selinux_state, &Some(elf_state));
         assert_eq!(
@@ -595,8 +592,8 @@ mod tests {
             assert_eq!(
                 check_signal_access(
                     &security_server.as_permission_check(),
-                    source_sid.clone(),
-                    target_sid.clone(),
+                    source_sid,
+                    target_sid,
                     signal,
                 ),
                 error!(EACCES)

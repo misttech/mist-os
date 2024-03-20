@@ -1301,7 +1301,7 @@ impl ThreadGroup {
         // TODO(http://b/316181721): to avoid TOCTOU issues, once initial security contexts are
         // propagated to tasks in the system, in some cases using this API will need to be replaced
         // with call sites holding the state lock while making updates.
-        self.mutable_state.read().selinux_state.as_ref().map(|state| state.current_sid.clone())
+        self.mutable_state.read().selinux_state.as_ref().map(|state| state.current_sid)
     }
 }
 

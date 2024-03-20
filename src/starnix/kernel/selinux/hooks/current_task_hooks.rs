@@ -342,7 +342,7 @@ mod tests {
             .expect("missing security server")
             .security_context_to_sid(b"u:object_r:fork_no_t:s0")
             .expect("invalid security context");
-        let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
+        let elf_state = SeLinuxResolvedElfState { sid: elf_sid };
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut task, &Some(elf_state));
         assert_eq!(
@@ -366,7 +366,7 @@ mod tests {
             .expect("missing security server")
             .security_context_to_sid(b"u:object_r:fork_no_t:s0")
             .expect("invalid security context");
-        let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
+        let elf_state = SeLinuxResolvedElfState { sid: elf_sid };
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut task, &Some(elf_state));
         assert_eq!(
@@ -635,7 +635,7 @@ mod tests {
 
         assert!(node.info().sid.is_some());
 
-        let first_sid = node.info().sid.clone().unwrap();
+        let first_sid = node.info().sid.unwrap();
         post_setxattr(
             current_task.as_ref(),
             node.as_ref(),
@@ -645,7 +645,7 @@ mod tests {
 
         assert!(node.info().sid.is_some());
 
-        let second_sid = node.info().sid.clone().unwrap();
+        let second_sid = node.info().sid.unwrap();
 
         assert_ne!(first_sid, second_sid);
     }

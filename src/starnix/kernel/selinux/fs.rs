@@ -325,7 +325,7 @@ impl SeInitialContext {
 impl BytesFileOps for SeInitialContext {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let sid = SecurityId::initial(self.initial_sid);
-        if let Some(context) = self.security_server.sid_to_security_context(&sid) {
+        if let Some(context) = self.security_server.sid_to_security_context(sid) {
             Ok(context.into())
         } else {
             // Looking up an initial SID can only fail if no policy is loaded, in
@@ -691,18 +691,18 @@ impl BytesFileOps for SeProcAttrNode {
                 let sid = {
                     let tg = task.thread_group.read();
                     tg.selinux_state.as_ref().and_then(|selinux_state| match self.attr {
-                        Current => Some(selinux_state.current_sid.clone()),
-                        Exec => selinux_state.exec_sid.clone(),
-                        FsCreate => selinux_state.fscreate_sid.clone(),
-                        KeyCreate => selinux_state.keycreate_sid.clone(),
-                        Previous => Some(selinux_state.previous_sid.clone()),
-                        SockCreate => selinux_state.sockcreate_sid.clone(),
+                        Current => Some(selinux_state.current_sid),
+                        Exec => selinux_state.exec_sid,
+                        FsCreate => selinux_state.fscreate_sid,
+                        KeyCreate => selinux_state.keycreate_sid,
+                        Previous => Some(selinux_state.previous_sid),
+                        SockCreate => selinux_state.sockcreate_sid,
                     })
                 };
 
                 // Convert it to a Security Context string.
                 let security_context =
-                    sid.and_then(|sid| security_server.sid_to_security_context(&sid));
+                    sid.and_then(|sid| security_server.sid_to_security_context(sid));
 
                 Ok(security_context.unwrap_or_else(Vec::new).into())
             }

@@ -12,7 +12,7 @@ pub use selinux_common::InitialSid;
 use std::num::NonZeroU32;
 
 /// The Security ID (SID) used internally to refer to a security context.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SecurityId(NonZeroU32);
 
 impl SecurityId {

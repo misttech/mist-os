@@ -116,21 +116,21 @@ struct SecurityServerState {
 impl SecurityServerState {
     fn security_context_to_sid(&mut self, security_context: SecurityContext) -> SecurityId {
         match self.sids.iter().find(|(_, sc)| **sc == security_context) {
-            Some((sid, _)) => sid.clone(),
+            Some((sid, _)) => *sid,
             None => {
                 // Create and insert a new SID for `security_context`.
                 let sid = SecurityId(self.next_sid);
                 self.next_sid = self.next_sid.checked_add(1).expect("exhausted SID namespace");
                 assert!(
-                    self.sids.insert(sid.clone(), security_context).is_none(),
+                    self.sids.insert(sid, security_context).is_none(),
                     "impossible error: SID already exists."
                 );
                 sid
             }
         }
     }
-    fn sid_to_security_context(&self, sid: &SecurityId) -> Option<&SecurityContext> {
-        self.sids.get(sid)
+    fn sid_to_security_context(&self, sid: SecurityId) -> Option<&SecurityContext> {
+        self.sids.get(&sid)
     }
     fn deny_unknown(&self) -> bool {
         self.policy.as_ref().map_or(true, |p| *p.parsed.handle_unknown() != HandleUnknown::Allow)
@@ -201,7 +201,7 @@ impl SecurityServer {
     /// Returns the Security Context string for the requested `sid`.
     /// This is used only where Contexts need to be stringified to expose to userspace, as
     /// is the case for e.g. the `/proc/*/attr/` filesystem.
-    pub fn sid_to_security_context(&self, sid: &SecurityId) -> Option<Vec<u8>> {
+    pub fn sid_to_security_context(&self, sid: SecurityId) -> Option<Vec<u8>> {
         let state = self.state.lock();
         let context = state.sid_to_security_context(sid)?;
         Some(state.policy.as_ref()?.parsed.serialize_security_context(context))
@@ -326,7 +326,7 @@ impl SecurityServer {
         };
 
         if let (Some(source_security_context), Some(target_security_context)) =
-            (state.sid_to_security_context(&source_sid), state.sid_to_security_context(&target_sid))
+            (state.sid_to_security_context(source_sid), state.sid_to_security_context(target_sid))
         {
             // Take copies of the the type fields before dropping the state lock.
             let source_type = source_security_context.type_().clone();
@@ -368,8 +368,8 @@ impl SecurityServer {
         };
 
         if let (Some(source_security_context), Some(target_security_context)) = (
-            state.sid_to_security_context(&source_sid).cloned(),
-            state.sid_to_security_context(&target_sid).cloned(),
+            state.sid_to_security_context(source_sid).cloned(),
+            state.sid_to_security_context(target_sid).cloned(),
         ) {
             drop(state);
 
@@ -531,7 +531,7 @@ mod tests {
             .security_context_to_sid(security_context)
             .expect("creating SID from security context should succeed");
         assert_eq!(
-            security_server.sid_to_security_context(&sid).expect("sid not found"),
+            security_server.sid_to_security_context(sid).expect("sid not found"),
             security_context
         );
     }
@@ -799,7 +799,7 @@ mod tests {
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
             .expect("new sid computed");
         let computed_context = security_server
-            .sid_to_security_context(&computed_sid)
+            .sid_to_security_context(computed_sid)
             .expect("computed sid associated with context");
 
         // User and low security level should be copied from the source,
@@ -825,7 +825,7 @@ mod tests {
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
             .expect("new sid computed");
         let computed_context = security_server
-            .sid_to_security_context(&computed_sid)
+            .sid_to_security_context(computed_sid)
             .expect("computed sid associated with context");
 
         // All fields should be copied from the source, but only the "low" part of the security
@@ -851,7 +851,7 @@ mod tests {
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
             .expect("new sid computed");
         let computed_context = security_server
-            .sid_to_security_context(&computed_sid)
+            .sid_to_security_context(computed_sid)
             .expect("computed sid associated with context");
 
         // User, role and type copied from target, with source's low security level.
@@ -876,7 +876,7 @@ mod tests {
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
             .expect("new sid computed");
         let computed_context = security_server
-            .sid_to_security_context(&computed_sid)
+            .sid_to_security_context(computed_sid)
             .expect("computed sid associated with context");
 
         // User and low security level copied from source, role and type as default.
@@ -902,7 +902,7 @@ mod tests {
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
             .expect("new sid computed");
         let computed_context = security_server
-            .sid_to_security_context(&computed_sid)
+            .sid_to_security_context(computed_sid)
             .expect("computed sid associated with context");
 
         // User and full security range copied from source, role and type as default.
@@ -927,7 +927,7 @@ mod tests {
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
             .expect("new sid computed");
         let computed_context = security_server
-            .sid_to_security_context(&computed_sid)
+            .sid_to_security_context(computed_sid)
             .expect("computed sid associated with context");
 
         // User and high security level copied from source, role and type as default.
@@ -952,7 +952,7 @@ mod tests {
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
             .expect("new sid computed");
         let computed_context = security_server
-            .sid_to_security_context(&computed_sid)
+            .sid_to_security_context(computed_sid)
             .expect("computed sid associated with context");
 
         // User copied from source, low security level from target, role and type as default.
@@ -978,7 +978,7 @@ mod tests {
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
             .expect("new sid computed");
         let computed_context = security_server
-            .sid_to_security_context(&computed_sid)
+            .sid_to_security_context(computed_sid)
             .expect("computed sid associated with context");
 
         // User copied from source, full security range from target, role and type as default.
@@ -1003,7 +1003,7 @@ mod tests {
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
             .expect("new sid computed");
         let computed_context = security_server
-            .sid_to_security_context(&computed_sid)
+            .sid_to_security_context(computed_sid)
             .expect("computed sid associated with context");
 
         // User copied from source, high security level from target, role and type as default.

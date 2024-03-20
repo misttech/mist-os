@@ -307,8 +307,8 @@ mod tests {
                 false,
                 PermissionCheck::has_permission(
                     &deny_all,
-                    A_TEST_SID.clone(),
-                    A_TEST_SID.clone(),
+                    *A_TEST_SID,
+                    *A_TEST_SID,
                     permission.clone()
                 )
             );
@@ -316,8 +316,8 @@ mod tests {
                 false,
                 PermissionCheckMut::has_permission(
                     &mut deny_all,
-                    A_TEST_SID.clone(),
-                    A_TEST_SID.clone(),
+                    *A_TEST_SID,
+                    *A_TEST_SID,
                     permission.clone()
                 )
             );
@@ -326,8 +326,8 @@ mod tests {
                 true,
                 PermissionCheck::has_permission(
                     &allow_all,
-                    A_TEST_SID.clone(),
-                    A_TEST_SID.clone(),
+                    *A_TEST_SID,
+                    *A_TEST_SID,
                     permission.clone()
                 )
             );
@@ -335,8 +335,8 @@ mod tests {
                 true,
                 PermissionCheckMut::has_permission(
                     &mut allow_all,
-                    A_TEST_SID.clone(),
-                    A_TEST_SID.clone(),
+                    *A_TEST_SID,
+                    *A_TEST_SID,
                     permission.clone()
                 )
             );
@@ -347,8 +347,8 @@ mod tests {
             false,
             PermissionCheck::has_permissions(
                 &deny_all,
-                A_TEST_SID.clone(),
-                A_TEST_SID.clone(),
+                *A_TEST_SID,
+                *A_TEST_SID,
                 permissions.clone()
             )
         );
@@ -356,8 +356,8 @@ mod tests {
             false,
             PermissionCheckMut::has_permissions(
                 &mut deny_all,
-                A_TEST_SID.clone(),
-                A_TEST_SID.clone(),
+                *A_TEST_SID,
+                *A_TEST_SID,
                 permissions.clone()
             )
         );
@@ -367,8 +367,8 @@ mod tests {
             true,
             PermissionCheck::has_permissions(
                 &allow_all,
-                A_TEST_SID.clone(),
-                A_TEST_SID.clone(),
+                *A_TEST_SID,
+                *A_TEST_SID,
                 permissions.clone()
             )
         );
@@ -376,9 +376,9 @@ mod tests {
             true,
             PermissionCheckMut::has_permissions(
                 &mut allow_all,
-                A_TEST_SID.clone(),
-                A_TEST_SID.clone(),
-                permissions
+                *A_TEST_SID,
+                *A_TEST_SID,
+                permissions.clone()
             )
         );
 
@@ -388,8 +388,8 @@ mod tests {
             true,
             PermissionCheck::has_permissions(
                 &deny_all,
-                A_TEST_SID.clone(),
-                A_TEST_SID.clone(),
+                *A_TEST_SID,
+                *A_TEST_SID,
                 empty_permissions.clone()
             )
         );
@@ -397,8 +397,8 @@ mod tests {
             true,
             PermissionCheckMut::has_permissions(
                 &mut deny_all,
-                A_TEST_SID.clone(),
-                A_TEST_SID.clone(),
+                *A_TEST_SID,
+                *A_TEST_SID,
                 empty_permissions.clone()
             )
         );
@@ -406,8 +406,8 @@ mod tests {
             true,
             PermissionCheck::has_permissions(
                 &allow_all,
-                A_TEST_SID.clone(),
-                A_TEST_SID.clone(),
+                *A_TEST_SID,
+                *A_TEST_SID,
                 empty_permissions.clone()
             )
         );
@@ -415,9 +415,9 @@ mod tests {
             true,
             PermissionCheckMut::has_permissions(
                 &mut allow_all,
-                A_TEST_SID.clone(),
-                A_TEST_SID.clone(),
-                empty_permissions
+                *A_TEST_SID,
+                *A_TEST_SID,
+                empty_permissions.clone()
             )
         );
     }
