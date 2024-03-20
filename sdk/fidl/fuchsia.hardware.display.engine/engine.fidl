@@ -280,6 +280,12 @@ open protocol Engine {
         minimum_rgb uint8;
     }) -> () error zx.Status;
 
+    /// Returns true iff the display Engine supports capturing the pixels
+    /// on the display device.
+    flexible IsCaptureSupported() -> (struct {
+        is_supported bool;
+    });
+
     /// Starts capture into the resource mapped by `capture_image_id `(non-blocking)
     /// Only one active capture is allowed at a time.
     /// A valid image must be displayed during capture. Otherwise unexpected
@@ -311,6 +317,11 @@ open protocol Engine {
         is_capture_completed bool;
     });
 
+    /// Triggered when a previous display capture triggered by [`StartCapture`]
+    /// is completed.
+    ///
+    /// The display Engine emits an [`OnCaptureComplete`] event only if
+    /// [`IsCaptureSupported`] returns `true`.
     flexible -> OnCaptureComplete();
 
     /// Called when displays are added or removed.

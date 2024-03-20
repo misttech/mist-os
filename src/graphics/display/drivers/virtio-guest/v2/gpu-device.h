@@ -80,6 +80,8 @@ class GpuDevice : public fdf::WireServer<fuchsia_hardware_display_engine::Engine
                        SetDisplayPowerCompleter::Sync& completer) override {}
   void SetMinimumRgb(SetMinimumRgbRequestView request, fdf::Arena& arena,
                      SetMinimumRgbCompleter::Sync& completer) override {}
+  void IsCaptureSupported(fdf::Arena& arena,
+                          IsCaptureSupportedCompleter::Sync& completer) override {}
   void StartCapture(StartCaptureRequestView request, fdf::Arena& arena,
                     StartCaptureCompleter::Sync& completer) override {}
   void ReleaseCapture(ReleaseCaptureRequestView request, fdf::Arena& arena,
