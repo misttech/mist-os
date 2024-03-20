@@ -26,6 +26,9 @@ use netstack3_core::sync::RwLock as CoreRwLock;
 
 use super::StackTime;
 
+// TODO(https://fxbug.dev/42083407): Remove this module when we've moved to the
+// new timers worker.
+
 /// The granularity of scheduled timer instants.
 ///
 /// Timers that are requested to be fired at an instant that is not a multiple

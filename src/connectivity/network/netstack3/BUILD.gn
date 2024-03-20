@@ -110,6 +110,7 @@ common_sources = [
   "src/bindings/socket/worker.rs",
   "src/bindings/stack_fidl_worker.rs",
   "src/bindings/timers.rs",
+  "src/bindings/timers2.rs",
   "src/bindings/util.rs",
   "src/bindings/verifier_worker.rs",
   "src/main.rs",

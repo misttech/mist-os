@@ -25,6 +25,9 @@ mod routes;
 mod socket;
 mod stack_fidl_worker;
 mod timers;
+// TODO(https://fxbug.dev/42083407): Rename this module when everything is using
+// the new timer context.
+mod timers2;
 mod util;
 mod verifier_worker;
 
@@ -267,13 +270,19 @@ const DEFAULT_INTERFACE_METRIC: u32 = 100;
 
 pub(crate) struct BindingsCtxInner {
     timers: timers::TimerDispatcher<TimerId<BindingsCtx>>,
+    timers2: timers2::TimerDispatcher<TimerId<BindingsCtx>>,
     devices: Devices<DeviceId<BindingsCtx>>,
     routes: routes::ChangeSink,
 }
 
 impl BindingsCtxInner {
     fn new(routes_change_sink: routes::ChangeSink) -> Self {
-        Self { timers: Default::default(), devices: Default::default(), routes: routes_change_sink }
+        Self {
+            timers: Default::default(),
+            timers2: Default::default(),
+            devices: Default::default(),
+            routes: routes_change_sink,
+        }
     }
 }
 
@@ -450,32 +459,29 @@ impl RngContext for BindingsCtx {
 }
 
 impl TimerBindingsTypes for BindingsCtx {
-    type Timer = TimerId<BindingsCtx>;
+    type Timer = timers2::Timer<TimerId<BindingsCtx>>;
     type DispatchId = TimerId<BindingsCtx>;
 }
 
-// TODO(https://fxbug.dev/42083407): Move the timer implementation to something
-// that keeps meaningful timer state in core instead of relying on the existing
-// timer impl.
 impl TimerContext2 for BindingsCtx {
     fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
-        id
+        self.timers2.new_timer(id)
     }
 
     fn schedule_timer_instant2(
         &mut self,
-        time: Self::Instant,
+        StackTime(time): Self::Instant,
         timer: &mut Self::Timer,
     ) -> Option<Self::Instant> {
-        self.timers.schedule_timer(timer.clone(), time)
+        timer.schedule(time).map(Into::into)
     }
 
     fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-        self.timers.cancel_timer(timer)
+        timer.cancel().map(Into::into)
     }
 
     fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-        self.timers.scheduled_time(timer)
+        timer.scheduled_time().map(Into::into)
     }
 }
 
@@ -1151,6 +1157,16 @@ impl NetstackSeed {
         let timers_task =
             NamedTask::new("timers", netstack.ctx.bindings_ctx().timers.spawn(netstack.clone()));
 
+        let mut timer_handler_ctx = netstack.ctx.clone();
+        // TODO(https://fxbug.dev/42083407): Don't forget to rename this
+        // variable and the string below when deleting old timers impl.
+        let timers2_task = NamedTask::new(
+            "timers2",
+            netstack.ctx.bindings_ctx().timers2.spawn(move |timer| {
+                timer_handler_ctx.api().handle_timer(timer);
+            }),
+        );
+
         let (route_update_dispatcher_v4, route_update_dispatcher_v6) =
             routes_change_runner.route_update_dispatchers();
 
@@ -1192,6 +1208,7 @@ impl NetstackSeed {
         let no_finish_tasks = loopback_tasks.into_iter().chain([
             interfaces_worker_task,
             timers_task,
+            timers2_task,
             neighbor_worker_task,
         ]);
         let mut no_finish_tasks = futures::stream::FuturesUnordered::from_iter(
@@ -1487,6 +1504,7 @@ impl NetstackSeed {
             .expect("loopback task must still be running");
         // Stop the timer dispatcher.
         ctx.bindings_ctx().timers.stop();
+        ctx.bindings_ctx().timers2.stop();
         // Stop the interfaces watcher worker.
         std::mem::drop(interfaces_watcher_sink);
         // Stop the neighbor watcher worker.
