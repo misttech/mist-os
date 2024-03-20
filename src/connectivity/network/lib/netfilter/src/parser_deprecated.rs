@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use pest::iterators::Pair;
-use pest::Parser;
+use pest::{iterators::Pair, Parser};
 
 use fidl_fuchsia_hardware_network as fhnet;
 use fidl_fuchsia_net as net;
 use fidl_fuchsia_net_filter_deprecated as filter;
 
-use crate::grammar::{Error, FilterRuleParser, InvalidReason, Rule};
+use crate::{
+    grammar::{Error, FilterRuleParser, InvalidReason, Rule},
+    util,
+};
 
 fn parse_action(pair: Pair<'_, Rule>) -> filter::Action {
     assert_eq!(pair.as_rule(), Rule::action);
@@ -80,7 +82,7 @@ fn parse_src_or_dst(
     match inner.next() {
         Some(pair) => match pair.as_rule() {
             Rule::invertible_subnet => {
-                let (subnet, invert_match) = parse_invertible_subnet(pair)?;
+                let (subnet, invert_match) = util::parse_invertible_subnet(pair)?;
                 let port = match inner.next() {
                     Some(pair) => parse_port_range(pair)?,
                     None => filter::PortRange { start: 0, end: 0 },
@@ -94,70 +96,22 @@ fn parse_src_or_dst(
     }
 }
 
-fn parse_invertible_subnet(pair: Pair<'_, Rule>) -> Result<(net::Subnet, bool), Error> {
-    assert_eq!(pair.as_rule(), Rule::invertible_subnet);
-    let mut inner = pair.into_inner();
-    let mut pair = inner.next().unwrap();
-    let invert_match = match pair.as_rule() {
-        Rule::not => {
-            pair = inner.next().unwrap();
-            true
-        }
-        Rule::subnet => false,
-        _ => unreachable!("invertible subnet must be either not or a subnet"),
-    };
-    let subnet = parse_subnet(pair)?;
-    Ok((subnet, invert_match))
-}
-
-fn parse_subnet(pair: Pair<'_, Rule>) -> Result<net::Subnet, Error> {
-    assert_eq!(pair.as_rule(), Rule::subnet);
-    let mut inner = pair.into_inner();
-    let addr = parse_ipaddr(inner.next().unwrap())?;
-    let prefix_len = parse_prefix_len(inner.next().unwrap())?;
-
-    Ok(net::Subnet { addr, prefix_len })
-}
-
-fn parse_ipaddr(pair: Pair<'_, Rule>) -> Result<net::IpAddress, Error> {
-    assert_eq!(pair.as_rule(), Rule::ipaddr);
-    let pair = pair.into_inner().next().unwrap();
-    let addr = pair.as_str().parse().map_err(Error::Addr)?;
-    match addr {
-        std::net::IpAddr::V4(ip4) => {
-            Ok(net::IpAddress::Ipv4(net::Ipv4Address { addr: ip4.octets() }))
-        }
-        std::net::IpAddr::V6(ip6) => {
-            Ok(net::IpAddress::Ipv6(net::Ipv6Address { addr: ip6.octets() }))
-        }
-    }
-}
-
-fn parse_prefix_len(pair: Pair<'_, Rule>) -> Result<u8, Error> {
-    assert_eq!(pair.as_rule(), Rule::prefix_len);
-    pair.as_str().parse::<u8>().map_err(Error::Num)
-}
-
 fn parse_port_range(pair: Pair<'_, Rule>) -> Result<filter::PortRange, Error> {
     assert_eq!(pair.as_rule(), Rule::port_range);
     let mut inner = pair.into_inner();
     let pair = inner.next().unwrap();
     match pair.as_rule() {
         Rule::port => {
-            let port_num = parse_port_num(inner.next().unwrap())?;
+            let port_num = util::parse_port_num(inner.next().unwrap())?;
             Ok(filter::PortRange { start: port_num, end: port_num })
         }
         Rule::range => {
-            let port_start = parse_port_num(inner.next().unwrap())?;
-            let port_end = parse_port_num(inner.next().unwrap())?;
+            let port_start = util::parse_port_num(inner.next().unwrap())?;
+            let port_end = util::parse_port_num(inner.next().unwrap())?;
             Ok(filter::PortRange { start: port_start, end: port_end })
         }
         _ => unreachable!("port range must be either a single port, or a port range"),
     }
-}
-
-fn parse_port_num(pair: Pair<'_, Rule>) -> Result<u16, Error> {
-    pair.as_str().parse::<u16>().map_err(Error::Num)
 }
 
 fn parse_log(pair: Pair<'_, Rule>) -> bool {
@@ -216,7 +170,7 @@ fn parse_nat(pair: Pair<'_, Rule>) -> Result<filter::Nat, Error> {
     let mut pairs = pair.into_inner();
 
     let proto = parse_proto(pairs.next().unwrap());
-    let src_subnet = parse_subnet(pairs.next().unwrap())?;
+    let src_subnet = util::parse_subnet(pairs.next().unwrap())?;
 
     Ok(filter::Nat {
         proto,
@@ -230,9 +184,9 @@ fn parse_rdr(pair: Pair<'_, Rule>) -> Result<filter::Rdr, Error> {
     let mut pairs = pair.into_inner();
 
     let proto = parse_proto(pairs.next().unwrap());
-    let dst_addr = parse_ipaddr(pairs.next().unwrap())?;
+    let dst_addr = util::parse_ipaddr(pairs.next().unwrap())?;
     let dst_port_range = parse_port_range(pairs.next().unwrap())?;
-    let new_dst_addr = parse_ipaddr(pairs.next().unwrap())?;
+    let new_dst_addr = util::parse_ipaddr(pairs.next().unwrap())?;
     let new_dst_port_range = parse_port_range(pairs.next().unwrap())?;
 
     Ok(filter::Rdr {
@@ -257,18 +211,9 @@ fn port_range_length(range: &filter::PortRange) -> Result<u16, Error> {
     Ok(range.end - range.start)
 }
 
-fn ip_version_eq(left: &net::IpAddress, right: &net::IpAddress) -> bool {
-    match (left, right) {
-        (net::IpAddress::Ipv4(_), net::IpAddress::Ipv4(_))
-        | (net::IpAddress::Ipv6(_), net::IpAddress::Ipv6(_)) => true,
-        (net::IpAddress::Ipv4(_), net::IpAddress::Ipv6(_))
-        | (net::IpAddress::Ipv6(_), net::IpAddress::Ipv4(_)) => false,
-    }
-}
-
 fn validate_rule(rule: &filter::Rule) -> Result<(), Error> {
     if let (Some(src_subnet), Some(dst_subnet)) = (&rule.src_subnet, &rule.dst_subnet) {
-        if !ip_version_eq(&src_subnet.addr, &dst_subnet.addr) {
+        if !util::ip_version_eq(&src_subnet.addr, &dst_subnet.addr) {
             return Err(Error::Invalid(InvalidReason::MixedIPVersions));
         }
     }
@@ -279,7 +224,7 @@ fn validate_rule(rule: &filter::Rule) -> Result<(), Error> {
 }
 
 fn validate_rdr(rdr: &filter::Rdr) -> Result<(), Error> {
-    if !ip_version_eq(&rdr.dst_addr, &rdr.new_dst_addr) {
+    if !util::ip_version_eq(&rdr.dst_addr, &rdr.new_dst_addr) {
         return Err(Error::Invalid(InvalidReason::MixedIPVersions));
     }
     if port_range_length(&rdr.dst_port_range)? != port_range_length(&rdr.new_dst_port_range)? {
@@ -342,6 +287,8 @@ pub fn parse_str_to_rdr_rules(line: &str) -> Result<Vec<filter::Rdr>, Error> {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    use net_declare::{fidl_ip, fidl_subnet};
 
     #[test]
     fn test_rule_with_proto_any() {
@@ -434,10 +381,7 @@ mod test {
                 action: filter::Action::Pass,
                 direction: filter::Direction::Incoming,
                 proto: filter::SocketProtocol::Tcp,
-                src_subnet: Some(Box::new(net::Subnet {
-                    addr: net::IpAddress::Ipv4(net::Ipv4Address { addr: [1, 2, 3, 4] }),
-                    prefix_len: 24,
-                })),
+                src_subnet: Some(Box::new(fidl_subnet!("1.2.3.4/24"))),
                 src_subnet_invert_match: false,
                 src_port_range: filter::PortRange { start: 0, end: 0 },
                 dst_subnet: None,
@@ -519,10 +463,7 @@ mod test {
                 action: filter::Action::Pass,
                 direction: filter::Direction::Incoming,
                 proto: filter::SocketProtocol::Tcp,
-                src_subnet: Some(Box::new(net::Subnet {
-                    addr: net::IpAddress::Ipv4(net::Ipv4Address { addr: [1, 2, 3, 4] }),
-                    prefix_len: 24,
-                })),
+                src_subnet: Some(Box::new(fidl_subnet!("1.2.3.4/24"))),
                 src_subnet_invert_match: false,
                 src_port_range: filter::PortRange { start: 10000, end: 10000 },
                 dst_subnet: None,
@@ -544,10 +485,7 @@ mod test {
                 action: filter::Action::Pass,
                 direction: filter::Direction::Incoming,
                 proto: filter::SocketProtocol::Tcp,
-                src_subnet: Some(Box::new(net::Subnet {
-                    addr: net::IpAddress::Ipv4(net::Ipv4Address { addr: [1, 2, 3, 4] }),
-                    prefix_len: 24,
-                })),
+                src_subnet: Some(Box::new(fidl_subnet!("1.2.3.4/24"))),
                 src_subnet_invert_match: true,
                 src_port_range: filter::PortRange { start: 10000, end: 10000 },
                 dst_subnet: None,
@@ -569,12 +507,7 @@ mod test {
                 action: filter::Action::Pass,
                 direction: filter::Direction::Incoming,
                 proto: filter::SocketProtocol::Tcp,
-                src_subnet: Some(Box::new(net::Subnet {
-                    addr: net::IpAddress::Ipv6(net::Ipv6Address {
-                        addr: [0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    }),
-                    prefix_len: 32,
-                })),
+                src_subnet: Some(Box::new(fidl_subnet!("1234:5678::/32"))),
                 src_subnet_invert_match: false,
                 src_port_range: filter::PortRange { start: 10000, end: 10000 },
                 dst_subnet: None,
@@ -599,12 +532,7 @@ mod test {
                 src_subnet: None,
                 src_subnet_invert_match: false,
                 src_port_range: filter::PortRange { start: 0, end: 0 },
-                dst_subnet: Some(Box::new(net::Subnet {
-                    addr: net::IpAddress::Ipv6(net::Ipv6Address {
-                        addr: [0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    }),
-                    prefix_len: 32,
-                })),
+                dst_subnet: Some(Box::new(fidl_subnet!("1234:5678::/32"))),
                 dst_subnet_invert_match: false,
                 dst_port_range: filter::PortRange { start: 10000, end: 10000 },
                 nic: 0,
@@ -635,20 +563,10 @@ mod test {
                 action: filter::Action::Pass,
                 direction: filter::Direction::Incoming,
                 proto: filter::SocketProtocol::Tcp,
-                src_subnet: Some(Box::new(net::Subnet {
-                    addr: net::IpAddress::Ipv6(net::Ipv6Address {
-                        addr: [0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    }),
-                    prefix_len: 32,
-                })),
+                src_subnet: Some(Box::new(fidl_subnet!("1234:5678::/32"))),
                 src_subnet_invert_match: false,
                 src_port_range: filter::PortRange { start: 10000, end: 10000 },
-                dst_subnet: Some(Box::new(net::Subnet {
-                    addr: net::IpAddress::Ipv6(net::Ipv6Address {
-                        addr: [0x23, 0x45, 0x67, 0x89, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    }),
-                    prefix_len: 32,
-                })),
+                dst_subnet: Some(Box::new(fidl_subnet!("2345:6789::/32"))),
                 dst_subnet_invert_match: false,
                 dst_port_range: filter::PortRange { start: 1000, end: 1000 },
                 nic: 0,
@@ -753,10 +671,7 @@ mod test {
             parse_str_to_nat_rules("nat from 1.2.3.0/24 -> from 192.168.1.1;"),
             Ok(vec![filter::Nat {
                 proto: filter::SocketProtocol::Any,
-                src_subnet: net::Subnet {
-                    addr: net::IpAddress::Ipv4(net::Ipv4Address { addr: [1, 2, 3, 0] }),
-                    prefix_len: 24,
-                },
+                src_subnet: fidl_subnet!("1.2.3.0/24"),
                 outgoing_nic: 0,
             }])
         );
@@ -768,10 +683,7 @@ mod test {
             parse_str_to_nat_rules("nat proto tcp from 1.2.3.0/24 -> from 192.168.1.1;"),
             Ok(vec![filter::Nat {
                 proto: filter::SocketProtocol::Tcp,
-                src_subnet: net::Subnet {
-                    addr: net::IpAddress::Ipv4(net::Ipv4Address { addr: [1, 2, 3, 0] }),
-                    prefix_len: 24,
-                },
+                src_subnet: fidl_subnet!("1.2.3.0/24"),
                 outgoing_nic: 0,
             }])
         );
@@ -783,9 +695,9 @@ mod test {
             parse_str_to_rdr_rules("rdr to 1.2.3.4 port 10000 -> to 192.168.1.1 port 20000;"),
             Ok(vec![filter::Rdr {
                 proto: filter::SocketProtocol::Any,
-                dst_addr: net::IpAddress::Ipv4(net::Ipv4Address { addr: [1, 2, 3, 4] }),
+                dst_addr: fidl_ip!("1.2.3.4"),
                 dst_port_range: filter::PortRange { start: 10000, end: 10000 },
-                new_dst_addr: net::IpAddress::Ipv4(net::Ipv4Address { addr: [192, 168, 1, 1] }),
+                new_dst_addr: fidl_ip!("192.168.1.1"),
                 new_dst_port_range: filter::PortRange { start: 20000, end: 20000 },
                 nic: 0,
             }])
@@ -800,9 +712,9 @@ mod test {
             ),
             Ok(vec![filter::Rdr {
                 proto: filter::SocketProtocol::Tcp,
-                dst_addr: net::IpAddress::Ipv4(net::Ipv4Address { addr: [1, 2, 3, 4] }),
+                dst_addr: fidl_ip!("1.2.3.4"),
                 dst_port_range: filter::PortRange { start: 10000, end: 10000 },
-                new_dst_addr: net::IpAddress::Ipv4(net::Ipv4Address { addr: [192, 168, 1, 1] }),
+                new_dst_addr: fidl_ip!("192.168.1.1"),
                 new_dst_port_range: filter::PortRange { start: 20000, end: 20000 },
                 nic: 0,
             }])
@@ -817,9 +729,9 @@ mod test {
             ),
             Ok(vec![filter::Rdr {
                 proto: filter::SocketProtocol::Tcp,
-                dst_addr: net::IpAddress::Ipv4(net::Ipv4Address { addr: [1, 2, 3, 4] }),
+                dst_addr: fidl_ip!("1.2.3.4"),
                 dst_port_range: filter::PortRange { start: 10000, end: 10005 },
-                new_dst_addr: net::IpAddress::Ipv4(net::Ipv4Address { addr: [192, 168, 1, 1] }),
+                new_dst_addr: fidl_ip!("192.168.1.1"),
                 new_dst_port_range: filter::PortRange { start: 20000, end: 20005 },
                 nic: 0,
             }])
@@ -864,16 +776,12 @@ mod test {
             ),
             Ok(vec![filter::Rdr {
                 proto: filter::SocketProtocol::Tcp,
-                dst_addr: net::IpAddress::Ipv6(net::Ipv6Address {
-                    addr: [0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                }),
+                dst_addr: fidl_ip!("1234:5678::"),
                 dst_port_range: filter::PortRange {
                     start: 10000,
                     end: 10005,
                 },
-                new_dst_addr: net::IpAddress::Ipv6(net::Ipv6Address {
-                    addr: [0x23, 0x45, 0x67, 0x89, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                }),
+                new_dst_addr: fidl_ip!("2345:6789::"),
                 new_dst_port_range: filter::PortRange {
                     start: 20000,
                     end: 20005,

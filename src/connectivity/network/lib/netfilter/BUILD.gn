@@ -30,6 +30,7 @@ rustc_library("netfilter") {
     "src/lib.rs",
     "src/parser.rs",
     "src/parser_deprecated.rs",
+    "src/util.rs",
   ]
 }
 

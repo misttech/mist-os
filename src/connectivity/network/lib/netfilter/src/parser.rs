@@ -5,10 +5,12 @@
 use pest::{iterators::Pair, Parser};
 
 use fidl_fuchsia_hardware_network as fhnet;
-use fidl_fuchsia_net as net;
 use fidl_fuchsia_net_filter_ext as filter_ext;
 
-use crate::grammar::{Error, FilterRuleParser, InvalidReason, Rule};
+use crate::{
+    grammar::{Error, FilterRuleParser, InvalidReason, Rule},
+    util,
+};
 
 fn parse_action(pair: Pair<'_, Rule>) -> filter_ext::Action {
     assert_eq!(pair.as_rule(), Rule::action);
@@ -92,7 +94,7 @@ fn parse_src_or_dst(
     match inner.next() {
         Some(pair) => match pair.as_rule() {
             Rule::invertible_subnet => {
-                let (subnet, invert_match) = parse_invertible_subnet(pair)?;
+                let (subnet, invert_match) = util::parse_invertible_subnet(pair)?;
                 let port = match inner.next() {
                     Some(pair) => Some(parse_port_range(pair)?),
                     None => None,
@@ -114,57 +116,13 @@ fn parse_src_or_dst(
     }
 }
 
-fn parse_invertible_subnet(pair: Pair<'_, Rule>) -> Result<(net::Subnet, bool), Error> {
-    assert_eq!(pair.as_rule(), Rule::invertible_subnet);
-    let mut inner = pair.into_inner();
-    let mut pair = inner.next().unwrap();
-    let invert_match = match pair.as_rule() {
-        Rule::not => {
-            pair = inner.next().unwrap();
-            true
-        }
-        Rule::subnet => false,
-        _ => unreachable!("invertible subnet must be either not or a subnet"),
-    };
-    let subnet = parse_subnet(pair)?;
-    Ok((subnet, invert_match))
-}
-
-fn parse_subnet(pair: Pair<'_, Rule>) -> Result<net::Subnet, Error> {
-    assert_eq!(pair.as_rule(), Rule::subnet);
-    let mut inner = pair.into_inner();
-    let addr = parse_ipaddr(inner.next().unwrap())?;
-    let prefix_len = parse_prefix_len(inner.next().unwrap())?;
-
-    Ok(net::Subnet { addr, prefix_len })
-}
-
-fn parse_ipaddr(pair: Pair<'_, Rule>) -> Result<net::IpAddress, Error> {
-    assert_eq!(pair.as_rule(), Rule::ipaddr);
-    let pair = pair.into_inner().next().unwrap();
-    let addr = pair.as_str().parse().map_err(Error::Addr)?;
-    match addr {
-        std::net::IpAddr::V4(ip4) => {
-            Ok(net::IpAddress::Ipv4(net::Ipv4Address { addr: ip4.octets() }))
-        }
-        std::net::IpAddr::V6(ip6) => {
-            Ok(net::IpAddress::Ipv6(net::Ipv6Address { addr: ip6.octets() }))
-        }
-    }
-}
-
-fn parse_prefix_len(pair: Pair<'_, Rule>) -> Result<u8, Error> {
-    assert_eq!(pair.as_rule(), Rule::prefix_len);
-    pair.as_str().parse::<u8>().map_err(Error::Num)
-}
-
 fn parse_port_range(pair: Pair<'_, Rule>) -> Result<filter_ext::PortMatcher, Error> {
     assert_eq!(pair.as_rule(), Rule::port_range);
     let mut inner = pair.into_inner();
     let pair = inner.next().unwrap();
     match pair.as_rule() {
         Rule::port => {
-            let port_num = parse_port_num(inner.next().unwrap())?;
+            let port_num = util::parse_port_num(inner.next().unwrap())?;
             filter_ext::PortMatcher::new(port_num, port_num, false).map_err(|err| match err {
                 filter_ext::PortMatcherError::InvalidPortRange => {
                     Error::Invalid(InvalidReason::InvalidPortRange)
@@ -172,8 +130,8 @@ fn parse_port_range(pair: Pair<'_, Rule>) -> Result<filter_ext::PortMatcher, Err
             })
         }
         Rule::range => {
-            let port_start = parse_port_num(inner.next().unwrap())?;
-            let port_end = parse_port_num(inner.next().unwrap())?;
+            let port_start = util::parse_port_num(inner.next().unwrap())?;
+            let port_end = util::parse_port_num(inner.next().unwrap())?;
             filter_ext::PortMatcher::new(port_start, port_end, false).map_err(|err| match err {
                 filter_ext::PortMatcherError::InvalidPortRange => {
                     Error::Invalid(InvalidReason::InvalidPortRange)
@@ -182,10 +140,6 @@ fn parse_port_range(pair: Pair<'_, Rule>) -> Result<filter_ext::PortMatcher, Err
         }
         _ => unreachable!("port range must be either a single port, or a port range"),
     }
-}
-
-fn parse_port_num(pair: Pair<'_, Rule>) -> Result<u16, Error> {
-    pair.as_str().parse::<u16>().map_err(Error::Num)
 }
 
 fn parse_rule(
@@ -253,15 +207,6 @@ pub struct FilterRoutines {
     pub local_egress: Option<filter_ext::RoutineId>,
 }
 
-fn ip_version_eq(left: &net::IpAddress, right: &net::IpAddress) -> bool {
-    match (left, right) {
-        (net::IpAddress::Ipv4(_), net::IpAddress::Ipv4(_))
-        | (net::IpAddress::Ipv6(_), net::IpAddress::Ipv6(_)) => true,
-        (net::IpAddress::Ipv4(_), net::IpAddress::Ipv6(_))
-        | (net::IpAddress::Ipv6(_), net::IpAddress::Ipv4(_)) => false,
-    }
-}
-
 fn validate_rule(rule: &filter_ext::Rule) -> Result<(), Error> {
     if let (Some(src_subnet), Some(dst_subnet)) = (&rule.matchers.src_addr, &rule.matchers.dst_addr)
     {
@@ -270,7 +215,7 @@ fn validate_rule(rule: &filter_ext::Rule) -> Result<(), Error> {
             filter_ext::AddressMatcherType::Subnet(dst_subnet),
         ) = (&src_subnet.matcher, &dst_subnet.matcher)
         {
-            if !ip_version_eq(&src_subnet.get().addr, &dst_subnet.get().addr) {
+            if !util::ip_version_eq(&src_subnet.get().addr, &dst_subnet.get().addr) {
                 return Err(Error::Invalid(InvalidReason::MixedIPVersions));
             }
         }

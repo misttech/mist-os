@@ -6,5 +6,6 @@ mod error;
 mod grammar;
 pub mod parser;
 pub mod parser_deprecated;
+mod util;
 
 pub use error::FidlReturn;
