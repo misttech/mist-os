@@ -32,8 +32,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         }
 
         if context.board_info.kernel.contiguous_physical_pages {
-            // This is commented out because we have to soft transition the vim3 in v/g first
-            // builder.platform_bundle("kernel_contiguous_physical_pages");
+            builder.platform_bundle("kernel_contiguous_physical_pages");
         }
 
         Ok(())
