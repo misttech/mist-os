@@ -54,35 +54,48 @@ type LevelDependency = resource struct {
 open protocol Topology {
     /// Called by a Power Element owner to register a new Power Element and
     /// open control channels for that element.
-    flexible AddElement(resource struct {
-        /// Human-readable name for logging and debug purposes.
-        element_name string:MAX_ELEMENT_NAME_LEN;
-        /// The initial current power level of the element.
-        initial_current_level PowerLevel;
-        /// All power levels that are valid for this element. Any level not
-        /// specified here will be treated as invalid.
-        valid_levels vector<PowerLevel>:MAX_VALID_POWER_LEVELS;
-        /// List of dependencies for this element's power levels.
-        /// Note: dependencies UPON this element's levels cannot be added here.
-        dependencies vector<LevelDependency>:MAX_DEPENDENCIES_IN_ADD_ELEMENT;
-        /// List of active dependency tokens to register for this element.
-        /// These tokens will allow other element owners to create active
-        /// dependencies upon this element by passing them as the
-        /// requires_token of a LevelDependency.
-        active_dependency_tokens_to_register vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
-        /// List of passive dependency tokens to register for this element.
-        /// These tokens will allow other element owners to create passive
-        /// dependencies upon this element by passing them as the
-        /// requires_token of a LevelDependency.
-        passive_dependency_tokens_to_register vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
-    }) -> (resource struct {
+    flexible AddElement(ElementSchema) -> (resource struct {
         /// ElementControl channel for this element.
         element_control_channel client_end:ElementControl;
         /// Lessor channel for this element.
         lessor_channel client_end:Lessor;
-        /// LevelControl channel for this element.
-        level_control_channel client_end:LevelControl;
     }) error AddElementError;
+};
+
+/// Passed to Topology.AddElement.
+type ElementSchema = resource table {
+    /// Human-readable name for logging and debug purposes.
+    1: element_name string:MAX_ELEMENT_NAME_LEN;
+    /// The initial current power level of the element.
+    2: initial_current_level PowerLevel;
+    /// All power levels that are valid for this element. Any level not
+    /// specified here will be treated as invalid.
+    3: valid_levels vector<PowerLevel>:MAX_VALID_POWER_LEVELS;
+    /// List of dependencies for this element's power levels.
+    /// Note: dependencies UPON this element's levels cannot be added here.
+    4: dependencies vector<LevelDependency>:MAX_DEPENDENCIES_IN_ADD_ELEMENT;
+    /// List of active dependency tokens to register for this element.
+    /// These tokens will allow other element owners to create active
+    /// dependencies upon this element by passing them as the
+    /// requires_token of a LevelDependency.
+    5: active_dependency_tokens_to_register vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
+    /// List of passive dependency tokens to register for this element.
+    /// These tokens will allow other element owners to create passive
+    /// dependencies upon this element by passing them as the
+    /// requires_token of a LevelDependency.
+    6: passive_dependency_tokens_to_register vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
+    /// Channels on which Power Broker will send required power levels and
+    /// receive current level updates.
+    7: level_control_channels LevelControlChannels;
+};
+
+type LevelControlChannels = resource struct {
+    /// Channel on which Power Broker will receive current level updates
+    /// for this element.
+    current server_end:CurrentLevel;
+    /// Channel on which Power Broker will send required power levels
+    /// for this element.
+    required server_end:RequiredLevel;
 };
 
 // Limitations on vector length for the sake of bounding request size.
@@ -162,38 +175,43 @@ type Permissions = strict bits : uint32 {
     MODIFY_DEPENDENCY = 0b00000100;
 };
 
-/// Provides element-scoped access to receive current power level status
-/// and initiate power level changes of an element previously added via
-/// Topology.AddElement.
-open protocol LevelControl {
-    /// Returns the required power level for this element, non-blocking.
-    flexible GetRequiredLevel() -> (resource struct {
-        required_level PowerLevel;
-    }) error RequiredLevelError;
-
-    /// Returns the required power level for this element, blocking until
-    /// the required power level is different than last_required_level.
-    flexible WatchRequiredLevel(resource struct {
-        last_required_level PowerLevel;
-    }) -> (resource struct {
-        required_level PowerLevel;
-    }) error RequiredLevelError;
-
+/// CurrentLevel and RequiredLevel must both be used by all managed
+/// Power Elements as part of the power level handshake with Power Broker:
+/// * The element operator calls RequiredLevel.Watch to receive the next
+///   required level from Power Broker.
+/// * The operator makes the changes necessary to transition to the new
+///   required level.
+/// * The operator calls CurrentLevel.Update to inform Power Broker
+///   that it has completed the transition to the new level.
+/// Established via ElementControl.AddElement.
+open protocol CurrentLevel {
     /// Sent by the element on initial startup and whenever there is a change
     /// in power level.
-    flexible UpdateCurrentPowerLevel(resource struct {
+    flexible Update(resource struct {
         current_level PowerLevel;
-    }) -> () error UpdateCurrentPowerLevelError;
+    }) -> () error CurrentLevelError;
+};
+
+type CurrentLevelError = flexible enum {
+    NOT_AUTHORIZED = 1;
+};
+
+/// Part of the power level handshake with Power Broker used for receiving
+/// required levels from Power Broker. See above note on CurrentLevel.
+/// Established via ElementControl.AddElement.
+open protocol RequiredLevel {
+    /// Returns the required power level for this element. The first call on
+    /// this channel will return immediately. Subsequent calls will block until
+    /// the required power level has changed.
+    flexible Watch() -> (resource struct {
+        required_level PowerLevel;
+    }) error RequiredLevelError;
 };
 
 type RequiredLevelError = flexible enum {
     INTERNAL = 1;
     NOT_AUTHORIZED = 2;
     UNKNOWN = 3;
-};
-
-type UpdateCurrentPowerLevelError = flexible enum {
-    NOT_AUTHORIZED = 1;
 };
 
 // Unique ID provided by Power Broker (currently a UUID but subject to change).

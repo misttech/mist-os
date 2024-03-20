@@ -8,7 +8,7 @@ use anyhow::{Error, Result};
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_power_broker::{
     ElementControlMarker, LeaseControlMarker, LessorMarker, LessorRequest, LessorRequestStream,
-    LevelControlMarker, TopologyRequest, TopologyRequestStream,
+    TopologyRequest, TopologyRequestStream,
 };
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
@@ -58,11 +58,8 @@ impl FakePowerBroker {
                         create_request_stream::<LessorMarker>().expect("");
                     fasync::Task::local(self.clone().handle_lessor(lessor_stream)).detach();
 
-                    let (level_control_client, _level_control_stream) =
-                        create_request_stream::<LevelControlMarker>().expect("");
-
                     responder
-                        .send(Ok((element_control_client, lessor_client, level_control_client)))
+                        .send(Ok((element_control_client, lessor_client)))
                         .expect("send should success")
                 }
                 TopologyRequest::_UnknownMethod { .. } => todo!(),

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::Result;
+use fidl::endpoints::create_proxy;
 use fidl_fuchsia_power_broker as fbroker;
 use fuchsia_zircon::{HandleBased, Rights};
 
@@ -15,7 +16,8 @@ pub const BINARY_POWER_LEVELS: [fbroker::PowerLevel; 2] = [
 pub struct PowerElementContext {
     pub element_control: fbroker::ElementControlProxy,
     pub lessor: fbroker::LessorProxy,
-    pub level_control: fbroker::LevelControlProxy,
+    pub required_level: fbroker::RequiredLevelProxy,
+    pub current_level: fbroker::CurrentLevelProxy,
     active_dependency_token: fbroker::DependencyToken,
     passive_dependency_token: fbroker::DependencyToken,
     name: String,
@@ -115,23 +117,37 @@ impl<'a> PowerElementContextBuilder<'a> {
                 .expect("failed to duplicate token"),
         );
 
-        let (element_control_client_end, lessor_client_end, level_control_client_end) = self
+        let (current_level, current_level_server_end) =
+            create_proxy::<fbroker::CurrentLevelMarker>()?;
+        let (required_level, required_level_server_end) =
+            create_proxy::<fbroker::RequiredLevelMarker>()?;
+        let (element_control_client_end, lessor_client_end) = self
             .topology
-            .add_element(
-                self.element_name,
-                self.initial_current_level,
-                self.valid_levels,
-                self.dependencies,
-                self.active_dependency_tokens_to_register,
-                self.passive_dependency_tokens_to_register,
-            )
+            .add_element(fbroker::ElementSchema {
+                element_name: Some(self.element_name.into()),
+                initial_current_level: Some(self.initial_current_level),
+                valid_levels: Some(self.valid_levels.to_vec()),
+                dependencies: Some(self.dependencies),
+                active_dependency_tokens_to_register: Some(
+                    self.active_dependency_tokens_to_register,
+                ),
+                passive_dependency_tokens_to_register: Some(
+                    self.passive_dependency_tokens_to_register,
+                ),
+                level_control_channels: Some(fbroker::LevelControlChannels {
+                    current: current_level_server_end,
+                    required: required_level_server_end,
+                }),
+                ..Default::default()
+            })
             .await?
             .map_err(|d| anyhow::anyhow!("{d:?}"))?;
-
+        let element_control = element_control_client_end.into_proxy()?;
         Ok(PowerElementContext {
-            element_control: element_control_client_end.into_proxy()?,
+            element_control,
             lessor: lessor_client_end.into_proxy()?,
-            level_control: level_control_client_end.into_proxy()?,
+            required_level,
+            current_level,
             active_dependency_token,
             passive_dependency_token,
             name: self.element_name.to_string(),

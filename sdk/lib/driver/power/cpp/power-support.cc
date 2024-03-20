@@ -425,7 +425,10 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
     fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
     fuchsia_hardware_power::wire::PowerElementConfiguration config, TokenMap tokens,
-    const zx::unowned_event& active_token, const zx::unowned_event& passive_token) {
+    const zx::unowned_event& active_token, const zx::unowned_event& passive_token,
+    std::optional<std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
+                            fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>
+        level_control) {
   // Get the power levels we should have
   std::vector<fuchsia_power_broker::PowerLevel> levels = PowerLevelsFromConfig(config);
   if (levels.size() == 0) {
@@ -453,9 +456,7 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
   }
 
   // Shove everything into a FIDL-ized structure
-  fidl::VectorView<fuchsia_power_broker::wire::LevelDependency> level_deps;
-  level_deps.Allocate(arena, dep_count);
-  level_deps.set_count(dep_count);
+  std::vector<fuchsia_power_broker::LevelDependency> level_deps(dep_count);
   int dep_index = 0;
   for (const std::pair<const fuchsia_hardware_power::ParentElement,
                        std::vector<fuchsia_power_broker::LevelDependency>>& dep : dep_map) {
@@ -471,46 +472,59 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
         // This should only fail if the supplied event handle is invalid
         return fit::error(Error::INVALID_ARGS);
       }
-      fuchsia_power_broker::LevelDependency c{{needs.dependency_type(), needs.dependent_level(),
-                                               std::move(dupe), needs.requires_level()}};
-      level_deps[dep_index] = fidl::ToWire(arena, std::move(c));
+      fuchsia_power_broker::LevelDependency c{{.dependency_type = needs.dependency_type(),
+                                               .dependent_level = needs.dependent_level(),
+                                               .requires_token = std::move(dupe),
+                                               .requires_level = needs.requires_level()}};
+      level_deps[dep_index] = std::move(c);
       dep_index++;
     }
   }
 
   // Duplicate the token for active dependencies
-  fidl::VectorView<zx::event> active_tokens{};
+  std::vector<zx::event> active_tokens{};
   if (active_token->is_valid()) {
-    active_tokens.Allocate(arena, 1);
     zx::event dupe;
     zx_status_t dupe_result = active_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
     if (dupe_result != ZX_OK) {
       return fit::error(Error::INVALID_ARGS);
     }
-    active_tokens[0] = std::move(dupe);
+    active_tokens.emplace_back(std::move(dupe));
   }
 
   // Duplicate the token for passive dependencies
-  fidl::VectorView<zx::event> passive_tokens{};
+  std::vector<zx::event> passive_tokens{};
   if (passive_token->is_valid()) {
-    passive_tokens.Allocate(arena, 1);
     zx::event dupe;
     zx_status_t dupe_result = passive_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
     if (dupe_result != ZX_OK) {
       return fit::error(Error::INVALID_ARGS);
     }
-    passive_tokens[0] = std::move(dupe);
+    passive_tokens.emplace_back(std::move(dupe));
   }
+
+  std::optional<fuchsia_power_broker::LevelControlChannels> lvl_ctrl;
+  if (level_control.has_value()) {
+    lvl_ctrl = {std::move(level_control->first), std::move(level_control->second)};
+  } else {
+    level_control = std::nullopt;
+  }
+
+  fuchsia_power_broker::ElementSchema schema{
+      {.element_name = std::string(config.element().name().data(), config.element().name().size()),
+       .initial_current_level = static_cast<uint8_t>(0),
+       .valid_levels = std::move(levels),
+       .dependencies = std::move(level_deps),
+       .active_dependency_tokens_to_register = std::move(active_tokens),
+       .passive_dependency_tokens_to_register = std::move(passive_tokens),
+       .level_control_channels = std::move(lvl_ctrl)}};
 
   // Steal the underlying channel
   fidl::WireSyncClient<fuchsia_power_broker::Topology> pb(
       fidl::ClientEnd<fuchsia_power_broker::Topology>(zx::channel(power_broker.TakeChannel())));
 
   // Add the element
-  auto add_result =
-      pb->AddElement(config.element().name(), 0,
-                     fidl::VectorView<fuchsia_power_broker::wire::PowerLevel>::FromExternal(levels),
-                     level_deps, active_tokens, passive_tokens);
+  auto add_result = pb->AddElement(fidl::ToWire(arena, std::move(schema)));
 
   // Put the channel back where it belongs
   power_broker.reset(pb.TakeClientEnd().TakeChannel().release());

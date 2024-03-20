@@ -6,12 +6,13 @@ use anyhow::{Context as _, Error};
 use async_utils::event::Event;
 use fidl::endpoints::{create_request_stream, ControlHandle, Responder, ServerEnd};
 use fidl_fuchsia_power_broker::{
-    self as fpb, ElementControlMarker, ElementControlRequest, ElementControlRequestStream,
-    LeaseControlMarker, LeaseControlRequest, LeaseControlRequestStream, LeaseStatus, LessorMarker,
-    LessorRequest, LessorRequestStream, LevelControlMarker, LevelControlRequest,
-    LevelControlRequestStream, PowerLevel, StatusRequest, StatusRequestStream, TopologyRequest,
-    TopologyRequestStream,
+    self as fpb, CurrentLevelRequest, CurrentLevelRequestStream, ElementControlMarker,
+    ElementControlRequest, ElementControlRequestStream, LeaseControlMarker, LeaseControlRequest,
+    LeaseControlRequestStream, LeaseStatus, LessorMarker, LessorRequest, LessorRequestStream,
+    PowerLevel, RequiredLevelRequest, RequiredLevelRequestStream, StatusRequest,
+    StatusRequestStream, TopologyRequest, TopologyRequestStream,
 };
+use fpb::ElementSchema;
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter};
@@ -37,6 +38,8 @@ enum IncomingRequest {
 
 struct BrokerSvc {
     broker: Rc<RefCell<Broker>>,
+    required_level_handlers: Rc<RefCell<HashMap<ElementID, RequiredLevelHandler>>>,
+    current_level_handlers: Rc<RefCell<HashMap<ElementID, Rc<CurrentLevelHandler>>>>,
     status_channel_handlers: Rc<RefCell<HashMap<ElementID, Vec<StatusChannelHandler>>>>,
 }
 
@@ -44,6 +47,8 @@ impl BrokerSvc {
     fn new() -> Self {
         Self {
             broker: Rc::new(RefCell::new(Broker::new())),
+            required_level_handlers: Rc::new(RefCell::new(HashMap::new())),
+            current_level_handlers: Rc::new(RefCell::new(HashMap::new())),
             status_channel_handlers: Rc::new(RefCell::new(HashMap::new())),
         }
     }
@@ -161,7 +166,7 @@ impl BrokerSvc {
             .try_for_each(|request| async {
                 match request {
                     ElementControlRequest::OpenStatusChannel { status_channel, .. } => {
-                        tracing::debug!("OpenStatus({:?})", &element_id);
+                        tracing::debug!("OpenStatusChannel({:?})", &element_id);
                         let svc = self.clone();
                         svc.create_status_channel_handler(element_id.clone(), status_channel).await
                     }
@@ -171,6 +176,8 @@ impl BrokerSvc {
                         broker.remove_element(&element_id);
 
                         // Clean up StatusChannelHandlers.
+                        self.required_level_handlers.borrow_mut().remove(&element_id);
+                        self.current_level_handlers.borrow_mut().remove(&element_id);
                         self.status_channel_handlers.borrow_mut().remove(&element_id);
 
                         // Close the ElementControl channel.
@@ -278,91 +285,51 @@ impl BrokerSvc {
             .await
     }
 
-    async fn run_level_control(
-        &self,
-        element_id: ElementID,
-        stream: LevelControlRequestStream,
-    ) -> Result<(), Error> {
-        stream
-            .map(|result| result.context("failed request"))
-            .try_for_each(|request| async {
-                match request {
-                    LevelControlRequest::GetRequiredLevel { responder } => {
-                        tracing::debug!("GetRequiredLevel({:?})", &element_id);
-                        let required_level = {
-                            let mut broker = self.broker.borrow_mut();
-                            tracing::debug!("get_required_level({:?})", &element_id);
-                            broker.get_required_level(&element_id)
-                        };
-                        if let Some(required_level) = required_level {
-                            responder.send(Ok(required_level)).context("response failed")
-                        } else {
-                            responder.send(Err(fpb::RequiredLevelError::Unknown)).context("response failed")
-                        }
-                    }
-                    LevelControlRequest::WatchRequiredLevel {
-                        last_required_level,
-                        responder,
-                    } => {
-                        tracing::debug!(
-                            "WatchRequiredLevel({:?}, {:?})",
-                            &element_id,
-                            &last_required_level
-                        );
-                        let mut receiver = {
-                            let mut broker = self.broker.borrow_mut();
-                            broker.watch_required_level(&element_id)
-                        };
-                        while let Some(next) = receiver.next().await {
-                            tracing::debug!(
-                                "receiver.next = {:?}, last_required_level = {:?}",
-                                &next,
-                                last_required_level
-                            );
-                            let Some(required_level) = next else {
-                                tracing::error!("element missing default required level");
-                                return responder.send(Err(fpb::RequiredLevelError::Internal)).context("send failed");
-                            };
-                            if last_required_level != required_level {
-                                tracing::debug!(
-                                    "WatchRequiredLevel: sending new level: {:?}", &required_level,
-                                );
-                                return responder.send(Ok(required_level)).context("send failed");
-                            }
-                            tracing::debug!(
-                                "WatchRequiredLevel: level has not changed, watching for next update...",
-                            );
-                        }
-                        Err(anyhow::anyhow!("Receiver closed, element is no longer available."))
-                    }
-                    LevelControlRequest::UpdateCurrentPowerLevel {
-                        current_level,
-                        responder,
-                    } => {
-                        tracing::debug!(
-                            "UpdateCurrentPowerLevel({:?}, {:?})",
-                            &element_id,
-                            &current_level
-                        );
-                        let mut broker = self.broker.borrow_mut();
-                        let res = broker.update_current_level(&element_id, current_level);
-                        match res {
-                            Ok(_) => {
-                                responder.send(Ok(())).context("send failed")
-                            },
-                            Err(err) => {
-                                tracing::debug!("UpdateCurrentPowerLevel Err: {:?}", &err);
-                                responder.send(Err(err.into())).context("send failed")
-                            },
-                        }
-                    }
-                    LevelControlRequest::_UnknownMethod { ordinal, .. } => {
-                        tracing::warn!("Received unknown LevelControlRequest: {ordinal}");
-                        todo!()
-                    }
-                }
-            })
-            .await
+    fn validate_and_unpack_add_element_payload(
+        payload: ElementSchema,
+    ) -> Result<
+        (
+            String,
+            u8,
+            Vec<u8>,
+            Vec<fpb::LevelDependency>,
+            Vec<credentials::Token>,
+            Vec<credentials::Token>,
+            Option<fpb::LevelControlChannels>,
+        ),
+        fpb::AddElementError,
+    > {
+        let Some(element_name) = payload.element_name else {
+            return Err(fpb::AddElementError::Invalid);
+        };
+        let Some(initial_current_level) = payload.initial_current_level else {
+            return Err(fpb::AddElementError::Invalid);
+        };
+        let Some(valid_levels) = payload.valid_levels else {
+            return Err(fpb::AddElementError::Invalid);
+        };
+        let level_dependencies = payload.dependencies.unwrap_or(vec![]);
+        let active_dependency_tokens: Vec<credentials::Token> = payload
+            .active_dependency_tokens_to_register
+            .unwrap_or(vec![])
+            .into_iter()
+            .map(|d| d.into())
+            .collect();
+        let passive_dependency_tokens: Vec<credentials::Token> = payload
+            .passive_dependency_tokens_to_register
+            .unwrap_or(vec![])
+            .into_iter()
+            .map(|d| d.into())
+            .collect();
+        Ok((
+            element_name,
+            initial_current_level,
+            valid_levels,
+            level_dependencies,
+            active_dependency_tokens,
+            passive_dependency_tokens,
+            payload.level_control_channels,
+        ))
     }
 
     async fn run_topology(self: Rc<Self>, stream: TopologyRequestStream) -> Result<(), Error> {
@@ -370,44 +337,48 @@ impl BrokerSvc {
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async {
                 match request {
-                    TopologyRequest::AddElement {
-                        element_name,
-                        initial_current_level,
-                        valid_levels,
-                        dependencies,
-                        active_dependency_tokens_to_register,
-                        passive_dependency_tokens_to_register,
-                        responder,
-                    } => {
-                        tracing::debug!(
-                            "AddElement({:?}, {:?}, {:?}, {:?}, {:?}, {:?})",
-                            &element_name,
-                            &initial_current_level,
-                            &valid_levels,
-                            &dependencies,
-                            &active_dependency_tokens_to_register,
-                            &passive_dependency_tokens_to_register,
-                        );
-                        let mut broker = self.broker.borrow_mut();
-                        let active_dependency_tokens = active_dependency_tokens_to_register
-                            .into_iter()
-                            .map(|d| d.into())
-                            .collect();
-                        let passive_dependency_tokens = passive_dependency_tokens_to_register
-                            .into_iter()
-                            .map(|d| d.into())
-                            .collect();
-                        let res = broker.add_element(
-                            &element_name,
+                    TopologyRequest::AddElement { payload, responder } => {
+                        tracing::debug!("AddElement({:?})", &payload);
+                        let Ok((
+                            element_name,
                             initial_current_level,
                             valid_levels,
-                            dependencies,
+                            level_dependencies,
                             active_dependency_tokens,
                             passive_dependency_tokens,
-                        );
+                            level_control_channels,
+                        )) = Self::validate_and_unpack_add_element_payload(payload)
+                        else {
+                            return responder
+                                .send(Err(fpb::AddElementError::Invalid))
+                                .context("send failed");
+                        };
+                        let res = {
+                            let mut broker = self.broker.borrow_mut();
+                            broker.add_element(
+                                &element_name,
+                                initial_current_level,
+                                valid_levels,
+                                level_dependencies,
+                                active_dependency_tokens,
+                                passive_dependency_tokens,
+                            )
+                        };
                         tracing::debug!("AddElement add_element = {:?}", res);
                         match res {
                             Ok(element_id) => {
+                                if let Some(level_control) = level_control_channels {
+                                    self.set_current_level_handler(
+                                        element_id.clone(),
+                                        level_control.current,
+                                    )
+                                    .await;
+                                    self.set_required_level_handler(
+                                        element_id.clone(),
+                                        level_control.required,
+                                    )
+                                    .await;
+                                }
                                 let (element_control_client, element_control_stream) =
                                     create_request_stream::<ElementControlMarker>()?;
                                 tracing::debug!(
@@ -443,30 +414,11 @@ impl BrokerSvc {
                                 })
                                 .detach();
                                 tracing::debug!(
-                                    "Spawning level control task for {:?}",
+                                    "Create level control handler for {:?}",
                                     &element_id
                                 );
-                                let (level_control_client, level_control_stream) =
-                                    create_request_stream::<LevelControlMarker>()?;
-                                Task::local({
-                                    let svc = self.clone();
-                                    let element_id = element_id.clone();
-                                    async move {
-                                        if let Err(err) = svc
-                                            .run_level_control(element_id, level_control_stream)
-                                            .await
-                                        {
-                                            tracing::debug!("run_level_control err: {:?}", err);
-                                        }
-                                    }
-                                })
-                                .detach();
                                 responder
-                                    .send(Ok((
-                                        element_control_client,
-                                        lessor_client,
-                                        level_control_client,
-                                    )))
+                                    .send(Ok((element_control_client, lessor_client)))
                                     .context("send failed")
                             }
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
@@ -481,8 +433,34 @@ impl BrokerSvc {
             .await
     }
 
+    async fn set_required_level_handler(
+        &self,
+        element_id: ElementID,
+        server_end: ServerEnd<fpb::RequiredLevelMarker>,
+    ) {
+        let receiver = {
+            let mut broker = self.broker.borrow_mut();
+            broker.watch_required_level(&element_id)
+        };
+        let mut handler = RequiredLevelHandler::new(element_id.clone());
+        let stream = server_end.into_stream().unwrap();
+        handler.start(stream, receiver);
+        self.required_level_handlers.borrow_mut().insert(element_id.clone(), handler);
+    }
+
+    async fn set_current_level_handler(
+        &self,
+        element_id: ElementID,
+        server_end: ServerEnd<fpb::CurrentLevelMarker>,
+    ) {
+        let handler = Rc::new(CurrentLevelHandler::new(self.broker.clone(), element_id.clone()));
+        let stream = server_end.into_stream().unwrap();
+        handler.clone().start(stream);
+        self.current_level_handlers.borrow_mut().insert(element_id.clone(), handler);
+    }
+
     async fn create_status_channel_handler(
-        self: Rc<Self>,
+        &self,
         element_id: ElementID,
         server_end: ServerEnd<fpb::StatusMarker>,
     ) -> Result<(), Error> {
@@ -492,13 +470,135 @@ impl BrokerSvc {
         };
         let mut handler = StatusChannelHandler::new(element_id.clone());
         let stream = server_end.into_stream()?;
-        handler.start(stream, receiver)?;
+        handler.start(stream, receiver);
         self.status_channel_handlers
             .borrow_mut()
             .entry(element_id.clone())
             .or_insert(Vec::new())
             .push(handler);
         Ok(())
+    }
+}
+
+struct RequiredLevelHandler {
+    element_id: ElementID,
+    shutdown: Event,
+}
+
+impl RequiredLevelHandler {
+    fn new(element_id: ElementID) -> Self {
+        Self { element_id, shutdown: Event::new() }
+    }
+
+    fn start(
+        &mut self,
+        mut stream: RequiredLevelRequestStream,
+        mut receiver: UnboundedReceiver<Option<PowerLevel>>,
+    ) {
+        let element_id = self.element_id.clone();
+        let mut shutdown = self.shutdown.wait_or_dropped();
+        tracing::debug!("Starting new RequiredLevelHandler for {:?}", &self.element_id);
+        Task::local(async move {
+            loop {
+                select! {
+                    _ = shutdown => {
+                        break;
+                    }
+                    next = stream.next() => {
+                        if let Some(Ok(request)) = next {
+                            if let Err(err) = RequiredLevelHandler::handle_request(element_id.clone(), request, &mut receiver).await {
+                                tracing::debug!("handle_request error: {:?}", err);
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            tracing::debug!("Closed RequiredLevel channel for {:?}.", &element_id);
+        }).detach();
+    }
+
+    async fn handle_request(
+        element_id: ElementID,
+        request: RequiredLevelRequest,
+        receiver: &mut UnboundedReceiver<Option<PowerLevel>>,
+    ) -> Result<(), Error> {
+        match request {
+            RequiredLevelRequest::Watch { responder } => {
+                if let Some(Some(power_level)) = receiver.next().await {
+                    tracing::debug!("RequiredLevel.Watch: send({:?})", &power_level);
+                    responder.send(Ok(power_level)).context("response failed")
+                } else {
+                    tracing::info!(
+                        "RequiredLevel.Watch: receiver closed, element {:?} is no longer available.",
+                        &element_id
+                    );
+                    Ok(())
+                }
+            }
+            RequiredLevelRequest::_UnknownMethod { ordinal, .. } => {
+                tracing::warn!("Received unknown RequiredLevelRequest: {ordinal}");
+                Err(anyhow::anyhow!("Received unknown RequiredLevelRequest: {ordinal}"))
+            }
+        }
+    }
+}
+
+struct CurrentLevelHandler {
+    broker: Rc<RefCell<Broker>>,
+    element_id: ElementID,
+}
+
+impl CurrentLevelHandler {
+    fn new(broker: Rc<RefCell<Broker>>, element_id: ElementID) -> Self {
+        Self { broker, element_id }
+    }
+
+    async fn handle_current_level_stream(
+        &self,
+        element_id: ElementID,
+        stream: CurrentLevelRequestStream,
+    ) -> Result<(), Error> {
+        stream
+            .map(|result| result.context("failed request"))
+            .try_for_each(|request| async {
+                match request {
+                    CurrentLevelRequest::Update { current_level, responder } => {
+                        tracing::debug!(
+                            "CurrentLevel.Update({:?}, {:?})",
+                            &element_id,
+                            &current_level
+                        );
+                        let mut broker = self.broker.borrow_mut();
+                        let res = broker.update_current_level(&element_id, current_level);
+                        match res {
+                            Ok(_) => responder.send(Ok(())).context("send failed"),
+                            Err(err) => {
+                                tracing::debug!("CurrentLevel.Update Err: {:?}", &err);
+                                responder.send(Err(err.into())).context("send failed")
+                            }
+                        }
+                    }
+                    CurrentLevelRequest::_UnknownMethod { ordinal, .. } => {
+                        tracing::warn!("Received unknown CurrentLevelRequest: {ordinal}");
+                        Err(anyhow::anyhow!("Received unknown CurrentLevelRequest: {ordinal}"))
+                    }
+                }
+            })
+            .await
+    }
+
+    fn start(self: Rc<Self>, stream: CurrentLevelRequestStream) {
+        let element_id = self.element_id.clone();
+        tracing::debug!("Starting new CurrentLevelHandler for {:?}", &self.element_id);
+        Task::local(async move {
+            if let Err(err) = self.handle_current_level_stream(element_id.clone(), stream).await {
+                tracing::error!("handle_current_level_control_stream error: {:?}", err);
+            }
+            tracing::debug!("Closed CurrentLevel channel for {:?}.", &element_id);
+        })
+        .detach();
     }
 }
 
@@ -516,7 +616,7 @@ impl StatusChannelHandler {
         &mut self,
         mut stream: StatusRequestStream,
         mut receiver: UnboundedReceiver<Option<PowerLevel>>,
-    ) -> Result<(), Error> {
+    ) {
         let element_id = self.element_id.clone();
         let mut shutdown = self.shutdown.wait_or_dropped();
         tracing::debug!("Starting new StatusChannelHandler for {:?}", &self.element_id);
@@ -539,7 +639,6 @@ impl StatusChannelHandler {
             }
             tracing::debug!("Closed StatusChannel for {:?}.", &element_id);
         }).detach();
-        Ok(())
     }
 
     async fn handle_request(

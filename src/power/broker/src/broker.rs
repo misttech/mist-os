@@ -99,7 +99,7 @@ impl Broker {
         &mut self,
         element_id: &ElementID,
         level: PowerLevel,
-    ) -> Result<(), fpb::UpdateCurrentPowerLevelError> {
+    ) -> Result<(), fpb::CurrentLevelError> {
         tracing::debug!("update_current_level({:?}, {:?})", element_id, level);
         self.current.update(element_id, level);
         // Some previously pending claims may now be ready to be activated,
@@ -156,6 +156,7 @@ impl Broker {
         self.current.subscribe(element_id)
     }
 
+    #[cfg(test)]
     pub fn get_required_level(&mut self, element_id: &ElementID) -> Option<PowerLevel> {
         self.required.get(element_id)
     }

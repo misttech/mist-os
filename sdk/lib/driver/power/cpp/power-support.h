@@ -128,7 +128,10 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
     fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
     fuchsia_hardware_power::wire::PowerElementConfiguration config, TokenMap tokens,
-    const zx::unowned_event& active_token, const zx::unowned_event& passive_token);
+    const zx::unowned_event& active_token, const zx::unowned_event& passive_token,
+    std::optional<std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
+                            fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>
+        level_control);
 }  // namespace fdf_power
 
 #endif /* SDK_LIB_DRIVERS_POWER_CPP_FDF_POWER_ */

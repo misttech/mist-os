@@ -96,19 +96,21 @@ impl SuspendResumeManager {
         {
             // TODO(b/316023943): also depends on execution_resume_latency after implemented.
             let power_levels: Vec<u8> = (0..=POWER_ON_LEVEL).collect();
-            let (_, lessor_client_end, _) = topology
+            let (_, lessor_client_end) = topology
                 .add_element(
-                    "starnix_power_mode",
-                    POWER_ON_LEVEL,
-                    power_levels.as_slice(),
-                    vec![fbroker::LevelDependency {
-                        dependency_type: fbroker::DependencyType::Active,
-                        dependent_level: POWER_ON_LEVEL,
-                        requires_token: application_activity_token,
-                        requires_level: fsystem::ApplicationActivityLevel::Active.into_primitive(),
-                    }],
-                    vec![],
-                    vec![],
+                    fbroker::ElementSchema {
+                        element_name: Some("starnix_power_mode".into()),
+                        initial_current_level: Some(POWER_ON_LEVEL),
+                        valid_levels: Some(power_levels),
+                        dependencies: Some(vec![fbroker::LevelDependency {
+                            dependency_type: fbroker::DependencyType::Active,
+                            dependent_level: POWER_ON_LEVEL,
+                            requires_token: application_activity_token,
+                            requires_level: fsystem::ApplicationActivityLevel::Active
+                                .into_primitive(),
+                        }]),
+                        ..Default::default()
+                    },
                     zx::Time::INFINITE,
                 )?
                 .map_err(|e| anyhow!("PowerBroker::AddElementError({e:?})"))?;

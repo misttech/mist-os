@@ -5,11 +5,13 @@
 use anyhow::{Error, Result};
 use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
 use fidl_fuchsia_power_broker::{
-    self as fpb, BinaryPowerLevel, DependencyType, LeaseStatus, LevelDependency, StatusMarker,
-    TopologyMarker,
+    self as fpb, BinaryPowerLevel, DependencyType, ElementSchema, LeaseStatus, LevelDependency,
+    StatusMarker, TopologyMarker,
 };
+use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_zircon::{self as zx, HandleBased};
+use futures::task::Poll;
 use power_broker_client::BINARY_POWER_LEVELS;
 
 async fn build_power_broker_realm() -> Result<RealmInstance, Error> {
@@ -29,832 +31,1086 @@ async fn build_power_broker_realm() -> Result<RealmInstance, Error> {
     Ok(realm)
 }
 
-#[fuchsia::test]
-async fn test_direct() -> Result<()> {
-    let realm = build_power_broker_realm().await?;
-
-    // Create a topology with only two elements and a single dependency:
-    // P <- C
-    let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-    let parent_token = zx::Event::create();
-    let (parent_element_control, _, parent_level_control) = topology
-        .add_element(
-            "P",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![],
-            vec![parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let parent_element_control = parent_element_control.into_proxy()?;
-    let parent_status = {
-        let (client, server) = create_proxy::<StatusMarker>()?;
-        parent_element_control.open_status_channel(server)?;
-        client
+#[cfg(test)]
+mod tests {
+    use {
+        super::*,
+        fpb::{CurrentLevelMarker, RequiredLevelMarker},
     };
-    let parent_level_control = parent_level_control.into_proxy()?;
-    let (_, child_lessor, _) = topology
-        .add_element(
-            "C",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![LevelDependency {
-                dependency_type: DependencyType::Active,
-                dependent_level: BinaryPowerLevel::On.into_primitive(),
-                requires_token: parent_token
+
+    #[fuchsia::test]
+    async fn test_direct() -> Result<()> {
+        let realm = build_power_broker_realm().await?;
+
+        // Create a topology with only two elements and a single dependency:
+        // P <- C
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let parent_token = zx::Event::create();
+        let (parent_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
+        let (parent_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (parent_element_control, _) = topology
+            .add_element(ElementSchema {
+                element_name: Some("P".into()),
+                initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                active_dependency_tokens_to_register: Some(vec![parent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed"),
-                requires_level: BinaryPowerLevel::On.into_primitive(),
-            }],
-            vec![],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let child_lessor: fpb::LessorProxy = child_lessor.into_proxy()?;
+                    .expect("dup failed")]),
+                level_control_channels: Some(fpb::LevelControlChannels {
+                    current: current_server,
+                    required: required_server,
+                }),
+                ..Default::default()
+            })
+            .await?
+            .expect("add_element failed");
+        let parent_element_control = parent_element_control.into_proxy()?;
+        let parent_status = {
+            let (client, server) = create_proxy::<StatusMarker>()?;
+            parent_element_control.open_status_channel(server)?;
+            client
+        };
+        let (_, child_lessor) = topology
+            .add_element(ElementSchema {
+                element_name: Some("C".into()),
+                initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                dependencies: Some(vec![LevelDependency {
+                    dependency_type: DependencyType::Active,
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
+                    requires_token: parent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
+                }]),
+                ..Default::default()
+            })
+            .await?
+            .expect("add_element failed");
+        let child_lessor: fpb::LessorProxy = child_lessor.into_proxy()?;
 
-    // Initial required level for P should be OFF.
-    // Update P's current level to OFF with PowerBroker.
-    let parent_req_level =
-        parent_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(parent_req_level, BinaryPowerLevel::Off.into_primitive());
-    parent_level_control
-        .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
-        .await?
-        .expect("update_current_power_level failed");
-    let power_level = parent_status.watch_power_level().await?.expect("watch_power_level failed");
-    assert_eq!(power_level, BinaryPowerLevel::Off.into_primitive());
-
-    // Acquire lease for C, P should now have required level ON
-    let lease = child_lessor
-        .lease(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("Lease response not ok")
-        .into_proxy()?;
-    let parent_req_level = parent_level_control
-        .watch_required_level(parent_req_level)
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(parent_req_level, BinaryPowerLevel::On.into_primitive());
-    assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
-
-    // Update P's current level to ON. Lease should now be active.
-    parent_level_control
-        .update_current_power_level(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("update_current_power_level failed");
-    let power_level = parent_status.watch_power_level().await?.expect("watch_power_level failed");
-    assert_eq!(power_level, BinaryPowerLevel::On.into_primitive());
-    assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
-
-    // Drop lease, P should now have required level OFF
-    drop(lease);
-    let parent_req_level = parent_level_control
-        .watch_required_level(parent_req_level)
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(parent_req_level, BinaryPowerLevel::Off.into_primitive());
-
-    // Update P's required level to OFF
-    parent_level_control
-        .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
-        .await?
-        .expect("update_current_power_level failed");
-    let power_level = parent_status.watch_power_level().await?.expect("watch_power_level failed");
-    assert_eq!(power_level, BinaryPowerLevel::Off.into_primitive());
-
-    // Remove P's element. Status channel should be closed.
-    parent_element_control.remove_element().await?;
-    let status_after_remove = parent_status.watch_power_level().await;
-    assert!(matches!(status_after_remove, Err(fidl::Error::ClientChannelClosed { .. })));
-
-    Ok(())
-}
-
-#[fuchsia::test]
-async fn test_transitive() -> Result<()> {
-    let realm = build_power_broker_realm().await?;
-
-    // Create a four element topology with the following dependencies:
-    // C depends on B, which in turn depends on A.
-    // D has no dependencies or dependents.
-    // A <- B <- C   D
-    let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-    let element_a_token = zx::Event::create();
-    let (element_a_element_control, _, element_a_level_control) = topology
-        .add_element(
-            "A",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![],
-            vec![element_a_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let element_a_level_control = element_a_level_control.into_proxy()?;
-    let element_a_status = {
-        let (client, server) = create_endpoints::<StatusMarker>();
-        element_a_element_control.into_proxy()?.open_status_channel(server)?;
-        client.into_proxy()?
-    };
-    let element_b_token = zx::Event::create();
-    let (element_b_element_control, _, element_b_level_control) = topology
-        .add_element(
-            "B",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![LevelDependency {
-                dependency_type: DependencyType::Active,
-                dependent_level: BinaryPowerLevel::On.into_primitive(),
-                requires_token: element_a_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed"),
-                requires_level: BinaryPowerLevel::On.into_primitive(),
-            }],
-            vec![element_b_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let element_b_level_control = element_b_level_control.into_proxy()?;
-    let element_b_status: fpb::StatusProxy = {
-        let (client, server) = create_endpoints::<StatusMarker>();
-        element_b_element_control.into_proxy()?.open_status_channel(server)?;
-        client.into_proxy()?
-    };
-    let (_, element_c_lessor, _) = topology
-        .add_element(
-            "C",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![LevelDependency {
-                dependency_type: DependencyType::Active,
-                dependent_level: BinaryPowerLevel::On.into_primitive(),
-                requires_token: element_b_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed"),
-                requires_level: BinaryPowerLevel::On.into_primitive(),
-            }],
-            vec![],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let element_c_lessor = element_c_lessor.into_proxy()?;
-    let (element_d_element_control, _, element_d_level_control) = topology
-        .add_element(
-            "D",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![],
-            vec![],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let element_d_level_control = element_d_level_control.into_proxy()?;
-    let element_d_status: fpb::StatusProxy = {
-        let (client, server) = create_endpoints::<StatusMarker>();
-        element_d_element_control.into_proxy()?.open_status_channel(server)?;
-        client.into_proxy()?
-    };
-
-    // Initial required level for each element should be OFF.
-    // Update managed elements' current level to OFF with PowerBroker.
-    for (status, level_control) in [
-        (&element_a_status, &element_a_level_control),
-        (&element_b_status, &element_b_level_control),
-        (&element_d_status, &element_d_level_control),
-    ] {
-        let req_level =
-            level_control.get_required_level().await?.expect("get_required_level failed");
-        assert_eq!(req_level, BinaryPowerLevel::Off.into_primitive());
-        level_control
-            .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
+        // Initial required level for P should be OFF.
+        // Update P's current level to OFF with PowerBroker.
+        let parent_req_level = parent_required.watch().await?.expect("watch_required_level failed");
+        assert_eq!(parent_req_level, BinaryPowerLevel::Off.into_primitive());
+        parent_current
+            .update(BinaryPowerLevel::Off.into_primitive())
             .await?
             .expect("update_current_power_level failed");
-        let power_level = status.watch_power_level().await?.expect("watch_power_level failed");
+        let power_level =
+            parent_status.watch_power_level().await?.expect("watch_power_level failed");
         assert_eq!(power_level, BinaryPowerLevel::Off.into_primitive());
+
+        // Acquire lease for C, P should now have required level ON
+        let lease = child_lessor
+            .lease(BinaryPowerLevel::On.into_primitive())
+            .await?
+            .expect("Lease response not ok")
+            .into_proxy()?;
+        let parent_req_level = parent_required.watch().await?.expect("watch_required_level failed");
+        assert_eq!(parent_req_level, BinaryPowerLevel::On.into_primitive());
+        assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
+
+        // Update P's current level to ON. Lease should now be active.
+        parent_current
+            .update(BinaryPowerLevel::On.into_primitive())
+            .await?
+            .expect("update_current_power_level failed");
+        let power_level =
+            parent_status.watch_power_level().await?.expect("watch_power_level failed");
+        assert_eq!(power_level, BinaryPowerLevel::On.into_primitive());
+        assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
+
+        // Drop lease, P should now have required level OFF
+        drop(lease);
+        let parent_req_level = parent_required.watch().await?.expect("watch_required_level failed");
+        assert_eq!(parent_req_level, BinaryPowerLevel::Off.into_primitive());
+
+        // Update P's required level to OFF
+        parent_current
+            .update(BinaryPowerLevel::Off.into_primitive())
+            .await?
+            .expect("update_current_power_level failed");
+        let power_level =
+            parent_status.watch_power_level().await?.expect("watch_power_level failed");
+        assert_eq!(power_level, BinaryPowerLevel::Off.into_primitive());
+
+        // Remove P's element. Status channel should be closed.
+        parent_element_control.remove_element().await?;
+        let status_after_remove = parent_status.watch_power_level().await;
+        assert!(matches!(status_after_remove, Err(fidl::Error::ClientChannelClosed { .. })));
+
+        Ok(())
     }
 
-    // Acquire lease for C with PB, Initially, A should have required level ON
-    // and B should have required level OFF because C has a dependency on B
-    // and B has a dependency on A.
-    // D should still have required level OFF.
-    let lease = element_c_lessor
-        .lease(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("Lease response not ok")
-        .into_proxy()?;
-    let a_req_level =
-        element_a_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(a_req_level, BinaryPowerLevel::On.into_primitive());
-    let b_req_level =
-        element_b_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(b_req_level, BinaryPowerLevel::Off.into_primitive());
-    let d_req_level =
-        element_d_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(d_req_level, BinaryPowerLevel::Off.into_primitive());
-    assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
+    #[test]
+    fn test_transitive() -> Result<()> {
+        let mut executor = fasync::TestExecutor::new();
+        let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
 
-    // Update A's current level to ON. Now B's required level should become ON
-    // because its dependency on A is unblocked.
-    // D should still have required level OFF.
-    element_a_level_control
-        .update_current_power_level(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("update_current_power_level failed");
-    let a_req_level = element_a_level_control
-        .watch_required_level(BinaryPowerLevel::Off.into_primitive())
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(a_req_level, BinaryPowerLevel::On.into_primitive());
-    let b_req_level =
-        element_b_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(b_req_level, BinaryPowerLevel::On.into_primitive());
-    let d_req_level =
-        element_d_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(d_req_level, BinaryPowerLevel::Off.into_primitive());
-    assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
+        // Create a four element topology with the following dependencies:
+        // C depends on B, which in turn depends on A.
+        // D has no dependencies or dependents.
+        // A <- B <- C   D
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let element_a_token = zx::Event::create();
+        let (element_a_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
+        let (element_a_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (element_a_element_control, _) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("A".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    active_dependency_tokens_to_register: Some(vec![element_a_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")]),
+                    level_control_channels: Some(fpb::LevelControlChannels {
+                        current: current_server,
+                        required: required_server,
+                    }),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let element_a_element_control = element_a_element_control.into_proxy()?;
+        let element_a_status = {
+            let (client, server) = create_endpoints::<StatusMarker>();
+            element_a_element_control.open_status_channel(server)?;
+            client.into_proxy()?
+        };
+        let element_b_token = zx::Event::create();
+        let (element_b_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
+        let (element_b_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (element_b_element_control, _) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("B".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: element_a_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                    }]),
+                    active_dependency_tokens_to_register: Some(vec![element_b_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")]),
+                    level_control_channels: Some(fpb::LevelControlChannels {
+                        current: current_server,
+                        required: required_server,
+                    }),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let element_b_element_control = element_b_element_control.into_proxy()?;
+        let element_b_status: fpb::StatusProxy = {
+            let (client, server) = create_endpoints::<StatusMarker>();
+            element_b_element_control.open_status_channel(server)?;
+            client.into_proxy()?
+        };
+        let (_, element_c_lessor) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("C".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: element_b_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                    }]),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let element_c_lessor = element_c_lessor.into_proxy()?;
+        let (element_d_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
+        let (element_d_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (element_d_element_control, _) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("D".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    level_control_channels: Some(fpb::LevelControlChannels {
+                        current: current_server,
+                        required: required_server,
+                    }),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let element_d_element_control = element_d_element_control.into_proxy()?;
+        let element_d_status: fpb::StatusProxy = {
+            let (client, server) = create_endpoints::<StatusMarker>();
+            element_d_element_control.open_status_channel(server)?;
+            client.into_proxy()?
+        };
 
-    // Update B's current level to ON.
-    // Both A and B should have required_level ON.
-    // D should still have required level OFF.
-    element_b_level_control
-        .update_current_power_level(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("update_current_power_level failed");
-    let a_req_level =
-        element_a_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(a_req_level, BinaryPowerLevel::On.into_primitive());
-    let b_req_level = element_b_level_control
-        .watch_required_level(BinaryPowerLevel::Off.into_primitive())
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(b_req_level, BinaryPowerLevel::On.into_primitive());
-    let d_req_level =
-        element_d_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(d_req_level, BinaryPowerLevel::Off.into_primitive());
-    assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
+        // Initial required level for each element should be OFF.
+        // Update managed elements' current level to OFF with PowerBroker.
+        for (status, current, required) in [
+            (&element_a_status, &element_a_current, &element_a_required),
+            (&element_b_status, &element_b_current, &element_b_required),
+            (&element_d_status, &element_d_current, &element_d_required),
+        ] {
+            executor.run_singlethreaded(async {
+                let req_level_fut = required.watch();
+                assert_eq!(
+                    req_level_fut.await.unwrap(),
+                    Ok(BinaryPowerLevel::Off.into_primitive())
+                );
+                current
+                    .update(BinaryPowerLevel::Off.into_primitive())
+                    .await
+                    .unwrap()
+                    .expect("update_current_power_level failed");
+                let power_level =
+                    status.watch_power_level().await.unwrap().expect("watch_power_level failed");
+                assert_eq!(power_level, BinaryPowerLevel::Off.into_primitive());
+            });
+        }
+        let element_a_required_fut = element_a_required.watch();
+        let mut element_b_required_fut = element_b_required.watch();
+        let mut element_d_required_fut = element_d_required.watch();
 
-    // Drop lease for C with PB, B should have required level OFF.
-    // A should still have required level ON.
-    // D should still have required level OFF.
-    drop(lease);
-    let a_req_level =
-        element_a_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(a_req_level, BinaryPowerLevel::On.into_primitive());
-    let b_req_level = element_b_level_control
-        .watch_required_level(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(b_req_level, BinaryPowerLevel::Off.into_primitive());
-    let d_req_level =
-        element_d_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(d_req_level, BinaryPowerLevel::Off.into_primitive());
+        // Acquire lease for C with PB, Initially, A should have required level ON
+        // and B should have required level OFF because C has a dependency on B
+        // and B has a dependency on A.
+        // D should still have required level OFF.
+        let lease = executor.run_singlethreaded(async {
+            element_c_lessor
+                .lease(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("Lease response not ok")
+                .into_proxy()
+        })?;
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                element_a_required_fut.await.unwrap(),
+                Ok(BinaryPowerLevel::On.into_primitive())
+            );
+        });
+        let mut element_a_required_fut = element_a_required.watch();
+        assert_eq!(
+            executor.run_until_stalled(&mut element_b_required_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut element_d_required_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
 
-    // Lower B's current level to OFF
-    // Both A and B should have required level OFF.
-    // D should still have required level OFF.
-    element_b_level_control
-        .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
-        .await?
-        .expect("update_current_power_level failed");
-    let a_req_level =
-        element_a_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(a_req_level, BinaryPowerLevel::Off.into_primitive());
-    let b_req_level = element_b_level_control
-        .watch_required_level(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(b_req_level, BinaryPowerLevel::Off.into_primitive());
-    let d_req_level =
-        element_d_level_control.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(d_req_level, BinaryPowerLevel::Off.into_primitive());
+        // Update A's current level to ON. Now B's required level should become ON
+        // because its dependency on A is unblocked.
+        // D should still have required level OFF.
+        executor.run_singlethreaded(async {
+            element_a_current
+                .update(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+        });
+        assert_eq!(
+            executor.run_until_stalled(&mut element_a_required_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                element_b_required_fut.await.unwrap(),
+                Ok(BinaryPowerLevel::On.into_primitive())
+            );
+        });
+        let mut element_b_required_fut = element_b_required.watch();
+        assert_eq!(
+            executor.run_until_stalled(&mut element_d_required_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
 
-    Ok(())
-}
+        // Update B's current level to ON.
+        // The lease for C should now be satisfied.
+        // Both A and B should have required_level ON.
+        // D should still have required level OFF.
+        executor.run_singlethreaded(async {
+            element_b_current
+                .update(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+        });
+        assert_eq!(
+            executor.run_until_stalled(&mut element_a_required_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut element_b_required_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut element_d_required_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
 
-#[fuchsia::test]
-async fn test_shared() -> Result<()> {
-    // Create a topology of two child elements with a shared
-    // parent and grandparent
-    // C1 \
-    //     > P -> GP
-    // C2 /
-    // Child 1 requires Parent at 50 to support its own level of 5.
-    // Parent requires Grandparent at 200 to support its own level of 50.
-    // C1 -> P -> GP
-    //  5 -> 50 -> 200
-    // Child 2 requires Parent at 30 to support its own level of 3.
-    // Parent requires Grandparent at 90 to support its own level of 30.
-    // C2 -> P -> GP
-    //  3 -> 30 -> 90
-    // Grandparent has a default minimum level of 10.
-    // All other elements have a default of 0.
-    let realm = build_power_broker_realm().await?;
-    let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-    let grandparent_token = zx::Event::create();
-    let (_, _, grandparent_control) = topology
-        .add_element(
-            "GP",
-            10,
-            &[10, 90, 200],
-            vec![],
-            vec![grandparent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let grandparent_control = grandparent_control.into_proxy()?;
-    let parent_token = zx::Event::create();
-    let (_, _, parent_control) = topology
-        .add_element(
-            "P",
-            0,
-            &[0, 30, 50],
-            vec![
-                LevelDependency {
+        // Drop lease for C with PB, B should have required level OFF.
+        // A should still have required level ON.
+        // D should still have required level OFF.
+        drop(lease);
+        assert_eq!(
+            executor.run_until_stalled(&mut element_a_required_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                element_b_required_fut.await.unwrap(),
+                Ok(BinaryPowerLevel::Off.into_primitive())
+            );
+        });
+        let mut element_b_required_fut = element_b_required.watch();
+        assert_eq!(
+            executor.run_until_stalled(&mut element_d_required_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+
+        // Lower B's current level to OFF
+        // A should now have required level OFF.
+        // B should still have required level OFF.
+        // D should still have required level OFF.
+        executor.run_singlethreaded(async {
+            element_b_current
+                .update(BinaryPowerLevel::Off.into_primitive())
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+        });
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                element_a_required_fut.await.unwrap(),
+                Ok(BinaryPowerLevel::Off.into_primitive())
+            );
+        });
+        assert_eq!(
+            executor.run_until_stalled(&mut element_b_required_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut element_d_required_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_shared() -> Result<()> {
+        // Create a topology of two child elements with a shared
+        // parent and grandparent
+        // C1 \
+        //     > P -> GP
+        // C2 /
+        // Child 1 requires Parent at 50 to support its own level of 5.
+        // Parent requires Grandparent at 200 to support its own level of 50.
+        // C1 -> P -> GP
+        //  5 -> 50 -> 200
+        // Child 2 requires Parent at 30 to support its own level of 3.
+        // Parent requires Grandparent at 90 to support its own level of 30.
+        // C2 -> P -> GP
+        //  3 -> 30 -> 90
+        // Grandparent has a default minimum level of 10.
+        // All other elements have a default of 0.
+        let mut executor = fasync::TestExecutor::new();
+        let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let grandparent_token = zx::Event::create();
+        let (grandparent_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
+        let (grandparent_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (_, _) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("GP".into()),
+                    initial_current_level: Some(10),
+                    valid_levels: Some(vec![10, 90, 200]),
+                    active_dependency_tokens_to_register: Some(vec![grandparent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")]),
+                    level_control_channels: Some(fpb::LevelControlChannels {
+                        current: current_server,
+                        required: required_server,
+                    }),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let parent_token = zx::Event::create();
+        let (parent_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
+        let (parent_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (_, _) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("P".into()),
+                    initial_current_level: Some(0),
+                    valid_levels: Some(vec![0, 30, 50]),
+                    dependencies: Some(vec![
+                        LevelDependency {
+                            dependency_type: DependencyType::Active,
+                            dependent_level: 50,
+                            requires_token: grandparent_token
+                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                                .expect("dup failed"),
+                            requires_level: 200,
+                        },
+                        LevelDependency {
+                            dependency_type: DependencyType::Active,
+                            dependent_level: 30,
+                            requires_token: grandparent_token
+                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                                .expect("dup failed"),
+                            requires_level: 90,
+                        },
+                    ]),
+                    active_dependency_tokens_to_register: Some(vec![parent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")]),
+                    level_control_channels: Some(fpb::LevelControlChannels {
+                        current: current_server,
+                        required: required_server,
+                    }),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let (_, child1_lessor) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("C1".into()),
+                    initial_current_level: Some(0),
+                    valid_levels: Some(vec![0, 5]),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: 5,
+                        requires_token: parent_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level: 50,
+                    }]),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let child1_lessor = child1_lessor.into_proxy()?;
+        let (_, child2_lessor) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("C2".into()),
+                    initial_current_level: Some(0),
+                    valid_levels: Some(vec![0, 3]),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: 3,
+                        requires_token: parent_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level: 30,
+                    }]),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let child2_lessor = child2_lessor.into_proxy()?;
+
+        // Initially, Grandparent should have a default required level of 10
+        // and Parent should have a default required level of 0.
+        executor.run_singlethreaded(async {
+            let grandparent_req_level_fut = grandparent_required.watch();
+            let parent_req_level_fut = parent_required.watch();
+            assert_eq!(grandparent_req_level_fut.await.unwrap(), Ok(10));
+            grandparent_current
+                .update(10)
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+            assert_eq!(parent_req_level_fut.await.unwrap(), Ok(0));
+            parent_current.update(0).await.unwrap().expect("update_current_power_level failed");
+        });
+        let grandparent_req_level_fut = grandparent_required.watch();
+        let mut parent_req_level_fut = parent_required.watch();
+
+        // Acquire lease for Child 1. Initially, Grandparent should have
+        // required level 200 and Parent should have required level 0
+        // because Child 1 has a dependency on Parent and Parent has a
+        // dependency on Grandparent. Grandparent has no dependencies so its
+        // level should be raised first.
+        let lease_child_1 = executor.run_singlethreaded(async {
+            child1_lessor.lease(5).await.unwrap().expect("Lease response not ok").into_proxy()
+        })?;
+        executor.run_singlethreaded(async {
+            assert_eq!(grandparent_req_level_fut.await.unwrap(), Ok(200));
+        });
+        let mut grandparent_req_level_fut = grandparent_required.watch();
+        assert_eq!(
+            executor.run_until_stalled(&mut parent_req_level_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_1.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Raise Grandparent's current level to 200. Now Parent claim should
+        // be active, because its dependency on Grandparent is unblocked
+        // raising its required level to 50.
+        executor.run_singlethreaded(async {
+            grandparent_current
+                .update(200)
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+        });
+        assert_eq!(
+            executor.run_until_stalled(&mut grandparent_req_level_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(parent_req_level_fut.await.unwrap(), Ok(50));
+            assert_eq!(
+                lease_child_1.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+        let mut parent_req_level_fut = parent_required.watch();
+
+        // Update Parent's current level to 50.
+        // Parent and Grandparent should have required levels of 50 and 200.
+        executor.run_singlethreaded(async {
+            parent_current.update(50).await.unwrap().expect("update_current_power_level failed");
+        });
+        assert_eq!(
+            executor.run_until_stalled(&mut grandparent_req_level_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut parent_req_level_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_1.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Acquire lease for Child 2, Though Child 2 has nominal
+        // requirements of Parent at 30 and Grandparent at 100, they are
+        // superseded by Child 1's requirements of 50 and 200.
+        let lease_child_2 = executor.run_singlethreaded(async {
+            child2_lessor
+                .lease(3)
+                .await
+                .unwrap()
+                .expect("Lease response not ok")
+                .into_proxy()
+                .unwrap()
+        });
+        assert_eq!(
+            executor.run_until_stalled(&mut grandparent_req_level_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut parent_req_level_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_1.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+            assert_eq!(
+                lease_child_2.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Drop lease for Child 1. Parent's required level should immediately
+        // drop to 30. Grandparent's required level will remain at 200 for now.
+        drop(lease_child_1);
+        assert_eq!(
+            executor.run_until_stalled(&mut grandparent_req_level_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(parent_req_level_fut.await.unwrap(), Ok(30));
+            assert_eq!(
+                lease_child_2.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+        let mut parent_req_level_fut = parent_required.watch();
+
+        // Lower Parent's current level to 30. Now Grandparent's required level
+        // should drop to 90.
+        executor.run_singlethreaded(async {
+            parent_current.update(30).await.unwrap().expect("update_current_power_level failed");
+            assert_eq!(grandparent_req_level_fut.await.unwrap(), Ok(90));
+        });
+        assert_eq!(
+            executor.run_until_stalled(&mut parent_req_level_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_2.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Drop lease for Child 2, Parent should have required level 0.
+        // Grandparent should still have required level 90.
+        drop(lease_child_2);
+        let mut grandparent_req_level_fut = grandparent_required.watch();
+        assert_eq!(
+            executor.run_until_stalled(&mut grandparent_req_level_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(parent_req_level_fut.await.unwrap(), Ok(0));
+        });
+        let mut parent_req_level_fut = parent_required.watch();
+
+        // Lower Parent's current level to 0. Grandparent claim should now be
+        // dropped and have its default required level of 10.
+        executor.run_singlethreaded(async {
+            parent_current.update(0).await.unwrap().expect("update_current_power_level failed");
+            assert_eq!(grandparent_req_level_fut.await.unwrap(), Ok(10));
+        });
+        assert_eq!(
+            executor.run_until_stalled(&mut parent_req_level_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_passive() -> Result<()> {
+        // B has an active dependency on A.
+        // C has a passive dependency on B (and transitively, a passive dependency on A).
+        // D has an active dependency on B (and transitively, an active dependency on A).
+        //  A     B     C     D
+        // ON <= ON
+        //       ON <- ON
+        //       ON <======= ON
+        let mut executor = fasync::TestExecutor::new();
+        let realm =
+            executor.run_singlethreaded(async { build_power_broker_realm().await }).unwrap();
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let token_a = zx::Event::create();
+        let (current_a, current_server) = create_proxy::<CurrentLevelMarker>()?;
+        let (required_a, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (_, _) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("A".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    active_dependency_tokens_to_register: Some(vec![token_a
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .unwrap()]),
+                    level_control_channels: Some(fpb::LevelControlChannels {
+                        current: current_server,
+                        required: required_server,
+                    }),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let token_b_active = zx::Event::create();
+        let token_b_passive = zx::Event::create();
+        let (current_b, current_server) = create_proxy::<CurrentLevelMarker>()?;
+        let (required_b, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (_, _) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("B".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: token_a.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                    }]),
+                    active_dependency_tokens_to_register: Some(vec![token_b_active
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .unwrap()]),
+                    passive_dependency_tokens_to_register: Some(vec![token_b_passive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .unwrap()]),
+                    level_control_channels: Some(fpb::LevelControlChannels {
+                        current: current_server,
+                        required: required_server,
+                    }),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let (_, element_c_lessor) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("C".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Passive,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: token_b_passive
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .unwrap(),
+                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                    }]),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let element_c_lessor = element_c_lessor.into_proxy()?;
+        let (_, element_d_lessor) = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("D".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: token_b_active
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .unwrap(),
+                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                    }]),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        let element_d_lessor = element_d_lessor.into_proxy()?;
+
+        // Initial required level for A and B should be OFF.
+        // Set A and B's current level to OFF.
+        executor.run_singlethreaded(async {
+            let req_level_a = required_a.watch().await.unwrap();
+            assert_eq!(req_level_a, Ok(BinaryPowerLevel::Off.into_primitive()));
+            let req_level_b = required_b.watch().await.unwrap();
+            assert_eq!(req_level_b, Ok(BinaryPowerLevel::Off.into_primitive()));
+            current_a
+                .update(BinaryPowerLevel::Off.into_primitive())
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+            current_b
+                .update(BinaryPowerLevel::Off.into_primitive())
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+        });
+        let mut required_a_fut = required_a.watch();
+        let mut required_b_fut = required_b.watch();
+
+        // Lease C, A & B's required levels should remain OFF because of
+        // passive claim.
+        // Lease C should remain unsatisfied.
+        // TODO(b/311419716): When we have lease rejection, reject this lease.
+        let lease_c = executor.run_singlethreaded(async {
+            element_c_lessor
+                .lease(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("Lease response not ok")
+                .into_proxy()
+        })?;
+        assert_eq!(
+            executor.run_until_stalled(&mut required_a_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut required_b_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Lease D, A should have required level ON because of D's transitive active claim.
+        // Lease C & D should become satisfied.
+        let lease_d = executor.run_singlethreaded(async {
+            element_d_lessor
+                .lease(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("Lease response not ok")
+                .into_proxy()
+        })?;
+        executor.run_singlethreaded(async {
+            assert_eq!(required_a_fut.await.unwrap(), Ok(BinaryPowerLevel::On.into_primitive()));
+        });
+        let mut required_a_fut = required_a.watch();
+        assert_eq!(
+            executor.run_until_stalled(&mut required_b_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+            assert_eq!(
+                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Update A's current level to ON.
+        // B should now have required level ON because of D's active claim and
+        // its dependency on A being satisfied.
+        executor.run_singlethreaded(async {
+            current_a
+                .update(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+        });
+        assert_eq!(
+            executor.run_until_stalled(&mut required_a_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(required_b_fut.await.unwrap(), Ok(BinaryPowerLevel::On.into_primitive()));
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+            assert_eq!(
+                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+        let required_b_fut = required_b.watch();
+
+        // Update B's current level to ON.
+        // Lease C & D should become satisfied.
+        executor.run_singlethreaded(async {
+            current_b
+                .update(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Pending).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+            assert_eq!(
+                lease_d.watch_status(LeaseStatus::Pending).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Drop Lease on D, B's required level should become OFF.
+        drop(lease_d);
+        assert_eq!(
+            executor.run_until_stalled(&mut required_a_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(required_b_fut.await.unwrap(), Ok(BinaryPowerLevel::Off.into_primitive()));
+        });
+        let mut required_b_fut = required_b.watch();
+        // TODO(b/308659273): When we have lease revocation, verify lease C was revoked.
+
+        // Update B's current level to OFF. A's required level should become OFF.
+        executor.run_singlethreaded(async {
+            current_b
+                .update(BinaryPowerLevel::Off.into_primitive())
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+            assert_eq!(required_a_fut.await.unwrap(), Ok(BinaryPowerLevel::Off.into_primitive()));
+        });
+        assert_eq!(
+            executor.run_until_stalled(&mut required_b_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_topology() -> Result<(), Error> {
+        let realm = build_power_broker_realm().await?;
+
+        // Create a four element topology.
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let earth_token = zx::Event::create();
+        let (earth_element_control, _) = topology
+            .add_element(ElementSchema {
+                element_name: Some("Earth".into()),
+                initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                active_dependency_tokens_to_register: Some(vec![
+                    earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
+                ]),
+                ..Default::default()
+            })
+            .await?
+            .expect("add_element failed");
+        let earth_element_control = earth_element_control.into_proxy()?;
+        let water_token = zx::Event::create();
+        let (water_element_control, _) = topology
+            .add_element(ElementSchema {
+                element_name: Some("Water".into()),
+                initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                dependencies: Some(vec![LevelDependency {
                     dependency_type: DependencyType::Active,
-                    dependent_level: 50,
-                    requires_token: grandparent_token
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
+                    requires_token: earth_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: 200,
-                },
-                LevelDependency {
-                    dependency_type: DependencyType::Active,
-                    dependent_level: 30,
-                    requires_token: grandparent_token
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .expect("dup failed"),
-                    requires_level: 90,
-                },
-            ],
-            vec![parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let parent_control = parent_control.into_proxy()?;
-    let (_, child1_lessor, _) = topology
-        .add_element(
-            "C1",
-            0,
-            &[0, 5],
-            vec![LevelDependency {
-                dependency_type: DependencyType::Active,
-                dependent_level: 5,
-                requires_token: parent_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed"),
-                requires_level: 50,
-            }],
-            vec![],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let child1_lessor = child1_lessor.into_proxy()?;
-    let (_, child2_lessor, _) = topology
-        .add_element(
-            "C2",
-            0,
-            &[0, 3],
-            vec![LevelDependency {
-                dependency_type: DependencyType::Active,
-                dependent_level: 3,
-                requires_token: parent_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed"),
-                requires_level: 30,
-            }],
-            vec![],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let child2_lessor = child2_lessor.into_proxy()?;
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
+                }]),
+                active_dependency_tokens_to_register: Some(vec![
+                    water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
+                ]),
+                ..Default::default()
+            })
+            .await?
+            .expect("add_element failed");
+        let water_element_control = water_element_control.into_proxy()?;
+        let fire_token = zx::Event::create();
+        let (fire_element_control, _) = topology
+            .add_element(ElementSchema {
+                element_name: Some("Fire".into()),
+                initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                active_dependency_tokens_to_register: Some(vec![
+                    fire_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
+                ]),
+                ..Default::default()
+            })
+            .await?
+            .expect("add_element failed");
+        let fire_element_control = fire_element_control.into_proxy()?;
+        let air_token = zx::Event::create();
+        let (air_element_control, _) = topology
+            .add_element(ElementSchema {
+                element_name: Some("Air".into()),
+                initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                active_dependency_tokens_to_register: Some(vec![
+                    air_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
+                ]),
+                ..Default::default()
+            })
+            .await?
+            .expect("add_element failed");
+        let air_element_control = air_element_control.into_proxy()?;
 
-    // Initially, Grandparent should have a default required level of 10
-    // and Parent should have a default required level of 0.
-    let grandparent_req_level =
-        grandparent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(grandparent_req_level, 10);
-    grandparent_control
-        .update_current_power_level(10)
-        .await?
-        .expect("update_current_power_level failed");
-    let parent_req_level =
-        parent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(parent_req_level, 0);
-    parent_control.update_current_power_level(0).await?.expect("update_current_power_level failed");
+        let extra_add_dep_res = water_element_control
+            .add_dependency(
+                DependencyType::Active,
+                BinaryPowerLevel::On.into_primitive(),
+                earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await?;
+        assert!(matches!(extra_add_dep_res, Err(fpb::ModifyDependencyError::AlreadyExists { .. })));
 
-    // Acquire lease for Child 1. Initially, Grandparent should have
-    // required level 200 and Parent should have required level 0
-    // because Child 1 has a dependency on Parent and Parent has a
-    // dependency on Grandparent. Grandparent has no dependencies so its
-    // level should be raised first.
-    let lease_child_1 =
-        child1_lessor.lease(5).await?.expect("Lease response not ok").into_proxy()?;
-    let grandparent_req_level =
-        grandparent_control.watch_required_level(10).await?.expect("watch_required_level failed");
-    assert_eq!(grandparent_req_level, 200);
-    let parent_req_level =
-        parent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(parent_req_level, 0);
-    assert_eq!(lease_child_1.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
+        water_element_control
+            .remove_dependency(
+                DependencyType::Active,
+                BinaryPowerLevel::On.into_primitive(),
+                earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await?
+            .expect("remove_dependency failed");
 
-    // Raise Grandparent's current level to 200. Now Parent claim should
-    // be active, because its dependency on Grandparent is unblocked
-    // raising its required level to 50.
-    grandparent_control
-        .update_current_power_level(200)
-        .await?
-        .expect("update_current_power_level failed");
-    let grandparent_req_level =
-        grandparent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(grandparent_req_level, 200);
-    let parent_req_level =
-        parent_control.watch_required_level(0).await?.expect("watch_required_level failed");
-    assert_eq!(parent_req_level, 50);
-    assert_eq!(lease_child_1.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
+        let extra_remove_dep_res = water_element_control
+            .remove_dependency(
+                DependencyType::Active,
+                BinaryPowerLevel::On.into_primitive(),
+                earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await?;
+        assert!(matches!(extra_remove_dep_res, Err(fpb::ModifyDependencyError::NotFound { .. })));
 
-    // Update Parent's current level to 50.
-    // Parent and Grandparent should have required levels of 50 and 200.
-    parent_control
-        .update_current_power_level(50)
-        .await?
-        .expect("update_current_power_level failed");
-    let grandparent_req_level =
-        grandparent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(grandparent_req_level, 200);
-    let parent_req_level =
-        parent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(parent_req_level, 50);
-    assert_eq!(lease_child_1.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
+        fire_element_control.remove_element().await.expect("remove_element failed");
+        fire_element_control.on_closed().await?;
+        air_element_control.remove_element().await.expect("remove_element failed");
+        air_element_control.on_closed().await?;
 
-    // Acquire lease for Child 2, Though Child 2 has nominal
-    // requirements of Parent at 30 and Grandparent at 100, they are
-    // superseded by Child 1's requirements of 50 and 200.
-    let lease_child_2 =
-        child2_lessor.lease(3).await?.expect("Lease response not ok").into_proxy()?;
-    let grandparent_req_level =
-        grandparent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(grandparent_req_level, 200);
-    let parent_req_level =
-        parent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(parent_req_level, 50);
-    assert_eq!(lease_child_1.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
-    assert_eq!(lease_child_2.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
+        let add_dep_req_invalid = earth_element_control
+            .add_dependency(
+                DependencyType::Active,
+                BinaryPowerLevel::On.into_primitive(),
+                fire_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await?;
+        assert!(matches!(add_dep_req_invalid, Err(fpb::ModifyDependencyError::NotAuthorized),));
 
-    // Drop lease for Child 1. Parent's required level should immediately
-    // drop to 30. Grandparent's required level will remain at 200 for now.
-    drop(lease_child_1);
-    let grandparent_req_level =
-        grandparent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(grandparent_req_level, 200);
-    let parent_req_level =
-        parent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(parent_req_level, 30);
-    assert_eq!(lease_child_2.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
-
-    // Lower Parent's current level to 30. Now Grandparent's required level
-    // should drop to 90.
-    parent_control
-        .update_current_power_level(30)
-        .await?
-        .expect("update_current_power_level failed");
-    let grandparent_req_level =
-        grandparent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(grandparent_req_level, 90);
-    let parent_req_level =
-        parent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(parent_req_level, 30);
-    assert_eq!(lease_child_2.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
-
-    // Drop lease for Child 2, Parent should have required level 0.
-    // Grandparent should still have required level 90.
-    drop(lease_child_2);
-    let grandparent_req_level =
-        grandparent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(grandparent_req_level, 90);
-    let parent_req_level =
-        parent_control.watch_required_level(30).await?.expect("watch_required_level failed");
-    assert_eq!(parent_req_level, 0);
-
-    // Lower Parent's current level to 0. Grandparent claim should now be
-    // dropped and have its default required level of 10.
-    parent_control.update_current_power_level(0).await?.expect("update_current_power_level failed");
-    let grandparent_req_level =
-        grandparent_control.watch_required_level(90).await?.expect("watch_required_level failed");
-    assert_eq!(grandparent_req_level, 10);
-    let parent_req_level =
-        parent_control.get_required_level().await?.expect("get_required_level failed");
-    assert_eq!(parent_req_level, 0);
-
-    Ok(())
-}
-
-#[fuchsia::test]
-async fn test_passive() -> Result<()> {
-    // B has an active dependency on A.
-    // C has a passive dependency on B (and transitively, a passive dependency on A).
-    // D has an active dependency on B (and transitively, an active dependency on A).
-    //  A     B     C     D
-    // ON <= ON
-    //       ON <- ON
-    //       ON <======= ON
-    let realm = build_power_broker_realm().await?;
-    let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-    let token_a = zx::Event::create();
-    let (_, _, level_control_a) = topology
-        .add_element(
-            "A",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![],
-            vec![token_a.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let level_control_a = level_control_a.into_proxy()?;
-    let token_b_active = zx::Event::create();
-    let token_b_passive = zx::Event::create();
-    let (_, _, level_control_b) = topology
-        .add_element(
-            "B",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![LevelDependency {
-                dependency_type: DependencyType::Active,
-                dependent_level: BinaryPowerLevel::On.into_primitive(),
-                requires_token: token_a.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                requires_level: BinaryPowerLevel::On.into_primitive(),
-            }],
-            vec![token_b_active.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
-            vec![token_b_passive.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
-        )
-        .await?
-        .expect("add_element failed");
-    let level_control_b = level_control_b.into_proxy()?;
-    let (_, element_c_lessor, _) = topology
-        .add_element(
-            "C",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![LevelDependency {
-                dependency_type: DependencyType::Passive,
-                dependent_level: BinaryPowerLevel::On.into_primitive(),
-                requires_token: token_b_passive.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                requires_level: BinaryPowerLevel::On.into_primitive(),
-            }],
-            vec![],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let element_c_lessor = element_c_lessor.into_proxy()?;
-    let (_, element_d_lessor, _) = topology
-        .add_element(
-            "D",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![LevelDependency {
-                dependency_type: DependencyType::Active,
-                dependent_level: BinaryPowerLevel::On.into_primitive(),
-                requires_token: token_b_active.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                requires_level: BinaryPowerLevel::On.into_primitive(),
-            }],
-            vec![],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let element_d_lessor = element_d_lessor.into_proxy()?;
-
-    // Initial required level for A and B should be OFF.
-    // Set A and B's current level to OFF.
-    let req_level_a =
-        level_control_a.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(req_level_a, BinaryPowerLevel::Off.into_primitive());
-    let req_level_b =
-        level_control_b.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(req_level_b, BinaryPowerLevel::Off.into_primitive());
-    level_control_a
-        .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
-        .await?
-        .expect("update_current_power_level failed");
-    level_control_b
-        .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
-        .await?
-        .expect("update_current_power_level failed");
-
-    // Lease C, A & B's required levels should remain OFF because of
-    // passive claim.
-    // Lease C should remain unsatisfied.
-    // TODO(b/311419716): When we have lease rejection, reject this lease.
-    let lease_c = element_c_lessor
-        .lease(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("Lease response not ok")
-        .into_proxy()?;
-    let req_level_a =
-        level_control_a.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(req_level_a, BinaryPowerLevel::Off.into_primitive());
-    let req_level_b =
-        level_control_b.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(req_level_b, BinaryPowerLevel::Off.into_primitive());
-    assert_eq!(lease_c.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
-
-    // Lease D, A should have required level ON because of D's transitive active claim.
-    // Lease C & D should become satisfied.
-    let lease_d = element_d_lessor
-        .lease(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("Lease response not ok")
-        .into_proxy()?;
-    let req_level_a = level_control_a
-        .watch_required_level(BinaryPowerLevel::Off.into_primitive())
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(req_level_a, BinaryPowerLevel::On.into_primitive());
-    let req_level_b =
-        level_control_b.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(req_level_b, BinaryPowerLevel::Off.into_primitive());
-    assert_eq!(lease_c.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
-    assert_eq!(lease_d.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
-
-    // Update A's current level to ON.
-    // B should now have required level ON because of D's active claim and
-    // its dependency on A being satisfied.
-    level_control_a
-        .update_current_power_level(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("update_current_power_level failed");
-    let req_level_a =
-        level_control_a.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(req_level_a, BinaryPowerLevel::On.into_primitive());
-    let req_level_b = level_control_b
-        .watch_required_level(BinaryPowerLevel::Off.into_primitive())
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(req_level_b, BinaryPowerLevel::On.into_primitive());
-    assert_eq!(lease_c.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
-    assert_eq!(lease_d.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
-
-    // Update B's current level to ON.
-    // Lease C & D should become satisfied.
-    level_control_b
-        .update_current_power_level(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("update_current_power_level failed");
-    assert_eq!(lease_c.watch_status(LeaseStatus::Pending).await?, LeaseStatus::Satisfied);
-    assert_eq!(lease_d.watch_status(LeaseStatus::Pending).await?, LeaseStatus::Satisfied);
-
-    // Drop Lease on D, B's required level should become OFF.
-    drop(lease_d);
-    let req_level_a =
-        level_control_a.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(req_level_a, BinaryPowerLevel::On.into_primitive());
-    let req_level_b = level_control_b
-        .watch_required_level(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(req_level_b, BinaryPowerLevel::Off.into_primitive());
-    // TODO(b/308659273): When we have lease revocation, verify lease C was revoked.
-
-    // Update B's current level to OFF. A's required level should become OFF.
-    level_control_b
-        .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
-        .await?
-        .expect("update_current_power_level failed");
-    let req_level_a = level_control_a
-        .watch_required_level(BinaryPowerLevel::On.into_primitive())
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(req_level_a, BinaryPowerLevel::Off.into_primitive());
-    let req_level_b =
-        level_control_b.get_required_level().await?.expect("watch_required_level failed");
-    assert_eq!(req_level_b, BinaryPowerLevel::Off.into_primitive());
-
-    Ok(())
-}
-
-#[fuchsia::test]
-async fn test_topology() -> Result<()> {
-    let realm = build_power_broker_realm().await?;
-
-    // Create a four element topology.
-    let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-    let earth_token = zx::Event::create();
-    let (earth_element_control, _, _) = topology
-        .add_element(
-            "Earth",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![],
-            vec![earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let earth_element_control = earth_element_control.into_proxy()?;
-    let water_token = zx::Event::create();
-    let (water_element_control, _, _) = topology
-        .add_element(
-            "Water",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![LevelDependency {
-                dependency_type: DependencyType::Active,
-                dependent_level: BinaryPowerLevel::On.into_primitive(),
-                requires_token: earth_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed"),
-                requires_level: BinaryPowerLevel::On.into_primitive(),
-            }],
-            vec![water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let water_element_control = water_element_control.into_proxy()?;
-    let fire_token = zx::Event::create();
-    let (fire_element_control, _, _) = topology
-        .add_element(
-            "Fire",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![],
-            vec![fire_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let fire_element_control = fire_element_control.into_proxy()?;
-    let air_token = zx::Event::create();
-    let (air_element_control, _, _) = topology
-        .add_element(
-            "Air",
-            BinaryPowerLevel::Off.into_primitive(),
-            &BINARY_POWER_LEVELS,
-            vec![],
-            vec![air_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
-            vec![],
-        )
-        .await?
-        .expect("add_element failed");
-    let air_element_control = air_element_control.into_proxy()?;
-
-    let extra_add_dep_res = water_element_control
-        .add_dependency(
-            DependencyType::Active,
-            BinaryPowerLevel::On.into_primitive(),
-            earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-            BinaryPowerLevel::On.into_primitive(),
-        )
-        .await?;
-    assert!(matches!(extra_add_dep_res, Err(fpb::ModifyDependencyError::AlreadyExists { .. })));
-
-    water_element_control
-        .remove_dependency(
-            DependencyType::Active,
-            BinaryPowerLevel::On.into_primitive(),
-            earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-            BinaryPowerLevel::On.into_primitive(),
-        )
-        .await?
-        .expect("remove_dependency failed");
-
-    let extra_remove_dep_res = water_element_control
-        .remove_dependency(
-            DependencyType::Active,
-            BinaryPowerLevel::On.into_primitive(),
-            earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-            BinaryPowerLevel::On.into_primitive(),
-        )
-        .await?;
-    assert!(matches!(extra_remove_dep_res, Err(fpb::ModifyDependencyError::NotFound { .. })));
-
-    fire_element_control.remove_element().await.expect("remove_element failed");
-    fire_element_control.on_closed().await?;
-    air_element_control.remove_element().await.expect("remove_element failed");
-    air_element_control.on_closed().await?;
-
-    let add_dep_req_invalid = earth_element_control
-        .add_dependency(
-            DependencyType::Active,
-            BinaryPowerLevel::On.into_primitive(),
-            fire_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-            BinaryPowerLevel::On.into_primitive(),
-        )
-        .await?;
-    assert!(matches!(add_dep_req_invalid, Err(fpb::ModifyDependencyError::NotAuthorized),));
-
-    Ok(())
+        Ok(())
+    }
 }

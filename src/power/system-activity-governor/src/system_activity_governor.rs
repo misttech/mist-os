@@ -466,7 +466,7 @@ impl SystemActivityGovernor {
                 ?last_required_level,
                 "run_power_element: waiting for new level"
             );
-            match power_element.level_control.watch_required_level(last_required_level).await {
+            match power_element.required_level.watch().await {
                 Ok(Ok(required_level)) => {
                     tracing::debug!(
                         ?element_name,
@@ -474,15 +474,16 @@ impl SystemActivityGovernor {
                         ?last_required_level,
                         "run_power_element: new level requested"
                     );
+                    if required_level == last_required_level {
+                        // Required level has not changed.
+                        continue;
+                    }
 
                     if let Some(pre_update_fn) = &pre_update_fn {
                         pre_update_fn(required_level).await;
                     }
 
-                    let res = power_element
-                        .level_control
-                        .update_current_power_level(required_level)
-                        .await;
+                    let res = power_element.current_level.update(required_level).await;
                     if let Err(error) = res {
                         tracing::warn!(
                             ?element_name,

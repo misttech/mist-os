@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
-use fidl::endpoints::ProtocolMarker;
+use fidl::endpoints::{create_proxy, ProtocolMarker};
 use fidl_fuchsia_power_broker as fpb;
 use fidl_fuchsia_power_system as fps;
 use fuchsia_async as fasync;
@@ -41,7 +41,7 @@ async fn manage_internal<F, G>(
 ) -> Result<fasync::Task<()>>
 where
     G: Future<Output = fasync::Task<()>>,
-    F: Fn(fpb::LevelControlProxy) -> G,
+    F: Fn(fpb::CurrentLevelProxy, fpb::RequiredLevelProxy) -> G,
 {
     let power_elements = governor_proxy
         .get_power_elements()
@@ -58,20 +58,27 @@ where
                 requires_level: REQUIRED_LEVEL,
             }];
 
+            let (current, current_level_channel) = create_proxy::<fpb::CurrentLevelMarker>()?;
+            let (required, required_level_channel) = create_proxy::<fpb::RequiredLevelMarker>()?;
             let result = topology_proxy
-                .add_element(
-                    ELEMENT_NAME,
-                    POWER_ON,
-                    &vec![POWER_ON, POWER_OFF],
-                    deps,
-                    vec![],
-                    vec![],
-                )
+                .add_element(fpb::ElementSchema {
+                    element_name: Some(ELEMENT_NAME.into()),
+                    initial_current_level: Some(POWER_ON),
+                    valid_levels: Some(vec![POWER_ON, POWER_OFF]),
+                    dependencies: Some(deps),
+                    active_dependency_tokens_to_register: Some(vec![]),
+                    passive_dependency_tokens_to_register: Some(vec![]),
+                    level_control_channels: Some(fpb::LevelControlChannels {
+                        current: current_level_channel,
+                        required: required_level_channel,
+                    }),
+                    ..Default::default()
+                })
                 .await
                 .context("while calling fuchsia.power.broker.Topology/AddElement")?;
             match result {
-                Ok((_element_control_ch, _lease_control_ch, level_control_ch)) => {
-                    return Ok(loop_fn(level_control_ch.into_proxy().expect("never fails")).await);
+                Ok((_element_control_ch, _lease_control_ch)) => {
+                    return Ok(loop_fn(current, required).await);
                 }
                 Err(e) => return Err(anyhow!("error while adding element: {:?}", e)),
             }
@@ -88,19 +95,19 @@ where
 // we can insert a power transition process in between.
 //
 // Returns the task spawned for transition control.
-async fn management_loop(proxy: fpb::LevelControlProxy) -> fasync::Task<()> {
-    let clone = proxy.clone();
+async fn management_loop(
+    current: fpb::CurrentLevelProxy,
+    required: fpb::RequiredLevelProxy,
+) -> fasync::Task<()> {
     // The Sender is used to ensure that rcv_task does not send before send_task
     // is done.
     let (mut send, mut rcv) = mpsc::channel::<(u8, mpsc::Sender<()>)>(1);
 
     let rcv_task = fasync::Task::local(async move {
-        let mut last_required_level: u8 = POWER_ON;
         loop {
-            let result = clone.watch_required_level(last_required_level).await;
+            let result = required.watch().await;
             match result {
                 Ok(Ok(level)) => {
-                    last_required_level = level;
                     let (s, mut r) = mpsc::channel::<()>(1);
                     // For now, we just echo the power level back to the power broker.
                     if let Err(e) = send.send((level, s)).await {
@@ -124,7 +131,7 @@ async fn management_loop(proxy: fpb::LevelControlProxy) -> fasync::Task<()> {
     });
     let send_task = fasync::Task::local(async move {
         while let Some((new_level, mut s)) = rcv.next().await {
-            match proxy.update_current_power_level(new_level).await {
+            match current.update(new_level).await {
                 Ok(Ok(())) => {
                     // Allow rcv_task to proceed.
                     s.send(()).await.unwrap();
@@ -171,8 +178,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn propagate_level() {
-        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fpb::LevelControlMarker>()
-            .expect("always succeeds");
+        let (current, mut current_stream) =
+            endpoints::create_proxy_and_stream::<fpb::CurrentLevelMarker>()
+                .expect("always succeeds");
+        let (required, mut required_stream) =
+            endpoints::create_proxy_and_stream::<fpb::RequiredLevelMarker>()
+                .expect("always succeeds");
 
         // Send the power level in from test into the handler.
         let (mut in_send, mut in_recv) = mpsc::channel(1);
@@ -180,26 +191,35 @@ mod tests {
         // Get the power level out from the handler into the test.
         let (mut out_send, mut out_recv) = mpsc::channel(1);
 
-        // Serve the topology stream asynchronously.
+        // Serve the topology streams asynchronously.
         fasync::Task::local(async move {
             debug!("topology: start listening for requests.");
-            while let Some(next) = stream.next().await {
-                let request: fpb::LevelControlRequest = next.unwrap();
+            while let Some(next) = current_stream.next().await {
+                let request: fpb::CurrentLevelRequest = next.unwrap();
                 debug!("topology: request: {:?}", request);
                 match request {
-                    fpb::LevelControlRequest::WatchRequiredLevel { responder, .. } => {
+                    fpb::CurrentLevelRequest::Update { current_level, responder, .. } => {
+                        out_send.send(current_level).await.expect("always succeeds");
+                        responder.send(Ok(())).unwrap();
+                    }
+                    _ => {
+                        unimplemented!();
+                    }
+                }
+            }
+        })
+        .detach();
+        fasync::Task::local(async move {
+            debug!("topology: start listening for requests.");
+            while let Some(next) = required_stream.next().await {
+                let request: fpb::RequiredLevelRequest = next.unwrap();
+                debug!("topology: request: {:?}", request);
+                match request {
+                    fpb::RequiredLevelRequest::Watch { responder, .. } => {
                         // Emulate hanging get response: block on a new value, then report that
                         // value.
                         let new_level = in_recv.next().await.expect("always succeeds");
                         responder.send(Ok(new_level)).unwrap();
-                    }
-                    fpb::LevelControlRequest::UpdateCurrentPowerLevel {
-                        current_level,
-                        responder,
-                        ..
-                    } => {
-                        out_send.send(current_level).await.expect("always succeeds");
-                        responder.send(Ok(())).unwrap();
                     }
                     _ => {
                         unimplemented!();
@@ -211,7 +231,7 @@ mod tests {
 
         // Management loop is also asynchronous.
         fasync::Task::local(async move {
-            management_loop(proxy).await.await;
+            management_loop(current, required).await.await;
         })
         .detach();
 
@@ -225,7 +245,7 @@ mod tests {
         assert_eq!(POWER_ON, block_recv_from(&mut out_recv).await);
     }
 
-    async fn empty_loop(_: fpb::LevelControlProxy) -> fasync::Task<()> {
+    async fn empty_loop(_: fpb::CurrentLevelProxy, _: fpb::RequiredLevelProxy) -> fasync::Task<()> {
         fasync::Task::local(async move {})
     }
 
@@ -276,17 +296,9 @@ mod tests {
         fasync::Task::local(async move {
             while let Some(request) = _t_stream.next().await {
                 match request {
-                    Ok(fpb::TopologyRequest::AddElement {
-                        element_name: _,
-                        initial_current_level: _,
-                        valid_levels: _,
-                        dependencies: _,
-                        active_dependency_tokens_to_register: _,
-                        passive_dependency_tokens_to_register: _,
-                        responder,
-                    }) => {
+                    Ok(fpb::TopologyRequest::AddElement { payload: _, responder }) => {
                         responder
-                            .send(Ok((dummy_client_end(), dummy_client_end(), dummy_client_end())))
+                            .send(Ok((dummy_client_end(), dummy_client_end())))
                             .expect("never fails");
                     }
                     Ok(_) | Err(_) => unimplemented!(),
