@@ -965,6 +965,7 @@ impl FsNodeOps for Arc<FuseNode> {
 
     fn unlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,

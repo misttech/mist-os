@@ -365,14 +365,18 @@ impl DirEntry {
         Ok(DirEntry::new_unrooted(node))
     }
 
-    pub fn unlink(
+    pub fn unlink<L>(
         self: &DirEntryHandle,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         kind: UnlinkKind,
         must_be_directory: bool,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         assert!(!DirEntry::is_reserved_name(name));
 
         // child *must* be dropped after self_children and child_children below (even in the error
@@ -416,7 +420,7 @@ impl DirEntry {
             }
         }
 
-        self.node.unlink(current_task, mount, name, &child.node)?;
+        self.node.unlink(locked, current_task, mount, name, &child.node)?;
         self_children.children.remove(name);
 
         std::mem::drop(child_children);

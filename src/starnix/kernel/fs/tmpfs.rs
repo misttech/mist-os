@@ -305,6 +305,7 @@ impl FsNodeOps for TmpfsDirectory {
 
     fn unlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -547,7 +548,7 @@ mod test {
             .expect("failed to open /usr/bin");
         usr_bin
             .name
-            .unlink(&current_task, "test.txt".into(), UnlinkKind::NonDirectory, false)
+            .unlink(&mut locked, &current_task, "test.txt".into(), UnlinkKind::NonDirectory, false)
             .expect("failed to unlink test.text");
         assert_eq!(
             errno!(ENOENT),
@@ -559,7 +560,13 @@ mod test {
             errno!(ENOENT),
             usr_bin
                 .name
-                .unlink(&current_task, "test.txt".into(), UnlinkKind::NonDirectory, false)
+                .unlink(
+                    &mut locked,
+                    &current_task,
+                    "test.txt".into(),
+                    UnlinkKind::NonDirectory,
+                    false
+                )
                 .unwrap_err()
         );
 
@@ -585,7 +592,7 @@ mod test {
             current_task.open_file(&mut locked, "/usr/foo".into(), OpenFlags::RDONLY).unwrap_err()
         );
         usr.name
-            .unlink(&current_task, "bin".into(), UnlinkKind::Directory, false)
+            .unlink(&mut locked, &current_task, "bin".into(), UnlinkKind::Directory, false)
             .expect("failed to unlink /usr/bin");
     }
 

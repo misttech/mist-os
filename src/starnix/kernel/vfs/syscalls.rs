@@ -1017,9 +1017,15 @@ pub fn sys_unlinkat(
     }
     let kind =
         if flags & AT_REMOVEDIR != 0 { UnlinkKind::Directory } else { UnlinkKind::NonDirectory };
-    lookup_parent_at(locked, current_task, dir_fd, user_path, |_, context, parent, basename| {
-        parent.unlink(current_task, basename, kind, context.must_be_directory)
-    })?;
+    lookup_parent_at(
+        locked,
+        current_task,
+        dir_fd,
+        user_path,
+        |locked, context, parent, basename| {
+            parent.unlink(locked, current_task, basename, kind, context.must_be_directory)
+        },
+    )?;
     Ok(())
 }
 

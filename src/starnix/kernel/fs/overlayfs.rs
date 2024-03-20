@@ -156,7 +156,7 @@ impl ActiveEntry {
         name: &FsStr,
     ) -> Result<ActiveEntry, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.create_entry(current_task, name, |dir, mount, name| {
             dir.mknod(
@@ -199,7 +199,7 @@ impl ActiveEntry {
         current_task: &CurrentTask,
     ) -> Result<Vec<DirEntryInfo>, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut sink = DirentSinkAdapter::default();
         self.entry()
@@ -418,12 +418,18 @@ impl OverlayNode {
     /// unlinked before the upper directory can be unlinked as well.
     /// `prepare_to_unlink()` checks that the directory doesn't contain anything other
     /// than whiteouts and if that is the case then it unlinks all of them.
-    fn prepare_to_unlink(self: &Arc<OverlayNode>, current_task: &CurrentTask) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps. Needs to be before FileOpsCore
+    fn prepare_to_unlink<L>(
+        self: &Arc<OverlayNode>,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if self.main_entry().entry().node.is_dir() {
             let mut lower_entries = BTreeSet::new();
             if let Some(dir) = &self.lower {
-                for item in dir.read_dir_entries(&mut locked, current_task)?.drain(..) {
+                for item in dir.read_dir_entries(locked, current_task)?.drain(..) {
                     if !dir.is_whiteout_child(current_task, &item)? {
                         lower_entries.insert(item.name);
                     }
@@ -432,7 +438,7 @@ impl OverlayNode {
 
             if let Some(dir) = self.upper.get() {
                 let mut to_remove = Vec::<FsString>::new();
-                for item in dir.read_dir_entries(&mut locked, current_task)?.drain(..) {
+                for item in dir.read_dir_entries(locked, current_task)?.drain(..) {
                     if !dir.is_whiteout_child(current_task, &item)? {
                         return error!(ENOTEMPTY);
                     }
@@ -451,6 +457,7 @@ impl OverlayNode {
                 // Finally, remove the children.
                 for name in to_remove.iter() {
                     dir.entry().unlink(
+                        locked,
                         current_task,
                         dir.mount(),
                         name.as_ref(),
@@ -653,20 +660,20 @@ impl FsNodeOps for Arc<OverlayNode> {
 
     fn unlink(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps; needs to be before FileOpsCore
-        let upper = self.ensure_upper(&mut locked, current_task)?;
+        let upper = self.ensure_upper(locked, current_task)?;
         let child_overlay = OverlayNode::from_fs_node(child)?;
-        child_overlay.prepare_to_unlink(current_task)?;
+        child_overlay.prepare_to_unlink(locked, current_task)?;
 
         let need_whiteout = self.lower_entry_exists(current_task, name)?;
         if need_whiteout {
             self.fs.create_upper_entry(
-                &mut locked,
+                locked,
                 current_task,
                 &upper,
                 &name,
@@ -679,7 +686,7 @@ impl FsNodeOps for Arc<OverlayNode> {
             } else {
                 UnlinkKind::NonDirectory
             };
-            upper.entry().unlink(current_task, upper.mount(), name, kind, false)?
+            upper.entry().unlink(locked, current_task, upper.mount(), name, kind, false)?
         }
 
         Ok(())
@@ -966,6 +973,7 @@ impl OverlayFs {
         do_init: FInit,
     ) -> Result<ActiveEntry, Errno>
     where
+        L: LockEqualOrBefore<FileOpsCore>,
         FCreate: Fn(&mut Locked<'_, L>, &ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
         FInit: FnOnce(&mut Locked<'_, L>, &ActiveEntry) -> Result<(), Errno>,
     {
@@ -998,6 +1006,7 @@ impl OverlayFs {
                 self.work
                     .entry()
                     .unlink(
+                        locked,
                         current_task,
                         self.work.mount(),
                         temp_name.as_ref(),

@@ -77,6 +77,7 @@ impl FsNodeOps for SysRqNode {
 
     fn unlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,

@@ -611,6 +611,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// a directory or a non-directory child.
     fn unlink(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -828,6 +829,7 @@ macro_rules! fs_node_impl_dir_readonly {
 
         fn unlink(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -933,6 +935,7 @@ macro_rules! fs_node_impl_not_dir {
 
         fn unlink(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -1340,17 +1343,22 @@ impl FsNode {
         Ok(child.clone())
     }
 
-    pub fn unlink(
+    pub fn unlink<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         child: &FsNodeHandle,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // The user must be able to search and write to the directory.
         self.check_access(current_task, mount, Access::EXEC | Access::WRITE)?;
         self.check_sticky_bit(current_task, child)?;
-        self.ops().unlink(self, current_task, name, child)?;
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().unlink(&mut locked, self, current_task, name, child)?;
         self.update_ctime_mtime();
         Ok(())
     }

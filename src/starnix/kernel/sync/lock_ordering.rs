@@ -20,8 +20,8 @@ lock_level!(ProcessGroupState);
 lock_level!(FileOpsIoctl);
 
 // These lock levels are use to denote operations on FileOps, SocketOps and FsNodeOps
-// TODO(https://fxbug.dev/324065824): FsNode.create_file_ops, FSNode.mknod, FileOps.read, SocketOps.read
-// use the same level because of the circular dependencies between them.
+// TODO(https://fxbug.dev/324065824): FsNode.create_file_ops, FsNode.mknod, FsNode.unlink, FileOps.read,
+// SocketOps.read use the same level because of the circular dependencies between them.
 lock_level!(FileOpsCore);
 lock_level!(WriteOps);
 

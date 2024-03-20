@@ -508,8 +508,10 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
         name: &str,
         must_be_directory: bool,
     ) -> Result<(), zx::Status> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320465852): Reuse an existing Locked context
         let kind = if must_be_directory { UnlinkKind::Directory } else { UnlinkKind::NonDirectory };
         self.file.name.entry.unlink(
+            &mut locked,
             &*self.task().await?,
             &self.file.name.mount,
             name.into(),

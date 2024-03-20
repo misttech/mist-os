@@ -1212,13 +1212,17 @@ impl NamespaceNode {
         Ok(self.with_new_entry(dir_entry))
     }
 
-    pub fn unlink(
+    pub fn unlink<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
         kind: UnlinkKind,
         must_be_directory: bool,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         if DirEntry::is_reserved_name(name) {
             match kind {
                 UnlinkKind::Directory => {
@@ -1234,7 +1238,7 @@ impl NamespaceNode {
                 UnlinkKind::NonDirectory => error!(ENOTDIR),
             }
         } else {
-            self.entry.unlink(current_task, &self.mount, name, kind, must_be_directory)
+            self.entry.unlink(locked, current_task, &self.mount, name, kind, must_be_directory)
         }
     }
 
@@ -1759,7 +1763,7 @@ mod test {
         assert_eq!(
             errno!(EBUSY),
             ns2.root()
-                .unlink(&current_task, "foo".into(), UnlinkKind::Directory, false)
+                .unlink(&mut locked, &current_task, "foo".into(), UnlinkKind::Directory, false)
                 .unwrap_err()
         );
 
