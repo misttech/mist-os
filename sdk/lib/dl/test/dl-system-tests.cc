@@ -23,9 +23,21 @@ fit::error<Error> TakeError() {
 
 }  // namespace
 
-fit::result<Error, void*> DlSystemTests::DlOpen(const char* name, int mode) {
-  std::filesystem::path path = elfldltl::testing::GetTestDataPath(".") / name;
-  void* result = dlopen(path.c_str(), mode);
+fit::result<Error, void*> DlSystemTests::DlOpen(const char* file, int mode) {
+  void* result;
+  if (!file || !strlen(file)) {
+    result = dlopen(file, mode);
+  } else {
+    std::filesystem::path path;
+#ifdef __Fuchsia__
+    // Use the lib prefix for library paths to the same prefix used in libld,
+    // which generates the testing modules used by libdl.
+    path = std::filesystem::path("test") / "lib" / LD_TEST_LIBPREFIX / file;
+#else
+    path = elfldltl::testing::GetTestDataPath(file);
+#endif
+    result = dlopen(path.c_str(), mode);
+  }
   if (!result) {
     return TakeError();
   }

@@ -4,48 +4,27 @@
 
 #include "runtime-dynamic-linker.h"
 
-#include <string>
-
 namespace dl {
 
-Module* RuntimeDynamicLinker::FindModule(const Soname& name) {
+Module* RuntimeDynamicLinker::FindModule(Soname name) {
   if (auto it = std::find(loaded_modules_.begin(), loaded_modules_.end(), name);
       it != loaded_modules_.end()) {
+    // TODO(https://fxbug.dev/328135195): increase reference count.
+    // TODO(https://fxbug.dev/326120230): update flags
     Module& found = *it;
     return &found;
   }
   return nullptr;
 }
 
-fit::result<Error, void*> RuntimeDynamicLinker::Open(const char* file, int mode) {
+fit::result<Error, Module*> RuntimeDynamicLinker::CheckOpen(const char* file, int mode) {
   if (mode & ~(kOpenSymbolScopeMask | kOpenBindingModeMask | kOpenFlagsMask)) {
     return fit::error{Error{"invalid mode parameter"}};
   }
-
-  if (!file) {
-    return fit::error{Error{
-        "TODO(https://fxbug.dev/324136831): return modules list that includes startup modules"}};
+  if (!file || !strlen(file)) {
+    return fit::error{Error{"TODO(https://fxbug.dev/324136831): nullptr for file is unsupported."}};
   }
-
-  Soname name{file};
-
-  // Return a reference to the module if it is already loaded.
-  if (auto* found = FindModule(name)) {
-    // TODO(https://fxbug.dev/328135195): increase reference count.
-    // TODO(https://fxbug.dev/326120230): update flags
-    return fit::ok(found);
-  }
-  // TODO(https://fxbug.dev/323418587): a module will be created and added to
-  // loaded_modules_ only after it has been successfully loaded/relocated/etc.
-  // For now, create a new module and add it to loaded_modules_ so that we can
-  // look up and re-use the same module in basic tests.
-  fbl::AllocChecker ac;
-  loaded_modules_.push_back(Module::Create(name, ac));
-
-  // TODO(https://fxbug.dev/326138362): support & test RTLD_NOLOAD.
-
-  // TODO(https://fxbug.dev/324650368): support file retrieval.
-  return fit::error<Error>{"cannot open dependency: ", name.c_str()};
+  return fit::ok(FindModule(Soname{file}));
 }
 
 }  // namespace dl

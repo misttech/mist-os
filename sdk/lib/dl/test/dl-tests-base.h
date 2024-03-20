@@ -31,7 +31,7 @@ class DlTestsBase : public ::testing::Test {
   static constexpr bool kCanValidateMode = true;
 
   // Test fixtures are expected to provide definitions for the following API:
-  fit::result<Error, void*> DlOpen(const char* name, int mode);
+  fit::result<Error, void*> DlOpen(const char* file, int mode);
 };
 
 }  // namespace dl::testing

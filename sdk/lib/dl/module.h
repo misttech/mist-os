@@ -6,9 +6,12 @@
 #define LIB_DL_MODULE_H_
 
 #include <lib/elfldltl/soname.h>
+#include <lib/fit/result.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_double_list.h>
+
+#include "error.h"
 
 namespace dl {
 
@@ -21,20 +24,21 @@ class Module : public fbl::DoublyLinkedListable<std::unique_ptr<Module>> {
  public:
   using Soname = elfldltl::Soname<>;
 
-  // Not copyable, not movable.
+  // Not copyable, but movable.
   Module(const Module&) = delete;
-  Module(Module&&) = delete;
+  Module(Module&&) = default;
 
   constexpr bool operator==(const Soname& other_name) const { return name() == other_name; }
 
   constexpr const Soname& name() const { return name_; }
 
-  static std::unique_ptr<Module> Create(Soname name, fbl::AllocChecker& ac) {
-    // TODO(https://fxbug.dev/328487096): use the AllocChecker and handle
-    // allocation failures.
-    auto module = std::unique_ptr<Module>{new Module};
+  static fit::result<Error, std::unique_ptr<Module>> Create(Soname name, fbl::AllocChecker& ac) {
+    auto module = std::unique_ptr<Module>{new (ac) Module};
+    if (!ac.check()) {
+      return Error::OutOfMemory();
+    }
     module->name_ = name;
-    return module;
+    return fit::ok(std::move(module));
   }
 
  private:

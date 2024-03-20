@@ -5,6 +5,8 @@
 #ifndef LIB_DL_ERROR_H_
 #define LIB_DL_ERROR_H_
 
+#include <lib/fit/result.h>
+
 #include <cassert>
 #include <cstdlib>
 #include <string_view>
@@ -68,6 +70,11 @@ class Error {
   // anything else (except moving from or into the object).
   [[gnu::format(printf, 2, 3)]] void Printf(const char* format, ...);
   void Printf(const char* format, va_list args);
+
+  // Construct an Error object specifically for an out-of-memory scenario. This
+  // sets buffer & size values accordingly so that take_* methods will recognize
+  // the allocation failure and return an appropriate error string.
+  static fit::error<Error> OutOfMemory() { return fit::error{Error{nullptr, kAllocationFailure}}; }
 
   // This must be called exactly once after Printf has been called (or after
   // any non-default construction).  The returned string is valid only for the
@@ -133,6 +140,10 @@ class Error {
  private:
   friend DiagnosticsReport;
   friend StatefulError;
+
+  // This constructor is only used by methods that need to explicitly create
+  // an error object in a certain state (e.g. returning an out of memory error).
+  explicit Error(char* buffer, size_t size) : buffer_(buffer), size_(size) {}
 
   // One of these values must be in size_ when buffer_ is nullptr.  When
   // buffer_ is set, size_ may be kTaken instead of the string's length.

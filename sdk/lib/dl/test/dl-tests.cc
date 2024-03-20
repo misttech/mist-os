@@ -24,7 +24,12 @@ using DlTests = Fixture;
 // expectations and behave the same way, with exceptions noted within the test.
 using TestTypes = ::testing::Types<
 #ifdef __ELF__  // Hard to generate usable test modules for non-ELF host.
-    dl::testing::DlImplTests,
+#ifdef __Fuchsia__
+    dl::testing::DlImplTests<dl::testing::TestFuchsia>,
+#endif
+    // libdl's POSIX test fixture can also be tested on Fuchsia and is included
+    // for any ELF supported host.
+    dl::testing::DlImplTests<dl::testing::TestPosix>,
 #endif
     dl::testing::DlSystemTests>;
 
@@ -102,9 +107,7 @@ TYPED_TEST(DlTests, NotFound) {
   auto result = this->DlOpen("does_not_exist.so", RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
-    // TODO(https://fxbug.dev/324650368): support file retrieval. This will not
-    // match on the exact filename yet.
-    // EXPECT_EQ(result.error_value(), "cannot open dependency: does_not_exist.so");
+    EXPECT_EQ(result.error_value().take_str(), "cannot open does_not_exist.so");
   } else {
     EXPECT_THAT(result.error_value().take_str(),
                 MatchesRegex(".*does_not_exist.so:.*(No such file or directory|ZX_ERR_NOT_FOUND)"));

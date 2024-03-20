@@ -4,19 +4,33 @@
 
 #include "dl-impl-tests.h"
 
-#include <filesystem>
+#include <fcntl.h>
+#include <lib/elfldltl/testing/get-test-data.h>
 
-#include "../runtime-dynamic-linker.h"
+#include <filesystem>
 
 namespace dl::testing {
 
-// Set the lib prefix used in library paths to the same prefix used in libld,
-// which generates the testing modules used by libdl.
-constexpr std::string_view kLibprefix = LD_TEST_LIBPREFIX;
+#ifdef __Fuchsia__
 
-fit::result<Error, void*> DlImplTests::DlOpen(const char* name, int mode) {
-  std::string path = std::filesystem::path("test") / "lib" / kLibprefix / name;
-  return dynamic_linker_.Open(path.c_str(), mode);
+fit::result<Error, TestFuchsia::File> TestFuchsia::RetrieveFile(std::string_view filename) {
+  // Use the lib prefix for library paths to the same prefix used in libld,
+  // which generates the testing modules used by libdl.
+  std::filesystem::path path = std::filesystem::path("test") / "lib" / LD_TEST_LIBPREFIX / filename;
+  if (auto vmo = elfldltl::testing::TryGetTestLibVmo(path.c_str())) {
+    return fit::ok(std::move(vmo));
+  }
+  return fit::error{Error{"cannot open %.*s", static_cast<int>(filename.size()), filename.data()}};
+}
+
+#endif
+
+fit::result<Error, TestPosix::File> TestPosix::RetrieveFile(std::string_view filename) {
+  std::filesystem::path path = elfldltl::testing::GetTestDataPath(filename);
+  if (fbl::unique_fd fd{open(path.c_str(), O_RDONLY)}) {
+    return fit::ok(std::move(fd));
+  }
+  return fit::error{Error{"cannot open %.*s", static_cast<int>(filename.size()), filename.data()}};
 }
 
 }  // namespace dl::testing

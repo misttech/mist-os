@@ -49,10 +49,45 @@ class RuntimeDynamicLinker {
   RuntimeDynamicLinker(const RuntimeDynamicLinker&) = delete;
   RuntimeDynamicLinker(RuntimeDynamicLinker&&) = delete;
 
-  fit::result<Error, void*> Open(const char* file, int mode);
+  // Attempt to find the loaded module with the given name, returning a nullptr
+  // if the module was not found.
+  Module* FindModule(Soname name);
+
+  template <class OSImpl>
+  fit::result<Error, void*> Open(const char* file, int mode) {
+    auto already_loaded = CheckOpen(file, mode);
+    if (already_loaded.is_error()) [[unlikely]] {
+      return already_loaded.take_error();
+    }
+    // If the Module for `file` was found, return a reference to it.
+    if (already_loaded.value()) {
+      return fit::ok(already_loaded.value());
+    }
+
+    // TODO(https://fxbug.dev/323418587): This will eventually be moved into a
+    // Module::Load() function, which will create the permanent Module data
+    // structure in association with a LoadModule. For now, just create a new
+    // module so we can return it from this function.
+    fbl::AllocChecker ac;
+    auto module = Module::Create(Soname{file}, ac);
+    if (module.is_error()) [[unlikely]] {
+      return module.take_error();
+    }
+
+    // TODO(https://fxbug.dev/324650368): implement file retrieval interfaces.
+    if (auto lookup = OSImpl::RetrieveFile(module.value()->name().str()); lookup.is_error()) {
+      return lookup.take_error();
+    }
+
+    return fit::ok(&module);
+  }
 
  private:
-  Module* FindModule(const Soname& name);
+  // Perform basic argument checking and check whether a module for `file` was
+  // already loaded. An error is returned if bad input was given. Otherwise,
+  // return a reference to the module if it was already loaded, or nullptr if
+  // a module for `file` was not found.
+  fit::result<Error, Module*> CheckOpen(const char* file, int mode);
 
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
