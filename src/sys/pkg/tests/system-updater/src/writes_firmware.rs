@@ -54,20 +54,7 @@ async fn images_manifest_update_package_firmware_no_match() {
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
@@ -97,9 +84,7 @@ async fn images_manifest_update_package_firmware_no_match() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -138,20 +123,7 @@ async fn images_manifest_update_package_firmware_match_desired_config() {
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
@@ -170,9 +142,7 @@ async fn images_manifest_update_package_firmware_match_desired_config() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -215,20 +185,7 @@ async fn images_manifest_update_package_firmware_match_active_config() {
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
@@ -256,9 +213,7 @@ async fn images_manifest_update_package_firmware_match_active_config() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -310,20 +265,7 @@ async fn firmware_comparing_respects_fuchsia_mem_buffer_size() {
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
@@ -355,9 +297,7 @@ async fn firmware_comparing_respects_fuchsia_mem_buffer_size() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -405,20 +345,7 @@ async fn firmware_copying_sets_fuchsia_mem_buffer_size() {
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
@@ -445,9 +372,7 @@ async fn firmware_copying_sets_fuchsia_mem_buffer_size() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -486,69 +411,49 @@ async fn writes_multiple_firmware_types() {
 
     env.run_update().await.expect("success");
 
-    let interactions = env.take_interactions();
-
-    assert_eq!(
-        interactions,
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::ReadFirmware {
-                configuration: paver::Configuration::B,
-                firmware_type: "a".to_string(),
-            }),
-            Paver(PaverEvent::ReadFirmware {
-                configuration: paver::Configuration::A,
-                firmware_type: "a".to_string(),
-            }),
-            Paver(PaverEvent::ReadFirmware {
-                configuration: paver::Configuration::B,
-                firmware_type: "b".to_string(),
-            }),
-            Paver(PaverEvent::ReadFirmware {
-                configuration: paver::Configuration::A,
-                firmware_type: "b".to_string(),
-            }),
-            ReplaceRetainedPackages(vec![hashstr(5).parse().unwrap()]),
-            Gc,
-            PackageResolve(image_package_url_to_string("update-images-firmware", 5,)),
-            Paver(PaverEvent::WriteFirmware {
-                configuration: paver::Configuration::B,
-                firmware_type: "a".to_string(),
-                payload: b"A contents".to_vec()
-            }),
-            Paver(PaverEvent::WriteFirmware {
-                configuration: paver::Configuration::B,
-                firmware_type: "b".to_string(),
-                payload: b"B contents".to_vec()
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![]),
-            Gc,
-            BlobfsSync,
-            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-            Paver(PaverEvent::BootManagerFlush),
-            Reboot,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "a".to_string(),
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::A,
+            firmware_type: "a".to_string(),
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "b".to_string(),
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::A,
+            firmware_type: "b".to_string(),
+        }),
+        ReplaceRetainedPackages(vec![hashstr(5).parse().unwrap()]),
+        Gc,
+        PackageResolve(image_package_url_to_string("update-images-firmware", 5)),
+        Paver(PaverEvent::WriteFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "a".to_string(),
+            payload: b"A contents".to_vec(),
+        }),
+        Paver(PaverEvent::WriteFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "b".to_string(),
+            payload: b"B contents".to_vec(),
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![]),
+        Gc,
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -593,54 +498,36 @@ async fn skips_unsupported_firmware_type() {
     // Update should still succeed, we want to skip unsupported firmware types.
     env.run_update().await.expect("success");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::ReadFirmware {
-                configuration: paver::Configuration::B,
-                firmware_type: "a".to_string(),
-            }),
-            Paver(PaverEvent::ReadFirmware {
-                configuration: paver::Configuration::A,
-                firmware_type: "a".to_string(),
-            }),
-            ReplaceRetainedPackages(vec![hashstr(5).parse().unwrap()]),
-            Gc,
-            PackageResolve(image_package_url_to_string("update-images-firmware", 5,)),
-            Paver(PaverEvent::WriteFirmware {
-                configuration: paver::Configuration::B,
-                firmware_type: "a".to_string(),
-                payload: b"A contents".to_vec()
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![]),
-            Gc,
-            BlobfsSync,
-            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-            Paver(PaverEvent::BootManagerFlush),
-            Reboot,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "a".to_string(),
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::A,
+            firmware_type: "a".to_string(),
+        }),
+        ReplaceRetainedPackages(vec![hashstr(5).parse().unwrap()]),
+        Gc,
+        PackageResolve(image_package_url_to_string("update-images-firmware", 5)),
+        Paver(PaverEvent::WriteFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "a".to_string(),
+            payload: b"A contents".to_vec(),
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![]),
+        Gc,
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -705,45 +592,27 @@ async fn fails_on_firmware_write_error() {
         )
     );
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::ReadFirmware {
-                configuration: paver::Configuration::B,
-                firmware_type: "a".to_string()
-            }),
-            Paver(PaverEvent::ReadFirmware {
-                configuration: paver::Configuration::A,
-                firmware_type: "a".to_string()
-            }),
-            ReplaceRetainedPackages(vec![hashstr(5).parse().unwrap()]),
-            Gc,
-            PackageResolve(image_package_url_to_string("update-images-firmware", 5)),
-            Paver(PaverEvent::WriteFirmware {
-                configuration: paver::Configuration::B,
-                firmware_type: "a".to_string(),
-                payload: b"A contents".to_vec()
-            }),
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "a".to_string(),
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::A,
+            firmware_type: "a".to_string(),
+        }),
+        ReplaceRetainedPackages(vec![hashstr(5).parse().unwrap()]),
+        Gc,
+        PackageResolve(image_package_url_to_string("update-images-firmware", 5)),
+        Paver(PaverEvent::WriteFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "a".to_string(),
+            payload: b"A contents".to_vec(),
+        }),
+    ]));
 }

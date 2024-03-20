@@ -19,28 +19,10 @@ async fn fails_on_package_resolver_connect_error() {
     let result = env.run_update().await;
     assert!(result.is_err(), "system updater succeeded when it should fail");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            // The connect succeeds, so the system updater only notices the resolver is not there when
-            // it tries to resolve a package
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        // The connect succeeds, so the system updater only notices the resolver is not there when
+        // it tries to resolve a package
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -71,35 +53,17 @@ async fn fails_on_update_package_fetch_error() {
         }
     );
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![SYSTEM_IMAGE_HASH.parse().unwrap()]),
-            Gc,
-            PackageResolve(system_image_url.to_string()),
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![SYSTEM_IMAGE_HASH.parse().unwrap()]),
+        Gc,
+        PackageResolve(system_image_url.to_string()),
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -182,50 +146,32 @@ async fn fails_on_content_package_fetch_error() {
         }
     );
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![
-                SYSTEM_IMAGE_HASH.parse().unwrap(),
-                merkle_str!("aa").parse().unwrap(),
-                merkle_str!("00").parse().unwrap(),
-                merkle_str!("bb").parse().unwrap(),
-                merkle_str!("cc").parse().unwrap(),
-                merkle_str!("dd").parse().unwrap(),
-                merkle_str!("ee").parse().unwrap(),
-                UPDATE_HASH.parse().unwrap(),
-            ],),
-            Gc,
-            PackageResolve(SYSTEM_IMAGE_URL.to_string()),
-            PackageResolve(pkg1_url.to_string()),
-            PackageResolve(pkg2_url.to_string()),
-            PackageResolve(pkg3_url.to_string()),
-            PackageResolve(pkg4_url.to_string()),
-            PackageResolve(pkg5_url.to_string()),
-            // pkg6_url is never resolved, as pkg2's resolve finishes first with an error.
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![
+            SYSTEM_IMAGE_HASH.parse().unwrap(),
+            merkle_str!("aa").parse().unwrap(),
+            merkle_str!("00").parse().unwrap(),
+            merkle_str!("bb").parse().unwrap(),
+            merkle_str!("cc").parse().unwrap(),
+            merkle_str!("dd").parse().unwrap(),
+            merkle_str!("ee").parse().unwrap(),
+            UPDATE_HASH.parse().unwrap(),
+        ]),
+        Gc,
+        PackageResolve(SYSTEM_IMAGE_URL.to_string()),
+        PackageResolve(pkg1_url.to_string()),
+        PackageResolve(pkg2_url.to_string()),
+        PackageResolve(pkg3_url.to_string()),
+        PackageResolve(pkg4_url.to_string()),
+        PackageResolve(pkg5_url.to_string()),
+        // pkg6_url is never resolved, as pkg2's resolve finishes first with an error.
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -245,36 +191,18 @@ async fn fails_when_package_cache_sync_fails() {
 
     assert!(result.is_err(), "system updater succeeded when it should fail");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![SYSTEM_IMAGE_HASH.parse().unwrap()]),
-            Gc,
-            PackageResolve(SYSTEM_IMAGE_URL.to_string()),
-            BlobfsSync,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![SYSTEM_IMAGE_HASH.parse().unwrap()]),
+        Gc,
+        PackageResolve(SYSTEM_IMAGE_URL.to_string()),
+        BlobfsSync,
+    ]));
 }
 
 /// Verifies that when we fail to resolve the update package, we get a Prepare failure with the

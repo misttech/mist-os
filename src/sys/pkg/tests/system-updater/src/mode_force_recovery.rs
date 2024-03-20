@@ -30,42 +30,20 @@ async fn writes_recovery_and_force_reboots_into_it() {
         }
     );
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::Recovery,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![]),
-            Gc,
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::A
-            }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            Reboot,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::Recovery,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![]),
+        Gc,
+        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::A }),
+        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -130,26 +108,8 @@ async fn rejects_zbi() {
     let result = env.run_update().await;
     assert!(result.is_err(), "system updater succeeded when it should fail");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-        ]
+    env.assert_interactions(
+        crate::initial_interactions().chain([PackageResolve(UPDATE_PKG_URL.to_string())]),
     );
 }
 

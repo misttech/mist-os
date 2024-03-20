@@ -30,26 +30,8 @@ async fn rejects_invalid_package_name() {
     // Expect to have failed prior to downloading images.
     // The overall result should be similar to an invalid board, and we should have used
     // the not_update package URL, not `fuchsia.com/update`.
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(not_update_package_url.to_string())
-        ]
+    env.assert_interactions(
+        crate::initial_interactions().chain([PackageResolve(not_update_package_url.to_string())]),
     );
 
     assert_eq!(
@@ -73,26 +55,8 @@ async fn fails_if_package_unavailable() {
     let result = env.run_update().await;
     assert!(result.is_err(), "system updater succeeded when it should fail");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-        ]
+    env.assert_interactions(
+        crate::initial_interactions().chain([PackageResolve(UPDATE_PKG_URL.to_string())]),
     );
 }
 
@@ -110,20 +74,7 @@ async fn uses_custom_update_package() {
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
@@ -136,9 +87,7 @@ async fn uses_custom_update_package() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -185,24 +134,14 @@ async fn fails_on_malformed_images_manifest_update_package() {
         "system updater succeeded when it should fail"
     );
 
-    let expected = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
-        PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".into()),
-    ];
-    assert_eq!(env_with_bad_images_json.take_interactions(), expected);
-    assert_eq!(env_no_images_json.take_interactions(), expected);
+    env_with_bad_images_json.assert_interactions(
+        crate::initial_interactions()
+            .chain([PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".into())]),
+    );
+    env_no_images_json.assert_interactions(
+        crate::initial_interactions()
+            .chain([PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".into())]),
+    );
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -223,42 +162,24 @@ async fn retry_update_package_resolve_once() {
 
     env.run_update().await.expect("run system updater");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            // First resolve should fail with NoSpace, so we GC and try the resolve again.
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Gc,
-            // Second resolve should succeed!
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![]),
-            Gc,
-            BlobfsSync,
-            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-            Paver(PaverEvent::BootManagerFlush),
-            Reboot,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        // First resolve should fail with NoSpace, so we GC and try the resolve again.
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Gc,
+        // Second resolve should succeed!
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![]),
+        Gc,
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -280,47 +201,29 @@ async fn retry_update_package_resolve_twice() {
 
     env.run_update().await.expect("run system updater");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            // First resolve should fail with NoSpace, so we GC and try the resolve again.
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Gc,
-            // Second resolve should fail with NoSpace, so we clear the retained packages set then
-            // GC and try the resolve again.
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            ClearRetainedPackages,
-            Gc,
-            // Third resolve should succeed!
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![]),
-            Gc,
-            BlobfsSync,
-            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-            Paver(PaverEvent::BootManagerFlush),
-            Reboot,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        // First resolve should fail with NoSpace, so we GC and try the resolve again.
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Gc,
+        // Second resolve should fail with NoSpace, so we clear the retained packages set then
+        // GC and try the resolve again.
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        ClearRetainedPackages,
+        Gc,
+        // Third resolve should succeed!
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![]),
+        Gc,
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -342,36 +245,18 @@ async fn retry_update_package_resolve_thrice_fails_update_attempt() {
         State::FailPrepare(PrepareFailureReason::OutOfSpace)
     );
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            // First resolve should fail with out of space, so we GC and try the resolve again.
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Gc,
-            // Second resolve should fail with out of space, so we clear retained packages set then
-            // GC and try the resolve again.
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            ClearRetainedPackages,
-            Gc,
-            // Third resolve should fail with out of space, so the update fails.
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        // First resolve should fail with out of space, so we GC and try the resolve again.
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Gc,
+        // Second resolve should fail with out of space, so we clear retained packages set then
+        // GC and try the resolve again.
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        ClearRetainedPackages,
+        Gc,
+        // Third resolve should fail with out of space, so the update fails.
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]

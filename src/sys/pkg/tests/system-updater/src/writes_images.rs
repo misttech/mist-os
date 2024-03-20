@@ -60,26 +60,8 @@ async fn fails_on_missing_zbi_error() {
         }
     );
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            },),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            },),
-            Paver(PaverEvent::QueryCurrentConfiguration,),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-        ]
+    env.assert_interactions(
+        crate::initial_interactions().chain([PackageResolve(UPDATE_PKG_URL.to_string())]),
     );
 }
 
@@ -133,43 +115,25 @@ async fn fails_on_image_write_error() {
         }
     );
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            },),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            },),
-            Paver(PaverEvent::QueryCurrentConfiguration,),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            },),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel,
-            },),
-            ReplaceRetainedPackages(vec![hash(9).into()]),
-            Gc,
-            PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
-            Paver(PaverEvent::WriteAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-                payload: b"zbi zbi".to_vec(),
-            },),
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
+        ReplaceRetainedPackages(vec![hash(9).into()]),
+        Gc,
+        PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
+        Paver(PaverEvent::WriteAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+            payload: b"zbi zbi".to_vec(),
+        }),
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -212,38 +176,20 @@ async fn skip_recovery_does_not_write_recovery_or_vbmeta() {
     .await
     .expect("success");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![]),
-            Gc,
-            BlobfsSync,
-            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-            Paver(PaverEvent::BootManagerFlush),
-            Reboot,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![]),
+        Gc,
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -293,30 +239,27 @@ async fn writes_to_both_configs_if_abr_not_supported() {
         }
     );
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            ReplaceRetainedPackages(vec![hash(9).into()]),
-            Gc,
-            PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
-            Paver(PaverEvent::WriteAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel,
-                payload: b"zbi zbi".to_vec(),
-            }),
-            Paver(PaverEvent::WriteAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-                payload: b"zbi zbi".to_vec(),
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![]),
-            Gc,
-            BlobfsSync,
-            Reboot,
-        ]
-    );
+    env.assert_interactions([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        ReplaceRetainedPackages(vec![hash(9).into()]),
+        Gc,
+        PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
+        Paver(PaverEvent::WriteAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+            payload: b"zbi zbi".to_vec(),
+        }),
+        Paver(PaverEvent::WriteAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+            payload: b"zbi zbi".to_vec(),
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![]),
+        Gc,
+        BlobfsSync,
+        Reboot,
+    ]);
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -352,22 +295,16 @@ async fn does_not_update_with_unhealthy_current_partition() {
         }
     );
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: current_config,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: current_config,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: current_config }),
-        ]
-    );
+    env.assert_interactions([
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::ReadAsset {
+            configuration: current_config,
+            asset: paver::Asset::VerifiedBootMetadata,
+        }),
+        Paver(PaverEvent::ReadAsset { configuration: current_config, asset: paver::Asset::Kernel }),
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::QueryConfigurationStatus { configuration: current_config }),
+    ]);
 }
 
 // If the alternate configuration can't be marked unbootable, the system-updater fails.
@@ -406,27 +343,19 @@ async fn does_not_update_if_alternate_cant_be_marked_unbootable() {
         }
     );
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: current_config,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: current_config,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: current_config }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            // Make sure we flush, even if marking Unbootable failed.
-            Paver(PaverEvent::BootManagerFlush),
-        ]
-    );
+    env.assert_interactions([
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::ReadAsset {
+            configuration: current_config,
+            asset: paver::Asset::VerifiedBootMetadata,
+        }),
+        Paver(PaverEvent::ReadAsset { configuration: current_config, asset: paver::Asset::Kernel }),
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::QueryConfigurationStatus { configuration: current_config }),
+        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
+        // Make sure we flush, even if marking Unbootable failed.
+        Paver(PaverEvent::BootManagerFlush),
+    ]);
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -683,61 +612,43 @@ async fn retry_image_package_resolve_once() {
         .await
         .expect("run system updater");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel,
-            }),
-            // Verify that base packages are removed from the retained package index if
-            // image fails to resolve with OutOfSpace.
-            ReplaceRetainedPackages(vec![
-                "beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead".parse().unwrap(),
-                hash(9).into(),
-            ]),
-            Gc,
-            PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
-            ReplaceRetainedPackages(vec![hash(9).into()]),
-            Gc,
-            PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
-            Paver(PaverEvent::WriteAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-                payload: b"real zbi contents".to_vec()
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![
-                "beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead".parse().unwrap(),
-            ]),
-            Gc,
-            PackageResolve(base_package.to_string()),
-            BlobfsSync,
-            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-            Paver(PaverEvent::BootManagerFlush),
-            Reboot,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
+        // Verify that base packages are removed from the retained package index if
+        // image fails to resolve with OutOfSpace.
+        ReplaceRetainedPackages(vec![
+            "beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead".parse().unwrap(),
+            hash(9).into(),
+        ]),
+        Gc,
+        PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
+        ReplaceRetainedPackages(vec![hash(9).into()]),
+        Gc,
+        PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
+        Paver(PaverEvent::WriteAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+            payload: b"real zbi contents".to_vec(),
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![
+            "beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead".parse().unwrap(),
+        ]),
+        Gc,
+        PackageResolve(base_package.to_string()),
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -798,79 +709,46 @@ async fn retry_image_package_resolve_twice_fails_update() {
         )
     );
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel,
-            }),
-            // Verify that base packages are removed from the retained package index if
-            // image fails to resolve with OutOfSpace.
-            ReplaceRetainedPackages(vec![
-                "beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead".parse().unwrap(),
-                hash(9).into(),
-            ]),
-            Gc,
-            PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
-            ReplaceRetainedPackages(vec![hash(9).into()]),
-            Gc,
-            PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
-        ]
-    );
-}
-
-fn construct_events(
-    middle: impl IntoIterator<Item = SystemUpdaterInteraction>,
-) -> Vec<SystemUpdaterInteraction> {
-    let preamble = [
-        Paver(PaverEvent::QueryCurrentConfiguration),
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
         Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
         }),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::A,
             asset: paver::Asset::Kernel,
         }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
-        PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
-    ];
-
-    let postscript = [
-        Paver(PaverEvent::DataSinkFlush),
-        ReplaceRetainedPackages(vec![]),
+        // Verify that base packages are removed from the retained package index if
+        // image fails to resolve with OutOfSpace.
+        ReplaceRetainedPackages(vec![
+            "beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead".parse().unwrap(),
+            hash(9).into(),
+        ]),
         Gc,
-        BlobfsSync,
-        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
-        Reboot,
-    ];
+        PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
+        ReplaceRetainedPackages(vec![hash(9).into()]),
+        Gc,
+        PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
+    ]));
+}
 
-    preamble.into_iter().chain(middle).chain(postscript).collect()
+fn construct_events(
+    middle: impl IntoIterator<Item = SystemUpdaterInteraction>,
+) -> Vec<SystemUpdaterInteraction> {
+    crate::initial_interactions()
+        .chain([PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string())])
+        .chain(middle)
+        .chain([
+            Paver(PaverEvent::DataSinkFlush),
+            ReplaceRetainedPackages(vec![]),
+            Gc,
+            BlobfsSync,
+            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+            Paver(PaverEvent::BootManagerFlush),
+            Reboot,
+        ])
+        .collect()
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -916,20 +794,7 @@ async fn writes_fuchsia() {
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         // Check that we read from both configurations and write resolved zbi contents
         // to desired configuration.
@@ -957,9 +822,7 @@ async fn writes_fuchsia() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -999,20 +862,7 @@ async fn writes_fuchsia_vbmeta() {
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         // Events we care about.
         Paver(PaverEvent::ReadAsset {
@@ -1052,9 +902,7 @@ async fn writes_fuchsia_vbmeta() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -1260,20 +1108,7 @@ async fn asset_comparing_respects_fuchsia_mem_buffer_size() {
         .await
         .expect("run system updater");
 
-    let events = [
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
@@ -1300,8 +1135,7 @@ async fn asset_comparing_respects_fuchsia_mem_buffer_size() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -1412,20 +1246,7 @@ async fn recovery_already_present() {
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
@@ -1444,9 +1265,7 @@ async fn recovery_already_present() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -1487,20 +1306,7 @@ async fn writes_recovery() {
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
@@ -1527,9 +1333,7 @@ async fn writes_recovery() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -1577,20 +1381,7 @@ async fn writes_recovery_vbmeta() {
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
@@ -1626,9 +1417,7 @@ async fn writes_recovery_vbmeta() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -1676,20 +1465,7 @@ async fn recovery_present_but_should_write_recovery_is_false() {
     .await
     .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
+    env.assert_interactions(crate::initial_interactions().chain([
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
         // Note that we never look at recovery because the flag indicated it should be skipped!
         Paver(PaverEvent::ReadAsset {
@@ -1715,7 +1491,5 @@ async fn recovery_present_but_should_write_recovery_is_false() {
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
-    ];
-
-    assert_eq!(env.take_interactions(), events);
+    ]));
 }

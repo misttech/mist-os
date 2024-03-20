@@ -490,6 +490,11 @@ impl TestEnv {
         std::mem::take(&mut *self.interactions.lock())
     }
 
+    #[track_caller]
+    fn assert_interactions(&self, expected: impl IntoIterator<Item = SystemUpdaterInteraction>) {
+        assert_eq!(self.take_interactions(), expected.into_iter().collect::<Vec<_>>());
+    }
+
     /// Set the name of the board that system-updater is running on.
     fn set_board_name(&self, board: impl AsRef<str>) {
         // Write the "board" file into the build-info directory.
@@ -808,4 +813,26 @@ fn hash(n: u8) -> Hash {
 
 fn hashstr(n: u8) -> String {
     hash(n).to_string()
+}
+
+/// Actions the system-updater takes at the beginning of each OTA attempt.
+fn initial_interactions() -> impl Iterator<Item = SystemUpdaterInteraction> {
+    [
+        // Hashes the ZBI and vbmeta from the current configuration to include in the history.
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::VerifiedBootMetadata,
+        }),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
+        // Makes sure the current configuration is healthy and the other is unbootable.
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
+        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+    ]
+    .into_iter()
 }

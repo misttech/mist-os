@@ -30,44 +30,26 @@ async fn succeeds_even_if_retained_packages_fails() {
         .await
         .expect("run system updater");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata,
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
-            Gc,
-            PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
-            // No RetainedPackages use here b/c protocol is blocked
-            Gc,
-            PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            // No RetainedPackages use here b/c protocol is blocked
-            Gc,
-            PackageResolve(SYSTEM_IMAGE_URL.to_string()),
-            BlobfsSync,
-            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-            Paver(PaverEvent::BootManagerFlush),
-            Reboot,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
+        Gc,
+        PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
+        // No RetainedPackages use here b/c protocol is blocked
+        Gc,
+        PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        // No RetainedPackages use here b/c protocol is blocked
+        Gc,
+        PackageResolve(SYSTEM_IMAGE_URL.to_string()),
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }
 
 // Verifies that:
@@ -98,47 +80,29 @@ async fn pinned_url_and_non_empty_packages_json() {
         .await
         .expect("run system updater");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata,
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
-            Gc,
-            PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
-            ReplaceRetainedPackages(vec![UPDATE_HASH.parse().unwrap()]),
-            Gc,
-            PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![
-                SYSTEM_IMAGE_HASH.parse().unwrap(),
-                UPDATE_HASH.parse().unwrap()
-            ]),
-            Gc,
-            PackageResolve(SYSTEM_IMAGE_URL.to_string()),
-            BlobfsSync,
-            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-            Paver(PaverEvent::BootManagerFlush),
-            Reboot,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
+        Gc,
+        PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
+        ReplaceRetainedPackages(vec![UPDATE_HASH.parse().unwrap()]),
+        Gc,
+        PackageResolve(UPDATE_PKG_URL_PINNED.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![
+            SYSTEM_IMAGE_HASH.parse().unwrap(),
+            UPDATE_HASH.parse().unwrap(),
+        ]),
+        Gc,
+        PackageResolve(SYSTEM_IMAGE_URL.to_string()),
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }
 
 // Verifies that an unpinned update pkg URL causes:
@@ -174,47 +138,29 @@ async fn unpinned_url_and_non_empty_packages_json() {
 
     let () = env.run_update().await.expect("run system updater");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata,
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Gc,
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            ClearRetainedPackages,
-            Gc,
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![
-                SYSTEM_IMAGE_HASH.parse().unwrap(),
-                UPDATE_HASH.parse().unwrap()
-            ]),
-            Gc,
-            PackageResolve(SYSTEM_IMAGE_URL.to_string()),
-            BlobfsSync,
-            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-            Paver(PaverEvent::BootManagerFlush),
-            Reboot,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Gc,
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        ClearRetainedPackages,
+        Gc,
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![
+            SYSTEM_IMAGE_HASH.parse().unwrap(),
+            UPDATE_HASH.parse().unwrap(),
+        ]),
+        Gc,
+        PackageResolve(SYSTEM_IMAGE_URL.to_string()),
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }
 
 // Verifies that an unpinned update pkg URL causes:
@@ -277,70 +223,52 @@ async fn unpinned_url_and_resolved_image_package_and_non_empty_packages_json() {
 
     let () = env.run_update().await.expect("run system updater");
 
-    assert_eq!(
-        env.take_interactions(),
-        vec![
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::VerifiedBootMetadata,
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::QueryCurrentConfiguration),
-            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-            Paver(PaverEvent::SetConfigurationUnbootable {
-                configuration: paver::Configuration::B
-            }),
-            Paver(PaverEvent::BootManagerFlush),
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Gc,
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            ClearRetainedPackages,
-            Gc,
-            PackageResolve(UPDATE_PKG_URL.to_string()),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-            }),
-            Paver(PaverEvent::ReadAsset {
-                configuration: paver::Configuration::A,
-                asset: paver::Asset::Kernel,
-            }),
-            ReplaceRetainedPackages(vec![
-                SYSTEM_IMAGE_HASH.parse().unwrap(),
-                hash(zbi_hash_seed).into(),
-                UPDATE_HASH.parse().unwrap()
-            ]),
-            Gc,
-            PackageResolve(
-                image_package_resource_url("zbi", zbi_hash_seed, "zbi").package_url().to_string()
-            ),
-            ReplaceRetainedPackages(vec![hash(zbi_hash_seed).into(), UPDATE_HASH.parse().unwrap()]),
-            Gc,
-            PackageResolve(
-                image_package_resource_url("zbi", zbi_hash_seed, "zbi").package_url().to_string()
-            ),
-            Paver(PaverEvent::WriteAsset {
-                configuration: paver::Configuration::B,
-                asset: paver::Asset::Kernel,
-                payload: b"zbi contents".to_vec(),
-            },),
-            Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![
-                SYSTEM_IMAGE_HASH.parse().unwrap(),
-                UPDATE_HASH.parse().unwrap()
-            ]),
-            Gc,
-            PackageResolve(SYSTEM_IMAGE_URL.to_string()),
-            BlobfsSync,
-            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-            Paver(PaverEvent::BootManagerFlush),
-            Reboot,
-        ]
-    );
+    env.assert_interactions(crate::initial_interactions().chain([
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Gc,
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        ClearRetainedPackages,
+        Gc,
+        PackageResolve(UPDATE_PKG_URL.to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
+        ReplaceRetainedPackages(vec![
+            SYSTEM_IMAGE_HASH.parse().unwrap(),
+            hash(zbi_hash_seed).into(),
+            UPDATE_HASH.parse().unwrap(),
+        ]),
+        Gc,
+        PackageResolve(
+            image_package_resource_url("zbi", zbi_hash_seed, "zbi").package_url().to_string(),
+        ),
+        ReplaceRetainedPackages(vec![hash(zbi_hash_seed).into(), UPDATE_HASH.parse().unwrap()]),
+        Gc,
+        PackageResolve(
+            image_package_resource_url("zbi", zbi_hash_seed, "zbi").package_url().to_string(),
+        ),
+        Paver(PaverEvent::WriteAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+            payload: b"zbi contents".to_vec(),
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![
+            SYSTEM_IMAGE_HASH.parse().unwrap(),
+            UPDATE_HASH.parse().unwrap(),
+        ]),
+        Gc,
+        PackageResolve(SYSTEM_IMAGE_URL.to_string()),
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
 }
 
 // Verifies that:
