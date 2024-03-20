@@ -10,13 +10,13 @@ load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_toolcha
 load("@fuchsia_sdk//fuchsia/workspace:sdk_host_tool.bzl", "sdk_host_tool")
 load("api_version.bzl", "DEFAULT_TARGET_API")
 
-# Export all files as individual targets.
+# Export all files directly within this package as individual targets.
 exports_files(glob(["**/*"]))
 
 # A single target that includes all files in the SDK.
 filegroup(
     name = "all_files",
-    srcs = glob(["**/*"]),
+    srcs = glob(["**/*"]) + [{{ALL_FILES}}],
     visibility = ["//visibility:public"],
 )
 

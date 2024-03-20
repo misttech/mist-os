@@ -5,5 +5,5 @@
 licenses(["notice"])
 
 exports_files(
-    glob(["*"]),
+    glob(["**/*"]),
 )

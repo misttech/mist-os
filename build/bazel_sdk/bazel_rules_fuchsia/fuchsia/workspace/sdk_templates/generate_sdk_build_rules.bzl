@@ -15,6 +15,15 @@ def _header():
 
 package(default_visibility = ["//visibility:public"])
 
+# LINT.IfChange
+# Needed for @fuchsia_sdk//:all_files.
+filegroup(
+    name = "_EXPORT_SUBPACKAGE_FILEGROUP",
+    srcs = glob(["**/*"]),
+    visibility = ["//:__pkg__"],
+)
+# LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/workspace/fuchsia_sdk_repository.bzl)
+
 """
 
 _SDK_TEMPLATES = {
@@ -117,6 +126,21 @@ def _get_starlark_dict(entries):
             v_str = "\"" + str(v) + "\""
         entries_str += "    \"" + k + "\": " + v_str + ",\n"
     return "{" + entries_str + "}"
+
+def serialize(obj):
+    """Transitively serializes a starlark object.
+
+    Args:
+        obj: Either a list or dict.
+    Returns:
+        A serialized string representation of the starlark object.
+    """
+    if type(obj) == "list":
+        return _get_starlark_list(obj)
+    elif type(obj) == "dict":
+        return _get_starlark_dict(obj)
+    else:
+        fail("Unknown type: %s", repr(obj))
 
 def _get_parent_workspace(ctx):
     if ctx.attr.parent_sdk:
@@ -590,9 +614,6 @@ def _generate_package_build_rules(ctx, meta, relative_dir, build_file, process_c
         for variant in meta["variants"]
     ]
 
-    # TODO(chandarren): Remove once variants in IDK metadata are deduplicated.
-    package_variants = [variant for i, variant in enumerate(package_variants) if variant.name not in [variant.name for variant in package_variants[:i]]]
-
     for variant in package_variants:
         # Write build defs for each package variant.
         _merge_template(ctx, build_file, _sdk_template_path(ctx, "package"), {
@@ -850,13 +871,13 @@ def generate_sdk_constants(repo_ctx, manifests):
     return constants
 
 def generate_sdk_build_rules(ctx, manifests, copy_content_strategy, constants, filter_types = None, exclude_types = None):
-    """ Generates BUILD.bazel rules from the sdk metadata
+    """Generates BUILD.bazel rules from the sdk metadata
 
     Args:
         ctx: the repository context
         manifests: a list of paths to the meta data manifests.
         copy_content_strategy: "symlink" to create symlinks to Fuchsia SDK artifacts or "copy" to attempt
-                to create hardlinks, or standard copy if hardlinks are not possible
+            to create hardlinks, or standard copy if hardlinks are not possible
         constants: A struct returned by generated_sdk_constants
         filter_types: tuple of sdk element types. If given, do not process any sdk element types that are not in this tuple
         exclude_types: tuple of sdk element types. If given, do not process any sdk element types in this tuple

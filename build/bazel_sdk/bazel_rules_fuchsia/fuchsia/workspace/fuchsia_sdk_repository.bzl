@@ -5,7 +5,7 @@
 """Defines a WORKSPACE rule for loading a version of the Fuchsia IDK."""
 
 load("//fuchsia/workspace:utils.bzl", "workspace_path")
-load("//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl", "generate_sdk_build_rules", "generate_sdk_constants", "resolve_repository_labels", "sdk_id_from_manifests")
+load("//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl", "generate_sdk_build_rules", "generate_sdk_constants", "resolve_repository_labels", "sdk_id_from_manifests", "serialize")
 
 # Environment variable used to set a local Fuchsia Platform tree build output
 # directory. If this variable is set, it should point to
@@ -86,6 +86,35 @@ def _merge_rules_fuchsia(ctx):
         executable = False,
     )
 
+def _export_all_files(ctx):
+    result = ctx.execute(["find", "-L", ".", "-type", "f", "-name", "BUILD.bazel"])
+    if result.return_code:
+        fail("Failed to enumerate all subpackages in @fuchsia_sdk")
+
+    # LINT.IfChange
+    EXPOSED_DEP = "_EXPORT_SUBPACKAGE_FILEGROUP"
+    # LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/workspace/sdk_templates/generate_sdk_build_rules.bzl)
+
+    # Get a list of all BUILD.bazel files.
+    all_build_files = result.stdout.strip().split("\n")
+
+    # Filter only the ones that expose `:_EXPORT_SUBPACKAGE_FILEGROUP`.
+    # Transform "./<pkg>/BUILD.bazel" to "//<pkg>:_EXPORT_SUBPACKAGE_FILEGROUP`.
+    exported_targets = [
+        "//%s:%s" % ("/".join(build_file.split("/")[1:-1]), EXPOSED_DEP)
+        for build_file in all_build_files
+        if EXPOSED_DEP in ctx.read(build_file)
+    ]
+
+    ctx.template(
+        "BUILD.bazel",
+        "BUILD.bazel",
+        substitutions = {
+            "{{ALL_FILES}}": serialize(exported_targets),
+        },
+        executable = False,
+    )
+
 def _fuchsia_sdk_repository_impl(ctx):
     if _LOCAL_FUCHSIA_PLATFORM_BUILD in ctx.os.environ:
         copy_content_strategy = "copy"
@@ -128,6 +157,9 @@ def _fuchsia_sdk_repository_impl(ctx):
     generate_sdk_build_rules(ctx, manifests, copy_content_strategy, constants)
 
     _merge_rules_fuchsia(ctx)
+
+    # Should only be called after all BUILD.bazel files have been added.
+    _export_all_files(ctx)
 
     # Run buildifier on all generated files, if the host tool is provided.
     if ctx.attr.buildifier:
