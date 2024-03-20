@@ -2006,7 +2006,7 @@ mod tests {
     use selinux::security_server::{Mode as SecurityServerMode, SecurityServer};
     use starnix_sync::Unlocked;
 
-    const VALID_SECURITY_CONTEXT: &'static str = "system_u:object_r:unconfined_t:s0";
+    const VALID_SECURITY_CONTEXT: &'static str = "u:object_r:test_valid_t:s0";
 
     fn create_test_file(
         locked: &mut Locked<'_, Unlocked>,
