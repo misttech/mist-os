@@ -29,7 +29,7 @@ fuchsia_product_configuration(
         # bazel-generated package manifests use relative paths for blobs.
         # "//build/bazel/examples/hello_cpp:pkg",
     ],
-    product_config_json = {
+    json_config = {
         "platform": {
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "utility",
