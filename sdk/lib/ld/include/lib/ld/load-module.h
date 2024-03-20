@@ -500,9 +500,6 @@ class LoadModule {
   }
 
  protected:
-  constexpr auto& decoded_storage() { return decoded_; }
-  constexpr auto& decoded_storage() const { return decoded_; }
-
   constexpr void SetAbiName() {
     if constexpr (kMutableDecoded) {
       if (HasDecoded()) {

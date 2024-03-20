@@ -7,13 +7,13 @@
 
 #include <lib/elfldltl/loadinfo-mutable-memory.h>
 #include <lib/elfldltl/resolve.h>
+#include <lib/ld/remote-decoded-module.h>
 
 #include <algorithm>
 #include <type_traits>
 #include <vector>
 
 #include "internal/filter-view.h"
-#include "remote-decoded-module.h"
 
 namespace ld {
 
@@ -51,8 +51,6 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   using typename Base::size_type;
   using typename Base::Soname;
   using ExecInfo = typename Decoded::ExecInfo;
-
-  using DecodedPtr = typename Decoded::Ptr;
 
   // This is the type of the module list.  The ABI remoting scheme relies on
   // this being indexable; see <lib/ld/remote-abi.h> for details.  Being able
@@ -133,8 +131,6 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   }
 
   RemoteLoadModule& operator=(RemoteLoadModule&& other) noexcept = default;
-
-  DecodedPtr decoded_module() const { return this->decoded_storage(); }
 
   // Note this shadows LoadModule::module(), so module() calls in the methods
   // of class and its subclasses return module_ but module() calls in the

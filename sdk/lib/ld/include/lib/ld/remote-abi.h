@@ -31,8 +31,6 @@ namespace ld {
 template <class Elf = elfldltl::Elf<>>
 class RemoteAbi {
  public:
-  using AbiStubPtr = typename RemoteAbiStub<Elf>::Ptr;
-
   using size_type = typename Elf::size_type;
   using Addr = typename Elf::Addr;
   using TlsLayout = elfldltl::TlsLayout<Elf>;
@@ -45,23 +43,15 @@ class RemoteAbi {
   using LocalAbiModule = typename LocalAbi::Module;
   using LocalRDebug = typename Elf::template RDebug<elfldltl::LocalAbiTraits>;
 
-  RemoteAbi() = default;
-
-  RemoteAbi(RemoteAbi&&) = default;
-
-  RemoteAbi& operator=(RemoteAbi&&) = default;
-
   // Lay out the final stub data segment given the full decoded module list.
   // Then modify the decoded stub_module (which could be a copy of the one that
   // was used to initialize abi_stub, or the same one) so its mutable segment
   // is replaced by a longer ConstantSegment.  After this, the stub_module has
   // its final vaddr_size; load addresses can be selected for all modules.
   template <class Diagnostics>
-  zx::result<> Init(Diagnostics& diag, AbiStubPtr stub, RemoteModule& stub_module,
+  zx::result<> Init(Diagnostics& diag, const AbiStub& abi_stub, RemoteModule& stub_module,
                     ModuleList& modules, size_type max_tls_modid) {
-    stub_ = std::move(stub);
-
-    RemoteAbiHeapLayout layout{stub_->data_size()};
+    RemoteAbiHeapLayout layout{abi_stub.data_size()};
 
     // The _ld_abi.loaded_modules linked-list will be populated by elements of
     // a flat array.  To simplify transcription, this array is indexed by the
@@ -121,7 +111,7 @@ class RemoteAbi {
     }
     assert(module_heap_names_.size() == modules.size());
 
-    auto result = AbiHeap::Create(diag, stub_->data_size(), stub_module, std::move(layout));
+    auto result = AbiHeap::Create(diag, abi_stub.data_size(), stub_module, std::move(layout));
     if (result.is_error()) {
       return result.take_error();
     }
@@ -129,7 +119,7 @@ class RemoteAbi {
     heap_.emplace(*std::move(result));
 
     // Clear the remote _ld_abi struct before Finish is called to fill it in.
-    Abi& abi = heap_->template Local<Abi>(stub_->abi_offset());
+    Abi& abi = heap_->template Local<Abi>(abi_stub.abi_offset());
     abi = {};
 
     if (max_tls_modid > 0) {
@@ -154,8 +144,9 @@ class RemoteAbi {
   // Note that this modifies the RemoteLoadModule objects in the list to
   // install the linked-list pointers in each one's module().link_map.
   template <class Diagnostics>
-  zx::result<> Finish(Diagnostics& diag, const RemoteModule& stub_module, ModuleList& modules) && {
-    Abi& abi = heap_->template Local<Abi>(stub_->abi_offset());
+  zx::result<> Finish(Diagnostics& diag, const AbiStub& abi_stub, const RemoteModule& stub_module,
+                      ModuleList& modules) && {
+    Abi& abi = heap_->template Local<Abi>(abi_stub.abi_offset());
     if (!FinishAbi(diag, abi, modules, stub_module)) {
       // The only way this can fail is by some FromLocal call failing.  The
       // failing call is responsible for doing its own error logging, via a
@@ -163,7 +154,7 @@ class RemoteAbi {
       return zx::error{ZX_ERR_IO};
     }
 
-    RDebug& r_debug = heap_->template Local<RDebug>(stub_->rdebug_offset());
+    RDebug& r_debug = heap_->template Local<RDebug>(abi_stub.rdebug_offset());
     FillRDebug(r_debug, abi, stub_module.load_bias());
 
     // Write the data into the stub data segment's VMO.
@@ -547,7 +538,6 @@ class RemoteAbi {
     r_debug.ldbase = stub_load_bias;
   }
 
-  AbiStubPtr stub_;
   std::optional<AbiHeap> heap_;
   RemoteAbiSpan<AbiModule> abi_modules_;
   RemoteAbiSpan<AbiTlsModule> abi_tls_modules_;

@@ -11,9 +11,6 @@
 
 #include <array>
 
-#include <fbl/ref_counted.h>
-#include <fbl/ref_ptr.h>
-
 #include "abi.h"
 #include "remote-decoded-module.h"
 #include "tlsdesc.h"
@@ -29,16 +26,15 @@ namespace ld {
 // passive ABI symbols.
 //
 // The RemoteAbiStub object collects data about the layout and symbols in the
-// stub dynamic linker as decoded into a RemoteDecodedModule.  The Init()
-// method examines the module and records its layout, and stores the module
-// RefPtr for later use.  The RemoteAbiStub object can be reused or copied as
-// long as the same stub dynamic linker ELF file (or verbatim copy) is being
-// used.
+// stub dynamic linker as decoded into a RemoteLoadModule.  The Init() method
+// examines the module and records its layout, but does not refer to the
+// argument RemoteLoadModule object thereafter.  The RemoteAbiStub object can
+// be reused or trivially copied as long as the same stub dynamic linker ELF
+// file (or verbatim copy) is being used.
 //
 // This object is used by the RemoteAbiHeap to modify a RemoteLoadModule for
 // the specific instantiation of the stub dynamic linker for a particular
-// remote dynamic linking domain (or zygote thereof).  The decoded_module()
-// pointer can be used to create that RemoteLoadModule.
+// remote dynamic linking domain (or zygote thereof).
 //
 // RemoteAbiStub also collects a set of TLSDESC runtime entry point addresses.
 // These are not encoded as symbols, but obscured inside the .eh_frame table.
@@ -52,28 +48,16 @@ namespace ld {
 // tree as this class.
 
 template <class Elf = elfldltl::Elf<>>
-class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
+class RemoteAbiStub {
  public:
-  // Once created, the RemoteAbiStub only needs to be used as const.
-  using Ptr = fbl::RefPtr<const RemoteAbiStub>;
-
   using size_type = typename Elf::size_type;
   using Addr = typename Elf::Addr;
   using Phdr = typename Elf::Phdr;
   using Sym = typename Elf::Sym;
   using RemoteModule = RemoteDecodedModule<Elf>;
-  using RemoteModulePtr = typename RemoteModule::Ptr;
   using LocalAbi = abi::Abi<Elf>;
   using TlsDescResolver = ld::StaticTlsDescResolver<Elf>;
   using TlsdescRuntimeHooks = typename TlsDescResolver::RuntimeHooks;
-
-  RemoteAbiStub() = default;
-  RemoteAbiStub(const RemoteAbiStub&) = default;
-  RemoteAbiStub(RemoteAbiStub&&) = default;
-
-  // This is the ld::RemoteDecodedModule for the stub dynamic linker,
-  // the same pointer that was given to Create().
-  const RemoteModulePtr& decoded_module() const { return decoded_module_; }
 
   // Exact size of the data segment.  This includes whatever file data gives it
   // a page-aligned starting vaddr, but the total size is not page-aligned.
@@ -102,30 +86,14 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
     return TlsDescResolver{tlsdesc_runtime_, stub_load_bias};
   }
 
-  // Create() calculates and records all those values by examining the stub
-  // dynamic linker previously decoded.  The module pointer is saved for later
-  // use via decoded_module(), below.  Note that if the Diagnostics object says
-  // to keep going, this may return with partial information both in the
-  // RemoteAbiStub and in the decoded_module().
+  // Init() calculates and records all those values by examining the stub
+  // dynamic linker previously decoded.  The module reference is only used to
+  // examine and is not saved.  It need not be the same module data structure
+  // that's actually prepared and loaded using those values, but it must be one
+  // coming from the the same ELF file (or a verbatim copy thereof).
   template <class Diagnostics>
-  static Ptr Create(Diagnostics& diag, RemoteModulePtr ld_stub) {
-    auto abi_stub = fbl::MakeRefCounted<RemoteAbiStub>();
-    abi_stub->decoded_module_ = std::move(ld_stub);
-    if (!abi_stub->Init(diag)) {
-      abi_stub.reset();
-    }
-    return abi_stub;
-  }
-
- private:
-  using Abi = abi::Abi<Elf, elfldltl::RemoteAbiTraits>;
-  using RDebug = typename Elf::template RDebug<elfldltl::RemoteAbiTraits>;
-
-  using EhFrameHdr = elfldltl::dwarf::EhFrameHdr<Elf>;
-
-  template <class Diagnostics>
-  bool Init(Diagnostics& diag) {
-    if (decoded_module_->load_info().segments().empty()) [[unlikely]] {
+  bool Init(Diagnostics& diag, const RemoteModule& ld_stub) {
+    if (ld_stub.load_info().segments().empty()) [[unlikely]] {
       return diag.FormatError("stub ", LocalAbi::kSoname.str(), " has no segments");
     }
 
@@ -133,9 +101,9 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
     // order, so the last one will be the highest addressed, while the module's
     // vaddr_start will correspond to the first one's vaddr.
     const Phdr* eh_frame_hdr = nullptr;
-    for (auto it = decoded_module_->module().phdrs.rbegin();
+    for (auto it = ld_stub.module().phdrs.rbegin();
          (data_size_ == 0 || !eh_frame_hdr) &&  // Bail early when done.
-         it != decoded_module_->module().phdrs.rend();
+         it != ld_stub.module().phdrs.rend();
          ++it) {
       switch (it->type()) {
         case elfldltl::ElfPhdrType::kLoad:
@@ -152,24 +120,24 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
           break;
       }
     }
-    assert(decoded_module_->load_info().VisitSegment(
+    assert(ld_stub.load_info().VisitSegment(
         [this](const auto& segment) {
           return segment.vaddr() <= data_size_ && segment.vaddr() + segment.memsz() >= data_size_;
         },
-        decoded_module_->load_info().segments().back()));
+        ld_stub.load_info().segments().back()));
     size_type stub_data_vaddr;
-    decoded_module_->load_info().VisitSegment(
+    ld_stub.load_info().VisitSegment(
         [&stub_data_vaddr](const auto& segment) -> std::true_type {
           stub_data_vaddr = segment.vaddr();
           return {};
         },
-        decoded_module_->load_info().segments().back());
+        ld_stub.load_info().segments().back());
     data_size_ -= stub_data_vaddr;
 
-    auto get_offset = [this, &diag, stub_data_vaddr](  //
+    auto get_offset = [this, &diag, &ld_stub, stub_data_vaddr](  //
                           size_type& offset, const elfldltl::SymbolName& name,
                           size_t size) -> bool {
-      const Sym* symbol = name.Lookup(decoded_module_->module().symbols);
+      const Sym* symbol = name.Lookup(ld_stub.module().symbols);
       if (!symbol) [[unlikely]] {
         return diag.FormatError("stub ", LocalAbi::kSoname.str(), " does not define ", name,
                                 " symbol");
@@ -198,8 +166,14 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
            get_offset(rdebug_offset_, abi::kRDebugSymbol, sizeof(RDebug)) &&
            (no_overlap(abi_offset_, sizeof(Abi), rdebug_offset_, sizeof(RDebug)) ||
             diag.FormatError("stub ", LocalAbi::kSoname.str(), " symbols overlap!")) &&
-           FindTlsdescRuntime(diag, eh_frame_hdr, *decoded_module_);
+           FindTlsdescRuntime(diag, eh_frame_hdr, ld_stub);
   }
+
+ private:
+  using Abi = abi::Abi<Elf, elfldltl::RemoteAbiTraits>;
+  using RDebug = typename Elf::template RDebug<elfldltl::RemoteAbiTraits>;
+
+  using EhFrameHdr = elfldltl::dwarf::EhFrameHdr<Elf>;
 
   // In lieu of symbols that would be directly visible to users, the stub
   // dynamic linker unofficially "exports" its TLSDESC entry point addresses
@@ -223,7 +197,7 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
                               " missing PT_GNU_EH_FRAME program header"sv);
     }
 
-    auto memory = decoded_module_->metadata_memory();
+    auto memory = ld_stub.metadata_memory();
     if (memory.base() != 0) [[unlikely]] {
       return diag.FormatError("stub "sv, LocalAbi::kSoname.str(), " has base address ",
                               memory.base());
@@ -300,7 +274,6 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
                             " magic LSDA values for TLSDESC entry points"sv);
   }
 
-  RemoteModulePtr decoded_module_;
   size_type abi_offset_ = 0;
   size_type rdebug_offset_ = 0;
   size_type data_size_ = 0;
