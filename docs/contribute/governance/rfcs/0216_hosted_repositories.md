@@ -344,7 +344,7 @@ the most part, they fall into one of the following categories:
   then export for use in another (destination) repository.
 
 - A developer working on a component in one source repository needs to publish
-  that component it to a package repository hosted in another (destination)
+  that component to a package repository hosted in another (destination)
   source repository.
 
 - A developer working on a component in one source repository needs to make that
