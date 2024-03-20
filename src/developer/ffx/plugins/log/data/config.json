@@ -1,5 +1,6 @@
 {
     "log_cmd": {
-        "color": true
+        "color": true,
+        "pretty_backtraces": true
     }
 }

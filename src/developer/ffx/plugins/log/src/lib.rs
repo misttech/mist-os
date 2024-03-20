@@ -76,7 +76,7 @@ pub async fn log_impl(
     cmd: LogCommand,
 ) -> Result<(), LogError> {
     let enable_transactional_symbolizer =
-        ffx_config::get("logger.transactional_logging.enabled").await.unwrap_or(false);
+        ffx_config::get("log_cmd.pretty_backtraces").await.unwrap_or(false);
     let no_symbolize = cmd.no_symbolize;
     let instance_getter = rcs::root_realm_query(&rcs_proxy, TIMEOUT).await?;
     log_main(
