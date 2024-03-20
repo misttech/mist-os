@@ -222,29 +222,7 @@
             {
                 source_moniker: "/bootstrap/fshost",
                 source: "component",
-                source_name: "system",
-                capability: "directory",
-                target_monikers: [
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this
-                    // capability no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
-                ],
-            },
-            {
-                source_moniker: "/bootstrap/fshost",
-                source: "component",
                 source_name: "tmp",
-                capability: "directory",
-                target_monikers: [
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this
-                    // capability no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
-                ],
-            },
-            {
-                source_moniker: "/bootstrap/fshost",
-                source: "component",
-                source_name: "build-info",
                 capability: "directory",
                 target_monikers: [
                     // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this

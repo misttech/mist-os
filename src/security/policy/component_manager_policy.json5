@@ -368,18 +368,6 @@
                 ],
             },
             {
-                source_moniker: "/bootstrap/fshost",
-                source: "component",
-                source_name: "deprecated-misc-storage",
-                capability: "directory",
-                target_monikers: [
-                    "/bootstrap/fshost",
-                    "/core/system-update/omaha-client-service",
-                    "/core/system-update/system-update-checker",
-                    "/core/system-update/system-updater",
-                ],
-            },
-            {
                 // We restrict access to PackageResolver because it gives direct access to package
                 // handles which provide executability which bypass VX security policy.
                 source_moniker: "/core/pkg-resolver",

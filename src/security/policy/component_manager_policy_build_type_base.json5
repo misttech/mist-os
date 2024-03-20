@@ -39,42 +39,11 @@
             {
                 source_moniker: "/bootstrap/fshost",
                 source: "component",
-                source_name: "system",
-                capability: "directory",
-                target_monikers: [
-                    "/bootstrap",
-                    "/bootstrap/console-launcher",
-                    "/bootstrap/driver_manager",
-                    "/bootstrap/fshost",
-                    "/core/system-updater",
-                    "/core/system-update/omaha-client-service",
-                    "/core/system-update/system-update-checker",
-                    "/core/system-update/system-updater",
-                ],
-            },
-            {
-                source_moniker: "/bootstrap/fshost",
-                source: "component",
                 source_name: "tmp",
                 capability: "directory",
                 target_monikers: [
                     "/bootstrap/netsvc",
                     "/core",
-                ],
-            },
-            {
-                source_moniker: "/bootstrap/fshost",
-                source: "component",
-                source_name: "build-info",
-                capability: "directory",
-                target_monikers: [
-                    "/core/build-info",
-                    "/core/feedback",
-                    "/core/omaha-client-service",
-                    "/core/system-updater",
-                    "/core/system-update/omaha-client-service",
-                    "/core/system-update/system-update-checker",
-                    "/core/system-update/system-updater",
                 ],
             },
             {
