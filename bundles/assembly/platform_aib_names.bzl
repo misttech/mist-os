@@ -26,6 +26,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "paravirtualization_support",
     "kernel_anonymous_memory_compression",
     "kernel_anonymous_memory_compression_eager_lru",
+    "kernel_contiguous_physical_pages",
     "kernel_args_user",
     "live_usb",
     "resources",

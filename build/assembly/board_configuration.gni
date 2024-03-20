@@ -307,7 +307,11 @@ template("board_configuration") {
           rebase_path(files.input_bundle_dirs, files.board_configuration_dir)
     }
 
-    forward_variables_from(invoker, [ "provided_features" ])
+    forward_variables_from(invoker,
+                           [
+                             "provided_features",
+                             "kernel",
+                           ])
   }
 
   generated_file(labels.base_info) {

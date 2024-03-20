@@ -27,6 +27,7 @@ bootstrap_user_platform_aib_names = [
 
   # Kernel args
   "kernel_args_user",
+  "kernel_contiguous_physical_pages",
 
   # RCS live usb support
   "empty_live_usb",

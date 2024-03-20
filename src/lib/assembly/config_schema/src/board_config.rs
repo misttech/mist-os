@@ -67,6 +67,10 @@ pub struct BoardInformation {
     #[serde(skip_deserializing)]
     #[file_relative_paths]
     pub configuration: BoardProvidedConfig,
+
+    /// Configure kernel cmdline args
+    #[serde(default)]
+    pub kernel: KernelConfig,
 }
 
 /// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl
@@ -136,6 +140,15 @@ pub struct BoardProvidedConfig {
     pub thermal: Option<FileRelativePathBuf>,
 }
 
+/// This struct defines supported kernel features.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct KernelConfig {
+    /// Enable the use of 'contiguous physical pages'. This should be enabled
+    /// when a significant contiguous memory size is required.
+    pub contiguous_physical_pages: bool,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -174,7 +187,10 @@ mod test {
                 "bundle_a",
                 "bundle_b"
             ],
-            "devicetree": "test.dtb"
+            "devicetree": "test.dtb",
+            "kernel": {
+                "contiguous_physical_pages": true,
+            }
         });
 
         let parsed: BoardInformation = serde_json::from_value(json).unwrap();
@@ -194,6 +210,7 @@ mod test {
                 FileRelativePathBuf::Resolved("some/path/to/board/bundle_b".into()),
             ],
             devicetree: Some(FileRelativePathBuf::Resolved("some/path/to/board/test.dtb".into())),
+            kernel: KernelConfig { contiguous_physical_pages: true },
             ..Default::default()
         };
 

@@ -59,6 +59,10 @@ _base = {
       size_checker_maximum_bytes = 5216665600
     }
   }
+
+  kernel = {
+    contiguous_physical_pages = true
+  }
 }
 
 board_configuration("vim3") {

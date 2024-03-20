@@ -3543,6 +3543,24 @@ assembly_input_bundle("kernel_anonymous_memory_compression") {
   ]
 }
 
+# Enables in kernel contiguous physical pages with some common configuration options.
+assembly_input_bundle("kernel_contiguous_physical_pages") {
+  # Physical page loaning and borrowing.
+  #
+  # "k ppb stats" (see also "k ppb help") can be used to check whether the
+  # vast majority of loaned pages are absorbed by using them for pager-backed
+  # VMOs when running a relevant workload (not just mostly idle), or if some
+  # loaned pages remain stranded even as the system approaches OOM. As long as
+  # loaned free pages hits a low fraction of this value before any overall
+  # OOM, pages aren't being stranded when it really matters.
+  kernel_cmdline = [
+    "kernel.ppb.loan=true",
+    "kernel.ppb.borrow-in-supplypages=true",
+    "kernel.ppb.borrow-on-mru=true",
+    "kernel.ppb.replace-on-unloan=true",
+  ]
+}
+
 # Extends compression to happen eagerly as part of queue rotation, only has meaning if
 # "kernel_compression" is also included.
 assembly_input_bundle("kernel_anonymous_memory_compression_eager_lru") {
