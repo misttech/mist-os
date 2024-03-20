@@ -5,6 +5,7 @@
 #include "aml-spi.h"
 
 #include <endian.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
@@ -20,7 +21,6 @@
 #include <zxtest/zxtest.h>
 
 #include "registers.h"
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"
 
@@ -70,6 +70,58 @@ class TestAmlSpiDriver : public AmlSpiDriver {
   uint32_t testreg_{};
 };
 
+class FakePDev : public fidl::testing::WireTestBase<fuchsia_hardware_platform_device::Device> {
+ public:
+  fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler(
+      async_dispatcher_t* dispatcher) {
+    return fuchsia_hardware_platform_device::Service::InstanceHandler({
+        .device = binding_group_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+    });
+  }
+
+  void set_interrupt(zx::interrupt interrupt) { interrupt_ = std::move(interrupt); }
+
+  void set_bti(zx::bti bti) { bti_ = std::move(bti); }
+
+ private:
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {}
+
+  void GetInterruptById(
+      fuchsia_hardware_platform_device::wire::DeviceGetInterruptByIdRequest* request,
+      GetInterruptByIdCompleter::Sync& completer) override {
+    if (request->index != 0 || !interrupt_) {
+      return completer.ReplyError(ZX_ERR_NOT_FOUND);
+    }
+
+    zx::interrupt out_interrupt;
+    zx_status_t status = interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &out_interrupt);
+    if (status == ZX_OK) {
+      completer.ReplySuccess(std::move(out_interrupt));
+    } else {
+      completer.ReplyError(status);
+    }
+  }
+
+  void GetBtiById(fuchsia_hardware_platform_device::wire::DeviceGetBtiByIdRequest* request,
+                  GetBtiByIdCompleter::Sync& completer) override {
+    if (request->index != 0 || !bti_) {
+      return completer.ReplyError(ZX_ERR_NOT_FOUND);
+    }
+
+    zx::bti out_bti;
+    zx_status_t status = bti_.duplicate(ZX_RIGHT_SAME_RIGHTS, &out_bti);
+    if (status == ZX_OK) {
+      completer.ReplySuccess(std::move(out_bti));
+    } else {
+      completer.ReplyError(status);
+    }
+  }
+
+  zx::interrupt interrupt_;
+  zx::bti bti_;
+  fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> binding_group_;
+};
+
 class AmlSpiTest : public zxtest::Test {
  public:
   AmlSpiTest()
@@ -77,15 +129,15 @@ class AmlSpiTest : public zxtest::Test {
         node_server_("root"),
         dut_(TestAmlSpiDriver::GetDriverRegistration()) {}
 
-  virtual void SetUpInterrupt(fake_pdev::FakePDevFidl::Config& config) {
+  virtual void SetUpInterrupt() {
     ASSERT_OK(zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &interrupt_));
     zx::interrupt dut_interrupt;
     ASSERT_OK(interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dut_interrupt));
-    config.irqs[0] = std::move(dut_interrupt);
+    pdev_server_.set_interrupt(std::move(dut_interrupt));
     interrupt_.trigger(0, zx::clock::get_monotonic());
   }
 
-  virtual void SetUpBti(fake_pdev::FakePDevFidl::Config& config) {}
+  virtual void SetUpBti() {}
 
   virtual bool SetupResetRegister() { return true; }
 
@@ -94,14 +146,8 @@ class AmlSpiTest : public zxtest::Test {
   }
 
   void SetUp() override {
-    fake_pdev::FakePDevFidl::Config config;
-    config.device_info = pdev_device_info_t{
-        .mmio_count = 1,
-        .irq_count = 1u,
-    };
-
-    SetUpInterrupt(config);
-    SetUpBti(config);
+    SetUpInterrupt();
+    SetUpBti();
 
     zx::result start_args = node_server_.CreateStartArgsAndServe();
     ASSERT_TRUE(start_args.is_ok());
@@ -112,8 +158,6 @@ class AmlSpiTest : public zxtest::Test {
         test_environment_.Initialize(std::move(start_args->incoming_directory_server)).is_ok());
 
     start_args_ = std::move(start_args->start_args);
-
-    pdev_server_.SetConfig(std::move(config));
 
     auto& directory = test_environment_.incoming_directory();
 
@@ -276,7 +320,7 @@ class AmlSpiTest : public zxtest::Test {
   }
 
   fdf_testing::DriverRuntime runtime_;
-  fake_pdev::FakePDevFidl pdev_server_;
+  FakePDev pdev_server_;
   mock_registers::MockRegisters registers_;
   std::queue<std::pair<zx_status_t, uint8_t>> gpio_writes_;
   fake_gpio::FakeGpio gpio_;
@@ -1275,12 +1319,12 @@ class AmlSpiBtiPaddrTest : public AmlSpiTest {
  public:
   static constexpr zx_paddr_t kDmaPaddrs[] = {0x1212'0000, 0xabab'000};
 
-  virtual void SetUpBti(fake_pdev::FakePDevFidl::Config& config) override {
+  virtual void SetUpBti() override {
     zx::bti bti;
     ASSERT_OK(fake_bti_create_with_paddrs(kDmaPaddrs, std::size(kDmaPaddrs),
                                           bti.reset_and_get_address()));
     bti_local_ = bti.borrow();
-    config.btis[0] = std::move(bti);
+    pdev_server_.set_bti(std::move(bti));
   }
 
  protected:
@@ -1371,11 +1415,11 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
 
 class AmlSpiBtiEmptyTest : public AmlSpiTest {
  public:
-  virtual void SetUpBti(fake_pdev::FakePDevFidl::Config& config) override {
+  virtual void SetUpBti() override {
     zx::bti bti;
     ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
     bti_local_ = bti.borrow();
-    config.btis[0] = std::move(bti);
+    pdev_server_.set_bti(std::move(bti));
   }
 
  protected:
@@ -1663,7 +1707,7 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
 
 class AmlSpiNoIrqTest : public AmlSpiTest {
  public:
-  virtual void SetUpInterrupt(fake_pdev::FakePDevFidl::Config& config) override {}
+  virtual void SetUpInterrupt() override {}
 };
 
 TEST_F(AmlSpiNoIrqTest, InterruptRequired) {
