@@ -175,9 +175,16 @@ void BindManager::BindInternal(BindRequest request,
         OnMatchDriverCallback(std::move(request), result, std::move(match_complete_callback));
       };
   fidl::Arena arena;
-  auto builder = fuchsia_driver_index::wire::MatchDriverArgs::Builder(arena)
-                     .name(node->name())
-                     .properties(node->properties());
+  auto builder = fuchsia_driver_index::wire::MatchDriverArgs::Builder(arena).name(node->name());
+
+  // Composite node's "default" node properties are its primary parent's node properties which
+  // should not be used.
+  if (node->type() == NodeType::kNormal) {
+    auto node_properties = node->GetNodeProperties();
+    if (node_properties.has_value()) {
+      builder.properties(node_properties.value());
+    }
+  }
   if (!driver_url_suffix.empty()) {
     builder.driver_url_suffix(driver_url_suffix);
   }

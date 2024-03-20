@@ -343,6 +343,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.node_properties",
+        "ordinal": "9",
+        "type": "vector<fuchsia.driver.framework/NodePropertyEntry>"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.framework/DriverStartArgs.outgoing_dir",
         "ordinal": "6",
         "type": "server_end:fuchsia.io/Directory"
@@ -614,6 +620,22 @@
     {
         "kind": "struct",
         "name": "fuchsia.driver.framework/NodeProperty"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodePropertyEntry.name",
+        "ordinal": "1",
+        "type": "string:128"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodePropertyEntry.properties",
+        "ordinal": "2",
+        "type": "vector<fuchsia.driver.framework/NodeProperty>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/NodePropertyEntry"
     },
     {
         "kind": "union/member",

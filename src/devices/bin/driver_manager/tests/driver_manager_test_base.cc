@@ -32,15 +32,16 @@ std::shared_ptr<driver_manager::Node> DriverManagerTestBase::CreateNode(
 }
 
 std::shared_ptr<driver_manager::Node> DriverManagerTestBase::CreateCompositeNode(
-    std::string_view name, std::vector<std::weak_ptr<driver_manager::Node>> parents, bool is_legacy,
+    std::string_view name, std::vector<std::weak_ptr<driver_manager::Node>> parents,
+    cpp20::span<const fuchsia_driver_framework::wire::NodeProperty> properties, bool is_legacy,
     uint32_t primary_index) {
   std::vector<std::string> parent_names;
   parent_names.reserve(parents.size());
   for (auto& parent : parents) {
     parent_names.push_back(parent.lock()->name());
   }
-  return driver_manager::Node::CreateCompositeNode(name, parents, std::move(parent_names), {},
-                                                   GetNodeManager(), dispatcher(), is_legacy,
-                                                   primary_index)
+  return driver_manager::Node::CreateCompositeNode(name, parents, std::move(parent_names),
+                                                   properties, GetNodeManager(), dispatcher(),
+                                                   is_legacy, primary_index)
       .value();
 }

@@ -11,6 +11,21 @@ using zx;
 
 const MAX_NAMESPACE_COUNT uint32 = fuchsia.component.runner.MAX_NAMESPACE_COUNT;
 
+/// Contains the node properties that belong to a node.
+@available(added=19)
+type NodePropertyEntry = struct {
+    /// Name of the node that has |node_properties|.
+    name NodeName;
+
+    /// Node properties that belong to the node whose name is |node_name|. If
+    /// the node is a composite then |properties| is empty and does not contain
+    /// its parents' properties.
+    properties NodePropertyVector;
+};
+
+@available(added=19)
+alias NodePropertyDictionary = vector<NodePropertyEntry>:MAX;
+
 /// Arguments for starting a driver.
 type DriverStartArgs = resource table {
     /// Node that the driver is bound to.
@@ -18,6 +33,14 @@ type DriverStartArgs = resource table {
 
     /// The name of the node the driver is bound to.
     8: node_name string:MAX;
+
+    /// Node properties of the node the driver is bound to. If the node is
+    /// non-composite then the "default" entry will contain the node's own
+    /// properties. If the node is a composite then there is an entry for each
+    /// of its parents and the "default" entry will reference the primary
+    /// composite parent node's properties.
+    @available(added=19)
+    9: node_properties NodePropertyDictionary;
 
     /// Symbols provided to the driver, for |node|. These come from the driver
     /// that added |node|, and are filtered to the symbols requested in the bind

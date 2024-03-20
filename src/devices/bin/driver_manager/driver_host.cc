@@ -109,6 +109,7 @@ void DriverHostComponent::InitializeElfDir() {
 
 void DriverHostComponent::Start(
     fidl::ClientEnd<fdf::Node> client_end, std::string node_name,
+    fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
     fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
     frunner::wire::ComponentStartInfo start_info,
     fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) {
@@ -117,6 +118,7 @@ void DriverHostComponent::Start(
   auto args = fdf::wire::DriverStartArgs::Builder(arena);
   args.node(std::move(client_end))
       .node_name(fidl::StringView::FromExternal(node_name))
+      .node_properties(node_properties)
       .url(start_info.resolved_url())
       .program(start_info.program())
       .incoming(start_info.ns())

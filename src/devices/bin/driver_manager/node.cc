@@ -35,6 +35,48 @@ const std::string kUnboundUrl = "unbound";
 // DFv2.
 constexpr bool kEnableCompositeNodeSpecRebind = false;
 
+// Return a clone of `node_properties`. The data referenced by the clone is owned by `arena`.
+std::vector<fuchsia_driver_framework::wire::NodeProperty> CloneNodeProperties(
+    fidl::AnyArena& arena,
+    cpp20::span<const fuchsia_driver_framework::wire::NodeProperty> node_properties) {
+  std::vector<fuchsia_driver_framework::wire::NodeProperty> clone;
+  clone.reserve(node_properties.size());
+  for (const auto& node_property : node_properties) {
+    auto natural = fidl::ToNatural(node_property);
+    clone.emplace_back(fidl::ToWire(arena, natural));
+  }
+  return clone;
+}
+
+// Return a clone of the node properties of `parents`. The data referenced by the clone is owned by
+// `arena`.
+std::vector<fuchsia_driver_framework::wire::NodePropertyEntry> GetParentNodePropertyEntries(
+    fidl::AnyArena& arena, cpp20::span<const std::weak_ptr<Node>> parents) {
+  std::vector<fuchsia_driver_framework::wire::NodePropertyEntry> entries;
+  for (const auto& weak_parent : parents) {
+    const auto parent = weak_parent.lock();
+    if (!parent) {
+      continue;
+    }
+    std::vector<fuchsia_driver_framework::wire::NodeProperty> parent_properties_clone;
+
+    // Composite node's "default" node properties are its primary parent's node properties which
+    // should not be used.
+    if (parent->type() == NodeType::kNormal) {
+      auto parent_properties = parent->GetNodeProperties();
+      if (parent_properties.has_value()) {
+        parent_properties_clone = CloneNodeProperties(arena, parent_properties.value());
+      }
+    }
+
+    entries.emplace_back(fuchsia_driver_framework::wire::NodePropertyEntry{
+        .name = fidl::StringView(arena, parent->name()),
+        .properties =
+            fuchsia_driver_framework::wire::NodePropertyVector(arena, parent_properties_clone)});
+  }
+  return entries;
+}
+
 template <typename R, typename F>
 std::optional<R> VisitOffer(fdecl::Offer& offer, F apply) {
   // Note, we access each field of the union as mutable, so that `apply` can
@@ -70,20 +112,6 @@ const char* CollectionName(Collection collection) {
     case Collection::kFullPackage:
       return "full-pkg-drivers";
   }
-}
-
-uint32_t GetProtocolId(const std::vector<fdf::wire::NodeProperty>& properties) {
-  uint32_t protocol_id = 0;
-  for (const fdf::wire::NodeProperty& property : properties) {
-    if (!property.key.is_int_value()) {
-      continue;
-    }
-    if (property.key.int_value() != BIND_PROTOCOL) {
-      continue;
-    }
-    protocol_id = property.value.int_value();
-  }
-  return protocol_id;
 }
 
 // Processes the offer by validating it has a source_name and adding a source ref to it.
@@ -306,7 +334,7 @@ Node::Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents,
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<std::weak_ptr<Node>> parents,
     std::vector<std::string> parents_names,
-    const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties,
+    cpp20::span<const fuchsia_driver_framework::wire::NodeProperty> properties,
     NodeManager* driver_binder, async_dispatcher_t* dispatcher, bool is_legacy,
     uint32_t primary_index) {
   ZX_ASSERT(!parents.empty());
@@ -327,11 +355,11 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
       is_legacy ? NodeType::kLegacyComposite : NodeType::kComposite);
   composite->parents_names_ = std::move(parents_names);
 
-  for (const auto& prop : properties) {
-    auto natural = fidl::ToNatural(prop);
-    auto new_prop = fidl::ToWire(composite->arena_, std::move(natural));
-    composite->properties_.push_back(new_prop);
+  if (!properties.empty()) {
+    LOGF(ERROR, "Composite nodes cannot have properties");
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
+  composite->SetCompositeParentProperties();
   composite->SetAndPublishInspect();
 
   Node* primary = composite->GetPrimaryParent();
@@ -664,6 +692,46 @@ std::shared_ptr<BindResultTracker> Node::CreateBindResultTracker() {
       });
 }
 
+void Node::SetNonCompositeProperties(
+    cpp20::span<const fuchsia_driver_framework::NodeProperty> properties) {
+  std::vector<fuchsia_driver_framework::wire::NodeProperty> wire;
+  wire.reserve(properties.size() + 1);  // + 1 for DFv2 prop.
+  for (const auto& property : properties) {
+    wire.emplace_back(fidl::ToWire(arena_, property));
+  }
+  wire.emplace_back(fdf::MakeProperty(arena_, bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION,
+                                      static_cast<uint32_t>(2)));
+
+  std::vector<fuchsia_driver_framework::wire::NodePropertyEntry> entries;
+  entries.emplace_back(fuchsia_driver_framework::wire::NodePropertyEntry{
+      .name = "default",
+      .properties = fuchsia_driver_framework::wire::NodePropertyVector(arena_, wire)});
+
+  properties_ = fuchsia_driver_framework::wire::NodePropertyDictionary(arena_, entries);
+  SynchronizePropertiesDict();
+}
+
+void Node::SetCompositeParentProperties() {
+  auto entries = GetParentNodePropertyEntries(arena_, parents_);
+
+  ZX_ASSERT(primary_index_ < parents_.size());
+  const auto default_node_properties = entries[primary_index_].properties.get();
+  entries.emplace_back(fuchsia_driver_framework::wire::NodePropertyEntry{
+      .name = "default",
+      .properties = fuchsia_driver_framework::wire::NodePropertyVector::FromExternal(
+          default_node_properties.data(), default_node_properties.size())});
+
+  properties_ = fuchsia_driver_framework::wire::NodePropertyDictionary(arena_, entries);
+  SynchronizePropertiesDict();
+}
+
+void Node::SynchronizePropertiesDict() {
+  properties_dict_.clear();
+  for (const auto& entry : properties_) {
+    properties_dict_[std::string(entry.name.get())] = entry.properties.get();
+  }
+}
+
 fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> Node::AddChildHelper(
     fuchsia_driver_framework::NodeAddArgs args,
     fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller,
@@ -697,19 +765,13 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
       std::make_shared<Node>(name, std::vector<std::weak_ptr<Node>>{weak_from_this()},
                              *node_manager_, dispatcher_, std::move(inspect));
 
-  if (args.properties().has_value()) {
-    child->properties_.reserve(args.properties()->size() + 1);  // + 1 for DFv2 prop.
-    for (auto& property : args.properties().value()) {
-      child->properties_.emplace_back(fidl::ToWire(child->arena_, property));
-    }
-  }
-
-  // We set a property for DFv2 devices.
-  child->properties_.emplace_back(fdf::MakeProperty(
-      child->arena_, bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION, static_cast<uint32_t>(2)));
-
   auto& deprecated_offers = args.offers();
   auto& fdf_offers = args.offers2();
+  std::vector<fuchsia_driver_framework::NodeProperty> properties;
+  const auto& arg_properties = args.properties();
+  if (arg_properties.has_value()) {
+    properties = arg_properties.value();
+  }
   if (deprecated_offers.has_value() || fdf_offers.has_value()) {
     size_t n = 0;
     if (deprecated_offers.has_value()) {
@@ -772,10 +834,12 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
         }
         auto [processed_offer, property] = std::move(new_offer.value());
         child->offers_.emplace_back(fidl::ToWire(child->arena_, processed_offer));
-        child->properties_.emplace_back(fidl::ToWire(child->arena_, property));
+        properties.emplace_back(property);
       }
     }
   }
+
+  child->SetNonCompositeProperties(properties);
 
   child->SetAndPublishInspect();
 
@@ -1077,7 +1141,7 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   }
   driver_component_.emplace(*this, std::string(url), std::move(controller),
                             std::move(driver_endpoints->client));
-  driver_host_.value()->Start(std::move(endpoints->client), name_, symbols, start_info,
+  driver_host_.value()->Start(std::move(endpoints->client), name_, properties_, symbols, start_info,
                               std::move(driver_endpoints->server),
                               [weak_self = weak_from_this(), name = name_,
                                cb = std::move(cb)](zx::result<> result) mutable {
@@ -1229,6 +1293,15 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
   Remove(RemovalSet::kAll, nullptr);
 }
 
+std::optional<cpp20::span<const fuchsia_driver_framework::wire::NodeProperty>>
+Node::GetNodeProperties(std::string_view parent_name) const {
+  auto it = properties_dict_.find(std::string(parent_name));
+  if (it == properties_dict_.end()) {
+    return std::nullopt;
+  }
+  return {it->second};
+}
+
 Node::DriverComponent::DriverComponent(
     Node& node, std::string url,
     fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
@@ -1250,16 +1323,27 @@ void Node::SetAndPublishInspect() {
   constexpr char kCompositeDeviceTypeString[] = "Composite Device";
 
   std::vector<zx_device_prop_t> property_vector;
-  for (auto& property : properties_) {
-    if (property.key.is_int_value() && property.value.is_int_value()) {
-      property_vector.push_back(zx_device_prop_t{
-          .id = static_cast<uint16_t>(property.key.int_value()),
-          .value = property.value.int_value(),
-      });
+  uint32_t protocol_id = 0;
+  if (type_ == NodeType::kNormal) {
+    const auto node_properties = GetNodeProperties();
+    ZX_ASSERT_MSG(node_properties.has_value(), "Non-composite node \"%s\" missing node properties",
+                  name_.c_str());
+    for (auto& node_property : node_properties.value()) {
+      if (node_property.key.is_int_value() && node_property.value.is_int_value()) {
+        auto key = node_property.key.int_value();
+        auto value = node_property.value.int_value();
+        property_vector.push_back(zx_device_prop_t{
+            .id = static_cast<uint16_t>(key),
+            .value = value,
+        });
+        if (key == BIND_PROTOCOL) {
+          protocol_id = value;
+        }
+      }
     }
   }
 
-  inspect_.SetStaticValues(MakeTopologicalPath(), GetProtocolId(properties_),
+  inspect_.SetStaticValues(MakeTopologicalPath(), protocol_id,
                            IsComposite() ? kCompositeDeviceTypeString : kDeviceTypeString,
                            property_vector,
                            driver_component_.has_value() ? driver_component_->driver_url : "");

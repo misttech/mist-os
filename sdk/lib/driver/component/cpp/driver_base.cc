@@ -35,6 +35,15 @@ DriverBase::DriverBase(std::string_view name, DriverStartArgs start_args,
   std::optional outgoing_request = std::move(start_args_.outgoing_dir());
   ZX_ASSERT(outgoing_request.has_value());
   InitializeAndServe(std::move(incoming), std::move(outgoing_request.value()));
+
+#if __Fuchsia_API_level__ >= 19
+  const auto& node_properties = start_args_.node_properties();
+  if (node_properties.has_value()) {
+    for (const auto& entry : node_properties.value()) {
+      node_properties_.emplace(std::string{entry.name()}, entry.properties());
+    }
+  }
+#endif
 }
 
 void DriverBase::InitializeAndServe(
@@ -58,6 +67,15 @@ void DriverBase::InitInspectorExactlyOnce(inspect::Inspector inspector) {
     inspector_.emplace(outgoing()->component(), dispatcher(), std::move(inspector));
 #endif
   });
+}
+
+cpp20::span<const fuchsia_driver_framework::NodeProperty> DriverBase::node_properties(
+    const std::string& parent_node_name) const {
+  auto it = node_properties_.find(parent_node_name);
+  if (it == node_properties_.end()) {
+    return {};
+  }
+  return {it->second};
 }
 
 DriverBase::~DriverBase() { Logger::SetGlobalInstance(nullptr); }

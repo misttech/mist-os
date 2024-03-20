@@ -23,6 +23,33 @@ namespace driver_manager {
 
 namespace {
 
+void SetNodeInfoBuilderNodeProperties(
+    fidl::AnyArena& allocator, const driver_manager::Node& node,
+    fidl::WireTableBuilder<fuchsia_driver_development::wire::NodeInfo> node_info_builder,
+    fidl::WireTableBuilder<fuchsia_driver_development::wire::V2NodeInfo>& v2_node_info_builder) {
+  // Composite node's "default" node properties are its primary parent's node properties which
+  // should not be used.
+  if (node.type() == driver_manager::NodeType::kComposite) {
+    return;
+  }
+
+  auto properties = node.GetNodeProperties();
+  // Avoid allocating an empty VectorView.
+  if (!properties.has_value() || properties->empty()) {
+    return;
+  }
+
+  fidl::VectorView<fdf::wire::NodeProperty> node_properties(allocator, properties->size());
+  for (size_t i = 0; i < properties->size(); ++i) {
+    node_properties[i] = fdf::wire::NodeProperty{
+        .key = fidl::ToWire(allocator, fidl::ToNatural(properties.value()[i].key)),
+        .value = fidl::ToWire(allocator, fidl::ToNatural(properties.value()[i].value)),
+    };
+  }
+  node_info_builder.node_property_list(node_properties);
+  v2_node_info_builder.node_property_list(node_properties);
+}
+
 zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
                                                  const driver_manager::Node* node) {
   auto device_info = fdd::wire::NodeInfo::Builder(allocator);
@@ -61,18 +88,7 @@ zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
 
   device_info.bound_driver_url(fidl::StringView(allocator, node->driver_url()));
 
-  auto properties = node->properties();
-  if (!properties.empty()) {
-    fidl::VectorView<fdf::wire::NodeProperty> node_properties(allocator, properties.size());
-    for (size_t i = 0; i < properties.size(); ++i) {
-      node_properties[i] = fdf::wire::NodeProperty{
-          .key = fidl::ToWire(allocator, fidl::ToNatural(properties[i].key)),
-          .value = fidl::ToWire(allocator, fidl::ToNatural(properties[i].value)),
-      };
-    }
-    v2_info_builder.node_property_list(node_properties);
-    device_info.node_property_list(node_properties);
-  }
+  SetNodeInfoBuilderNodeProperties(allocator, *node, device_info, v2_info_builder);
 
   // TODO(https://fxbug.dev/42172220): Get topological path
 

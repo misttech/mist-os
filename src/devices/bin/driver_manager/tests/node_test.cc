@@ -6,6 +6,8 @@
 
 #include <fuchsia/component/cpp/fidl.h>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
+
 #include "src/devices/bin/driver_manager/composite_node_spec_v2.h"
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/tests/driver_manager_test_base.h"
@@ -45,6 +47,7 @@ class FakeDriverHost : public driver_manager::DriverHost {
  public:
   using StartCallback = fit::callback<void(zx::result<>)>;
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
+             fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
              fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override {
@@ -197,7 +200,7 @@ TEST_F(Dfv2NodeTest, TestEvaluateRematchFlags) {
   auto parent_1 = CreateNode("p1");
   auto parent_2 = CreateNode("p2");
 
-  auto legacy_composite = CreateCompositeNode("legacy-composite", {parent_1, parent_2},
+  auto legacy_composite = CreateCompositeNode("legacy-composite", {parent_1, parent_2}, {},
                                               /* is_legacy*/ true, /* primary_index */ 0);
 
   ASSERT_FALSE(legacy_composite->EvaluateRematchFlags(
@@ -210,7 +213,7 @@ TEST_F(Dfv2NodeTest, TestEvaluateRematchFlags) {
           fuchsia_driver_development::RestartRematchFlags::kLegacyComposite,
       "some-url"));
 
-  auto composite = CreateCompositeNode("composite", {parent_1, parent_2},
+  auto composite = CreateCompositeNode("composite", {parent_1, parent_2}, {},
                                        /* is_legacy*/ false, /* primary_index */ 0);
 
   ASSERT_FALSE(composite->EvaluateRematchFlags(
@@ -243,7 +246,7 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind) {
   ASSERT_EQ(driver_manager::NodeState::kRunning, parent_node_2->GetNodeState());
 
   auto composite =
-      CreateCompositeNode("composite", {parent_node_1, parent_node_2}, /* is_legacy*/ false);
+      CreateCompositeNode("composite", {parent_node_1, parent_node_2}, {}, /* is_legacy*/ false);
   StartTestDriver(composite);
   ASSERT_TRUE(composite->HasDriverComponent());
   ASSERT_EQ(driver_manager::NodeState::kRunning, composite->GetNodeState());
@@ -282,7 +285,7 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind_Dealloc) {
   ASSERT_EQ(driver_manager::NodeState::kRunning, parent_node_2->GetNodeState());
 
   auto composite =
-      CreateCompositeNode("composite", {parent_node_1, parent_node_2}, /* is_legacy*/ false);
+      CreateCompositeNode("composite", {parent_node_1, parent_node_2}, {}, /* is_legacy*/ false);
   StartTestDriver(composite);
   ASSERT_TRUE(composite->HasDriverComponent());
   ASSERT_EQ(driver_manager::NodeState::kRunning, composite->GetNodeState());
@@ -319,7 +322,7 @@ TEST_F(Dfv2NodeTest, RestartOnCrashComposite) {
   ASSERT_EQ(driver_manager::NodeState::kRunning, parent_node_2->GetNodeState());
 
   auto composite =
-      CreateCompositeNode("composite", {parent_node_1, parent_node_2}, /* is_legacy*/ false);
+      CreateCompositeNode("composite", {parent_node_1, parent_node_2}, {}, /* is_legacy*/ false);
   StartTestDriver(composite, {.host_restart_on_crash = true});
 
   ASSERT_TRUE(composite->HasDriverComponent());
@@ -334,4 +337,84 @@ TEST_F(Dfv2NodeTest, RestartOnCrashComposite) {
 
   // The node should come back to running state.
   ASSERT_EQ(driver_manager::NodeState::kRunning, composite->GetNodeState());
+}
+
+TEST_F(Dfv2NodeTest, TestCompositeNodeProperties) {
+  const char* kParent1Name = "parent-1";
+  const std::vector<fuchsia_driver_framework::NodeProperty> kParent1NodeProperties{
+      fuchsia_driver_framework::NodeProperty(
+          fuchsia_driver_framework::NodePropertyKey::WithIntValue(1),
+          fuchsia_driver_framework::NodePropertyValue::WithIntValue(2))};
+  const char* kParent2Name = "parent-2";
+  const std::vector<fuchsia_driver_framework::NodeProperty> kParent2NodeProperties{
+      fuchsia_driver_framework::NodeProperty(
+          fuchsia_driver_framework::NodePropertyKey::WithStringValue("test-key"),
+          fuchsia_driver_framework::NodePropertyValue::WithStringValue("test-value"))};
+  auto parent_1 = CreateNode(kParent1Name);
+  parent_1->SetNonCompositeProperties(kParent1NodeProperties);
+  auto parent_2 = CreateNode(kParent2Name);
+  parent_2->SetNonCompositeProperties(kParent2NodeProperties);
+
+  auto composite = CreateCompositeNode("composite", {parent_1, parent_2}, {},
+                                       /* is_legacy*/ false, /* primary_index */ 0);
+
+  // Verify primary parent properties. Primary parent should be parent 1.
+  const auto& primary_parent_node_properties = composite->GetNodeProperties();
+  ASSERT_TRUE(primary_parent_node_properties.has_value());
+  ASSERT_EQ(2ul, primary_parent_node_properties->size());
+
+  const auto& primary_parent_node_property_1 = primary_parent_node_properties.value()[0];
+  ASSERT_TRUE(primary_parent_node_property_1.key.is_int_value());
+  ASSERT_EQ(kParent1NodeProperties[0].key().int_value().value(),
+            primary_parent_node_property_1.key.int_value());
+  ASSERT_TRUE(primary_parent_node_property_1.value.is_int_value());
+  ASSERT_EQ(kParent1NodeProperties[0].value().int_value().value(),
+            primary_parent_node_property_1.value.int_value());
+
+  const auto& primary_parent_node_property_2 = primary_parent_node_properties.value()[1];
+  ASSERT_TRUE(primary_parent_node_property_2.key.is_string_value());
+  ASSERT_EQ(bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION,
+            primary_parent_node_property_2.key.string_value().get());
+  ASSERT_TRUE(primary_parent_node_property_2.value.is_int_value());
+  ASSERT_EQ(2ul, primary_parent_node_property_2.value.int_value());
+
+  // Verify parent 1 properties.
+  const auto& parent_1_node_properties = composite->GetNodeProperties(kParent1Name);
+  ASSERT_TRUE(parent_1_node_properties.has_value());
+  ASSERT_EQ(2ul, parent_1_node_properties->size());
+
+  const auto& parent_1_node_property_1 = parent_1_node_properties.value()[0];
+  ASSERT_TRUE(parent_1_node_property_1.key.is_int_value());
+  ASSERT_EQ(kParent1NodeProperties[0].key().int_value().value(),
+            parent_1_node_property_1.key.int_value());
+  ASSERT_TRUE(parent_1_node_property_1.value.is_int_value());
+  ASSERT_EQ(kParent1NodeProperties[0].value().int_value().value(),
+            parent_1_node_property_1.value.int_value());
+
+  const auto& parent_1_node_property_2 = parent_1_node_properties.value()[1];
+  ASSERT_TRUE(parent_1_node_property_2.key.is_string_value());
+  ASSERT_EQ(bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION,
+            parent_1_node_property_2.key.string_value().get());
+  ASSERT_TRUE(parent_1_node_property_2.value.is_int_value());
+  ASSERT_EQ(2ul, parent_1_node_property_2.value.int_value());
+
+  // Verify parent 2 properties.
+  const auto& parent_2_node_properties = composite->GetNodeProperties(kParent2Name);
+  ASSERT_TRUE(parent_2_node_properties.has_value());
+  ASSERT_EQ(2ul, parent_2_node_properties->size());
+
+  const auto& parent_2_node_property_1 = parent_2_node_properties.value()[0];
+  ASSERT_TRUE(parent_2_node_property_1.key.is_string_value());
+  ASSERT_EQ(kParent2NodeProperties[0].key().string_value().value(),
+            parent_2_node_property_1.key.string_value().get());
+  ASSERT_TRUE(parent_2_node_property_1.value.is_string_value());
+  ASSERT_EQ(kParent2NodeProperties[0].value().string_value().value(),
+            parent_2_node_property_1.value.string_value().get());
+
+  const auto& parent_2_node_property_2 = parent_2_node_properties.value()[1];
+  ASSERT_TRUE(parent_2_node_property_2.key.is_string_value());
+  ASSERT_EQ(bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION,
+            parent_2_node_property_2.key.string_value().get());
+  ASSERT_TRUE(parent_2_node_property_2.value.is_int_value());
+  ASSERT_EQ(2ul, parent_2_node_property_2.value.int_value());
 }

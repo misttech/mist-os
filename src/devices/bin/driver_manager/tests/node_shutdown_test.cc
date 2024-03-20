@@ -59,6 +59,7 @@ class FakeDriverHost : public DriverHost {
  public:
   using StartCallback = fit::callback<void(zx::result<>)>;
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
+             fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
              fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override {
@@ -232,7 +233,7 @@ class NodeShutdownTest : public DriverManagerTestBase {
       ASSERT_NE(nodes_.find(parent_name), nodes_.end());
       parent_nodes.push_back(nodes_[parent_name]);
     }
-    nodes_[composite_name] = CreateCompositeNode(composite_name, parent_nodes,
+    nodes_[composite_name] = CreateCompositeNode(composite_name, parent_nodes, {},
                                                  /* is_legacy */ false, /* primary_index */ 0);
   }
 

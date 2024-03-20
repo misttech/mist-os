@@ -38,7 +38,8 @@ class DriverManagerTestBase : public gtest::TestLoopFixture {
 
   std::shared_ptr<driver_manager::Node> CreateCompositeNode(
       std::string_view name, std::vector<std::weak_ptr<driver_manager::Node>> parents,
-      bool is_legacy, uint32_t primary_index = 0);
+      cpp20::span<const fuchsia_driver_framework::wire::NodeProperty> properties, bool is_legacy,
+      uint32_t primary_index = 0);
 
   std::shared_ptr<driver_manager::Node> root() const { return root_; }
 

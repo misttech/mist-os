@@ -250,6 +250,7 @@ executable("node_test") {
   deps = [
     ":driver_manager_test_base",
     "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
   ]
 }
 

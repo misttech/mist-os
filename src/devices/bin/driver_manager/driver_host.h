@@ -17,7 +17,8 @@ class DriverHost {
  public:
   using StartCallback = fit::callback<void(zx::result<>)>;
   virtual void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end,
-                     std::string node_node,
+                     std::string node_name,
+                     fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
                      fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
                      fuchsia_component_runner::wire::ComponentStartInfo start_info,
                      fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) = 0;
@@ -35,6 +36,7 @@ class DriverHostComponent final
                       std::shared_ptr<bool> server_connected);
 
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
+             fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
              fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override;
