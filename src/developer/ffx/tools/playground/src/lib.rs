@@ -22,12 +22,15 @@ use std::fs::File;
 use std::io::{self, BufRead as _, BufReader};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use vfs::directory::helper::DirectlyMutable;
 
 mod presentation;
 mod repl;
 mod strict_mutex;
+mod toolbox_fs;
 
 use presentation::display_result;
+use toolbox_fs::toolbox_directory;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "playground", description = "Directly invoke FIDL services")]
@@ -106,8 +109,11 @@ pub async fn exec_playground(
     }
 
     let remote_proxy = Arc::new(remote_proxy);
+    let query = rcs::root_realm_query(&remote_proxy, std::time::Duration::from_secs(5)).await?;
+    let toolbox = toolbox_directory(&*remote_proxy, &query).await?;
     let fs_root_simple = vfs::directory::mutable::simple();
     let root_dir_client = vfs::directory::spawn_directory(Arc::clone(&fs_root_simple));
+    fs_root_simple.add_entry("toolbox", toolbox)?;
     let Ok(root_dir_client) = root_dir_client.into_channel() else {
         ffx_bail!("Could not turn proxy back into channel");
     };
