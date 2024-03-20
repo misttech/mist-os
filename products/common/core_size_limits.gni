@@ -156,9 +156,11 @@ size_checker_input = {
       component = "Media"
       pkgs = [
         "audio_core",
+        "audio_device_registry",
+        "codec_factory",
         "codec_runner_intel_gen",
         "mediasession",
-        "codec_factory",
+        "soundplayer",
       ]
       limit = 17825792  # 17 MiB
       creep_limit = 428032  # 418.0 KiB

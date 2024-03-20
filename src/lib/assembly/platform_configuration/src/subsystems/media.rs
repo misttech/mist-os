@@ -41,6 +41,7 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
                 if config.use_adc_device {
                     builder.platform_bundle("audio_core_use_adc_device");
                 }
+                builder.platform_bundle("soundplayer");
             }
             (Some(AudioConfig::PartialStack), false) => {
                 builder.platform_bundle("audio_device_registry");

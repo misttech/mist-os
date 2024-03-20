@@ -1711,8 +1711,6 @@ assembly_input_bundle("input_group_one") {
           component_name = "core"
           shards = rebase_path(
                   [
-                    "//src/media/sounds/soundplayer/meta/soundplayer.core_shard.cml",
-
                     # TODO(https://fxbug.dev/42160712): only include in eng builds
                     "//src/sys/fuzzing/meta/fuzzing.core-shard.cml",
                   ],
@@ -1725,10 +1723,7 @@ assembly_input_bundle("input_group_one") {
 
 assembly_input_bundle("input_group_two") {
   kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
-  base_packages = [
-    "//src/media/sounds/soundplayer",
-    "//src/session/bin/session_manager",
-  ]
+  base_packages = [ "//src/session/bin/session_manager" ]
   flexible_packages = [
     "//src/connectivity/location/emergency",
     "//src/media/sessions:mediasession",
@@ -2994,6 +2989,28 @@ assembly_input_bundle("audio_device_registry") {
           component_name = "core"
           shards = rebase_path(
                   [ "//src/media/audio/services/device_registry/meta/audio_device_registry.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+# Component that plays audio files using audio_core protocols.
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("soundplayer") {
+  flexible_packages = [ "//src/media/sounds/soundplayer" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/media/sounds/soundplayer/meta/soundplayer.core_shard.cml" ],
                   root_build_dir)
         },
       ]

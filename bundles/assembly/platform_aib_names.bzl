@@ -59,6 +59,7 @@ BRINGUP_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + BOOTSTRAP_USERD
 # Please keep sorted, it makes merge conflicts less likely vs adding to the
 # end of the list.
 USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
+    # keep-sorted: start
     "audio_core",
     "audio_core_routing",
     "audio_core_use_adc_device",
@@ -118,15 +119,16 @@ USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "sensors_framework",
     "session_manager",
     "setui",
-    "standard_user",
-    "thread_lowpan",
     "setui.icu_default_{}".format(icu_flavors.default_git_commit),
     "setui.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "setui_with_camera",
     "setui_with_camera.icu_default_{}".format(icu_flavors.default_git_commit),
     "setui_with_camera.icu_latest_{}".format(icu_flavors.latest_git_commit),
+    "soundplayer",
+    "standard_user",
     "starnix_support",
     "system_update_configurator",
+    "thread_lowpan",
     "ui",
     "ui_package_eng_userdebug_with_synthetic_device_support",
     "ui_package_user_and_userdebug",
@@ -141,6 +143,7 @@ USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "wlan_softmac_support",
     "wlan_wlanix",
     "zoneinfo",
+    # keep-sorted: end
 ]
 
 USERDEBUG_PLATFORM_AIB_NAMES = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + USER_PLATFORM_AIB_NAMES + [

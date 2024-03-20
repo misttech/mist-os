@@ -126,6 +126,7 @@ user_platform_aib_names =
       "audio_core_routing",
       "audio_core_use_adc_device",
       "audio_device_registry",
+      "soundplayer",
       "camera",
 
       # Diagnostics
