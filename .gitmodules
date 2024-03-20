@@ -686,3 +686,8 @@
 [submodule "infra/testproject"]
 	path = infra/testproject
 	url = https://fuchsia.googlesource.com/infra/testproject
+[submodule "third_party/fuchsia-infra-bazel-rules/src"]
+	path = third_party/fuchsia-infra-bazel-rules/src
+	url = https://fuchsia.googlesource.com/fuchsia-infra-bazel-rules
+	name = third_party/fuchsia-infra-bazel-rules
+	ignore = all
