@@ -57,14 +57,6 @@
             rights: [ "r*" ],
             path: "/config/data",
         },
-        {
-            storage: "data",
-            path: "/data",
-        },
-        {
-            storage: "tmp",
-            path: "/tmp",
-        },
     ],
     expose: [
         {
