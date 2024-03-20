@@ -1773,8 +1773,11 @@ impl ResolvedInstanceState {
                 continue;
             };
             let sender = sandbox::Sender::new_sendable(open);
-            let router = Capability::Sender(sender)
-                .with_capability_requested_hook(weak_component.clone(), capability.name().clone());
+            let router = Router::new(CapabilityRequestedHook {
+                source: weak_component.clone(),
+                name: capability.name().clone(),
+                sender,
+            });
             dict.insert_capability(iter::once(name), router.into());
         }
         dict
@@ -2521,41 +2524,37 @@ impl ComponentRuntime {
     }
 }
 
-trait RouterExt: Routable + Clone + Send + Sync + 'static {
-    /// Returns a router that delegates to the event system if the capability request is
-    /// intercepted by some hook, and delegates to the current router otherwise.
-    fn with_capability_requested_hook(self, source: WeakComponentInstance, name: Name) -> Router {
-        let name = name.to_string();
-        let route_fn = move |request: Request| {
-            let source = source.clone();
-            let name = name.clone();
-            let router = self.clone();
-            async move {
-                let source = source.upgrade().map_err(RoutingError::from)?;
-                let target = request.target.upgrade().map_err(RoutingError::from)?;
-                let (receiver, sender) = CapabilityReceiver::new();
-                let event = Event::new(
-                    &target,
-                    EventPayload::CapabilityRequested {
-                        source_moniker: source.moniker.clone(),
-                        name,
-                        receiver: receiver.clone(),
-                    },
-                );
-                source.hooks.dispatch(&event).await;
-                if receiver.is_taken() {
-                    Ok(sender.into())
-                } else {
-                    router.route(request).await
-                }
-            }
-            .boxed()
-        };
-        Router::new(route_fn)
-    }
+/// This delegates to the event system if the capability request is
+/// intercepted by some hook, and delegates to the current sender otherwise.
+#[derive(Debug)]
+struct CapabilityRequestedHook {
+    source: WeakComponentInstance,
+    name: Name,
+    sender: sandbox::Sender,
 }
 
-impl<T: Routable + Clone + Send + Sync + 'static> RouterExt for T {}
+#[async_trait]
+impl Routable for CapabilityRequestedHook {
+    async fn route(&self, request: Request) -> Result<Capability, bedrock_error::BedrockError> {
+        let source = self.source.upgrade().map_err(RoutingError::from)?;
+        let target = request.target.upgrade().map_err(RoutingError::from)?;
+        let (receiver, sender) = CapabilityReceiver::new();
+        let event = Event::new(
+            &target,
+            EventPayload::CapabilityRequested {
+                source_moniker: source.moniker.clone(),
+                name: self.name.to_string(),
+                receiver: receiver.clone(),
+            },
+        );
+        source.hooks.dispatch(&event).await;
+        if receiver.is_taken() {
+            Ok(sender.into())
+        } else {
+            Ok(self.sender.clone().into())
+        }
+    }
+}
 
 #[cfg(test)]
 pub mod tests {
