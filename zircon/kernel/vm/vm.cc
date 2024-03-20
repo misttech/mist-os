@@ -23,7 +23,6 @@
 #include <zircon/types.h>
 
 #include <fbl/algorithm.h>
-#include <kernel/attribution.h>
 #include <kernel/thread.h>
 #include <ktl/array.h>
 #include <vm/anonymous_page_requester.h>
@@ -271,10 +270,6 @@ void vm_init_preheap() {
 
 void vm_init() {
   LTRACE_ENTRY;
-
-  if constexpr (KERNEL_BASED_MEMORY_ATTRIBUTION) {
-    AttributionObject::KernelAttributionInit();
-  }
 
   // Protect the regions of the physmap that are not backed by normal memory.
   //

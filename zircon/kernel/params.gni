@@ -137,10 +137,6 @@ declare_args() {
   jtrace_target_buffer_size = "auto"
   jtrace_use_large_entries = "auto"
 
-  # Controls the instantiation of AttributionObjects
-  # on ProcessDispatcher creation.
-  kernel_based_memory_attribution_enabled = false
-
   # Build a kernel with no user-space support, for development only.
   kernel_no_userabi = false
 

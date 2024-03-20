@@ -22,7 +22,6 @@
 #include <fbl/macros.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
-#include <kernel/attribution.h>
 #include <kernel/mutex.h>
 #include <vm/compressor.h>
 #include <vm/page_source.h>

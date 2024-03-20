@@ -260,7 +260,6 @@ if (is_kernel) {
       ":virtual_heap",
       ":standalone",
       ":warnings",
-      ":kernel_based_memory_attribution",
       "arch/$zircon_cpu:abi",
       "arch/$zircon_cpu:kernel",
       "//build/config:no-finite-loops",
@@ -391,16 +390,6 @@ if (is_kernel) {
       defines += [ "VIRTUAL_HEAP=1" ]
     } else {
       defines += [ "VIRTUAL_HEAP=0" ]
-    }
-  }
-
-  config("kernel_based_memory_attribution") {
-    visibility = [ ":*" ]
-    defines = []
-    if (kernel_based_memory_attribution_enabled) {
-      defines += [ "KERNEL_BASED_MEMORY_ATTRIBUTION=1" ]
-    } else {
-      defines += [ "KERNEL_BASED_MEMORY_ATTRIBUTION=0" ]
     }
   }
 

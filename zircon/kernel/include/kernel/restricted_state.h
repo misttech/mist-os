@@ -20,7 +20,6 @@
 // Per thread state to support restricted mode.
 // Intentionally kept simple to keep the amount of kernel/thread.h dependencies to a minimum.
 
-class AttributionObject;
 class VmObjectPaged;
 class VmMapping;
 

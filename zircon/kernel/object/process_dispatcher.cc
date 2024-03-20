@@ -79,21 +79,14 @@ zx_status_t ProcessDispatcher::Create(fbl::RefPtr<JobDispatcher> job, ktl::strin
                                       KernelHandle<VmAddressRegionDispatcher>* root_vmar_handle,
                                       zx_rights_t* root_vmar_rights) {
   fbl::AllocChecker ac;
-  fbl::RefPtr<AttributionObject> attribution_object;
-  if constexpr (KERNEL_BASED_MEMORY_ATTRIBUTION) {
-    attribution_object = fbl::MakeRefCountedChecked<AttributionObject>(&ac);
-    if (!ac.check())
-      return ZX_ERR_NO_MEMORY;
-  }
-
   fbl::RefPtr<ShareableProcessState> shareable_state =
       fbl::AdoptRef(new (&ac) ShareableProcessState);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  KernelHandle new_handle(fbl::AdoptRef(new (&ac) ProcessDispatcher(
-      shareable_state, job, name, flags, ktl::move(attribution_object))));
+  KernelHandle new_handle(
+      fbl::AdoptRef(new (&ac) ProcessDispatcher(shareable_state, job, name, flags)));
   if (!ac.check()) {
     // shareable_state was created successfully, and thus has a process count of 1 that needs to be
     // decremented here.
@@ -143,13 +136,6 @@ zx_status_t ProcessDispatcher::CreateShared(
   }
 
   fbl::AllocChecker ac;
-  fbl::RefPtr<AttributionObject> attribution_object;
-  if constexpr (KERNEL_BASED_MEMORY_ATTRIBUTION) {
-    attribution_object = fbl::MakeRefCountedChecked<AttributionObject>(&ac);
-    if (!ac.check())
-      return ZX_ERR_NO_MEMORY;
-  }
-
   fbl::RefPtr<ShareableProcessState> shareable_state;
   shareable_state = shared_proc->shareable_state_;
   // Increment the share count on the shared state before passing it to the ProcessDispatcher
@@ -158,8 +144,8 @@ zx_status_t ProcessDispatcher::CreateShared(
     return ZX_ERR_BAD_STATE;
   }
 
-  KernelHandle new_process(fbl::AdoptRef(new (&ac) ProcessDispatcher(
-      shareable_state, shared_proc->job(), name, flags, ktl::move(attribution_object))));
+  KernelHandle new_process(
+      fbl::AdoptRef(new (&ac) ProcessDispatcher(shareable_state, shared_proc->job(), name, flags)));
   if (!ac.check()) {
     // shareable_state was created successfully, and thus has a process count of 1 that needs to be
     // decremented here.
@@ -197,22 +183,14 @@ zx_status_t ProcessDispatcher::CreateShared(
 
 ProcessDispatcher::ProcessDispatcher(fbl::RefPtr<ShareableProcessState> shareable_state,
                                      fbl::RefPtr<JobDispatcher> job, ktl::string_view name,
-                                     uint32_t flags,
-                                     fbl::RefPtr<AttributionObject> attribution_object)
+                                     uint32_t flags)
     : shareable_state_(ktl::move(shareable_state)),
       job_(ktl::move(job)),
-#if KERNEL_BASED_MEMORY_ATTRIBUTION
-      attribution_object_(ktl::move(attribution_object)),
-#endif
       policy_(job_->GetPolicy()),
       exceptionate_(ZX_EXCEPTION_CHANNEL_TYPE_PROCESS),
       debug_exceptionate_(ZX_EXCEPTION_CHANNEL_TYPE_DEBUGGER),
       name_(name.data(), name.length()) {
   LTRACE_ENTRY_OBJ;
-
-#if KERNEL_BASED_MEMORY_ATTRIBUTION
-  attribution_object_->AddToGlobalListWithKoid(job_->attribution_objects_end(), get_koid());
-#endif
 
   kcounter_add(dispatcher_process_create_count, 1);
 }

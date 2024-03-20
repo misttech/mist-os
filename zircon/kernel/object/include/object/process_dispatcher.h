@@ -16,7 +16,6 @@
 #include <fbl/name.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
-#include <kernel/attribution.h>
 #include <kernel/brwlock.h>
 #include <kernel/event.h>
 #include <kernel/mutex.h>
@@ -172,16 +171,6 @@ class ProcessDispatcher final
   }
 
   State state() const;
-
-  // Attribution object tracking the process that this dispatcher instance
-  // represents.
-  const fbl::RefPtr<AttributionObject>& attribution_object() const {
-#if KERNEL_BASED_MEMORY_ATTRIBUTION
-    return attribution_object_;
-#else
-    return AttributionObject::null_attribution_ptr_;
-#endif
-  }
 
   fbl::RefPtr<JobDispatcher> job();
 
@@ -339,8 +328,7 @@ class ProcessDispatcher final
   friend void DumpProcessMemoryUsage(const char* prefix, size_t min_pages);
 
   ProcessDispatcher(fbl::RefPtr<ShareableProcessState> shareable_state,
-                    fbl::RefPtr<JobDispatcher> job, ktl::string_view name, uint32_t flags,
-                    fbl::RefPtr<AttributionObject> attribution_object);
+                    fbl::RefPtr<JobDispatcher> job, ktl::string_view name, uint32_t flags);
 
   ProcessDispatcher(const ProcessDispatcher&) = delete;
   ProcessDispatcher& operator=(const ProcessDispatcher&) = delete;
@@ -370,10 +358,6 @@ class ProcessDispatcher final
 
   // the enclosing job
   const fbl::RefPtr<JobDispatcher> job_;
-
-#if KERNEL_BASED_MEMORY_ATTRIBUTION
-  fbl::RefPtr<AttributionObject> attribution_object_;
-#endif
 
   // Job that this process is critical to.
   //

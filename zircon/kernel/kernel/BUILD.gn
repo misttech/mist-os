@@ -6,7 +6,6 @@
 
 source_set("kernel") {
   sources = [
-    "attribution.cc",
     "brwlock.cc",
     "cpu_distance_map.cc",
     "cpu_search_set.cc",
