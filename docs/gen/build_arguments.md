@@ -2807,7 +2807,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:159
+From //zircon/kernel/params.gni:155
 
 ### enable_mdns_trace
 
@@ -3120,7 +3120,7 @@ Include a mechanism for the kernel to sample threads and write the results to a 
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:151
+From //zircon/kernel/params.gni:147
 
 ### extra_bazel_assembly_targets
 
@@ -4094,15 +4094,6 @@ From //zircon/kernel/params.gni:138
 
 From //zircon/kernel/params.gni:28
 
-### kernel_based_memory_attribution_enabled
-
-Controls the instantiation of AttributionObjects
-on ProcessDispatcher creation.
-
-**Current value (from the default):** `false`
-
-From //zircon/kernel/params.gni:142
-
 ### kernel_debug_level
 
 Enables various kernel debugging and diagnostic features.  Valid
@@ -4154,7 +4145,7 @@ Build a kernel with no user-space support, for development only.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:145
+From //zircon/kernel/params.gni:141
 
 ### kernel_version_string
 
@@ -5499,7 +5490,7 @@ Example:
 
 **Current value (from the default):** `[]`
 
-From //build/assembly/developer_overrides.gni:104
+From //build/assembly/developer_overrides.gni:117
 
 ### product_bootfs_labels
 
@@ -6456,13 +6447,12 @@ From //third_party/pigweed/src/third_party/emboss/emboss.gni:24
 
 ### pw_third_party_emboss_USE_NEW_SOURCES
 
-If true, use latest `sources` list in emboss_cc_library target.
-If false, use old `sources` list (for compatibility with Emboss versions
-earlier than v2024.0304.184309).
+Flag is no longer used. It's assumed Emboss is v2024.0304.184309 or greater.
+TODO: b/329872338 - Remove once downstreams have stopped usage.
 
 **Current value (from the default):** `true`
 
-From //third_party/pigweed/src/third_party/emboss/emboss.gni:29
+From //third_party/pigweed/src/third_party/emboss/emboss.gni:28
 
 ### pw_third_party_mbedtls_CONFIG_HEADER
 
@@ -8207,7 +8197,7 @@ Build an ELF kernel rather than a ZBI image kernel.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:148
+From //zircon/kernel/params.gni:144
 
 ### use_gigaboot
 
