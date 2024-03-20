@@ -122,14 +122,15 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     // for creating and populating the RemoteLoadModule for the passive ABI of
     // any number of separate dynamic linking domains in however many
     // processes.
-    RemoteAbiStub<> abi_stub;
-    EXPECT_TRUE(abi_stub.Init(diag, predecoded_modules[kStub].decoded()));
-    EXPECT_GE(abi_stub.data_size(), sizeof(ld::abi::Abi<>) + sizeof(elfldltl::Elf<>::RDebug<>));
-    EXPECT_LT(abi_stub.data_size(), zx_system_get_page_size());
-    EXPECT_LE(abi_stub.abi_offset(), abi_stub.data_size() - sizeof(ld::abi::Abi<>));
-    EXPECT_LE(abi_stub.rdebug_offset(), abi_stub.data_size() - sizeof(elfldltl::Elf<>::RDebug<>));
-    EXPECT_NE(abi_stub.rdebug_offset(), abi_stub.abi_offset())
-        << "with data_size() " << abi_stub.data_size();
+    RemoteAbiStub<>::Ptr abi_stub =
+        RemoteAbiStub<>::Create(diag, predecoded_modules[kStub].decoded_module());
+    EXPECT_TRUE(abi_stub);
+    EXPECT_GE(abi_stub->data_size(), sizeof(ld::abi::Abi<>) + sizeof(elfldltl::Elf<>::RDebug<>));
+    EXPECT_LT(abi_stub->data_size(), zx_system_get_page_size());
+    EXPECT_LE(abi_stub->abi_offset(), abi_stub->data_size() - sizeof(ld::abi::Abi<>));
+    EXPECT_LE(abi_stub->rdebug_offset(), abi_stub->data_size() - sizeof(elfldltl::Elf<>::RDebug<>));
+    EXPECT_NE(abi_stub->rdebug_offset(), abi_stub->abi_offset())
+        << "with data_size() " << abi_stub->data_size();
 
     // Verify that the TLSDESC entry points were found in the stub and that their
     // addresses pass some basic smell tests.
@@ -138,7 +139,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     const auto segment_is_executable = [](const auto& segment) -> bool {
       return segment.executable();
     };
-    for (const elfldltl::Elf<>::size_type entry : abi_stub.tlsdesc_runtime()) {
+    for (const elfldltl::Elf<>::size_type entry : abi_stub->tlsdesc_runtime()) {
       // Must be nonzero.
       EXPECT_NE(entry, 0u);
 
@@ -246,7 +247,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     // entry TLSDESC points.  Note this could in the general case be modified
     // later by:
     // `tls_desc_resolver.SetHook(TlsdescRuntime::kStatic, custom_hook);`
-    auto tls_desc_resolver = abi_stub.tls_desc_resolver(loaded_stub.load_bias());
+    auto tls_desc_resolver = abi_stub->tls_desc_resolver(loaded_stub.load_bias());
 
     // Apply relocations to segment VMOs.
     EXPECT_TRUE(RemoteModule::RelocateModules(diag, modules, tls_desc_resolver));
@@ -269,7 +270,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     }
 
     // Now that load addresses have been chosen, populate the remote ABI data.
-    abi_result = std::move(remote_abi).Finish(diag, abi_stub, loaded_stub, modules);
+    abi_result = std::move(remote_abi).Finish(diag, loaded_stub, modules);
     EXPECT_TRUE(abi_result.is_ok()) << abi_result.status_string();
 
     // Finally, all the VMO contents are in place to be mapped into the
