@@ -251,6 +251,27 @@ TEST(RunQueueTests, EvaluateNextThread) {
     EXPECT_EQ(preemption, threadB.start());
     EXPECT_EQ(preemption, Time{7});
   }
+
+  // The originally scheduled next two threads are now expired: the third is
+  // picked.
+  {
+    TestThread current{{Capacity(3), Period(4)}, Start(0)};
+    current.Tick(Duration{3});
+    TestThread threadA{{Capacity(7), Period(10)}, Start(1)};
+    TestThread threadB{{Capacity(3), Period(5)}, Start(5)};
+
+    sched::RunQueue<TestThread> queue;
+    queue.Queue(threadA, Start(0));
+    queue.Queue(threadB, Start(0));
+
+    // t=11 is past the two periods of threads A and B. We should see
+    // * current reactivated for [11, 15)
+    // * threadA reactivated for [11, 21)
+    // * threadB reactivated for [11, 16)
+    auto [next, preemption] = queue.EvaluateNextThread(current, Start(11));
+    EXPECT_EQ(&current, next);
+    EXPECT_EQ(preemption, Time{14});
+  }
 }
 
 }  // namespace

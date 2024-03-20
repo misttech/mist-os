@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <utility>
 
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/wavl_tree_best_node_observer.h>
@@ -38,6 +39,8 @@ class RunQueue {
 
  public:
   static_assert(std::is_base_of_v<ThreadBase<Thread>, Thread>);
+
+  ~RunQueue() { tree_.clear(); }
 
   // Threads are iterated through in order of start time.
   using iterator = typename Tree::const_iterator;
@@ -75,21 +78,30 @@ class RunQueue {
     // finish time - factor into the next round of scheduling decisions.
     current.ReactivateIfExpired(now);
 
-    // Try to avoid rebalancing (from tree insertion and deletion) in the case
-    // where the next thread is the current one.
-    //
-    // As a tie-breaker when the next eligible has the same finish time as the
-    // current, ensure a wider variety of work being done by letting the other
-    // one have its turn.
-    Thread* next;
-    if (auto it = FindNextEligibleThread(now); it && it->finish() <= current.finish()) {
-      next = it.CopyPointer();
-      Dequeue(*next);
-      Queue(current, now);
-    } else {
-      next = &current;
+    Thread* next = nullptr;
+    while (!next) {
+      // Try to avoid rebalancing (from tree insertion and deletion) in the case
+      // where the next thread is the current one.
+      //
+      // As a tie-breaker when the next eligible has the same finish time as the
+      // current, ensure a wider variety of work being done by letting the other
+      // one have its turn.
+      if (auto it = FindNextEligibleThread(now); it && it->finish() <= current.finish()) {
+        // The next eligible might actually be expired (e.g., due to bandwidth
+        // oversubscription), in which case it should be reactivated and
+        // requeued, and our search should begin again for an eligible thread
+        // still in its current period.
+        next = it.CopyPointer();
+        Dequeue(*next);
+        Thread& requeued = now < next->finish() ? current : *std::exchange(next, nullptr);
+        Queue(requeued, now);
+      } else {
+        next = &current;
+      }
     }
 
+    ZX_DEBUG_ASSERT(next->time_slice_remaining() > 0);
+    ZX_DEBUG_ASSERT(now < next->finish());
     Time next_completion = std::min<Time>(now + next->time_slice_remaining(), next->finish());
 
     // Check if there is a thread with an earlier finish that will become
@@ -101,6 +113,7 @@ class RunQueue {
       preemption = next_completion;
     }
 
+    ZX_DEBUG_ASSERT(preemption > now);
     return {next, preemption};
   }
 

@@ -22,26 +22,28 @@ class RunQueue;
 using Duration = ffl::Fixed<zx_duration_t, 0>;
 using Time = ffl::Fixed<zx_time_t, 0>;
 
+// The parameters that specify a thread's activation period (i.e., the
+// recurring cycle in which it is scheduled).
+struct BandwidthParameters {
+  // The total duration within a given activation period in which a thread is
+  // expected to complete its work. This can be regarded as a measure of the
+  // expected worst-case runtime.
+  Duration capacity;
+
+  // The duration of the thread's activation period.
+  Duration period;
+};
+
 // The base thread class from which we expect schedulable thread types to
 // inherit (following the 'Curiously Recurring Template Pattern'). This class
 // manages the scheduler-related thread state of interest to this library.
 template <typename Thread>
 class ThreadBase {
  public:
-  // The parameters that specify a thread's activation period (i.e., the
-  // recurring cycle in which it is scheduled).
-  struct BandwidthParameters {
-    // The total duration within a given activation period in which a thread is
-    // expected to complete its work. This can be regarded as a measure of the
-    // expected worst-case runtime.
-    Duration capacity;
-
-    // The duration of the thread's activation period.
-    Duration period;
-  };
-
   constexpr ThreadBase(BandwidthParameters bandwidth, Time start)
       : capacity_(bandwidth.capacity), period_(bandwidth.period) {
+    ZX_ASSERT(bandwidth.capacity > 0);
+    ZX_ASSERT(bandwidth.period >= bandwidth.capacity);
     ReactivateIfExpired(start);
   }
 
@@ -66,7 +68,7 @@ class ThreadBase {
   // Whether the thread has completed its work for the current activation
   // period or activation period itself has ended.
   constexpr bool IsExpired(Time now) const {
-    return time_slice_used() >= capacity() || finish() <= now;
+    return time_slice_used() >= capacity() || now >= finish();
   }
 
   // Reactivates the thread in a new activation period beginning `now`.
