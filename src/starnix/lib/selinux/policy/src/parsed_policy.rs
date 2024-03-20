@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::arrays::{RoleAllow, RoleTransition};
+use crate::{
+    arrays::{RoleAllow, RoleTransition},
+    symbols::find_role_by_name,
+};
 
 use super::{
     arrays::{
@@ -17,10 +20,11 @@ use super::{
     metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature},
     parser::ParseStrategy,
     symbols::{
-        find_class_by_name, find_class_permission_by_name, Category, Class, Classes, CommonSymbol,
-        CommonSymbols, ConditionalBoolean, Permission, Role, Sensitivity, SymbolList, Type, User,
+        find_class_by_name, find_class_permission_by_name, find_type_alias_or_attribute_by_name,
+        Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean, Permission,
+        Role, Sensitivity, SymbolList, Type, User,
     },
-    AccessVector, CategoryId, Parse, RoleId, SensitivityId, TypeId, UserId, Validate,
+    AccessVector, CategoryId, Parse, RoleId, SensitivityId, TypeId, Validate,
 };
 
 use anyhow::Context as _;
@@ -131,6 +135,9 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         target_class: &Class<PS>,
         permission: &Permission<PS>,
     ) -> Result<bool, QueryError> {
+        let source_type_id = self.find_type_alias_or_attribute(source_type).id();
+        let target_type_id = self.find_type_alias_or_attribute(target_type).id();
+
         let permission_id = permission.id();
         let permission_bit = (1 as u32) << (permission_id - 1);
 
@@ -144,6 +151,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
             // Concern ourselves only with `allow [source-type] [target-type]:[class] [...];`
             // policy statements where `[class]` matches `target_class_id`.
+            let target_class_id: le::U16 = target_class_id.try_into().expect("class id as u16");
             if access_vector.target_class() != target_class_id {
                 continue;
             }
@@ -168,16 +176,16 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             // Concern ourselves only with `allow [source-type] [...];` policy statements where
             // `[source-type]` is associated with `source_type_id`.
             let source_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(source_type.0.get() - 1) as usize];
-            if !source_attribute_bitmap.is_set(access_vector.source_type().0.get() - 1) {
+                &self.attribute_maps[(source_type_id.get() - 1) as usize];
+            if !source_attribute_bitmap.is_set((access_vector.source_type().get() - 1) as u32) {
                 continue;
             }
 
             // Concern ourselves only with `allow [source-type] [target-type][...];` policy
             // statements where `[target-type]` is associated with `target_type_id`.
             let target_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(target_type.0.get() - 1) as usize];
-            if !target_attribute_bitmap.is_set(access_vector.target_type().0.get() - 1) {
+                &self.attribute_maps[(target_type_id.get() - 1) as usize];
+            if !target_attribute_bitmap.is_set((access_vector.target_type().get() - 1) as u32) {
                 continue;
             }
 
@@ -215,6 +223,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         target_type: &TypeId,
         target_class: &Class<PS>,
     ) -> Result<AccessVector, QueryError> {
+        let source_type_id = self.find_type_alias_or_attribute(source_type).id();
+        let target_type_id = self.find_type_alias_or_attribute(target_type).id();
         let target_class_id = target_class.id();
 
         let mut computed_access_vector = AccessVector::NONE;
@@ -226,6 +236,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
             // Concern ourselves only with `allow [source-type] [target-type]:[class] [...];`
             // policy statements where `[class]` matches `target_class_id`.
+            let target_class_id: le::U16 = target_class_id.try_into().expect("class id as u16");
             if access_vector.target_class() != target_class_id {
                 continue;
             }
@@ -238,16 +249,16 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             // Concern ourselves only with `allow [source-type] [...];` policy statements where
             // `[source-type]` is associated with `source_type_id`.
             let source_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(source_type.0.get() - 1) as usize];
-            if !source_attribute_bitmap.is_set(access_vector.source_type().0.get() - 1) {
+                &self.attribute_maps[(source_type_id.get() - 1) as usize];
+            if !source_attribute_bitmap.is_set((access_vector.source_type().get() - 1) as u32) {
                 continue;
             }
 
             // Concern ourselves only with `allow [source-type] [target-type][...];` policy
             // statements where `[target-type]` is associated with `target_type_id`.
             let target_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(target_type.0.get() - 1) as usize];
-            if !target_attribute_bitmap.is_set(access_vector.target_type().0.get() - 1) {
+                &self.attribute_maps[(target_type_id.get() - 1) as usize];
+            if !target_attribute_bitmap.is_set((access_vector.target_type().get() - 1) as u32) {
                 continue;
             }
 
@@ -270,57 +281,32 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
     /// Returns the `User` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(crate) fn user(&self, id: UserId) -> &User<PS> {
-        self.users.data.iter().find(|x| x.id() == id).unwrap()
-    }
-
-    /// Returns the named user, if present in the policy.
-    pub(crate) fn user_by_name(&self, name: &str) -> Option<&User<PS>> {
-        self.users.data.iter().find(|x| x.name_bytes() == name.as_bytes())
+    pub(crate) fn user(&self, id: le::U32) -> &User<PS> {
+        &self.users.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the `Role` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(crate) fn role(&self, id: RoleId) -> &Role<PS> {
-        self.roles.data.iter().find(|x| x.id() == id).unwrap()
-    }
-
-    /// Returns the named role, if present in the policy.
-    pub(crate) fn role_by_name(&self, name: &str) -> Option<&Role<PS>> {
-        self.roles.data.iter().find(|x| x.name_bytes() == name.as_bytes())
+    pub(crate) fn role(&self, id: le::U32) -> &Role<PS> {
+        &self.roles.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the `Type` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(crate) fn type_(&self, id: TypeId) -> &Type<PS> {
-        self.types.data.iter().find(|x| x.id() == id).unwrap()
-    }
-
-    /// Returns the named type, if present in the policy.
-    pub(crate) fn type_by_name(&self, name: &str) -> Option<&Type<PS>> {
-        self.types.data.iter().find(|x| x.name_bytes() == name.as_bytes())
+    pub(crate) fn type_(&self, id: le::U32) -> &Type<PS> {
+        &self.types.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the `Sensitivity` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(crate) fn sensitivity(&self, id: SensitivityId) -> &Sensitivity<PS> {
-        self.sensitivities.data.iter().find(|x| x.id() == id).unwrap()
-    }
-
-    /// Returns the named sensitivity level, if present in the policy.
-    pub(crate) fn sensitivity_by_name(&self, name: &str) -> Option<&Sensitivity<PS>> {
-        self.sensitivities.data.iter().find(|x| x.name_bytes() == name.as_bytes())
+    pub(crate) fn sensitivity(&self, id: le::U32) -> &Sensitivity<PS> {
+        &self.sensitivities.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the `Category` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(crate) fn category(&self, id: CategoryId) -> &Category<PS> {
+    pub(crate) fn category(&self, id: le::U32) -> &Category<PS> {
         self.categories.data.iter().find(|y| y.id() == id).unwrap()
-    }
-
-    /// Returns the named category, if present in the policy.
-    pub(crate) fn category_by_name(&self, name: &str) -> Option<&Category<PS>> {
-        self.categories.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
     pub(crate) fn classes(&self) -> &Classes<PS> {
@@ -333,6 +319,10 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
     pub(crate) fn conditional_booleans(&self) -> &Vec<ConditionalBoolean<PS>> {
         &self.conditional_booleans.data
+    }
+
+    pub(crate) fn roles(&self) -> &Vec<Role<PS>> {
+        &self.roles.data
     }
 
     pub(crate) fn role_allowlist(&self) -> &[RoleAllow] {
@@ -351,14 +341,36 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self.access_vectors.data
     }
 
+    /// Helper used by `security_level()` to create a `Sensitivity` instance from policy fields.
+    pub(crate) fn sensitivity_id(&self, sensitivity: le::U32) -> SensitivityId {
+        SensitivityId(
+            String::from_utf8(self.sensitivity(sensitivity).name_bytes().to_vec()).unwrap(),
+        )
+    }
+
+    /// Helper used by `category()` to create a category name from policy fields.
+    pub(crate) fn category_id(&self, id: le::U32) -> CategoryId {
+        CategoryId(String::from_utf8(self.category(id).name_bytes().to_vec()).unwrap())
+    }
+
     #[cfg(feature = "selinux_policy_test_api")]
     pub fn validate(&self) -> Result<(), anyhow::Error> {
         Validate::validate(self)
     }
 
     #[cfg(feature = "selinux_policy_test_api")]
-    pub fn type_id_by_name(&self, name: &str) -> TypeId {
-        self.type_by_name(name).unwrap().id()
+    pub fn type_by_name(&self, name: &str) -> TypeId {
+        TypeId(name.to_string())
+    }
+
+    /// Returns the type, alias, or attribute for a [`TypeId`] obtained from this policy.
+    pub(crate) fn find_type_alias_or_attribute(&self, type_: &TypeId) -> &Type<PS> {
+        find_type_alias_or_attribute_by_name(&self.types.data, type_.0.as_str()).unwrap()
+    }
+
+    /// Returns the role for a [`RoleId`] obtained from this policy.
+    pub(crate) fn find_role(&self, role: &RoleId) -> &Role<PS> {
+        find_role_by_name(&self.roles.data, role.0.as_str()).unwrap()
     }
 }
 

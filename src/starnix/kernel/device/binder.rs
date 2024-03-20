@@ -3501,7 +3501,7 @@ impl BinderDriver {
                             .current_sid
                             .clone();
                         let mut security_context = security_server
-                            .sid_to_security_context(sid)
+                            .sid_to_security_context(&sid)
                             .map_or(FsString::default(), FsString::from);
                         security_context.push(b'\0');
                         Some(security_context)

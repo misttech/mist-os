@@ -2,20 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{
+    security_context,
+    symbols::{find_role_by_id, Role},
+};
+
 use super::{
     error::NewSecurityContextError,
     extensible_bitmap::ExtensibleBitmapSpan,
     parser::ParseStrategy,
-    security_context,
     symbols::{
         Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, MlsLevel,
-        Permission,
+        Permission, Type,
     },
-    CategoryId, ParsedPolicy, RoleId, SecurityContext, TypeId,
+    ParsedPolicy, RoleId, SecurityContext, TypeId,
 };
 
 use selinux_common::{self as sc, ClassPermission as _};
-use std::{collections::HashMap, num::NonZeroU32};
+use std::collections::HashMap;
+use zerocopy::little_endian as le;
 
 /// An index for facilitating fast lookup of common abstractions inside parsed binary policy data
 /// structures. Typically, data is indexed by an enum that describes a well-known value and the
@@ -34,8 +39,6 @@ pub(crate) struct PolicyIndex<PS: ParseStrategy> {
     permissions: HashMap<sc::Permission, PermissionIndex>,
     /// The parsed binary policy.
     parsed_policy: ParsedPolicy<PS>,
-    /// The "object_r" role used as a fallback for new file context transitions.
-    object_role: RoleId,
 }
 
 impl<PS: ParseStrategy> PolicyIndex<PS> {
@@ -100,15 +103,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             ));
         }
 
-        // Locate the "object_r" role.
-        let object_role = parsed_policy
-            .role_by_name("object_r")
-            .ok_or(anyhow::anyhow!(
-                "failed to locate well-known 'object_r' role in SELinux binary policy"
-            ))?
-            .id();
-
-        Ok(Self { classes, permissions, parsed_policy, object_role })
+        Ok(Self { classes, permissions, parsed_policy })
     }
 
     pub fn class<'a>(&'a self, object_class: &sc::ObjectClass) -> &'a Class<PS> {
@@ -139,6 +134,8 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         let object_class = sc::ObjectClass::from(class.clone());
         let policy_class = self.class(&object_class);
         let class_defaults = policy_class.defaults();
+        let source_type = self.parsed_policy.find_type_alias_or_attribute(source.type_());
+        let target_type = self.parsed_policy.find_type_alias_or_attribute(target.type_());
 
         // The SELinux notebook states:
         //
@@ -155,32 +152,42 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // The role component generally defaults to the object_r role (policy version 26 allows a
         // role_transition and version 27 allows a default_role of source or target to be defined
         // for each object class).
-        let role = match self.role_transition_new_role(source.role(), target.type_(), policy_class)
-        {
-            Some(new_role) => {
-                if !self.role_transition_is_explicitly_allowed(source.role(), new_role) {
-                    return Err(NewSecurityContextError::RoleTransitionNotAllowed {
-                        source_security_context: source.clone(),
-                        target_security_context: target.clone(),
-                        source_role: String::from_utf8(
-                            self.parsed_policy.role(source.role()).name_bytes().to_vec(),
-                        )
-                        .unwrap(),
-                        new_role: String::from_utf8(
-                            self.parsed_policy.role(new_role).name_bytes().to_vec(),
-                        )
-                        .unwrap(),
-                    });
-                }
+        let source_role = self.parsed_policy.find_role(source.role());
+        let computed_role =
+            match self.role_transition_new_role(source_role, target_type, policy_class) {
+                Some(new_role) => {
+                    if !self.role_transition_is_explicitly_allowed(source_role, new_role) {
+                        return Err(NewSecurityContextError::RoleTransitionNotAllowed {
+                            source_security_context: source.clone(),
+                            target_security_context: target.clone(),
+                            source_role: std::str::from_utf8(source_role.name_bytes())
+                                .expect("valid role name in policy")
+                                .to_string(),
+                            new_role: std::str::from_utf8(new_role.name_bytes())
+                                .expect("valid role name in policy")
+                                .to_string(),
+                        });
+                    }
 
-                new_role
-            }
-            None => match class_defaults.role() {
-                ClassDefault::Source => source.role(),
-                ClassDefault::Target => target.role(),
-                _ => self.object_role,
-            },
-        };
+                    new_role
+                }
+                None => {
+                    match class_defaults.role() {
+                        ClassDefault::Source => self.parsed_policy.find_role(source.role()),
+                        ClassDefault::Target => self.parsed_policy.find_role(target.role()),
+                        _ => {
+                            // TODO: This special role should probably be cached somewhere.
+                            let object_r = RoleId("object_r".to_string());
+                            self.parsed_policy.find_role(&object_r)
+                        }
+                    }
+                }
+            };
+        let role = RoleId(
+            std::str::from_utf8(computed_role.name_bytes())
+                .expect("valid role name in policy")
+                .to_owned(),
+        );
 
         // The SELinux notebook states:
         //
@@ -188,19 +195,24 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // type_transition rule was specified in the policy (policy version 25 allows a filename
         // type_transition rule and version 28 allows a default_type of source or target to be
         // defined for each object class).
-        let type_ =
-            match self.type_transition_new_type(source.type_(), target.type_(), policy_class) {
+        let computed_type =
+            match self.type_transition_new_type(source_type, target_type, policy_class) {
                 Some(new_type) => new_type,
                 None => {
-                    match class_defaults.type_() {
+                    self.parsed_policy.find_type_alias_or_attribute(match class_defaults.type_() {
                         ClassDefault::Source => source.type_(),
                         ClassDefault::Target => target.type_(),
                         // The "parent directory" in this context is the target. (The source is the
                         // process creating the file-like object.)
                         _ => target.type_(),
-                    }
+                    })
                 }
             };
+        let type_ = TypeId(
+            std::str::from_utf8(computed_type.name_bytes())
+                .expect("valid type name in policy")
+                .to_owned(),
+        );
 
         // The SELinux notebook states:
         //
@@ -209,7 +221,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // default_range of source or target with the selected range being low, high or low-high to
         // be defined for each object class).
         let (low_level, high_level) =
-            match self.range_transition_new_range(source.type_(), target.type_(), policy_class) {
+            match self.range_transition_new_range(source_type, target_type, policy_class) {
                 Some((low_level, high_level)) => (low_level, high_level),
                 None => match class_defaults.range() {
                     ClassDefaultRange::SourceLow => (source.low_level().clone(), None),
@@ -231,17 +243,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             };
 
         // TODO(b/319232900): Ensure that the generated Context has e.g. valid security range.
-        SecurityContext::new(self, user, role, type_, low_level.clone(), high_level.clone())
-            .map_err(|err| NewSecurityContextError::MalformedComputedSecurityContext {
-                source_security_context: source.clone(),
-                target_security_context: target.clone(),
-                computed_user: user,
-                computed_role: role,
-                computed_type: type_,
-                computed_low_level: low_level,
-                computed_high_level: high_level,
-                error: err,
-            })
+        Ok(SecurityContext::new(user.clone(), role, type_, low_level, high_level))
     }
 
     pub(crate) fn parsed_policy(&self) -> &ParsedPolicy<PS> {
@@ -252,44 +254,60 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     /// the policy fields.
     pub(crate) fn security_level(&self, level: &MlsLevel<PS>) -> security_context::SecurityLevel {
         security_context::SecurityLevel::new(
-            level.sensitivity(),
+            self.parsed_policy.sensitivity_id(level.sensitivity()),
             level.categories().spans().map(|span| self.security_context_category(span)).collect(),
         )
     }
 
     /// Helper used by `security_level()` to create a `Category` instance from policy fields.
-    fn security_context_category(&self, span: ExtensibleBitmapSpan) -> security_context::Category {
+    pub fn security_context_category(
+        &self,
+        span: ExtensibleBitmapSpan,
+    ) -> security_context::Category {
         // Spans describe zero-based bit indexes, corresponding to 1-based category Ids.
         if span.low == span.high {
-            security_context::Category::Single(CategoryId(NonZeroU32::new(span.low + 1).unwrap()))
+            security_context::Category::Single(
+                self.parsed_policy.category_id(le::U32::new(span.low + 1)),
+            )
         } else {
             security_context::Category::Range {
-                low: CategoryId(NonZeroU32::new(span.low + 1).unwrap()),
-                high: CategoryId(NonZeroU32::new(span.high + 1).unwrap()),
+                low: self.parsed_policy.category_id(le::U32::new(span.low + 1)),
+                high: self.parsed_policy.category_id(le::U32::new(span.high + 1)),
             }
         }
     }
 
     fn role_transition_new_role(
         &self,
-        current_role: RoleId,
-        type_: TypeId,
+        source_role: &Role<PS>,
+        target_type: &Type<PS>,
         class: &Class<PS>,
-    ) -> Option<RoleId> {
-        self.parsed_policy
-            .role_transitions()
-            .iter()
-            .find(|role_transition| {
-                role_transition.current_role() == current_role
-                    && role_transition.type_() == type_
-                    && role_transition.class() == class.id()
-            })
-            .map(|x| x.new_role())
+    ) -> Option<&Role<PS>> {
+        let role_transitions = self.parsed_policy.role_transitions();
+
+        for role_transition in role_transitions {
+            if role_transition.current_role() == source_role.id()
+                && role_transition.type_() == target_type.id()
+                && role_transition.class() == class.id()
+            {
+                let new_role =
+                    find_role_by_id(self.parsed_policy.roles(), role_transition.new_role())?;
+                return Some(new_role);
+            }
+        }
+
+        None
     }
 
-    fn role_transition_is_explicitly_allowed(&self, source_role: RoleId, new_role: RoleId) -> bool {
+    fn role_transition_is_explicitly_allowed(
+        &self,
+        source_role: &Role<PS>,
+        new_role: &Role<PS>,
+    ) -> bool {
         for role_allow in self.parsed_policy.role_allowlist() {
-            if role_allow.source_role() == source_role && role_allow.new_role() == new_role {
+            if role_allow.source_role() == source_role.id()
+                && role_allow.new_role() == new_role.id()
+            {
                 return true;
             }
         }
@@ -299,33 +317,42 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
     fn type_transition_new_type(
         &self,
-        source_type: TypeId,
-        target_type: TypeId,
+        source_type: &Type<PS>,
+        target_type: &Type<PS>,
         class: &Class<PS>,
-    ) -> Option<TypeId> {
-        // Return first match. The `checkpolicy` tool will not compile a policy that has
-        // multiple matches, so behavior on multiple matches is undefined.
-        self.parsed_policy
-            .access_vectors()
-            .iter()
-            .find(|access_vector| {
-                access_vector.is_type_transition()
-                    && access_vector.source_type() == source_type
-                    && access_vector.target_type() == target_type
-                    && access_vector.target_class() == class.id()
-            })
-            .map(|x| x.new_type().unwrap())
+    ) -> Option<&Type<PS>> {
+        let access_vectors = self.parsed_policy.access_vectors();
+        let source_type_id: le::U16 = source_type.id().try_into().expect("type id as u16");
+        let target_type_id: le::U16 = target_type.id().try_into().expect("type id as u16");
+        let target_class_id: le::U16 = class.id().try_into().expect("class id as u16");
+
+        if let Some(access_vector) = access_vectors.into_iter().find(|access_vector| {
+            access_vector.is_type_transition()
+                && access_vector.source_type() == source_type_id
+                && access_vector.target_type() == target_type_id
+                && access_vector.target_class() == target_class_id
+        }) {
+            // Return first match. The `checkpolicy` tool will not compile a policy that has
+            // multiple matches, so behavior on multiple matches is undefined.
+            let new_type_id = access_vector
+                .new_type()
+                .expect("new_type extended permissions on type_transition access vector");
+            let new_type = self.parsed_policy.type_(new_type_id);
+            return Some(new_type);
+        }
+
+        None
     }
 
     fn range_transition_new_range(
         &self,
-        source_type: TypeId,
-        target_type: TypeId,
+        source_type: &Type<PS>,
+        target_type: &Type<PS>,
         class: &Class<PS>,
     ) -> Option<(security_context::SecurityLevel, Option<security_context::SecurityLevel>)> {
         for range_transition in self.parsed_policy.range_transitions() {
-            if range_transition.source_type() == source_type
-                && range_transition.target_type() == target_type
+            if range_transition.source_type() == source_type.id()
+                && range_transition.target_type() == target_type.id()
                 && range_transition.target_class() == class.id()
             {
                 let mls_range = range_transition.mls_range();

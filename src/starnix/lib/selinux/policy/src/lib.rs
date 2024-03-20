@@ -13,7 +13,7 @@ mod extensible_bitmap;
 mod security_context;
 mod symbols;
 
-pub use security_context::{SecurityContext, SecurityContextError};
+pub use security_context::{SecurityContext, SecurityContextParseError};
 
 use {
     anyhow::Context as _,
@@ -24,7 +24,7 @@ use {
     parser::ByValue,
     parser::{ByRef, ParseStrategy},
     selinux_common::{self as sc, ClassPermission as _, FileClass},
-    std::{fmt::Debug, marker::PhantomData, num::NonZeroU32, ops::Deref},
+    std::{fmt::Debug, marker::PhantomData, ops::Deref},
     zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned},
 };
 
@@ -32,24 +32,24 @@ use {
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
 
 /// Identifies a user within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct UserId(NonZeroU32);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UserId(String);
 
 /// Identifies a role within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct RoleId(NonZeroU32);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RoleId(String);
 
 /// Identifies a type within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct TypeId(NonZeroU32);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TypeId(String);
 
 /// Identifies a sensitivity level within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct SensitivityId(NonZeroU32);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SensitivityId(String);
 
 /// Identifies a security category within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct CategoryId(NonZeroU32);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CategoryId(String);
 
 /// The set of permissions that may be granted to sources accessing targets of a particular class,
 /// as defined in an SELinux policy.
@@ -175,28 +175,30 @@ impl<PS: ParseStrategy> Policy<PS> {
     pub fn initial_context(&self, id: sc::InitialSid) -> security_context::SecurityContext {
         let id = le::U32::from(id as u32);
 
-        // Policy validation is assumed to have ensured that all `InitialSid` values exist
-        // and have valid & consistent content.
-        let context = self.0.parsed_policy().initial_context(id).unwrap();
-        let low_level = self.0.security_level(context.low_level());
-        let high_level = context.high_level().as_ref().map(|x| self.0.security_level(x));
+        let policy_index = &self.0;
+        let parsed_policy = policy_index.parsed_policy();
+        let context = parsed_policy.initial_context(id).unwrap();
+        let user = parsed_policy.user(context.user_id());
+        let role = parsed_policy.role(context.role_id());
+        let type_ = parsed_policy.type_(context.type_id());
+        let low_level = policy_index.security_level(context.low_level());
+        let high_level = context.high_level().as_ref().map(|x| policy_index.security_level(x));
 
         security_context::SecurityContext::new(
-            &self.0,
-            context.user_id(),
-            context.role_id(),
-            context.type_id(),
+            UserId(String::from_utf8(user.name_bytes().to_vec()).unwrap()),
+            RoleId(String::from_utf8(role.name_bytes().to_vec()).unwrap()),
+            TypeId(String::from_utf8(type_.name_bytes().to_vec()).unwrap()),
             low_level,
             high_level,
         )
-        .unwrap()
     }
 
     /// Returns a [`SecurityContext`] with fields parsed from the supplied Security Context string.
     pub fn parse_security_context(
         &self,
         security_context: &[u8],
-    ) -> Result<security_context::SecurityContext, security_context::SecurityContextError> {
+    ) -> Result<security_context::SecurityContext, security_context::SecurityContextParseError>
+    {
         security_context::SecurityContext::parse(&self.0, security_context)
     }
 
@@ -309,9 +311,10 @@ impl<PS: ParseStrategy> Policy<PS> {
         }
     }
 
+    /// Used by tests to resolve a type, alias or attribute name to a `TypeId`.
     #[cfg(feature = "selinux_policy_test_api")]
-    pub fn type_id_by_name(&self, name: &str) -> TypeId {
-        self.0.parsed_policy().type_id_by_name(name)
+    pub fn type_by_name(&self, name: &str) -> TypeId {
+        self.0.parsed_policy().type_by_name(name)
     }
 }
 

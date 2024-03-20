@@ -29,10 +29,7 @@ policy = {
     "src/security_context.rs",
     "src/symbols.rs",
   ]
-  inputs = [
-    "//src/starnix/lib/selinux/testdata/policies/emulator",
-    "//src/starnix/lib/selinux/testdata/micro_policies/security_context_tests_policy.pp",
-  ]
+  inputs = [ "//src/starnix/lib/selinux/testdata/policies/emulator" ]
 }
 
 additional_policy_configs = [ "//src/starnix/config:starnix_clippy_lints" ]

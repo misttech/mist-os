@@ -8,11 +8,10 @@ use super::{
         CONFIG_HANDLE_UNKNOWN_MASK, CONFIG_MLS_FLAG, POLICYDB_SIGNATURE,
         POLICYDB_STRING_MAX_LENGTH, POLICYDB_VERSION_MAX, POLICYDB_VERSION_MIN, SELINUX_MAGIC,
     },
-    security_context::SecurityLevel,
     symbols::{ClassDefault, ClassDefaultRange},
-    RoleId, SecurityContext, SecurityContextError, TypeId, UserId,
 };
 
+use super::{SecurityContext, SecurityContextParseError};
 use selinux_common as sc;
 use thiserror::Error;
 
@@ -86,8 +85,6 @@ pub enum ValidateError {
     InvalidClassDefaultRange { value: u32 },
     #[error("missing initial SID {initial_sid:?}")]
     MissingInitialSid { initial_sid: sc::InitialSid },
-    #[error("non-optional Id field is zero")]
-    NonOptionalIdIsZero,
     #[error("required validation routine not implemented")]
     NotImplemented,
 }
@@ -136,11 +133,11 @@ parsing error: {error:?}"#
     MalformedComputedSecurityContext {
         source_security_context: SecurityContext,
         target_security_context: SecurityContext,
-        computed_user: UserId,
-        computed_role: RoleId,
-        computed_type: TypeId,
-        computed_low_level: SecurityLevel,
-        computed_high_level: Option<SecurityLevel>,
-        error: SecurityContextError,
+        computed_user: String,
+        computed_role: String,
+        computed_type: String,
+        computed_low_level: String,
+        computed_high_level: Option<String>,
+        error: SecurityContextParseError,
     },
 }

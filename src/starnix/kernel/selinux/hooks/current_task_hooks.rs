@@ -222,8 +222,8 @@ mod tests {
     use starnix_uapi::{device_type::DeviceType, file_mode::FileMode, signals::SIGTERM};
     use tests::thread_group_hooks::SeLinuxThreadGroupState;
 
-    const VALID_SECURITY_CONTEXT: &'static str = "u:object_r:test_valid_t:s0";
-    const DIFFERENT_VALID_SECURITY_CONTEXT: &'static str = "u:object_r:test_different_valid_t:s0";
+    const VALID_SECURITY_CONTEXT: &'static str = "system_u:object_r:unconfined_t:s0";
+    const DIFFERENT_VALID_SECURITY_CONTEXT: &'static str = "system_u:object_r:unconfined_t:s1";
 
     const HOOKS_TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
@@ -340,7 +340,7 @@ mod tests {
             .security_server
             .as_ref()
             .expect("missing security server")
-            .security_context_to_sid(b"u:object_r:fork_no_t:s0")
+            .security_context_to_sid(b"u:object_r:type_t:s0")
             .expect("invalid security context");
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);
@@ -364,7 +364,7 @@ mod tests {
             .security_server
             .as_ref()
             .expect("missing security server")
-            .security_context_to_sid(b"u:object_r:fork_no_t:s0")
+            .security_context_to_sid(b"u:object_r:type_t:s0")
             .expect("invalid security context");
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);

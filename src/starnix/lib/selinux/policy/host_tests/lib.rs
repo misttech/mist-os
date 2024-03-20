@@ -102,7 +102,7 @@ fn policy_lookup() {
     let (policy, _) = parse_policy_by_value(policy_bytes.clone()).expect("parse policy");
     let policy = policy.validate().expect("validate selinux testsuite policy");
 
-    let unconfined_t = policy.type_id_by_name("unconfined_t");
+    let unconfined_t = policy.type_by_name("unconfined_t");
 
     policy
         .is_explicitly_allowed(
@@ -142,8 +142,8 @@ fn explicit_allow_type_type() {
     let parsed_policy = policy.parsed_policy();
     parsed_policy.validate().expect("validate policy");
 
-    let a_t = parsed_policy.type_id_by_name("a_t");
-    let b_t = parsed_policy.type_id_by_name("b_t");
+    let a_t = parsed_policy.type_by_name("a_t");
+    let b_t = parsed_policy.type_by_name("b_t");
 
     assert!(parsed_policy
         .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
@@ -162,8 +162,8 @@ fn no_explicit_allow_type_type() {
     let parsed_policy = policy.parsed_policy();
     parsed_policy.validate().expect("validate policy");
 
-    let a_t = parsed_policy.type_id_by_name("a_t");
-    let b_t = parsed_policy.type_id_by_name("b_t");
+    let a_t = parsed_policy.type_by_name("a_t");
+    let b_t = parsed_policy.type_by_name("b_t");
 
     assert!(!parsed_policy
         .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
@@ -182,8 +182,8 @@ fn explicit_allow_type_attr() {
     let parsed_policy = policy.parsed_policy();
     parsed_policy.validate().expect("validate policy");
 
-    let a_t = parsed_policy.type_id_by_name("a_t");
-    let b_t = parsed_policy.type_id_by_name("b_t");
+    let a_t = parsed_policy.type_by_name("a_t");
+    let b_t = parsed_policy.type_by_name("b_t");
 
     assert!(parsed_policy
         .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
@@ -202,8 +202,8 @@ fn no_explicit_allow_type_attr() {
     let parsed_policy = policy.parsed_policy();
     parsed_policy.validate().expect("validate policy");
 
-    let a_t = parsed_policy.type_id_by_name("a_t");
-    let b_t = parsed_policy.type_id_by_name("b_t");
+    let a_t = parsed_policy.type_by_name("a_t");
+    let b_t = parsed_policy.type_by_name("b_t");
 
     assert!(!parsed_policy
         .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
@@ -222,8 +222,8 @@ fn explicit_allow_attr_attr() {
     let parsed_policy = policy.parsed_policy();
     parsed_policy.validate().expect("validate policy");
 
-    let a_t = parsed_policy.type_id_by_name("a_t");
-    let b_t = parsed_policy.type_id_by_name("b_t");
+    let a_t = parsed_policy.type_by_name("a_t");
+    let b_t = parsed_policy.type_by_name("b_t");
 
     assert!(parsed_policy
         .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
@@ -242,8 +242,8 @@ fn no_explicit_allow_attr_attr() {
     let parsed_policy = policy.parsed_policy();
     parsed_policy.validate().expect("validate policy");
 
-    let a_t = parsed_policy.type_id_by_name("a_t");
-    let b_t = parsed_policy.type_id_by_name("b_t");
+    let a_t = parsed_policy.type_by_name("a_t");
+    let b_t = parsed_policy.type_by_name("b_t");
 
     assert!(!parsed_policy
         .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
@@ -262,7 +262,7 @@ fn compute_explicitly_allowed_multiple_attributes() {
     let parsed_policy = policy.parsed_policy();
     parsed_policy.validate().expect("validate policy");
 
-    let a_t = parsed_policy.type_id_by_name("a_t");
+    let a_t = parsed_policy.type_by_name("a_t");
 
     let raw_access_vector = parsed_policy
         .compute_explicitly_allowed_custom(&a_t, &a_t, "class0")
