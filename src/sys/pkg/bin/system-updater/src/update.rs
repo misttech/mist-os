@@ -1210,18 +1210,26 @@ async fn get_firmware_buffer_if_hash_and_size_match(
     subtype: &str,
     image: &update_package::ImageMetadata,
 ) -> Option<fmem::Buffer> {
-    let buffer = match paver::paver_read_firmware(data_sink, configuration, subtype).await {
-        Ok(buffer) => buffer,
-        Err(e) => {
-            warn!(
-                ?configuration, ?image, %subtype,
-                "Error reading firmware so it will not be used to avoid a download: {:#}",
-                anyhow!(e)
-            );
-            return None;
-        }
-    };
-    let buffer_hash = match calculate_hash(&buffer, image.size()) {
+    let fmem::Buffer { vmo, size } =
+        match paver::paver_read_firmware(data_sink, configuration, subtype).await {
+            Ok(buffer) => buffer,
+            Err(e) => {
+                warn!(
+                    ?configuration, ?image, %subtype,
+                    "Error reading firmware so it will not be used to avoid a download: {:#}",
+                    anyhow!(e)
+                );
+                return None;
+            }
+        };
+
+    // The size field in the fuchsia.mem.Buffer returned by ReadFirmware is the size of the entire
+    // partition.
+    if size < image.size() {
+        return None;
+    }
+    let buffer = fmem::Buffer { vmo, size: image.size() };
+    let buffer_hash = match sha256_buffer(&buffer) {
         Ok(hash) => hash,
         Err(e) => {
             warn!(
@@ -1245,20 +1253,28 @@ async fn get_asset_buffer_if_hash_and_size_match(
     asset: fpaver::Asset,
     image: &update_package::ImageMetadata,
 ) -> Option<fmem::Buffer> {
-    let buffer = match paver::paver_read_asset(data_sink, configuration, asset).await {
-        Ok(buffer) => buffer,
-        Err(e) => {
-            warn!(
-                ?configuration,
-                ?image,
-                ?asset,
-                "Error reading asset so it will not be used to avoid a download: {:#}",
-                anyhow!(e)
-            );
-            return None;
-        }
-    };
-    let buffer_hash = match calculate_hash(&buffer, image.size()) {
+    let fmem::Buffer { vmo, size } =
+        match paver::paver_read_asset(data_sink, configuration, asset).await {
+            Ok(buffer) => buffer,
+            Err(e) => {
+                warn!(
+                    ?configuration,
+                    ?image,
+                    ?asset,
+                    "Error reading asset so it will not be used to avoid a download: {:#}",
+                    anyhow!(e)
+                );
+                return None;
+            }
+        };
+
+    // The size field in the fuchsia.mem.Buffer returned by ReadAsset will either be the size of
+    // just the image or the size of the entire partition.
+    if size < image.size() {
+        return None;
+    }
+    let buffer = fmem::Buffer { vmo, size: image.size() };
+    let buffer_hash = match sha256_buffer(&buffer) {
         Ok(hash) => hash,
         Err(e) => {
             warn!(
@@ -1278,24 +1294,23 @@ async fn get_asset_buffer_if_hash_and_size_match(
     }
 }
 
-fn calculate_hash(buffer: &fmem::Buffer, size: u64) -> anyhow::Result<Hash> {
-    let mut remaining = usize::try_from(size)
-        .with_context(|| format!("converting buffer u64 size to usize {size}"))?;
+fn sha256_buffer(fmem::Buffer { vmo, size }: &fmem::Buffer) -> anyhow::Result<Hash> {
     let mut hasher = sha2::Sha256::new();
+    const SCRATCH_SIZE: usize = 1024 * 16;
+    // Guaranteeing SCRATCH_SIZE is a valid u64 means all the following `as` casts never truncate.
+    static_assertions::const_assert_eq!(SCRATCH_SIZE, SCRATCH_SIZE as u64 as usize);
+    let mut scratch = vec![0; SCRATCH_SIZE];
     let mut offset = 0;
-
-    while remaining > 0 {
-        let mut chunk = [0; 4096];
-        let chunk_len = remaining.min(4096);
-        let chunk = &mut chunk[..chunk_len];
-
-        let () = buffer.vmo.read(chunk, offset).context("reading vmo")?;
-        let () = hasher.update(chunk);
-
-        offset += chunk_len as u64;
-        remaining -= chunk_len;
+    loop {
+        let n = (*size - offset).min(SCRATCH_SIZE as u64) as usize;
+        if n == 0 {
+            break;
+        }
+        let slice = &mut scratch[..n];
+        let () = vmo.read(slice, offset).context("reading vmo")?;
+        let () = hasher.update(slice);
+        offset += n as u64;
     }
-
     Ok(Hash::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize())))
 }
 
@@ -1494,7 +1509,6 @@ mod tests {
         assert_matches::assert_matches,
         fuchsia_async as fasync,
         fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage},
-        std::str::FromStr as _,
     };
 
     // Simulate the cobalt test hanging indefinitely, and ensure we time out correctly.
@@ -1559,62 +1573,54 @@ mod tests {
             Err(PrepareError::UnsupportedDowngrade { src: 1, target: 0 })
         );
     }
+}
 
-    fn write_mem_buffer(payload: Vec<u8>) -> fmem::Buffer {
-        let vmo = fuchsia_zircon::Vmo::create(payload.len() as u64).expect("Creating VMO");
-        vmo.write(&payload, 0).expect("writing to VMO");
-        fmem::Buffer { vmo, size: payload.len() as u64 }
+#[cfg(test)]
+mod test_sha256_buffer {
+    use {super::*, assert_matches::assert_matches};
+
+    fn make_buffer(payload: Vec<u8>) -> fmem::Buffer {
+        let vmo = fuchsia_zircon::Vmo::create(payload.len().try_into().unwrap()).unwrap();
+        let () = vmo.write(&payload, 0).unwrap();
+        fmem::Buffer { vmo, size: payload.len().try_into().unwrap() }
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn calculate_hash_test_image_larger_than_buffer() {
-        let buffer = write_mem_buffer(vec![]);
-        let image_size = 4;
-        let calc_hash = calculate_hash(&buffer, image_size);
-
-        assert_matches!(calc_hash, Err(_));
+    #[test]
+    fn empty() {
+        let buffer = make_buffer(vec![]);
+        let calc_hash = sha256_buffer(&buffer).unwrap();
+        assert_eq!(
+            calc_hash,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".parse().unwrap()
+        );
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn calculate_hash_test_same_size() {
-        let buffer = write_mem_buffer(vec![0; 4]);
-        let image_size = 4;
-        let image_hash =
-            Hash::from_str("df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119")
-                .unwrap();
-        let calc_hash = calculate_hash(&buffer, image_size).unwrap();
-
-        assert_eq!(calc_hash, image_hash);
+    #[test]
+    fn large() {
+        let buffer = make_buffer(vec![0; 1024 * 50]);
+        let calc_hash = sha256_buffer(&buffer).unwrap();
+        assert_eq!(
+            calc_hash,
+            "16fa66a7dc98d93f2a4c5d20baf5177f59c4c37fc62face65690c11c15fe6ff9".parse().unwrap()
+        );
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn calculate_hash_test_image_smaller_than_buffer() {
-        let buffer = write_mem_buffer(vec![0; 4]);
-
-        let mut hasher = sha2::Sha256::new();
-        let mut chunk = [0; 4096];
-        let chunk_len = 2_usize;
-        let chunk = &mut chunk[..chunk_len];
-
-        buffer.vmo.read(chunk, 0).unwrap();
-        hasher.update(chunk);
-        let image_hash = Hash::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize()));
-
-        let image_size = 2;
-        let calc_hash = calculate_hash(&buffer, image_size).unwrap();
-
-        assert_eq!(calc_hash, image_hash);
+    #[test]
+    fn buffer_size_smaller_than_vmo_size_uses_buffer_size() {
+        let mut buffer = make_buffer(vec![0; 1024 * 51]);
+        buffer.size = 1024 * 50;
+        let calc_hash = sha256_buffer(&buffer).unwrap();
+        assert_eq!(
+            calc_hash,
+            "16fa66a7dc98d93f2a4c5d20baf5177f59c4c37fc62face65690c11c15fe6ff9".parse().unwrap()
+        );
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn calculate_hash_test_buffer_larger_than_vmo() {
-        let buffer = write_mem_buffer(vec![0; 4097]);
-        let image_size = 2;
-        let calc_hash = calculate_hash(&buffer, image_size).unwrap();
-        let image_hash =
-            Hash::from_str("96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7")
-                .unwrap();
-
-        assert_eq!(calc_hash, image_hash);
+    #[test]
+    fn buffer_size_larger_than_vmo_size_errors() {
+        let mut buffer = make_buffer(vec![0; 10]);
+        // vmo size will be rounded up to nearest page multiple
+        buffer.size = 4097;
+        assert_matches!(sha256_buffer(&buffer), Err(_));
     }
 }

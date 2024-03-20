@@ -36,6 +36,13 @@ fn write_mem_buffer(payload: Vec<u8>) -> Buffer {
     Buffer { vmo, size: payload.len() as u64 }
 }
 
+fn write_mem_buffer_custom_buffer_size((payload, size): (Vec<u8>, u64)) -> Buffer {
+    let vmo =
+        Vmo::create_with_opts(VmoOptions::RESIZABLE, payload.len() as u64).expect("Creating VMO");
+    let () = vmo.write(&payload, 0).expect("writing to VMO");
+    Buffer { vmo, size }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PaverEvent {
     ReadAsset { configuration: paver::Configuration, asset: paver::Asset },
@@ -347,6 +354,40 @@ pub mod hooks {
         }
     }
 
+    /// A Hook for responding to `ReadFirmware` calls that sets the size field of the returned
+    /// fuchsia.mem.Buffer independently from the content of the VMO.
+    pub fn read_firmware_custom_buffer_size<F>(callback: F) -> ReadFirmwareCustomBufferSize<F>
+    where
+        F: Fn(paver::Configuration, String) -> Result<(Vec<u8>, u64), Status>,
+    {
+        ReadFirmwareCustomBufferSize(callback)
+    }
+
+    pub struct ReadFirmwareCustomBufferSize<F>(F);
+
+    #[async_trait]
+    impl<F> Hook for ReadFirmwareCustomBufferSize<F>
+    where
+        F: Fn(paver::Configuration, String) -> Result<(Vec<u8>, u64), Status> + Sync,
+    {
+        async fn data_sink(
+            &self,
+            request: paver::DataSinkRequest,
+        ) -> Option<paver::DataSinkRequest> {
+            match request {
+                paver::DataSinkRequest::ReadFirmware { configuration, type_, responder } => {
+                    let result = (self.0)(configuration, type_)
+                        .map(write_mem_buffer_custom_buffer_size)
+                        .map_err(Status::into_raw);
+                    // Ignore errors from peers closing the channel early
+                    let _ = responder.send(result);
+                    None
+                }
+                request => Some(request),
+            }
+        }
+    }
+
     /// A Hook for responding to `ReadAsset` calls.
     pub fn read_asset<F>(callback: F) -> ReadAsset<F>
     where
@@ -370,6 +411,40 @@ pub mod hooks {
                 paver::DataSinkRequest::ReadAsset { configuration, asset, responder } => {
                     let result = (self.0)(configuration, asset)
                         .map(write_mem_buffer)
+                        .map_err(Status::into_raw);
+                    // Ignore errors from peers closing the channel early
+                    let _ = responder.send(result);
+                    None
+                }
+                request => Some(request),
+            }
+        }
+    }
+
+    /// A Hook for responding to `ReadAsset` calls that sets the size field of the returned
+    /// fuchsia.mem.Buffer independently from the content of the VMO.
+    pub fn read_asset_custom_buffer_size<F>(callback: F) -> ReadAssetCustomBufferSize<F>
+    where
+        F: Fn(paver::Configuration, paver::Asset) -> Result<(Vec<u8>, u64), Status>,
+    {
+        ReadAssetCustomBufferSize(callback)
+    }
+
+    pub struct ReadAssetCustomBufferSize<F>(F);
+
+    #[async_trait]
+    impl<F> Hook for ReadAssetCustomBufferSize<F>
+    where
+        F: Fn(paver::Configuration, paver::Asset) -> Result<(Vec<u8>, u64), Status> + Sync,
+    {
+        async fn data_sink(
+            &self,
+            request: paver::DataSinkRequest,
+        ) -> Option<paver::DataSinkRequest> {
+            match request {
+                paver::DataSinkRequest::ReadAsset { configuration, asset, responder } => {
+                    let result = (self.0)(configuration, asset)
+                        .map(write_mem_buffer_custom_buffer_size)
                         .map_err(Status::into_raw);
                     // Ignore errors from peers closing the channel early
                     let _ = responder.send(result);

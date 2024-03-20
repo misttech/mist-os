@@ -1216,6 +1216,157 @@ async fn zbi_match_in_active_config_error_in_desired_config() {
 }
 
 #[fasync::run_singlethreaded(test)]
+async fn asset_comparing_respects_fuchsia_mem_buffer_size() {
+    let images_json = ::update_package::ImagePackagesManifest::builder()
+        .fuchsia_package(
+            ::update_package::ImageMetadata::new(
+                8,
+                Hash::from_str(MATCHING_HASH).unwrap(),
+                image_package_resource_url("update-images-fuchsia", 9, "zbi"),
+            ),
+            None,
+        )
+        .clone()
+        .build();
+
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::read_asset_custom_buffer_size(|configuration, asset| {
+                match (configuration, asset) {
+                    // The read will return a VMO with the correct contents, but the
+                    // fuchsia.mem.Buffer size is too small so system-updater will not use it.
+                    (paver::Configuration::A, paver::Asset::Kernel) => Ok((b"matching".into(), 7)),
+                    (paver::Configuration::B, paver::Asset::Kernel) => {
+                        Ok((b"not a match sorry".to_vec(), 17))
+                    }
+                    (_, _) => Ok((vec![], 0)),
+                }
+            }))
+        })
+        .build()
+        .await;
+
+    env.resolver
+        .register_custom_package("another-update/4", "update", "upd4t3r", "fuchsia.com")
+        .add_file("packages.json", make_packages_json([]))
+        .add_file("epoch.json", make_current_epoch_json())
+        .add_file("images.json", serde_json::to_string(&images_json).unwrap());
+
+    env.resolver.url(image_package_url_to_string("update-images-fuchsia", 9)).resolve(
+        &env.resolver.package("update-images-fuchsia", hashstr(9)).add_file("zbi", "matching"),
+    );
+
+    env.run_update_with_options("fuchsia-pkg://fuchsia.com/another-update/4", default_options())
+        .await
+        .expect("run system updater");
+
+    let events = [
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::VerifiedBootMetadata,
+        }),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
+        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        // ZBI in A is read.
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
+        // But because the Buffer size is respected, it is not a match and the ZBI is resolved.
+        ReplaceRetainedPackages(vec![hash(9).into()]),
+        Gc,
+        PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
+        Paver(PaverEvent::WriteAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+            payload: b"matching".to_vec(),
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![]),
+        Gc,
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ];
+    assert_eq!(env.take_interactions(), events);
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn asset_copying_sets_fuchsia_mem_buffer_size() {
+    let images_json = ::update_package::ImagePackagesManifest::builder()
+        .fuchsia_package(
+            ::update_package::ImageMetadata::new(
+                8,
+                Hash::from_str(MATCHING_HASH).unwrap(),
+                image_package_resource_url("update-images-fuchsia", 9, "zbi"),
+            ),
+            None,
+        )
+        .clone()
+        .build();
+
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::read_asset(|configuration, asset| {
+                match (configuration, asset) {
+                    // The Buffer contains an extra 0u8, but ReadAsset can return the VMO of
+                    // the entire partition (not just the image), so system-updater should use
+                    // the size from the manifest in the update package and still find a match and
+                    // write only the 8 bytes of the image.
+                    (paver::Configuration::A, paver::Asset::Kernel) => Ok(b"matching\0".into()),
+                    (paver::Configuration::B, paver::Asset::Kernel) => {
+                        Ok(b"not a match sorry".to_vec())
+                    }
+                    (_, _) => Ok(vec![]),
+                }
+            }))
+        })
+        .build()
+        .await;
+
+    env.resolver
+        .register_custom_package("another-update/4", "update", "upd4t3r", "fuchsia.com")
+        .add_file("packages.json", make_packages_json([]))
+        .add_file("epoch.json", make_current_epoch_json())
+        .add_file("images.json", serde_json::to_string(&images_json).unwrap());
+
+    env.run_update_with_options("fuchsia-pkg://fuchsia.com/another-update/4", default_options())
+        .await
+        .expect("run system updater");
+
+    let events = [
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::WriteAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+            // Only 8 bytes are written, the trailing 0u8 returned by ReadAsset is ignored.
+            payload: b"matching".to_vec(),
+        }),
+    ];
+    assert_eq!(env.take_interactions(), construct_events(events));
+}
+
+#[fasync::run_singlethreaded(test)]
 async fn recovery_already_present() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
         .recovery_package(

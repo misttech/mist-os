@@ -90,7 +90,6 @@ async fn images_manifest_update_package_firmware_no_match() {
             firmware_type: "".to_string(),
             payload: b"_ contents".to_vec(),
         }),
-        // rest of events
         Paver(PaverEvent::DataSinkFlush),
         ReplaceRetainedPackages(vec![]),
         Gc,
@@ -250,6 +249,195 @@ async fn images_manifest_update_package_firmware_match_active_config() {
             payload: b"matching".to_vec(),
         }),
         // rest of the events.
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![]),
+        Gc,
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ];
+
+    assert_eq!(env.take_interactions(), events);
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn firmware_comparing_respects_fuchsia_mem_buffer_size() {
+    let images_json = ::update_package::ImagePackagesManifest::builder()
+        .firmware_package(btreemap! {
+            "".to_owned() => ::update_package::ImageMetadata::new(
+                8,
+                Hash::from_str(MATCHING_HASH).unwrap(),
+                image_package_resource_url("update-images-firmware", 6, "a")
+            ),
+        })
+        .fuchsia_package(
+            ::update_package::ImageMetadata::new(
+                0,
+                Hash::from_str(EMPTY_HASH).unwrap(),
+                image_package_resource_url("update-images-fuchsia", 9, "zbi"),
+            ),
+            None,
+        )
+        .clone()
+        .build();
+
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::read_firmware_custom_buffer_size(|configuration, _| {
+                match configuration {
+                    // The read will return a VMO with the correct contents, but the
+                    // fuchsia.mem.Buffer size is too small so system-updater will not use it.
+                    paver::Configuration::A => Ok((b"matching".to_vec(), 7)),
+                    _ => Ok((b"no match".to_vec(), 8)),
+                }
+            }))
+        })
+        .build()
+        .await;
+
+    env.resolver
+        .register_custom_package("another-update/4", "update", "upd4t3r", "fuchsia.com")
+        .add_file("packages.json", make_packages_json([]))
+        .add_file("epoch.json", make_current_epoch_json())
+        .add_file("images.json", serde_json::to_string(&images_json).unwrap());
+
+    env.resolver.url(image_package_url_to_string("update-images-firmware", 6)).resolve(
+        &env.resolver.package("update-images-firmware", hashstr(6)).add_file("a", "matching"),
+    );
+
+    env.run_update_with_options("fuchsia-pkg://fuchsia.com/another-update/4", default_options())
+        .await
+        .expect("run system updater");
+
+    let events = vec![
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::VerifiedBootMetadata,
+        }),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
+        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "".to_string(),
+        }),
+        // Firmware in A is read.
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::A,
+            firmware_type: "".to_string(),
+        }),
+        // But because the Buffer size is respected, it is not a match and the image is resolved.
+        ReplaceRetainedPackages(vec![hash(6).into()]),
+        Gc,
+        PackageResolve(image_package_url_to_string("update-images-firmware", 6)),
+        Paver(PaverEvent::WriteFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "".to_string(),
+            payload: b"matching".to_vec(),
+        }),
+        // rest of the events.
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedPackages(vec![]),
+        Gc,
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ];
+
+    assert_eq!(env.take_interactions(), events);
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn firmware_copying_sets_fuchsia_mem_buffer_size() {
+    let images_json = ::update_package::ImagePackagesManifest::builder()
+        .firmware_package(btreemap! {
+            "".to_owned() => ::update_package::ImageMetadata::new(
+                8,
+                Hash::from_str(MATCHING_HASH).unwrap(),
+                image_package_resource_url("update-images-firmware", 6, "a")
+            ),
+        })
+        .fuchsia_package(
+            ::update_package::ImageMetadata::new(
+                0,
+                Hash::from_str(EMPTY_HASH).unwrap(),
+                image_package_resource_url("update-images-fuchsia", 9, "zbi"),
+            ),
+            None,
+        )
+        .clone()
+        .build();
+
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::read_firmware(|configuration, _| match configuration {
+                // The Buffer contains an extra 0u8, but ReadFirmware returns the VMO of
+                // the entire partition (not just the image), so system-updater should use
+                // the size from the manifest in the update package and still find a match and
+                // write only the 8 bytes of the image.
+                paver::Configuration::A => Ok(b"matching\0".to_vec()),
+                _ => Ok(b"no match".to_vec()),
+            }))
+        })
+        .build()
+        .await;
+
+    env.resolver
+        .register_custom_package("another-update/4", "update", "upd4t3r", "fuchsia.com")
+        .add_file("packages.json", make_packages_json([]))
+        .add_file("epoch.json", make_current_epoch_json())
+        .add_file("images.json", serde_json::to_string(&images_json).unwrap());
+
+    env.run_update_with_options("fuchsia-pkg://fuchsia.com/another-update/4", default_options())
+        .await
+        .expect("run system updater");
+
+    let events = vec![
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::VerifiedBootMetadata,
+        }),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::QueryCurrentConfiguration),
+        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
+        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "".to_string(),
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::A,
+            firmware_type: "".to_string(),
+        }),
+        Paver(PaverEvent::WriteFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "".to_string(),
+            // Only 8 bytes are written, the trailing 0u8 returned by ReadFirmware is ignored.
+            payload: b"matching".to_vec(),
+        }),
         Paver(PaverEvent::DataSinkFlush),
         ReplaceRetainedPackages(vec![]),
         Gc,
