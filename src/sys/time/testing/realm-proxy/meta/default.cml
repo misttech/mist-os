@@ -53,12 +53,8 @@
     expose: [
         {
             protocol: [
-                // The below two protocols are forwarded programmatically to
-                // the #realm_builder collection. This is because there is no
-                // way to route directly to a collection (as opposed to a
-                // statically defined child component).
-                "fuchsia.testing.FakeClock",
-                "fuchsia.testing.FakeClockControl",
+                // This should be the only protocol exposed from the
+                // realm created by this realm factory.
                 "test.time.realm.RealmFactory",
             ],
             from: "self",
