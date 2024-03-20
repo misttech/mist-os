@@ -30,6 +30,7 @@ required_ffx_plugins = [
   "//src/developer/ffx/plugins/target:ffx_target",
   "//src/developer/ffx/plugins/version:ffx_version",
   "//src/developer/ffx/plugins/platform:ffx_platform",
+  "//src/developer/ffx/plugins/sdk:ffx_sdk",
 ]
 
 # The list of ffx plugins that we currently build as part of the 'main' ffx
@@ -60,7 +61,6 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/product:ffx_product",
   "//src/developer/ffx/plugins/profile:ffx_profile",
   "//src/developer/ffx/plugins/repository:ffx_repository",
-  "//src/developer/ffx/plugins/sdk:ffx_sdk",
   "//src/developer/ffx/plugins/session:ffx_session",
   "//src/developer/ffx/plugins/test:ffx_test",
   "//src/developer/ffx/plugins/trace:ffx_trace",
@@ -76,7 +76,6 @@ dual_mode_defaults = [
   "//src/developer/ffx/plugins/log/data/config.json",
   "//src/developer/ffx/plugins/product/data/config.json",
   "//src/developer/ffx/plugins/repository/data/config.json",
-  "//src/developer/ffx/plugins/sdk/data/config.json",
   "//src/developer/ffx/plugins/test/data/config.json",
   "//src/developer/ffx/plugins/trace/data/config.json",
 ]
