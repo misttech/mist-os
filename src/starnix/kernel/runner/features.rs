@@ -45,6 +45,8 @@ pub struct Features {
 
     pub magma: bool,
 
+    pub gfxstream: bool,
+
     pub test_data: bool,
 
     pub custom_artifacts: bool,
@@ -88,6 +90,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("framebuffer", _) => features.framebuffer = true,
             ("gralloc", _) => features.gralloc = true,
             ("magma", _) => features.magma = true,
+            ("gfxstream", _) => features.gfxstream = true,
             ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
             ("log_dump_on_exit", _) => features.kernel.log_dump_on_exit = true,
             ("perfetto", Some(socket_path)) => {
@@ -141,6 +144,9 @@ pub fn run_container_features(
     }
     if features.magma {
         magma_device_init(locked, system_task);
+    }
+    if features.gfxstream {
+        return Err(anyhow!("gfxstream unsupported"));
     }
     if let Some(socket_path) = features.perfetto.clone() {
         start_perfetto_consumer_thread(kernel, socket_path)
