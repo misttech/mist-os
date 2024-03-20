@@ -58,11 +58,10 @@ test("aml-saradc-test-bin") {
   sources = [ "aml-saradc-test.cc" ]
   deps = [
     ":common",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/testing/cpp:cpp",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-mmio-reg",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
   ]
 }
 
