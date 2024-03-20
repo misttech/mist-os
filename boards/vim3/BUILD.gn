@@ -73,6 +73,7 @@ board_configuration("vim3") {
 board_configuration("vim3-devicetree") {
   forward_variables_from(_base, "*")
   input_bundles += [ ":devicetree_board_driver" ]
+  devicetree = "//src/devices/board/drivers/vim3-devicetree:vim3"
 }
 
 board_input_bundle("main_bundle") {

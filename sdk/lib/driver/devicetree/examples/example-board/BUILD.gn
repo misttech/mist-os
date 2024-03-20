@@ -15,10 +15,9 @@ bazel_driver_package("bazel_package") {
   package_name = "example-board"
 }
 
-devicetree("example-board-dt") {
+devicetree("example-board") {
   sources = [ "dts/example-board.dts.S" ]
   golden = "dts/example-board.golden.dts"
-  outputs = [ "$target_out_dir/example-board.dtb" ]
   deps = [ "//zircon/system/ulib/ddk-platform-defs" ]
 }
 
@@ -32,7 +31,7 @@ zbi_input("example-board-dtb") {
 }
 
 bazel_input_resource("test-dtb") {
-  deps = [ ":example-board-dt" ]
+  deps = [ ":example-board" ]
   sources = [ "$target_out_dir/example-board.dtb" ]
   outputs = [ "{{source_file_part}}" ]
 }

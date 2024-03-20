@@ -58,6 +58,9 @@ pub struct ImageAssemblyConfig {
     /// Optionally-provided data to pass to the board's Board Driver via a ZBI
     /// item.
     pub board_driver_arguments: Option<BoardDriverArguments>,
+
+    /// Devicetree binary to be added to zbi
+    pub devicetree: Option<Utf8PathBuf>,
 }
 
 impl ImageAssemblyConfig {
@@ -79,6 +82,7 @@ impl ImageAssemblyConfig {
             qemu_kernel: "path/to/qemu/kernel".into(),
             images_config: ImagesConfig::default(),
             board_driver_arguments: None,
+            devicetree: Some("path/to/devicetree/binary".into()),
         }
     }
 }

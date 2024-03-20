@@ -333,8 +333,12 @@ template("devicetree") {
                              "sources",
                              "deps",
                              "public_deps",
-                             "outputs",
                            ])
+    if (defined(invoker.outputs)) {
+      outputs = invoker.outputs
+    } else {
+      outputs = [ "$target_out_dir/$compiled_dtb_target" ]
+    }
   }
 
   # Decompile the compiled DTS so we can use it for the golden comparison.
