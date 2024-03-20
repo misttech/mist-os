@@ -583,34 +583,6 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
   }
 }
 
-void AmlogicDisplay::DdkSuspend(ddk::SuspendTxn txn) {
-  if (txn.suspend_reason() != DEVICE_SUSPEND_REASON_MEXEC) {
-    txn.Reply(ZX_ERR_NOT_SUPPORTED, txn.requested_state());
-    return;
-  }
-  if (fully_initialized()) {
-    video_input_unit_->DisableLayer();
-  }
-
-  fbl::AutoLock l(&image_mutex_);
-  for (auto& i : imported_images_) {
-    if (i.pmt) {
-      i.pmt.unpin();
-    }
-    if (i.canvas.has_value() && i.canvas_idx > 0) {
-      fidl::WireResult result = fidl::WireCall(i.canvas.value())->Free(i.canvas_idx);
-    }
-  }
-  txn.Reply(ZX_OK, txn.requested_state());
-}
-
-void AmlogicDisplay::DdkResume(ddk::ResumeTxn txn) {
-  if (fully_initialized()) {
-    video_input_unit_->EnableLayer();
-  }
-  txn.Reply(ZX_OK, DEV_POWER_STATE_D0, txn.requested_state());
-}
-
 void AmlogicDisplay::DdkRelease() {
   vsync_receiver_.reset();
 
