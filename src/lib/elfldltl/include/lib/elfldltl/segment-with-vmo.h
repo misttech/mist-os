@@ -79,13 +79,30 @@ class SegmentWithVmo {
   static_assert(std::is_move_assignable_v<VmoHolder>);
 
   // The Copy and NoCopy templates are shorthands using this.
-  template <class Copy>
+  template <class CopyT>
   struct Wrapper {
     // Segment types that have a filesz() are replaced with this subclass.
     // ZeroFillSegment never needs a VMO handle.
     template <class Segment>
     struct WithVmo : public Segment, VmoHolder {
+      template <class OtherCopyT>
+      using OtherSegment = typename Wrapper<OtherCopyT>::template WithVmo<Segment>;
+
       using Segment::Segment;
+
+      // It's movable, though not copyable.  The base Segment type is copyable.
+      WithVmo(WithVmo&&) = default;
+
+      // It's explicitly constructible from the base Segment type.
+      explicit WithVmo(const Segment& other) : Segment{other} {}
+
+      WithVmo& operator=(WithVmo&&) = default;
+
+      // Assigning from the base Segment type drops any previous VMO.
+      WithVmo& operator=(const Segment& other) {
+        Segment::operator=(other);
+        vmo().reset();
+      }
 
       // Don't merge with any other segment if there's a VMO installed.  Its
       // contents won't cover the other segment.  Both segments will get the
@@ -104,6 +121,39 @@ class SegmentWithVmo {
         static_assert(std::is_move_constructible_v<WithVmo>);
         static_assert(std::is_move_assignable_v<WithVmo>);
         return !vmo();
+      }
+
+      // Copy from the unadorned Segment is fine: there's never a VMO to copy.
+      template <class Diagnostics>
+      static fit::result<bool, WithVmo> Copy(  //
+          Diagnostics& diag, const Segment& other) {
+        return fit::ok(WithVmo{*Segment::Copy(diag, other)});
+      }
+
+      // Copy from the corresponding Segment subclass of this wrapper is just
+      // fine: clone the VMO, if any.  Both the SegmentWithVmo::Copy and
+      // SegmentWithVmo::NoCopy instantiations of the corresponding Segment
+      // subclass are accepted.  The VMOs are always cloned--the distinction of
+      // NoCopy is only about what a VmarLoader does with these segments.
+      template <class Diagnostics, class OtherCopyT>
+      static fit::result<bool, WithVmo> Copy(  //
+          Diagnostics& diag, const OtherSegment<OtherCopyT>& other) {
+        // Copy the base Segment type's fields first.  It cannot fail.
+        WithVmo copy{*Segment::Copy(diag, static_cast<const Segment&>(other))};
+
+        // If the other segment has its own VMO, then the copied segment needs
+        // a copy-on-write clone of that whole VMO.
+        zx::vmo new_vmo;
+        if (other.vmo()) {
+          assert(copy.filesz() == other.filesz());
+          zx_status_t status =  //
+              CopyVmo(other.vmo().borrow(), 0, copy.filesz(), copy.vmo());
+          if (status != ZX_OK) [[unlikely]] {
+            return SystemError(diag, copy, kCopyVmoFail, status);
+          }
+        }
+
+        return fit::ok(std::move(copy));
       }
     };
 
@@ -144,20 +194,22 @@ class SegmentWithVmo {
      private:
       // In Copy, copy_on_write() is statically true all the time.  In NoCopy,
       // it's true by default but can be set to false in the constructor.
-      using CopyTrue = std::conditional_t<Copy{}, Copy, std::true_type>;
-      using CopyFalse = std::conditional_t<Copy{}, Copy, std::false_type>;
+      using CopyTrue = std::conditional_t<CopyT{}, CopyT, std::true_type>;
+      using CopyFalse = std::conditional_t<CopyT{}, CopyT, std::false_type>;
 
       zx::unowned_vmo vmo_;
-      std::conditional_t<Copy{}, Copy, bool> copy_on_write_{CopyTrue{}};
+      std::conditional_t<CopyT{}, CopyT, bool> copy_on_write_{CopyTrue{}};
       uint64_t offset_;
     };
   };
 
   template <class Segment>
   using Copy = typename Wrapper<std::true_type>::template Type<Segment>;
+  using CopySegmentVmo = Wrapper<std::true_type>::SegmentVmo;
 
   template <class Segment>
   using NoCopy = Wrapper<std::false_type>::template Type<Segment>;
+  using NoCopySegmentVmo = Wrapper<std::true_type>::SegmentVmo;
 
   // This takes a LoadInfo::*Segment type that has file contents (i.e. not
   // ZeroFillSegment), and ensures that segment.vmo() is a valid segment.
@@ -183,12 +235,16 @@ class SegmentWithVmo {
   // main file VMO is installed as its vmo().  In the modified VMO, the partial
   // page has been cleared to all zero bytes.  The segment.filesz() has been
   // rounded up to whole pages so it can be mapped with no additional zeroing.
+  //
+  // With the optional readonly flag set, make each new per-segment VMO
+  // immutable by replacing the segment .vmo() handle without ZX_RIGHT_WRITE.
   template <class Diagnostics, class LoadInfo>
   [[nodiscard]] static bool AlignSegments(Diagnostics& diag, LoadInfo& info, zx::unowned_vmo vmo,
-                                          size_t page_size) {
+                                          size_t page_size, bool readonly = false) {
     using DataWithZeroFillSegment = typename LoadInfo::DataWithZeroFillSegment;
-    return info.VisitSegments([vmo, page_size, &diag](auto& segment) {
+    auto align_segment = [vmo, page_size, readonly, &diag](auto& segment) {
       using Segment = std::decay_t<decltype(segment)>;
+      constexpr zx_rights_t kRights = ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_WRITE;
       if constexpr (std::is_same_v<Segment, DataWithZeroFillSegment>) {
         const size_t zero_size = segment.MakeAligned(page_size);
         if (zero_size > 0) {
@@ -201,10 +257,17 @@ class SegmentWithVmo {
           if (status != ZX_OK) [[unlikely]] {
             return SystemError(diag, segment, kZeroVmoFail, status);
           }
+          if (readonly) {
+            status = segment.vmo().replace(kRights, &segment.vmo());
+            if (status != ZX_OK) [[unlikely]] {
+              return SystemError(diag, segment, kProtectVmoFail, status);
+            }
+          }
         }
       }
       return true;
-    });
+    };
+    return info.VisitSegments(align_segment);
   }
 
   // elfldltl::SegmentWithVmo::GetMutableMemory must be instantiated with a
@@ -280,6 +343,8 @@ class SegmentWithVmo {
       "cannot create copy-on-write VMO for segment contents";
   static constexpr std::string_view kZeroVmoFail =
       "cannot zero partial page in VMO for data segment";
+  static constexpr std::string_view kProtectVmoFail =
+      "cannot drop ZX_RIGHT_WRITE on VMO for data segment";
   static constexpr std::string_view kColonSpace = ": ";
   static constexpr std::string_view kMapFail = "cannot map segment to apply relocations";
   static constexpr std::string_view kMutableZeroFill = "cannot make zero-fill segment mutable";
@@ -310,14 +375,14 @@ class SegmentWithVmo {
 
 template <class Elf, template <class> class Container, PhdrLoadPolicy Policy>
 class VmarLoader::SegmentVmo<LoadInfo<Elf, Container, Policy, SegmentWithVmo::Copy>>
-    : public SegmentWithVmo::Wrapper<std::true_type>::SegmentVmo {
-  using SegmentWithVmo::Wrapper<std::true_type>::SegmentVmo::SegmentVmo;
+    : public SegmentWithVmo::CopySegmentVmo {
+  using SegmentWithVmo::CopySegmentVmo::CopySegmentVmo;
 };
 
 template <class Elf, template <class> class Container, PhdrLoadPolicy Policy>
 class VmarLoader::SegmentVmo<LoadInfo<Elf, Container, Policy, SegmentWithVmo::NoCopy>>
-    : public SegmentWithVmo::Wrapper<std::false_type>::SegmentVmo {
-  using SegmentWithVmo::Wrapper<std::false_type>::SegmentVmo::SegmentVmo;
+    : public SegmentWithVmo::NoCopySegmentVmo {
+  using SegmentWithVmo::NoCopySegmentVmo::NoCopySegmentVmo;
 };
 
 }  // namespace elfldltl

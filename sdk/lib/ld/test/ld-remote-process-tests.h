@@ -123,7 +123,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     // any number of separate dynamic linking domains in however many
     // processes.
     RemoteAbiStub<> abi_stub;
-    EXPECT_TRUE(abi_stub.Init(diag, predecoded_modules[kStub]));
+    EXPECT_TRUE(abi_stub.Init(diag, predecoded_modules[kStub].decoded()));
     EXPECT_GE(abi_stub.data_size(), sizeof(ld::abi::Abi<>) + sizeof(elfldltl::Elf<>::RDebug<>));
     EXPECT_LT(abi_stub.data_size(), zx_system_get_page_size());
     EXPECT_LE(abi_stub.abi_offset(), abi_stub.data_size() - sizeof(ld::abi::Abi<>));
@@ -143,13 +143,13 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
       EXPECT_NE(entry, 0u);
 
       // Must lie within the module bounds.
-      EXPECT_GT(entry, predecoded_stub.load_info().vaddr_start());
-      EXPECT_LT(entry - predecoded_stub.load_info().vaddr_start(),
-                predecoded_stub.load_info().vaddr_size());
+      EXPECT_GT(entry, predecoded_stub.decoded().load_info().vaddr_start());
+      EXPECT_LT(entry - predecoded_stub.decoded().load_info().vaddr_start(),
+                predecoded_stub.decoded().load_info().vaddr_size());
 
       // Must be inside an executable segment.
-      auto segment = predecoded_stub.load_info().FindSegment(entry);
-      ASSERT_NE(segment, predecoded_stub.load_info().segments().end());
+      auto segment = predecoded_stub.decoded().load_info().FindSegment(entry);
+      ASSERT_NE(segment, predecoded_stub.decoded().load_info().segments().end());
       EXPECT_TRUE(std::visit(segment_is_executable, *segment));
 
       // Must be unique.

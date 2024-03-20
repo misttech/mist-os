@@ -12,7 +12,7 @@
 #include <array>
 
 #include "abi.h"
-#include "remote-load-module.h"
+#include "remote-decoded-module.h"
 #include "tlsdesc.h"
 
 namespace ld {
@@ -54,7 +54,7 @@ class RemoteAbiStub {
   using Addr = typename Elf::Addr;
   using Phdr = typename Elf::Phdr;
   using Sym = typename Elf::Sym;
-  using RemoteModule = RemoteLoadModule<Elf>;
+  using RemoteModule = RemoteDecodedModule<Elf>;
   using LocalAbi = abi::Abi<Elf>;
   using TlsDescResolver = ld::StaticTlsDescResolver<Elf>;
   using TlsdescRuntimeHooks = typename TlsDescResolver::RuntimeHooks;
@@ -197,7 +197,7 @@ class RemoteAbiStub {
                               " missing PT_GNU_EH_FRAME program header"sv);
     }
 
-    auto memory = ld_stub.decoded().metadata_memory();
+    auto memory = ld_stub.metadata_memory();
     if (memory.base() != 0) [[unlikely]] {
       return diag.FormatError("stub "sv, LocalAbi::kSoname.str(), " has base address ",
                               memory.base());

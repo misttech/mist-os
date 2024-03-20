@@ -17,6 +17,8 @@
 #include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
 
+#include <memory>
+
 namespace ld {
 
 // ld::RemoteDecodedModule represents an ELF file and all the metadata
@@ -27,27 +29,51 @@ namespace ld {
 //
 // The RemoteDecodedModule object owns a read-and-execute-only VMO handle for
 // the file's immutable contents and a mapping covering all its segments
-// (perhaps the whole file).  The VMO is supplied at construction.
+// (perhaps the whole file).  The VMO is supplied at construction and is owned
+// for the lifetime of the RemoteDecodedModule.  The Init method decodes the
+// ELF file's metadata and prepares the RemoteDecodedModule for use.  All other
+// methods are const.
+//
+// If Init encountered errors then the object may be in a partially-initialized
+// state where HasModule() returns false, or where it returns true but the
+// mapped_vmo() and/or module() and/or load_info() data is incomplete.  How
+// much partial work might be done (and the return value of Init) depends on
+// when the Diagnostics object says to keep going.  An incomplete object that
+// won't be used should be destroyed because it may use substantial resources
+// (like mapping the whole file VMO into the local address space).
 //
 // It's a movable object, but moving it does not invalidate all the metadata
 // pointers.  For the lifetime of the RemoteDecodedModule, other objects can
 // point into the mapped file's metadata such as by doing shallow copies of
 // `.module()`.  The `.load_info()` object may own move-only zx::vmo handles to
-// VMOs in `.segments()` via elfldltl::SegmentWithVmo::NoCopy.  (The
-// distinction between NoCopy and Copy doesn't really matter here, since the
-// segments in RemoteDecodedModule should never be passed to a VmarLoader.)  As
-// no relocations are performed on these segments, such a writable VMO will
-// only exist when elfldltl::SegmentWithVmo::AlignSegments finds a
-// DataWithZeroFillSegment with a partial page of bss to be cleared.
+// VMOs in `.segments()` via elfldltl::SegmentWithVmo::Copy.  (The distinction
+// between NoCopy and Copy doesn't really matter here, since the segments in
+// RemoteDecodedModule should never be passed to a VmarLoader.  Using Copy just
+// expresses the abstract intent that RemoteDecodedModule be used in a const
+// fashion, including never modifying contents of VMOs it owns after Init.)  As
+// no relocations are performed on these segments, such a VMO will only exist
+// when a DataWithZeroFillSegment with a partial page of bss is adjusted by
+// elfldltl::SegmentWithVmo::AlignSegments with a separate VMO.  Any new VMO
+// becomes immutable (with no ZX_RIGHT_WRITE on the only handle) once its final
+// partial page has been zeroed.
 
+// This is a shorthand for the <lib/elfldltl/container.h> wrappers used here.
+template <typename T>
+using RemoteContainer = elfldltl::StdContainer<std::vector>::Container<T>;
+
+// This is an implementation detail of RemoteDecodedModule, below.
 template <class Elf>
 using RemoteDecodedModuleBase =
-    DecodedModule<Elf, elfldltl::StdContainer<std::vector>::Container, AbiModuleInline::kYes,
-                  DecodedModuleRelocInfo::kYes, elfldltl::SegmentWithVmo::NoCopy>;
+    DecodedModule<Elf, RemoteContainer, AbiModuleInline::kYes, DecodedModuleRelocInfo::kYes,
+                  elfldltl::SegmentWithVmo::Copy>;
 
 template <class Elf = elfldltl::Elf<>>
 class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
  public:
+  // ld::RemoteDecodedModule is usually used only via const pointer.
+  // Only the Init method is called on a mutable ld::RemoteDecodedModule.
+  using Ptr = std::unique_ptr<const RemoteDecodedModule>;
+
   using Base = RemoteDecodedModuleBase<Elf>;
   static_assert(std::is_move_constructible_v<Base>);
   static_assert(std::is_move_assignable_v<Base>);
@@ -101,6 +127,19 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
   // file image and are valid for the lifetime of this RemoteDecodedModule (or
   // until it's assigned).
   const NeededList& needed() const { return needed_; }
+
+  // This creates and initializes a new RemoteDecodedModule from a VMO.  See
+  // Init() below for details about interaction with the Diagnostics object.
+  // This returns a null pointer if Init() returned false.  In all cases, the
+  // VMO handle is consumed.
+  template <class Diagnostics>
+  static Ptr Create(Diagnostics& diag, zx::vmo vmo, size_type page_size) {
+    auto decoded = std::make_unique<RemoteDecodedModule>(std::move(vmo));
+    if (!decoded->Init(diag, page_size)) {
+      decoded.reset();
+    }
+    return decoded;
+  }
 
   // Initialize the module from the provided VMO, representing either the
   // binary or shared library to be loaded.  Create the data structures that
@@ -158,14 +197,17 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
     }
 
     // Apply RELRO protection before segments are aligned & equipped with VMOs.
-    if (!this->load_info().ApplyRelro(diag, relro_phdr, page_size, false)) {
+    if (!this->load_info().ApplyRelro(diag, relro_phdr, page_size, false)) [[unlikely]] {
       // ApplyRelro only fails if Diagnostics said to give up.
       return false;
     }
 
-    // Fix up segments to be compatible with AlignedRemoteVmarLoader.
-    if (!elfldltl::SegmentWithVmo::AlignSegments(diag, this->load_info(), vmo_.borrow(),
-                                                 page_size)) {
+    // Fix up segments to be compatible with AlignedRemoteVmarLoader.  Any
+    // per-segment VMOs created for partial-page zeroing become immutable.
+    // Only copy-on-write clones of them will have relocations or other
+    // mutations applied or be mapped writable in any process.
+    if (!elfldltl::SegmentWithVmo::AlignSegments(diag, this->load_info(), vmo_.borrow(), page_size,
+                                                 true)) [[unlikely]] {
       // AlignSegments only fails if Diagnostics said to give up.
       return false;
     }
@@ -183,7 +225,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
     // offset into the DT_STRTAB, but the single pass finds DT_STRTAB and sees
     // each DT_NEEDED at the same time.  So the observer just collects their
     // offsets and then those are reified into strings afterwards.
-    elfldltl::StdContainer<std::vector>::Container<size_type> needed_offsets;
+    RemoteContainer<size_type> needed_offsets;
 
     if (auto result = DecodeModuleDynamic<Elf>(
             this->module(), diag, memory, dyn_phdr, NeededObserver(needed_offsets),
@@ -225,13 +267,12 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
   }
 
  private:
-  // This is ultimately just passed to StdContainer<...>::push_back, which
+  // This is ultimately just passed to RemoteContainer<...>::push_back, which
   // never uses it since it will just crash if allocation fails.
   static const constexpr std::string_view kImpossibleError{};
 
-  using NeededObserver = elfldltl::DynamicValueCollectionObserver<
-      Elf, elfldltl::ElfDynTag::kNeeded, elfldltl::StdContainer<std::vector>::Container<size_type>,
-      kImpossibleError>;
+  using NeededObserver = elfldltl::DynamicValueCollectionObserver<  //
+      Elf, elfldltl::ElfDynTag::kNeeded, RemoteContainer<size_type>, kImpossibleError>;
 
   elfldltl::MappedVmoFile mapped_vmo_;
   NeededList needed_;
