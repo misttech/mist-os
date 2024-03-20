@@ -56,7 +56,6 @@ test("aml-spi-test-bin") {
   ]
   deps = [
     ":common",
-    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/gpio/testing/fake-gpio",

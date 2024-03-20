@@ -5,7 +5,6 @@
 #include "aml-spi.h"
 
 #include <endian.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
@@ -70,27 +69,11 @@ class TestAmlSpiDriver : public AmlSpiDriver {
   uint32_t testreg_{};
 };
 
-struct IncomingNamespace {
-  explicit IncomingNamespace(const fdf::UnownedSynchronizedDispatcher& dispatcher)
-      : registers(dispatcher->async_dispatcher()),
-        node_server("root", dispatcher->async_dispatcher()),
-        test_environment(dispatcher->get()) {}
-
-  fake_pdev::FakePDevFidl pdev_server;
-  mock_registers::MockRegisters registers;
-  std::queue<std::pair<zx_status_t, uint8_t>> gpio_writes;
-  fake_gpio::FakeGpio gpio;
-  fdf_testing::TestNode node_server;
-  fdf_testing::TestEnvironment test_environment;
-  compat::DeviceServer compat;
-};
-
 class AmlSpiTest : public zxtest::Test {
  public:
   AmlSpiTest()
-      : background_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        incoming_(background_dispatcher_->async_dispatcher(), std::in_place,
-                  background_dispatcher_->borrow()),
+      : registers_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+        node_server_("root"),
         dut_(TestAmlSpiDriver::GetDriverRegistration()) {}
 
   virtual void SetUpInterrupt(fake_pdev::FakePDevFidl::Config& config) {
@@ -125,77 +108,64 @@ class AmlSpiTest : public zxtest::Test {
     SetUpInterrupt(config);
     SetUpBti(config);
 
-    incoming_.SyncCall([this, config = std::move(config)](IncomingNamespace* incoming) mutable {
-      zx::result start_args = incoming->node_server.CreateStartArgsAndServe();
-      ASSERT_TRUE(start_args.is_ok());
+    zx::result start_args = node_server_.CreateStartArgsAndServe();
+    ASSERT_TRUE(start_args.is_ok());
 
-      driver_outgoing_ = std::move(start_args->outgoing_directory_client);
+    driver_outgoing_ = std::move(start_args->outgoing_directory_client);
 
-      ASSERT_TRUE(
-          incoming->test_environment.Initialize(std::move(start_args->incoming_directory_server))
-              .is_ok());
+    ASSERT_TRUE(
+        test_environment_.Initialize(std::move(start_args->incoming_directory_server)).is_ok());
 
-      start_args_ = std::move(start_args->start_args);
+    start_args_ = std::move(start_args->start_args);
 
-      incoming->pdev_server.SetConfig(std::move(config));
+    pdev_server_.SetConfig(std::move(config));
 
-      auto& directory = incoming->test_environment.incoming_directory();
+    auto& directory = test_environment_.incoming_directory();
 
-      auto result = directory.AddService<fuchsia_hardware_platform_device::Service>(
-          incoming->pdev_server.GetInstanceHandler(background_dispatcher_->async_dispatcher()),
-          "pdev");
-      ASSERT_TRUE(result.is_ok());
+    auto result = directory.AddService<fuchsia_hardware_platform_device::Service>(
+        pdev_server_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()), "pdev");
+    ASSERT_TRUE(result.is_ok());
 
-      const auto metadata = GetAmlSpiMetadata();
-      EXPECT_OK(
-          incoming->compat.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &metadata, sizeof(metadata)));
-      incoming->compat.Init("pdev", {});
-      EXPECT_OK(incoming->compat.Serve(background_dispatcher_->async_dispatcher(), &directory));
+    const auto metadata = GetAmlSpiMetadata();
+    EXPECT_OK(compat_.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &metadata, sizeof(metadata)));
+    compat_.Init("pdev", {});
+    EXPECT_OK(compat_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &directory));
 
-      result = directory.AddService<fuchsia_hardware_gpio::Service>(
-          incoming->gpio.CreateInstanceHandler(), "gpio-cs-2");
-      ASSERT_TRUE(result.is_ok());
+    result = directory.AddService<fuchsia_hardware_gpio::Service>(gpio_.CreateInstanceHandler(),
+                                                                  "gpio-cs-2");
+    ASSERT_TRUE(result.is_ok());
 
-      result = directory.AddService<fuchsia_hardware_gpio::Service>(
-          incoming->gpio.CreateInstanceHandler(), "gpio-cs-3");
-      ASSERT_TRUE(result.is_ok());
+    result = directory.AddService<fuchsia_hardware_gpio::Service>(gpio_.CreateInstanceHandler(),
+                                                                  "gpio-cs-3");
+    ASSERT_TRUE(result.is_ok());
 
-      result = directory.AddService<fuchsia_hardware_gpio::Service>(
-          incoming->gpio.CreateInstanceHandler(), "gpio-cs-5");
-      ASSERT_TRUE(result.is_ok());
+    result = directory.AddService<fuchsia_hardware_gpio::Service>(gpio_.CreateInstanceHandler(),
+                                                                  "gpio-cs-5");
+    ASSERT_TRUE(result.is_ok());
 
-      incoming->gpio.SetCurrentState(
-          fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
-                           .sub_state = fake_gpio::WriteSubState{.value = 0}});
-      incoming->gpio.SetWriteCallback([incoming](fake_gpio::FakeGpio& gpio) {
-        if (incoming->gpio_writes.empty()) {
-          EXPECT_FALSE(incoming->gpio_writes.empty());
-          return ZX_ERR_INTERNAL;
-        }
-        auto [status, value] = incoming->gpio_writes.front();
-        incoming->gpio_writes.pop();
-        if (status != ZX_OK) {
-          EXPECT_EQ(value, gpio.GetWriteValue());
-        }
-        return status;
-      });
+    gpio_.SetCurrentState(fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
+                                           .sub_state = fake_gpio::WriteSubState{.value = 0}});
+    gpio_.SetWriteCallback([this](fake_gpio::FakeGpio& gpio) {
+      if (gpio_writes_.empty()) {
+        EXPECT_FALSE(gpio_writes_.empty());
+        return ZX_ERR_INTERNAL;
+      }
+      auto [status, value] = gpio_writes_.front();
+      gpio_writes_.pop();
+      if (status != ZX_OK) {
+        EXPECT_EQ(value, gpio_.GetWriteValue());
+      }
+      return status;
     });
-    ASSERT_NO_FATAL_FAILURE();
 
     if (SetupResetRegister()) {
-      incoming_.SyncCall([](IncomingNamespace* incoming) {
-        auto result = incoming->test_environment.incoming_directory()
-                          .AddService<fuchsia_hardware_registers::Service>(
-                              incoming->registers.GetInstanceHandler(), "reset");
-        ASSERT_TRUE(result.is_ok());
-      });
-      ASSERT_NO_FATAL_FAILURE();
+      auto result =
+          test_environment_.incoming_directory().AddService<fuchsia_hardware_registers::Service>(
+              registers_.GetInstanceHandler(), "reset");
+      ASSERT_TRUE(result.is_ok());
     }
 
-    incoming_.SyncCall([](IncomingNamespace* incoming) {
-      incoming->registers.ExpectWrite<uint32_t>(0x1c, 1 << 1, 1 << 1);
-    });
-    ASSERT_NO_FATAL_FAILURE();
+    registers_.ExpectWrite<uint32_t>(0x1c, 1 << 1, 1 << 1);
   }
 
   void TearDown() override {
@@ -204,29 +174,21 @@ class AmlSpiTest : public zxtest::Test {
     EXPECT_TRUE(dut_.Stop().is_ok());
   }
 
-  void ExpectGpioWrite(zx_status_t status, uint8_t value) {
-    incoming_.SyncCall(
-        [&](IncomingNamespace* incoming) { incoming->gpio_writes.emplace(status, value); });
-  }
+  void ExpectGpioWrite(zx_status_t status, uint8_t value) { gpio_writes_.emplace(status, value); }
 
   void VerifyGpioAndClear() {
-    incoming_.SyncCall([&](IncomingNamespace* incoming) {
-      EXPECT_EQ(incoming->gpio_writes.size(), 0);
-      incoming->gpio_writes = {};
-    });
+    EXPECT_EQ(gpio_writes_.size(), 0);
+    gpio_writes_ = {};
   }
 
   ddk_fake::FakeMmioRegRegion& mmio() { return dut_->mmio(); }
   bool ControllerReset() {
-    zx_status_t status;
-    incoming_.SyncCall([&status](IncomingNamespace* incoming) {
-      status = incoming->registers.VerifyAll();
-      if (status == ZX_OK) {
-        // Always keep a single expectation in the queue, that way we can verify when the controller
-        // is not reset.
-        incoming->registers.ExpectWrite<uint32_t>(0x1c, 1 << 1, 1 << 1);
-      }
-    });
+    zx_status_t status = registers_.VerifyAll();
+    if (status == ZX_OK) {
+      // Always keep a single expectation in the queue, that way we can verify when the controller
+      // is not reset.
+      registers_.ExpectWrite<uint32_t>(0x1c, 1 << 1, 1 << 1);
+    }
 
     return status == ZX_OK;
   }
@@ -248,8 +210,12 @@ class AmlSpiTest : public zxtest::Test {
   }
 
   fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher background_dispatcher_;
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
+  fake_pdev::FakePDevFidl pdev_server_;
+  mock_registers::MockRegisters registers_;
+  std::queue<std::pair<zx_status_t, uint8_t>> gpio_writes_;
+  fake_gpio::FakeGpio gpio_;
+  fdf_testing::TestNode node_server_;
+  fdf_testing::TestEnvironment test_environment_;
   fdf_testing::DriverUnderTest<TestAmlSpiDriver> dut_;
   fuchsia_driver_framework::DriverStartArgs start_args_;
 
@@ -264,6 +230,7 @@ class AmlSpiTest : public zxtest::Test {
 
   zx::interrupt interrupt_;
   fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
+  compat::DeviceServer compat_;
 };
 
 zx_koid_t GetVmoKoid(const zx::vmo& vmo) {
@@ -281,10 +248,7 @@ TEST_F(AmlSpiTest, DdkLifecycle) {
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    ASSERT_NE(incoming->node_server.children().find("aml-spi-0"),
-              incoming->node_server.children().cend());
-  });
+  ASSERT_NE(node_server_.children().find("aml-spi-0"), node_server_.children().cend());
 }
 
 TEST_F(AmlSpiTest, ChipSelectCount) {
