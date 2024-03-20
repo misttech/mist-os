@@ -83,7 +83,12 @@ class Terminal:
                     pass
                 elif (m := _UP_REGEX.match(code)) is not None:
                     # Go up N lines
-                    self._line_position -= int(m.group(1))
+                    value = int(m.group(1))
+                    if value == 0:
+                        raise TerminalError(
+                            "It is invalid to go up 0 lines in the terminal"
+                        )
+                    self._line_position -= value
                 elif code == "[0J":
                     if not at_front:
                         raise TerminalError(

@@ -162,10 +162,25 @@ def write_lines(
         write_buffer = io.StringIO()
 
         if _last_line_count:
-            write_buffer.write(
-                "\r"
-                + colorama.Cursor.UP(_last_line_count - 1)
-                + colorama.ansi.clear_screen(_CLEAR_SCREEN_TO_END_MODE)
+            write_buffer.writelines(
+                [
+                    # Go to beginning of line
+                    "\r",
+                    # Move up, but only if we are on a new line.
+                    # If the cursor was left on the same line as
+                    # the only text (_last_line_count == 1), then
+                    # moving to the beginning of the line was sufficient
+                    # and attempting to scroll with an offset of 0
+                    # will delete the previous line erroneously!
+                    (
+                        colorama.Cursor.UP(_last_line_count - 1)
+                        if _last_line_count > 1
+                        else ""
+                    ),
+                    # Clear to the end of the screen so we do not leave old
+                    # text on the screen.
+                    colorama.ansi.clear_screen(_CLEAR_SCREEN_TO_END_MODE),
+                ]
             )
 
         for line in prepend or []:
