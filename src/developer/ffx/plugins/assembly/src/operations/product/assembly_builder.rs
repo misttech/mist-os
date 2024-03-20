@@ -1762,6 +1762,7 @@ mod tests {
                     "tool": "./host_x64/cmc",
                     "args": [
                         "compile",
+                        "--features=allow_long_names",
                         "--includeroot",
                         vars.outdir.join("bundle/compiled_packages/include").as_str(),
                         "--includepath",
@@ -1787,6 +1788,7 @@ mod tests {
                     "tool": "./host_x64/cmc",
                     "args": [
                         "compile",
+                        "--features=allow_long_names",
                         "--includeroot",
                         vars.outdir.join("bundle/compiled_packages/include").as_str(),
                         "--includepath",

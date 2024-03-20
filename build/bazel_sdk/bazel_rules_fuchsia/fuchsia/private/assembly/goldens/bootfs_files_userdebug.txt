@@ -75,6 +75,7 @@ lib/libusb-peripheral-utils.so
 lib/libvfs_internal.so
 ?meta/blobfs.cm
 ?meta/blobfs.cvf
+?meta/bootstrap.cm
 ?meta/decompressor-sandbox.cm
 ?meta/f2fs.cm
 ?meta/fshost.cm

@@ -58,6 +58,7 @@ impl ComponentBuilder {
 
         let args = vec![
             "compile".into(),
+            "--features=allow_long_names".into(),
             "--includeroot".into(),
             include_path.as_ref().to_string(),
             "--includepath".into(),
@@ -124,6 +125,7 @@ mod tests {
                     "tool": "./host_x64/cmc",
                     "args": [
                         "compile",
+                        "--features=allow_long_names",
                         "--includeroot",
                         "include/path",
                         "--includepath",

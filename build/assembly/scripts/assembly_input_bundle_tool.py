@@ -32,6 +32,7 @@ from serialization.serialization import (
 logger = logging.getLogger()
 
 BOOTFS_COMPILED_PACKAGE_ALLOWLIST = [
+    "bootstrap",
     "fshost",
     "for-test2",
 ]  # test package

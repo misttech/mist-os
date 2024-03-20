@@ -12,32 +12,6 @@
             url: "fuchsia-boot:///device-name-provider#meta/device-name-provider.cm",
         },
         {
-            name: "driver_manager",
-            url: "fuchsia-boot:///driver_manager#meta/driver_manager.cm",
-            environment: "#driver_manager-env",
-        },
-        {
-            name: "driver_index",
-            url: "fuchsia-boot:///driver-index#meta/driver-index.cm",
-            on_terminate: "reboot",
-        },
-        {
-            // Exists to augment capability graph with information about when #boot-drivers should
-            // be stopped. Most components should prefer depending on capabiliites provided by
-            // #devfs-with-pkg over this component
-            name: "devfs",
-            url: "fuchsia-boot:///devfs#meta/devfs.cm",
-            environment: "#devfs-env",
-        },
-        {
-            // Exists to augment capability graph with information about when #pkg-drivers and
-            // #full-pkg-drivers should be stopped. Most components should prefer depending on
-            // capabiliites provided by this component over #devfs.
-            name: "devfs-with-pkg",
-            url: "fuchsia-boot:///devfs#meta/devfs-pkg.cm",
-            environment: "#devfs-env",
-        },
-        {
             name: "fshost",
             url: "fuchsia-boot:///#meta/fshost.cm",
             environment: "#fshost-env",
@@ -145,57 +119,7 @@
             environment: "#base-resolver-env",
         },
     ],
-    collections: [
-        {
-            name: "driver-hosts",
-            environment: "#driver-host-env",
-            durability: "single_run",
-        },
-        {
-            name: "boot-drivers",
-            environment: "#boot-driver-env",
-            durability: "single_run",
-            allowed_offers: "static_and_dynamic",
-            allow_long_names: true,
-        },
-        {
-            name: "pkg-drivers",
-            environment: "#pkg-driver-env",
-            durability: "single_run",
-            allowed_offers: "static_and_dynamic",
-            allow_long_names: true,
-        },
-        {
-            name: "full-pkg-drivers",
-            environment: "#full-pkg-driver-env",
-            durability: "single_run",
-            allowed_offers: "static_and_dynamic",
-            allow_long_names: true,
-        },
-    ],
     offer: [
-        {
-            from: "parent",
-            to: "#driver_index",
-            config: [
-                "fuchsia.driver.BindEager",
-                "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
-                "fuchsia.driver.DisabledDrivers",
-                "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
-                "fuchsia.driver.EnableDriverLoadFuzzer",
-                "fuchsia.driver.EnableEphemeralDrivers",
-            ],
-        },
-        {
-            from: "parent",
-            to: "#driver_manager",
-            config: [
-                "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
-                "fuchsia.driver.manager.DriverHostCrashPolicy",
-                "fuchsia.driver.manager.EnableTestShutdownDelays",
-                "fuchsia.driver.manager.RootDriver",
-            ],
-        },
         {
             from: "parent",
             to: "#svchost",
@@ -238,16 +162,11 @@
             from: "parent",
             to: [
                 "#archivist",
-                "#boot-drivers",
                 "#console-launcher",
                 "#cpu_manager",
-                "#driver-hosts",
-                "#driver_manager",
                 "#fshost",
-                "#full-pkg-drivers",
                 "#netsvc",
                 "#pkg-cache",
-                "#pkg-drivers",
                 "#power_manager",
                 "#virtual_console",
             ],
@@ -358,51 +277,10 @@
             to: "#console-launcher",
         },
         {
-            protocol: "fuchsia.component.resolution.Resolver",
-            from: "parent",
-            as: "fuchsia.component.resolution.Resolver-boot",
-            to: [
-                "#driver_index",
-                "#driver_manager",
-            ],
-        },
-        {
-            protocol: "fuchsia.component.resolution.Resolver",
-            from: "#pkg-cache",
-            as: "fuchsia.component.resolution.Resolver-base",
-            to: [
-                "#driver_index",
-                "#driver_manager",
-            ],
-
-            // pkg-cache depends on fshost for blobfs and fshost depends transitively on
-            // driver_index and driver_manager, but driver_index and driver_manager don't need base
-            // packages to provide fshost's (transitive) dependencies.
-            dependency: "weak",
-        },
-        {
-            // This is only used when the #driver_index |enable_ephemeral_drivers| config
-            // is set, which enables loading drivers ephemerally. This is intended for
-            // eng builds only and is set through product assembly.
-            //
-            // The #driver_manager will only use this protocol in DFv1.
-            // In DFv2 resolution is done by the component framework since drivers
-            // are componenets in DFv2.
-            protocol: "fuchsia.component.resolution.Resolver",
-            from: "#full_resolver",
-            as: "fuchsia.component.resolution.Resolver-full",
-            to: [
-                "#driver_index",
-                "#driver_manager",
-            ],
-            dependency: "weak",
-        },
-        {
             directory: "boot",
             from: "parent",
             to: [
                 "#console-launcher",
-                "#driver_manager",
                 "#fshost",
                 "#miscsvc",
                 "#netsvc",
@@ -458,121 +336,9 @@
             subdir: "config/cpu_manager",
         },
         {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.boot.Items",
-                "fuchsia.boot.RootResource",
-                "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.kernel.FramebufferResource",
-                "fuchsia.kernel.InfoResource",
-                "fuchsia.kernel.IommuResource",
-                "fuchsia.kernel.IoportResource",
-                "fuchsia.kernel.IrqResource",
-                "fuchsia.kernel.MexecResource",
-                "fuchsia.kernel.MmioResource",
-                "fuchsia.kernel.MsiResource",
-                "fuchsia.kernel.PowerResource",
-                "fuchsia.kernel.RootJob",
-                "fuchsia.kernel.SmcResource",
-                "fuchsia.process.Launcher",
-            ],
-            from: "parent",
-            to: "#driver_manager",
-        },
-        {
-            protocol: "fuchsia.component.Realm",
-            from: "framework",
-            to: "#driver_manager",
-        },
-        {
-            protocol: [
-                "fuchsia.driver.index.DevelopmentManager",
-                "fuchsia.driver.index.DriverIndex",
-                "fuchsia.driver.registrar.DriverRegistrar",
-            ],
-            from: "#driver_index",
-            to: "#driver_manager",
-        },
-        {
-            // The dependency relationship between power-manager and
-            // driver-manager is inverted. In other words, driver-manager
-            // depends on power-manager for its policy, but the relationship is
-            // expressed in reverse in the driver framework using weak
-            // dependencies. This "protocol" is a phantom used to ensure that
-            // driver-manager is shut down before power-manager is.
-            //
-            // TODO(https://fxbug.dev/42071033): Change the APIs used here so that
-            // driver-manager pulls policy from power-manager, rather
-            // power-manager pushing it to driver-manager.
-            protocol: [ "power-manager-outlives-driver-manager" ],
-            from: "#power_manager",
-            to: "#driver_manager",
-        },
-        {
             protocol: [ "fuchsia.thermal.ClientStateConnector" ],
             from: "#power_manager",
             to: "#cpu_manager",
-        },
-        {
-            protocol: [ "fuchsia.boot.WriteOnlyLog" ],
-            from: "parent",
-            to: "#driver-hosts",
-        },
-        {
-            protocol: [
-                "fuchsia.boot.Items",
-                "fuchsia.kernel.CpuResource",
-                "fuchsia.kernel.FramebufferResource",
-                "fuchsia.kernel.IommuResource",
-                "fuchsia.kernel.IoportResource",
-                "fuchsia.kernel.IrqResource",
-                "fuchsia.kernel.MmioResource",
-                "fuchsia.kernel.MsiResource",
-                "fuchsia.kernel.PowerResource",
-                "fuchsia.kernel.SmcResource",
-            ],
-            from: "parent",
-            to: "#boot-drivers",
-        },
-        {
-            protocol: "fuchsia.boot.RootResource",
-            from: "parent",
-            to: [
-                "#boot-drivers",
-                "#pkg-drivers",
-            ],
-        },
-        {
-            protocol: "fuchsia.kernel.InfoResource",
-            from: "parent",
-            to: [
-                "#boot-drivers",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
-            ],
-        },
-        {
-            protocol: "fuchsia.boot.Arguments",
-            from: "parent",
-            to: [
-                "#boot-drivers",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
-            ],
-        },
-        {
-            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
-            from: "#system-activity-governor",
-            to: [
-                "#boot-drivers",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
-            ],
-
-            // system-activity-governor depends on the suspend HAL but not all
-            // drivers depend on system-activity-governor.
-            // Weak to resolve dependency cycles.
-            dependency: "weak",
         },
         {
             protocol: [
@@ -694,24 +460,12 @@
         {
             protocol: [ "fuchsia.scheduler.ProfileProvider" ],
             from: "#svchost",
-            to: [
-                "#boot-drivers",
-                "#driver-hosts",
-                "#fshost",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
-            ],
+            to: [ "#fshost" ],
         },
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "#role_manager",
-            to: [
-                "#boot-drivers",
-                "#driver-hosts",
-                "#fshost",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
-            ],
+            to: [ "#fshost" ],
         },
         {
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],
@@ -739,74 +493,6 @@
                 "#console-launcher",
                 "#netsvc",
             ],
-        },
-        {
-            protocol: [ "fuchsia.driver.framework.CompositeNodeManager" ],
-            from: "#driver_manager",
-            to: [
-                "#boot-drivers",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
-            ],
-        },
-        {
-            protocol: [ "fuchsia.device.fs.lifecycle.Lifecycle" ],
-            from: "#driver_manager",
-            to: [ "#devfs" ],
-        },
-        {
-            protocol: "fuchsia.device.fs.with.pkg.lifecycle.Lifecycle",
-            from: "#driver_manager",
-            as: "fuchsia.device.fs.lifecycle.Lifecycle",
-            to: [ "#devfs-with-pkg" ],
-        },
-        {
-            directory: "dev",
-            from: "#driver_manager",
-            to: [ "#devfs" ],
-        },
-        {
-            directory: "dev-topological",
-            from: "#devfs",
-            as: "dev",
-            to: [ "#devfs-with-pkg" ],
-        },
-
-        // These protocols are not actually used but exist to increase the lifetime
-        // of components. The capabilities are named after their place in the topology.
-        // We cannot use a single service due to the lack of service merging.
-        {
-            service: [ "bootstrap.driver-hosts" ],
-            from: "#driver-hosts",
-            to: [
-                "#devfs",
-                "#devfs-with-pkg",
-            ],
-        },
-        {
-            service: [ "bootstrap.boot-drivers" ],
-            from: "#boot-drivers",
-            to: [ "#devfs" ],
-        },
-        {
-            service: [ "bootstrap.pkg-drivers" ],
-            from: "#pkg-drivers",
-            to: [ "#devfs-with-pkg" ],
-        },
-        {
-            service: [ "bootstrap.full-pkg-drivers" ],
-            from: "#full-pkg-drivers",
-            to: [ "#devfs-with-pkg" ],
-        },
-        {
-            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
-            from: "#svchost",
-            to: "#driver_manager",
-        },
-        {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-            from: "#role_manager",
-            to: "#driver_manager",
         },
         {
             protocol: [
@@ -837,19 +523,6 @@
                 "#console-launcher",
                 "#netsvc",
             ],
-        },
-        {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
-            from: "#miscsvc",
-            to: [
-                "#boot-drivers",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
-            ],
-
-            // This must be weak because miscsvc needs sysmem from devfs, which creates
-            // a cycle. sysmem can be made into a non-driver to fix this.
-            dependency: "weak",
         },
         {
             protocol: [ "fuchsia.sysmem.Allocator" ],
@@ -996,21 +669,6 @@
             ],
         },
         {
-            // TODO(https://fxbug.dev/42144438) This is only needed for an ordered shutdown.
-            // Driver_manager has to shut down before shutdown_shim.
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
-            from: "#shutdown_shim",
-            to: "#driver_manager",
-        },
-        {
-            // TODO(https://fxbug.dev/42144438) This is only needed for an ordered shutdown.
-            // Console should outlive driver_manager so that logs at the end of the boot process
-            // can still be seen.
-            protocol: "fuchsia.hardware.pty.Device",
-            from: "#console",
-            to: "#driver_manager",
-        },
-        {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
             to: [
@@ -1035,14 +693,7 @@
         {
             protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
             from: "#shutdown_shim",
-            to: [
-                "#boot-drivers",
-                "#driver-hosts",
-                "#driver_manager",
-                "#full-pkg-drivers",
-                "#miscsvc",
-                "#pkg-drivers",
-            ],
+            to: [ "#miscsvc" ],
         },
         {
             protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
@@ -1100,23 +751,15 @@
             ],
             from: "#archivist",
             to: [
-                "#boot-drivers",
                 "#console",
                 "#console-launcher",
                 "#cpu_manager",
                 "#cr50_agent",
-                "#devfs",
-                "#devfs-with-pkg",
                 "#device_name_provider",
-                "#driver-hosts",
-                "#driver_index",
-                "#driver_manager",
                 "#fshost",
-                "#full-pkg-drivers",
                 "#live_usb",
                 "#miscsvc",
                 "#netsvc",
-                "#pkg-drivers",
                 "#power-broker",
                 "#power_manager",
                 "#ptysvc",
@@ -1354,14 +997,6 @@
             from: "#device_name_provider",
         },
         {
-            protocol: [ "fuchsia.driver.development.Manager" ],
-            from: "#driver_manager",
-        },
-        {
-            protocol: "fuchsia.driver.registrar.DriverRegistrar",
-            from: "#driver_index",
-        },
-        {
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],
             from: "#virtual_console",
         },
@@ -1448,14 +1083,6 @@
             from: "#pkg-cache",
         },
         {
-            service: "fuchsia.hardware.rtc.Service",
-            from: [
-                "#boot-drivers",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
-            ],
-        },
-        {
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
         },
@@ -1485,97 +1112,6 @@
 
             // 20 minutes
             __stop_timeout_ms: 1200000,
-        },
-        {
-            name: "driver_manager-env",
-            extends: "realm",
-
-            // 1 minute
-            __stop_timeout_ms: 60000,
-        },
-        {
-            name: "devfs-env",
-            extends: "realm",
-
-            // 1 minute
-            __stop_timeout_ms: 60000,
-        },
-        {
-            name: "driver-host-env",
-            extends: "realm",
-
-            // 2 seconds
-            __stop_timeout_ms: 2000,
-        },
-        {
-            name: "boot-driver-env",
-            extends: "none",
-            runners: [
-                {
-                    runner: "driver",
-                    from: "#driver_manager",
-                },
-            ],
-            resolvers: [
-                {
-                    resolver: "boot_resolver",
-                    from: "parent",
-                    scheme: "fuchsia-boot",
-                },
-            ],
-
-            // 1 second
-            __stop_timeout_ms: 1000,
-        },
-        {
-            name: "pkg-driver-env",
-            extends: "none",
-            runners: [
-                {
-                    runner: "driver",
-                    from: "#driver_manager",
-                },
-            ],
-            resolvers: [
-                {
-                    resolver: "boot_resolver",
-                    from: "parent",
-                    scheme: "fuchsia-boot",
-                },
-                {
-                    resolver: "base_resolver",
-                    from: "#pkg-cache",
-                    scheme: "fuchsia-pkg",
-                },
-            ],
-
-            // 1 second
-            __stop_timeout_ms: 1000,
-        },
-        {
-            name: "full-pkg-driver-env",
-            extends: "none",
-            runners: [
-                {
-                    runner: "driver",
-                    from: "#driver_manager",
-                },
-            ],
-            resolvers: [
-                {
-                    resolver: "boot_resolver",
-                    from: "parent",
-                    scheme: "fuchsia-boot",
-                },
-                {
-                    resolver: "full-resolver",
-                    from: "#full_resolver",
-                    scheme: "fuchsia-pkg",
-                },
-            ],
-
-            // 1 second
-            __stop_timeout_ms: 1000,
         },
     ],
 }

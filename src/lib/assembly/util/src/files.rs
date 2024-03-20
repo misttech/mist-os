@@ -43,6 +43,8 @@ pub enum BootfsDestination {
     BootDriverManifest,
     /// The list of bootfs packages.
     BootfsPackageIndex,
+    /// The component manifest for the bootstrap realm.
+    BootstrapManifest,
     /// The component id index config for the Storage subsystem.
     ComponentIdIndex,
     /// The component manager policy for the Component subsystem.
@@ -79,6 +81,7 @@ impl std::fmt::Display for BootfsDestination {
                 Self::ComponentIdIndex => "config/component_id_index",
                 Self::ComponentManagerConfig => "config/component_manager",
                 Self::CpuManagerNodeConfig => "config/cpu_manager/node_config.json",
+                Self::BootstrapManifest => "meta/bootstrap.cm",
                 Self::FshostConfig => "meta/fshost.cvf",
                 Self::FshostManifest => "meta/fshost.cm",
                 Self::PowerManagerNodeConfig => "config/power_manager/node_config.json",
@@ -217,6 +220,8 @@ pub enum BlobfsCompiledPackageDestination {
 pub enum BootfsCompiledPackageDestination {
     /// The compiled fshost package.
     Fshost,
+    /// The compiled bootstrap realm package.
+    Bootstrap,
 }
 
 /// Test variants.
@@ -406,6 +411,7 @@ mod tests {
         let packages_expected: Vec<String> = vec![
             "",
             "",
+            "bootstrap",
             "build-info",
             "config-data",
             "core",
@@ -455,6 +461,7 @@ mod tests {
             "config/zxcrypt",
             "data/bootfs_packages",
             "for-test",
+            "meta/bootstrap.cm",
             "meta/fshost.cm",
             "meta/fshost.cvf",
         ]
