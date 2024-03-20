@@ -22,7 +22,7 @@ py_binary(
 # TODO(b/294853608): Remove once clients have moved to //products/zedboot.
 fuchsia_product_configuration(
     name = "zedboot",
-    json_config = {
+    product_config_json = {
         "platform": {
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",
@@ -46,7 +46,7 @@ fuchsia_product_configuration(
 
 fuchsia_product_configuration(
     name = "default",
-    json_config = {
+    product_config_json = {
         "platform": {
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",

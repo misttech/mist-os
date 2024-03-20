@@ -9,9 +9,9 @@ load(
     "BUILD_TYPES",
     "INPUT_DEVICE_TYPE",
     "fuchsia_elf_sizes",
+    "fuchsia_product",
     "fuchsia_product_bundle",
     "fuchsia_product_configuration",
-    "fuchsia_product_image",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -43,125 +43,125 @@ _PRODUCT_CONFIG_BASE_JSON = {
 
 fuchsia_product_configuration(
     name = "product_config",
-    json_config = _PRODUCT_CONFIG_BASE_JSON,
+    product_config_json = _PRODUCT_CONFIG_BASE_JSON,
 )
 # LINT.ThenChange(//products/minimal/BUILD.gn)
 
-fuchsia_product_image(
+fuchsia_product(
     name = "image.x64",
     board_config = "//boards:x64",
-    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
 
 fuchsia_elf_sizes(
     name = "elf_sizes.x64",
-    product_image = ":image.x64",
+    product = ":image.x64",
 )
 
 fuchsia_product_bundle(
     name = "product_bundle.x64",
     board_name = "x64",
+    main = ":image.x64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
-    product_image = ":image.x64",
-    product_name = "fuchsia",
+    product_bundle_name = "fuchsia",
     recovery = "//products/zedboot:x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )
 
-fuchsia_product_image(
+fuchsia_product(
     name = "image.arm64",
     board_config = "//boards:arm64",
-    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
 
 fuchsia_elf_sizes(
     name = "elf_sizes.arm64",
-    product_image = ":image.arm64",
+    product = ":image.arm64",
 )
 
 fuchsia_product_bundle(
     name = "product_bundle.arm64",
     board_name = "arm64",
+    main = ":image.arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
-    product_image = ":image.arm64",
-    product_name = "fuchsia",
+    product_bundle_name = "fuchsia",
     recovery = "//products/zedboot:arm64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )
 
-fuchsia_product_image(
+fuchsia_product(
     name = "image.qemu-x64",
     board_config = "//boards:qemu-x64",
-    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
 
 fuchsia_elf_sizes(
     name = "elf_sizes.qemu-x64",
-    product_image = ":image.qemu-x64",
+    product = ":image.qemu-x64",
 )
 
 fuchsia_product_bundle(
     name = "product_bundle.qemu-x64",
     board_name = "qemu-x64",
+    main = ":image.qemu-x64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
-    product_image = ":image.qemu-x64",
-    product_name = "fuchsia",
+    product_bundle_name = "fuchsia",
     recovery = "//products/zedboot:qemu-x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )
 
-fuchsia_product_image(
+fuchsia_product(
     name = "image.vim3",
     board_config = "//boards:vim3",
-    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
 
 fuchsia_elf_sizes(
     name = "elf_sizes.vim3",
-    product_image = ":image.vim3",
+    product = ":image.vim3",
 )
 
 fuchsia_product_bundle(
     name = "product_bundle.vim3",
     board_name = "vim3",
+    main = ":image.vim3",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
-    product_image = ":image.vim3",
-    product_name = "fuchsia",
+    product_bundle_name = "fuchsia",
     recovery = "//products/zedboot:vim3_with_fvm",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )
 
-fuchsia_product_image(
+fuchsia_product(
     name = "image.riscv64",
     board_config = "//boards:riscv64",
-    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
 
 fuchsia_elf_sizes(
     name = "elf_sizes.riscv64",
-    product_image = ":image.riscv64",
+    product = ":image.riscv64",
 )
 
 fuchsia_product_bundle(
     name = "product_bundle.riscv64",
     board_name = "riscv64",
+    main = ":image.riscv64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:riscv64",
-    product_image = ":image.riscv64",
-    product_name = "fuchsia",
+    product_bundle_name = "fuchsia",
     recovery = "//products/zedboot:riscv64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
