@@ -334,7 +334,7 @@ pub enum Response {
     Quit,
 }
 
-pub trait Interface: Send + Sync {
+pub trait Interface {
     fn present(&self, output: &Presentation) -> Result<Response>;
 }
 
@@ -349,7 +349,7 @@ pub struct InnerTextUi<'a> {
 
     /// E.g. stderr.
     #[allow(unused)]
-    error_output: &'a mut (dyn Write + Send + Sync + 'a),
+    error_output: &'a mut (dyn Write + 'a),
 
     /// Some text UI overwrites itself at each iteration other than the first.
     /// Track how many lines to overwrite.
@@ -380,7 +380,7 @@ impl<'a> TextUi<'a> {
     where
         R: Read + Send + Sync + 'a,
         W: Write + Send + Sync + 'a,
-        E: Write + Send + Sync + 'a,
+        E: Write + 'a,
     {
         Self {
             inner: std::sync::Mutex::new(InnerTextUi {

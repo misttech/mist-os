@@ -83,7 +83,7 @@ pub async fn resolve_branch_to_base_urls<I>(
     client: &Client,
 ) -> Result<Vec<String>>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     let base_urls = ffx_config::get::<Vec<String>, _>(CONFIG_BASE_URLS)
         .await
@@ -146,7 +146,7 @@ pub async fn get_latest_version<I>(
     client: &Client,
 ) -> Result<String>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     let list = list_from_gcs(bucket, prefix, auth, ui, &client)
         .await
@@ -174,7 +174,7 @@ pub async fn pb_list_impl<I>(
     ui: &I,
 ) -> Result<Vec<ProductBundle>>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     let client = Client::initial()?;
 
@@ -203,7 +203,7 @@ async fn pb_gather_from_url<I>(
     client: &Client,
 ) -> Result<Vec<ProductBundle>>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     tracing::debug!("transfer_manifest_url Url::parse");
     let mut manifest_url = match url::Url::parse(&base_url) {

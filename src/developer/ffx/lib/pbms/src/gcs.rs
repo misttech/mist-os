@@ -28,7 +28,7 @@ pub(crate) async fn fetch_from_gcs<F, I>(
 ) -> Result<()>
 where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     tracing::debug!("fetch_from_gcs {:?}", gcs_url);
     let (gcs_bucket, gcs_path) = split_gs_url(gcs_url).context("Splitting gs URL.")?;
@@ -70,7 +70,7 @@ where
 /// Intended to simplify handling of a GcsError::NeedNewAccessToken error.
 pub async fn handle_new_access_token<I>(auth_flow: &AuthFlowChoice, ui: &I) -> Result<String>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     tracing::debug!("handle_new_access_token");
     let access_token = match auth_flow {
@@ -126,7 +126,7 @@ pub(crate) async fn string_from_gcs<F, I>(
 ) -> Result<String>
 where
     F: Fn(FileProgress<'_>) -> ProgressResult,
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     tracing::debug!("string_from_gcs {:?}", gcs_url);
     let (gcs_bucket, gcs_path) = split_gs_url(gcs_url).context("Splitting gs URL.")?;
@@ -183,7 +183,7 @@ pub async fn list_from_gcs<I>(
     client: &Client,
 ) -> Result<Vec<String>>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     loop {
         match client.list(bucket, prefix).await.context("listing all the objects.") {
@@ -223,7 +223,7 @@ where
 /// refresh token to the ~/.boto file.
 async fn update_refresh_token<I>(auth_flow: &AuthFlowChoice, ui: &I) -> Result<()>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     tracing::debug!("update_refresh_token");
     let refresh_token = match auth_flow {

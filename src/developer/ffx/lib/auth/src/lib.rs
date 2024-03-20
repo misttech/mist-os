@@ -36,7 +36,7 @@ impl From<AuthError> for fho::Error {
 
 pub async fn mint_new_access_token<I>(auth_flow: &AuthFlowChoice, ui: &I) -> Result<String>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     tracing::debug!("mint_new_access_token");
     let credentials = Credentials::load_or_new().await;
@@ -58,7 +58,7 @@ where
 
 async fn update_refresh_token<I>(auth_flow: &AuthFlowChoice, ui: &I) -> Result<()>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     let refresh_token = match auth_flow {
         AuthFlowChoice::Default | AuthFlowChoice::Pkce => {

@@ -25,7 +25,7 @@ pub async fn pb_show(cmd: ShowCommand) -> Result<()> {
 
 async fn pb_show_impl<I>(ui: &I, cmd: &ShowCommand) -> Result<()>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     tracing::debug!("pb_show");
     if !cmd.product_bundle_path.exists() {
@@ -72,7 +72,7 @@ async fn retrieve_v2_virtual_devices(
 /// virtual device specifications linked to that product bundle.
 pub async fn list_virtual_devices<I>(product_bundle: &ProductBundle, ui: &I) -> Result<()>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     let virtual_devices = match product_bundle {
         ProductBundle::V2(product_bundle) => retrieve_v2_virtual_devices(product_bundle).await?,
@@ -97,7 +97,7 @@ pub async fn virtual_device_details<I>(
     device_name: &str,
 ) -> Result<()>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     let virtual_devices = match product_bundle {
         ProductBundle::V2(product_bundle) => retrieve_v2_virtual_devices(product_bundle).await?,

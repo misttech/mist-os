@@ -47,7 +47,7 @@ pub async fn pb_lookup_impl<I>(
     ui: &I,
 ) -> Result<ProductBundle>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     let start = std::time::Instant::now();
     tracing::info!("---------------------- Lookup Begin ----------------------------");

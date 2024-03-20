@@ -13,12 +13,27 @@ use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_product_download_args::DownloadCommand;
 use ffx_product_list::pb_list_impl;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, MachineWriter};
 use pbms::{make_way_for_output, transfer_download, AuthFlowChoice};
-use std::{
-    io::{stderr, stdin, stdout},
-    path::Path,
-};
+use std::{cell::RefCell, path::Path, rc::Rc};
+use structured_ui::{Interface, Presentation, Response};
+
+pub struct MachineUi<'a> {
+    writer: Rc<RefCell<&'a mut MachineWriter<Presentation>>>,
+}
+
+impl<'a> Interface for MachineUi<'a> {
+    fn present(&self, output: &structured_ui::Presentation) -> Result<structured_ui::Response> {
+        match output {
+            Presentation::Notice(_) => self.writer.borrow_mut().machine(&output)?,
+            Presentation::Progress(_) => (),
+            Presentation::StringPrompt(_) => (),
+            Presentation::Table(_) => self.writer.borrow_mut().machine(&output)?,
+        };
+
+        Ok(Response::Default)
+    }
+}
 
 #[derive(FfxTool)]
 pub struct PbDownloadTool {
@@ -28,13 +43,11 @@ pub struct PbDownloadTool {
 
 #[async_trait(?Send)]
 impl FfxMain for PbDownloadTool {
-    type Writer = SimpleWriter;
-    async fn main(self, _writer: SimpleWriter) -> fho::Result<()> {
+    type Writer = MachineWriter<Presentation>;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let client = Client::initial()?;
-        let mut input = stdin();
-        let mut output = stdout();
-        let mut err_out = stderr();
-        let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+
+        let ui = MachineUi { writer: Rc::new(RefCell::new(&mut writer)) };
 
         let cmd = preprocess_cmd(self.cmd, &ui).await?;
 
@@ -47,7 +60,7 @@ impl FfxMain for PbDownloadTool {
 
 fho::embedded_plugin!(PbDownloadTool);
 
-pub async fn pb_download_impl<I: structured_ui::Interface + Sync>(
+pub async fn pb_download_impl<I: structured_ui::Interface>(
     auth: &AuthFlowChoice,
     force: bool,
     manifest_url: &str,
@@ -111,7 +124,7 @@ pub async fn pb_download_impl<I: structured_ui::Interface + Sync>(
     Ok(())
 }
 
-pub async fn preprocess_cmd<I: structured_ui::Interface + Sync>(
+pub async fn preprocess_cmd<I: structured_ui::Interface>(
     cmd: DownloadCommand,
     ui: &I,
 ) -> Result<DownloadCommand> {

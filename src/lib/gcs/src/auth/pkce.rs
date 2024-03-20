@@ -68,7 +68,7 @@ struct ExchangeAuthCodeResponse {
 /// This may involve user interaction such as opening a browser window..
 pub async fn new_refresh_token<I>(_ui: &I) -> Result<String>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     let (auth_code, code_verifier, redirect_uri) =
         get_auth_code().await.context("getting auth code")?;

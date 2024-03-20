@@ -38,7 +38,7 @@ pub async fn transfer_download<F, I>(
 ) -> Result<()>
 where
     F: Fn(Vec<ProgressState<'_>>) -> ProgressResult,
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     let start = std::time::Instant::now();
     tracing::debug!(
@@ -114,7 +114,7 @@ async fn transfer_download_v1<F, I>(
 ) -> Result<()>
 where
     F: Fn(Vec<ProgressState<'_>>) -> ProgressResult,
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     fn malformed_warning<T>(err: T) -> T {
         eprintln!("The specified remote transfer manifest is malformed or broken.");

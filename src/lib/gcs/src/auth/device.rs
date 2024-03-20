@@ -111,7 +111,7 @@ struct DeviceRefreshTokenError {
 /// This may involve user interaction such as opening a browser window..
 pub async fn new_refresh_token<I>(ui: &I) -> Result<String>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     let https_client = new_https_client();
     inner_new_refresh_token(&https_client, ui).await
@@ -119,7 +119,7 @@ where
 
 async fn inner_new_refresh_token<I>(https_client: &HttpsClient, ui: &I) -> Result<String>
 where
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     tracing::debug!("device_new_refresh_token");
     let device_info = get_device_code(&https_client).await.context("getting device code")?;

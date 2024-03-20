@@ -118,7 +118,7 @@ pub(crate) async fn fetch_from_url<F, I>(
 ) -> Result<()>
 where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     tracing::debug!("fetch_from_url {:?}", product_url);
     if product_url.scheme() == GS_SCHEME {
@@ -146,7 +146,7 @@ async fn fetch_from_web<F, I>(
 ) -> Result<()>
 where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     tracing::debug!("fetch_from_web");
     let name = if let Some((_, name)) = product_uri.path().rsplit_once('/') {

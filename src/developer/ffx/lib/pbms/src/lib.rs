@@ -259,7 +259,7 @@ pub async fn string_from_url<F, I>(
 ) -> Result<String>
 where
     F: Fn(FileProgress<'_>) -> ProgressResult,
-    I: structured_ui::Interface + Sync,
+    I: structured_ui::Interface,
 {
     tracing::debug!("string_from_url {:?}", product_url);
     Ok(match product_url.scheme() {
