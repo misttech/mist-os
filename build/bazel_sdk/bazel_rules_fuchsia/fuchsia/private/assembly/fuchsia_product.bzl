@@ -323,6 +323,6 @@ def fuchsia_product(
     _fuchsia_product_create_system(
         name = name,
         product_assembly = ":" + name + "_product_assembly",
-        package_mode = create_system_mode,
+        package_mode = package_mode or create_system_mode,
         **kwargs
     )
