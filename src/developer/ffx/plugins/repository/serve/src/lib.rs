@@ -158,7 +158,6 @@ impl FfxMain for ServeTool {
 
     async fn main(self, mut writer: SimpleWriter) -> Result<()> {
         let repo_name = self.cmd.repository;
-        let repo_server_listen_addr = self.cmd.address;
 
         let repo_path = if let Some(repo_path) = self.cmd.repo_path {
             repo_path
@@ -192,7 +191,7 @@ impl FfxMain for ServeTool {
 
         // Serve RepositoryManager over a RepositoryServer
         let (server_fut, _, server) =
-            RepositoryServer::builder(repo_server_listen_addr, Arc::clone(&repo_manager))
+            RepositoryServer::builder(self.cmd.address, Arc::clone(&repo_manager))
                 .start()
                 .await
                 .with_context(|| format!("starting repository server"))?;
@@ -233,7 +232,7 @@ impl FfxMain for ServeTool {
                 tracing::info!("Attempting connection to default target");
                 let connection = connect_to_target(
                     repo_target,
-                    repo_server_listen_addr,
+                    server.local_addr(),
                     &repo,
                     &self.target_collection_proxy,
                     self.cmd.alias_conflict_mode.into(),
@@ -242,8 +241,12 @@ impl FfxMain for ServeTool {
 
                 match connection {
                     Ok(()) => {
-                        let s = format!("Serving repository '{}' to target '{target_identifier}' over address '{repo_server_listen_addr}'.", repo_path.display());
-                        writeln!(writer, "{}", s,)
+                        let s = format!(
+                            "Serving repository '{}' to target '{target_identifier}' over address '{}'.",
+                            repo_path.display(),
+                            server.local_addr()
+                        );
+                        writeln!(writer, "{}", s)
                             .map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
                         tracing::info!("{}", s);
                         loop {
@@ -272,11 +275,11 @@ impl FfxMain for ServeTool {
             }
         } else {
             let s = format!(
-                "Serving repository '{}' over address '{repo_server_listen_addr}'.",
-                repo_path.display()
+                "Serving repository '{}' over address '{}'.",
+                repo_path.display(),
+                server.local_addr()
             );
-            writeln!(writer, "{}", s,)
-                .map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
+            writeln!(writer, "{}", s).map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
             tracing::info!("{}", s);
         }
 
@@ -718,15 +721,19 @@ mod test {
         .await
         .unwrap();
 
+        // Get dynamic port
+        let dynamic_repo_port =
+            fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
+        tmp_port_file.close().unwrap();
+
+        let repo_url = format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}");
+
         assert_eq!(
             fake_repo.take_events(),
             vec![RepositoryManagerEvent::Add {
                 repo: RepositoryConfig {
                     mirrors: Some(vec![MirrorConfig {
-                        mirror_url: Some(format!(
-                            "http://{}:{}/{}",
-                            REPO_ADDR, REPO_PORT, REPO_NAME
-                        )),
+                        mirror_url: Some(repo_url.clone()),
                         subscribe: Some(true),
                         ..Default::default()
                     }]),
@@ -760,23 +767,16 @@ mod test {
             ],
         );
 
-        // Get dynamic port
-        let dynamic_repo_port =
-            fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
-        tmp_port_file.close().unwrap();
-
         // Check repository state.
         let http_repo = HttpRepository::new(
             fuchsia_hyper::new_client(),
-            Url::parse(&format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}")).unwrap(),
-            Url::parse(&format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}/blobs"))
-                .unwrap(),
+            Url::parse(&repo_url).unwrap(),
+            Url::parse(&format!("{repo_url}/blobs")).unwrap(),
             BTreeSet::new(),
         );
         let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
 
         assert_matches!(repo_client.update().await, Ok(true));
-        fuchsia_async::Timer::new(std::time::Duration::from_secs(15)).await;
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -825,12 +825,13 @@ mod test {
             fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
         tmp_port_file.close().unwrap();
 
+        let repo_url = format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}");
+
         // Check repository state.
         let http_repo = HttpRepository::new(
             fuchsia_hyper::new_client(),
-            Url::parse(&format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}")).unwrap(),
-            Url::parse(&format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}/blobs"))
-                .unwrap(),
+            Url::parse(&repo_url).unwrap(),
+            Url::parse(&format!("{repo_url}/blobs")).unwrap(),
             BTreeSet::new(),
         );
         let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
