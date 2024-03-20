@@ -156,6 +156,10 @@ async fn fails_on_image_write_error() {
                 configuration: paver::Configuration::B,
                 asset: paver::Asset::Kernel,
             },),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::A,
+                asset: paver::Asset::Kernel,
+            },),
             ReplaceRetainedPackages(vec![hash(9).into()]),
             Gc,
             PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
@@ -516,6 +520,10 @@ async fn assert_writes_for_current_and_target(
                 configuration: target_config,
                 asset: paver::Asset::Kernel,
             }),
+            Paver(PaverEvent::ReadAsset {
+                configuration: current_config,
+                asset: paver::Asset::Kernel,
+            }),
             ReplaceRetainedPackages(vec![hash(9).into(), UPDATE_HASH.parse().unwrap()]),
             Gc,
             PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
@@ -698,6 +706,10 @@ async fn retry_image_package_resolve_once() {
                 configuration: paver::Configuration::B,
                 asset: paver::Asset::Kernel,
             }),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::A,
+                asset: paver::Asset::Kernel,
+            }),
             // Verify that base packages are removed from the retained package index if
             // image fails to resolve with OutOfSpace.
             ReplaceRetainedPackages(vec![
@@ -809,6 +821,10 @@ async fn retry_image_package_resolve_twice_fails_update() {
                 configuration: paver::Configuration::B,
                 asset: paver::Asset::Kernel,
             }),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::A,
+                asset: paver::Asset::Kernel,
+            }),
             // Verify that base packages are removed from the retained package index if
             // image fails to resolve with OutOfSpace.
             ReplaceRetainedPackages(vec![
@@ -824,8 +840,10 @@ async fn retry_image_package_resolve_twice_fails_update() {
     );
 }
 
-fn construct_events(middle: &mut Vec<SystemUpdaterInteraction>) -> Vec<SystemUpdaterInteraction> {
-    let mut preamble = vec![
+fn construct_events(
+    middle: impl IntoIterator<Item = SystemUpdaterInteraction>,
+) -> Vec<SystemUpdaterInteraction> {
+    let preamble = [
         Paver(PaverEvent::QueryCurrentConfiguration),
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::A,
@@ -842,7 +860,7 @@ fn construct_events(middle: &mut Vec<SystemUpdaterInteraction>) -> Vec<SystemUpd
         PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
     ];
 
-    let mut postscript = vec![
+    let postscript = [
         Paver(PaverEvent::DataSinkFlush),
         ReplaceRetainedPackages(vec![]),
         Gc,
@@ -852,9 +870,7 @@ fn construct_events(middle: &mut Vec<SystemUpdaterInteraction>) -> Vec<SystemUpd
         Reboot,
     ];
 
-    preamble.append(middle);
-    preamble.append(&mut postscript);
-    preamble
+    preamble.into_iter().chain(middle).chain(postscript).collect()
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -1004,7 +1020,15 @@ async fn writes_fuchsia_vbmeta() {
             asset: paver::Asset::Kernel,
         }),
         Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
+            asset: paver::Asset::VerifiedBootMetadata,
+        }),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
             asset: paver::Asset::VerifiedBootMetadata,
         }),
         ReplaceRetainedPackages(vec![hash(9).into()]),
@@ -1069,11 +1093,11 @@ async fn zbi_match_in_desired_config() {
         .await
         .expect("run system updater");
 
-    let mut events = vec![Paver(PaverEvent::ReadAsset {
+    let events = vec![Paver(PaverEvent::ReadAsset {
         configuration: paver::Configuration::B,
         asset: paver::Asset::Kernel,
     })];
-    assert_eq!(env.take_interactions(), construct_events(&mut events));
+    assert_eq!(env.take_interactions(), construct_events(events));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -1115,7 +1139,7 @@ async fn zbi_match_in_active_config() {
         .await
         .expect("run system updater");
 
-    let mut events = vec![
+    let events = [
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
             asset: paver::Asset::Kernel,
@@ -1130,7 +1154,7 @@ async fn zbi_match_in_active_config() {
             payload: b"matching".to_vec(),
         }),
     ];
-    assert_eq!(env.take_interactions(), construct_events(&mut events));
+    assert_eq!(env.take_interactions(), construct_events(events));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -1166,54 +1190,29 @@ async fn zbi_match_in_active_config_error_in_desired_config() {
         .add_file("epoch.json", make_current_epoch_json())
         .add_file("images.json", serde_json::to_string(&images_json).unwrap());
 
-    env.resolver
-        .url(image_package_url_to_string("update-images-fuchsia", 9))
-        .resolve(&env.resolver.package("zbi", hashstr(8)).add_file("zbi", "real zbi contents"));
-
     env.run_update_with_options("fuchsia-pkg://fuchsia.com/another-update/4", default_options())
         .await
         .expect("run system updater");
 
-    let events = vec![
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::VerifiedBootMetadata,
-        }),
-        Paver(PaverEvent::ReadAsset {
-            configuration: paver::Configuration::A,
-            asset: paver::Asset::Kernel,
-        }),
-        Paver(PaverEvent::QueryCurrentConfiguration),
-        Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
-        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
-        PackageResolve("fuchsia-pkg://fuchsia.com/another-update/4".to_string()),
-        // system-updater raises an error so cautiously choose to resolve and write zbi
-        // rather than check Configuration::A.
+    let events = [
+        // Even though an error is encountered while reading B (the VMO is smaller than the image),
+        // system-updater still tries to read A instead of bailing immediately to the images
+        // package.
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
             asset: paver::Asset::Kernel,
         }),
-        ReplaceRetainedPackages(vec![hash(9).into()]),
-        Gc,
-        PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
         Paver(PaverEvent::WriteAsset {
             configuration: paver::Configuration::B,
             asset: paver::Asset::Kernel,
-            payload: b"real zbi contents".to_vec(),
+            payload: b"matching".to_vec(),
         }),
-        // Rest of events.
-        Paver(PaverEvent::DataSinkFlush),
-        ReplaceRetainedPackages(vec![]),
-        Gc,
-        BlobfsSync,
-        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
-        Paver(PaverEvent::BootManagerFlush),
-        Reboot,
     ];
-
-    assert_eq!(env.take_interactions(), events);
+    assert_eq!(env.take_interactions(), construct_events(events));
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -1544,6 +1543,10 @@ async fn recovery_present_but_should_write_recovery_is_false() {
         // Note that we never look at recovery because the flag indicated it should be skipped!
         Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
             asset: paver::Asset::Kernel,
         }),
         ReplaceRetainedPackages(vec![hash(9).into()]),

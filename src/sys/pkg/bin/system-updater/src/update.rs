@@ -74,9 +74,6 @@ enum PrepareError {
     #[error("while determining update mode")]
     ParseUpdateMode(#[source] update_package::ParseUpdateModeError),
 
-    #[error("while reading from paver")]
-    PaverRead(#[source] anyhow::Error),
-
     #[error("while writing asset to paver")]
     PaverWriteAsset(#[source] anyhow::Error),
 
@@ -105,9 +102,6 @@ enum PrepareError {
 
     #[error("force-recovery mode is incompatible with skip-recovery option")]
     VerifyUpdateMode,
-
-    #[error("while reading a buffer")]
-    VmoRead(#[source] fuchsia_zircon::Status),
 }
 
 impl PrepareError {
@@ -1110,14 +1104,14 @@ async fn firmware_to_write(
 ) -> Result<Option<AbsoluteComponentUrl>, PrepareError> {
     let desired_config = current_config.to_non_current_configuration();
     if let Some(non_current_config) = desired_config.to_configuration() {
-        if (get_firmware_buffer_if_hash_and_size_match(
+        if get_firmware_buffer_if_hash_and_size_match(
             data_sink,
             non_current_config,
             filename,
             image_metadata,
         )
-        .await?)
-            .is_some()
+        .await
+        .is_some()
         {
             return Ok(None);
         }
@@ -1129,7 +1123,7 @@ async fn firmware_to_write(
                 filename,
                 image_metadata,
             )
-            .await?
+            .await
             {
                 paver::write_image_buffer(data_sink, buffer, image, desired_config)
                     .await
@@ -1155,14 +1149,14 @@ async fn asset_to_write(
 ) -> Result<Option<AbsoluteComponentUrl>, PrepareError> {
     let desired_config = current_config.to_non_current_configuration();
     if let Some(non_current_config) = desired_config.to_configuration() {
-        if (get_asset_buffer_if_hash_and_size_match(
+        if get_asset_buffer_if_hash_and_size_match(
             data_sink,
             non_current_config,
             asset,
             image_metadata,
         )
-        .await?)
-            .is_some()
+        .await
+        .is_some()
         {
             return Ok(None);
         }
@@ -1174,7 +1168,7 @@ async fn asset_to_write(
                 asset,
                 image_metadata,
             )
-            .await?
+            .await
             {
                 paver::write_image_buffer(data_sink, buffer, image, desired_config)
                     .await
@@ -1196,14 +1190,14 @@ async fn recovery_to_write(
     data_sink: &fpaver::DataSinkProxy,
     asset: fpaver::Asset,
 ) -> Result<Option<AbsoluteComponentUrl>, PrepareError> {
-    if (get_asset_buffer_if_hash_and_size_match(
+    if get_asset_buffer_if_hash_and_size_match(
         data_sink,
         fpaver::Configuration::Recovery,
         asset,
         image_metadata,
     )
-    .await?)
-        .is_some()
+    .await
+    .is_some()
     {
         return Ok(None);
     }
@@ -1212,25 +1206,36 @@ async fn recovery_to_write(
 
 async fn get_firmware_buffer_if_hash_and_size_match(
     data_sink: &fpaver::DataSinkProxy,
-    desired_configuration: fpaver::Configuration,
+    configuration: fpaver::Configuration,
     subtype: &str,
     image: &update_package::ImageMetadata,
-) -> Result<Option<fmem::Buffer>, PrepareError> {
-    let buffer = match paver::paver_read_firmware(data_sink, desired_configuration, subtype).await {
+) -> Option<fmem::Buffer> {
+    let buffer = match paver::paver_read_firmware(data_sink, configuration, subtype).await {
         Ok(buffer) => buffer,
         Err(e) => {
             warn!(
-                ?desired_configuration, ?image, %subtype,
-                "Error reading firmware, assuming it needs to be written: {:#}",
+                ?configuration, ?image, %subtype,
+                "Error reading firmware so it will not be used to avoid a download: {:#}",
                 anyhow!(e)
             );
-            return Ok(None);
+            return None;
         }
     };
-    if calculate_hash(&buffer, image.size() as usize)? == image.hash() {
-        Ok(Some(buffer))
+    let buffer_hash = match calculate_hash(&buffer, image.size()) {
+        Ok(hash) => hash,
+        Err(e) => {
+            warn!(
+                ?configuration, ?image, %subtype,
+                "Error hashing firmware so it will not be used to avoid a download: {:#}",
+                anyhow!(e)
+            );
+            return None;
+        }
+    };
+    if buffer_hash == image.hash() {
+        Some(buffer)
     } else {
-        Ok(None)
+        None
     }
 }
 
@@ -1239,19 +1244,43 @@ async fn get_asset_buffer_if_hash_and_size_match(
     configuration: fpaver::Configuration,
     asset: fpaver::Asset,
     image: &update_package::ImageMetadata,
-) -> Result<Option<fmem::Buffer>, PrepareError> {
-    let buffer = paver::paver_read_asset(data_sink, configuration, asset)
-        .await
-        .map_err(PrepareError::PaverRead)?;
-    let calculated_hash = calculate_hash(&buffer, image.size() as usize)?;
-    if calculated_hash == image.hash() {
-        return Ok(Some(buffer));
+) -> Option<fmem::Buffer> {
+    let buffer = match paver::paver_read_asset(data_sink, configuration, asset).await {
+        Ok(buffer) => buffer,
+        Err(e) => {
+            warn!(
+                ?configuration,
+                ?image,
+                ?asset,
+                "Error reading asset so it will not be used to avoid a download: {:#}",
+                anyhow!(e)
+            );
+            return None;
+        }
+    };
+    let buffer_hash = match calculate_hash(&buffer, image.size()) {
+        Ok(hash) => hash,
+        Err(e) => {
+            warn!(
+                ?configuration,
+                ?image,
+                ?asset,
+                "Error hashing asset so it will not be used to avoid a download: {:#}",
+                anyhow!(e)
+            );
+            return None;
+        }
+    };
+    if buffer_hash == image.hash() {
+        Some(buffer)
+    } else {
+        None
     }
-    Ok(None)
 }
 
-#[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/42069090)
-fn calculate_hash(buffer: &fmem::Buffer, mut remaining: usize) -> Result<Hash, PrepareError> {
+fn calculate_hash(buffer: &fmem::Buffer, size: u64) -> anyhow::Result<Hash> {
+    let mut remaining = usize::try_from(size)
+        .with_context(|| format!("converting buffer u64 size to usize {size}"))?;
     let mut hasher = sha2::Sha256::new();
     let mut offset = 0;
 
@@ -1260,8 +1289,8 @@ fn calculate_hash(buffer: &fmem::Buffer, mut remaining: usize) -> Result<Hash, P
         let chunk_len = remaining.min(4096);
         let chunk = &mut chunk[..chunk_len];
 
-        buffer.vmo.read(chunk, offset).map_err(PrepareError::VmoRead)?;
-        hasher.update(chunk);
+        let () = buffer.vmo.read(chunk, offset).context("reading vmo")?;
+        let () = hasher.update(chunk);
 
         offset += chunk_len as u64;
         remaining -= chunk_len;
@@ -1460,14 +1489,12 @@ async fn replace_retained_packages(
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use {
         super::*,
         assert_matches::assert_matches,
         fuchsia_async as fasync,
         fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage},
-        fuchsia_zircon::Status,
+        std::str::FromStr as _,
     };
 
     // Simulate the cobalt test hanging indefinitely, and ensure we time out correctly.
@@ -1540,18 +1567,18 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn calculate_hash_test_empty_buffer() {
+    async fn calculate_hash_test_image_larger_than_buffer() {
         let buffer = write_mem_buffer(vec![]);
-        let image_size = 4_usize;
+        let image_size = 4;
         let calc_hash = calculate_hash(&buffer, image_size);
 
-        assert_matches!(calc_hash, Err(PrepareError::VmoRead(Status::OUT_OF_RANGE)));
+        assert_matches!(calc_hash, Err(_));
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn calculate_hash_test_same_size() {
         let buffer = write_mem_buffer(vec![0; 4]);
-        let image_size = 4_usize;
+        let image_size = 4;
         let image_hash =
             Hash::from_str("df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119")
                 .unwrap();
@@ -1573,7 +1600,7 @@ mod tests {
         hasher.update(chunk);
         let image_hash = Hash::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize()));
 
-        let image_size = 2_usize;
+        let image_size = 2;
         let calc_hash = calculate_hash(&buffer, image_size).unwrap();
 
         assert_eq!(calc_hash, image_hash);
@@ -1582,7 +1609,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn calculate_hash_test_buffer_larger_than_vmo() {
         let buffer = write_mem_buffer(vec![0; 4097]);
-        let image_size = 2_usize;
+        let image_size = 2;
         let calc_hash = calculate_hash(&buffer, image_size).unwrap();
         let image_hash =
             Hash::from_str("96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7")

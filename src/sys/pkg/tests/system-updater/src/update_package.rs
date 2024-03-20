@@ -463,7 +463,15 @@ async fn fully_populated_images_manifest() {
             asset: paver::Asset::Kernel,
         }),
         Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadAsset {
             configuration: paver::Configuration::B,
+            asset: paver::Asset::VerifiedBootMetadata,
+        }),
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::A,
             asset: paver::Asset::VerifiedBootMetadata,
         }),
         Paver(PaverEvent::ReadAsset {
@@ -479,7 +487,15 @@ async fn fully_populated_images_manifest() {
             firmware_type: "".to_string(),
         }),
         Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::A,
+            firmware_type: "".to_string(),
+        }),
+        Paver(PaverEvent::ReadFirmware {
             configuration: paver::Configuration::B,
+            firmware_type: "bl2".to_string(),
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::A,
             firmware_type: "bl2".to_string(),
         }),
     ];
@@ -529,10 +545,10 @@ async fn fully_populated_images_manifest() {
 
     let all_events = env.take_interactions();
 
-    let all_events_start = all_events[0..beginning_events.len()].to_vec();
+    let all_events_start = all_events[..beginning_events.len()].to_vec();
     assert_eq!(all_events_start, beginning_events);
 
-    let all_events_end = all_events[all_events.len() - end_events.len()..all_events.len()].to_vec();
+    let all_events_end = all_events[all_events.len() - end_events.len()..].to_vec();
     assert_eq!(all_events_end, end_events);
 
     // The 5 is for the nondeterministic events.

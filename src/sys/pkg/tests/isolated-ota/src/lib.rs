@@ -27,6 +27,7 @@ use {
     isolated_swd::updater::Updater,
     mock_omaha_server::OmahaResponse,
     mock_paver::{hooks as mphooks, PaverEvent},
+    pretty_assertions::assert_eq,
     std::collections::BTreeSet,
     vfs::{directory::entry_container::Directory, file::vmo::read_only},
 };
@@ -397,6 +398,7 @@ pub async fn test_pave_fails() -> Result<(), Error> {
             PaverEvent::SetConfigurationUnbootable { configuration: Configuration::B },
             PaverEvent::BootManagerFlush,
             PaverEvent::ReadAsset { configuration: Configuration::B, asset: Asset::Kernel },
+            PaverEvent::ReadAsset { configuration: Configuration::A, asset: Asset::Kernel },
             PaverEvent::WriteAsset {
                 asset: Asset::Kernel,
                 configuration: Configuration::B,
@@ -453,13 +455,23 @@ pub async fn test_updater_succeeds() -> Result<(), Error> {
             PaverEvent::SetConfigurationUnbootable { configuration: Configuration::B },
             PaverEvent::BootManagerFlush,
             PaverEvent::ReadAsset { configuration: Configuration::B, asset: Asset::Kernel },
+            PaverEvent::ReadAsset { configuration: Configuration::A, asset: Asset::Kernel },
             PaverEvent::ReadAsset {
                 configuration: Configuration::B,
                 asset: Asset::VerifiedBootMetadata
             },
+            PaverEvent::ReadAsset {
+                configuration: Configuration::A,
+                asset: Asset::VerifiedBootMetadata
+            },
             PaverEvent::ReadFirmware { configuration: Configuration::B, firmware_type: "".into() },
+            PaverEvent::ReadFirmware { configuration: Configuration::A, firmware_type: "".into() },
             PaverEvent::ReadFirmware {
                 configuration: Configuration::B,
+                firmware_type: "test".into()
+            },
+            PaverEvent::ReadFirmware {
+                configuration: Configuration::A,
                 firmware_type: "test".into()
             },
             PaverEvent::WriteFirmware {
@@ -744,9 +756,15 @@ pub async fn test_omaha_works() -> Result<(), Error> {
             PaverEvent::SetConfigurationUnbootable { configuration: Configuration::B },
             PaverEvent::BootManagerFlush,
             PaverEvent::ReadAsset { configuration: Configuration::B, asset: Asset::Kernel },
+            PaverEvent::ReadAsset { configuration: Configuration::A, asset: Asset::Kernel },
             PaverEvent::ReadFirmware { configuration: Configuration::B, firmware_type: "".into() },
+            PaverEvent::ReadFirmware { configuration: Configuration::A, firmware_type: "".into() },
             PaverEvent::ReadFirmware {
                 configuration: Configuration::B,
+                firmware_type: "test".into()
+            },
+            PaverEvent::ReadFirmware {
+                configuration: Configuration::A,
                 firmware_type: "test".into()
             },
             PaverEvent::WriteFirmware {

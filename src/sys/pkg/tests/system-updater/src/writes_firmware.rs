@@ -328,7 +328,15 @@ async fn writes_multiple_firmware_types() {
                 firmware_type: "a".to_string(),
             }),
             Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
+                firmware_type: "a".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
                 configuration: paver::Configuration::B,
+                firmware_type: "b".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
                 firmware_type: "b".to_string(),
             }),
             ReplaceRetainedPackages(vec![hashstr(5).parse().unwrap()]),
@@ -358,21 +366,22 @@ async fn writes_multiple_firmware_types() {
 #[fasync::run_singlethreaded(test)]
 async fn skips_unsupported_firmware_type() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
-    .firmware_package(
+        .firmware_package(
             btreemap! {
                 "a".to_owned() => ::update_package::ImageMetadata::new(5, hash(5), image_package_resource_url("update-images-firmware", 5, "A")),
             },
         )
-    .fuchsia_package(
+        .fuchsia_package(
             ::update_package::ImageMetadata::new(
-            0,
-            Hash::from_str(EMPTY_HASH)
-                .unwrap(),
-            image_package_resource_url("update-images-fuchsia", 9, "zbi"),
-        ),
-        None,)
-    .clone()
-    .build();
+                0,
+                Hash::from_str(EMPTY_HASH)
+                    .unwrap(),
+                image_package_resource_url("update-images-fuchsia", 9, "zbi"),
+            ),
+            None
+        )
+        .clone()
+        .build();
 
     let env = TestEnv::builder()
         .paver_service(|builder| {
@@ -423,6 +432,10 @@ async fn skips_unsupported_firmware_type() {
                 configuration: paver::Configuration::B,
                 firmware_type: "a".to_string(),
             }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
+                firmware_type: "a".to_string(),
+            }),
             ReplaceRetainedPackages(vec![hashstr(5).parse().unwrap()]),
             Gc,
             PackageResolve(image_package_url_to_string("update-images-firmware", 5,)),
@@ -445,21 +458,21 @@ async fn skips_unsupported_firmware_type() {
 #[fasync::run_singlethreaded(test)]
 async fn fails_on_firmware_write_error() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
-    .firmware_package(
-            btreemap! {
-                "a".to_owned() => ::update_package::ImageMetadata::new(5, hash(5), image_package_resource_url("update-images-firmware", 5, "A")),
-            },
-        )
-    .fuchsia_package(
+        .firmware_package(btreemap! {
+            "a".to_owned() => ::update_package::ImageMetadata::new(
+                5, hash(5), image_package_resource_url("update-images-firmware", 5, "A")
+            ),
+        })
+        .fuchsia_package(
             ::update_package::ImageMetadata::new(
-            0,
-            Hash::from_str(EMPTY_HASH)
-                .unwrap(),
-            image_package_resource_url("update-images-fuchsia", 9, "zbi"),
-        ),
-        None,)
-    .clone()
-    .build();
+                0,
+                Hash::from_str(EMPTY_HASH).unwrap(),
+                image_package_resource_url("update-images-fuchsia", 9, "zbi"),
+            ),
+            None,
+        )
+        .clone()
+        .build();
 
     let env = TestEnv::builder()
         .paver_service(|builder| {
@@ -529,6 +542,10 @@ async fn fails_on_firmware_write_error() {
             }),
             Paver(PaverEvent::ReadFirmware {
                 configuration: paver::Configuration::B,
+                firmware_type: "a".to_string()
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
                 firmware_type: "a".to_string()
             }),
             ReplaceRetainedPackages(vec![hashstr(5).parse().unwrap()]),

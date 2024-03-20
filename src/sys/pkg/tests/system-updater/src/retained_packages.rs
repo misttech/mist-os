@@ -305,6 +305,10 @@ async fn unpinned_url_and_resolved_image_package_and_non_empty_packages_json() {
                 configuration: paver::Configuration::B,
                 asset: paver::Asset::Kernel,
             }),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::A,
+                asset: paver::Asset::Kernel,
+            }),
             ReplaceRetainedPackages(vec![
                 SYSTEM_IMAGE_HASH.parse().unwrap(),
                 hash(zbi_hash_seed).into(),

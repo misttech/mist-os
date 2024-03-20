@@ -581,13 +581,23 @@ async fn test_ota_component_successfully_updates_with_empty_blobfs() -> Result<(
             PaverEvent::SetConfigurationUnbootable { configuration: Configuration::B },
             PaverEvent::BootManagerFlush,
             PaverEvent::ReadAsset { configuration: Configuration::B, asset: Asset::Kernel },
+            PaverEvent::ReadAsset { configuration: Configuration::A, asset: Asset::Kernel },
             PaverEvent::ReadAsset {
                 configuration: Configuration::B,
                 asset: Asset::VerifiedBootMetadata
             },
+            PaverEvent::ReadAsset {
+                configuration: Configuration::A,
+                asset: Asset::VerifiedBootMetadata
+            },
             PaverEvent::ReadFirmware { configuration: Configuration::B, firmware_type: "".into() },
+            PaverEvent::ReadFirmware { configuration: Configuration::A, firmware_type: "".into() },
             PaverEvent::ReadFirmware {
                 configuration: Configuration::B,
+                firmware_type: "test".into()
+            },
+            PaverEvent::ReadFirmware {
+                configuration: Configuration::A,
                 firmware_type: "test".into()
             },
             PaverEvent::WriteFirmware {
