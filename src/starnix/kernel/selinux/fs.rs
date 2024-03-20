@@ -15,6 +15,7 @@ use crate::{
     },
 };
 
+use bstr::ByteSlice;
 use selinux::{
     security_server::{SecurityServer, SecurityServerStatus as _},
     InitialSid, SecurityId,
@@ -304,9 +305,8 @@ impl BytesFileOps for SeContext {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         // Validate that the `data` describe valid user, role, type, etc by attempting to create
         // a SID from it.
-        self.security_server
-            .security_context_to_sid(data.as_slice())
-            .map_err(|_| errno!(EINVAL))?;
+        let context = data.as_slice().trim_end_with(|c| c == '\0');
+        self.security_server.security_context_to_sid(context.into()).map_err(|_| errno!(EINVAL))?;
         Ok(())
     }
 }
@@ -325,7 +325,7 @@ impl SeInitialContext {
 impl BytesFileOps for SeInitialContext {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let sid = SecurityId::initial(self.initial_sid);
-        if let Some(context) = self.security_server.sid_to_security_context(&sid) {
+        if let Some(context) = self.security_server.sid_to_security_context(sid) {
             Ok(context.into())
         } else {
             // Looking up an initial SID can only fail if no policy is loaded, in
@@ -619,6 +619,7 @@ pub fn selinux_proc_attrs(
     dir.entry(current_task, "sockcreate", SockCreate.new_node(task), mode!(IFREG, 0o666));
 }
 
+#[derive(Debug)]
 enum SeProcAttrNodeType {
     Current,
     Exec,
@@ -653,8 +654,9 @@ impl BytesFileOps for SeProcAttrNode {
 
         // Attempt to convert the Security Context string to a SID.
         // Writes that consist of a single NUL or a newline clear the SID.
-        let sid = match data.as_slice() {
-            b"\x0a" | b"\x00" => None,
+        let context = data.as_slice().trim_end_with(|c| c == '\0');
+        let sid = match context {
+            b"\x0a" => None,
             slice => {
                 Some(security_server.security_context_to_sid(slice).map_err(|_| errno!(EINVAL))?)
             }
@@ -702,7 +704,7 @@ impl BytesFileOps for SeProcAttrNode {
 
                 // Convert it to a Security Context string.
                 let security_context =
-                    sid.and_then(|sid| security_server.sid_to_security_context(&sid));
+                    sid.and_then(|sid| security_server.sid_to_security_context(sid));
 
                 Ok(security_context.unwrap_or_else(Vec::new).into())
             }

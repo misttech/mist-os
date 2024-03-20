@@ -341,7 +341,7 @@ mod tests {
         let mut selinux_state = Some(initial_state.clone());
 
         let elf_sid = security_server
-            .security_context_to_sid(b"u:object_r:type_t:s0")
+            .security_context_to_sid(b"u:object_r:test_valid_t:s0")
             .expect("invalid security context");
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);

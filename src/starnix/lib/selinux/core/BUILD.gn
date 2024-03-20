@@ -42,7 +42,7 @@ rustc_library("core") {
     "../testdata/micro_policies/file_range_target_low_policy.pp",
     "../testdata/micro_policies/file_source_defaults_policy.pp",
     "../testdata/micro_policies/file_target_defaults_policy.pp",
-    "../testdata/policies/emulator",
+    "../testdata/micro_policies/security_server_tests_policy.pp",
     "../testdata/policies/selinux_testsuite",
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
