@@ -26,11 +26,6 @@ rustc_library("ffx_component") {
     ]
   }
 
-  test_deps = [
-    "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:futures",
-  ]
-
   sources = [
     "src/format.rs",
     "src/lib.rs",
