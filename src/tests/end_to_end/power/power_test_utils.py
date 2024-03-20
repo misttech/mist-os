@@ -347,6 +347,9 @@ class PowerSampler:
         """Returns a MetricsProcessor instance associated with the sampler."""
         return self._metrics_processor_impl()
 
+    def should_generate_load(self) -> bool:
+        return False
+
     def merge_power_data(self, model: trace_model.Model, fxt_path: str) -> None:
         pass
 
@@ -465,6 +468,9 @@ class _RealPowerSampler(PowerSampler):
                 f"stderr: {stderr}"
             )
         _LOGGER.debug("measurepower process stopped.")
+
+    def should_generate_load(self) -> bool:
+        return True
 
     def merge_power_data(self, model: trace_model.Model, fxt_path: str) -> None:
         merge_power_data(model, self._csv_output_path, fxt_path)
