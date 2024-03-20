@@ -5895,6 +5895,28 @@ toolchain to avoid unnecessary duplication in the build.
 
 From //third_party/pigweed/src/pw_build/python_gn_args.gni:20
 
+### pw_build_TEST_TRANSITIVE_PYTHON_DEPS
+
+Whether or not to lint/test transitive deps of pw_python_package targets.
+
+For example: if lib_a depends on lib_b, lib_a.tests will run after first
+running lib_b.tests if pw_build_TEST_TRANSITIVE_PYTHON_DEPS is true.
+
+If pw_build_TEST_TRANSITIVE_PYTHON_DEPS is false, tests for a
+pw_python_package will run if you directly build the target (e.g.
+lib_b.tests) OR if the pw_python_package is placed in a pw_python_group AND
+you build the group.tests target.
+
+This applies to mypy, pylint, and tests.
+
+While this defaults to true for compatibility reasons, it's strongly
+recommended to turn this off so you're not linting and testing all of your
+external dependencies.
+
+**Current value (from the default):** `true`
+
+From //third_party/pigweed/src/pw_build/python.gni:55
+
 ### pw_build_TOOLCHAIN_LINK_DEPS
 
 pw_build_TOOLCHAIN_LINK_DEPS is used by pw_toolchain module to set default
