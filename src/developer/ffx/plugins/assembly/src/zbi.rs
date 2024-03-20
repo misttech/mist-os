@@ -116,11 +116,6 @@ pub fn construct_zbi(
         zbi_builder.add_ramdisk(ramdisk);
     }
 
-    // Add the devicetree binary in the ZBI if necessary.
-    if let Some(devicetree) = &product.devicetree {
-        zbi_builder.add_devicetree(devicetree);
-    }
-
     // Set the zbi compression to use.
     zbi_builder.set_compression(match zbi_config.compression {
         ZbiCompression::ZStd => "zstd",

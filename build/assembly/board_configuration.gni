@@ -68,9 +68,6 @@ import("//build/python/python_action.gni")
 #    NOTE:  This template converts GN paths for vbmeta keys into the correctly
 #    rebased form automatically.
 #
-#  devicetree (optional)
-#    [GN Label] The GN label of the devicetree binary for this board. This
-#    should be a devicetree() target.
 #
 #  Outputs
 #    A directory structure and manifest
@@ -113,6 +110,7 @@ template("board_configuration") {
 
     # Intermediate Files
     base_info = "${target_name}.base_info"
+    kernel_cmdline = "${target_name}.kernel_cmdline"
   }
 
   files = {
@@ -144,6 +142,10 @@ template("board_configuration") {
       input_bundles_dir = "${board_configuration_dir}/input_bundles"
       input_bundle_dirs = []
     }
+
+    # The output path for the generated file which collects kernel cmdline
+    # arguments.
+    kernel_cmdline = "${board_configuration_dir}.kernel_cmdline"
   }
 
   creation_deps = []
@@ -279,12 +281,6 @@ template("board_configuration") {
     creation_deps += labels.input_bundle_copy_targets
   }
 
-  if (defined(invoker.devicetree)) {
-    _dtb_file = get_label_info(invoker.devicetree, "target_out_dir") + "/" +
-                get_label_info(invoker.devicetree, "name") + ".dtb"
-    creation_deps += [ invoker.devicetree ]
-  }
-
   base_info_contents = {
     name = board_name
 
@@ -309,10 +305,6 @@ template("board_configuration") {
     if (defined(files.input_bundle_dirs)) {
       input_bundles =
           rebase_path(files.input_bundle_dirs, files.board_configuration_dir)
-    }
-
-    if (defined(invoker.devicetree)) {
-      devicetree = rebase_path(_dtb_file, files.board_configuration_dir)
     }
 
     forward_variables_from(invoker,

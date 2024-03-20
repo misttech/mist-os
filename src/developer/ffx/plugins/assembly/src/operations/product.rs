@@ -234,13 +234,6 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     serde_json::to_writer_pretty(board_forensics_file, &board_info)
         .with_context(|| format!("Writing board forensics file to: {board_forensics_file_path}"))?;
 
-    // Add devicetree binary
-    if let Some(devicetree_path) = &board_info.devicetree {
-        builder
-            .add_devicetree(devicetree_path.as_utf8_pathbuf())
-            .context("Adding devicetree binary")?;
-    }
-
     // Do the actual building of everything for the Image Assembly config.
     let mut image_assembly =
         builder.build(&outdir, &tools).context("Building Image Assembly config")?;

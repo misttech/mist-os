@@ -26,3 +26,6 @@ board_description = "A generic vim3 device (using devicetree)"
 board_configuration_label = "//boards/vim3:vim3-devicetree"
 
 devicetree_board_driver = true
+
+kernel_zbi_extra_deps =
+    [ "//src/devices/board/drivers/vim3-devicetree:vim3-dtb-item" ]
