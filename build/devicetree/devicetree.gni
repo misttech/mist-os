@@ -307,7 +307,7 @@ template("dts") {
 #     - Optional: The singleton list containing the output blob path. This value
 #       can be accessed as `get_target_outputs(target_name)`.
 #     - Type: list(path). Must only have one entry.
-#     - Default: target_out_dir + "/" + get_path_info(sources[0], "name) + ".dtb"
+#     - Default: target_out_dir + "/" + target_name + ".dtb"
 #
 template("devicetree") {
   compiled_dtb_target = "$target_name.dtb"
@@ -323,8 +323,12 @@ template("devicetree") {
                              "sources",
                              "deps",
                              "public_deps",
-                             "outputs",
                            ])
+    if (defined(invoker.outputs)) {
+      outputs = invoker.outputs
+    } else {
+      outputs = [ "$target_out_dir/$compiled_dtb_target" ]
+    }
   }
 
   # Decompile the compiled DTS so we can use it for the golden comparison.

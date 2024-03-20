@@ -31,6 +31,9 @@ pub struct ZbiBuilder {
     // A ramdisk to add to the ZBI.
     ramdisk: Option<Utf8PathBuf>,
 
+    // A devicetree binary to add to the ZBI
+    devicetree: Option<Utf8PathBuf>,
+
     /// optional compression to use.
     compression: Option<String>,
 
@@ -49,6 +52,7 @@ impl ZbiBuilder {
             cmdline: Vec::default(),
             board_driver_arguments: None,
             ramdisk: None,
+            devicetree: None,
             compression: None,
             output_manifest: None,
         }
@@ -103,6 +107,11 @@ impl ZbiBuilder {
     /// Add a ramdisk to the ZBI.
     pub fn add_ramdisk(&mut self, source: impl Into<Utf8PathBuf>) {
         self.ramdisk = Some(source.into());
+    }
+
+    /// Add a devicetree binary to the ZBI.
+    pub fn add_devicetree(&mut self, source: impl Into<Utf8PathBuf>) {
+        self.devicetree = Some(source.into());
     }
 
     /// Set the compression to use with the ZBI.
@@ -224,6 +233,11 @@ impl ZbiBuilder {
         if let Some(board_info_path) = board_info_path {
             args.push("--type=drv_board_info".to_string());
             args.push(board_info_path.as_ref().to_string());
+        }
+
+        if let Some(devicetree_path) = &self.devicetree {
+            args.push("--type=devicetree".to_string());
+            args.push(devicetree_path.to_string());
         }
 
         // Then, add the bootfs files.
@@ -357,6 +371,34 @@ mod tests {
                 "--type=container",
                 "path/to/kernel",
                 "--type=cmdline",
+                "--files",
+                "bootfs",
+                "--type=image_args",
+                "--entry=bootargs",
+                "--output",
+                "output",
+            ]
+        );
+    }
+
+    #[test]
+    fn zbi_args_with_kernel_with_devicetree() {
+        let tools = FakeToolProvider::default();
+        let zbi_tool = tools.get_tool("zbi").unwrap();
+        let mut builder = ZbiBuilder::new(zbi_tool);
+        builder.set_kernel("path/to/kernel");
+        builder.add_devicetree("path/to/devicetree");
+        let args = builder
+            .build_zbi_args("bootfs", Some("bootargs"), None::<String>, None::<String>, "output")
+            .unwrap();
+        assert_eq!(
+            args,
+            [
+                "--type=container",
+                "path/to/kernel",
+                "--type=cmdline",
+                "--type=devicetree",
+                "path/to/devicetree",
                 "--files",
                 "bootfs",
                 "--type=image_args",

@@ -47,6 +47,7 @@ class ImageAssemblyConfig:
     boot_args: Set[str] = field(default_factory=set)
     bootfs_files: Set[FileEntry] = field(default_factory=set)
     bootfs_packages: Set[FilePath] = field(default_factory=set)
+    devicetree: Optional[FilePath] = None
 
     def __repr__(self) -> str:
         """Serialize to a JSON string"""

@@ -55,9 +55,8 @@ all these visitors using the `load-visitors` helper library.
 Typically the devicetree blob (DTB) is passed down by the bootloader to the kernel as a
 |ZBI_TYPE_DEVICETREE| item and made available to the board driver via |fuchsia_boot::Items| protocol.
 In boards where the bootloader is not yet capable of passing the DTB (typically during board
-bringup), the kernel ZBI can be appended with the devicetree blob at build time using |zbi_input|
-and |kernel_zbi_extra_deps|. See `examples/example-board/BUILD.gn` for more details.
-
+bringup), the DTB can be passed in through board configuration's devicetree field, and later it will
+be appended to ZBI by assembly.
 ## Testing
 
 A board driver integration test can be added to test that the parsing and creation of nodes by the

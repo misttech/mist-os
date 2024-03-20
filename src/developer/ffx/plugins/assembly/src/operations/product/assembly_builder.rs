@@ -95,6 +95,9 @@ pub struct ImageAssemblyConfigBuilder {
     /// Configuration capabilities to add to a configuration component/package.
     configuration_capabilities: Option<assembly_config_capabilities::CapabilityNamedMap>,
 
+    /// Devicetree binary to be added to zbi
+    devicetree: Option<Utf8PathBuf>,
+
     /// Developer override options
     developer_only_options: Option<DeveloperOnlyOptions>,
 }
@@ -123,6 +126,7 @@ impl ImageAssemblyConfigBuilder {
             packages_to_compile: BTreeMap::default(),
             board_driver_arguments: None,
             configuration_capabilities: None,
+            devicetree: None,
             developer_only_options: None,
         }
     }
@@ -661,6 +665,14 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
+    pub fn add_devicetree(&mut self, devicetree_path: &Utf8Path) -> Result<()> {
+        if self.devicetree.is_some() {
+            return Err(anyhow::format_err!("duplicate devicetree binary"));
+        }
+        self.devicetree = Some(devicetree_path.into());
+        Ok(())
+    }
+
     /// Construct an ImageAssembly ImageAssemblyConfig from the collected items in the
     /// builder.
     ///
@@ -703,6 +715,7 @@ impl ImageAssemblyConfigBuilder {
             packages_to_compile,
             board_driver_arguments,
             configuration_capabilities,
+            devicetree,
             developer_only_options: _,
         } = self;
 
@@ -913,6 +926,7 @@ impl ImageAssemblyConfigBuilder {
             bootfs_packages: bootfs_packages.into_paths().sorted().collect(),
             images_config: Default::default(),
             board_driver_arguments,
+            devicetree,
         };
         Ok(image_assembly_config)
     }
