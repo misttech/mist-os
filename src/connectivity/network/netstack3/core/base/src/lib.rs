@@ -20,7 +20,10 @@ mod time;
 pub use context::ContextPair;
 pub use counters::Counter;
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
-pub use time::{Instant, InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext2};
+pub use time::{
+    CoreTimerContext, Instant, InstantBindingsTypes, InstantContext, TimerBindingsTypes,
+    TimerContext2,
+};
 
 /// Test utilities provided to all crates.
 pub mod testutil {

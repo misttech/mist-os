@@ -132,3 +132,20 @@ pub trait TimerContext2: InstantContext + TimerBindingsTypes {
     /// Get the instant a timer will fire, if one is scheduled.
     fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant>;
 }
+
+/// A core context providing timer type conversion.
+///
+/// This trait is used to convert from a core-internal timer type `T` to the
+/// timer dispatch ID supported by bindings in `BT::DispatchId`.
+pub trait CoreTimerContext<T, BT: TimerBindingsTypes> {
+    /// Converts an inner timer to the bindings timer type.
+    fn convert_timer(dispatch_id: T) -> BT::DispatchId;
+
+    /// A helper function to create a new timer with the provided dispatch id.
+    fn new_timer(bindings_ctx: &mut BT, dispatch_id: T) -> BT::Timer
+    where
+        BT: TimerContext2,
+    {
+        bindings_ctx.new_timer(Self::convert_timer(dispatch_id))
+    }
+}

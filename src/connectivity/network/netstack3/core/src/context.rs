@@ -50,7 +50,8 @@ use crate::{
 };
 
 pub use netstack3_base::{
-    ContextPair, InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext2,
+    ContextPair, CoreTimerContext, InstantBindingsTypes, InstantContext, TimerBindingsTypes,
+    TimerContext2,
 };
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]

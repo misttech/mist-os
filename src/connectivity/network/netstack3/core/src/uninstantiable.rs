@@ -17,6 +17,7 @@ use net_types::SpecifiedAddr;
 use packet::{BufferMut, Serializer};
 
 use crate::{
+    context::{CoreTimerContext, TimerBindingsTypes},
     convert::BidirectionalConverter,
     device::{self, Device, DeviceIdContext},
     ip::{
@@ -80,6 +81,16 @@ impl<D: Device, C: DeviceIdContext<D>> DeviceIdContext<D> for UninstantiableWrap
         _weak_device_id: &Self::WeakDeviceId,
     ) -> Option<Self::DeviceId> {
         self.uninstantiable_unreachable()
+    }
+}
+
+impl<T, BT, C> CoreTimerContext<T, BT> for UninstantiableWrapper<C>
+where
+    BT: TimerBindingsTypes,
+    C: CoreTimerContext<T, BT>,
+{
+    fn convert_timer(dispatch_id: T) -> BT::DispatchId {
+        C::convert_timer(dispatch_id)
     }
 }
 

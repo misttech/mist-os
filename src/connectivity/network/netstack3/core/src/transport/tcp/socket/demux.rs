@@ -451,10 +451,11 @@ where
 {
     core_ctx.with_socket_mut_transport_demux(conn_id, |core_ctx, socket_state| {
         let TcpSocketState { socket_state, ip_options: _ } = socket_state;
-        let conn_and_addr = assert_matches!(
+        let (conn_and_addr, timer) = assert_matches!(
             socket_state,
-            TcpSocketStateInner::Bound(BoundSocketState::Connected((conn_and_addr, _sharing)))
-                => conn_and_addr,
+            TcpSocketStateInner::Bound(BoundSocketState::Connected {
+                 conn, timer, sharing: _
+            }) => (conn , timer),
             "invalid socket ID"
         );
         let this_or_other_stack = match core_ctx {
@@ -502,6 +503,7 @@ where
                     conn_id,
                     demux_conn_id,
                     conn,
+                    timer,
                     incoming,
                 )
             }
@@ -513,6 +515,7 @@ where
                     conn_id,
                     demux_conn_id,
                     conn,
+                    timer,
                     incoming,
                 )
             }
@@ -533,6 +536,7 @@ fn try_handle_incoming_for_connection<SockI, WireI, CC, BC, DC>(
     conn_id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
     demux_id: WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
     conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
+    timer: &mut BC::Timer,
     incoming: Segment<&[u8]>,
 ) -> ConnectionIncomingSegmentDisposition
 where
@@ -636,7 +640,7 @@ where
                     assert_matches!(socketmap.conns_mut().remove(&demux_id, &conn_addr), Ok(()))
                 },
             );
-            let _: Option<_> = bindings_ctx.cancel_timer(conn_id.downgrade());
+            let _: Option<_> = bindings_ctx.cancel_timer2(timer);
             if *defunct {
                 // If the client has promised to not touch the socket again,
                 // we can destroy the socket finally.
@@ -661,7 +665,7 @@ where
     }
 
     // Send any enqueued data, if there is any.
-    tcp::socket::do_send_inner(conn_id, conn, &conn_addr, core_ctx, bindings_ctx);
+    tcp::socket::do_send_inner(conn_id, conn, &conn_addr, timer, core_ctx, bindings_ctx);
 
     // Enqueue the connection to the associated listener
     // socket's accept queue.
@@ -924,10 +928,11 @@ where
             if let Some((tw_reuse, conn_addr)) = tw_reuse {
                 match socketmap.conns_mut().remove(tw_reuse, &conn_addr) {
                     Ok(()) => {
-                        assert_matches!(
-                            WireI::cancel_timer_with_demux_id(bindings_ctx, tw_reuse),
-                            Some(_)
-                        );
+                        // NB: We're removing the tw_reuse connection from the
+                        // demux here, but not canceling its timer. The timer is
+                        // canceled via drop when we destroy the socket. Special
+                        // care is taken when handling timers in the time wait
+                        // state to account for this.
                     }
                     Err(NotFoundError) => {
                         // We could lose a race trying to reuse the tw_reuse
@@ -940,31 +945,38 @@ where
             // Try to create and add the new socket to the demux.
             let accept_queue_clone = accept_queue.clone();
             let ip_sock = ip_sock.clone();
+            let bindings_ctx_moved = &mut *bindings_ctx;
             match socketmap.conns_mut().try_insert_with(addr, sharing, move |addr, sharing| {
-                let (id, primary) =
-                    TcpSocketId::new(TcpSocketStateInner::Bound(BoundSocketState::Connected((
-                        make_connection(
-                            Connection {
-                                accept_queue: Some(accept_queue_clone),
-                                state,
-                                ip_sock,
-                                defunct: false,
-                                socket_options,
-                                soft_error: None,
-                                handshake_status: HandshakeStatus::Pending,
-                            },
-                            addr,
-                        ),
-                        sharing,
-                    ))));
+                let conn = make_connection(
+                    Connection {
+                        accept_queue: Some(accept_queue_clone),
+                        state,
+                        ip_sock,
+                        defunct: false,
+                        socket_options,
+                        soft_error: None,
+                        handshake_status: HandshakeStatus::Pending,
+                    },
+                    addr,
+                );
+
+                let (id, primary) = TcpSocketId::new_cyclic(|weak| {
+                    let mut timer = CC::new_timer(bindings_ctx_moved, weak);
+                    // Schedule the timer here because we can't acquire the lock
+                    // later. This only runs when inserting into the demux
+                    // succeeds so it's okay.
+                    assert_eq!(
+                        bindings_ctx_moved.schedule_timer_instant2(poll_send_at, &mut timer),
+                        None
+                    );
+                    TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, sharing, timer })
+                });
                 (make_demux_id(id.clone()), (primary, id))
             }) {
                 Ok((_entry, (primary, id))) => {
                     // Make sure the new socket is in the pending accept queue
                     // before we release the demux lock.
-                    accept_queue.push_pending(id.clone());
-                    let timer = id.downgrade();
-                    assert_eq!(bindings_ctx.schedule_timer_instant(poll_send_at, timer), None);
+                    accept_queue.push_pending(id);
                     Some(primary)
                 }
                 Err((e, _sharing_state)) => {

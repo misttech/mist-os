@@ -10,6 +10,7 @@ use lock_order::{
 use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 
 use crate::{
+    context::CoreTimerContext,
     device::{self, WeakDeviceId},
     socket::{datagram, MaybeDualStack},
     transport::{
@@ -20,10 +21,21 @@ use crate::{
             },
         },
         udp::{self, UdpSocketId, UdpSocketSet, UdpSocketState},
+        TransportLayerTimerId,
     },
     uninstantiable::{Uninstantiable, UninstantiableWrapper},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
+
+impl<I, BC, L> CoreTimerContext<WeakTcpSocketId<I, WeakDeviceId<BC>, BC>, BC> for CoreCtx<'_, BC, L>
+where
+    I: tcp::socket::DualStackIpExt,
+    BC: BindingsContext,
+{
+    fn convert_timer(dispatch_id: WeakTcpSocketId<I, WeakDeviceId<BC>, BC>) -> BC::DispatchId {
+        TransportLayerTimerId::Tcp(dispatch_id.into()).into()
+    }
+}
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I, L, BC> tcp::socket::TcpDemuxContext<I, WeakDeviceId<BC>, BC> for CoreCtx<'_, BC, L>
