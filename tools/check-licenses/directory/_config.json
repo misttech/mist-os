@@ -29,6 +29,14 @@
             },
             {
                 "notes": [
+                    "Exempt CTF releases from the license checker"
+                ],
+                "paths": [
+                    "prebuilt/ctf"
+                ]
+            },
+            {
+                "notes": [
                     "New Flutter licenses are tripping the license checker.",
                     "Remove this skip once the flutter licenses can be successfully parsed.",
                     "See b/225400494 for more info."
