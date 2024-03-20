@@ -94,7 +94,7 @@ def _fuchsia_sdk_repository_impl(ctx):
 
     manifests = []
 
-    # Resolve labels early to avoir repository rule restarts.
+    # Resolve labels early to avoid repository rule restarts.
     repo_build_template = ctx.path(Label("//fuchsia/workspace/sdk_templates:repository.BUILD.template"))
     resolve_repository_labels(ctx)
 
