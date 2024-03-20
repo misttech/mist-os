@@ -13,8 +13,16 @@ The `.cml` file is compiled into a FIDL wire format (`.cm`) file.
 
 Both capabilities and a component's children are named. A name string may
 consist of one or more of the following characters: `A-Z`, `a-z`, `0-9`,
-`_`, `.`, `-`. It must not exceed 100 characters in length and may not start
+`_`, `.`, `-`. It must not exceed 255 characters in length and may not start
 with `.` or `-`.
+
+### Paths {#paths}
+
+Paths are sequences of [names]{#names} delimited by the `/` character. A path
+must not exceed 4095 characters in length. Throughout the document,
+
+- Relative paths cannot start with the `/` character.
+- Namespace and outgoing directory paths must start with the `/` character.
 
 ### References {#references}
 
@@ -315,7 +323,7 @@ The `collections` section declares collections as described in
         This is the default.
     - `static_and_dynamic`: Both static offers and those specified at runtime
         with `CreateChild` are allowed.
-- `allow_long_names`: (_optional `bool`_) Allow child names up to 1024 characters long instead of the usual 100 character limit.
+- `allow_long_names`: (_optional `bool`_) Allow child names up to 1024 characters long instead of the usual 255 character limit.
     Default is false.
 - `persistent_storage`: (_optional `bool`_) If set to `true`, the data in isolated storage used by dynamic child instances and
     their descendants will persist after the instances are destroyed. A new child instance

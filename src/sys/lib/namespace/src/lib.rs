@@ -23,9 +23,11 @@ pub use tree::Tree;
 ///
 /// Namespaces may be represented as a collection of directory client endpoints and their
 /// corresponding unique paths, so called "flat representation". In this case each path
-/// must be a valid [`Path`], and no path can be a parent of another path.
+/// must be a valid [`cm_types::NamespacePath`], and no path can be a parent of another path.
 ///
-/// See https://fuchsia.dev/fuchsia-src/concepts/process/namespaces.
+/// See https://fuchsia.dev/fuchsia-src/concepts/process/namespaces for the definition
+/// of namespaces of a process. The namespace of a component largely follows except that
+/// some more characters are disallowed (c.f. [`cm_types::NamespacePath`] documentation).
 #[derive(Debug)]
 pub struct Namespace {
     tree: Tree<ClientEnd<fio::DirectoryMarker>>,

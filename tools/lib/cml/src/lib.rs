@@ -1012,8 +1012,16 @@ impl Right {
 ///
 /// Both capabilities and a component's children are named. A name string may
 /// consist of one or more of the following characters: `A-Z`, `a-z`, `0-9`,
-/// `_`, `.`, `-`. It must not exceed 100 characters in length and may not start
+/// `_`, `.`, `-`. It must not exceed 255 characters in length and may not start
 /// with `.` or `-`.
+///
+/// ### Paths {#paths}
+///
+/// Paths are sequences of [names]{#names} delimited by the `/` character. A path
+/// must not exceed 4095 characters in length. Throughout the document,
+///
+/// - Relative paths cannot start with the `/` character.
+/// - Namespace and outgoing directory paths must start with the `/` character.
 ///
 /// ### References {#references}
 ///
@@ -2677,7 +2685,7 @@ impl<'de> de::Deserialize<'de> for Program {
         const EXPECTED_PROGRAM: &'static str =
             "a JSON object that includes a `runner` string property";
         const EXPECTED_RUNNER: &'static str =
-            "a non-empty `runner` string property no more than 100 characters in length \
+            "a non-empty `runner` string property no more than 255 characters in length \
             that consists of [A-Za-z0-9_.-] and starts with [A-Za-z0-9_]";
 
         impl<'de> de::Visitor<'de> for Visitor {
@@ -3379,7 +3387,7 @@ pub struct Collection {
     ///     with `CreateChild` are allowed.
     pub allowed_offers: Option<AllowedOffers>,
 
-    /// Allow child names up to 1024 characters long instead of the usual 100 character limit.
+    /// Allow child names up to 1024 characters long instead of the usual 255 character limit.
     /// Default is false.
     pub allow_long_names: Option<bool>,
 
