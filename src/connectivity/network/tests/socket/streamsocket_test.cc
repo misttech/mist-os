@@ -566,7 +566,7 @@ TEST_P(ConnectingIOTest, BlockedIO) {
         .fd = listener.get(),
         .events = POLLIN,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kPositiveCheckTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     ASSERT_EQ(pfd.revents, POLLIN);
@@ -660,7 +660,7 @@ TEST_P(ConnectingIOTest, BlockedIO) {
             .fd = test_accept.get(),
             .events = POLLIN,
         };
-        int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
+        int n = poll(&pfd, 1, std::chrono::milliseconds(kPositiveCheckTimeout).count());
         ASSERT_GE(n, 0) << strerror(errno);
         ASSERT_EQ(n, 1);
         ASSERT_EQ(pfd.revents, POLLIN);
@@ -678,7 +678,7 @@ TEST_P(ConnectingIOTest, BlockedIO) {
     }
   }
 
-  EXPECT_EQ(fut.wait_for(kDeprecatedTimeout), std::future_status::ready);
+  EXPECT_EQ(fut.wait_for(kPositiveCheckTimeout), std::future_status::ready);
 }
 
 std::string ConnectingIOParamsToString(const testing::TestParamInfo<ConnectingIOParams> info) {
