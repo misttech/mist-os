@@ -21,10 +21,11 @@ namespace {
 constexpr int kSwitchJob = 1;
 constexpr int kSwitchExact = 2;
 constexpr int kSwitchWeak = 3;
+constexpr int kSwitchRecursive = 4;
 
 const char kAttachShortHelp[] = "attach: Attach to processes.";
 const char kAttachHelp[] =
-    R"(attach [ --job / -j <pid/koid> ] [ --exact ] [ <what> ]
+    R"(attach [ --job / -j <pid/koid> ] [ --exact ] [ --weak ] [ --recursive / -r ] [ <what> ]
 
   Attaches to current or future process.
 
@@ -51,6 +52,12 @@ Arguments
         typically used by orchestration tools, rather than from the command
         line. This option can be specified in combination with any type of
         filter and all other flags to attach.
+
+    --recursive
+        Attaching recursively to a component means that when matched, an
+        implicit moniker prefix filter will also be installed and will match any
+        subsequent components that are launched under this component's realm.
+        Note: this option does nothing for non-component filters.
 
 Attaching to a process by a process id
 
@@ -93,6 +100,14 @@ Attaching to processes by a component name
   name "foobar.cm". This will create a filter that matches all processes in
   components with the given name.
 
+Attaching to all processes within a realm
+
+  Using any of the above component filters, using the --recursive option will
+  attach to _all_ processes found under the realm of a matching component. The
+  component can be specified with either exact moniker, moniker substring, or
+  package URL. Note using a short moniker substring could unintentionally attach
+  to many processes, which will slow down the system.
+
 Attaching to processes by a process name
 
   Other arguments will be interpreted as a general filter which is a substring
@@ -129,11 +144,22 @@ Examples
   attach /core/foobar
       Attaches to processes in the component /core/foobar.
 
+  attach --recursive /core/foobar
+      Attaches to all processes found in the realm rooted at /core/foobar.
+
   attach foo/bar
       Attaches to processes in the component(s) with foo/bar in their moniker.
 
+  attach --recursive foo/bar
+      Attaches to all processes in all realms rooted at any moniker containing
+      foo/bar.
+
   attach fuchsia-pkg://devhost/foobar#meta/foobar.cm
       Attaches to processes in components with the above component URL.
+
+  attach --recursive fuchsia-pkg://devhost/foobar#meta/foobar.cm
+      Attaches to all processes in the realm rooted at any moniker associated
+      with the given URL.
 
   attach foobar.cm
       Attaches to processes in components with the above name.
@@ -217,6 +243,10 @@ void RunVerbAttach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
     filter->SetWeak(true);
   }
 
+  if (cmd.HasSwitch(kSwitchRecursive)) {
+    filter->SetRecursive(true);
+  }
+
   std::string pattern;
   if (!cmd.args().empty())
     pattern = cmd.args()[0];
@@ -270,6 +300,7 @@ VerbRecord GetAttachVerbRecord() {
   attach.switches.emplace_back(kSwitchJob, true, "job", 'j');
   attach.switches.emplace_back(kSwitchExact, false, "exact");
   attach.switches.emplace_back(kSwitchWeak, false, "weak");
+  attach.switches.emplace_back(kSwitchRecursive, false, "recursive", 'r');
   return attach;
 }
 

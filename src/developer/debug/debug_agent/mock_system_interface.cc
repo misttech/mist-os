@@ -66,6 +66,17 @@ std::unique_ptr<MockSystemInterface> MockSystemInterface::CreateWithData() {
   MockJobHandle job3(28, "job3");
   job3.set_child_processes({job3_p1});
 
+  // Job 4
+  // Note: Job4 is contained in a child component under a routing component which contains no ELF
+  // executable. We keep no reference of such a component in our view of a running system, but will
+  // be notified when these components are discovered. The routing component itself has no
+  // associated job, and will not appear as "running" in any view of the system, but it's children
+  // could contain ELF executables, which we may want to attach to. See "recursive" filters.
+  MockJobHandle job4(32, "job4");
+  MockProcessHandle job4_p1(33, "job4-p1");
+  job4_p1.set_threads({MockThreadHandle(34, "initial-thread")});
+  job4.set_child_processes({job4_p1});
+
   // Root.
   MockProcessHandle root_p1(2, "root-p1");
   root_p1.set_threads({MockThreadHandle(3, "initial-thread")});
@@ -104,6 +115,9 @@ std::unique_ptr<MockSystemInterface> MockSystemInterface::CreateWithData() {
   system_interface->mock_component_manager().component_info().emplace(
       job3.GetKoid(), debug_ipc::ComponentInfo{.moniker = "bootstrap/hosts:host-1",
                                                .url = "fuchsia-boot:///url#meta/host.cm"});
+  system_interface->mock_component_manager().component_info().emplace(
+      job4.GetKoid(), debug_ipc::ComponentInfo{.moniker = "/moniker/generated/root:test/driver",
+                                               .url = "#meta/child.cm"});
 
   return system_interface;
 }

@@ -24,20 +24,21 @@
                 // Used by fdio for running executables.
                 "fuchsia.process.Launcher",
 
-                // To launch v2 components.
+                // To launch components.
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmQuery.root",
 
-                // To launch v2 tests.
+                // To launch tests.
                 "fuchsia.test.manager.Query",
                 "fuchsia.test.manager.RunBuilder",
             ],
             from: "parent",
         },
         {
-            // To watch and attach to v2 components.
+            // To watch and attach to components.
             event_stream: [
                 "debug_started",
+                "discovered",
                 "stopped",
             ],
             from: "parent",

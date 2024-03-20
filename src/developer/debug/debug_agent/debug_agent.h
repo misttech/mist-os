@@ -61,6 +61,7 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
   void OnProcessStart(std::unique_ptr<ProcessHandle> process);
 
   // Notified by ComponentManager.
+  void OnComponentDiscovered(const std::string& moniker, const std::string& url);
   void OnComponentStarted(const std::string& moniker, const std::string& url);
   void OnComponentExited(const std::string& moniker, const std::string& url);
   void OnTestComponentExited(const std::string& url);
@@ -135,6 +136,9 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
   // Process Limbo ---------------------------------------------------------------------------------
 
   void OnProcessEnteredLimbo(const LimboProvider::Record& record);
+
+  std::vector<const Filter*> GetMatchingFiltersForComponentInfo(const std::string& moniker,
+                                                                const std::string& url) const;
 
   // Members ---------------------------------------------------------------------------------------
 

@@ -547,6 +547,7 @@ struct Filter {
     kComponentUrl,
     kComponentMoniker,
     kComponentMonikerSuffix,
+    kComponentMonikerPrefix,
 
     kLast,
   } type = Type::kUnset;
@@ -563,10 +564,17 @@ struct Filter {
   // modules to the front end.
   bool weak = false;
 
+  // Indicates a recursive filter, which should match all child components spawned in the realm of
+  // this filter's matching component.
+  bool recursive = false;
+
   void Serialize(Serializer& ser, uint32_t ver) {
     ser | type | pattern | job_koid;
     if (ver >= 61) {
       ser | id | weak;
+    }
+    if (ver >= 62) {
+      ser | recursive;
     }
   }
 };

@@ -48,6 +48,8 @@ bool FilterMatches(const Filter& filter, const std::string& process_name,
         return component.moniker == filter.pattern;
       case Filter::Type::kComponentMonikerSuffix:
         return debug::StringEndsWith(component.moniker, filter.pattern);
+      case Filter::Type::kComponentMonikerPrefix:
+        return debug::StringStartsWith(component.moniker, filter.pattern);
       default:
         return false;
     }

@@ -40,6 +40,9 @@ class Filter : public ClientObject {
   void SetWeak(bool weak);
   bool weak() const { return filter_.weak; }
 
+  void SetRecursive(bool recursive);
+  bool recursive() const { return filter_.recursive; }
+
   // Accessing the underlying filter storage.
   const debug_ipc::Filter& filter() const { return filter_; }
   SettingStore& settings() { return settings_; }

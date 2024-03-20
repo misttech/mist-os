@@ -35,6 +35,7 @@ bool Filter::MatchesProcess(const ProcessHandle& process, SystemInterface& syste
 bool Filter::MatchesComponent(const std::string& moniker, const std::string& url) const {
   if (filter_.type == debug_ipc::Filter::Type::kComponentMoniker ||
       filter_.type == debug_ipc::Filter::Type::kComponentMonikerSuffix ||
+      filter_.type == debug_ipc::Filter::Type::kComponentMonikerPrefix ||
       filter_.type == debug_ipc::Filter::Type::kComponentName ||
       filter_.type == debug_ipc::Filter::Type::kComponentUrl) {
     return debug_ipc::FilterMatches(filter_, "",

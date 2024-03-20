@@ -44,7 +44,6 @@ class ZirconComponentManager : public ComponentManager {
   class TestLauncher;
 
   void GetNextComponentEvent();
-  // std::optional<std::vector<debug_ipc::ComponentInfo>> FindAllComponentInfo(zx_koid_t job_koid);
 
   fit::callback<void()> ready_callback_ = []() {};
 

@@ -38,6 +38,11 @@ OutputBuffer FormatFilter(const ConsoleContext* context, const Filter* filter) {
     out.Append("=true ");
   }
 
+  if (filter->recursive()) {
+    out.Append(Syntax::kVariable, "recursive");
+    out.Append("=true ");
+  }
+
   if (!filter->is_valid()) {
     out.Append(Syntax::kComment, "(invalid) ");
   }

@@ -39,6 +39,14 @@ size_t LocalStreamBackend::ConsumeStreamBufferData(const char* data, size_t len)
       HandleAttach(std::move(attach));
       break;
     }
+    case debug_ipc::MsgHeader::Type::kNotifyComponentStarting: {
+      debug_ipc::NotifyComponentStarting component_starting;
+      if (!debug_ipc::Deserialize(std::move(msg_buffer), &component_starting,
+                                  debug_ipc::kCurrentProtocolVersion))
+        FX_NOTREACHED();
+      HandleNotifyComponentStarting(component_starting);
+      break;
+    }
     case debug_ipc::MsgHeader::Type::kNotifyException: {
       debug_ipc::NotifyException exception;
       if (!debug_ipc::Deserialize(std::move(msg_buffer), &exception,

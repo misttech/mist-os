@@ -200,7 +200,9 @@ const char* Filter::TypeToString(Type type) {
     case Type::kComponentMoniker:
       return "component moniker";
     case Type::kComponentMonikerSuffix:
-      return "component moniker substr";
+      return "component moniker suffix";
+    case Type::kComponentMonikerPrefix:
+      return "component moniker prefix";
     case Type::kLast:
       break;
   }

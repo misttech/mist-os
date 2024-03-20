@@ -867,9 +867,31 @@ void DebugAgent::OnProcessStart(std::unique_ptr<ProcessHandle> process_handle) {
   }
 }
 
+void DebugAgent::OnComponentDiscovered(const std::string& moniker, const std::string& url) {
+  auto matched_filters = GetMatchingFiltersForComponentInfo(moniker, url);
+
+  for (auto filter : matched_filters) {
+    if (filter != nullptr && filter->filter().recursive) {
+      // When any recursive filter matches here, we install a component moniker prefix so that any
+      // sub-components created as children of this one are attached implicitly. Only one filter
+      // match needs to be recursive for us to install the prefix filter for |moniker|, and we only
+      // need to install one new filter per invocation of this function.
+      //
+      // TODO(b/330571289): This internal filter will be removed the next time the client
+      // synchronizes filters via UpdateFilters, which could result in child components not being
+      // attached unexpectedly. In practice filter updates don't happen that often, but we should
+      // still handle this case.
+      debug_ipc::Filter filter;
+      filter.type = debug_ipc::Filter::Type::kComponentMonikerPrefix;
+      filter.pattern = moniker;
+      filters_.emplace_back(filter);
+      return;
+    }
+  }
+}
+
 void DebugAgent::OnComponentStarted(const std::string& moniker, const std::string& url) {
-  if (std::any_of(filters_.begin(), filters_.end(),
-                  [&](const Filter& f) { return f.MatchesComponent(moniker, url); })) {
+  if (!GetMatchingFiltersForComponentInfo(moniker, url).empty()) {
     debug_ipc::NotifyComponentStarting notify;
     notify.component.moniker = moniker;
     notify.component.url = url;
@@ -880,8 +902,7 @@ void DebugAgent::OnComponentStarted(const std::string& moniker, const std::strin
 }
 
 void DebugAgent::OnComponentExited(const std::string& moniker, const std::string& url) {
-  if (std::any_of(filters_.begin(), filters_.end(),
-                  [&](const Filter& f) { return f.MatchesComponent(moniker, url); })) {
+  if (!GetMatchingFiltersForComponentInfo(moniker, url).empty()) {
     debug_ipc::NotifyComponentExiting notify;
     notify.component.moniker = moniker;
     notify.component.url = url;
@@ -923,6 +944,18 @@ void DebugAgent::OnProcessEnteredLimbo(const LimboProvider::Record& record) {
   process_starting.timestamp = GetNowTimestamp();
 
   SendNotification(process_starting);
+}
+
+std::vector<const Filter*> DebugAgent::GetMatchingFiltersForComponentInfo(
+    const std::string& moniker, const std::string& url) const {
+  std::vector<const Filter*> matches;
+  for (const auto& filter : filters_) {
+    if (filter.MatchesComponent(moniker, url)) {
+      matches.push_back(&filter);
+    }
+  }
+
+  return matches;
 }
 
 void DebugAgent::WriteLog(debug::LogSeverity severity, const debug::FileLineFunction& location,

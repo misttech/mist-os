@@ -45,6 +45,14 @@ TEST_F(FormatFilterTest, FormatFilter) {
   f->SetWeak(true);
   EXPECT_EQ("Filter 1 type=\"component name\" pattern=component.cm weak=true ",
             FormatFilter(&context, f).AsString());
+
+  f->SetType(debug_ipc::Filter::Type::kComponentUrl);
+  f->SetPattern("fuchsia-pkg://devhost/package#meta/component.cm");
+  f->SetJobKoid(0);  // Must be 0 when type is kComponent*.
+  f->SetRecursive(true);
+  EXPECT_EQ(
+      "Filter 1 type=\"component url\" pattern=fuchsia-pkg://devhost/package#meta/component.cm weak=true recursive=true ",
+      FormatFilter(&context, f).AsString());
 }
 
 TEST_F(FormatFilterTest, FormatFilterList) {

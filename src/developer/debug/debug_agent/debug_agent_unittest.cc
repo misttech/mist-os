@@ -546,4 +546,34 @@ TEST_F(DebugAgentTests, WeakFilterMatchDoesNotSendModules) {
   EXPECT_TRUE(harness.stream_backend()->modules().empty());
 }
 
+TEST_F(DebugAgentTests, RecursiveFilterAppliesImplicitFilter) {
+  MockDebugAgentHarness harness;
+  RemoteAPI* remote_api = harness.debug_agent();
+
+  constexpr char kRootComponentUrl[] = "fuchsia-pkg://devhost/root_package#meta/root_component.cm";
+  constexpr char kRootComponentMoniker[] = "some/moniker/root:test";
+  constexpr char kSubpackageUrl[] = "#meta/child.cm";
+  constexpr char kSubpackageMoniker[] = "some/moniker/root:test/driver";
+
+  debug_ipc::UpdateFilterRequest request;
+  auto& filter = request.filters.emplace_back();
+  filter.type = debug_ipc::Filter::Type::kComponentUrl;
+  filter.pattern = kRootComponentUrl;
+  filter.recursive = true;
+
+  debug_ipc::UpdateFilterReply reply;
+  remote_api->OnUpdateFilter(request, &reply);
+
+  harness.debug_agent()->OnComponentDiscovered(kRootComponentMoniker, kRootComponentUrl);
+
+  // There should now be TWO filters, one of which the frontend doesn't know about.
+
+  // Now we start the child component, which contains a program.
+  harness.debug_agent()->OnComponentStarted(kSubpackageMoniker, kSubpackageUrl);
+
+  EXPECT_EQ(harness.stream_backend()->component_starts().size(), 1u);
+  EXPECT_EQ(harness.stream_backend()->component_starts()[0].component.url, kSubpackageUrl);
+  EXPECT_EQ(harness.stream_backend()->component_starts()[0].component.moniker, kSubpackageMoniker);
+}
+
 }  // namespace debug_agent

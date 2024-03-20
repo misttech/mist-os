@@ -15,6 +15,10 @@ class MockStreamBackend : public LocalStreamBackend {
     attach_replies_.push_back(std::move(attach_reply));
   }
 
+  void HandleNotifyComponentStarting(debug_ipc::NotifyComponentStarting notification) override {
+    component_starts_.push_back(std::move(notification));
+  }
+
   void HandleNotifyProcessStarting(debug_ipc::NotifyProcessStarting notification) override {
     process_starts_.push_back(std::move(notification));
   }
@@ -24,6 +28,10 @@ class MockStreamBackend : public LocalStreamBackend {
   }
 
   const std::vector<debug_ipc::AttachReply>& attach_replies() const { return attach_replies_; }
+
+  const std::vector<debug_ipc::NotifyComponentStarting>& component_starts() const {
+    return component_starts_;
+  }
 
   const std::vector<debug_ipc::NotifyProcessStarting>& process_starts() const {
     return process_starts_;
@@ -38,6 +46,7 @@ class MockStreamBackend : public LocalStreamBackend {
 
  private:
   std::vector<debug_ipc::AttachReply> attach_replies_;
+  std::vector<debug_ipc::NotifyComponentStarting> component_starts_;
   std::vector<debug_ipc::NotifyProcessStarting> process_starts_;
   std::vector<debug_ipc::NotifyModules> modules_;
   std::vector<debug_ipc::NotifyException> exceptions_;

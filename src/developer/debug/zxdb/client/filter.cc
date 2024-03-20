@@ -127,6 +127,11 @@ void Filter::SetWeak(bool weak) {
   Sync();
 }
 
+void Filter::SetRecursive(bool recursive) {
+  filter_.recursive = recursive;
+  Sync();
+}
+
 void Filter::Sync() { session()->system().SyncFilters(); }
 
 // static

@@ -254,11 +254,22 @@ void ZirconComponentManager::OnComponentEvent(fuchsia_component::Event event) {
   if (!event.payload() || !event.header() || !event.header()->event_type() ||
       !event.header()->component_url() || !event.header()->moniker() ||
       event.header()->moniker()->empty()) {
+    if (event.header()) {
+      DEBUG_LOG(Process) << "Did not process EventType = "
+                         << static_cast<int>(*event.header()->event_type());
+    }
     return;
   }
+
   const auto& moniker = *event.header()->moniker();
   const auto& url = *event.header()->component_url();
   switch (*event.header()->event_type()) {
+    case fuchsia_component::EventType::kDiscovered: {
+      if (debug_agent_) {
+        debug_agent_->OnComponentDiscovered(moniker, url);
+      }
+      break;
+    }
     case fuchsia_component::EventType::kDebugStarted:
       if (debug_agent_) {
         debug_agent_->OnComponentStarted(moniker, url);
