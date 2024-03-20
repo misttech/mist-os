@@ -30,11 +30,6 @@
     ],
     use: [
         {
-            directory: "boot",
-            rights: [ "rx*" ],
-            path: "/boot",
-        },
-        {
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.component.resolution.Resolver-base",
@@ -42,8 +37,6 @@
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.index.DevelopmentManager",
                 "fuchsia.driver.index.DriverIndex",
-                "fuchsia.kernel.RootJob",
-                "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "power-manager-outlives-driver-manager",

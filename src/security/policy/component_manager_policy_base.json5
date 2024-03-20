@@ -19,7 +19,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/console-launcher",
-                    "/bootstrap/driver_manager",
 
                     // Driver component names vary depending on the
                     // exact hardware configuration of the board.
@@ -28,7 +27,6 @@
                     // TODO(https://fxbug.dev/42174945): remove this once the root
                     // resource is not widely used.
                     "/bootstrap/boot-drivers:**",
-                    "/bootstrap/pkg-drivers:**",
                     "/bootstrap/netsvc",
                     "/bootstrap/svchost",
                 ],
@@ -63,7 +61,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/boot-drivers:**",
-                    "/bootstrap/driver_manager",
                 ],
             },
             {
@@ -84,7 +81,6 @@
                     "/bootstrap",
                     "/bootstrap/boot-drivers:**",
                     "/bootstrap/console-launcher",
-                    "/bootstrap/driver_manager",
                 ],
             },
             {
@@ -95,7 +91,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/boot-drivers:**",
-                    "/bootstrap/driver_manager",
                 ],
             },
             {
@@ -106,7 +101,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/boot-drivers:**",
-                    "/bootstrap/driver_manager",
                 ],
             },
             {
@@ -117,7 +111,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/boot-drivers:**",
-                    "/bootstrap/driver_manager",
                 ],
             },
             {
@@ -128,7 +121,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/console-launcher",
-                    "/bootstrap/driver_manager",
                     "/bootstrap/netsvc",
                     "/bootstrap/pwrbtn-monitor",
                     "/bootstrap/svchost",
@@ -163,7 +155,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/boot-drivers:**",
-                    "/bootstrap/driver_manager",
                 ],
             },
             {
@@ -174,7 +165,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/boot-drivers:**",
-                    "/bootstrap/driver_manager",
                 ],
             },
             {
@@ -197,7 +187,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/boot-drivers:**",
-                    "/bootstrap/driver_manager",
                 ],
             },
             {

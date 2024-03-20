@@ -143,29 +143,12 @@
             subdir: "config/driver_index",
         },
         {
-            directory: "boot",
-            from: "parent",
-            to: [ "#driver_manager" ],
-            rights: [ "rx*" ],
-        },
-        {
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
-                "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.kernel.FramebufferResource",
-                "fuchsia.kernel.InfoResource",
-                "fuchsia.kernel.IommuResource",
-                "fuchsia.kernel.IoportResource",
-                "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MexecResource",
-                "fuchsia.kernel.MmioResource",
-                "fuchsia.kernel.MsiResource",
                 "fuchsia.kernel.PowerResource",
-                "fuchsia.kernel.RootJob",
-                "fuchsia.kernel.SmcResource",
-                "fuchsia.process.Launcher",
             ],
             from: "parent",
             to: "#driver_manager",
@@ -223,10 +206,7 @@
         {
             protocol: "fuchsia.boot.RootResource",
             from: "parent",
-            to: [
-                "#boot-drivers",
-                "#pkg-drivers",
-            ],
+            to: [ "#boot-drivers" ],
         },
         {
             protocol: "fuchsia.kernel.InfoResource",

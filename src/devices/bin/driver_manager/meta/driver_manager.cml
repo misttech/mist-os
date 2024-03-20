@@ -20,16 +20,8 @@
             // test
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.kernel.FramebufferResource",
-                "fuchsia.kernel.InfoResource",
-                "fuchsia.kernel.IommuResource",
-                "fuchsia.kernel.IoportResource",
-                "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MexecResource",
-                "fuchsia.kernel.MmioResource",
-                "fuchsia.kernel.MsiResource",
                 "fuchsia.kernel.PowerResource",
-                "fuchsia.kernel.SmcResource",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
             ],
