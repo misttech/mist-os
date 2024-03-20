@@ -6,9 +6,21 @@ use async_trait::async_trait;
 use errors::ffx_error;
 use ffx_target::add_manual_target;
 use ffx_target_add_args::AddCommand;
-use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
+use fho::{daemon_protocol, FfxMain, FfxTool, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 use netext::parse_address_parts;
+use schemars::JsonSchema;
+use serde::Serialize;
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub enum CommandStatus {
+    /// Successful execution with an optional informational string.
+    Ok { message: Option<String> },
+    /// Unexpected error with string.
+    UnexpectedError { message: String },
+    /// A known kind of error that can be reported usefully to the user
+    UserError { message: String },
+}
 
 #[derive(FfxTool)]
 pub struct AddTool {
@@ -22,9 +34,22 @@ fho::embedded_plugin!(AddTool);
 
 #[async_trait(?Send)]
 impl FfxMain for AddTool {
-    type Writer = SimpleWriter;
-    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        add_impl(self.target_collection_proxy, self.cmd).await
+    type Writer = VerifiedMachineWriter<CommandStatus>;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        match add_impl(self.target_collection_proxy, self.cmd).await {
+            Ok(_) => {
+                writer.machine(&CommandStatus::Ok { message: None })?;
+                Ok(())
+            }
+            Err(fho::Error::User(e)) => {
+                writer.machine(&CommandStatus::UserError { message: e.to_string() })?;
+                Err(fho::Error::User(e))
+            }
+            Err(e) => {
+                writer.machine(&CommandStatus::UnexpectedError { message: e.to_string() })?;
+                Err(e)
+            }
+        }
     }
 }
 
@@ -56,6 +81,7 @@ pub async fn add_impl(
 #[cfg(test)]
 mod test {
     use super::*;
+    use fho::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx as ffx;
     use fidl_fuchsia_net as net;
 
@@ -74,7 +100,7 @@ mod test {
         })
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add() {
         let server = setup_fake_target_collection(|addr| {
             assert_eq!(
@@ -96,7 +122,7 @@ mod test {
             .unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_port() {
         let server = setup_fake_target_collection(|addr| {
             assert_eq!(
@@ -119,7 +145,7 @@ mod test {
             .unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_v6() {
         let server = setup_fake_target_collection(|addr| {
             assert_eq!(
@@ -135,7 +161,7 @@ mod test {
         add_impl(server, AddCommand { addr: "f000::1".to_owned(), nowait: true }).await.unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_v6_port() {
         let server = setup_fake_target_collection(|addr| {
             assert_eq!(
@@ -154,7 +180,7 @@ mod test {
             .unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_v6_scope_id() {
         let server = setup_fake_target_collection(|addr| {
             assert_eq!(
@@ -170,7 +196,7 @@ mod test {
         add_impl(server, AddCommand { addr: "f000::1%1".to_owned(), nowait: true }).await.unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_v6_scope_id_port() {
         let server = setup_fake_target_collection(|addr| {
             assert_eq!(
@@ -187,5 +213,61 @@ mod test {
         add_impl(server, AddCommand { addr: "[f000::1%1]:640".to_owned(), nowait: true })
             .await
             .unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn test_machine_output() {
+        let server = setup_fake_target_collection(|addr| {
+            assert_eq!(
+                addr,
+                ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+                    ip: net::IpAddress::Ipv6(net::Ipv6Address {
+                        addr: "f000::1".parse::<std::net::Ipv6Addr>().unwrap().octets().into()
+                    }),
+                    scope_id: 1,
+                    port: 640,
+                })
+            )
+        });
+        let tool = AddTool {
+            cmd: AddCommand { addr: "[f000::1%1]:640".to_owned(), nowait: true },
+            target_collection_proxy: server,
+        };
+
+        let buffers = TestBuffers::default();
+        let writer = VerifiedMachineWriter::new_test(Some(Format::Json), &buffers);
+        tool.main(writer).await.expect("target add");
+
+        let expected = String::from("{\"Ok\":{\"message\":null}}\n");
+        let actual = buffers.into_stdout_str();
+        assert_eq!(expected, actual)
+    }
+
+    #[fuchsia::test]
+    async fn test_machine_output_err() {
+        let server = setup_fake_target_collection(|addr| {
+            assert_eq!(
+                addr,
+                ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+                    ip: net::IpAddress::Ipv6(net::Ipv6Address {
+                        addr: "f000::1".parse::<std::net::Ipv6Addr>().unwrap().octets().into()
+                    }),
+                    scope_id: 1,
+                    port: 640,
+                })
+            )
+        });
+        let tool = AddTool {
+            cmd: AddCommand { addr: "invalid_address-100".into(), nowait: true },
+            target_collection_proxy: server,
+        };
+
+        let buffers = TestBuffers::default();
+        let writer = VerifiedMachineWriter::new_test(Some(Format::Json), &buffers);
+        tool.main(writer).await.expect_err("target add");
+
+        let expected = String::from("{\"UserError\":{\"message\":\"Could not parse 'invalid_address-100'. Invalid address\"}}\n");
+        let actual = buffers.into_stdout_str();
+        assert_eq!(expected, actual)
     }
 }
