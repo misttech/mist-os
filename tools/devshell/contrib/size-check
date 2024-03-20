@@ -14,7 +14,26 @@
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?
 fx-config-read
 
-assembly_manifest="$FUCHSIA_BUILD_DIR/obj/build/images/fuchsia/fuchsia/images.json"
+readonly ASSEMBLY_MANIFESTS_JSON="assembly_manifests.json"
+
+function _query_manifest {
+  local manifest="$1"
+  local jq_filter="$2"
+  local paths=($(fx-command-run jq --raw-output "${jq_filter}" "${FUCHSIA_BUILD_DIR}/${manifest}"))
+  # At most one path is supported.
+  if [[ ${#paths[@]} -gt 1 ]]; then
+    fx-error "More than one 'fuchsia' assembly manifest found in ${FUCHSIA_BUILD_DIR}/${manifest}!"
+    exit 1
+  fi
+  printf %s "${paths[0]}"
+}
+
+# Find the assembly manifest for the "fuchsia" product (the main one).
+manifest_query=$(_query_manifest "${ASSEMBLY_MANIFESTS_JSON}" '.[] | select(.image_name == "fuchsia") | .assembly_manifest_path')
+if [[ -z "${manifest_query}" ]]; then
+  exit 1
+fi
+assembly_manifest="$FUCHSIA_BUILD_DIR/$manifest_query"
 visualization_dir="$FUCHSIA_BUILD_DIR/size_visualization"
 flags=""
 
