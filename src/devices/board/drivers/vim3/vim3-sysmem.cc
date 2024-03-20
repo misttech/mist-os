@@ -25,18 +25,20 @@ static const sysmem_metadata_t sysmem_metadata = {
     .protected_memory_size = 0,
 
     // The AMlogic display engine needs contiguous physical memory for each
-    // frame buffer, because it does not have a page table walker. We reserve
-    // enough memory to hold  5 framebuffers (2 for virtcon, 3 for scenic) at
-    // the maximum supported resolution of 3840 x 2160 with 4 bytes per pixel
-    // (for the RGBA/BGRA 8888 pixel format).
+    // frame buffer, because it does not have a page table walker.
     //
     // The maximum supported resolution is documented below.
     // * "A311D Quick Reference Manual" revision 01, pages 2-3
     // * "A311D Datasheet" revision 08, section 2.2 "Features", pages 4-5
     //
-    // TODO(https://fxbug.dev/42072489): Reserving this much memory seems wasteful. The
-    // quantity below is 10% of RAM on a VIM3 Basic and 5% of RAM on a VIM3 Pro.
-    .contiguous_memory_size = int64_t{200} * 1024 * 1024,
+    // These pages can be loaned back to zircon for use in pager-backed VMOs,
+    // but these pages won't be used in "anonymous" VMOs (at least for now).
+    // Whether the loaned-back pages can be absorbed by pager-backed VMOs is
+    // workload dependent. The "k ppb stats_on" command can be used to determine
+    // whether all loaned pages are being used by pager-backed VMOs.
+    //
+    // TODO(https://fxbug.dev/42072489): This should be configured elsewhere.
+    .contiguous_memory_size = int64_t{384} * 1024 * 1024,
 };
 
 static const std::vector<fpbus::Metadata> sysmem_metadata_list{
