@@ -2,7 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Defines rules for use in WORKSPACE files."""
+"""Defines rules for use in WORKSPACE files.
+
+See also:
+ - @fuchsia_sdk//fuchsia:clang.bzl
+ - @fuchsia_sdk//fuchsia:products.bzl
+"""
 
 load(
     "//fuchsia/workspace:fuchsia_sdk_repository.bzl",
@@ -19,7 +24,7 @@ load(
 )
 
 # See corresponding `.bzl` files in fuchsia/private for documentation.
-fuchsia_sdk_repository = _fuchsia_sdk_repository
 fuchsia_sdk_ext = _fuchsia_sdk_ext
+fuchsia_sdk_repository = _fuchsia_sdk_repository
 rules_fuchsia_deps = _rules_fuchsia_deps
 python_runtime_repository = _python_runtime_repository

@@ -4,16 +4,18 @@
 
 """Flash device using product bundle as a task workflow."""
 
+load(":fuchsia_task_download.bzl", "get_product_bundle_dir")
 load(":fuchsia_task_ffx.bzl", "ffx_task_rule")
 load(":providers.bzl", "FuchsiaProductBundleInfo")
 
 def _fuchsia_task_flash_impl(ctx, _make_ffx_task):
+    pb_path = get_product_bundle_dir(ctx.attr.product_bundle[FuchsiaProductBundleInfo])
     return _make_ffx_task(
         prepend_args = [
             "target",
             "flash",
             "--product-bundle",
-            ctx.attr.product_bundle[FuchsiaProductBundleInfo].product_bundle,
+            pb_path,
         ],
     )
 

@@ -46,6 +46,8 @@ create
 debug_symbols
 delete
 delete_repo
+download
+emu
 fetch
 flash
 help
@@ -59,6 +61,7 @@ start
 set_channel
 stop
 wait
+zip
 """.strip().split("\n"))
 
 verbs = _verbs

@@ -4,7 +4,12 @@
 
 """Public definitions for Fuchsia rules.
 
-Documentation for all rules exported by this file is located at docs/defs.md"""
+Documentation for all rules exported by this file is located at docs/defs.md
+
+See also:
+ - @fuchsia_sdk//fuchsia:assembly.bzl
+ - @fuchsia_sdk//fuchsia:licenses.bzl
+"""
 
 load(
     "//fuchsia/constraints/platforms:supported_platforms.bzl",
@@ -111,6 +116,10 @@ load(
     _fuchsia_wrap_rust_binary = "fuchsia_wrap_rust_binary",
 )
 load(
+    "//fuchsia/private:fuchsia_remote_product_bundle.bzl",
+    _fuchsia_remote_product_bundle = "fuchsia_remote_product_bundle",
+)
+load(
     "//fuchsia/private:fuchsia_select.bzl",
     _fuchsia_select = "fuchsia_select",
     _if_fuchsia = "if_fuchsia",
@@ -160,6 +169,7 @@ fuchsia_package_resource = _fuchsia_package_resource
 fuchsia_package_resource_collection = _fuchsia_package_resource_collection
 fuchsia_package_resource_group = _fuchsia_package_resource_group
 fuchsia_package_group = _fuchsia_package_group
+fuchsia_remote_product_bundle = _fuchsia_remote_product_bundle
 fuchsia_select = _fuchsia_select
 fuchsia_cpu_select = _fuchsia_cpu_select
 fuchsia_cpu_filter_dict = _fuchsia_cpu_filter_dict

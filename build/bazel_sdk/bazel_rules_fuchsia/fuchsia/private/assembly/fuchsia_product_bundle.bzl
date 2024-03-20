@@ -5,7 +5,11 @@
 """Rule that creates a product bundle for flashing, emulating, or updating a Fuchsia product to a target device."""
 
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_product_bundle_inputs")
-load("//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl", "fuchsia_product_bundle_tasks")
+load(
+    "//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl",
+    "fuchsia_product_bundle_tasks",
+    "product_bundles_help_executable",
+)
 load(
     ":providers.bzl",
     "FuchsiaAssemblyConfigInfo",
@@ -32,6 +36,9 @@ def fuchsia_product_bundle(
         # Deprecated. Use main.
         product_image = None,
         main = None,
+        testonly = None,
+        visibility = None,
+        tags = [],
         **kwargs):
     """Build a fuchsia product bundle.
 
@@ -50,10 +57,10 @@ def fuchsia_product_bundle(
         product = ":your_image",
     )
     ```
-    - product_bundle.flash: Calling run on this target will flash the device with the created product_bundle.
-    - product_bundle.ota: Calling run on this target will ota the device with the created product_bundle.
-    - product_bundle.zip: Calling build on this target will create a zipped version of the product_bundle.
-    - product_bundle.emu: <TBA>.
+    - product_bundle.emu: Starts an emulator with the product_bundle.
+    - product_bundle.flash: Flashes a device with the product_bundle.
+    - product_bundle.ota: Runs ota on a device with the product_bundle.
+    - product_bundle.zip: Creates a zipped version of the product_bundle.
     """
 
     _build_fuchsia_product_bundle(
@@ -62,17 +69,26 @@ def fuchsia_product_bundle(
         partitions_config = partitions_config,
         product_image = main or product_image,
         product_name = product_bundle_name or product_name,
+        testonly = testonly,
+        visibility = visibility,
+        tags = tags,
         **kwargs
     )
 
     _build_zipped_product_bundle(
         name = name + ".zip",
         product_bundle = name,
+        testonly = testonly,
+        visibility = visibility,
+        tags = tags,
     )
 
     fuchsia_product_bundle_tasks(
         name = "%s_tasks" % name,
         product_bundle = name,
+        testonly = testonly,
+        visibility = visibility,
+        tags = tags,
     )
 
 def _build_zipped_product_bundle_impl(ctx):
@@ -664,15 +680,24 @@ def _build_fuchsia_product_bundle_impl(ctx):
         recovery_scrutiny_config = ctx.attr.recovery_scrutiny_config[FuchsiaScrutinyConfigInfo]
         deps += _scrutiny_validation(ctx, ffx_tool, pb_out_dir, recovery_scrutiny_config, platform_scrutiny_config, True)
 
-    return [DefaultInfo(files = depset(direct = deps)), FuchsiaProductBundleInfo(
-        product_bundle = pb_out_dir,
-        is_remote = False,
-    )]
+    return [
+        DefaultInfo(
+            executable = product_bundles_help_executable(ctx),
+            files = depset(direct = deps),
+        ),
+        FuchsiaProductBundleInfo(
+            is_remote = False,
+            product_bundle = pb_out_dir,
+            product_name = product_name,
+            product_version = product_version,
+        ),
+    ]
 
 _build_fuchsia_product_bundle = rule(
     doc = """Create a product bundle (PB) for flashing, emulating, or updating a Fuchsia product to a target device.""",
     implementation = _build_fuchsia_product_bundle_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    executable = True,
     attrs = {
         "board_name": attr.string(
             doc = "Name of the board this PB runs on. E.g. qemu-x64.",
