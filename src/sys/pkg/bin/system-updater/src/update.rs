@@ -545,14 +545,12 @@ impl BootSlot {
         BootSlot { zbi: None, vbmeta: None }
     }
 
-    fn set_zbi(&mut self, zbi: Option<AbsoluteComponentUrl>) -> &mut Self {
-        self.zbi = zbi;
-        self
+    fn set_zbi(&mut self, zbi: AbsoluteComponentUrl) {
+        self.zbi = Some(zbi);
     }
 
-    fn set_vbmeta(&mut self, vbmeta: Option<AbsoluteComponentUrl>) -> &mut Self {
-        self.vbmeta = vbmeta;
-        self
+    fn set_vbmeta(&mut self, vbmeta: AbsoluteComponentUrl) {
+        self.vbmeta = Some(vbmeta);
     }
 
     fn is_empty(&self) -> bool {
@@ -807,14 +805,15 @@ impl<'a> Attempt<'a> {
             )
             .await
             {
-                Ok(url) => images_to_write.fuchsia.set_zbi(url),
+                Ok(Some(url)) => images_to_write.fuchsia.set_zbi(url),
+                Ok(None) => (),
                 Err(e) => {
                     error!(
                         "Error while determining whether to write the zbi image, assume update is \
                         needed: {:#}",
                         anyhow!(e)
                     );
-                    images_to_write.fuchsia.set_zbi(Some(fuchsia.zbi().url().to_owned()))
+                    images_to_write.fuchsia.set_zbi(fuchsia.zbi().url().clone());
                 }
             };
 
@@ -831,14 +830,15 @@ impl<'a> Attempt<'a> {
                 )
                 .await
                 {
-                    Ok(url) => images_to_write.fuchsia.set_vbmeta(url),
+                    Ok(Some(url)) => images_to_write.fuchsia.set_vbmeta(url),
+                    Ok(None) => (),
                     Err(e) => {
                         error!(
                             "Error while determining whether to write the vbmeta image, assume \
                             update is needed: {:#}",
                             anyhow!(e)
                         );
-                        images_to_write.fuchsia.set_vbmeta(Some(vbmeta_image.url().to_owned()))
+                        images_to_write.fuchsia.set_vbmeta(vbmeta_image.url().clone())
                     }
                 };
             }
@@ -850,14 +850,15 @@ impl<'a> Attempt<'a> {
                 match recovery_to_write(recovery.zbi(), &self.env.data_sink, fpaver::Asset::Kernel)
                     .await
                 {
-                    Ok(url) => images_to_write.recovery.set_zbi(url),
+                    Ok(Some(url)) => images_to_write.recovery.set_zbi(url),
+                    Ok(None) => (),
                     Err(e) => {
                         error!(
                             "Error while determining whether to write the recovery zbi image, \
                             assume update is needed: {:#}",
                             anyhow!(e)
                         );
-                        images_to_write.recovery.set_zbi(Some(recovery.zbi().url().to_owned()))
+                        images_to_write.recovery.set_zbi(recovery.zbi().url().clone());
                     }
                 };
 
@@ -871,14 +872,15 @@ impl<'a> Attempt<'a> {
                     )
                     .await
                     {
-                        Ok(url) => images_to_write.recovery.set_vbmeta(url),
+                        Ok(Some(url)) => images_to_write.recovery.set_vbmeta(url),
+                        Ok(None) => (),
                         Err(e) => {
                             error!(
                                 "Error while determining whether to write the recovery vbmeta \
                                 image, assume update is needed: {:#}",
                                 anyhow!(e)
                             );
-                            images_to_write.recovery.set_vbmeta(Some(vbmeta_image.url().to_owned()))
+                            images_to_write.recovery.set_vbmeta(vbmeta_image.url().clone())
                         }
                     };
                 }
@@ -903,9 +905,7 @@ impl<'a> Attempt<'a> {
                         "Error while determining firmware to write, assume update is needed: {:#}",
                         anyhow!(e)
                     );
-                    images_to_write
-                        .firmware
-                        .push((filename.to_string(), imagemetadata.url().to_owned()))
+                    images_to_write.firmware.push((filename.clone(), imagemetadata.url().clone()))
                 }
             }
         }
