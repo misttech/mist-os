@@ -411,15 +411,10 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             return Err(Error::validate("\"path\" should be present with \"resolver\""));
         }
         if capability.config.is_some() {
-            if !self.features.has(&Feature::ConfigCapabilities) {
-                return Err(Error::validate("config capabilities are not enabled"));
-            }
+            self.features.check(Feature::ConfigCapabilities)?;
         }
-
         if capability.dictionary.is_some() {
-            if !self.features.has(&Feature::Dictionaries) {
-                return Err(Error::validate("dictionaries are not enabled"));
-            }
+            self.features.check(Feature::Dictionaries)?;
         }
         if let Some(from) = capability.from.as_ref() {
             self.validate_component_child_ref("\"capabilities\" source", &AnyRef::from(from))?;
@@ -712,9 +707,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
 
         // Ensure that dictionaries exposed from self are defined in `capabilities`.
         if let Some(dictionary) = expose.dictionary.as_ref() {
-            if !self.features.has(&Feature::Dictionaries) {
-                return Err(Error::validate("dictionaries are not enabled"));
-            }
+            self.features.check(Feature::Dictionaries)?;
             for dictionary in dictionary {
                 if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) {
                     if !self.all_dictionaries.contains_key(dictionary) {
@@ -927,9 +920,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
 
         // Ensure that dictionaries offered from self are defined in `dictionaries`.
         if let Some(dictionary) = offer.dictionary.as_ref() {
-            if !self.features.has(&Feature::Dictionaries) {
-                return Err(Error::validate("dictionaries are not enabled"));
-            }
+            self.features.check(Feature::Dictionaries)?;
             for dictionary in dictionary {
                 if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
                     if !self.all_dictionaries.contains_key(dictionary) {
@@ -7274,7 +7265,7 @@ mod tests {
     };
 
     #[test]
-    fn test_cml_use_bad_config_from_self() {
+    fn test_cml_missing_config_feature() {
         let input = must_parse_cml!({
         "capabilities": [
             {
@@ -7283,9 +7274,31 @@ mod tests {
                 "value": true,
             },
         ],
-            });
+        });
 
-        assert_matches!(compile(&input, CompileOptions::default()), Err(Error::Validate { .. }));
+        assert_matches!(
+            compile(&input, CompileOptions::new()),
+            Err(Error::RestrictedFeature(feature))
+            if feature == "config_capabilities"
+        );
+    }
+
+    #[test]
+    fn test_cml_use_bad_config_from_self() {
+        let input = must_parse_cml!({
+        "use": [
+            {
+                "config": "fuchsia.config.MyConfig",
+                "key": "my_config",
+                "type": "bool",
+                "from": "self",
+            },
+        ],
+        });
+
+        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
+        let options = CompileOptions::new().features(&features);
+        assert_matches!(compile(&input, options), Err(Error::Validate { .. }));
     }
 
     // Tests for config capabilities
