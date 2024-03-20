@@ -5,8 +5,6 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INTERNAL_LOAD_SEGMENT_TYPES_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INTERNAL_LOAD_SEGMENT_TYPES_H_
 
-#include <lib/fit/result.h>
-
 #include <cassert>
 #include <string_view>
 #include <type_traits>
@@ -57,17 +55,6 @@ class LoadConstantSegmentType : public SegmentType {
   constexpr explicit LoadConstantSegmentType(size_type offset, size_type vaddr, size_type memsz,
                                              uint32_t flags)
       : SegmentType(offset, vaddr, memsz), flags_(flags) {}
-
-  template <class Diagnostics, class Other>
-  static constexpr fit::result<bool, LoadConstantSegmentType> Copy(  //
-      Diagnostics& diag, const Other& other) {
-    return fit::ok(LoadConstantSegmentType{
-        other.offset(),
-        other.vaddr(),
-        other.memsz(),
-        other.flags(),
-    });
-  }
 
   // The whole segment is loaded from the file.
   constexpr size_type filesz() const { return this->memsz(); }
@@ -191,16 +178,6 @@ struct LoadSegmentTypes {
       assert(filesz == memsz);
     }
 
-    template <class Diagnostics, class Other>
-    static constexpr fit::result<bool, DataSegment> Copy(Diagnostics& diag, const Other& other) {
-      return fit::ok(DataSegment{
-          other.offset(),
-          other.vaddr(),
-          other.memsz(),
-          other.filesz(),
-      });
-    }
-
     // The whole segment is loaded from the file.
     constexpr size_type filesz() const { return this->memsz(); }
   };
@@ -214,17 +191,6 @@ struct LoadSegmentTypes {
     constexpr explicit DataWithZeroFillSegment(size_type offset, size_type vaddr, size_type memsz,
                                                size_type filesz)
         : Segment<Policy>(offset, vaddr, memsz), filesz_(filesz) {}
-
-    template <class Diagnostics, class Other>
-    static constexpr fit::result<bool, DataWithZeroFillSegment> Copy(  //
-        Diagnostics& diag, const Other& other) {
-      return fit::ok(DataWithZeroFillSegment{
-          other.offset(),
-          other.vaddr(),
-          other.memsz(),
-          other.filesz(),
-      });
-    }
 
     // Only a leading subset of the in-memory segment is loaded from the file.
     constexpr size_type filesz() const { return filesz_; }
@@ -251,12 +217,6 @@ struct LoadSegmentTypes {
   class ZeroFillSegment : public SegmentBase {
    public:
     using SegmentBase::SegmentBase;
-
-    template <class Diagnostics, class Other>
-    static constexpr fit::result<bool, ZeroFillSegment> Copy(Diagnostics& diag,
-                                                             const Other& other) {
-      return fit::ok(ZeroFillSegment{other.vaddr(), other.memsz()});
-    }
 
     constexpr size_type vaddr() const { return this->offset(); }
 

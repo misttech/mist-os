@@ -129,18 +129,13 @@ class LoadInfoMutableMemory {
   }
 
  private:
-  using LoadSegment =
-      std::conditional_t<std::is_const_v<LoadInfo>, const typename LoadInfo::Segment,
-                         typename LoadInfo::Segment>;
+  using LoadSegment = typename LoadInfo::Segment;
   using MutableMemory = std::decay_t<  //
       decltype(std::declval<GetMutableMemory>()(std::declval<Diagnostics&>(),
                                                 std::declval<LoadSegment&>())
                    .value())>;
   static_assert(std::is_move_constructible_v<MutableMemory> ||
                 std::is_copy_constructible_v<MutableMemory>);
-  static_assert(
-      !std::is_const_v<LoadSegment> || std::is_copy_constructible_v<MutableMemory>,
-      "elfldltl::LoadInfoMutableMemory requires copyable GetMutableMemory return values when LoadInfo template parameter is const");
 
   class MutableSegment {
    public:
@@ -177,8 +172,6 @@ class LoadInfoMutableMemory {
     size_type filesz_;
     std::optional<MutableMemory> memory_;
   };
-  static_assert(std::is_move_constructible_v<MutableSegment> ||
-                std::is_copy_constructible_v<MutableSegment>);
 
   using SegmentList = Container<MutableSegment>;
   using SegmentListIterator = typename SegmentList::iterator;

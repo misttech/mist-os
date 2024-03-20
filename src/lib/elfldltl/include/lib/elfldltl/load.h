@@ -203,27 +203,6 @@ using NoSegmentWrapper = SegmentType;
 // Such merging may reconstruct a new segment object and remove the old two,
 // default-constructing any subclass members and losing such state.
 //
-// The default segment types are copyable, but the SegmentWrapper types can be
-// move-only.  Each *Segment type also has a method:
-// ```
-// static fit::result<bool, Type> Copy(Diagnostics& diag, const OtherSegment& other_segment);
-// ```
-
-// This constructs *Segment by copying from a segment of the corresponding
-// *Segment type possibly from some different LoadInfo<...> instantiation.  In
-// the default case, this is no different from copy construction.  But a
-// segment subclass must override this with its own Copy method that also
-// copies its additional state.  Copying can fail, using the Diagnostics object
-// and returning the fit::error<bool> of whatever its *Error calls return.
-//
-// The CopyFrom method copies each segment that way to initialize the object
-// from any other LoadInfo<...> instantiation whose segments are accepted by
-// copied-to the SegmentWrapper types' Copy methods.  That could be just its
-// own types that are move-only but can be copied with costlier work that might
-// fail, or it could be a different compatible SegmentWrapper.  The default
-// *Segment::Copy functions will accept any corresponding segment type but will
-// just ignore any extra state added by the other SegmentWrapper.
-//
 // The GetPhdrObserver method is used with elfldltl::DecodePhdrs (see phdr.h)
 // to call AddSegment, which can also be called directly with a valid sequence
 // of PT_LOAD segments.
@@ -260,43 +239,6 @@ class LoadInfo {
       std::variant<ConstantSegment, DataSegment, DataWithZeroFillSegment, ZeroFillSegment>;
 
   static_assert(std::is_move_constructible_v<Segment> || std::is_copy_constructible_v<Segment>);
-
-  // LoadInfo is default-constructible.  Whether it's movable depends on the
-  // Container type.  Whether it's copyable depends both on the Container type
-  // and on the SegmentWrapper types.
-  //
-  // The CopyFrom method initializes a default-constructed LoadInfo by copying
-  // from another LoadInfo.  If this LoadInfo instantiation is copyable, then
-  // there's probably no need to use it.  However, it can be used to copy
-  // either from this LoadInfo type when it's not copyable, or from a different
-  // LoadInfo<Elf, ...> instantiation that can use a different container and/or
-  // different SegmentWrapper types.  This object's SegmentWrapper types must
-  // support Copy calls with the corresponding other Loadinfo::*Segment type.
-  template <class Diagnostics,
-            // The remaining template parameters are deduced from the
-            // LoadInfo<...> instantiation of the argument, which could differ.
-            template <typename> class OtherContainer, PhdrLoadPolicy OtherPolicy,
-            template <class> class OtherWrapper>
-  bool CopyFrom(Diagnostics& diag,
-                const LoadInfo<Elf, OtherContainer, OtherPolicy, OtherWrapper>& other) {
-    using Other = LoadInfo<Elf, OtherContainer, OtherPolicy, OtherWrapper>;
-
-    vaddr_start_ = other.vaddr_start();
-    vaddr_size_ = other.vaddr_size();
-
-    segments_.clear();
-    segments_.reserve(other.segments().size());
-    auto copy_segment = [this, &diag](const auto& other_segment) -> bool {
-      using OtherSegment = std::decay_t<decltype(other_segment)>;
-      using NewSegment = SegmentTypeFromOther<Other, OtherSegment>;
-      auto new_segment = NewSegment::Copy(diag, other_segment);
-      if (new_segment.is_error()) [[unlikely]] {
-        return new_segment.error_value();
-      }
-      return this->AddSegment(diag, *std::move(new_segment));
-    };
-    return other.VisitSegments(copy_segment);
-  }
 
   constexpr Container<Segment>& segments() { return segments_; }
   constexpr const Container<Segment>& segments() const { return segments_; }
@@ -519,34 +461,6 @@ class LoadInfo {
 
  private:
   using SegmentMerger = internal::SegmentMerger<LoadInfo>;
-
-  static constexpr size_t kTypeCount = std::variant_size_v<Segment>;
-
-  // This has a Type alias for the *Segment type that corresponds to
-  // OtherSegment where OtherVariant is the other LoadInfo<...>::Segment type.
-  template <class OtherVariant, class OtherSegment, size_t I>
-  struct SegmentTypeFromOtherHelper {
-    using TryOther = std::variant_alternative_t<I, OtherVariant>;
-    static constexpr bool kMatch = std::is_same_v<TryOther, OtherSegment>;
-
-    using This = std::variant_alternative_t<I, Segment>;
-    using Next = SegmentTypeFromOtherHelper<OtherVariant, OtherSegment, I + 1>;
-
-    using Type = std::conditional_t<kMatch, This, typename Next::Type>;
-  };
-
-  // This specialization prevents attempting an invalid index.  It will only be
-  // instantiated in the not-chosen argument of the std::conditional_t, but its
-  // Type alias still has to be a valid type for that.
-  template <class OtherVariant, class OtherSegment>
-  struct SegmentTypeFromOtherHelper<OtherVariant, OtherSegment, kTypeCount> {
-    using Type = void;
-  };
-
-  // This is used by Copy.
-  template <class Other, class OtherSegment>
-  using SegmentTypeFromOther =
-      typename SegmentTypeFromOtherHelper<typename Other::Segment, OtherSegment, 0>::Type;
 
   // Making this static with a universal reference parameter avoids having to
   // repeat the actual body in the const and non-const methods that call it.

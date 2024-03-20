@@ -481,16 +481,20 @@ struct StartupLoadModule : public StartupLoadModuleBase,
       new_array(tls_offsets);
 
       for (StartupLoadModule& module : modules) {
-        if (module.AssignStaticTls(mutable_abi.static_tls_layout)) {
-          const size_t idx = module.tls_module_id() - 1;
-          tls_modules[idx] = module.tls_module();
-          tls_offsets[idx] = module.static_tls_bias();
+        if (auto tls = module.AssignStaticTls(mutable_abi.static_tls_layout)) {
+          tls_modules[*tls] = module.tls_module();
+          tls_offsets[*tls] = module.static_tls_bias();
         }
 
-        if (module.tls_module_id() == max_tls_modid) {
-          // Don't keep scanning the list if there aren't any more.
+#ifdef NDEBUG
+        if (module.tls_module_id() == tls_modules.size()) {
+          // Don't keep scanning the list if there aren't any more, but skip
+          // this optimization if it would prevent a later iteration from
+          // hitting an assertion failure if there's a bug that causes an
+          // invalid index into the span.
           break;
         }
+#endif
       }
 
       mutable_abi.static_tls_modules = tls_modules;

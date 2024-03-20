@@ -18,91 +18,24 @@
 namespace ld {
 
 // RemoteLoadModule is the LoadModule type used in the remote dynamic linker.
-// It points to an immutable ld::RemoteDecodedModule describing the ELF file
-// itself (see <lib/ld/remote-decoded-module.h>), and then has the other common
-// state about the particular instance of the module, such as a name, load
-// bias, and relocated data segment contents.
-//
-// TODO(https://fxbug.dev/326524302): For now it owns the RemoteDecodedModule.
+// TODO(https://fxbug.dev/326524302): For now it owns the DecodedModule.
 // Later it should use a ref-counted smart pointer to const.
-
-// This the type of the second optional template paraemter to RemoteLoadModule.
-// It's a flag saying whether the module is going to be used as a "zygote".  A
-// fully-relocated module ready to be loaded as VMOs of relocate data.  In the
-// default case, those VMOs are mutable and get directly mapped into a process
-// by the Load method, where they may be mutated further via writing mappings.
-// In a zygote module, those VMOs are immutable after relocation and instead
-// get copy-on-write clones mapped in by Load.
-enum class RemoteLoadZygote : bool { kNo = false, kYes = true };
-
-// This is an implementation detail of RemoteLoadModule, below.
 template <class Elf>
-using RemoteLoadModuleBase = LoadModule<typename RemoteDecodedModule<Elf>::Ptr>;
+using RemoteLoadModuleBase = LoadModule<std::unique_ptr<RemoteDecodedModule<Elf>>>;
 
-template <class Elf = elfldltl::Elf<>, RemoteLoadZygote Zygote = RemoteLoadZygote::kNo>
+template <class Elf = elfldltl::Elf<>>
 class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
  public:
   using Base = RemoteLoadModuleBase<Elf>;
   static_assert(std::is_move_constructible_v<Base>);
 
-  // Alias useful types from Decoded and LoadModule.
   using typename Base::Decoded;
-  using typename Base::Module;
+  using typename Base::LoadInfo;
   using typename Base::size_type;
   using typename Base::Soname;
   using ExecInfo = typename Decoded::ExecInfo;
-
-  // This is the type of the module list.  The ABI remoting scheme relies on
-  // this being indexable; see <lib/ld/remote-abi.h> for details.  Being able
-  // to use the convenient and efficient indexable containers like std::vector
-  // is the main reason RemoteLoadModule needs to be kept movable.
   using List = std::vector<RemoteLoadModule>;
-
-  // RemoteLoadModule has its own LoadInfo that's initially copied from the
-  // RemoteDecodedModule, but then gets its own mutable segment VMOs as needed
-  // for relocation (or other special-case mutation, as in the ABI remoting).
-  //
-  // RemoteDecodedModule::LoadInfo always uses elfldltl::SegmentWithVmo::Copy
-  // to express that its per-segment VMOs (from partial-page zeroing) should
-  // not be mapped writable, only cloned.  However, RemoteLoadModule::LoadInfo
-  // can consume its own relocated segments when it's a RemoteLoadZygote::kNo
-  // instantiation.  Only the zygote case has reason to keep the segments
-  // mutated by relocation immutable thereafter by cloning them for mapping
-  // into a process.  (In both cases, the RemoteDecodedModule's segments are
-  // left immutable.)
-  //
-  // Note that the elfldltl::VmarLoader::SegmentVmo partial specializations
-  // defined for elfldltl::SegmentWithVmo must exactly match the SegmentWrapper
-  // template parameter of the LoadInfo instantiation.  So it's important that
-  // the LoadInfo instantiation here uses one of those exactly.  Therefore,
-  // this uses a template alias parameterized by the wrapper to do the
-  // instantiation inside std::conditional_t directly with the SegmwntWithVmo
-  // SegmentWrapper template, rather than a single instantiation with a
-  // template alias that uses std::conitional_t inside Segment instantiation.
-  // Both ways produce the same Segment types in the LoadInfo, but one makes
-  // the partial specializations on elfldltl::VmarLoader::SegmentVmo match.
-
-  template <template <class> class SegmentWrapper>
-  using LoadInfoWithWrapper =
-      elfldltl::LoadInfo<Elf, RemoteContainer, elfldltl::PhdrLoadPolicy::kBasic, SegmentWrapper>;
-
-  using LoadInfo = std::conditional_t<                      //
-      Zygote == RemoteLoadZygote::kYes,                     //
-      LoadInfoWithWrapper<elfldltl::SegmentWithVmo::Copy>,  //
-      LoadInfoWithWrapper<elfldltl::SegmentWithVmo::NoCopy>>;
-
-  // RemoteDecodedModule uses elfldltl::SegmentWithVmo::AlignSegments, so the
-  // loader can rely on just cloning mutable VMOs without partial-page zeroing.
   using Loader = elfldltl::AlignedRemoteVmarLoader;
-
-  // This is the SegmentVmo type that should be used as the basis for the
-  // partial specialization of elfldltl::VmarLoader::SegmentVmo, just to make
-  // sure it matched the right one.
-  using SegmentVmo = std::conditional_t<         //
-      Zygote == RemoteLoadZygote::kYes,          //
-      elfldltl::SegmentWithVmo::CopySegmentVmo,  //
-      elfldltl::SegmentWithVmo::NoCopySegmentVmo>;
-  static_assert(std::is_base_of_v<SegmentVmo, Loader::SegmentVmo<LoadInfo>>);
 
   template <size_t Count>
   using PredecodedPositions = std::array<size_t, Count>;
@@ -125,51 +58,9 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   RemoteLoadModule(RemoteLoadModule&&) noexcept = default;
 
   RemoteLoadModule(const Soname& name, std::optional<uint32_t> loaded_by_modid)
-      : Base{name}, loaded_by_modid_{loaded_by_modid} {
-    static_assert(std::is_move_constructible_v<RemoteLoadModule>);
-    static_assert(std::is_move_assignable_v<RemoteLoadModule>);
-  }
+      : Base{name}, loaded_by_modid_{loaded_by_modid} {}
 
   RemoteLoadModule& operator=(RemoteLoadModule&& other) noexcept = default;
-
-  // Note this shadows LoadModule::module(), so module() calls in the methods
-  // of class and its subclasses return module_ but module() calls in the
-  // LoadModule base class return the immutable decoded().module() instead.
-  // The only uses LoadModule's own methods make of module() are for the data
-  // that is not specific to a particular dynamic linking session: data
-  // independent of module name, load bias, and TLS and symbolizer ID numbers.
-  const Module& module() const {
-    assert(this->HasModule());
-    return module_;
-  }
-  Module& module() {
-    assert(this->HasModule());
-    return module_;
-  }
-
-  // This is set by the Decode method, below.
-  size_type tls_module_id() const { return module_.tls_modid; }
-
-  // This is set by the Allocate method, below.
-  size_type load_bias() const { return module_.link_map.addr; }
-
-  // This is only set by the Relocate method, below.  Before relocation is
-  // complete, consult decoded().load_info() for layout information.  The
-  // difference between load_info() and decoded().load_info() is that mutable
-  // segment VMOs contain relocated data specific to this RemoteLoadModule
-  // where as RemoteDecodedModule only has per-segment VMOs for partial-page
-  // zeroing, and those must stay immutable.
-  const LoadInfo& load_info() const { return load_info_; }
-  LoadInfo& load_info() { return load_info_; }
-
-  constexpr void set_name(const Soname& name) {
-    Base::set_name(name);
-    SetAbiName();
-  }
-  constexpr void set_name(std::string_view name) {
-    Base::set_name(name);
-    SetAbiName();
-  }
 
   // Return the index of other module in the list (if any) that requested this
   // one be loaded.  This means that the name() string points into that other
@@ -221,10 +112,10 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   bool Allocate(Diagnostics& diag, const zx::vmar& vmar) {
     if (this->HasModule()) [[likely]] {
       loader_ = Loader{vmar};
-      if (!loader_.Allocate(diag, this->decoded().load_info())) {
+      if (!loader_.Allocate(diag, this->load_info())) {
         return false;
       }
-      SetModuleVaddrBounds(module_, this->decoded().load_info(), loader_.load_bias());
+      SetModuleVaddrBounds(this->decoded().module(), this->load_info(), loader_.load_bias());
     }
     return true;
   }
@@ -235,24 +126,10 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
     return OnModules(modules, allocate);
   }
 
-  // Before relocation can mutate any segments, load_info() needs to be set up
-  // with its own copies of the segments, including copy-on-write cloning any
-  // per-segment VMOs that decoded() owns.  This can be done earlier if the
-  // segments need to be adjusted before relocation.
-  template <class Diagnostics>
-  bool PrepareLoadInfo(Diagnostics& diag) {
-    return !load_info_.segments().empty() ||  // Shouldn't be done twice!
-           load_info_.CopyFrom(diag, this->decoded().load_info());
-  }
-
   template <class Diagnostics, class ModuleList, typename TlsDescResolver>
   bool Relocate(Diagnostics& diag, ModuleList& modules, const TlsDescResolver& tls_desc_resolver) {
-    if (!PrepareLoadInfo(diag)) [[unlikely]] {
-      return false;
-    }
-
     auto mutable_memory = elfldltl::LoadInfoMutableMemory{
-        diag, load_info_,
+        diag, this->decoded().load_info(),
         elfldltl::SegmentWithVmo::GetMutableMemory<LoadInfo>{this->decoded().vmo().borrow()}};
     if (!mutable_memory.Init()) {
       return false;
@@ -272,27 +149,32 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   template <class Diagnostics, typename TlsDescResolver>
   static bool RelocateModules(Diagnostics& diag, List& modules,
                               TlsDescResolver&& tls_desc_resolver) {
-    // If any module wasn't decoded successfully, just skip it.  This doesn't
-    // cause a "failure" because the Diagnostics object must have reported the
-    // failures in decoding and decided to keep going anyway, so there is
-    // nothing new to report.  The caller may have decided to attempt
-    // relocation so as to diagnose all its specific errors, rather than
-    // bailing out immediately after decoding failed on some of the modules.
-    // Probably callers will more often decide to bail out, since missing
-    // dependency modules is an obvious recipe for undefined symbol errors that
-    // aren't going to be more enlightening to the user.  But this class
-    // supports any policy.
-    ld::internal::filter_view valid_modules{
-        // The span provides a copyable view of the vector (List), which
-        // can't be (and shouldn't be) copied.
-        cpp20::span{modules},
-        &RemoteLoadModule::HasModule,
-    };
     auto relocate = [&](auto& module) -> bool {
+      if (!module.HasModule()) [[unlikely]] {
+        // This module wasn't decoded successfully.  Just skip it.  This
+        // doesn't cause a "failure" because the Diagnostics object must have
+        // reported the failures in decoding and decided to keep going anyway,
+        // so there is nothing new to report.  The caller may have decided to
+        // attempt relocation so as to diagnose all its specific errors, rather
+        // than bailing out immediately after decoding failed on some of the
+        // modules.  Probably callers will more often decide to bail out, since
+        // missing dependency modules is an obvious recipe for undefined symbol
+        // errors that aren't going to be more enlightening to the user.  But
+        // this class supports any policy.
+        return true;
+      }
+
       // Resolve against the successfully decoded modules, ignoring the others.
+      ld::internal::filter_view valid_modules{
+          // The span provides a copyable view of the vector (List), which
+          // can't be (and shouldn't be) copied.
+          cpp20::span{modules},
+          &RemoteLoadModule::HasModule,
+      };
+
       return module.Relocate(diag, valid_modules, tls_desc_resolver);
     };
-    return std::all_of(valid_modules.begin(), valid_modules.end(), relocate);
+    return OnModules(modules, relocate);
   }
 
   // This returns false if any module was not successfully decoded enough to
@@ -307,7 +189,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   // Load the module into its allocated vaddr region.
   template <class Diagnostics>
   bool Load(Diagnostics& diag) {
-    return loader_.Load(diag, load_info_, this->decoded().vmo().borrow());
+    return loader_.Load(diag, this->load_info(), this->decoded().vmo().borrow());
   }
 
   template <class Diagnostics>
@@ -335,46 +217,25 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   // fetching the RemoteDecodedModule and using it read-only.
   template <class Diagnostics>
   bool Decode(Diagnostics& diag, zx::vmo vmo, uint32_t modid, size_type& max_tls_modid) {
-    // TODO(https://fxbug.dev/326524302): Creating the RemoteDecodedModule
-    // object will move outside this class, and Decode will be replaced with
-    // something that just does the rest of this method past this point to
-    // attach the pending RemoteLoadModule to the (shareable)
-    // RemoteDecodedModule.
-    this->set_decoded(Decoded::Create(diag, std::move(vmo), loader_.page_size()));
-    if (!this->HasDecoded()) [[unlikely]] {
+    this->set_decoded(std::make_unique<Decoded>(std::move(vmo)));
+    if (!this->decoded().Init(diag, loader_.page_size())) [[unlikely]] {
       return false;
     }
 
-    // Copy the passive ABI Module from the DecodedModule.  That one is the
-    // source of truth for all the actual data pointers, but its members
-    // related to the vaddr are using the unbiased link-time vaddr range and
-    // its module ID indices are not meaningful.  We could store just the or
-    // compute the members that vary in each particular dynamic linking session
-    // and get the others via indirection through the const decoded() object.
-    // But it's simpler just to copy, especially for the ABI remoting logic.
-    // It's only a handful of pointers and integers, so it's not a lot to copy.
-    module_ = this->decoded().module();
-
-    // The RemoteDecodedModule didn't set link_map.name; it used the generic
-    // modid of 0, and the generic TLS module ID of 1 if there was a PT_TLS
-    // segment at all.  Set those for this particular use of the module now.
-    // The rest will be set later by Allocate via ld::SetModuleVaddrBounds.
-    SetAbiName();
-    module_.symbolizer_modid = modid;
-    if (module_.tls_modid != 0) {
-      module_.tls_modid = ++max_tls_modid;
+    // Init didn't set link_map.name; it used the generic modid of 0, and the
+    // generic TLS module ID of 1 if there was a PT_TLS segment.  Set those for
+    // this particular use of the module now.
+    this->SetAbiName();
+    this->decoded().module().symbolizer_modid = modid;
+    this->decoded().module().symbols_visible = true;
+    if (this->decoded().tls_module_id() != 0) {
+      this->decoded().module().tls_modid = ++max_tls_modid;
     }
-
-    // This will be reset in DecodeDeps for any pre-decoded modules that aren't
-    // referenced.
-    module_.symbols_visible = true;
 
     return true;
   }
 
  private:
-  void SetAbiName() { module_.link_map.name = this->name().c_str(); }
-
   template <typename T>
   static bool OnModules(List& modules, T&& callback) {
     return std::all_of(modules.begin(), modules.end(), std::forward<T>(callback));
@@ -427,7 +288,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
             // Record the first module to request this dependency.
             mod.set_loaded_by_modid(loaded_by_modid);
             // Mark that the module is in the symbolic resolution set.
-            mod.module_.symbols_visible = true;
+            mod.decoded().module().symbols_visible = true;
 
             // Use the exact pointer that's the dependent module's DT_NEEDED
             // string for the name field, so remoting can transcribe it.
@@ -435,7 +296,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
             mod.set_loaded_by_modid(loaded_by_modid);
 
             // Assign the module ID that matches the position in the list.
-            mod.module_.symbolizer_modid = static_cast<uint32_t>(pos);
+            mod.decoded().module().symbolizer_modid = static_cast<uint32_t>(pos);
             return true;
           }
         }
@@ -505,17 +366,15 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
       if (pos == kNpos) {
         pos = modules.size();
         RemoteLoadModule& mod = modules.emplace_back(std::move(module));
-        mod.module_.symbols_visible = false;
-        mod.set_name(mod.soname());
-        mod.module_.symbolizer_modid = static_cast<uint32_t>(pos);
+        mod.decoded().module().symbols_visible = false;
+        mod.set_name(mod.module().symbols.soname());
+        mod.decoded().module().symbolizer_modid = static_cast<uint32_t>(pos);
       }
     }
 
     return {std::move(modules), std::move(predecoded_positions)};
   }
 
-  Module module_;
-  LoadInfo load_info_;
   Loader loader_;
   std::optional<uint32_t> loaded_by_modid_;
 };
