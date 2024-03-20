@@ -83,15 +83,6 @@ impl BasePackageBuilder {
             external_contents.insert(destination.clone(), source.clone());
         }
 
-        // All base packages are named 'system-image' internally, for
-        // consistency on the platform.
-        let mut builder =
-            PackageBuilder::new_without_abi_revision(PackageDestination::Base.to_string());
-        // However, they can have different published names.  And the name here
-        // is the name to publish it under (and to include in the generated
-        // package manifest).
-        builder.published_name(name);
-
         // It's not totally clear what the ABI revision means for the
         // system-image package. It isn't checked anywhere. Regardless, it's
         // never produced by assembly tools from one Fuchsia release and then
@@ -99,9 +90,15 @@ impl BasePackageBuilder {
         // for platform components seems appropriate.
         //
         // TODO(https://fxbug.dev/329125882): Clarify what this means.
-        builder.deprecated_abi_revision(
-            version_history::HISTORY.get_abi_revision_for_platform_components(),
-        );
+        //
+        // Also: all base packages are named 'system-image' internally, for
+        // consistency on the platform.
+        let mut builder =
+            PackageBuilder::new_platform_internal_package(PackageDestination::Base.to_string());
+        // However, they can have different published names.  And the name here
+        // is the name to publish it under (and to include in the generated
+        // package manifest).
+        builder.published_name(name);
 
         for (destination, source) in &external_contents {
             builder.add_file_as_blob(destination, source)?;

@@ -226,18 +226,6 @@ impl UpdatePackageBuilder {
             _ => format!("_{subname}"),
         };
 
-        // The update package needs to be named 'update' to be accepted by the
-        // `system-updater`.  Follow that convention for images packages as well.
-        let package_name = format!("update{suffix}");
-        let mut builder = PackageBuilder::new_without_abi_revision(&package_name);
-
-        // However, they can have different published names.  And the name here
-        // is the name to publish it under (and to include in the generated
-        // package manifest).
-        let base_publish_name = &self.name;
-        let publish_name = format!("{base_publish_name}{suffix}");
-        builder.published_name(publish_name);
-
         // It's not totally clear what the ABI revision means for the update
         // package. It isn't actually checked as part of the update process.
         // Maybe it should be - that way we could ensure that devices only apply
@@ -255,9 +243,19 @@ impl UpdatePackageBuilder {
         // accidentally add any checks without the necessary care.
         //
         // TODO(https://fxbug.dev/328812629): Clarify what this means.
-        builder.deprecated_abi_revision(
-            self.abi_revision.unwrap_or(version_history::AbiRevision::INVALID),
-        );
+        let abi_revision = self.abi_revision.unwrap_or(version_history::AbiRevision::INVALID);
+
+        // The update package needs to be named 'update' to be accepted by the
+        // `system-updater`.  Follow that convention for images packages as well.
+        let package_name = format!("update{suffix}");
+        let mut builder = PackageBuilder::new(&package_name, abi_revision);
+
+        // However, they can have different published names.  And the name here
+        // is the name to publish it under (and to include in the generated
+        // package manifest).
+        let base_publish_name = &self.name;
+        let publish_name = format!("{base_publish_name}{suffix}");
+        builder.published_name(publish_name);
 
         // Export the package's package manifest to paths that don't change
         // based on the configured publishing name.

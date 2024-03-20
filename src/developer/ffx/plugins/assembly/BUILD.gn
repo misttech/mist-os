@@ -98,7 +98,6 @@ ffx_plugin("ffx_assembly") {
     "//src/lib/gcs",
     "//src/lib/structured_ui",
     "//src/lib/utf8_path",
-    "//src/lib/versioning/version-history/rust:version-history",
     "//src/sys/pkg/lib/epoch",
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-merkle",

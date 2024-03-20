@@ -78,12 +78,6 @@ impl SubpackageBlobsPackageBuilder {
 
         let Self { contents, seen: _ } = self;
 
-        let mut builder = PackageBuilder::new_without_abi_revision("subpackage_blobs");
-        // However, they can have different published names.  And the name here
-        // is the name to publish it under (and to include in the generated
-        // package manifest).
-        builder.published_name(name);
-
         // It's not totally clear what the ABI revision means for the
         // subpackage_blobs package. It isn't checked anywhere. Since it's only
         // used as a vessel to transfer blobs, it's not clear who _would_ check
@@ -93,7 +87,12 @@ impl SubpackageBlobsPackageBuilder {
         // if/when we decide to check it.
         //
         // TODO(https://fxbug.dev/328787524): Clarify what this means.
-        builder.deprecated_abi_revision(version_history::AbiRevision::INVALID);
+        let mut builder =
+            PackageBuilder::new("subpackage_blobs", version_history::AbiRevision::INVALID);
+        // However, they can have different published names.  And the name here
+        // is the name to publish it under (and to include in the generated
+        // package manifest).
+        builder.published_name(name);
 
         for (destination, source) in &contents {
             builder.add_file_as_blob(destination, source)?;
@@ -137,10 +136,8 @@ mod tests {
     ) -> (PackageManifest, Utf8PathBuf) {
         let dir = root.join(name);
 
-        let mut builder = PackageBuilder::new_without_abi_revision(name);
-
         // Hardcode the ABI so it doesn't change when the ABI revision is bumped.
-        builder.deprecated_abi_revision(0x57904F5A17FA3B22.into());
+        let mut builder = PackageBuilder::new(name, 0x57904F5A17FA3B22.into());
 
         let blob_name = format!("{}-blob", name);
         builder.add_contents_as_blob(&blob_name, &blob_name, &dir).unwrap();

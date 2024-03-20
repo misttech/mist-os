@@ -88,10 +88,8 @@ mod tests {
     ) -> (PackageManifest, Utf8PathBuf) {
         let dir = root.join(name);
 
-        let mut builder = PackageBuilder::new_without_abi_revision(name);
-
         // Hardcode the ABI so it doesn't change when the ABI revision is bumped.
-        builder.deprecated_abi_revision(0x57904F5A17FA3B22.into());
+        let mut builder = PackageBuilder::new(name, 0x57904F5A17FA3B22.into());
 
         let blob_name = format!("{}-blob", name);
         builder.add_contents_as_blob(&blob_name, &blob_name, &dir).unwrap();

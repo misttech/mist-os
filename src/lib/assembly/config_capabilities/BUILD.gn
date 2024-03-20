@@ -18,7 +18,6 @@ rustc_library("config_capabilities") {
   deps = [
     "//src/lib/assembly/util",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/versioning/version-history/rust:version-history",
     "//src/sys/lib/cm_rust",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//third_party/rust_crates:anyhow",

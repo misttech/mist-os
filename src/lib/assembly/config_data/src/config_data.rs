@@ -50,14 +50,11 @@ impl ConfigDataBuilder {
     /// path to the `config_data` package's manifest.
     pub fn build(self, outdir: impl AsRef<Utf8Path>) -> Result<Utf8PathBuf> {
         let outdir = outdir.as_ref().join("config_data");
-        let mut package_builder =
-            PackageBuilder::new_without_abi_revision(PackageDestination::ConfigData.to_string());
-
         // config_data is never produced by assembly tools from one Fuchsia
         // release and then read by binaries from another Fuchsia release. Give
         // it the platform ABI revision.
-        package_builder.deprecated_abi_revision(
-            version_history::HISTORY.get_abi_revision_for_platform_components(),
+        let mut package_builder = PackageBuilder::new_platform_internal_package(
+            PackageDestination::ConfigData.to_string(),
         );
 
         for (package_name, entries) in self.for_packages.entries {
