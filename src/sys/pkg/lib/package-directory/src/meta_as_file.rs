@@ -495,9 +495,10 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_file_protocols() {
         let (_env, root_dir) = TestEnv::new().await;
-        for forbidden_file_protocols in
-            [fio::FileProtocolFlags::APPEND, fio::FileProtocolFlags::TRUNCATE]
-        {
+        for forbidden_file_protocols in [
+            fio::FileProtocolFlags::APPEND,   // NOT_SUPPORTED
+            fio::FileProtocolFlags::TRUNCATE, // INVALID_ARGS without WRITE_BYTES rights
+        ] {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
             let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
@@ -513,7 +514,8 @@ mod tests {
             });
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
-                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+                Err(fidl::Error::ClientChannelClosed { status , .. })
+                    if status == zx::Status::NOT_SUPPORTED || status == zx::Status::INVALID_ARGS
             );
         }
     }

@@ -399,6 +399,11 @@ impl ToFileOptions for fio::ConnectionProtocols {
                 return Err(Status::WRONG_TYPE);
             }
         }
+
+        if self.is_truncate() && !self.rights().unwrap().contains(fio::Operations::WRITE_BYTES) {
+            return Err(Status::INVALID_ARGS);
+        }
+
         Ok(FileOptions {
             // If is_file_allowed() returned true, there must be rights.
             rights: self.rights().unwrap(),

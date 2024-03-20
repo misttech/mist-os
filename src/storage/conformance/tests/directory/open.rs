@@ -775,6 +775,35 @@ async fn open2_file_append() {
 }
 
 #[fuchsia::test]
+async fn open2_file_truncate_invalid() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    let test_dir = harness.get_directory(
+        root_directory(vec![file("file", b"foo".to_vec())]),
+        fio::OpenFlags::RIGHT_READABLE,
+    );
+
+    let status = test_dir
+        .open2_node::<fio::FileMarker>(
+            "file",
+            fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::TRUNCATE),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect_err("open with truncate requires rights to write bytes");
+    assert_eq!(status, zx::Status::INVALID_ARGS);
+}
+
+#[fuchsia::test]
 async fn open2_file_truncate() {
     let harness = TestHarness::new().await;
 
