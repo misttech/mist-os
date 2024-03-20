@@ -125,15 +125,6 @@ void Driver::SetDisplayControllerInterface(display_controller_interface_protocol
   dc_.SetDisplayControllerInterface(controller_, ops);
 }
 
-zx_status_t Driver::SetDisplayCaptureInterface(display_capture_interface_protocol_ops_t* ops) {
-  if (use_engine_) {
-    return ZX_OK;
-  }
-
-  ZX_DEBUG_ASSERT(dc_.is_valid());
-  return dc_.SetDisplayCaptureInterface(controller_, ops);
-}
-
 zx_status_t Driver::ImportImage(image_t* image, DriverBufferCollectionId collection_id,
                                 uint32_t index) {
   if (use_engine_) {
@@ -204,6 +195,15 @@ zx_status_t Driver::SetBufferCollectionConstraints(const image_buffer_usage_t& u
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
   return dc_.SetBufferCollectionConstraints(&usage, ToBanjoDriverBufferCollectionId(collection_id));
+}
+
+bool Driver::IsCaptureSupported() {
+  if (use_engine_) {
+    return false;
+  }
+
+  ZX_DEBUG_ASSERT(dc_.is_valid());
+  return dc_.IsCaptureSupported();
 }
 
 zx_status_t Driver::StartCapture(DriverCaptureImageId driver_capture_image_id) {

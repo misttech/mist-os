@@ -231,18 +231,24 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
 // A completion semaphore indicating the display capture is completed.
 class DisplayCaptureCompletion {
  public:
-  // Tests can import the capture interface protocol to set up the callback to
-  // trigger the semaphore.
-  display_capture_interface_protocol_t GetDisplayCaptureInterfaceProtocol() {
-    static constexpr display_capture_interface_protocol_ops_t kDisplayCaptureInterfaceProtocolOps =
-        {
+  // Tests can import the display controller interface protocol to set up the
+  // callback to trigger the semaphore.
+  display_controller_interface_protocol_t GetDisplayControllerInterfaceProtocol() {
+    static constexpr display_controller_interface_protocol_ops_t
+        kDisplayControllerInterfaceProtocolOps = {
+            .on_displays_changed = [](void* ctx, const added_display_args_t* added_displays_list,
+                                      size_t added_displays_count,
+                                      const uint64_t* removed_display_ids_list,
+                                      size_t removed_display_ids_count) {},
+            .on_display_vsync = [](void* ctx, uint64_t display_id, zx_time_t timestamp,
+                                   const config_stamp_t* config_stamp) {},
             .on_capture_complete =
                 [](void* ctx) {
                   reinterpret_cast<DisplayCaptureCompletion*>(ctx)->OnCaptureComplete();
                 },
         };
-    return display_capture_interface_protocol_t{
-        .ops = &kDisplayCaptureInterfaceProtocolOps,
+    return display_controller_interface_protocol_t{
+        .ops = &kDisplayControllerInterfaceProtocolOps,
         .ctx = this,
     };
   }
@@ -598,9 +604,9 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
       std::move(new_framebuffer_buffer_collection_result.value());
 
   DisplayCaptureCompletion display_capture_completion = {};
-  const display_capture_interface_protocol_t& capture_protocol =
-      display_capture_completion.GetDisplayCaptureInterfaceProtocol();
-  EXPECT_OK(display()->DisplayControllerImplSetDisplayCaptureInterface(&capture_protocol));
+  const display_controller_interface_protocol_t& controller_protocol =
+      display_capture_completion.GetDisplayControllerInterfaceProtocol();
+  display()->DisplayControllerImplSetDisplayControllerInterface(&controller_protocol);
 
   constexpr display::DriverBufferCollectionId kCaptureBufferCollectionId(1);
   constexpr uint64_t kBanjoCaptureBufferCollectionId =
@@ -787,11 +793,7 @@ class FakeDisplayWithoutCaptureRealSysmemTest : public FakeDisplayRealSysmemTest
 };
 
 TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, SetDisplayCaptureInterface) {
-  DisplayCaptureCompletion display_capture_completion = {};
-  const display_capture_interface_protocol_t& capture_protocol =
-      display_capture_completion.GetDisplayCaptureInterfaceProtocol();
-  EXPECT_EQ(display()->DisplayControllerImplSetDisplayCaptureInterface(&capture_protocol),
-            ZX_ERR_NOT_SUPPORTED);
+  EXPECT_EQ(display()->DisplayControllerImplIsCaptureSupported(), false);
 }
 
 TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, ImportImageForCapture) {

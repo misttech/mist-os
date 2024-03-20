@@ -258,7 +258,14 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
   task.release()->Post(loop_.dispatcher());
 }
 
-void Controller::DisplayCaptureInterfaceOnCaptureComplete() {
+void Controller::DisplayControllerInterfaceOnCaptureComplete() {
+  if (!supports_capture_) {
+    zxlogf(ERROR,
+           "OnCaptureComplete(): the display engine doesn't support "
+           "display capture.");
+    return;
+  }
+
   std::unique_ptr<async::Task> task = std::make_unique<async::Task>();
   fbl::AutoLock lock(mtx());
   task->set_handler([this](async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
@@ -917,8 +924,7 @@ zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
 
   driver_.SetDisplayControllerInterface(&display_controller_interface_protocol_ops_);
 
-  status = driver_.SetDisplayCaptureInterface(&display_capture_interface_protocol_ops_);
-  supports_capture_ = (status == ZX_OK);
+  supports_capture_ = driver_.IsCaptureSupported();
   zxlogf(INFO, "Display capture is%s supported: %s", supports_capture_ ? "" : " not",
          zx_status_get_string(status));
 

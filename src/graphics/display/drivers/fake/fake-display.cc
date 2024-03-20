@@ -289,9 +289,9 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  // TODO(https://fxbug.dev/42079320): When capture is enabled (no_buffer_access is
-  // false), we should perform a check to ensure that the display images should
-  // not be of "inaccessible" coherency domain.
+  // TODO(https://fxbug.dev/42079320): When capture is enabled
+  // (IsCaptureSupported() is true), we should perform a check to ensure that
+  // the display images should not be of "inaccessible" coherency domain.
 
   display::DriverImageId driver_image_id = next_imported_display_driver_image_id_++;
   ImageMetadata display_image_metadata = {
@@ -557,21 +557,9 @@ zx_status_t FakeDisplay::DisplayControllerImplSetDisplayPower(uint64_t display_i
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
-    const display_capture_interface_protocol_t* intf) {
-  if (device_config_.no_buffer_access) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  fbl::AutoLock lock(&capture_mutex_);
-  capture_interface_client_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
-  current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
-  return ZX_OK;
-}
-
 zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
     uint64_t banjo_driver_buffer_collection_id, uint32_t index, uint64_t* out_capture_handle) {
-  if (device_config_.no_buffer_access) {
+  if (!IsCaptureSupported()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -643,8 +631,10 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
   return ZX_OK;
 }
 
+bool FakeDisplay::DisplayControllerImplIsCaptureSupported() { return IsCaptureSupported(); }
+
 zx_status_t FakeDisplay::DisplayControllerImplStartCapture(uint64_t capture_handle) {
-  if (device_config_.no_buffer_access) {
+  if (!IsCaptureSupported()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -667,7 +657,7 @@ zx_status_t FakeDisplay::DisplayControllerImplStartCapture(uint64_t capture_hand
 }
 
 zx_status_t FakeDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
-  if (device_config_.no_buffer_access) {
+  if (!IsCaptureSupported()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -696,7 +686,7 @@ void FakeDisplay::DdkRelease() {
     // Ignore return value here in case the vsync_thread_ isn't running.
     thrd_join(vsync_thread_, nullptr);
   }
-  if (!device_config_.no_buffer_access) {
+  if (IsCaptureSupported()) {
     capture_shutdown_flag_.store(true);
     thrd_join(capture_thread_, nullptr);
   }
@@ -716,36 +706,46 @@ zx_status_t FakeDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
 }
 
 zx_status_t FakeDisplay::SetupDisplayInterface() {
-  fbl::AutoLock interface_lock(&interface_mutex_);
   {
     fbl::AutoLock image_lock(&image_mutex_);
     current_image_to_capture_id_ = display::kInvalidDriverImageId;
   }
 
-  if (controller_interface_client_.is_valid()) {
-    added_display_args_t args;
-    PopulateAddedDisplayArgs(&args);
+  {
+    fbl::AutoLock interface_lock(&interface_mutex_);
+    if (controller_interface_client_.is_valid()) {
+      added_display_args_t args;
+      PopulateAddedDisplayArgs(&args);
 
-    controller_interface_client_.OnDisplaysChanged(&args, /*added_display_count=*/1,
-                                                   /*removed_display_list=*/nullptr,
-                                                   /*removed_display_count=*/0);
+      controller_interface_client_.OnDisplaysChanged(&args, /*added_display_count=*/1,
+                                                     /*removed_display_list=*/nullptr,
+                                                     /*removed_display_count=*/0);
+    }
   }
 
+  if (IsCaptureSupported()) {
+    fbl::AutoLock capture_lock(&capture_mutex_);
+    current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
+  }
   return ZX_OK;
 }
 
+bool FakeDisplay::IsCaptureSupported() const { return !device_config_.no_buffer_access; }
+
 int FakeDisplay::CaptureThread() {
+  ZX_DEBUG_ASSERT(IsCaptureSupported());
   while (true) {
     zx::nanosleep(zx::deadline_after(zx::sec(1) / kRefreshRateFps));
     if (capture_shutdown_flag_.load()) {
       break;
     }
     {
+      fbl::AutoLock interface_lock_(&interface_mutex_);
       // `current_capture_target_image_` is a pointer to DisplayImageInfo stored in
       // `imported_captures_` (guarded by `capture_mutex_`). So `capture_mutex_`
       // must be locked while the capture image is being used.
       fbl::AutoLock capture_lock(&capture_mutex_);
-      if (capture_interface_client_.is_valid() &&
+      if (controller_interface_client_.is_valid() &&
           (current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) &&
           ++capture_complete_signal_count_ >= kNumOfVsyncsForCapture) {
         {
@@ -829,7 +829,7 @@ int FakeDisplay::CaptureThread() {
             }
           }
         }
-        capture_interface_client_.OnCaptureComplete();
+        controller_interface_client_.OnCaptureComplete();
         current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
         capture_complete_signal_count_ = 0;
       }
@@ -908,7 +908,7 @@ zx_status_t FakeDisplay::Bind() {
     vsync_thread_running_ = true;
   }
 
-  if (!device_config_.no_buffer_access) {
+  if (IsCaptureSupported()) {
     status = thrd_status_to_zx_status(thrd_create_with_name(
         &capture_thread_,
         [](void* context) { return static_cast<FakeDisplay*>(context)->CaptureThread(); }, this,

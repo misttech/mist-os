@@ -72,11 +72,6 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
 
-  zx_status_t DisplayControllerImplSetDisplayCaptureInterface(
-      const display_capture_interface_protocol_t* intf) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
@@ -110,6 +105,8 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
+
+  bool DisplayControllerImplIsCaptureSupported() { return false; }
 
   zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;

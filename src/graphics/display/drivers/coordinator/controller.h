@@ -65,7 +65,6 @@ using DeviceType = ddk::Device<Controller, ddk::Unbindable,
 // Multiplexes between display controller clients and display engine drivers.
 class Controller : public DeviceType,
                    public ddk::DisplayControllerInterfaceProtocol<Controller>,
-                   public ddk::DisplayCaptureInterfaceProtocol<Controller>,
                    public ddk::EmptyProtocol<ZX_PROTOCOL_DISPLAY_COORDINATOR> {
  public:
   // Creates a new coordinator Controller device. It creates a new Inspector
@@ -94,7 +93,7 @@ class Controller : public DeviceType,
   void DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
                                                 const config_stamp_t* config_stamp);
 
-  void DisplayCaptureInterfaceOnCaptureComplete();
+  void DisplayControllerInterfaceOnCaptureComplete();
   void OnClientDead(ClientProxy* client);
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
   void ShowActiveDisplay();

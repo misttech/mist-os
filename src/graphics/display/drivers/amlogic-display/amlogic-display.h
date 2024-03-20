@@ -123,8 +123,7 @@ class AmlogicDisplay
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
 
-  zx_status_t DisplayControllerImplSetDisplayCaptureInterface(
-      const display_capture_interface_protocol_t* intf);
+  bool DisplayControllerImplIsCaptureSupported();
   zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
                                                          uint32_t index,
                                                          uint64_t* out_capture_handle);
@@ -263,12 +262,9 @@ class AmlogicDisplay
   // Display controller related data
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(display_mutex_);
 
-  // Display Capture interface protocol
-  ddk::DisplayCaptureInterfaceProtocolClient capture_intf_ TA_GUARDED(capture_mutex_);
-
   // Points to the next capture target image to capture displayed contents into.
   // Stores nullptr if capture is not going to be performed.
-  ImageInfo* current_capture_target_image_ TA_GUARDED(capture_mutex_);
+  ImageInfo* current_capture_target_image_ TA_GUARDED(capture_mutex_) = nullptr;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,

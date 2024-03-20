@@ -213,7 +213,7 @@ zx::result<> AmlogicDisplay::ResetDisplayEngine() {
 
 void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
-  fbl::AutoLock lock(&display_mutex_);
+  fbl::AutoLock display_lock(&display_mutex_);
   dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
 
   if (display_attached_) {
@@ -747,13 +747,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayPower(uint64_t displa
   return vout_->PowerOff().status_value();
 }
 
-zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayCaptureInterface(
-    const display_capture_interface_protocol_t* intf) {
-  fbl::AutoLock lock(&capture_mutex_);
-  capture_intf_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
-  current_capture_target_image_ = INVALID_ID;
-  return ZX_OK;
-}
+bool AmlogicDisplay::DisplayControllerImplIsCaptureSupported() { return true; }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
     uint64_t banjo_driver_buffer_collection_id, uint32_t index, uint64_t* out_capture_handle) {
@@ -894,7 +888,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplStartCapture(uint64_t capture_h
   }
 
   fbl::AutoLock lock(&capture_mutex_);
-  if (current_capture_target_image_ != INVALID_ID) {
+  if (current_capture_target_image_ != nullptr) {
     zxlogf(ERROR, "Failed to start capture while another capture is in progress");
     return ZX_ERR_SHOULD_WAIT;
   }
@@ -978,11 +972,16 @@ void AmlogicDisplay::OnCaptureComplete() {
   }
 
   vpu_->CaptureDone();
-  fbl::AutoLock lock(&capture_mutex_);
-  if (capture_intf_.is_valid()) {
-    capture_intf_.OnCaptureComplete();
+  {
+    fbl::AutoLock display_lock(&display_mutex_);
+    if (dc_intf_.is_valid()) {
+      dc_intf_.OnCaptureComplete();
+    }
   }
-  current_capture_target_image_ = nullptr;
+  {
+    fbl::AutoLock capture_lock(&capture_mutex_);
+    current_capture_target_image_ = nullptr;
+  }
 }
 
 void AmlogicDisplay::OnHotPlugStateChange(HotPlugDetectionState current_state) {

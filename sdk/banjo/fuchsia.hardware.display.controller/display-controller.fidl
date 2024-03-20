@@ -152,11 +152,12 @@ closed protocol DisplayControllerInterface {
         timestamp zx.Time;
         config_stamp box<ConfigStamp>;
     }) -> ();
-};
 
-@transport("Banjo")
-@banjo_layout("ddk-interface")
-closed protocol DisplayCaptureInterface {
+    /// Called when the previous display capture triggered by
+    /// [`DisplayControllerImpl.StartCapture`] is completed.
+    ///
+    /// Each `OnCaptureComplete` call must be paired with a previous successful
+    /// call to [`DisplayControllerImpl.StartCapture`].
     strict OnCaptureComplete() -> ();
 };
 
@@ -356,16 +357,6 @@ closed protocol DisplayControllerImpl {
         intf client_end:DisplayControllerInterface;
     }) -> ();
 
-    /// Initialize the display capture interface. Must be called only once
-    /// before importing resources for capture and starting display capture.
-    ///
-    /// Returns ZX_ERR_NOT_SUPPORTED if display capture is not supported.
-    strict SetDisplayCaptureInterface(resource struct {
-        intf client_end:DisplayCaptureInterface;
-    }) -> (struct {
-        s zx.Status;
-    });
-
     /// Import a sysmem buffer collection token.
     ///
     /// Returns ZX_ERR_ALREADY_EXISTS if `collection_id` is in use.
@@ -548,6 +539,12 @@ closed protocol DisplayControllerImpl {
         power_on bool;
     }) -> (struct {
         s zx.Status;
+    });
+
+    /// Returns true iff the display engine supports capturing the pixels
+    /// on the display device.
+    strict IsCaptureSupported() -> (struct {
+        is_supported bool;
     });
 
     /// Starts capture into the resource mapped by capture_handle (non-blocking)

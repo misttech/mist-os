@@ -96,12 +96,11 @@ class FakeDisplay : public DeviceType,
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
-  zx_status_t DisplayControllerImplSetDisplayCaptureInterface(
-      const display_capture_interface_protocol_t* intf);
   zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
                                                          uint32_t index,
                                                          uint64_t* out_capture_handle)
       __TA_EXCLUDES(capture_mutex_);
+  bool DisplayControllerImplIsCaptureSupported();
   zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle)
       __TA_EXCLUDES(capture_mutex_);
   zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle)
@@ -121,6 +120,8 @@ class FakeDisplay : public DeviceType,
   const display_controller_impl_protocol_t* display_controller_impl_banjo_protocol() const {
     return &display_controller_impl_banjo_protocol_;
   }
+
+  bool IsCaptureSupported() const;
 
   void SendVsync();
 
@@ -254,9 +255,6 @@ class FakeDisplay : public DeviceType,
   // Display controller related data
   ddk::DisplayControllerInterfaceProtocolClient controller_interface_client_
       TA_GUARDED(interface_mutex_);
-
-  // Display Capture interface protocol
-  ddk::DisplayCaptureInterfaceProtocolClient capture_interface_client_ TA_GUARDED(capture_mutex_);
 
   inspect::Inspector inspector_;
 };

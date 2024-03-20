@@ -50,7 +50,6 @@ class Driver : public ddk::Device<Driver> {
   void SetEld(DisplayId display_id, const uint8_t* raw_eld_list, size_t raw_eld_count);
 
   void SetDisplayControllerInterface(display_controller_interface_protocol_ops_t* ops);
-  zx_status_t SetDisplayCaptureInterface(display_capture_interface_protocol_ops_t* ops);
 
   zx_status_t ImportImage(image_t* image, DriverBufferCollectionId collection_id, uint32_t index);
   zx_status_t ImportImageForCapture(DriverBufferCollectionId collection_id, uint32_t index,
@@ -61,6 +60,7 @@ class Driver : public ddk::Device<Driver> {
   zx_status_t SetBufferCollectionConstraints(const image_buffer_usage_t& usage,
                                              DriverBufferCollectionId collection_id);
 
+  bool IsCaptureSupported();
   zx_status_t StartCapture(DriverCaptureImageId driver_capture_image_id);
   zx_status_t SetDisplayPower(DisplayId display_id, bool power_on);
   zx_status_t SetMinimumRgb(uint8_t minimum_rgb);
