@@ -283,9 +283,6 @@ template("dts") {
 # verification checks.
 # 2. The target "$target_name.dtb" can be used to get the output devicetree
 # blob using `get_target_output("$target_name.dtb")`.
-# 3. The target "$target_name.visitors" can be used to compile and add all the
-# visitor libraries into the board driver package. The visitors can be loaded
-# at runtime using the load-visitors library by the board driver.
 #
 # Parameters
 #
@@ -306,11 +303,6 @@ template("dts") {
 #     - Type: list(label)
 #     - Default: []
 #
-#   * visitors
-#     - Optional: Devicetree visitor targets related to the source.
-#     - Type: list(label)
-#     - Default: []
-#
 #  * outputs
 #     - Optional: The singleton list containing the output blob path. This value
 #       can be accessed as `get_target_outputs(target_name)`.
@@ -319,8 +311,6 @@ template("dts") {
 #
 template("devicetree") {
   compiled_dtb_target = "$target_name.dtb"
-
-  visitors_target = "$target_name.visitors"
 
   decompiled_dts_target = "_devicetree.$target_name.decompiled"
 
@@ -355,12 +345,6 @@ template("devicetree") {
         candidate = dts_outputs[0]
       },
     ]
-  }
-
-  group(visitors_target) {
-    if (defined(invoker.visitors)) {
-      deps = invoker.visitors
-    }
   }
 
   group(target_name) {
