@@ -5,8 +5,8 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
+#include <fidl/fuchsia.hardware.spiimpl/cpp/driver/wire.h>
 #include <fidl/fuchsia.scheduler/cpp/wire.h>
-#include <fuchsia/hardware/spiimpl/cpp/banjo.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fpromise/promise.h>
@@ -14,14 +14,12 @@
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
-#include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/result.h>
 
 #include <optional>
 
 #include <fbl/array.h>
-#include <fbl/mutex.h>
 #include <soc/aml-common/aml-spi.h>
 
 #include "sdk/lib/driver/compat/cpp/device_server.h"
@@ -29,12 +27,12 @@
 
 namespace spi {
 
-class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
+class AmlSpi : public fdf::WireServer<fuchsia_hardware_spiimpl::SpiImpl> {
  public:
   struct OwnedVmoInfo {
     uint64_t offset;
     uint64_t size;
-    uint32_t rights;
+    fuchsia_hardware_sharedmemory::SharedVmoRight rights;
   };
 
   using SpiVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
@@ -71,87 +69,104 @@ class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
         config_(config),
         bti_(std::move(bti)),
         tx_buffer_(std::move(tx_buffer)),
-        rx_buffer_(std::move(rx_buffer)) {}
-
-  spi_impl_protocol_ops_t* ops() { return &spi_impl_protocol_ops_; }
+        rx_buffer_(std::move(rx_buffer)),
+        outgoing_(fdf::Dispatcher::GetCurrent()->get()) {
+    bindings_.set_empty_set_handler(fit::bind_member<&AmlSpi::OnAllClientsUnbound>(this));
+  }
 
   void InitRegisters();
 
-  void Shutdown();
+  void Serve(fdf::ServerEnd<fuchsia_hardware_spiimpl::SpiImpl> request);
 
-  uint32_t SpiImplGetChipSelectCount() { return static_cast<uint32_t>(chips_.size()); }
-  zx_status_t SpiImplExchange(uint32_t cs, const uint8_t* txdata, size_t txdata_size,
-                              uint8_t* out_rxdata, size_t rxdata_size, size_t* out_rxdata_actual);
-
-  zx_status_t SpiImplRegisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo vmo,
-                                 uint64_t offset, uint64_t size, uint32_t rights);
-  zx_status_t SpiImplUnregisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo* out_vmo);
-  void SpiImplReleaseRegisteredVmos(uint32_t chip_select);
-  zx_status_t SpiImplTransmitVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
-                                 uint64_t size);
-  zx_status_t SpiImplReceiveVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
-                                uint64_t size);
-  zx_status_t SpiImplExchangeVmo(uint32_t chip_select, uint32_t tx_vmo_id, uint64_t tx_offset,
-                                 uint32_t rx_vmo_id, uint64_t rx_offset, uint64_t size);
-
-  zx_status_t SpiImplLockBus(uint32_t chip_select) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t SpiImplUnlockBus(uint32_t chip_select) { return ZX_ERR_NOT_SUPPORTED; }
+  void Stop();
 
  private:
-  void DumpState() TA_REQ(bus_lock_);
+  void GetChipSelectCount(fdf::Arena& arena,
+                          GetChipSelectCountCompleter::Sync& completer) override {
+    completer.buffer(arena).Reply(chips_.size());
+  }
+  void TransmitVector(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVectorRequest* request,
+                      fdf::Arena& arena, TransmitVectorCompleter::Sync& completer) override;
+  void ReceiveVector(fuchsia_hardware_spiimpl::wire::SpiImplReceiveVectorRequest* request,
+                     fdf::Arena& arena, ReceiveVectorCompleter::Sync& completer) override;
+  void ExchangeVector(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVectorRequest* request,
+                      fdf::Arena& arena, ExchangeVectorCompleter::Sync& completer) override;
+  void RegisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplRegisterVmoRequest* request,
+                   fdf::Arena& arena, RegisterVmoCompleter::Sync& completer) override;
+  void UnregisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplUnregisterVmoRequest* request,
+                     fdf::Arena& arena, UnregisterVmoCompleter::Sync& completer) override;
+  void ReleaseRegisteredVmos(
+      fuchsia_hardware_spiimpl::wire::SpiImplReleaseRegisteredVmosRequest* request,
+      fdf::Arena& arena, ReleaseRegisteredVmosCompleter::Sync& completer) override;
+  void TransmitVmo(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVmoRequest* request,
+                   fdf::Arena& arena, TransmitVmoCompleter::Sync& completer) override;
+  void ReceiveVmo(fuchsia_hardware_spiimpl::wire::SpiImplReceiveVmoRequest* request,
+                  fdf::Arena& arena, ReceiveVmoCompleter::Sync& completer) override;
+  void ExchangeVmo(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVmoRequest* request,
+                   fdf::Arena& arena, ExchangeVmoCompleter::Sync& completer) override;
 
-  void Exchange8(const uint8_t* txdata, uint8_t* out_rxdata, size_t size) TA_REQ(bus_lock_);
-  void Exchange64(const uint8_t* txdata, uint8_t* out_rxdata, size_t size) TA_REQ(bus_lock_);
+  void LockBus(fuchsia_hardware_spiimpl::wire::SpiImplLockBusRequest* request, fdf::Arena& arena,
+               LockBusCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void UnlockBus(fuchsia_hardware_spiimpl::wire::SpiImplUnlockBusRequest* request,
+                 fdf::Arena& arena, UnlockBusCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void DumpState();
+
+  zx::result<> Exchange(uint32_t cs, const uint8_t* txdata, uint8_t* out_rxdata,
+                        size_t exchange_size);
+
+  void Exchange8(const uint8_t* txdata, uint8_t* out_rxdata, size_t size);
+  void Exchange64(const uint8_t* txdata, uint8_t* out_rxdata, size_t size);
 
   void SetThreadProfile();
 
-  void WaitForTransferComplete() TA_REQ(bus_lock_);
-  void WaitForDmaTransferComplete() TA_REQ(bus_lock_);
-
-  void InitRegistersLocked() TA_REQ(bus_lock_);
+  void WaitForTransferComplete();
+  void WaitForDmaTransferComplete();
 
   // Checks size against the registered VMO size and returns a Span with offset applied. Returns a
   // Span with data set to nullptr if vmo_id wasn't found. Returns a Span with size set to zero if
   // offset and/or size are invalid.
-  zx::result<cpp20::span<uint8_t>> GetVmoSpan(uint32_t chip_select, uint32_t vmo_id,
-                                              uint64_t offset, uint64_t size, uint32_t right)
-      TA_REQ(vmo_lock_);
+  zx::result<cpp20::span<uint8_t>> GetVmoSpan(
+      uint32_t chip_select, const fuchsia_hardware_sharedmemory::wire::SharedVmoBuffer& buffer,
+      fuchsia_hardware_sharedmemory::SharedVmoRight right);
 
-  zx_status_t ExchangeDma(const uint8_t* txdata, uint8_t* out_rxdata, uint64_t size)
-      TA_REQ(bus_lock_);
+  zx_status_t ExchangeDma(const uint8_t* txdata, uint8_t* out_rxdata, uint64_t size);
 
-  size_t DoDmaTransfer(size_t words_remaining) TA_REQ(bus_lock_);
+  size_t DoDmaTransfer(size_t words_remaining);
 
-  bool UseDma(size_t size) const TA_REQ(bus_lock_);
+  bool UseDma(size_t size) const;
 
-  // Shims to support thread annotations on ChipInfo members.
-  const fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>& gpio(uint32_t chip_select)
-      TA_REQ(bus_lock_) {
+  void OnAllClientsUnbound();
+
+  const fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>& gpio(uint32_t chip_select) {
     return chips_[chip_select].gpio;
   }
 
-  std::optional<SpiVmoStore>& registered_vmos(uint32_t chip_select) TA_REQ(vmo_lock_) {
+  std::optional<SpiVmoStore>& registered_vmos(uint32_t chip_select) {
     return chips_[chip_select].registered_vmos;
   }
 
-  fdf::MmioBuffer mmio_ TA_GUARDED(bus_lock_);
+  fdf::MmioBuffer mmio_;
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_;
   fdf::UnownedDispatcher dispatcher_;
   fidl::WireClient<fuchsia_scheduler::ProfileProvider> profile_provider_;
   const uint32_t reset_mask_;
   const fbl::Array<ChipInfo> chips_;
-  bool need_reset_ TA_GUARDED(bus_lock_) = false;
+  bool need_reset_ = false;
   zx::interrupt interrupt_;
   const amlogic_spi::amlspi_config_t config_;
   bool apply_scheduler_role_ = true;
-  // Protects mmio_, need_reset_, and the DMA buffers.
-  fbl::Mutex bus_lock_;
-  // Protects registered_vmos members of chips_.
-  fbl::Mutex vmo_lock_;
   zx::bti bti_;
-  DmaBuffer tx_buffer_ TA_GUARDED(bus_lock_);
-  DmaBuffer rx_buffer_ TA_GUARDED(bus_lock_);
-  bool shutdown_ TA_GUARDED(bus_lock_) = false;
+  DmaBuffer tx_buffer_;
+  DmaBuffer rx_buffer_;
+  std::vector<uint8_t> rx_vector_buffer_;
+  bool shutdown_ = false;
+  fdf::OutgoingDirectory outgoing_;
+  fdf::ServerBindingGroup<fuchsia_hardware_spiimpl::SpiImpl> bindings_;
 };
 
 // AmlSpiDriver is a helper class that is responsible for acquiring resources on behalf of AmlSpi so
@@ -164,9 +179,10 @@ class AmlSpiDriver : public fdf::DriverBase {
         executor_(fdf::DriverBase::dispatcher()) {}
 
   void Start(fdf::StartCompleter completer) override;
+
   void Stop() override {
     if (device_) {
-      device_->Shutdown();
+      device_->Stop();
     }
   }
 

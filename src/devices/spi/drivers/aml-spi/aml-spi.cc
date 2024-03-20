@@ -5,7 +5,6 @@
 #include "aml-spi.h"
 
 #include <endian.h>
-#include <fuchsia/hardware/spiimpl/c/banjo.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/driver_export.h>
@@ -20,9 +19,9 @@
 
 #include <memory>
 
+#include <bind/fuchsia/hardware/spiimpl/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 
 #include "registers.h"
 #include "sdk/lib/driver/compat/cpp/metadata.h"
@@ -66,23 +65,24 @@ void AmlSpi::DumpState() {
 
 #undef dump_reg
 
-zx::result<cpp20::span<uint8_t>> AmlSpi::GetVmoSpan(uint32_t chip_select, uint32_t vmo_id,
-                                                    uint64_t offset, uint64_t size,
-                                                    uint32_t right) {
-  vmo_store::StoredVmo<OwnedVmoInfo>* const vmo_info = registered_vmos(chip_select)->GetVmo(vmo_id);
+zx::result<cpp20::span<uint8_t>> AmlSpi::GetVmoSpan(
+    uint32_t chip_select, const fuchsia_hardware_sharedmemory::wire::SharedVmoBuffer& buffer,
+    fuchsia_hardware_sharedmemory::SharedVmoRight right) {
+  vmo_store::StoredVmo<OwnedVmoInfo>* const vmo_info =
+      registered_vmos(chip_select)->GetVmo(buffer.vmo_id);
   if (!vmo_info) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  if ((vmo_info->meta().rights & right) == 0) {
+  if (!(vmo_info->meta().rights & right)) {
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
 
-  if (offset + size > vmo_info->meta().size) {
+  if (buffer.offset + buffer.size > vmo_info->meta().size) {
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
-  return zx::ok(vmo_info->data().subspan(vmo_info->meta().offset + offset));
+  return zx::ok(vmo_info->data().subspan(vmo_info->meta().offset + buffer.offset, buffer.size));
 }
 
 void AmlSpi::Exchange8(const uint8_t* txdata, uint8_t* out_rxdata, size_t size) {
@@ -257,11 +257,6 @@ void AmlSpi::WaitForDmaTransferComplete() {
 }
 
 void AmlSpi::InitRegisters() {
-  fbl::AutoLock lock(&bus_lock_);
-  InitRegistersLocked();
-}
-
-void AmlSpi::InitRegistersLocked() {
   ConReg::Get().FromValue(0).WriteTo(&mmio_);
 
   TestReg::Get().FromValue(0).set_dlyctl(config_.delay_control).set_clk_free_en(1).WriteTo(&mmio_);
@@ -293,25 +288,17 @@ void AmlSpi::InitRegistersLocked() {
   ConReg::Get().ReadFrom(&mmio_).set_en(1).WriteTo(&mmio_);
 }
 
-zx_status_t AmlSpi::SpiImplExchange(uint32_t cs, const uint8_t* txdata, size_t txdata_size,
-                                    uint8_t* out_rxdata, size_t rxdata_size,
-                                    size_t* out_rxdata_actual) {
-  if (cs >= SpiImplGetChipSelectCount()) {
-    return ZX_ERR_INVALID_ARGS;
+zx::result<> AmlSpi::Exchange(uint32_t cs, const uint8_t* txdata, uint8_t* out_rxdata,
+                              size_t exchange_size) {
+  if (cs >= chips_.size()) {
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
-  if (txdata_size && rxdata_size && (txdata_size != rxdata_size)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  fbl::AutoLock lock(&bus_lock_);
   if (shutdown_) {
-    return ZX_ERR_CANCELED;
+    return zx::error(ZX_ERR_CANCELED);
   }
 
   SetThreadProfile();
-
-  const size_t exchange_size = txdata_size ? txdata_size : rxdata_size;
 
   const bool use_dma = UseDma(exchange_size);
 
@@ -324,7 +311,7 @@ zx_status_t AmlSpi::SpiImplExchange(uint32_t cs, const uint8_t* txdata, size_t t
       FDF_LOG(WARNING, "Failed to reset SPI controller");
     }
 
-    InitRegistersLocked();  // The registers must be reinitialized after resetting the IP.
+    InitRegisters();  // The registers must be reinitialized after resetting the IP.
     need_reset_ = false;
   } else {
     // reset both fifos
@@ -365,129 +352,181 @@ zx_status_t AmlSpi::SpiImplExchange(uint32_t cs, const uint8_t* txdata, size_t t
     ZX_ASSERT_MSG(result->is_ok(), "error: %s", zx_status_get_string(result->error_value()));
   }
 
-  if (out_rxdata && out_rxdata_actual) {
-    *out_rxdata_actual = rxdata_size;
-  }
-
   if (exchange_size % 2 == 1) {
     need_reset_ = true;
   }
 
-  return status;
+  return zx::make_result(status);
 }
 
-zx_status_t AmlSpi::SpiImplRegisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo vmo,
-                                       uint64_t offset, uint64_t size, uint32_t rights) {
-  if (chip_select >= SpiImplGetChipSelectCount()) {
-    return ZX_ERR_OUT_OF_RANGE;
+void AmlSpi::TransmitVector(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVectorRequest* request,
+                            fdf::Arena& arena, TransmitVectorCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(
+      Exchange(request->chip_select, request->data.data(), nullptr, request->data.count()));
+}
+
+void AmlSpi::ReceiveVector(fuchsia_hardware_spiimpl::wire::SpiImplReceiveVectorRequest* request,
+                           fdf::Arena& arena, ReceiveVectorCompleter::Sync& completer) {
+  // If needed, grow our RX buffer to fit the incoming data.
+  if (rx_vector_buffer_.size() < request->size) {
+    rx_vector_buffer_.resize(request->size);
   }
 
-  if (rights & ~(SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE)) {
-    return ZX_ERR_INVALID_ARGS;
+  zx::result<> result =
+      Exchange(request->chip_select, nullptr, rx_vector_buffer_.data(), request->size);
+  if (result.is_ok()) {
+    completer.buffer(arena).ReplySuccess(
+        fidl::VectorView<uint8_t>::FromExternal(rx_vector_buffer_.data(), request->size));
+  } else {
+    completer.buffer(arena).Reply(result.take_error());
+  }
+}
+
+void AmlSpi::ExchangeVector(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVectorRequest* request,
+                            fdf::Arena& arena, ExchangeVectorCompleter::Sync& completer) {
+  if (rx_vector_buffer_.size() < request->txdata.count()) {
+    rx_vector_buffer_.resize(request->txdata.count());
   }
 
-  vmo_store::StoredVmo<OwnedVmoInfo> stored_vmo(std::move(vmo), OwnedVmoInfo{
-                                                                    .offset = offset,
-                                                                    .size = size,
-                                                                    .rights = rights,
-                                                                });
-  const zx_vm_option_t map_opts = ((rights & SPI_VMO_RIGHT_READ) ? ZX_VM_PERM_READ : 0) |
-                                  ((rights & SPI_VMO_RIGHT_WRITE) ? ZX_VM_PERM_WRITE : 0);
+  zx::result<> result = Exchange(request->chip_select, request->txdata.data(),
+                                 rx_vector_buffer_.data(), request->txdata.count());
+  if (result.is_ok()) {
+    completer.buffer(arena).ReplySuccess(
+        fidl::VectorView<uint8_t>::FromExternal(rx_vector_buffer_.data(), request->txdata.count()));
+  } else {
+    completer.buffer(arena).Reply(result.take_error());
+  }
+}
+
+void AmlSpi::RegisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplRegisterVmoRequest* request,
+                         fdf::Arena& arena, RegisterVmoCompleter::Sync& completer) {
+  using fuchsia_hardware_sharedmemory::SharedVmoRight;
+
+  if (request->chip_select >= chips_.size()) {
+    return completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
+  }
+
+  if (request->rights.has_unknown_bits()) {
+    return completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+  }
+
+  const bool vmo_right_read = (request->rights & SharedVmoRight::kRead) == SharedVmoRight::kRead;
+  const bool vmo_right_write = (request->rights & SharedVmoRight::kWrite) == SharedVmoRight::kWrite;
+
+  vmo_store::StoredVmo<OwnedVmoInfo> stored_vmo(std::move(request->vmo.vmo),
+                                                OwnedVmoInfo{
+                                                    .offset = request->vmo.offset,
+                                                    .size = request->vmo.size,
+                                                    .rights = request->rights,
+                                                });
+  const zx_vm_option_t map_opts =
+      (vmo_right_read ? ZX_VM_PERM_READ : 0) | (vmo_right_write ? ZX_VM_PERM_WRITE : 0);
   zx_status_t status = stored_vmo.Map(map_opts);
   if (status != ZX_OK) {
-    return status;
+    return completer.buffer(arena).ReplyError(status);
   }
 
-  fbl::AutoLock lock(&vmo_lock_);
-  return registered_vmos(chip_select)->RegisterWithKey(vmo_id, std::move(stored_vmo));
+  status = registered_vmos(request->chip_select)
+               ->RegisterWithKey(request->vmo_id, std::move(stored_vmo));
+  if (status == ZX_OK) {
+    completer.buffer(arena).ReplySuccess();
+  } else {
+    return completer.buffer(arena).ReplyError(status);
+  }
 }
 
-zx_status_t AmlSpi::SpiImplUnregisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo* out_vmo) {
-  if (chip_select >= SpiImplGetChipSelectCount()) {
-    return ZX_ERR_OUT_OF_RANGE;
+void AmlSpi::UnregisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplUnregisterVmoRequest* request,
+                           fdf::Arena& arena, UnregisterVmoCompleter::Sync& completer) {
+  if (request->chip_select >= chips_.size()) {
+    return completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
   }
 
-  fbl::AutoLock lock(&vmo_lock_);
-
-  vmo_store::StoredVmo<OwnedVmoInfo>* const vmo_info = registered_vmos(chip_select)->GetVmo(vmo_id);
+  vmo_store::StoredVmo<OwnedVmoInfo>* const vmo_info =
+      registered_vmos(request->chip_select)->GetVmo(request->vmo_id);
   if (!vmo_info) {
-    return ZX_ERR_NOT_FOUND;
+    return completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
   }
 
-  zx_status_t status = vmo_info->vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, out_vmo);
+  zx::vmo out_vmo;
+  zx_status_t status = vmo_info->vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &out_vmo);
   if (status != ZX_OK) {
-    return status;
+    return completer.buffer(arena).ReplyError(status);
   }
 
-  auto result = registered_vmos(chip_select)->Unregister(vmo_id);
+  auto result = registered_vmos(request->chip_select)->Unregister(request->vmo_id);
   if (result.is_error()) {
-    return result.status_value();
+    completer.buffer(arena).Reply(result.take_error());
+  } else {
+    completer.buffer(arena).ReplySuccess(std::move(out_vmo));
   }
-
-  *out_vmo = std::move(result.value());
-  return ZX_OK;
 }
 
-void AmlSpi::SpiImplReleaseRegisteredVmos(uint32_t chip_select) {
-  fbl::AutoLock lock(&vmo_lock_);
-  registered_vmos(chip_select).emplace(vmo_store::Options{});
+void AmlSpi::ReleaseRegisteredVmos(
+    fuchsia_hardware_spiimpl::wire::SpiImplReleaseRegisteredVmosRequest* request, fdf::Arena& arena,
+    ReleaseRegisteredVmosCompleter::Sync& completer) {
+  if (request->chip_select < chips_.size()) {
+    registered_vmos(request->chip_select).emplace(vmo_store::Options{});
+  }
 }
 
-zx_status_t AmlSpi::SpiImplTransmitVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
-                                       uint64_t size) {
-  if (chip_select >= SpiImplGetChipSelectCount()) {
-    return ZX_ERR_OUT_OF_RANGE;
+void AmlSpi::TransmitVmo(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVmoRequest* request,
+                         fdf::Arena& arena, TransmitVmoCompleter::Sync& completer) {
+  if (request->chip_select >= chips_.size()) {
+    return completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
   }
 
-  fbl::AutoLock lock(&vmo_lock_);
-
-  zx::result<cpp20::span<const uint8_t>> buffer =
-      GetVmoSpan(chip_select, vmo_id, offset, size, SPI_VMO_RIGHT_READ);
+  zx::result<cpp20::span<const uint8_t>> buffer = GetVmoSpan(
+      request->chip_select, request->buffer, fuchsia_hardware_sharedmemory::SharedVmoRight::kRead);
   if (buffer.is_error()) {
-    return buffer.error_value();
+    return completer.buffer(arena).Reply(buffer.take_error());
   }
 
-  return SpiImplExchange(chip_select, buffer->data(), size, nullptr, 0, nullptr);
+  completer.buffer(arena).Reply(
+      Exchange(request->chip_select, buffer->data(), nullptr, buffer->size()));
 }
 
-zx_status_t AmlSpi::SpiImplReceiveVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
-                                      uint64_t size) {
-  if (chip_select >= SpiImplGetChipSelectCount()) {
-    return ZX_ERR_OUT_OF_RANGE;
+void AmlSpi::ReceiveVmo(fuchsia_hardware_spiimpl::wire::SpiImplReceiveVmoRequest* request,
+                        fdf::Arena& arena, ReceiveVmoCompleter::Sync& completer) {
+  if (request->chip_select >= chips_.size()) {
+    return completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
   }
 
-  fbl::AutoLock lock(&vmo_lock_);
-
-  zx::result<cpp20::span<uint8_t>> buffer =
-      GetVmoSpan(chip_select, vmo_id, offset, size, SPI_VMO_RIGHT_WRITE);
+  zx::result<cpp20::span<uint8_t>> buffer = GetVmoSpan(
+      request->chip_select, request->buffer, fuchsia_hardware_sharedmemory::SharedVmoRight::kWrite);
   if (buffer.is_error()) {
-    return buffer.error_value();
+    return completer.buffer(arena).Reply(buffer.take_error());
   }
 
-  return SpiImplExchange(chip_select, nullptr, 0, buffer->data(), size, nullptr);
+  completer.buffer(arena).Reply(
+      Exchange(request->chip_select, nullptr, buffer->data(), buffer->size()));
 }
 
-zx_status_t AmlSpi::SpiImplExchangeVmo(uint32_t chip_select, uint32_t tx_vmo_id, uint64_t tx_offset,
-                                       uint32_t rx_vmo_id, uint64_t rx_offset, uint64_t size) {
-  if (chip_select >= SpiImplGetChipSelectCount()) {
-    return ZX_ERR_OUT_OF_RANGE;
+void AmlSpi::ExchangeVmo(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVmoRequest* request,
+                         fdf::Arena& arena, ExchangeVmoCompleter::Sync& completer) {
+  if (request->chip_select >= chips_.size()) {
+    return completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
   }
 
-  fbl::AutoLock lock(&vmo_lock_);
+  if (request->tx_buffer.size != request->rx_buffer.size) {
+    return completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+  }
 
   zx::result<cpp20::span<uint8_t>> tx_buffer =
-      GetVmoSpan(chip_select, tx_vmo_id, tx_offset, size, SPI_VMO_RIGHT_READ);
+      GetVmoSpan(request->chip_select, request->tx_buffer,
+                 fuchsia_hardware_sharedmemory::SharedVmoRight::kRead);
   if (tx_buffer.is_error()) {
-    return tx_buffer.error_value();
+    return completer.buffer(arena).Reply(tx_buffer.take_error());
   }
 
   zx::result<cpp20::span<uint8_t>> rx_buffer =
-      GetVmoSpan(chip_select, rx_vmo_id, rx_offset, size, SPI_VMO_RIGHT_WRITE);
+      GetVmoSpan(request->chip_select, request->rx_buffer,
+                 fuchsia_hardware_sharedmemory::SharedVmoRight::kWrite);
   if (rx_buffer.is_error()) {
-    return rx_buffer.error_value();
+    return completer.buffer(arena).Reply(rx_buffer.take_error());
   }
 
-  return SpiImplExchange(chip_select, tx_buffer->data(), size, rx_buffer->data(), size, nullptr);
+  completer.buffer(arena).Reply(
+      Exchange(request->chip_select, tx_buffer->data(), rx_buffer->data(), tx_buffer->size()));
 }
 
 zx_status_t AmlSpi::ExchangeDma(const uint8_t* txdata, uint8_t* out_rxdata, uint64_t size) {
@@ -668,11 +707,6 @@ void AmlSpiDriver::Start(fdf::StartCompleter completer) {
     compat_.Bind(*std::move(compat_client), dispatcher());
   }
 
-  compat::DeviceServer::BanjoConfig banjo_config{
-      .default_proto_id = ZX_PROTOCOL_SPI_IMPL,
-      .generic_callback = fit::bind_member<&AmlSpiDriver::GetBanjoProto>(this),
-  };
-
   compat_server_.Begin(
       incoming(), outgoing(), node_name(), component::kDefaultInstance,
       [this, completer = std::move(completer)](zx::result<> result) mutable {
@@ -683,7 +717,7 @@ void AmlSpiDriver::Start(fdf::StartCompleter completer) {
 
         OnCompatServerInitialized(std::move(completer));
       },
-      compat::ForwardMetadata::Some({DEVICE_METADATA_SPI_CHANNELS}), std::move(banjo_config));
+      compat::ForwardMetadata::Some({DEVICE_METADATA_SPI_CHANNELS}));
 }
 
 void AmlSpiDriver::OnCompatServerInitialized(fdf::StartCompleter completer) {
@@ -789,6 +823,17 @@ void AmlSpiDriver::AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_confi
 
   device_->InitRegisters();
 
+  {
+    fuchsia_hardware_spiimpl::Service::InstanceHandler handler({
+        .device = fit::bind_member<&AmlSpi::Serve>(device_.get()),
+    });
+    auto result = outgoing()->AddService<fuchsia_hardware_spiimpl::Service>(std::move(handler));
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "AddService failed: %s", result.status_string());
+      return completer(zx::error(result.error_value()));
+    }
+  }
+
   zx::result controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   if (!controller_endpoints.is_ok()) {
@@ -805,10 +850,12 @@ void AmlSpiDriver::AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_confi
   fidl::Arena arena;
 
   fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
-  properties[0] = fdf::MakeProperty(arena, "fuchsia.hardware.spiimpl.Service",
-                                    "fuchsia.hardware.spiimpl.Service.DriverTransport");
+  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_hardware_spiimpl::SERVICE,
+                                    bind_fuchsia_hardware_spiimpl::SERVICE_DRIVERTRANSPORT);
 
   std::vector offers = compat_server_.CreateOffers2(arena);
+  offers.push_back(
+      fdf::MakeOffer2<fuchsia_hardware_spiimpl::Service>(arena, component::kDefaultInstance));
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, devname)
                         .offers2(arena, std::move(offers))
@@ -915,33 +962,36 @@ zx_status_t AmlSpi::DmaBuffer::Create(const zx::bti& bti, size_t size, DmaBuffer
   return ZX_OK;
 }
 
-zx::result<compat::DeviceServer::GenericProtocol> AmlSpiDriver::GetBanjoProto(
-    compat::BanjoProtoId id) {
-  ZX_DEBUG_ASSERT(device_);
-
-  if (id != ZX_PROTOCOL_SPI_IMPL) {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  return zx::ok(compat::DeviceServer::GenericProtocol{
-      .ops = device_->ops(),
-      .ctx = device_.get(),
-  });
-}
-
-void AmlSpi::Shutdown() {
-  // Wait for any pending transfer to complete, then stop DMA and disable the controller.
-  fbl::AutoLock lock(&bus_lock_);
-
+void AmlSpi::Stop() {
+  // Prevent new connections and requests.
   shutdown_ = true;
 
+  bindings_.RemoveAll();
+
+  // There are no more pending requests -- stop DMA and disable the controller.
   DmaReg::Get().FromValue(0).WriteTo(&mmio_);
   ConReg::Get().FromValue(0).WriteTo(&mmio_);
 
-  // Under normal circumstances these are unpinned when the objects are destroyed. DdkRelease() is
-  // not always called however, so manually unpin here after DMA has been stopped.
+  // DMA has been stopped, manually unbind in case destructors aren't run.
   tx_buffer_.pinned.Unpin();
   rx_buffer_.pinned.Unpin();
+}
+
+void AmlSpi::Serve(fdf::ServerEnd<fuchsia_hardware_spiimpl::SpiImpl> request) {
+  if (shutdown_) {
+    request.channel().close();
+    return;
+  }
+
+  bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->get(), std::move(request), this,
+                       fidl::kIgnoreBindingClosure);
+}
+
+void AmlSpi::OnAllClientsUnbound() {
+  // Release registered VMOs if all clients have unbound.
+  for (auto& chip : chips_) {
+    chip.registered_vmos.emplace(vmo_store::Options{});
+  }
 }
 
 fpromise::promise<fdf::MmioBuffer, zx_status_t> AmlSpiDriver::MapMmio(

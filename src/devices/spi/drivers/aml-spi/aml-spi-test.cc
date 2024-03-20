@@ -232,35 +232,19 @@ class AmlSpiTest : public zxtest::Test {
   }
 
  protected:
-  ddk::SpiImplProtocolClient GetBanjoClient() {
-    ddk::SpiImplProtocolClient client{};
+  zx::result<fdf::ClientEnd<fuchsia_hardware_spiimpl::SpiImpl>> GetFidlClient() {
+    // Connect to the driver through its outgoing directory and get a spiimpl client.
+    zx::result svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    if (svc_endpoints.is_error()) {
+      return svc_endpoints.take_error();
+    }
 
-    const auto path = std::string("svc/") +
-                      component::MakeServiceMemberPath<fuchsia_driver_compat::Service::Device>(
-                          component::kDefaultInstance);
+    EXPECT_OK(fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
+                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                           svc_endpoints->server.TakeChannel().release()));
 
-    runtime_.PerformBlockingWork([&]() {
-      auto client_end = component::ConnectAt<fuchsia_driver_compat::Device>(driver_outgoing_, path);
-      ASSERT_TRUE(client_end.is_ok());
-
-      fidl::WireSyncClient<fuchsia_driver_compat::Device> compat(*std::move(client_end));
-
-      zx_info_handle_basic_t basic;
-      ASSERT_OK(zx::process::self()->get_info(ZX_INFO_HANDLE_BASIC, &basic, sizeof(basic), nullptr,
-                                              nullptr));
-
-      auto banjo_client = compat->GetBanjoProtocol(ZX_PROTOCOL_SPI_IMPL, basic.koid);
-      ASSERT_TRUE(banjo_client.ok());
-      ASSERT_TRUE(banjo_client->is_ok());
-
-      const spi_impl_protocol_t proto{
-          .ops = reinterpret_cast<spi_impl_protocol_ops_t*>(banjo_client->value()->ops),
-          .ctx = reinterpret_cast<void*>(banjo_client->value()->context),
-      };
-      client = ddk::SpiImplProtocolClient(&proto);
-    });
-
-    return client;
+    return fdf::internal::DriverTransportConnect<fuchsia_hardware_spiimpl::Service::Device>(
+        svc_endpoints->client, component::kDefaultInstance);
   }
 
   fdf_testing::DriverRuntime runtime_;
@@ -307,21 +291,32 @@ TEST_F(AmlSpiTest, ChipSelectCount) {
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
 
-  EXPECT_EQ(spi0.GetChipSelectCount(), 3);
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
+  fdf::Arena arena('TEST');
+  spiimpl.buffer(arena)->GetChipSelectCount().Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_EQ(result->count, 3);
+    runtime_.Quit();
+  });
+  runtime_.Run();
 }
 
 TEST_F(AmlSpiTest, Exchange) {
-  constexpr uint8_t kTxData[] = {0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12};
+  uint8_t kTxData[] = {0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12};
   constexpr uint8_t kExpectedRxData[] = {0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab};
 
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
 
@@ -331,12 +326,18 @@ TEST_F(AmlSpiTest, Exchange) {
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  uint8_t rxbuf[sizeof(kTxData)] = {};
-  size_t rx_actual;
-  EXPECT_OK(spi0.Exchange(0, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
+  fdf::Arena arena('TEST');
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(kTxData, sizeof(kTxData)))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
+        EXPECT_BYTES_EQ(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData));
+        runtime_.Quit();
+      });
+  runtime_.Run();
 
-  EXPECT_EQ(rx_actual, sizeof(rxbuf));
-  EXPECT_BYTES_EQ(rxbuf, kExpectedRxData, rx_actual);
   EXPECT_EQ(tx_data, kTxData[0]);
 
   EXPECT_FALSE(ControllerReset());
@@ -345,26 +346,35 @@ TEST_F(AmlSpiTest, Exchange) {
 }
 
 TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
-  constexpr uint8_t kTxData[] = {0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12};
+  uint8_t kTxData[] = {0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12};
   constexpr uint8_t kExpectedRxData[] = {0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab};
 
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
 
   uint64_t tx_data = 0;
   mmio()[AML_SPI_TXDATA].SetWriteCallback([&tx_data](uint64_t value) { tx_data = value; });
 
-  uint8_t rxbuf[sizeof(kTxData)] = {};
-  size_t rx_actual;
-  EXPECT_OK(spi0.Exchange(2, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
+  fdf::Arena arena('TEST');
+  spiimpl.buffer(arena)
+      ->ExchangeVector(2, fidl::VectorView<uint8_t>::FromExternal(kTxData, sizeof(kTxData)))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
+        EXPECT_BYTES_EQ(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData));
+        runtime_.Quit();
+      });
+  runtime_.Run();
 
-  EXPECT_EQ(rx_actual, sizeof(rxbuf));
-  EXPECT_BYTES_EQ(rxbuf, kExpectedRxData, rx_actual);
   EXPECT_EQ(tx_data, kTxData[0]);
 
   EXPECT_FALSE(ControllerReset());
@@ -374,57 +384,88 @@ TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
 }
 
 TEST_F(AmlSpiTest, RegisterVmo) {
+  using fuchsia_hardware_sharedmemory::SharedVmoRight;
+
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
-  ASSERT_TRUE(spi1.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
 
   const zx_koid_t test_vmo_koid = GetVmoKoid(test_vmo);
 
-  {
-    zx::vmo vmo;
-    EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
-  }
+  fdf::Arena arena('TEST');
 
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_NOT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 1, {std::move(vmo), 0, PAGE_SIZE}, SharedVmoRight::kRead)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
   }
 
   {
     zx::vmo vmo;
-    EXPECT_OK(spi1.UnregisterVmo(0, 1, &vmo));
-    EXPECT_EQ(test_vmo_koid, GetVmoKoid(vmo));
+    EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 1, {std::move(vmo), 0, PAGE_SIZE}, SharedVmoRight::kRead)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_error());
+        });
   }
 
-  {
-    zx::vmo vmo;
-    EXPECT_NOT_OK(spi1.UnregisterVmo(0, 1, &vmo));
-  }
+  spiimpl.buffer(arena)->UnregisterVmo(0, 1).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(test_vmo_koid, GetVmoKoid(result->value()->vmo));
+  });
+
+  spiimpl.buffer(arena)->UnregisterVmo(0, 1).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+    runtime_.Quit();
+  });
+  runtime_.Run();
 }
 
-TEST_F(AmlSpiTest, Transmit) {
+TEST_F(AmlSpiTest, TransmitVmo) {
+  using fuchsia_hardware_sharedmemory::SharedVmoRight;
+
   constexpr uint8_t kTxData[] = {0xa5, 0xa5, 0xa5, 0xa5, 0xa5, 0xa5, 0xa5};
 
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
-  ASSERT_TRUE(spi1.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
 
+  fdf::Arena arena('TEST');
+
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 256, PAGE_SIZE - 256, SPI_VMO_RIGHT_READ));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 1, {std::move(vmo), 256, PAGE_SIZE - 256}, SharedVmoRight::kRead)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
   }
 
   ExpectGpioWrite(ZX_OK, 0);
@@ -435,7 +476,12 @@ TEST_F(AmlSpiTest, Transmit) {
   uint64_t tx_data = 0;
   mmio()[AML_SPI_TXDATA].SetWriteCallback([&tx_data](uint64_t value) { tx_data = value; });
 
-  EXPECT_OK(spi1.TransmitVmo(0, 1, 256, sizeof(kTxData)));
+  spiimpl.buffer(arena)->TransmitVmo(0, {1, 256, sizeof(kTxData)}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_.Quit();
+  });
+  runtime_.Run();
 
   EXPECT_EQ(tx_data, kTxData[0]);
 
@@ -445,22 +491,34 @@ TEST_F(AmlSpiTest, Transmit) {
 }
 
 TEST_F(AmlSpiTest, ReceiveVmo) {
+  using fuchsia_hardware_sharedmemory::SharedVmoRight;
+
   constexpr uint8_t kExpectedRxData[] = {0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78};
 
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
-  ASSERT_TRUE(spi1.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
 
+  fdf::Arena arena('TEST');
+
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 256, PAGE_SIZE - 256,
-                               SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 1, {std::move(vmo), 256, PAGE_SIZE - 256},
+                      SharedVmoRight::kRead | SharedVmoRight::kWrite)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
   }
 
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
@@ -468,7 +526,12 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi1.ReceiveVmo(0, 1, 512, sizeof(kExpectedRxData)));
+  spiimpl.buffer(arena)->ReceiveVmo(0, {1, 512, sizeof(kExpectedRxData)}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_.Quit();
+  });
+  runtime_.Run();
 
   uint8_t rx_buffer[sizeof(kExpectedRxData)];
   EXPECT_OK(test_vmo.read(rx_buffer, 768, sizeof(rx_buffer)));
@@ -480,23 +543,35 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
 }
 
 TEST_F(AmlSpiTest, ExchangeVmo) {
+  using fuchsia_hardware_sharedmemory::SharedVmoRight;
+
   constexpr uint8_t kTxData[] = {0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef};
   constexpr uint8_t kExpectedRxData[] = {0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78};
 
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
-  ASSERT_TRUE(spi1.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
 
+  fdf::Arena arena('TEST');
+
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 256, PAGE_SIZE - 256,
-                               SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 1, {std::move(vmo), 256, PAGE_SIZE - 256},
+                      SharedVmoRight::kRead | SharedVmoRight::kWrite)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
   }
 
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
@@ -509,7 +584,14 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
 
   EXPECT_OK(test_vmo.write(kTxData, 512, sizeof(kTxData)));
 
-  EXPECT_OK(spi1.ExchangeVmo(0, 1, 256, 1, 512, sizeof(kTxData)));
+  spiimpl.buffer(arena)
+      ->ExchangeVmo(0, {1, 256, sizeof(kTxData)}, {1, 512, sizeof(kExpectedRxData)})
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        runtime_.Quit();
+      });
+  runtime_.Run();
 
   uint8_t rx_buffer[sizeof(kExpectedRxData)];
   EXPECT_OK(test_vmo.read(rx_buffer, 768, sizeof(rx_buffer)));
@@ -523,90 +605,177 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
 }
 
 TEST_F(AmlSpiTest, TransfersOutOfRange) {
+  using fuchsia_hardware_sharedmemory::SharedVmoRight;
+
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
 
+  fdf::Arena arena('TEST');
+
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi0.RegisterVmo(1, 1, std::move(vmo), PAGE_SIZE - 4, 4,
-                               SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(1, 1, {std::move(vmo), PAGE_SIZE - 4, 4},
+                      SharedVmoRight::kRead | SharedVmoRight::kWrite)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
   }
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0.ExchangeVmo(1, 1, 0, 1, 2, 2));
-  EXPECT_NOT_OK(spi0.ExchangeVmo(1, 1, 0, 1, 3, 2));
-  EXPECT_NOT_OK(spi0.ExchangeVmo(1, 1, 3, 1, 0, 2));
-  EXPECT_NOT_OK(spi0.ExchangeVmo(1, 1, 0, 1, 2, 3));
+  spiimpl.buffer(arena)->ExchangeVmo(1, {1, 0, 2}, {1, 2, 2}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  spiimpl.buffer(arena)->ExchangeVmo(1, {1, 0, 2}, {1, 3, 2}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
+  spiimpl.buffer(arena)->ExchangeVmo(1, {1, 3, 2}, {1, 0, 2}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
+  spiimpl.buffer(arena)->ExchangeVmo(1, {1, 0, 3}, {1, 2, 3}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0.TransmitVmo(1, 1, 0, 4));
-  EXPECT_NOT_OK(spi0.TransmitVmo(1, 1, 0, 5));
-  EXPECT_NOT_OK(spi0.TransmitVmo(1, 1, 3, 2));
-  EXPECT_NOT_OK(spi0.TransmitVmo(1, 1, 4, 1));
-  EXPECT_NOT_OK(spi0.TransmitVmo(1, 1, 5, 1));
+  spiimpl.buffer(arena)->TransmitVmo(1, {1, 0, 4}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  spiimpl.buffer(arena)->TransmitVmo(1, {1, 0, 5}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
+  spiimpl.buffer(arena)->TransmitVmo(1, {1, 3, 2}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
+  spiimpl.buffer(arena)->TransmitVmo(1, {1, 4, 1}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
+  spiimpl.buffer(arena)->TransmitVmo(1, {1, 5, 1}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
-  EXPECT_OK(spi0.ReceiveVmo(1, 1, 0, 4));
+  spiimpl.buffer(arena)->ReceiveVmo(1, {1, 0, 4}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
-  EXPECT_OK(spi0.ReceiveVmo(1, 1, 3, 1));
+  spiimpl.buffer(arena)->ReceiveVmo(1, {1, 3, 1}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
 
-  EXPECT_NOT_OK(spi0.ReceiveVmo(1, 1, 3, 2));
-  EXPECT_NOT_OK(spi0.ReceiveVmo(1, 1, 4, 1));
-  EXPECT_NOT_OK(spi0.ReceiveVmo(1, 1, 5, 1));
+  spiimpl.buffer(arena)->ReceiveVmo(1, {1, 3, 2}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
+  spiimpl.buffer(arena)->ReceiveVmo(1, {1, 4, 1}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
+  spiimpl.buffer(arena)->ReceiveVmo(1, {1, 5, 1}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+    runtime_.Quit();
+  });
+  runtime_.Run();
 
   ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, VmoBadRights) {
+  using fuchsia_hardware_sharedmemory::SharedVmoRight;
+
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
-  ASSERT_TRUE(spi1.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
 
+  fdf::Arena arena('TEST');
+
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, 256, SPI_VMO_RIGHT_READ));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 1, {std::move(vmo), 0, 256}, SharedVmoRight::kRead)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
   }
 
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(
-        spi1.RegisterVmo(0, 2, std::move(vmo), 0, 256, SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 2, {std::move(vmo), 0, 256},
+                      SharedVmoRight::kRead | SharedVmoRight::kWrite)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
   }
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi1.ExchangeVmo(0, 1, 0, 2, 128, 128));
-  EXPECT_EQ(spi1.ExchangeVmo(0, 2, 0, 1, 128, 128), ZX_ERR_ACCESS_DENIED);
-  EXPECT_EQ(spi1.ExchangeVmo(0, 1, 0, 1, 128, 128), ZX_ERR_ACCESS_DENIED);
-  EXPECT_EQ(spi1.ReceiveVmo(0, 1, 0, 128), ZX_ERR_ACCESS_DENIED);
+  spiimpl.buffer(arena)->ExchangeVmo(0, {1, 0, 128}, {2, 128, 128}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  spiimpl.buffer(arena)->ExchangeVmo(0, {2, 0, 128}, {1, 128, 128}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_EQ(result->error_value(), ZX_ERR_ACCESS_DENIED);
+  });
+  spiimpl.buffer(arena)->ExchangeVmo(0, {1, 0, 128}, {1, 128, 128}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_EQ(result->error_value(), ZX_ERR_ACCESS_DENIED);
+  });
+  spiimpl.buffer(arena)->ReceiveVmo(0, {1, 0, 128}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_EQ(result->error_value(), ZX_ERR_ACCESS_DENIED);
+    runtime_.Quit();
+  });
+  runtime_.Run();
 
   ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, Exchange64BitWords) {
-  constexpr uint8_t kTxData[] = {
+  uint8_t kTxData[] = {
       0x3c, 0xa7, 0x5f, 0xc8, 0x4b, 0x0b, 0xdf, 0xef, 0xb9, 0xa0, 0xcb, 0xbd,
       0xd4, 0xcf, 0xa8, 0xbf, 0x85, 0xf2, 0x6a, 0xe3, 0xba, 0xf1, 0x49, 0x00,
   };
@@ -618,8 +787,11 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   // First (and only) word of kExpectedRxData with bytes swapped.
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return 0xea2b'8f8f; });
@@ -630,12 +802,19 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  uint8_t rxbuf[sizeof(kTxData)] = {};
-  size_t rx_actual;
-  EXPECT_OK(spi0.Exchange(0, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
+  fdf::Arena arena('TEST');
 
-  EXPECT_EQ(rx_actual, sizeof(rxbuf));
-  EXPECT_BYTES_EQ(rxbuf, kExpectedRxData, rx_actual);
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(kTxData, sizeof(kTxData)))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
+        EXPECT_BYTES_EQ(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData));
+        runtime_.Quit();
+      });
+  runtime_.Run();
+
   // Last word of kTxData with bytes swapped.
   EXPECT_EQ(tx_data, 0xbaf1'4900);
 
@@ -645,7 +824,7 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
 }
 
 TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
-  constexpr uint8_t kTxData[] = {
+  uint8_t kTxData[] = {
       0x3c, 0xa7, 0x5f, 0xc8, 0x4b, 0x0b, 0xdf, 0xef, 0xb9, 0xa0, 0xcb,
       0xbd, 0xd4, 0xcf, 0xa8, 0xbf, 0x85, 0xf2, 0x6a, 0xe3, 0xba,
   };
@@ -657,8 +836,11 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return 0xea; });
 
@@ -668,12 +850,19 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  uint8_t rxbuf[sizeof(kTxData)] = {};
-  size_t rx_actual;
-  EXPECT_OK(spi0.Exchange(0, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
+  fdf::Arena arena('TEST');
 
-  EXPECT_EQ(rx_actual, sizeof(rxbuf));
-  EXPECT_BYTES_EQ(rxbuf, kExpectedRxData, rx_actual);
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(kTxData, sizeof(kTxData)))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
+        EXPECT_BYTES_EQ(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData));
+        runtime_.Quit();
+      });
+  runtime_.Run();
+
   EXPECT_EQ(tx_data, 0xba);
 
   EXPECT_FALSE(ControllerReset());
@@ -685,100 +874,248 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
+  fdf::Arena arena('TEST');
+
   uint8_t buf[17] = {};
-  size_t rx_actual;
-  EXPECT_OK(spi0.Exchange(0, buf, 17, buf, 17, &rx_actual));
-  EXPECT_EQ(rx_actual, 17);
-  EXPECT_FALSE(ControllerReset());
+
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 17))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_EQ(result->value()->rxdata.count(), 17);
+        EXPECT_FALSE(ControllerReset());
+      });
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
   // Controller should be reset because a 64-bit transfer was preceded by a transfer of an odd
   // number of bytes.
-  EXPECT_OK(spi0.Exchange(0, buf, 16, buf, 16, &rx_actual));
-  EXPECT_EQ(rx_actual, 16);
-  EXPECT_TRUE(ControllerReset());
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 16))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_EQ(result->value()->rxdata.count(), 16);
+        EXPECT_TRUE(ControllerReset());
+      });
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0.Exchange(0, buf, 3, buf, 3, &rx_actual));
-  EXPECT_EQ(rx_actual, 3);
-  EXPECT_FALSE(ControllerReset());
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 3))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_EQ(result->value()->rxdata.count(), 3);
+        EXPECT_FALSE(ControllerReset());
+      });
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0.Exchange(0, buf, 6, buf, 6, &rx_actual));
-  EXPECT_EQ(rx_actual, 6);
-  EXPECT_FALSE(ControllerReset());
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 6))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_EQ(result->value()->rxdata.count(), 6);
+        EXPECT_FALSE(ControllerReset());
+      });
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0.Exchange(0, buf, 8, buf, 8, &rx_actual));
-  EXPECT_EQ(rx_actual, 8);
-  EXPECT_TRUE(ControllerReset());
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 8))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_EQ(result->value()->rxdata.count(), 8);
+        EXPECT_TRUE(ControllerReset());
+        runtime_.Quit();
+      });
+  runtime_.Run();
 
   ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, ReleaseVmos) {
+  using fuchsia_hardware_sharedmemory::SharedVmoRight;
+
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
-  ASSERT_TRUE(spi1.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
+
+  fdf::Arena arena('TEST');
 
   {
     zx::vmo vmo;
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 1, {std::move(vmo), 0, PAGE_SIZE}, SharedVmoRight::kRead)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
 
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1.RegisterVmo(0, 2, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 2, {std::move(vmo), 0, PAGE_SIZE}, SharedVmoRight::kRead)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
   }
 
-  {
-    zx::vmo vmo;
-    EXPECT_OK(spi1.UnregisterVmo(0, 2, &vmo));
-  }
+  spiimpl.buffer(arena)->UnregisterVmo(0, 2).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
 
   // Release VMO 1 and make sure that a subsequent call to unregister it fails.
-  spi1.ReleaseRegisteredVmos(0);
+  EXPECT_TRUE(spiimpl.buffer(arena)->ReleaseRegisteredVmos(0).ok());
 
-  {
-    zx::vmo vmo;
-    EXPECT_NOT_OK(spi1.UnregisterVmo(0, 1, &vmo));
-  }
+  spiimpl.buffer(arena)->UnregisterVmo(0, 2).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
 
   {
     zx::vmo vmo;
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 1, {std::move(vmo), 0, PAGE_SIZE}, SharedVmoRight::kRead)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
 
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1.RegisterVmo(0, 2, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 2, {std::move(vmo), 0, PAGE_SIZE}, SharedVmoRight::kRead)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
   }
 
   // Release both VMOs and make sure that they can be registered again.
-  spi1.ReleaseRegisteredVmos(0);
+  EXPECT_TRUE(spiimpl.buffer(arena)->ReleaseRegisteredVmos(0).ok());
 
   {
     zx::vmo vmo;
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 1, {std::move(vmo), 0, PAGE_SIZE}, SharedVmoRight::kRead)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+        });
 
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1.RegisterVmo(0, 2, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    spiimpl.buffer(arena)
+        ->RegisterVmo(0, 2, {std::move(vmo), 0, PAGE_SIZE}, SharedVmoRight::kRead)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+          runtime_.Quit();
+        });
   }
+
+  runtime_.Run();
+}
+
+TEST_F(AmlSpiTest, ReleaseVmosAfterClientsUnbind) {
+  using fuchsia_hardware_sharedmemory::SharedVmoRight;
+
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
+
+  auto spiimpl_client1 = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client1.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl1(*std::move(spiimpl_client1),
+                                                              fdf::Dispatcher::GetCurrent()->get());
+
+  fdf::Arena arena('TEST');
+
+  // Register three VMOs through the first client.
+  for (uint32_t i = 1; i <= 3; i++) {
+    zx::vmo vmo;
+    EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
+    spiimpl1.buffer(arena)
+        ->RegisterVmo(0, i, {std::move(vmo), 0, PAGE_SIZE}, SharedVmoRight::kRead)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+          runtime_.Quit();
+        });
+    runtime_.Run();
+    runtime_.ResetQuit();
+  }
+
+  auto spiimpl_client2 = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client2.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl2(*std::move(spiimpl_client2),
+                                                              fdf::Dispatcher::GetCurrent()->get());
+
+  // The second client should be able to see the registered VMOs.
+  spiimpl2.buffer(arena)->UnregisterVmo(0, 1).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_.Quit();
+  });
+  runtime_.Run();
+  runtime_.ResetQuit();
+
+  // Unbind the first client.
+  EXPECT_TRUE(spiimpl1.UnbindMaybeGetEndpoint().is_ok());
+  runtime_.RunUntilIdle();
+
+  // The VMOs registered by the first client should remain.
+  spiimpl2.buffer(arena)->UnregisterVmo(0, 2).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_.Quit();
+  });
+  runtime_.Run();
+  runtime_.ResetQuit();
+
+  // Unbind the second client, then connect a third client.
+  EXPECT_TRUE(spiimpl2.UnbindMaybeGetEndpoint().is_ok());
+  runtime_.RunUntilIdle();
+
+  auto spiimpl_client3 = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client3.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl3(*std::move(spiimpl_client3),
+                                                              fdf::Dispatcher::GetCurrent()->get());
+
+  // All registered VMOs should have been released after the second client unbound.
+  spiimpl3.buffer(arena)->UnregisterVmo(0, 3).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+    runtime_.Quit();
+  });
+  runtime_.Run();
 }
 
 class AmlSpiNormalClockModeTest : public AmlSpiTest {
@@ -941,8 +1278,11 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
@@ -969,10 +1309,17 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   uint8_t buf[24] = {};
   memcpy(buf, kTxData, sizeof(buf));
 
-  size_t rx_actual;
-  EXPECT_OK(spi0.Exchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
-  EXPECT_EQ(rx_actual, sizeof(buf));
-  EXPECT_BYTES_EQ(kExpectedRxData, buf, sizeof(buf));
+  fdf::Arena arena('TEST');
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, sizeof(buf)))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        ASSERT_EQ(result->value()->rxdata.count(), sizeof(buf));
+        EXPECT_BYTES_EQ(kExpectedRxData, result->value()->rxdata.data(), sizeof(buf));
+        runtime_.Quit();
+      });
+  runtime_.Run();
 
   // Verify that the driver wrote the TX data to the TX VMO.
   EXPECT_OK(tx_dma_vmo.read(buf, 0, sizeof(buf)));
@@ -1008,8 +1355,11 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
@@ -1034,10 +1384,18 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   uint8_t buf[15] = {};
   memcpy(buf, kTxData, sizeof(buf));
 
-  size_t rx_actual;
-  EXPECT_OK(spi0.Exchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
-  EXPECT_EQ(rx_actual, sizeof(buf));
-  EXPECT_BYTES_EQ(kExpectedRxData, buf, sizeof(buf));
+  fdf::Arena arena('TEST');
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, sizeof(buf)))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        ASSERT_EQ(result->value()->rxdata.count(), sizeof(buf));
+        EXPECT_BYTES_EQ(kExpectedRxData, result->value()->rxdata.data(), sizeof(buf));
+        runtime_.Quit();
+      });
+  runtime_.Run();
+
   EXPECT_EQ(tx_data, kTxData[14]);
 
   // Verify that DMA was not used.
@@ -1074,8 +1432,11 @@ TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
@@ -1100,10 +1461,17 @@ TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
   uint8_t buf[sizeof(kTxData)] = {};
   memcpy(buf, kTxData, sizeof(buf));
 
-  size_t rx_actual;
-  EXPECT_OK(spi0.Exchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
-  EXPECT_EQ(rx_actual, sizeof(buf));
-  EXPECT_BYTES_EQ(kExpectedRxData, buf, sizeof(buf));
+  fdf::Arena arena('TEST');
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, sizeof(buf)))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        ASSERT_EQ(result->value()->rxdata.count(), sizeof(buf));
+        EXPECT_BYTES_EQ(kExpectedRxData, result->value()->rxdata.data(), sizeof(buf));
+        runtime_.Quit();
+      });
+  runtime_.Run();
 
   // Verify that the driver wrote the TX data to the TX VMO with the original byte order.
   EXPECT_OK(tx_dma_vmo.read(buf, 0, sizeof(buf)));
@@ -1129,15 +1497,25 @@ TEST_F(AmlSpiShutdownTest, Shutdown) {
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t buf[16] = {};
-  size_t rx_actual;
-  EXPECT_OK(spi0.Exchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
+  fdf::Arena arena('TEST');
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, sizeof(buf)))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        runtime_.Quit();
+      });
+  runtime_.Run();
 
   mmio()[AML_SPI_DMAREG].SetWriteCallback(
       [&dmareg_cleared](uint64_t value) { dmareg_cleared = value == 0; });
@@ -1168,46 +1546,77 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
   zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
   ASSERT_TRUE(start_result.is_ok());
 
-  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
-  ASSERT_TRUE(spi0.is_valid());
+  auto spiimpl_client = GetFidlClient();
+  ASSERT_TRUE(spiimpl_client.is_ok());
+
+  fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
+                                                             fdf::Dispatcher::GetCurrent()->get());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
+  fdf::Arena arena('TEST');
+
   uint8_t buf[17] = {};
-  size_t rx_actual;
-  EXPECT_OK(spi0.Exchange(0, buf, 17, buf, 17, &rx_actual));
-  EXPECT_EQ(rx_actual, 17);
-  EXPECT_FALSE(ControllerReset());
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 17))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_EQ(result->value()->rxdata.count(), 17);
+        EXPECT_FALSE(ControllerReset());
+      });
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
   // Controller should not be reset because no reset fragment was provided.
-  EXPECT_OK(spi0.Exchange(0, buf, 16, buf, 16, &rx_actual));
-  EXPECT_EQ(rx_actual, 16);
-  EXPECT_FALSE(ControllerReset());
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 16))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_EQ(result->value()->rxdata.count(), 16);
+        EXPECT_FALSE(ControllerReset());
+      });
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0.Exchange(0, buf, 3, buf, 3, &rx_actual));
-  EXPECT_EQ(rx_actual, 3);
-  EXPECT_FALSE(ControllerReset());
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 3))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_EQ(result->value()->rxdata.count(), 3);
+        EXPECT_FALSE(ControllerReset());
+      });
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0.Exchange(0, buf, 6, buf, 6, &rx_actual));
-  EXPECT_EQ(rx_actual, 6);
-  EXPECT_FALSE(ControllerReset());
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 6))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_EQ(result->value()->rxdata.count(), 6);
+        EXPECT_FALSE(ControllerReset());
+      });
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0.Exchange(0, buf, 8, buf, 8, &rx_actual));
-  EXPECT_EQ(rx_actual, 8);
-  EXPECT_FALSE(ControllerReset());
+  spiimpl.buffer(arena)
+      ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 8))
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_EQ(result->value()->rxdata.count(), 8);
+        EXPECT_FALSE(ControllerReset());
+        runtime_.Quit();
+      });
+  runtime_.Run();
 
   ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
