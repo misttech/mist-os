@@ -61,7 +61,9 @@ def spawn(
         # If there are no explicit breakpoints, then we can weakly attach to all tests. Explicit
         # breakpoints require us to load symbols proactively.
         if not breakpoints:
-            attach_args.extend(["--execute", f"attach --weak {test.info.name}"])
+            attach_args.extend(
+                ["--execute", f"attach --weak --recursive {test.info.name}"]
+            )
         else:
             attach_args.extend(["--execute", f"attach {test.info.name}"])
 
