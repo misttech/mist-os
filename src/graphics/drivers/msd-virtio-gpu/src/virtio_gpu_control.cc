@@ -20,3 +20,28 @@ zx::result<> VirtioGpuControlFidl::Init(std::shared_ptr<fdf::Namespace> incoming
 
   return zx::ok();
 }
+
+uint64_t VirtioGpuControlFidl::GetCapabilitySetLimit() {
+  auto result = control_->GetCapabilitySetLimit();
+  if (!result.ok()) {
+    MAGMA_DASSERT(false);
+    return 0;
+  }
+  return result.value().limit;
+}
+
+zx::result<> VirtioGpuControlFidl::SendHardwareCommand(
+    cpp20::span<uint8_t> request, std::function<void(cpp20::span<uint8_t>)> callback) {
+  auto wire_result = control_->SendHardwareCommand(
+      fidl::VectorView<uint8_t>::FromExternal(request.data(), request.size()));
+  if (!wire_result.ok()) {
+    return zx::error(wire_result.status());
+  }
+  auto result = wire_result.value();
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  auto response = result.value();
+  callback(cpp20::span<uint8_t>(response->response.data(), response->response.count()));
+  return zx::ok();
+}

@@ -14,11 +14,20 @@ struct msd::DeviceHandle {};
 class VirtioGpuControl : public msd::DeviceHandle {
  public:
   virtual ~VirtioGpuControl() = default;
+
+  virtual uint64_t GetCapabilitySetLimit() = 0;
+
+  virtual zx::result<> SendHardwareCommand(cpp20::span<uint8_t> request,
+                                           std::function<void(cpp20::span<uint8_t>)> callback) = 0;
 };
 
 class VirtioGpuControlFidl : public VirtioGpuControl {
  public:
   zx::result<> Init(std::shared_ptr<fdf::Namespace> incoming);
+
+  uint64_t GetCapabilitySetLimit() override;
+  zx::result<> SendHardwareCommand(cpp20::span<uint8_t> request,
+                                   std::function<void(cpp20::span<uint8_t>)> callback) override;
 
  private:
   fidl::WireSyncClient<fuchsia_gpu_virtio::GpuControl> control_;

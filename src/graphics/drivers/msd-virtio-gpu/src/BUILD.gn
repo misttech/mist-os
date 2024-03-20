@@ -38,7 +38,10 @@ source_set("msd_impl") {
     "//src/graphics/magma/lib/magma/util:macros",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-vthread",
+    "//zircon/system/ulib/zx",
   ]
+
+  deps = [ "//src/graphics/lib/virtio:virtio-spec" ]
 
   assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 }

@@ -29,6 +29,14 @@
 
 namespace virtio_abi {
 
+enum class CapsetId : uint32_t {
+  kCapsetVirGl = 1,
+  kCapsetVirGl2 = 2,
+  kCapsetGfxstream = 3,
+  kCapsetVenus = 4,
+  kCapsetCrossDomain = 5,
+};
+
 // GPU device configuration.
 //
 // struct virtio_gpu_config in virtio12 5.7.4 "Device configuration layout"
@@ -412,6 +420,32 @@ struct AttachResourceBackingCommand {
   uint32_t resource_id;
   uint32_t entry_count = N;
   MemoryEntry entries[N];
+};
+
+struct GetCapsetInfoCommand {
+  ControlHeader header;
+  uint32_t capset_index;
+  uint32_t padding;
+};
+
+struct GetCapsetInfoResponse {
+  ControlHeader header;
+  uint32_t capset_id;
+  uint32_t capset_max_version;
+  uint32_t capset_max_size;
+  uint32_t padding;
+};
+
+struct GetCapsetCommand {
+  ControlHeader header;
+  uint32_t capset_id;
+  uint32_t capset_version;
+};
+
+struct GetCapsetResponse {
+  ControlHeader header;
+  // Variable length response.
+  uint8_t capset_data[];
 };
 
 }  // namespace virtio_abi
