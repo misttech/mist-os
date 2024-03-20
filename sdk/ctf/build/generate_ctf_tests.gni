@@ -43,6 +43,7 @@ template("generate_fuchsia-diagnostics-tests") {
       # These tests do not currently use a test realm factory.
     ]
     test_component = "//sdk/ctf/tests/fidl/fuchsia.diagnostics:fuchsia-diagnostics-tests-root"
+    test_component_name = "fuchsia-diagnostics-tests-root.cm"
   }
 }
 
@@ -54,6 +55,7 @@ template("generate_fuchsia-diagnostics-log-tests") {
       # These tests do not currently use a test realm factory.
     ]
     test_component = "//sdk/ctf/tests/fidl/fuchsia.diagnostics:fuchsia-diagnostics-log-tests-root"
+    test_component_name = "fuchsia-diagnostics-log-tests-root.cm"
   }
 }
 
@@ -65,6 +67,7 @@ template("generate_fidl-hlcpp-unit-tests") {
       # These tests do not currently use a test realm factory.
     ]
     test_component = "//sdk/ctf/tests/pkg/fidl/cpp:fidl-hlcpp-unit-tests-root"
+    test_component_name = "fidl-hlcpp-unit-tests-root.cm"
   }
 }
 
@@ -77,6 +80,7 @@ template("generate_fidl-hlcpp-conformance-tests") {
     ]
     test_component =
         "//sdk/ctf/tests/pkg/fidl/cpp:fidl-hlcpp-conformance-tests-root"
+    test_component_name = "fidl-hlcpp-conformance-tests-root.cm"
   }
 }
 
@@ -88,6 +92,7 @@ template("generate_svc-tests") {
       # These tests do not currently use a test realm factory.
     ]
     test_component = "//sdk/ctf/tests/pkg/svc:svc-tests-root"
+    test_component_name = "svc-tests-root.cm"
   }
 }
 
@@ -99,6 +104,7 @@ template("generate_vulkan-loader-tests") {
       # These tests do not currently use a test realm factory.
     ]
     test_component = "//sdk/ctf/tests/pkg/vulkan:vulkan-loader-test-root"
+    test_component_name = "vulkan-loader-test-root.cm"
     test_specs = {
       environments = vulkan_envs
       log_settings = {
@@ -112,6 +118,7 @@ template("generate_fuchsia-intl-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
     test_component = "//sdk/ctf/tests/fidl/fuchsia.intl:test-root"
+    test_component_name = "test-root.cm"
     subpackages = [
       test_info.target_label,
       "//sdk/ctf/tests/fidl/fuchsia.intl/testing/realm-factory",
@@ -123,6 +130,7 @@ template("generate_timekeeper-integration") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/sys/time/timekeeper_integration:timekeeper-integration-test-root-component"
+    test_component_name = "timekeeper-integration-test-root-component.cm"
     subpackages = [
       test_info.target_label,
       "//src/sys/time/testing/realm-proxy:pkg",
@@ -141,6 +149,7 @@ template("generate_faketime-integration") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/sys/time/timekeeper_integration:faketime-integration-test-root-component"
+    test_component_name = "faketime-integration-test-root-component.cm"
     subpackages = [
       test_info.target_label,
       "//src/sys/time/testing/realm-proxy:pkg",
@@ -159,6 +168,7 @@ template("generate_fdio-spawn-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
     test_component = "//sdk/ctf/tests/pkg/fdio:test-root"
+    test_component_name = "test-root.cm"
     subpackages = [
       test_info.target_label,
       # These tests do not currently use a test realm factory.
@@ -178,6 +188,7 @@ template("generate_fuchsia-driver-test_tests") {
       "//src/devices/misc/drivers/test-parent",
     ]
     test_component = "//sdk/ctf/tests/fidl/fuchsia.driver.test:test-root"
+    test_component_name = "test-root.cm"
   }
 }
 
@@ -185,6 +196,7 @@ template("generate_fuchsia-settings-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
     test_component = "//sdk/ctf/tests/fidl/fuchsia.settings:test-root"
+    test_component_name = "test-root.cm"
     subpackages = [
       test_info.target_label,
       "//sdk/ctf/tests/fidl/fuchsia.settings/testing/realm-factory",
@@ -200,6 +212,7 @@ template("generate_fuchsia-element-tests") {
       "//sdk/ctf/tests/fidl/fuchsia.element/testing/realm-factory:realm-factory",
     ]
     test_component = "//sdk/ctf/tests/fidl/fuchsia.element:test-root"
+    test_component_name = "test-root.cm"
   }
 }
 
@@ -208,6 +221,7 @@ template("generate_fuchsia-hwinfo-tests") {
   fuchsia_package_with_test(target_name) {
     subpackages = [ test_info.target_label ]
     test_component = "//sdk/ctf/tests/fidl/fuchsia.hwinfo:test-root"
+    test_component_name = "test-root.cm"
   }
 }
 
@@ -219,13 +233,13 @@ template("generate_pkgdir-tests") {
       "//src/sys/pkg/tests/pkgdir/test_realm_proxy",
     ]
     test_component = "//src/sys/pkg/tests/pkgdir:test-root"
+    test_component_name = "test-root.cm"
   }
 }
 
 template("generate_simulate-scan-wlan-hw-sim-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "test-root.cm"
     test_specs = {
       log_settings = {
         max_severity = "ERROR"
@@ -237,6 +251,7 @@ template("generate_simulate-scan-wlan-hw-sim-tests") {
       "//src/lib/fuchsia-component-test/realm_builder_server:pkg",
     ]
     test_component = "//src/connectivity/wlan/testing/hw-sim/test:simulate-scan-test-root-component"
+    test_component_name = "test-root.cm"
   }
 }
 

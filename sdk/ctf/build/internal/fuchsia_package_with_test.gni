@@ -6,24 +6,15 @@ import("//build/components.gni")
 
 # Please do not use this template outside of CTF.
 #
-# This is similar to fuchsia_test_package, but it takes an optional
-# test_component_name rather than a list of test_component labels. The latter
-# requires that each test component be defined in the same BUILD.gn file as this
-# target, which is not possible for CTF tests.
-#
-# Parameters
-#   test_component_name
-#     Optional name of the test component. Defaults to the component's GN label
-#     name followed by '.cm'. For example: '//my/component:foo' => 'foo.cm'
-#     Type: string
+# This is similar to fuchsia_test_package. The latter requires that each test
+# component be defined in the same BUILD.gn file as this target, which is not
+# possible for CTF tests.
 template("fuchsia_package_with_test") {
   assert(defined(invoker.test_component), "test_component should be defined")
+  assert(defined(invoker.test_component_name),
+         "test_component_name should be defined")
 
-  test_component_name = get_label_info(invoker.test_component, "name") + ".cm"
-  if (defined(invoker.test_component_name)) {
-    test_component_name = invoker.test_component_name
-  }
-
+  test_component_name = invoker.test_component_name
   main_target_name = target_name
   package_name = main_target_name
 
