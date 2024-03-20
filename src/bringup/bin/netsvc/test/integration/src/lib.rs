@@ -1246,10 +1246,10 @@ async fn retransmits_acks(name: &str) {
 
         /// This controls how often ACK retransmits will be sent. We don't use
         /// the minimum value of 1 second here because the paver will timeout at
-        /// a fixed integer multiplier of the TFTP timeout. 2s here gives us
+        /// a fixed integer multiplier of the TFTP timeout. 3s here gives us
         /// more leeway over there to protect against flakes without making this
         /// test too slow.
-        const TIMEOUT_OPTION_SECS: u8 = 2;
+        const TIMEOUT_OPTION_SECS: u8 = 3;
         const BLOCK_SIZE: u16 = 1024;
         const WINDOW_SIZE: u16 = 2;
 
