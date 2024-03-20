@@ -211,6 +211,7 @@ rustc_binary("bin") {
     "src/model/context.rs",
     "src/model/environment.rs",
     "src/model/error.rs",
+    "src/model/escrow.rs",
     "src/model/event_logger.rs",
     "src/model/events/dispatcher.rs",
     "src/model/events/error.rs",

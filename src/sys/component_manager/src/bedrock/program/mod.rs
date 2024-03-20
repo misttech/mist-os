@@ -359,7 +359,7 @@ impl StartInfo {
 
 /// Information and capabilities that the framework holds on behalf of a component,
 /// to be delivered on the next execution.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct EscrowRequest {
     // Escrow the outgoing directory server endpoint. Whenever the
     // component is started, the framework will return this channel via
