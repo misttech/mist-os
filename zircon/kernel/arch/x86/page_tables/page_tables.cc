@@ -269,107 +269,6 @@ void X86PageTableBase::ConsistencyManager::Finish() {
   pt_ = nullptr;
 }
 
-class MappingCursor {
- public:
-  MappingCursor() = default;
-  MappingCursor(vaddr_t vaddr, size_t size) : vaddr_(vaddr), size_(size) {}
-  MappingCursor(const paddr_t* paddrs, size_t paddr_count, size_t page_size, vaddr_t vaddr,
-                size_t size)
-      : paddrs_(paddrs), page_size_(page_size), vaddr_(vaddr), size_(size) {
-#ifdef DEBUG_ASSERT_IMPLEMENTED
-    paddr_count_ = paddr_count;
-#endif
-  }
-  /**
-   * @brief Update the cursor to skip over a not-present page table entry.
-   */
-  void SkipEntry(PageTableLevel level) {
-    const size_t ps = page_size(level);
-    // Calculate the amount the cursor should skip to get to the next entry at
-    // this page table level.
-    const size_t next_entry_offset = ps - (vaddr_ & (ps - 1));
-    // If our endpoint was in the middle of this range, clamp the
-    // amount we remove from the cursor
-    const size_t consume = (size_ > next_entry_offset) ? next_entry_offset : size_;
-
-    DEBUG_ASSERT(size_ >= consume);
-    size_ -= consume;
-    vaddr_ += consume;
-
-    // Skipping entries has no meaning if we are attempting to create new mappings as we cannot
-    // manipulate the paddr in a sensible way, so we expect this to not get called.
-    DEBUG_ASSERT(!paddrs_);
-    DEBUG_ASSERT(page_size_ == 0);
-  }
-
-  void ConsumePAddr(size_t ps) {
-    DEBUG_ASSERT(paddrs_);
-    paddr_consumed_ += ps;
-    DEBUG_ASSERT(paddr_consumed_ <= page_size_);
-    vaddr_ += ps;
-    DEBUG_ASSERT(size_ >= ps);
-    size_ -= ps;
-    if (paddr_consumed_ == page_size_) {
-      paddrs_++;
-      paddr_consumed_ = 0;
-#ifdef DEBUG_ASSERT_IMPLEMENTED
-      DEBUG_ASSERT(paddr_count_ > 0);
-      paddr_count_--;
-#endif
-    }
-  }
-
-  void ConsumeVAddr(size_t ps) {
-    // If physical addresses are being tracked for creating mappings then ConsumePAddr should be
-    // called, so validate there are no paddrs we are going to desync with.
-    DEBUG_ASSERT(!paddrs_);
-    DEBUG_ASSERT(page_size_ == 0);
-    vaddr_ += ps;
-    DEBUG_ASSERT(size_ >= ps);
-    size_ -= ps;
-  }
-
-  // Provides a way to transition a mapping cursor from one that tracks paddrs to one that just
-  // tracks the remaining virtual range. This is useful when a cursor was being used to track
-  // mapping pages but then needs to be used to just track the virtual range to unmap / rollback.
-  void DropPAddrs() {
-    paddrs_ = nullptr;
-    page_size_ = 0;
-    paddr_consumed_ = 0;
-  }
-
-  paddr_t paddr() const {
-    DEBUG_ASSERT(paddrs_);
-    DEBUG_ASSERT(size_ > 0);
-    return (*paddrs_) + paddr_consumed_;
-  }
-
-  size_t PageRemaining() const {
-    DEBUG_ASSERT(paddrs_);
-    return page_size_ - paddr_consumed_;
-  }
-
-  vaddr_t vaddr() const { return vaddr_; }
-
-  size_t size() const { return size_; }
-
- private:
-  // Physical address is optional and only applies when mapping in new pages, and not manipulating
-  // existing mappings.
-  const paddr_t* paddrs_ = nullptr;
-#ifdef DEBUG_ASSERT_IMPLEMENTED
-  // We have no need to actually track the total number of elements in the paddrs array, as this
-  // should be a simple size/paddr_size. To guard against code mistakes though, we separately track
-  // this just in debug mode.
-  size_t paddr_count_ = 0;
-#endif
-  size_t paddr_consumed_ = 0;
-  size_t page_size_ = 0;
-
-  vaddr_t vaddr_;
-  size_t size_;
-};
-
 X86PageTableBase::X86PageTableBase() {}
 
 X86PageTableBase::~X86PageTableBase() {
@@ -722,7 +621,7 @@ zx::result<bool> X86PageTableBase::RemoveMapping(volatile pt_entry_t* table, Pag
     pt_entry_t pt_val = *e;
     // If the page isn't even mapped, just skip it
     if (!IS_PAGE_PRESENT(pt_val)) {
-      cursor.SkipEntry(level);
+      cursor.SkipEntry(page_size(level));
       continue;
     }
     any_pages = true;
@@ -747,7 +646,7 @@ zx::result<bool> X86PageTableBase::RemoveMapping(volatile pt_entry_t* table, Pag
           UnmapEntry(cm, level, cursor.vaddr(), e, /*was_terminal=*/true);
           unmapped = true;
 
-          cursor.SkipEntry(level);
+          cursor.SkipEntry(page_size(level));
           continue;
         } else {
           return zx::error(status);
@@ -1040,7 +939,7 @@ zx_status_t X86PageTableBase::UpdateMapping(volatile pt_entry_t* table, uint mmu
     pt_entry_t pt_val = *e;
     // Skip unmapped pages (we may encounter these due to demand paging)
     if (!IS_PAGE_PRESENT(pt_val)) {
-      cursor.SkipEntry(level);
+      cursor.SkipEntry(page_size(level));
       continue;
     }
 
@@ -1142,7 +1041,7 @@ bool X86PageTableBase::HarvestMapping(volatile pt_entry_t* table,
     pt_entry_t pt_val = *e;
     // If the page isn't even mapped, just skip it
     if (!IS_PAGE_PRESENT(pt_val)) {
-      cursor.SkipEntry(level);
+      cursor.SkipEntry(page_size(level));
       continue;
     }
 
@@ -1189,7 +1088,7 @@ bool X86PageTableBase::HarvestMapping(volatile pt_entry_t* table,
       unmap_page_table = page_aligned(level, unmap_vaddr) && unmap_size >= ps;
     } else {
       // No accessed flag and no request to unmap means we are done with this entry.
-      cursor.SkipEntry(level);
+      cursor.SkipEntry(page_size(level));
       continue;
     }
 
@@ -1334,7 +1233,7 @@ zx_status_t X86PageTableBase::MapPages(vaddr_t vaddr, paddr_t* phys, size_t coun
     DEBUG_ASSERT(virt_);
 
     MappingCursor cursor(/*paddrs=*/phys, /*paddr_count=*/count, /*page_size=*/PAGE_SIZE,
-                         /*vaddr=*/vaddr, /*size=*/count * PAGE_SIZE);
+                         /*vaddr=*/vaddr);
     zx_status_t status = AddMapping(virt_, mmu_flags, top_level(), existing_action, cursor, &cm);
     cm.Finish();
     if (status != ZX_OK) {
@@ -1368,7 +1267,7 @@ zx_status_t X86PageTableBase::MapPagesContiguous(vaddr_t vaddr, paddr_t paddr, c
     return ZX_ERR_INVALID_ARGS;
 
   MappingCursor cursor(/*paddrs=*/&paddr, /*paddr_count=*/1, /*page_size=*/count * PAGE_SIZE,
-                       /*vaddr=*/vaddr, /*size=*/count * PAGE_SIZE);
+                       /*vaddr=*/vaddr);
   __UNINITIALIZED ConsistencyManager cm(this);
   {
     Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};

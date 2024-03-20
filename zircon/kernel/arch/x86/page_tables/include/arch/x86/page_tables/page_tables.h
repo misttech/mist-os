@@ -14,6 +14,7 @@
 #include <kernel/mutex.h>
 // Needed for ARCH_MMU_FLAG_*
 #include <vm/arch_vm_aspace.h>
+#include <vm/mapping_cursor.h>
 #include <vm/pmm.h>
 
 typedef uint64_t pt_entry_t;
@@ -78,8 +79,6 @@ using PtFlags = uint64_t;
 // Type for flags used in the hardware page tables, for non-terminal
 // entries.
 using IntermediatePtFlags = uint64_t;
-
-class MappingCursor;
 
 class X86PageTableBase {
  public:
