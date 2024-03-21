@@ -16,10 +16,16 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 
 use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
-use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
+use net_types::{
+    ethernet::Mac,
+    ip::{Ip, IpVersion, Ipv4, Ipv6, Ipv6Addr, Mtu, Subnet},
+    UnicastAddr,
+};
 use netstack3_core::{
     device::{
-        EthernetCreationProperties, EthernetLinkDevice, EthernetWeakDeviceId, MaxEthernetFrameSize,
+        DeviceProvider, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
+        EthernetWeakDeviceId, MaxEthernetFrameSize, PureIpDevice, PureIpDeviceCreationProperties,
+        PureIpDeviceId, PureIpDeviceReceiveFrameMetadata, PureIpWeakDeviceId,
         RecvEthernetFrameMeta,
     },
     ip::{
@@ -32,14 +38,46 @@ use rand::Rng as _;
 
 use crate::bindings::{
     devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,
-    Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
+    DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, StaticNetdeviceInfo,
+    DEFAULT_INTERFACE_METRIC,
 };
+
+/// Like [`DeviceId`], but restricted to netdevice devices.
+enum NetdeviceId {
+    Ethernet(EthernetDeviceId<BindingsCtx>),
+    PureIp(PureIpDeviceId<BindingsCtx>),
+}
+
+impl NetdeviceId {
+    fn netdevice_info(&self) -> &StaticNetdeviceInfo {
+        match self {
+            NetdeviceId::Ethernet(eth) => &eth.external_state().netdevice,
+            NetdeviceId::PureIp(ip) => &ip.external_state().netdevice,
+        }
+    }
+}
+
+/// Like [`WeakDeviceId`], but restricted to netdevice devices.
+#[derive(Clone, Debug)]
+enum WeakNetdeviceId {
+    Ethernet(EthernetWeakDeviceId<BindingsCtx>),
+    PureIp(PureIpWeakDeviceId<BindingsCtx>),
+}
+
+impl WeakNetdeviceId {
+    fn upgrade(&self) -> Option<NetdeviceId> {
+        match self {
+            WeakNetdeviceId::Ethernet(eth) => eth.upgrade().map(NetdeviceId::Ethernet),
+            WeakNetdeviceId::PureIp(ip) => ip.upgrade().map(NetdeviceId::PureIp),
+        }
+    }
+}
 
 #[derive(Clone)]
 struct Inner {
     device: netdevice_client::Client,
     session: netdevice_client::Session,
-    state: Arc<Mutex<netdevice_client::PortSlab<EthernetWeakDeviceId<BindingsCtx>>>>,
+    state: Arc<Mutex<netdevice_client::PortSlab<WeakNetdeviceId>>>,
 }
 
 /// The worker that receives messages from the ethernet device, and passes them
@@ -145,7 +183,7 @@ impl NetdeviceWorker {
             };
 
             match workaround_drop_ssh_over_wlan(
-                &id.external_state().netdevice.handler.device_class,
+                &id.netdevice_info().handler.device_class,
                 &buff[..frame_length],
             ) {
                 FilterResult::Drop => {
@@ -163,25 +201,48 @@ impl NetdeviceWorker {
                 }
                 FilterResult::Accept => (),
             }
-
+            let buf = packet::Buf::new(&mut buff[..frame_length], ..);
             let frame_type = rx.frame_type().map_err(Error::Client)?;
-            match frame_type {
-                FrameType::Ethernet => {}
-                f @ FrameType::Ipv4 | f @ FrameType::Ipv6 => {
-                    // NB: When the port was attached, `Ethernet` was the only
-                    // permitted frame type; anything else here indicates a
-                    // bug in `netdevice_client` or the core netdevice driver.
-                    return Err(Error::MismatchedRxFrameType {
-                        port_type: PortWireFormat::Ethernet,
-                        frame_type: f,
-                    });
+            match id {
+                NetdeviceId::Ethernet(id) => {
+                    match frame_type {
+                        FrameType::Ethernet => {}
+                        f @ FrameType::Ipv4 | f @ FrameType::Ipv6 => {
+                            // NB: When the port was attached, `Ethernet` was
+                            // the only permitted frame type; anything else here
+                            // indicates a bug in `netdevice_client` or the core
+                            // netdevice driver.
+                            return Err(Error::MismatchedRxFrameType {
+                                port_type: PortWireFormat::Ethernet,
+                                frame_type: f,
+                            });
+                        }
+                    }
+                    ctx.api()
+                        .device::<EthernetLinkDevice>()
+                        .receive_frame(RecvEthernetFrameMeta { device_id: id.clone() }, buf)
+                }
+                NetdeviceId::PureIp(id) => {
+                    let ip_version = match frame_type {
+                        FrameType::Ipv4 => IpVersion::V4,
+                        FrameType::Ipv6 => IpVersion::V6,
+                        f @ FrameType::Ethernet => {
+                            // NB: When the port was attached, `IPv4` & `Ipv6`
+                            // were the only permitted frame types; anything
+                            // else here indicates a bug in `netdevice_client` or
+                            // the core netdevice driver.
+                            return Err(Error::MismatchedRxFrameType {
+                                port_type: PortWireFormat::Ip,
+                                frame_type: f,
+                            });
+                        }
+                    };
+                    ctx.api().device::<PureIpDevice>().receive_frame(
+                        PureIpDeviceReceiveFrameMetadata { device_id: id.clone(), ip_version },
+                        buf,
+                    )
                 }
             }
-
-            ctx.api().device::<EthernetLinkDevice>().receive_frame(
-                RecvEthernetFrameMeta { device_id: id.clone() },
-                packet::Buf::new(&mut buff[..frame_length], ..),
-            );
         }
     }
 }
@@ -411,54 +472,35 @@ impl DeviceHandler {
                 Error::ConfigurationNotSupported
             },
         )?;
-        match wire_format {
-            PortWireFormat::Ethernet => {}
-            // TODO(https://fxbug.dev/42051633): support pure IP devices.
-            PortWireFormat::Ip => return Err(Error::ConfigurationNotSupported),
-        }
 
+        let netdevice_client::client::PortStatus { flags, mtu } =
+            status_stream.try_next().await?.ok_or_else(|| Error::PortClosed)?;
+        let phy_up = flags.contains(fhardware_network::StatusFlags::ONLINE);
         let netdevice_client::client::PortBaseInfo {
             port_class: device_class,
             rx_types: _,
             tx_types: _,
         } = base_info;
-        let netdevice_client::client::PortStatus { flags, mtu: max_eth_frame_size } =
-            status_stream.try_next().await?.ok_or_else(|| Error::PortClosed)?;
-        let phy_up = flags.contains(fhardware_network::StatusFlags::ONLINE);
 
-        let (mac_proxy, mac_server) =
-            fidl::endpoints::create_proxy::<fhardware_network::MacAddressingMarker>()
-                .map_err(Error::SystemResource)?;
-        let () = port_proxy.get_mac(mac_server).map_err(Error::CantConnectToPort)?;
-
-        let mac_addr = {
-            let fnet::MacAddress { octets } =
-                mac_proxy.get_unicast_address().await.map_err(|e| {
-                    // TODO(https://fxbug.dev/42051633): support non-ethernet
-                    // devices.
-                    tracing::warn!("failed to get unicast address, sending not supported: {:?}", e);
-                    Error::ConfigurationNotSupported
-                })?;
-            let mac = net_types::ethernet::Mac::new(octets);
-            net_types::UnicastAddr::new(mac).ok_or_else(|| {
-                tracing::warn!("{} is not a valid unicast address", mac);
-                Error::MacNotUnicast { mac, port }
-            })?
+        enum DeviceProperties {
+            Ethernet {
+                max_frame_size: MaxEthernetFrameSize,
+                mac: UnicastAddr<Mac>,
+                mac_proxy: fhardware_network::MacAddressingProxy,
+            },
+            Ip {
+                max_frame_size: Mtu,
+            },
+        }
+        let properties = match wire_format {
+            PortWireFormat::Ethernet => {
+                let max_frame_size =
+                    MaxEthernetFrameSize::new(mtu).ok_or(Error::ConfigurationNotSupported)?;
+                let (mac, mac_proxy) = get_mac(&port_proxy, &port).await?;
+                DeviceProperties::Ethernet { max_frame_size, mac, mac_proxy }
+            }
+            PortWireFormat::Ip => DeviceProperties::Ip { max_frame_size: Mtu::new(mtu) },
         };
-
-        // Always set the interface to multicast promiscuous mode because we
-        // don't really plumb through multicast filtering.
-        // TODO(https://fxbug.dev/42136929): Remove this when multicast filtering
-        // is available.
-        fuchsia_zircon::Status::ok(
-            mac_proxy
-                .set_mode(fhardware_network::MacFilterMode::MulticastPromiscuous)
-                .await
-                .map_err(Error::CantConnectToPort)?,
-        )
-        .unwrap_or_else(|e| {
-            tracing::warn!("failed to set multicast promiscuous for new interface: {:?}", e)
-        });
 
         let mut state = state.lock().await;
         let state_entry = match state.entry(port) {
@@ -493,70 +535,93 @@ impl DeviceHandler {
             })
             .transpose()?;
 
-        let max_frame_size = MaxEthernetFrameSize::new(max_eth_frame_size)
-            .ok_or(Error::ConfigurationNotSupported)?;
-
         let binding_id = ctx.bindings_ctx().devices.alloc_new_id();
 
-        let name = name.unwrap_or_else(|| format!("eth{}", binding_id));
+        let name = name.unwrap_or_else(|| match wire_format {
+            PortWireFormat::Ethernet => format!("eth{}", binding_id),
+            PortWireFormat::Ip => format!("ip{}", binding_id),
+        });
 
-        let info = devices::EthernetInfo {
-            mac: mac_addr,
-            _mac_proxy: mac_proxy,
-            netdevice: devices::StaticNetdeviceInfo {
-                handler: PortHandler {
-                    id: binding_id,
-                    port_id: port,
-                    inner: self.inner.clone(),
-                    device_class: device_class.clone(),
-                    wire_format,
-                },
+        let static_netdevice_info = devices::StaticNetdeviceInfo {
+            handler: PortHandler {
+                id: binding_id,
+                port_id: port,
+                inner: self.inner.clone(),
+                device_class: device_class.clone(),
+                wire_format,
             },
-            common_info: Default::default(),
-            dynamic_info: devices::DynamicEthernetInfo {
-                netdevice: devices::DynamicNetdeviceInfo {
-                    phy_up,
-                    common_info: devices::DynamicCommonInfo {
-                        mtu: max_frame_size.as_mtu(),
-                        admin_enabled: false,
-                        events: crate::bindings::create_interface_event_producer(
-                            interfaces_event_sink,
-                            binding_id,
-                            crate::bindings::InterfaceProperties {
-                                name: name.clone(),
-                                device_class: fnet_interfaces::DeviceClass::Device(device_class),
-                            },
-                        ),
-                        control_hook: control_hook,
-                        addresses: HashMap::new(),
+        };
+        let dynamic_netdevice_info_builder = |mtu: Mtu| devices::DynamicNetdeviceInfo {
+            phy_up,
+            common_info: devices::DynamicCommonInfo {
+                mtu,
+                admin_enabled: false,
+                events: crate::bindings::create_interface_event_producer(
+                    interfaces_event_sink,
+                    binding_id,
+                    crate::bindings::InterfaceProperties {
+                        name: name.clone(),
+                        device_class: fnet_interfaces::DeviceClass::Device(device_class),
                     },
-                },
-                neighbor_event_sink: neighbor_event_sink.clone(),
+                ),
+                control_hook: control_hook,
+                addresses: HashMap::new(),
+            },
+        };
+
+        let core_id = match properties {
+            DeviceProperties::Ethernet { max_frame_size, mac, mac_proxy } => {
+                let info = devices::EthernetInfo {
+                    mac,
+                    _mac_proxy: mac_proxy,
+                    netdevice: static_netdevice_info,
+                    common_info: Default::default(),
+                    dynamic_info: devices::DynamicEthernetInfo {
+                        netdevice: dynamic_netdevice_info_builder(max_frame_size.as_mtu()),
+                        neighbor_event_sink: neighbor_event_sink.clone(),
+                    }
+                    .into(),
+                }
+                .into();
+                let core_ethernet_id = ctx.api().device::<EthernetLinkDevice>().add_device(
+                    devices::DeviceIdAndName { id: binding_id, name: name.clone() },
+                    EthernetCreationProperties { mac, max_frame_size },
+                    RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
+                    info,
+                );
+                state_entry.insert(WeakNetdeviceId::Ethernet(core_ethernet_id.downgrade()));
+                DeviceId::from(core_ethernet_id)
             }
-            .into(),
-        }
-        .into();
+            DeviceProperties::Ip { max_frame_size } => {
+                let info = devices::PureIpDeviceInfo {
+                    common_info: Default::default(),
+                    netdevice: static_netdevice_info,
+                    dynamic_info: dynamic_netdevice_info_builder(max_frame_size).into(),
+                }
+                .into();
+                let core_pure_ip_id = ctx.api().device::<PureIpDevice>().add_device(
+                    devices::DeviceIdAndName { id: binding_id, name: name.clone() },
+                    PureIpDeviceCreationProperties { mtu: max_frame_size },
+                    RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
+                    info,
+                );
+                state_entry.insert(WeakNetdeviceId::PureIp(core_pure_ip_id.downgrade()));
+                DeviceId::from(core_pure_ip_id)
+            }
+        };
 
-        let core_ethernet_id = ctx.api().device::<EthernetLinkDevice>().add_device(
-            devices::DeviceIdAndName { id: binding_id, name },
-            EthernetCreationProperties { mac: mac_addr, max_frame_size },
-            RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
-            info,
-        );
-
-        state_entry.insert(core_ethernet_id.downgrade());
-        let binding_id = core_ethernet_id.bindings_id().id;
-        let external_state = core_ethernet_id.external_state();
+        let binding_id = core_id.bindings_id().id;
+        let external_state = core_id.external_state();
         let devices::StaticCommonInfo { tx_notifier, authorization_token: _ } =
-            &external_state.common_info;
-
-        let core_id = DeviceId::from(core_ethernet_id.clone());
+            external_state.static_common_info();
         let task =
             crate::bindings::devices::spawn_tx_task(&tx_notifier, ctx.clone(), core_id.clone());
-        ctx.api().transmit_queue::<EthernetLinkDevice>().set_configuration(
-            &core_ethernet_id,
-            netstack3_core::device::TransmitQueueConfiguration::Fifo,
-        );
+        netstack3_core::for_any_device_id!(DeviceId, DeviceProvider, D, &core_id, device => {
+            ctx.api().transmit_queue::<D>().set_configuration(
+                device,
+                netstack3_core::device::TransmitQueueConfiguration::Fifo,
+            );
+        });
         add_initial_routes(ctx.bindings_ctx(), &core_id).await;
 
         // TODO(https://fxbug.dev/42148800): Use a different secret key (not this
@@ -602,6 +667,44 @@ impl DeviceHandler {
 
         Ok((binding_id, status_stream, task))
     }
+}
+
+/// Connect to the Port's `MacAddressingProxy`, and fetch the MAC address.
+async fn get_mac(
+    port_proxy: &fhardware_network::PortProxy,
+    port: &netdevice_client::Port,
+) -> Result<(UnicastAddr<Mac>, fhardware_network::MacAddressingProxy), Error> {
+    let (mac_proxy, mac_server) =
+        fidl::endpoints::create_proxy::<fhardware_network::MacAddressingMarker>()
+            .map_err(Error::SystemResource)?;
+    let () = port_proxy.get_mac(mac_server).map_err(Error::CantConnectToPort)?;
+
+    let mac_addr = {
+        let fnet::MacAddress { octets } = mac_proxy.get_unicast_address().await.map_err(|e| {
+            tracing::warn!("failed to get unicast address, sending not supported: {:?}", e);
+            Error::ConfigurationNotSupported
+        })?;
+        let mac = net_types::ethernet::Mac::new(octets);
+        net_types::UnicastAddr::new(mac).ok_or_else(|| {
+            tracing::warn!("{} is not a valid unicast address", mac);
+            Error::MacNotUnicast { mac, port: *port }
+        })?
+    };
+    // Always set the interface to multicast promiscuous mode because we
+    // don't really plumb through multicast filtering.
+    // TODO(https://fxbug.dev/42136929): Remove this when multicast filtering
+    // is available.
+    fuchsia_zircon::Status::ok(
+        mac_proxy
+            .set_mode(fhardware_network::MacFilterMode::MulticastPromiscuous)
+            .await
+            .map_err(Error::CantConnectToPort)?,
+    )
+    .unwrap_or_else(|e| {
+        tracing::warn!("failed to set multicast promiscuous for new interface: {:?}", e)
+    });
+
+    Ok((mac_addr, mac_proxy))
 }
 
 /// Adds the IPv4 and IPv6 multicast subnet routes, the IPv6 link-local subnet
@@ -718,7 +821,7 @@ impl PortHandler {
 
     pub(crate) async fn uninstall(self) -> Result<(), netdevice_client::Error> {
         let Self { port_id, inner: Inner { session, state, .. }, .. } = self;
-        let _: EthernetWeakDeviceId<_> = assert_matches!(
+        let _: WeakNetdeviceId = assert_matches!(
             state.lock().await.remove(&port_id),
             netdevice_client::port_slab::RemoveOutcome::Removed(core_id) => core_id
         );

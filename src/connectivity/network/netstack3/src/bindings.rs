@@ -60,7 +60,7 @@ use util::{ConversionContext, IntoFidl as _};
 use devices::{
     BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
     DynamicEthernetInfo, DynamicNetdeviceInfo, EthernetInfo, LoopbackInfo, PureIpDeviceInfo,
-    StaticCommonInfo,
+    StaticCommonInfo, StaticNetdeviceInfo,
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use timers::TimerDispatcher;
@@ -533,42 +533,50 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
         device: &EthernetDeviceId<Self>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
-        let state = device.external_state();
-        let enabled = state.with_dynamic_info(
-            |DynamicEthernetInfo {
-                 netdevice:
-                     DynamicNetdeviceInfo {
-                         phy_up,
-                         common_info: DynamicCommonInfo { admin_enabled, .. },
-                     },
-                 ..
-             }| { *admin_enabled && *phy_up },
-        );
-
-        if enabled {
-            state
-                .netdevice
-                .handler
-                .send(frame.as_ref(), fhardware_network::FrameType::Ethernet)
-                .unwrap_or_else(|e| {
-                    tracing::warn!("failed to send frame to {:?}: {:?}", state.netdevice.handler, e)
-                })
-        }
-
-        Ok(())
+        let EthernetInfo { mac: _, _mac_proxy: _, common_info: _, netdevice, dynamic_info } =
+            device.external_state();
+        let dynamic_info = dynamic_info.read().unwrap();
+        send_netdevice_frame(
+            netdevice,
+            &dynamic_info.netdevice,
+            frame,
+            fhardware_network::FrameType::Ethernet,
+        )
     }
 
     fn send_ip_packet(
         &mut self,
-        _device: &PureIpDeviceId<Self>,
-        _packet: Buf<Vec<u8>>,
-        _ip_version: IpVersion,
+        device: &PureIpDeviceId<Self>,
+        packet: Buf<Vec<u8>>,
+        ip_version: IpVersion,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
-        // TODO(https://fxbug.dev/42051633): Support sending IP packets to the
-        // device driver.
-        tracing::warn!("pure IP device tx is not implemented; dropping packet");
-        Ok(())
+        let frame_type = match ip_version {
+            IpVersion::V4 => fhardware_network::FrameType::Ipv4,
+            IpVersion::V6 => fhardware_network::FrameType::Ipv6,
+        };
+        let PureIpDeviceInfo { common_info: _, netdevice, dynamic_info } = device.external_state();
+        let dynamic_info = dynamic_info.read().unwrap();
+        send_netdevice_frame(netdevice, &dynamic_info, packet, frame_type)
     }
+}
+
+/// Send a frame on a Netdevice backed device.
+fn send_netdevice_frame(
+    StaticNetdeviceInfo { handler }: &StaticNetdeviceInfo,
+    DynamicNetdeviceInfo {
+        phy_up,
+        common_info:
+            DynamicCommonInfo { admin_enabled, mtu: _, events: _, control_hook: _, addresses: _ },
+    }: &DynamicNetdeviceInfo,
+    frame: Buf<Vec<u8>>,
+    frame_type: fhardware_network::FrameType,
+) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+    if *phy_up && *admin_enabled {
+        handler
+            .send(frame.as_ref(), frame_type)
+            .unwrap_or_else(|e| tracing::warn!("failed to send frame to {:?}: {:?}", handler, e))
+    }
+    Ok(())
 }
 
 impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx {

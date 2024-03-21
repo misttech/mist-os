@@ -9,13 +9,5 @@
                 "*",
             ],
         },
-        {
-            type: "expect_failure",
-            matchers: [
-                // TODO(https://fxbug.dev/42051633): Support IP-netdev backed
-                // devices.
-                "get_mac_pure_ip_ns3",
-            ],
-        },
     ],
 }

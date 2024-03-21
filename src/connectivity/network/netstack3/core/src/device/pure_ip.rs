@@ -52,7 +52,7 @@ pub enum PureIpDevice {}
 #[derive(Debug)]
 pub struct PureIpDeviceCreationProperties {
     /// The MTU of the device.
-    mtu: Mtu,
+    pub mtu: Mtu,
 }
 
 /// Metadata for IP packets held in the TX queue.
@@ -101,9 +101,9 @@ impl DeviceStateSpec for PureIpDevice {
 /// Metadata for IP packets received on a pure IP device.
 pub struct PureIpDeviceReceiveFrameMetadata<D> {
     /// The device a packet was received on.
-    device_id: D,
+    pub device_id: D,
     /// The IP version of the received packet.
-    ip_version: IpVersion,
+    pub ip_version: IpVersion,
 }
 
 impl DeviceReceiveFrameSpec for PureIpDevice {
