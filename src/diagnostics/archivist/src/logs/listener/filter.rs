@@ -51,6 +51,8 @@ impl MessageFilter {
                 this.tid = Some(options.tid)
             }
 
+            // TODO(b/322552971): Rename to raw_severity with LSC process.
+            // This is defined in FIDL and will be renamed in its own change.
             if options.verbosity > 0 {
                 // verbosity scale sits in the interstitial space between
                 // INFO and DEBUG
@@ -141,16 +143,16 @@ mod tests {
     fn should_send_verbose() {
         let mut message = test_message();
         let mut filter = MessageFilter {
-            min_severity: Some(LegacySeverity::Verbose(15)),
+            min_severity: Some(LegacySeverity::RawSeverity(15)),
             ..MessageFilter::default()
         };
-        for verbosity in 1..15 {
-            message.set_legacy_verbosity(verbosity);
+        for raw_severity in 1..15 {
+            message.set_raw_severity(raw_severity);
             assert!(filter.should_send(&message));
         }
 
         filter.min_severity = Some(LegacySeverity::Debug);
-        message.set_legacy_verbosity(1);
+        message.set_raw_severity(1);
         assert!(filter.should_send(&message));
     }
 
@@ -158,17 +160,17 @@ mod tests {
     fn should_reject_verbose() {
         let mut message = test_message();
         let mut filter = MessageFilter {
-            min_severity: Some(LegacySeverity::Verbose(1)),
+            min_severity: Some(LegacySeverity::RawSeverity(1)),
             ..MessageFilter::default()
         };
 
-        for verbosity in 2..15 {
-            message.set_legacy_verbosity(verbosity);
+        for raw_severity in 2..15 {
+            message.set_raw_severity(raw_severity);
             assert!(!filter.should_send(&message));
         }
 
         filter.min_severity = Some(LegacySeverity::Info);
-        message.set_legacy_verbosity(1);
+        message.set_raw_severity(1);
         assert!(!filter.should_send(&message));
     }
 

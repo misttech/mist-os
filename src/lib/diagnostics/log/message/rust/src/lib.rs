@@ -45,7 +45,7 @@ pub fn from_logger(source: MonikerWithUrl, msg: LoggerMessage) -> LogsData {
     }
     let mut result = builder.build();
     if let Some(verbosity) = msg.verbosity {
-        result.set_legacy_verbosity(verbosity);
+        result.set_raw_severity(verbosity);
     }
     result
 }
@@ -86,10 +86,10 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
             (Value::Text(t), LogsField::Dropped) => {
                 return Err(MessageError::ExpectedInteger { value: t, found: "text" });
             }
-            (Value::SignedInt(v), LogsField::Verbosity) => {
+            (Value::SignedInt(v), LogsField::RawSeverity) => {
                 severity_untrusted = Some(v);
             }
-            (_, LogsField::Verbosity) => {
+            (_, LogsField::RawSeverity) => {
                 return Err(MessageError::ExpectedInteger { value: "".into(), found: "other" });
             }
             (Value::Text(text), LogsField::Tag) => {
@@ -140,7 +140,7 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
     let mut result = builder.build();
 
     if verbosity.is_some() {
-        result.set_legacy_verbosity(verbosity.unwrap())
+        result.set_raw_severity(verbosity.unwrap())
     }
     Ok(result)
 }
@@ -308,7 +308,7 @@ pub fn parse_basic_structured_info(bytes: &[u8]) -> Result<(i64, Severity), Mess
     for a in record.arguments {
         let label = LogsField::from(a.name);
         match (a.value, label) {
-            (Value::SignedInt(v), LogsField::Verbosity) => {
+            (Value::SignedInt(v), LogsField::RawSeverity) => {
                 severity_untrusted = Some(v);
                 break;
             }

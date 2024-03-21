@@ -734,8 +734,8 @@ impl LogsDataBuilder {
         if let Some(msg) = self.msg {
             args.push(LogsProperty::String(LogsField::MsgStructured, msg));
         }
-        if let Some(verbosity) = self.raw_severity {
-            args.push(LogsProperty::Int(LogsField::Verbosity, verbosity));
+        if let Some(raw_severity) = self.raw_severity {
+            args.push(LogsProperty::Int(LogsField::RawSeverity, raw_severity));
         }
         let mut payload_fields = vec![DiagnosticsHierarchy::new("message", args, vec![])];
         if !self.keys.is_empty() {
@@ -877,7 +877,7 @@ impl Data<Logs> {
                 LogsProperty::String(LogsField::Tag, _tag) => None,
                 LogsProperty::String(LogsField::ProcessId, _tag) => None,
                 LogsProperty::String(LogsField::ThreadId, _tag) => None,
-                LogsProperty::String(LogsField::Verbosity, _tag) => None,
+                LogsProperty::String(LogsField::RawSeverity, _tag) => None,
                 LogsProperty::String(LogsField::Dropped, _tag) => None,
                 LogsProperty::String(LogsField::Msg, _tag) => None,
                 LogsProperty::String(LogsField::FilePath, _tag) => None,
@@ -965,8 +965,8 @@ impl Data<Logs> {
     /// The message's severity.
     #[cfg(target_os = "fuchsia")]
     pub fn legacy_severity(&self) -> LegacySeverity {
-        if let Some(verbosity) = self.verbosity() {
-            LegacySeverity::Verbose(verbosity)
+        if let Some(raw_severity) = self.raw_severity() {
+            LegacySeverity::RawSeverity(raw_severity)
         } else {
             match self.metadata.severity {
                 Severity::Trace => LegacySeverity::Trace,
@@ -1012,24 +1012,26 @@ impl Data<Logs> {
             .flatten()
     }
 
-    /// If the log has a verbosity, returns its value.
-    pub fn verbosity(&self) -> Option<i8> {
+    /// If the log has a raw severity, returns its value.
+    pub fn raw_severity(&self) -> Option<i8> {
         self.payload_message().and_then(|payload| {
             payload
                 .properties
                 .iter()
                 .filter_map(|property| match property {
-                    LogsProperty::Int(LogsField::Verbosity, verbosity) => Some(*verbosity as i8),
+                    LogsProperty::Int(LogsField::RawSeverity, verbosity) => Some(*verbosity as i8),
                     _ => None,
                 })
                 .next()
         })
     }
 
-    /// Sets the verbosity of a log.
-    pub fn set_legacy_verbosity(&mut self, legacy: i8) {
+    /// Sets the raw severity of a log.
+    pub fn set_raw_severity(&mut self, raw_severity: i8) {
         if let Some(payload_message) = self.payload_message_mut() {
-            payload_message.properties.push(LogsProperty::Int(LogsField::Verbosity, legacy.into()));
+            payload_message
+                .properties
+                .push(LogsProperty::Int(LogsField::RawSeverity, raw_severity.into()));
         }
     }
 
@@ -1335,7 +1337,7 @@ pub enum LogsField {
     ThreadId,
     Dropped,
     Tag,
-    Verbosity,
+    RawSeverity,
     Msg,
     MsgStructured,
     FilePath,
@@ -1350,7 +1352,7 @@ impl fmt::Display for LogsField {
             LogsField::ThreadId => write!(f, "tid"),
             LogsField::Dropped => write!(f, "num_dropped"),
             LogsField::Tag => write!(f, "tag"),
-            LogsField::Verbosity => write!(f, "verbosity"),
+            LogsField::RawSeverity => write!(f, "raw_severity"),
             LogsField::Msg => write!(f, "message"),
             LogsField::MsgStructured => write!(f, "value"),
             LogsField::FilePath => write!(f, "file_path"),
@@ -1374,8 +1376,8 @@ pub const TAG_LABEL: &str = "tag";
 pub const MESSAGE_LABEL_STRUCTURED: &str = "value";
 /// The label for the message in the log payload.
 pub const MESSAGE_LABEL: &str = "message";
-/// The label for the verbosity of a log.
-pub const VERBOSITY_LABEL: &str = "verbosity";
+/// The label for the raw severity of a log.
+pub const RAW_SEVERITY_LABEL: &str = "raw_severity";
 /// The label for the file associated with a log line.
 pub const FILE_PATH_LABEL: &str = "file";
 /// The label for the line number in the file associated with a log line.
@@ -1391,7 +1393,7 @@ impl LogsField {
                 | LogsField::Dropped
                 | LogsField::Tag
                 | LogsField::Msg
-                | LogsField::Verbosity
+                | LogsField::RawSeverity
         )
     }
 }
@@ -1404,7 +1406,7 @@ impl AsRef<str> for LogsField {
             Self::Dropped => DROPPED_LABEL,
             Self::Tag => TAG_LABEL,
             Self::Msg => MESSAGE_LABEL,
-            Self::Verbosity => VERBOSITY_LABEL,
+            Self::RawSeverity => RAW_SEVERITY_LABEL,
             Self::FilePath => FILE_PATH_LABEL,
             Self::LineNumber => LINE_NUMBER_LABEL,
             Self::MsgStructured => MESSAGE_LABEL_STRUCTURED,
@@ -1423,7 +1425,7 @@ where
             PID_LABEL => Self::ProcessId,
             TID_LABEL => Self::ThreadId,
             DROPPED_LABEL => Self::Dropped,
-            VERBOSITY_LABEL => Self::Verbosity,
+            RAW_SEVERITY_LABEL => Self::RawSeverity,
             TAG_LABEL => Self::Tag,
             MESSAGE_LABEL => Self::Msg,
             FILE_PATH_LABEL => Self::FilePath,

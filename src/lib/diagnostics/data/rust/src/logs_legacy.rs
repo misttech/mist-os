@@ -17,7 +17,7 @@ use thiserror::Error;
 pub enum LegacySeverity {
     Trace,
     Debug,
-    Verbose(i8),
+    RawSeverity(i8),
     Info,
     Warn,
     Error,
@@ -25,7 +25,7 @@ pub enum LegacySeverity {
 }
 
 impl LegacySeverity {
-    /// Splits this legacy value into a severity and an optional verbosity.
+    /// Splits this legacy value into a severity and an optional raw_severity.
     pub fn for_structured(self) -> (Severity, Option<i8>) {
         match self {
             LegacySeverity::Trace => (Severity::Trace, None),
@@ -34,7 +34,7 @@ impl LegacySeverity {
             LegacySeverity::Warn => (Severity::Warn, None),
             LegacySeverity::Error => (Severity::Error, None),
             LegacySeverity::Fatal => (Severity::Fatal, None),
-            LegacySeverity::Verbose(v) => (Severity::Debug, Some(v)),
+            LegacySeverity::RawSeverity(v) => (Severity::Debug, Some(v)),
         }
     }
 }
@@ -74,7 +74,7 @@ impl From<LegacySeverity> for c_int {
             LegacySeverity::Warn => LogLevelFilter::Warn as _,
             LegacySeverity::Error => LogLevelFilter::Error as _,
             LegacySeverity::Fatal => LogLevelFilter::Fatal as _,
-            LegacySeverity::Verbose(v) => (LogLevelFilter::Info as i8 - v) as _,
+            LegacySeverity::RawSeverity(v) => (LogLevelFilter::Info as i8 - v) as _,
         }
     }
 }
@@ -93,12 +93,12 @@ impl TryFrom<c_int> for LegacySeverity {
     fn try_from(raw: c_int) -> Result<LegacySeverity, SeverityError> {
         // Handle legacy/deprecated level filter values.
         if -10 <= raw && raw <= -3 {
-            Ok(LegacySeverity::Verbose(-raw as i8))
+            Ok(LegacySeverity::RawSeverity(-raw as i8))
         } else if raw == -2 {
-            // legacy values from trace verbosity
+            // legacy values from trace raw_severity
             Ok(LegacySeverity::Trace)
         } else if raw == -1 {
-            // legacy value from debug verbosity
+            // legacy value from debug raw_severity
             Ok(LegacySeverity::Debug)
         } else if raw == 0 {
             // legacy value for INFO
@@ -113,8 +113,8 @@ impl TryFrom<c_int> for LegacySeverity {
             // legacy value for FATAL
             Ok(LegacySeverity::Fatal)
         } else if raw < LogLevelFilter::Info as i32 && raw > LogLevelFilter::Debug as i32 {
-            // Verbosity scale exists as incremental steps between INFO & DEBUG
-            Ok(LegacySeverity::Verbose(LogLevelFilter::Info as i8 - raw as i8))
+            // raw_severity scale exists as incremental steps between INFO & DEBUG
+            Ok(LegacySeverity::RawSeverity(LogLevelFilter::Info as i8 - raw as i8))
         } else if let Some(level) = LogLevelFilter::from_primitive(raw as i8) {
             // Handle current level filter values.
             match level {
@@ -215,7 +215,7 @@ mod test {
     macro_rules! severity_roundtrip_test {
         ($raw:expr, $expected:expr) => {
             let legacy = LegacySeverity::try_from(i32::from($raw)).unwrap();
-            let (severity, verbosity) = legacy.for_structured();
+            let (severity, raw_severity) = legacy.for_structured();
             let mut msg = LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: 0i64.into(),
                 component_url: Some(TEST_URL.to_string()),
@@ -223,8 +223,8 @@ mod test {
                 severity,
             })
             .build();
-            if let Some(v) = verbosity {
-                msg.set_legacy_verbosity(v);
+            if let Some(v) = raw_severity {
+                msg.set_raw_severity(v);
             }
 
             let legacy_msg: LogMessage = (&msg).into();
@@ -241,27 +241,27 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn verbosity_roundtrip_legacy_v10() {
+    fn raw_severity_roundtrip_legacy_v10() {
         severity_roundtrip_test!(-10, fdiagnostics::Severity::Info.into_primitive() - 10);
     }
 
     #[fuchsia::test]
-    fn verbosity_roundtrip_legacy_v5() {
+    fn raw_severity_roundtrip_legacy_v5() {
         severity_roundtrip_test!(-5, fdiagnostics::Severity::Info.into_primitive() - 5);
     }
 
     #[fuchsia::test]
-    fn verbosity_roundtrip_legacy_v4() {
+    fn raw_severity_roundtrip_legacy_v4() {
         severity_roundtrip_test!(-4, fdiagnostics::Severity::Info.into_primitive() - 4);
     }
 
     #[fuchsia::test]
-    fn verbosity_roundtrip_legacy_v3() {
+    fn raw_severity_roundtrip_legacy_v3() {
         severity_roundtrip_test!(-3, fdiagnostics::Severity::Info.into_primitive() - 3);
     }
 
     #[fuchsia::test]
-    fn verbosity_roundtrip_legacy_v2() {
+    fn raw_severity_roundtrip_legacy_v2() {
         severity_roundtrip_test!(-2, fdiagnostics::Severity::Trace.into_primitive());
     }
 
@@ -271,7 +271,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn verbosity_roundtrip_legacy_v0() {
+    fn raw_severity_roundtrip_legacy_v0() {
         severity_roundtrip_test!(0, fdiagnostics::Severity::Info.into_primitive());
     }
 
@@ -281,7 +281,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn verbosity_roundtrip_legacy_error() {
+    fn raw_severity_roundtrip_legacy_error() {
         severity_roundtrip_test!(2, fdiagnostics::Severity::Error.into_primitive());
     }
 

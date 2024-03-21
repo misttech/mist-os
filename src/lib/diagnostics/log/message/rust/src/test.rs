@@ -22,11 +22,11 @@ lazy_static! {
     };
 }
 
-fn clear_legacy_verbosity(data: &mut LogsData) {
+fn clear_raw_severity(data: &mut LogsData) {
     data.payload_message_mut()
         .unwrap()
         .properties
-        .retain(|p| !matches!(p, LogsProperty::Int(LogsField::Verbosity, _)));
+        .retain(|p| !matches!(p, LogsProperty::Int(LogsField::RawSeverity, _)));
 }
 
 #[repr(C, packed)]
@@ -432,7 +432,7 @@ fn message_severity() {
 #[fuchsia::test]
 fn legacy_message_severity() {
     let mut packet = test_packet();
-    // legacy verbosity where v=10
+    // raw_severity where raw_severity=10
     packet.metadata.severity = LogLevelFilter::Info as i32 - 10;
     packet.data[0] = 0; // tag size
     packet.data[1] = 0; // null terminated
@@ -452,33 +452,33 @@ fn legacy_message_severity() {
     .set_tid(2)
     .set_message("".to_string())
     .build();
-    clear_legacy_verbosity(&mut expected_message);
-    expected_message.set_legacy_verbosity(10);
+    clear_raw_severity(&mut expected_message);
+    expected_message.set_raw_severity(10);
 
     assert_eq!(parsed, expected_message);
 
-    // legacy verbosity where v=2
+    // raw_severity where raw_severity=2
     packet.metadata.severity = LogLevelFilter::Info as i32 - 2;
     buffer = &packet.as_bytes()[..METADATA_SIZE + 2];
     parsed = crate::from_logger(get_test_identity(), LoggerMessage::try_from(buffer).unwrap());
-    clear_legacy_verbosity(&mut expected_message);
-    expected_message.set_legacy_verbosity(2);
+    clear_raw_severity(&mut expected_message);
+    expected_message.set_raw_severity(2);
 
     assert_eq!(parsed, expected_message);
 
-    // legacy verbosity where v=1
+    // raw_severity where raw_severity=1
     packet.metadata.severity = LogLevelFilter::Info as i32 - 1;
     buffer = &packet.as_bytes()[..METADATA_SIZE + 2];
     parsed = crate::from_logger(get_test_identity(), LoggerMessage::try_from(buffer).unwrap());
-    clear_legacy_verbosity(&mut expected_message);
-    expected_message.set_legacy_verbosity(1);
+    clear_raw_severity(&mut expected_message);
+    expected_message.set_raw_severity(1);
 
     assert_eq!(parsed, expected_message);
 
     packet.metadata.severity = 0; // legacy severity
     buffer = &packet.as_bytes()[..METADATA_SIZE + 2];
     parsed = crate::from_logger(get_test_identity(), LoggerMessage::try_from(buffer).unwrap());
-    clear_legacy_verbosity(&mut expected_message);
+    clear_raw_severity(&mut expected_message);
     expected_message.metadata.severity = Severity::Info;
 
     assert_eq!(parsed, expected_message);
@@ -530,7 +530,8 @@ fn test_raw_severity_parsing_and_conversions() {
     let mut encoder = Encoder::new(&mut buffer);
     encoder.write_record(&record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
-    let parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
+    let mut parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
+    parsed.sort_payload();
     assert_eq!(
         parsed,
         LogsDataBuilder::new(BuilderArgs {
