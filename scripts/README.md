@@ -13,3 +13,12 @@ get some auto-completion for fx by sourcing `scripts/fx-env.sh` into your shell.
 
 * Learn how to develop fx subcommands in [fx subcommands](/tools/devshell/README.md)
 
+## OWNERShip
+
+Given the wide breadth of the code under //scripts and the project's desire to
+encourage more local ownership, there are intentionally no OWNERS of //scripts
+itself (only per-file entries). Rather, the addition of new subdirectories or
+top-level files is expected to fall back toward requiring an
+[OWNERS override][owners-override].
+
+[owners-override]: https://fuchsia.dev/fuchsia-src/development/source_code/owners?hl=en#owners_override
