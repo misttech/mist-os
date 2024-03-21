@@ -4,19 +4,17 @@
 
 use {
     anyhow::{anyhow, Context as _},
-    async_lock::RwLock,
     async_trait::async_trait,
+    camino::Utf8Path,
+    errors::ffx_bail,
     ffx_config::EnvironmentContext,
     ffx_repository_serve_args::ServeCommand,
     ffx_target::{get_default_target, knock_target_by_name},
     fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter},
     fidl_fuchsia_developer_ffx::{
-        RepositoryError as FfxCliRepositoryError, RepositoryTarget as FfxCliRepositoryTarget,
+        RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetCollectionProxy,
+        TargetCollectionReaderMarker, TargetCollectionReaderRequest, TargetInfo,
         TargetQuery as FfxTargetQuery,
-    },
-    fidl_fuchsia_developer_ffx::{
-        TargetCollectionProxy, TargetCollectionReaderMarker, TargetCollectionReaderRequest,
-        TargetInfo,
     },
     fidl_fuchsia_developer_ffx_ext::{
         RepositoryRegistrationAliasConflictMode as FfxRepositoryRegistrationAliasConflictMode,
@@ -41,6 +39,8 @@ const SERVE_KNOCK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(
 const REPO_FOREGROUND_FEATURE_FLAG: &str = "repository.foreground.enabled";
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
 const ENGINE_MONIKER: &str = "/core/pkg-resolver";
+const DEFAULT_REPO_NAME: &str = "devhost";
+const REPO_PATH_RELATIVE_TO_BUILD_DIR: &str = "amber-files";
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag(REPO_FOREGROUND_FEATURE_FLAG))]
@@ -97,20 +97,16 @@ async fn connect_to_rcs(
 }
 
 async fn connect_to_target(
-    repo_target: FfxCliRepositoryTarget,
+    target_identifier: String,
+    aliases: Option<Vec<String>>,
+    storage_type: Option<RepositoryStorageType>,
     repo_server_listen_addr: std::net::SocketAddr,
-    repo: &Arc<RwLock<RepoClient<Box<dyn RepoProvider>>>>,
+    repo_manager: Arc<RepositoryManager>,
     target_collection_proxy: &TargetCollectionProxy,
     alias_conflict_mode: FfxRepositoryRegistrationAliasConflictMode,
 ) -> Result<(), anyhow::Error> {
-    let target_query = FfxTargetQuery {
-        string_matcher: repo_target.target_identifier.clone(),
-        ..Default::default()
-    };
-
-    // Construct RepositoryTarget from same args as `ffx target repository register`
-    let repo_target_info = FfxDaemonRepositoryTarget::try_from(repo_target)
-        .map_err(|e| anyhow!("Failed to build RepositoryTarget: {:?}", e))?;
+    let target_query =
+        FfxTargetQuery { string_matcher: Some(target_identifier.clone()), ..Default::default() };
 
     let rcs_proxy = connect_to_rcs(target_collection_proxy, &target_query).await?;
 
@@ -138,18 +134,31 @@ async fn connect_to_target(
             .await
             .with_context(|| format!("binding engine to stream on {:?}", target_query))?;
 
-    register_target_with_fidl_proxies(
-        repo_proxy,
-        engine_proxy,
-        &repo_target_info,
-        &target,
-        repo_server_listen_addr,
-        repo,
-        alias_conflict_mode.into(),
-    )
-    .await
-    .map_err(|e| anyhow!("Failed to register repository: {:?}", e))?;
+    for (repo_name, repo) in repo_manager.repositories() {
+        let repo_target = FfxCliRepositoryTarget {
+            repo_name: Some(repo_name),
+            target_identifier: Some(target_identifier.clone()),
+            aliases: aliases.clone(),
+            storage_type,
+            ..Default::default()
+        };
 
+        // Construct RepositoryTarget from same args as `ffx target repository register`
+        let repo_target_info = FfxDaemonRepositoryTarget::try_from(repo_target)
+            .map_err(|e| anyhow!("Failed to build RepositoryTarget: {:?}", e))?;
+
+        register_target_with_fidl_proxies(
+            repo_proxy.clone(),
+            engine_proxy.clone(),
+            &repo_target_info,
+            &target,
+            repo_server_listen_addr,
+            &repo,
+            alias_conflict_mode.clone(),
+        )
+        .await
+        .map_err(|e| anyhow!("Failed to register repository: {:?}", e))?;
+    }
     Ok(())
 }
 
@@ -158,37 +167,61 @@ impl FfxMain for ServeTool {
     type Writer = SimpleWriter;
 
     async fn main(self, mut writer: SimpleWriter) -> Result<()> {
-        let repo_name = self.cmd.repository;
-
-        let repo_path = if let Some(repo_path) = self.cmd.repo_path {
-            repo_path
-        } else {
-            // Default to "FUCHSIA_BUILD_DIR/amber-files"
-            let fuchsia_build_dir = self.context.build_dir().unwrap_or(&Path::new(""));
-
-            fuchsia_build_dir.join("amber-files")
-        };
-
-        // Create PmRepository and RepoClient
-        let repo_path = fs::canonicalize(repo_path.clone())
-            .with_context(|| format!("canonicalizing repo path {:?}", repo_path))?;
-        let pm_backend = PmRepository::new(
-            repo_path
-                .clone()
-                .try_into()
-                .with_context(|| format!("converting repo path to UTF-8 {:?}", repo_path))?,
-        );
-        let pm_repo_client = RepoClient::from_trusted_remote(Box::new(pm_backend) as Box<_>)
-            .await
-            .with_context(|| format!("creating repo client"))?;
-
-        // Add PmRepository to RepositoryManager
         let repo_manager: Arc<RepositoryManager> = RepositoryManager::new();
-        repo_manager.add(repo_name.clone(), pm_repo_client);
-        let repo = repo_manager
-            .get(&repo_name)
-            .ok_or_else(|| FfxCliRepositoryError::NoMatchingRepository)
-            .map_err(|e| anyhow!("Failed to fetch repository: {:?}", e))?;
+
+        let repo_path = match (self.cmd.repo_path, self.cmd.product_bundle) {
+            (Some(_), Some(_)) => {
+                ffx_bail!("Cannot specify both --repo-path and --product-bundle");
+            }
+            (None, Some(product_bundle)) => {
+                if self.cmd.repository.is_some() {
+                    ffx_bail!("--repository is not supported with --product-bundle");
+                }
+                let repositories = sdk_metadata::get_repositories(product_bundle.clone())
+                    .with_context(|| {
+                        format!("getting repositories from product bundle {product_bundle}")
+                    })?;
+                for repository in repositories {
+                    let repo_name = repository.aliases().first().unwrap().clone();
+
+                    let repo_client =
+                        RepoClient::from_trusted_remote(Box::new(repository) as Box<_>)
+                            .await
+                            .with_context(|| format!("Creating a repo client for {repo_name}"))?;
+                    repo_manager.add(repo_name, repo_client);
+                }
+                product_bundle
+            }
+            (repo_path, None) => {
+                let repo_path = if let Some(repo_path) = repo_path {
+                    repo_path
+                } else {
+                    // Default to "FUCHSIA_BUILD_DIR/amber-files"
+                    let fuchsia_build_dir = self.context.build_dir().unwrap_or(&Path::new(""));
+                    let fuchsia_build_dir =
+                        Utf8Path::from_path(fuchsia_build_dir).with_context(|| {
+                            format!("converting repo path to UTF-8 {:?}", repo_path)
+                        })?;
+
+                    fuchsia_build_dir.join(REPO_PATH_RELATIVE_TO_BUILD_DIR)
+                };
+
+                // Create PmRepository and RepoClient
+                let repo_path = repo_path
+                    .canonicalize_utf8()
+                    .with_context(|| format!("canonicalizing repo path {:?}", repo_path))?;
+                let pm_backend = PmRepository::new(repo_path.clone());
+                let pm_repo_client =
+                    RepoClient::from_trusted_remote(Box::new(pm_backend) as Box<_>)
+                        .await
+                        .with_context(|| format!("creating repo client"))?;
+
+                let repo_name =
+                    self.cmd.repository.unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
+                repo_manager.add(repo_name, pm_repo_client);
+                repo_path
+            }
+        };
 
         // Serve RepositoryManager over a RepositoryServer
         let (server_fut, _, server) =
@@ -218,23 +251,15 @@ impl FfxMain for ServeTool {
                         .with_context(|| format!("getting target identifier for default target"))??
                         .ok_or(anyhow!("no default target value"))?;
 
-                tracing::info!("Default target: {}", target_identifier);
-
-                let repo_target = FfxCliRepositoryTarget {
-                    repo_name: Some(repo_name.clone()),
-                    target_identifier: Some(target_identifier.clone()),
-                    aliases: Some(self.cmd.alias.clone()),
-                    storage_type: self.cmd.storage_type,
-                    ..Default::default()
-                };
-
                 // This blocks until the default target becomes available
                 // if a connection is possible.
-                tracing::info!("Attempting connection to default target");
+                tracing::info!("Attempting connection to default target: {target_identifier}");
                 let connection = connect_to_target(
-                    repo_target,
+                    target_identifier.clone(),
+                    Some(self.cmd.alias.clone()),
+                    self.cmd.storage_type,
                     server.local_addr(),
-                    &repo,
+                    Arc::clone(&repo_manager),
                     &self.target_collection_proxy,
                     self.cmd.alias_conflict_mode.into(),
                 )
@@ -243,8 +268,7 @@ impl FfxMain for ServeTool {
                 match connection {
                     Ok(()) => {
                         let s = format!(
-                            "Serving repository '{}' to target '{target_identifier}' over address '{}'.",
-                            repo_path.display(),
+                            "Serving repository '{repo_path}' to target '{target_identifier}' over address '{}'.",
                             server.local_addr()
                         );
                         writeln!(writer, "{}", s)
@@ -275,11 +299,8 @@ impl FfxMain for ServeTool {
                 };
             }
         } else {
-            let s = format!(
-                "Serving repository '{}' over address '{}'.",
-                repo_path.display(),
-                server.local_addr()
-            );
+            let s =
+                format!("Serving repository '{repo_path}' over address '{}'.", server.local_addr());
             writeln!(writer, "{}", s).map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
             tracing::info!("{}", s);
         }
@@ -302,14 +323,13 @@ mod test {
         fho::macro_deps::ffx_writer::TestBuffer,
         fidl::endpoints::DiscoverableProtocolMarker,
         fidl_fuchsia_developer_ffx::{
-            RemoteControlState, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
-            SshHostAddrInfo, TargetAddrInfo, TargetCollectionRequest, TargetIpPort, TargetRequest,
-            TargetState,
+            RemoteControlState, RepositoryRegistrationAliasConflictMode, SshHostAddrInfo,
+            TargetAddrInfo, TargetCollectionRequest, TargetIpPort, TargetRequest, TargetState,
         },
         fidl_fuchsia_developer_remotecontrol as frcs,
         fidl_fuchsia_net::{IpAddress, Ipv4Address},
         fidl_fuchsia_pkg::{
-            MirrorConfig, RepositoryConfig, RepositoryKeyConfig, RepositoryManagerRequest,
+            MirrorConfig, RepositoryConfig, RepositoryManagerRequest,
             RepositoryManagerRequestStream,
         },
         fidl_fuchsia_pkg_rewrite::{
@@ -334,7 +354,7 @@ mod test {
     const HOST_ADDR: &str = "1.2.3.4";
     const TARGET_NODENAME: &str = "some-target";
     const EMPTY_REPO_PATH: &str =
-        concat!(env!("ROOT_OUT_DIR"), "/test_data/ffx_plugin_serve_repo/empty-repo");
+        concat!(env!("ROOT_OUT_DIR"), "/test_data/ffx_lib_pkg/empty-repo");
 
     macro_rules! rule {
         ($host_match:expr => $host_replacement:expr,
@@ -496,8 +516,7 @@ mod test {
                                     }
                                     let _send = sender
                                         .send(RepositoryManagerMarker::PROTOCOL_NAME.to_owned())
-                                        .await
-                                        .unwrap();
+                                        .await;
                                 }
                                 EngineMarker::PROTOCOL_NAME => {
                                     if response == FakeTargetResponse::Respond {
@@ -511,8 +530,7 @@ mod test {
                                     }
                                     let _send = sender
                                         .send(EngineMarker::PROTOCOL_NAME.to_owned())
-                                        .await
-                                        .unwrap();
+                                        .await;
                                 }
                                 RemoteControlMarker::PROTOCOL_NAME => {
                                     // Serve the periodic knock whether the fake target is alive
@@ -539,8 +557,7 @@ mod test {
                                     }
                                     let _send = sender
                                         .send(RemoteControlMarker::PROTOCOL_NAME.to_owned())
-                                        .await
-                                        .unwrap();
+                                        .await;
                                 }
                                 e => {
                                     panic!("Requested capability not implemented: {}", e);
@@ -765,9 +782,10 @@ mod test {
 
         let serve_tool = ServeTool {
             cmd: ServeCommand {
-                repository: REPO_NAME.to_string(),
+                repository: Some(REPO_NAME.to_string()),
                 address: (REPO_IPV4_ADDR, REPO_PORT).into(),
                 repo_path: Some(EMPTY_REPO_PATH.into()),
+                product_bundle: None,
                 alias: vec!["example.com".into(), "fuchsia.com".into()],
                 storage_type: Some(RepositoryStorageType::Ephemeral),
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
@@ -782,7 +800,7 @@ mod test {
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
 
         // Run main in background
-        let _task = fasync::Task::local(serve_tool.main(writer));
+        let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
 
         // Future resolves once repo server communicates with them.
         let _timeout = timeout(time::Duration::from_secs(10), async {
@@ -811,10 +829,7 @@ mod test {
                         ..Default::default()
                     }]),
                     repo_url: Some(format!("fuchsia-pkg://{}", REPO_NAME)),
-                    root_keys: Some(vec![RepositoryKeyConfig::Ed25519Key(vec![
-                        29, 76, 86, 76, 184, 70, 108, 73, 249, 127, 4, 47, 95, 63, 36, 35, 101,
-                        255, 212, 33, 10, 154, 26, 130, 117, 157, 125, 88, 175, 214, 109, 113,
-                    ])]),
+                    root_keys: Some(vec![fuchsia_repo::test_utils::repo_key().into()]),
                     root_version: Some(1),
                     root_threshold: Some(1),
                     use_local_mirror: Some(false),
@@ -897,9 +912,10 @@ mod test {
 
         let serve_tool = ServeTool {
             cmd: ServeCommand {
-                repository: REPO_NAME.to_string(),
+                repository: Some(REPO_NAME.to_string()),
                 address: (REPO_IPV4_ADDR, REPO_PORT).into(),
                 repo_path: Some(EMPTY_REPO_PATH.into()),
+                product_bundle: None,
                 alias: vec!["example.com".into(), "fuchsia.com".into()],
                 storage_type: Some(RepositoryStorageType::Ephemeral),
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
@@ -914,16 +930,16 @@ mod test {
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
 
         // Run main in background
-        let _task = fasync::Task::local(serve_tool.main(writer));
+        let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
 
         // Future resolves once repo server communicates with them.
         let _timeout = timeout(time::Duration::from_secs(10), async {
             let _ = fake_repo_rx.next().await.unwrap();
             let _ = fake_engine_rx.next().await.unwrap();
-            let _fake_repo_response = target_collection_proxy_rx.next().await.unwrap();
-            let _fake_engine_response = target_collection_proxy_rx.next().await.unwrap();
-            assert_eq!(_fake_repo_response, RepositoryManagerMarker::PROTOCOL_NAME);
-            assert_eq!(_fake_engine_response, EngineMarker::PROTOCOL_NAME);
+            let fake_repo_response = target_collection_proxy_rx.next().await.unwrap();
+            let fake_engine_response = target_collection_proxy_rx.next().await.unwrap();
+            assert_eq!(fake_repo_response, RepositoryManagerMarker::PROTOCOL_NAME);
+            assert_eq!(fake_engine_response, EngineMarker::PROTOCOL_NAME);
         })
         .await
         .unwrap();
@@ -945,10 +961,7 @@ mod test {
                         ..Default::default()
                     }]),
                     repo_url: Some(format!("fuchsia-pkg://{}", REPO_NAME)),
-                    root_keys: Some(vec![RepositoryKeyConfig::Ed25519Key(vec![
-                        29, 76, 86, 76, 184, 70, 108, 73, 249, 127, 4, 47, 95, 63, 36, 35, 101,
-                        255, 212, 33, 10, 154, 26, 130, 117, 157, 125, 88, 175, 214, 109, 113,
-                    ])]),
+                    root_keys: Some(vec![fuchsia_repo::test_utils::repo_key().into()]),
                     root_version: Some(1),
                     root_threshold: Some(1),
                     use_local_mirror: Some(false),
@@ -1030,9 +1043,10 @@ mod test {
 
         let serve_tool = ServeTool {
             cmd: ServeCommand {
-                repository: REPO_NAME.to_string(),
+                repository: Some(REPO_NAME.to_string()),
                 address: (REPO_IPV4_ADDR, REPO_PORT).into(),
                 repo_path: Some(EMPTY_REPO_PATH.into()),
+                product_bundle: None,
                 alias: vec![],
                 storage_type: None,
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
@@ -1047,7 +1061,7 @@ mod test {
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
 
         // Run main in background
-        let _task = fasync::Task::local(serve_tool.main(writer));
+        let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
 
         // Wait for the "Serving repository ..." output
         for _ in 0..10 {
@@ -1118,5 +1132,148 @@ mod test {
 
         let c = target_proxy.open_remote_control(rcs_marker).await;
         assert!(c.is_ok());
+    }
+
+    async fn write_product_bundle(pb_dir: &Utf8Path) {
+        let blobs_dir = pb_dir.join("blobs");
+
+        let mut repositories = vec![];
+        for repo_name in ["fuchsia.com", "example.com"] {
+            let metadata_path = pb_dir.join(repo_name);
+            fuchsia_repo::test_utils::make_repo_dir(metadata_path.as_ref(), blobs_dir.as_ref())
+                .await;
+            repositories.push(sdk_metadata::Repository {
+                name: repo_name.into(),
+                metadata_path,
+                blobs_path: blobs_dir.clone(),
+                delivery_blob_type: None,
+                root_private_key_path: None,
+                targets_private_key_path: None,
+                snapshot_private_key_path: None,
+                timestamp_private_key_path: None,
+            });
+        }
+
+        let pb = sdk_metadata::ProductBundle::V2(sdk_metadata::ProductBundleV2 {
+            product_name: "test".into(),
+            product_version: "test-product-version".into(),
+            partitions: assembly_partitions_config::PartitionsConfig::default(),
+            sdk_version: "test-sdk-version".into(),
+            system_a: None,
+            system_b: None,
+            system_r: None,
+            repositories,
+            update_package_hash: None,
+            virtual_devices_path: None,
+        });
+        pb.write(&pb_dir).unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_serve_product_bundle() {
+        let test_env = get_test_env().await;
+
+        test_env
+            .context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(TARGET_NODENAME.into())
+            .await
+            .unwrap();
+
+        let tmp_pb_dir = tempfile::tempdir().unwrap();
+        let pb_dir = Utf8Path::from_path(tmp_pb_dir.path()).unwrap().canonicalize_utf8().unwrap();
+        write_product_bundle(&pb_dir).await;
+
+        let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
+
+        let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
+        let (fake_engine, _fake_engine_rx) = FakeEngine::new();
+        let (_, target_collection_proxy, _) =
+            FakeTargetCollection::new(fake_repo.clone(), fake_engine.clone(), None);
+
+        // Future resolves once fake target exists
+        let _timeout = timeout(time::Duration::from_secs(10), async {
+            let fake_targets = get_target_infos(
+                &target_collection_proxy,
+                &FfxTargetQuery { string_matcher: None, ..Default::default() },
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(fake_targets[0], to_target_info(TARGET_NODENAME.to_string()));
+        })
+        .await
+        .unwrap();
+
+        let serve_tool = ServeTool {
+            cmd: ServeCommand {
+                repository: None,
+                address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                repo_path: None,
+                product_bundle: Some(pb_dir),
+                alias: vec![],
+                storage_type: Some(RepositoryStorageType::Ephemeral),
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                port_path: Some(tmp_port_file.path().to_owned()),
+                no_device: false,
+            },
+            context: test_env.context.clone(),
+            target_collection_proxy: target_collection_proxy,
+        };
+
+        let test_stdout = TestBuffer::default();
+        let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
+
+        // Run main in background
+        let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
+
+        // Future resolves once repo server communicates with them.
+        let _timeout = timeout(time::Duration::from_secs(10), async {
+            let _ = fake_repo_rx.next().await.unwrap();
+        })
+        .await
+        .unwrap();
+
+        // Get dynamic port
+        let dynamic_repo_port =
+            fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
+        tmp_port_file.close().unwrap();
+
+        assert_eq!(
+            fake_repo.take_events(),
+            ["example.com", "fuchsia.com"].map(|repo_name| RepositoryManagerEvent::Add {
+                repo: RepositoryConfig {
+                    mirrors: Some(vec![MirrorConfig {
+                        mirror_url: Some(format!(
+                            "http://{REPO_ADDR}:{dynamic_repo_port}/{repo_name}"
+                        )),
+                        subscribe: Some(true),
+                        ..Default::default()
+                    }]),
+                    repo_url: Some(format!("fuchsia-pkg://{}", repo_name)),
+                    root_keys: Some(vec![fuchsia_repo::test_utils::repo_key().into()]),
+                    root_version: Some(1),
+                    root_threshold: Some(1),
+                    use_local_mirror: Some(false),
+                    storage_type: Some(fidl_fuchsia_pkg::RepositoryStorageType::Ephemeral),
+                    ..Default::default()
+                }
+            },)
+        );
+
+        // Check repository state.
+        for repo_name in ["example.com", "fuchsia.com"] {
+            let repo_url = format!("http://{REPO_ADDR}:{dynamic_repo_port}/{repo_name}");
+            let http_repo = HttpRepository::new(
+                fuchsia_hyper::new_client(),
+                Url::parse(&repo_url).unwrap(),
+                Url::parse(&format!("{repo_url}/blobs")).unwrap(),
+                BTreeSet::new(),
+            );
+            let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
+
+            assert_matches!(repo_client.update().await, Ok(true));
+        }
     }
 }

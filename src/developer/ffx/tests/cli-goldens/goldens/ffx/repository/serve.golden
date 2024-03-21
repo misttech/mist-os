@@ -50,6 +50,18 @@
     {
       "kind": {
         "Option": {
+          "arg_name": "product-bundle"
+        }
+      },
+      "optionality": "optional",
+      "long": "--product-bundle",
+      "short": null,
+      "description": "location of product bundle.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
           "arg_name": "alias"
         }
       },

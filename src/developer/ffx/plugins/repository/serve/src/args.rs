@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
+use camino::Utf8PathBuf;
 use ffx_core::ffx_command;
 use fidl_fuchsia_developer_ffx::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
 use std::{
@@ -19,10 +20,10 @@ use std::{
     description = "(EXPERIMENTAL) serve the repository server, registering repositories to device"
 )]
 pub struct ServeCommand {
-    #[argh(option, short = 'r', default = "default_repository()")]
+    #[argh(option, short = 'r')]
     /// register this repository.
     /// Default is `devhost`.
-    pub repository: String,
+    pub repository: Option<String>,
 
     /// address on which to serve the repository.
     /// Note that this can be either IPV4 or IPV6.
@@ -34,7 +35,11 @@ pub struct ServeCommand {
     /// location of pm-built repo.
     /// Default is "FUCHSIA_BUILD_DIR/amber-files"
     #[argh(option)]
-    pub repo_path: Option<PathBuf>,
+    pub repo_path: Option<Utf8PathBuf>,
+
+    /// location of product bundle.
+    #[argh(option)]
+    pub product_bundle: Option<Utf8PathBuf>,
 
     /// set up a rewrite rule mapping each `alias` host to
     /// the repository identified by `name`.
@@ -65,10 +70,6 @@ pub struct ServeCommand {
     /// Default is `false`.
     #[argh(switch)]
     pub no_device: bool,
-}
-
-fn default_repository() -> String {
-    "devhost".to_string()
 }
 
 fn default_address() -> SocketAddr {
