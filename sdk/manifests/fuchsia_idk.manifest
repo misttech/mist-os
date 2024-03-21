@@ -94,6 +94,7 @@ companion_host_tool://tools/x64/qemu_internal
 companion_host_tool://tools/x64/qemu_uefi_internal
 dart_library://dart/sl4f
 data://data/config/symbol_index
+data://pkg/heapdump_instrumentation/heapdump_instrumentation_shard.json
 data://pkg/inspect/inspect.json
 data://pkg/sys/component/realm_builder_shard_sdk.json
 data://pkg/sys/testing/testing_sdk.json

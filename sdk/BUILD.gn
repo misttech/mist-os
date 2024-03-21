@@ -487,6 +487,7 @@ sdk_molecule("core_packages_built_at_head") {
 sdk_molecule("core_data") {
   deps = [
     # TODO(ddorwin): Rename these to make it clear that they are data (e.g., _shards).
+    "//sdk/lib/heapdump_instrumentation:heapdump_instrumentation_shard",
     "//sdk/lib/inspect",
     "//sdk/lib/sys/component:realm_builder_shard_sdk",
     "//sdk/lib/syslog",
