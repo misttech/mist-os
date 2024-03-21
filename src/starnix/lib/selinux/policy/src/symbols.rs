@@ -8,11 +8,12 @@ use super::{
     error::{ParseError, ValidateError},
     extensible_bitmap::ExtensibleBitmap,
     parser::ParseStrategy,
-    Array, Counted, Parse, ParseSlice, Validate, ValidateArray,
+    Array, CategoryId, Counted, Parse, ParseSlice, RoleId, SensitivityId, TypeId, UserId, Validate,
+    ValidateArray,
 };
 
 use anyhow::Context as _;
-use std::{fmt::Debug, ops::Deref};
+use std::{fmt::Debug, num::NonZeroU32, ops::Deref};
 use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
 
 /// The `type` field value for a [`Constraint`] that contains an [`ExtensibleBitmap`] and
@@ -1001,8 +1002,8 @@ pub(crate) struct Role<PS: ParseStrategy> {
 }
 
 impl<PS: ParseStrategy> Role<PS> {
-    pub(crate) fn id(&self) -> le::U32 {
-        PS::deref(&self.metadata.metadata).id
+    pub(crate) fn id(&self) -> RoleId {
+        RoleId(NonZeroU32::new(PS::deref(&self.metadata.metadata).id.get()).unwrap())
     }
 
     pub(crate) fn name_bytes(&self) -> &[u8] {
@@ -1076,51 +1077,6 @@ impl Validate for RoleStaticMetadata {
     }
 }
 
-pub(crate) fn find_role_by_name<'a, PS: ParseStrategy>(
-    roles: &'a Vec<Role<PS>>,
-    name: &str,
-) -> Option<&'a Role<PS>> {
-    let name_bytes = name.as_bytes();
-
-    for role in roles.into_iter() {
-        if role.name_bytes() == name_bytes {
-            return Some(role);
-        }
-    }
-
-    None
-}
-
-pub(crate) fn find_role_by_id<'a, PS: ParseStrategy>(
-    roles: &'a Vec<Role<PS>>,
-    id: le::U32,
-) -> Option<&'a Role<PS>> {
-    for role in roles.into_iter() {
-        if role.id() == id {
-            return Some(role);
-        }
-    }
-
-    None
-}
-
-/// Returns a type or type alias or attribute named `name`, if one exists in the collection,
-/// `types`.
-pub(crate) fn find_type_alias_or_attribute_by_name<'a, PS: ParseStrategy>(
-    types: &'a Types<PS>,
-    name: &str,
-) -> Option<&'a Type<PS>> {
-    let name_bytes = name.as_bytes();
-
-    for taa in types.into_iter() {
-        if taa.name_bytes() == name_bytes {
-            return Some(taa);
-        }
-    }
-
-    None
-}
-
 /// Returns whether `ty` is associated with `attr` via the mappings `attribute_maps`. Such
 /// associations arise from policy statements of the form `typeattribute [ty] [attributes];` where
 /// `attr` appears in the comma-separated list, `[attributes]`.
@@ -1154,8 +1110,6 @@ array_type!(Type, PS, PS::Output<TypeMetadata>, PS::Slice<u8>);
 
 array_type_validate_deref_both!(Type);
 
-pub(crate) type Types<PS> = Vec<Type<PS>>;
-
 impl<PS: ParseStrategy> Type<PS> {
     /// Returns the name of this type.
     pub fn name_bytes(&self) -> &[u8] {
@@ -1165,8 +1119,8 @@ impl<PS: ParseStrategy> Type<PS> {
     /// Returns the id associated with this type. The id is used to index into collections and
     /// bitmaps associated with this type. The id is 1-indexed, whereas most collections and
     /// bitmaps are 0-indexed, so clients of this API will usually use `id - 1`.
-    pub fn id(&self) -> le::U32 {
-        PS::deref(&self.metadata).id
+    pub fn id(&self) -> TypeId {
+        TypeId(NonZeroU32::new(PS::deref(&self.metadata).id.get()).unwrap())
     }
 
     /// Returns whether this type is from a `type [name];` policy statement.
@@ -1246,8 +1200,8 @@ pub(crate) struct User<PS: ParseStrategy> {
 }
 
 impl<PS: ParseStrategy> User<PS> {
-    pub(crate) fn id(&self) -> le::U32 {
-        PS::deref(&self.user_data.metadata).id
+    pub(crate) fn id(&self) -> UserId {
+        UserId(NonZeroU32::new(PS::deref(&self.user_data.metadata).id.get()).unwrap())
     }
 
     pub(crate) fn name_bytes(&self) -> &[u8] {
@@ -1325,8 +1279,8 @@ pub(crate) struct MlsLevel<PS: ParseStrategy> {
 }
 
 impl<PS: ParseStrategy> MlsLevel<PS> {
-    pub fn sensitivity(&self) -> le::U32 {
-        *PS::deref(&self.sensitivity)
+    pub fn sensitivity(&self) -> SensitivityId {
+        SensitivityId(NonZeroU32::new(PS::deref(&self.sensitivity).get()).unwrap())
     }
     pub fn categories(&self) -> &ExtensibleBitmap<PS> {
         &self.categories
@@ -1514,8 +1468,8 @@ pub(crate) struct Sensitivity<PS: ParseStrategy> {
 }
 
 impl<PS: ParseStrategy> Sensitivity<PS> {
-    pub fn id(&self) -> le::U32 {
-        *PS::deref(&self.level.sensitivity)
+    pub fn id(&self) -> SensitivityId {
+        SensitivityId(NonZeroU32::new(PS::deref(&self.level.sensitivity).get()).unwrap())
     }
 
     pub fn name_bytes(&self) -> &[u8] {
@@ -1550,6 +1504,8 @@ impl<PS: ParseStrategy> Validate for Sensitivity<PS> {
 
     /// TODO: Validate internal consistency of `self.metadata` and `self.level`.
     fn validate(&self) -> Result<(), Self::Error> {
+        NonZeroU32::new(PS::deref(&self.level.sensitivity).get())
+            .ok_or(ValidateError::NonOptionalIdIsZero)?;
         Ok(())
     }
 }
@@ -1608,8 +1564,8 @@ array_type!(Category, PS, PS::Output<CategoryMetadata>, PS::Slice<u8>);
 array_type_validate_deref_both!(Category);
 
 impl<PS: ParseStrategy> Category<PS> {
-    pub fn id(&self) -> le::U32 {
-        PS::deref(&self.metadata).id
+    pub fn id(&self) -> CategoryId {
+        CategoryId(NonZeroU32::new(PS::deref(&self.metadata).id.get()).unwrap())
     }
 
     pub fn name_bytes(&self) -> &[u8] {
@@ -1650,6 +1606,7 @@ impl Validate for CategoryMetadata {
 
     /// TODO: Validate internal consistency of [`CategoryMetadata`].
     fn validate(&self) -> Result<(), Self::Error> {
+        NonZeroU32::new(self.id.get()).ok_or(ValidateError::NonOptionalIdIsZero)?;
         Ok(())
     }
 }

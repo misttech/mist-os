@@ -11,12 +11,12 @@ use super::{
     extensible_bitmap::ExtensibleBitmap,
     parser::ParseStrategy,
     symbols::{MlsLevel, MlsRange},
-    Array, Counted, Parse, Validate, ValidateArray,
+    Array, Counted, Parse, RoleId, TypeId, UserId, Validate, ValidateArray,
 };
 
 use anyhow::Context as _;
 use selinux_common as sc;
-use std::fmt::Debug;
+use std::{fmt::Debug, num::NonZeroU32};
 use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
 
 pub(crate) const EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK: u16 = 0x0700;
@@ -187,20 +187,21 @@ impl<PS: ParseStrategy> AccessVector<PS> {
 
     /// Returns the source type id in this access vector. This id corresponds to the
     /// [`super::symbols::Type`] `id()` of some type or attribute in the same policy.
-    pub fn source_type(&self) -> le::U16 {
-        PS::deref(&self.metadata).source_type
+    pub fn source_type(&self) -> TypeId {
+        TypeId(NonZeroU32::new(PS::deref(&self.metadata).source_type.into()).unwrap())
     }
 
     /// Returns the target type id in this access vector. This id corresponds to the
     /// [`super::symbols::Type`] `id()` of some type or attribute in the same policy.
-    pub fn target_type(&self) -> le::U16 {
-        PS::deref(&self.metadata).target_type
+    pub fn target_type(&self) -> TypeId {
+        TypeId(NonZeroU32::new(PS::deref(&self.metadata).target_type.into()).unwrap())
     }
 
     /// Returns the target class id in this access vector. This id corresponds to the
     /// [`super::symbols::Class`] `id()` of some class in the same policy.
-    pub fn target_class(&self) -> le::U16 {
-        PS::deref(&self.metadata).class
+    /// Although the index is returned as a 32-bit value, the field itself is 16-bit
+    pub fn target_class(&self) -> le::U32 {
+        PS::deref(&self.metadata).class.into()
     }
 
     /// A bit mask that corresponds to the permissions in this access vector. Permission bits are
@@ -214,10 +215,12 @@ impl<PS: ParseStrategy> AccessVector<PS> {
     }
 
     /// A numeric type id that corresponds to a the `[new_type]` in a
-    /// `type_transtion [source] [target]:[class] [new_type];` policy statement.
-    pub fn new_type(&self) -> Option<le::U32> {
+    /// `type_transition [source] [target]:[class] [new_type];` policy statement.
+    pub fn new_type(&self) -> Option<TypeId> {
         match &self.extended_permissions {
-            ExtendedPermissions::NewType(new_type) => Some(*PS::deref(new_type)),
+            ExtendedPermissions::NewType(new_type) => {
+                Some(TypeId(NonZeroU32::new(PS::deref(new_type).get().into()).unwrap()))
+            }
             _ => None,
         }
     }
@@ -339,20 +342,20 @@ pub(crate) struct RoleTransition {
 }
 
 impl RoleTransition {
-    pub(crate) fn current_role(&self) -> le::U32 {
-        self.role
+    pub(crate) fn current_role(&self) -> RoleId {
+        RoleId(NonZeroU32::new(self.role.get()).unwrap())
     }
 
-    pub(crate) fn type_(&self) -> le::U32 {
-        self.role_type
+    pub(crate) fn type_(&self) -> TypeId {
+        TypeId(NonZeroU32::new(self.role_type.get()).unwrap())
     }
 
     pub(crate) fn class(&self) -> le::U32 {
         self.tclass
     }
 
-    pub(crate) fn new_role(&self) -> le::U32 {
-        self.new_role
+    pub(crate) fn new_role(&self) -> RoleId {
+        RoleId(NonZeroU32::new(self.new_role.get()).unwrap())
     }
 }
 
@@ -389,12 +392,12 @@ pub(crate) struct RoleAllow {
 }
 
 impl RoleAllow {
-    pub(crate) fn source_role(&self) -> le::U32 {
-        self.role
+    pub(crate) fn source_role(&self) -> RoleId {
+        RoleId(NonZeroU32::new(self.role.get()).unwrap())
     }
 
-    pub(crate) fn new_role(&self) -> le::U32 {
-        self.new_role
+    pub(crate) fn new_role(&self) -> RoleId {
+        RoleId(NonZeroU32::new(self.new_role.get()).unwrap())
     }
 }
 
@@ -628,14 +631,14 @@ pub(crate) struct Context<PS: ParseStrategy> {
 }
 
 impl<PS: ParseStrategy> Context<PS> {
-    pub(crate) fn user_id(&self) -> le::U32 {
-        PS::deref(&self.metadata).user
+    pub(crate) fn user_id(&self) -> UserId {
+        UserId(NonZeroU32::new(PS::deref(&self.metadata).user.get()).unwrap())
     }
-    pub(crate) fn role_id(&self) -> le::U32 {
-        PS::deref(&self.metadata).role
+    pub(crate) fn role_id(&self) -> RoleId {
+        RoleId(NonZeroU32::new(PS::deref(&self.metadata).role.get()).unwrap())
     }
-    pub(crate) fn type_id(&self) -> le::U32 {
-        PS::deref(&self.metadata).context_type
+    pub(crate) fn type_id(&self) -> TypeId {
+        TypeId(NonZeroU32::new(PS::deref(&self.metadata).context_type.get()).unwrap())
     }
     pub(crate) fn low_level(&self) -> &MlsLevel<PS> {
         self.mls_range.low()
@@ -1131,12 +1134,12 @@ pub(crate) struct RangeTransition<PS: ParseStrategy> {
 }
 
 impl<PS: ParseStrategy> RangeTransition<PS> {
-    pub fn source_type(&self) -> le::U32 {
-        PS::deref(&self.metadata).source_type
+    pub fn source_type(&self) -> TypeId {
+        TypeId(NonZeroU32::new(PS::deref(&self.metadata).source_type.get()).unwrap())
     }
 
-    pub fn target_type(&self) -> le::U32 {
-        PS::deref(&self.metadata).target_type
+    pub fn target_type(&self) -> TypeId {
+        TypeId(NonZeroU32::new(PS::deref(&self.metadata).target_type.get()).unwrap())
     }
 
     pub fn target_class(&self) -> le::U32 {
