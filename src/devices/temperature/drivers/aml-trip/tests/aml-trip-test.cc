@@ -27,6 +27,7 @@
 #include <zircon/errors.h>
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 
@@ -249,6 +250,40 @@ TEST_F(AmlTripTest, TestSetTripBadType) {
   rise_desc->type = fuchsia_hardware_trippoint::wire::TripPointType::kOneshotTempBelow;
   rise_desc->configuration =
       fuchsia_hardware_trippoint::wire::TripPointValue::WithOneshotTempBelowTripPoint(tp);
+
+  descs.push_back(*rise_desc);
+  auto set_desc_view =
+      fidl::VectorView<fuchsia_hardware_trippoint::wire::TripPointDescriptor>::FromExternal(descs);
+
+  auto set_result = client_->SetTripPoints(set_desc_view);
+  EXPECT_TRUE(set_result.ok());
+  EXPECT_TRUE(set_result->is_error());
+}
+
+TEST_F(AmlTripTest, TestSetCriticalTempInfinity) {
+  auto result = client_->GetTripPointDescriptors();
+
+  ASSERT_TRUE(result.ok());
+
+  auto descs_view = result.value()->descriptors;
+
+  std::vector<fuchsia_hardware_trippoint::wire::TripPointDescriptor> descs;
+
+  auto rise_desc = std::find_if(
+      descs_view.begin(), descs_view.end(),
+      [](fuchsia_hardware_trippoint::wire::TripPointDescriptor& d) {
+        return d.type == fuchsia_hardware_trippoint::wire::TripPointType::kOneshotTempAbove;
+      });
+
+  // Make sure at least one descriptor is found.
+  ASSERT_NE(rise_desc, descs_view.end());
+
+  // It's illegal to configure the trip point temperature as Infinity.
+  fuchsia_hardware_trippoint::wire::OneshotTempAboveTripPoint tp;
+  tp.critical_temperature_celsius = std::numeric_limits<float>::infinity();
+  rise_desc->type = fuchsia_hardware_trippoint::wire::TripPointType::kOneshotTempAbove;
+  rise_desc->configuration =
+      fuchsia_hardware_trippoint::wire::TripPointValue::WithOneshotTempAboveTripPoint(tp);
 
   descs.push_back(*rise_desc);
   auto set_desc_view =

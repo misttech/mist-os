@@ -147,10 +147,20 @@ void AmlTripDevice::SetTripPoints(SetTripPointsRequestView request,
         completer.ReplyError(ZX_ERR_INVALID_ARGS);
         return;
       }
+      if (std::isinf(
+              desc.configuration.oneshot_temp_below_trip_point().critical_temperature_celsius)) {
+        completer.ReplyError(ZX_ERR_INVALID_ARGS);
+        return;
+      }
     } else if (desc.configuration.is_oneshot_temp_above_trip_point()) {
       if (desc.type != fuchsia_hardware_trippoint::TripPointType::kOneshotTempAbove) {
         FDF_LOG(ERROR, "The provided configuration does not match the trip point type. index = %u",
                 desc.index);
+        completer.ReplyError(ZX_ERR_INVALID_ARGS);
+        return;
+      }
+      if (std::isinf(
+              desc.configuration.oneshot_temp_above_trip_point().critical_temperature_celsius)) {
         completer.ReplyError(ZX_ERR_INVALID_ARGS);
         return;
       }
