@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Array_of_ShowEntry",
+  "type": "array",
+  "items": {
+    "$ref": "#/definitions/ShowEntry"
+  },
+  "definitions": {
+    "ShowEntry": {
+      "description": "A node in a hierarchy of show information or groupings.",
+      "type": "object",
+      "required": [
+        "child",
+        "description",
+        "label",
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ShowValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "child": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ShowEntry"
+          }
+        }
+      }
+    },
+    "ShowValue": {
+      "description": "Show entry values.",
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    }
+  }
+}
