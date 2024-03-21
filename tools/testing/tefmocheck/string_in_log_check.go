@@ -639,11 +639,21 @@ func infraToolLogChecks() []FailureModeCheck {
 			String:      "botanist DEBUG: error sending keepalive",
 			Type:        swarmingOutputType,
 			AlwaysFlake: true,
+			ExceptBlocks: []*logBlock{
+				{startString: "==========> RtcTest <==========", endString: "Summary for test class RtcTest"},
+				{startString: "==========> SoftRebootTest <==========", endString: "Summary for test class SoftRebootTest"},
+				{startString: "==========> NetstackIperfTest <==========", endString: "Summary for test class NetstackIperfTest"},
+			},
 		},
 		&stringInLogCheck{
 			String:      "botanist DEBUG: ssh keepalive timed out",
 			Type:        swarmingOutputType,
 			AlwaysFlake: true,
+			ExceptBlocks: []*logBlock{
+				{startString: "==========> RtcTest <==========", endString: "Summary for test class RtcTest"},
+				{startString: "==========> SoftRebootTest <==========", endString: "Summary for test class SoftRebootTest"},
+				{startString: "==========> NetstackIperfTest <==========", endString: "Summary for test class NetstackIperfTest"},
+			},
 		},
 		&stringInLogCheck{
 			String:      "remote command exited without exit status or exit signal",
