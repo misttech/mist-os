@@ -953,9 +953,6 @@ def main():
         # to Python scripts.  This also covers dirs named python3.x.
         os.path.join(src_root, "prebuilt", "third_party", "python3"),
         ### Dart
-        # TODO(jayzhuang): flutter's dart_libraries currently don't have sources
-        # listed, fix that and remove this exception.
-        os.path.join(src_root, "third_party", "dart-pkg", "git", "flutter/"),
         # Dart provides prebuilt libs and their snapshots for its standard libraries
         # that are not strict inputs to Dart programs.
         os.path.join(src_root, "prebuilt", "third_party", "dart/"),
@@ -967,9 +964,6 @@ def main():
         # catching other tools trying to write to $HOME in the future.
         # This only affects local builds.
         os.path.join(os.getcwd(), ".dart/"),
-        ### Flutter
-        # Implicit engine deps
-        os.path.join(src_root, "prebuilt", "third_party", "sky_engine", "lib/"),
         ### Ninja
         # There is no way to specify this file as an input to a GN action
         # since this file is not known to GN.
@@ -985,8 +979,6 @@ def main():
         # TODO(jayzhuang): Figure out whether `.dart_tool/package_config.json`
         # should be included in inputs.
         "/.dart_tool/package_config.json",
-        # Allow Flutter to read and write tool states.
-        "/.config/flutter/tool_state",
         # Allow global access to remote action download file locks,
         # which are not consumed by any other builds actions.
         ".dl-lock",
@@ -1013,14 +1005,6 @@ def main():
         # at GN gen time, so write them to `__untraced_dart_kernel__` and ignore
         # accesses to them.
         "__untraced_dart_kernel__",
-        # Flutter dart components collects flutter assets in an output directory
-        # which cannot be determined at GN gen time, so write them to
-        # `__untraced_flutter_assets__` and ignore accesses to them.
-        "__untraced_flutter_assets__",
-        # https://fxbug.dev/42053129: our current dartdoc implementation seems
-        # to be throwing aberrant unexpected reads and is also missing
-        # some writes. We declare this exemption temporarily until it is fixed.
-        "__untraced_dartdoc_output__",
     }
     # It's ok to access */.git/* if your action is sensitive to .git contents.
     for args_input in args.inputs:
