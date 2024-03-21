@@ -207,7 +207,7 @@ The methods are summarized here and explained in full below.
 : destroy/create/start : then starts :         :          :           :
 | ffx component run    | destroys,   | yes     | yes      | no        |
 : --recreate           : then starts :         :          :           :
-| ffx component        | stops and   | yes     | no       | yes       |
+| ffx component        | stops and   | no      | no       | yes       |
 : stop/start           : starts      :         :          :           :
 :                      : without     :         :          :           :
 :                      : destroying  :         :          :           :
