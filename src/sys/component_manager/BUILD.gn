@@ -415,6 +415,11 @@ component_config("component_manager_realm_builder_debug_config") {
   dest = "data/component_manager_realm_builder_debug_config"
 }
 
+component_config("component_manager_realm_builder_passthrough_config") {
+  sources = [ "configs/realm_builder_passthrough_config.json5" ]
+  dest = "data/component_manager_realm_builder_passthrough_config"
+}
+
 component_config("component_manager_bootfs_config") {
   build_type = "eng"
   dest = "config/component_manager"

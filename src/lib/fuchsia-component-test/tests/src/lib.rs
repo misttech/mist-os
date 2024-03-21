@@ -7,8 +7,7 @@ use {
     assert_matches::assert_matches,
     cm_rust::FidlIntoNative,
     fidl_fidl_examples_routing_echo::{self as fecho, EchoMarker as EchoClientStatsMarker},
-    fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_component::EventStreamMarker,
+    fidl_fuchsia_component::{self as fcomponent, EventStreamMarker},
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_test as ftest,
     fidl_fuchsia_data as fdata, fidl_fuchsia_examples_services as fex_services,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
@@ -1122,6 +1121,42 @@ async fn echo_clients() -> Result<(), Error> {
         realm_instance.destroy().await?;
     }
 
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn nested_component_manager_with_passthrough() -> Result<(), Error> {
+    let builder = RealmBuilder::new().await?;
+    let (send_echo_server_called, mut receive_echo_server_called) = mpsc::channel(1);
+    let echo_server = builder
+        .add_local_child(
+            "echo-server",
+            move |h| echo_server_mock(DEFAULT_ECHO_STR, send_echo_server_called.clone(), h).boxed(),
+            ChildOptions::new().eager(),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fecho::EchoMarker>())
+                .from(&echo_server)
+                .to(Ref::parent()),
+        )
+        .await
+        .expect("failed to add route");
+    let cm_instance =
+        builder.build_in_nested_component_manager("#meta/component_manager.cm").await?;
+
+    let echo_proxy = cm_instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    assert_eq!(
+        Some(DEFAULT_ECHO_STR.to_string()),
+        echo_proxy.echo_string(Some(DEFAULT_ECHO_STR)).await?,
+    );
+    assert!(
+        receive_echo_server_called.next().await.is_some(),
+        "failed to observe the mock server report a successful connection",
+    );
+    cm_instance.destroy().await?;
     Ok(())
 }
 

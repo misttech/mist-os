@@ -5,7 +5,10 @@
 use {
     crate::{error::Error, local_component_runner::LocalComponentRunnerBuilder},
     anyhow::{format_err, Context as _},
-    cm_rust::{FidlIntoNative, NativeIntoFidl},
+    cm_rust::{
+        CapabilityDecl, ExposeDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget, FidlIntoNative,
+        NativeIntoFidl, ProtocolDecl,
+    },
     component_events::{events::Started, matcher::EventMatcher},
     fidl::endpoints::{
         self, create_proxy, ClientEnd, DiscoverableProtocolMarker, Proxy, ServerEnd, ServiceMarker,
@@ -30,6 +33,10 @@ pub mod new {
 
 /// The default name of the child component collection that contains built topologies.
 pub const DEFAULT_COLLECTION_NAME: &'static str = "realm_builder";
+
+/// The default path of the remote directory through which a nested component
+/// manager serves capabilities exposed by the root component.
+const ROOT_CAPABILITY_PATH: &'static str = "/root-exposed";
 
 const REALM_BUILDER_SERVER_CHILD_NAME: &'static str = "realm_builder_server";
 
@@ -930,6 +937,43 @@ impl RealmBuilder {
         component_manager_fragment_only_url: &str,
     ) -> Result<(RealmBuilder, fasync::Task<()>), Error> {
         let collection_name = self.collection_name.clone();
+        let root_decl = self.root_realm.get_realm_decl().await?;
+        let root_caps = root_decl
+            .exposes
+            .iter()
+            .filter_map(|exposed| match exposed {
+                ExposeDecl::Protocol(decl) => {
+                    let source_path = cm_types::Path::new(format!(
+                        "{}/{}",
+                        ROOT_CAPABILITY_PATH,
+                        decl.target_name.clone()
+                    ))
+                    .inspect_err(|e| warn!("invalid capability source path: {}", e)).ok()?;
+                    let capability = ProtocolDecl {
+                        name: decl.target_name.clone(),
+                        source_path: Some(source_path),
+                    };
+                    let expose = ExposeProtocolDecl {
+                        source: ExposeSource::Self_,
+                        source_name: decl.target_name.clone(),
+                        source_dictionary: None,
+                        target: ExposeTarget::Parent,
+                        target_name: decl.target_name.clone(),
+                        availability: decl.availability,
+                    };
+                    Some((CapabilityDecl::Protocol(capability), ExposeDecl::Protocol(expose)))
+                }
+                d @ ExposeDecl::Service(_)
+                | d @ ExposeDecl::Directory(_)
+                | d @ ExposeDecl::Config(_)
+                | d @ ExposeDecl::Runner(_)
+                | d @ ExposeDecl::Resolver(_)
+                | d @ ExposeDecl::Dictionary(_) => {
+                    warn!("capability type not supported for nested component manager passthrough: {:?}", d);
+                    None
+                }
+            })
+            .collect::<Vec<(CapabilityDecl, ExposeDecl)>>();
         let (root_url, nested_local_component_runner_task) = self.initialize().await?;
 
         // We now have a root URL we could create in a collection, but instead we want to launch a
@@ -972,6 +1016,10 @@ impl RealmBuilder {
                 fdata::DictionaryValue::StrVec(ref mut v) => v.push(root_url),
                 _ => panic!("component manager's manifest has a single value for 'args', but we were expecting a vector"),
         }
+        for (capability, expose) in &root_caps {
+            component_manager_decl.capabilities.push(capability.clone());
+            component_manager_decl.exposes.push(expose.clone());
+        }
         component_manager_realm
             .replace_component_decl("component_manager", component_manager_decl)
             .await?;
@@ -1003,6 +1051,37 @@ impl RealmBuilder {
                     .to(Ref::parent()),
             )
             .await?;
+        for (cap, _expose) in root_caps {
+            match cap {
+                CapabilityDecl::Protocol(decl) => {
+                    component_manager_realm
+                        .add_route(
+                            Route::new()
+                                .capability(Capability::protocol_by_name(decl.name))
+                                .from(Ref::child("component_manager"))
+                                .to(Ref::parent()),
+                        )
+                        .await?;
+                }
+                CapabilityDecl::Service(decl) => {
+                    component_manager_realm
+                        .add_route(
+                            Route::new()
+                                .capability(Capability::service_by_name(decl.name))
+                                .from(Ref::child("component_manager"))
+                                .to(Ref::parent()),
+                        )
+                        .await?;
+                }
+                CapabilityDecl::Directory(_)
+                | CapabilityDecl::Config(_)
+                | CapabilityDecl::Runner(_)
+                | CapabilityDecl::Resolver(_)
+                | CapabilityDecl::Dictionary(_)
+                | CapabilityDecl::Storage(_)
+                | CapabilityDecl::EventStream(_) => (),
+            }
+        }
         Ok((component_manager_realm, nested_local_component_runner_task))
     }
 

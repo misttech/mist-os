@@ -7,6 +7,7 @@ use crate::builtin::smc_resource::SmcResource;
 
 #[cfg(target_arch = "x86_64")]
 use crate::builtin::ioport_resource::IoportResource;
+use crate::model::component::WeakComponentInstance;
 
 use {
     crate::{
@@ -311,6 +312,11 @@ impl BuiltinEnvironmentBuilder {
             fidl_fuchsia_component_internal::RealmBuilderResolverAndRunner::None => None,
         };
 
+        let capability_passthrough = match runtime_config.realm_builder_resolver_and_runner {
+            fidl_fuchsia_component_internal::RealmBuilderResolverAndRunner::Namespace => true,
+            fidl_fuchsia_component_internal::RealmBuilderResolverAndRunner::None => false,
+        };
+
         let runner_map = self
             .runners
             .iter()
@@ -361,6 +367,7 @@ impl BuiltinEnvironmentBuilder {
             self.utc_clock,
             self.inspector.unwrap_or(component::inspector().clone()),
             self.crash_records,
+            capability_passthrough,
         )
         .await?)
     }
@@ -492,6 +499,7 @@ pub struct BuiltinEnvironment {
     pub num_threads: usize,
     pub realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
     pub root_component_input: ComponentInput,
+    capability_passthrough: bool,
     _service_fs_task: Option<fasync::Task<()>>,
 }
 
@@ -506,6 +514,7 @@ impl BuiltinEnvironment {
         utc_clock: Option<Arc<Clock>>,
         inspector: Inspector,
         crash_records: CrashRecords,
+        capability_passthrough: bool,
     ) -> Result<BuiltinEnvironment, Error> {
         let debug = runtime_config.debug;
 
@@ -1138,6 +1147,7 @@ impl BuiltinEnvironment {
             num_threads,
             realm_builder_resolver,
             root_component_input,
+            capability_passthrough,
             _service_fs_task: None,
         })
     }
@@ -1179,14 +1189,45 @@ impl BuiltinEnvironment {
 
         // Install the `fuchsia.component.sandbox.Factory` protocol.
         let factory_capability_host = self.factory_capability_host.clone();
-        service_fs.dir("svc").add_fidl_service(move |stream| {
-            let factory_capability_host = factory_capability_host.clone();
+        {
+            let scope = scope.clone();
+            service_fs.dir("svc").add_fidl_service(move |stream| {
+                let factory_capability_host = factory_capability_host.clone();
+                scope.spawn(async move {
+                    if let Err(err) = factory_capability_host.serve(stream).await {
+                        warn!(?err, "Failed to serve fuchsia.component.sandbox.Factory");
+                    }
+                });
+            });
+        }
+
+        // If capability passthrough is enabled, add a remote directory to proxy
+        // capabilities exposed by the root component.
+        if self.capability_passthrough {
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+            service_fs.add_remote("root-exposed", proxy);
+            let root = self.model.top_instance().root().await;
+            let root = WeakComponentInstance::new(&root);
             scope.spawn(async move {
-                if let Err(err) = factory_capability_host.serve(stream).await {
-                    warn!(?err, "Failed to serve fuchsia.component.sandbox.Factory");
+                let signals = fasync::OnSignals::new(&server_end, zx::Signals::CHANNEL_READABLE);
+                let _ = signals.await.expect("failed to await channel readable signal");
+                if let Ok(root) = root.upgrade() {
+                    let resolved_state = root
+                        .lock_resolved_state()
+                        .await
+                        .expect("failed to resolve root component state");
+                    let server_end = server_end.into_channel();
+                    let flags = routing::rights::Rights::from(fio::RW_STAR_DIR).into_legacy();
+                    resolved_state
+                        .open_exposed_dir(
+                            flags,
+                            vfs::path::Path::dot(),
+                            fidl::endpoints::ServerEnd::new(server_end),
+                        )
+                        .await;
                 }
             });
-        });
+        }
 
         // If component manager is in debug mode, create an event source scoped at the
         // root and offer it via ServiceFs to the outside world.
