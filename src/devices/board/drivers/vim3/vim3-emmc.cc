@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
@@ -64,6 +65,100 @@ static const std::vector<fpbus::BootMetadata> emmc_boot_metadata{
         .zbi_extra = 0,
     }},
 };
+
+constexpr fuchsia_power_broker::PowerLevel kPowerLevelOff = 0;
+constexpr fuchsia_power_broker::PowerLevel kPowerLevelOn = 1;
+
+// This power element represents the SDMMC controller hardware. Its passive dependency on SAG's
+// (Execution State, wake handling) allows for orderly power down of the hardware before the CPU
+// suspends scheduling.
+fuchsia_hardware_power::PowerElementConfiguration hardware_power_config() {
+  constexpr char kPowerElementName[] = "aml-sdmmc-hardware";
+
+  auto transitions_from_off =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = kPowerLevelOn,
+          .latency_us = 100,
+      }}};
+  auto transitions_from_on =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = kPowerLevelOff,
+          .latency_us = 200,
+      }}};
+  fuchsia_hardware_power::PowerLevel off = {
+      {.level = kPowerLevelOff, .name = "off", .transitions = transitions_from_off}};
+  fuchsia_hardware_power::PowerLevel on = {
+      {.level = kPowerLevelOn, .name = "on", .transitions = transitions_from_on}};
+  fuchsia_hardware_power::PowerElement hardware_power = {{
+      .name = kPowerElementName,
+      .levels = {{off, on}},
+  }};
+
+  fuchsia_hardware_power::LevelTuple on_to_wake_handling = {{
+      .child_level = kPowerLevelOn,
+      .parent_level =
+          static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kWakeHandling),
+  }};
+  fuchsia_hardware_power::PowerDependency passive_on_exec_state_wake_handling = {{
+      .child = kPowerElementName,
+      .parent = fuchsia_hardware_power::ParentElement::WithSag(
+          fuchsia_hardware_power::SagElement::kExecutionState),
+      .level_deps = {{on_to_wake_handling}},
+      .strength = fuchsia_hardware_power::RequirementType::kPassive,
+  }};
+
+  fuchsia_hardware_power::PowerElementConfiguration hardware_power_config = {
+      {.element = hardware_power, .dependencies = {{passive_on_exec_state_wake_handling}}}};
+  return hardware_power_config;
+}
+
+// This power element does not represent hardware. It is used to keep the system from suspending
+// when the driver gets a request and the hardware is off, such that the driver is able to raise the
+// hardware power level to completion and serve the requests. It is implemented as a dependency on
+// (Wake Handling, active).
+fuchsia_hardware_power::PowerElementConfiguration system_wake_on_request_power_config() {
+  constexpr char kPowerElementName[] = "aml-sdmmc-system-wake-on-request";
+
+  auto transitions_from_off =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = kPowerLevelOn,
+          .latency_us = 0,
+      }}};
+  auto transitions_from_on =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = kPowerLevelOff,
+          .latency_us = 0,
+      }}};
+  fuchsia_hardware_power::PowerLevel off = {
+      {.level = kPowerLevelOff, .name = "off", .transitions = transitions_from_off}};
+  fuchsia_hardware_power::PowerLevel on = {
+      {.level = kPowerLevelOn, .name = "on", .transitions = transitions_from_on}};
+  fuchsia_hardware_power::PowerElement wake_on_request = {{
+      .name = kPowerElementName,
+      .levels = {{off, on}},
+  }};
+
+  fuchsia_hardware_power::LevelTuple on_to_active = {{
+      .child_level = kPowerLevelOn,
+      .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
+  }};
+  fuchsia_hardware_power::PowerDependency active_on_wake_handling_active = {{
+      .child = kPowerElementName,
+      .parent = fuchsia_hardware_power::ParentElement::WithSag(
+          fuchsia_hardware_power::SagElement::kWakeHandling),
+      .level_deps = {{on_to_active}},
+      .strength = fuchsia_hardware_power::RequirementType::kActive,
+  }};
+
+  fuchsia_hardware_power::PowerElementConfiguration wake_on_request_config = {
+      {.element = wake_on_request, .dependencies = {{active_on_wake_handling_active}}}};
+  return wake_on_request_config;
+}
+
+std::vector<fuchsia_hardware_power::PowerElementConfiguration> emmc_power_configs() {
+  return std::vector<fuchsia_hardware_power::PowerElementConfiguration>{
+      hardware_power_config(), system_wake_on_request_power_config()};
+}
 
 const std::vector<fdf::BindRule> kClockGateRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
@@ -127,6 +222,7 @@ zx_status_t Vim3::EmmcInit() {
   emmc_dev.bti() = emmc_btis;
   emmc_dev.metadata() = emmc_metadata;
   emmc_dev.boot_metadata() = emmc_boot_metadata;
+  emmc_dev.power_config() = emmc_power_configs();
 
   // set alternate functions to enable EMMC
   gpio_init_steps_.push_back({A311D_GPIOBOOT(0), GpioSetAltFunction(A311D_GPIOBOOT_0_EMMC_D0_FN)});
