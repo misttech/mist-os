@@ -165,8 +165,17 @@ pub async fn exec_playground(
         let repl = Arc::new(repl::Repl::new()?);
         let interpreter = Arc::new(interpreter);
 
+        let completer = {
+            let interpreter = Arc::clone(&interpreter);
+            move |cmd, pos| {
+                let interpreter = Arc::clone(&interpreter);
+                async move { interpreter.complete(cmd, pos).await }
+            }
+        };
+
         while let Either::Left((line, _)) = select(
-            repl.get_cmd(&format!("\x1b[1;92m{} \x1b[1;97m➤\x1b[0m", node_name)).boxed(),
+            repl.get_cmd(&format!("\x1b[1;92m{} \x1b[1;97m➤\x1b[0m", node_name), &completer)
+                .boxed(),
             &mut quit_receiver,
         )
         .await

@@ -417,6 +417,23 @@ impl Interpreter {
             compiled(&self.inner, &frame).await
         }
     }
+
+    pub async fn complete(&self, cmd: String, cursor_pos: usize) -> Vec<(String, usize)> {
+        let mut ret = Vec::new();
+        if cursor_pos != cmd.len() {
+            return ret;
+        }
+
+        if "open".starts_with(&cmd) {
+            ret.push(("open ".into(), 0));
+        }
+
+        if "req".starts_with(&cmd) {
+            ret.push(("req ".into(), 0));
+        }
+
+        ret
+    }
 }
 
 /// Adds built-in commands to the global scope of this interpreter.

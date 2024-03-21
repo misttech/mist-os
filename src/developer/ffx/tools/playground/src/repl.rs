@@ -9,13 +9,28 @@ use futures::io::{AsyncReadExt as _, AsyncWrite};
 use futures::task::AtomicWaker;
 use futures::FutureExt as _;
 use std::collections::VecDeque;
+use std::future::Future;
 use std::io::{self, stdin, stdout, Write as _};
 use std::os::unix::io::{AsRawFd as _, FromRawFd as _};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 
 use crate::strict_mutex::StrictMutex;
+
+static DOUBLE_TAB_TIME: Duration = Duration::from_millis(500);
+
+/// Get the longest common prefix of two strings.
+fn common_prefix<'a>(a: &'a str, b: &str) -> &'a str {
+    let len = a
+        .char_indices()
+        .zip(b.char_indices())
+        .find(|((_, x), (_, y))| x != y)
+        .map(|((x, _), _)| x)
+        .unwrap_or(std::cmp::min(a.len(), b.len()));
+    &a[..len]
+}
 
 /// Lock-protected portion of `Repl`
 struct ReplInner {
@@ -176,13 +191,18 @@ impl Repl {
 
     /// Retrieve a command. Displays the given prompt and waits for input. Supports basic editing
     /// keys.
-    pub async fn get_cmd(&self, prompt: &str) -> io::Result<Option<String>> {
+    pub async fn get_cmd<F: Future<Output = Vec<(String, usize)>>>(
+        &self,
+        prompt: &str,
+        completer: impl Fn(String, usize) -> F,
+    ) -> io::Result<Option<String>> {
         const UP_ARROW: &[u8] = b"\x1b[A";
         const DOWN_ARROW: &[u8] = b"\x1b[B";
         const RIGHT_ARROW: &[u8] = b"\x1b[C";
         const LEFT_ARROW: &[u8] = b"\x1b[D";
         let mut buf = [0; 4];
         let mut ret = None;
+        let mut tab_time: Option<Instant> = None;
 
         {
             let mut inner = self.inner.lock().await;
@@ -235,6 +255,7 @@ impl Repl {
             }
 
             while buf.len() > 0 {
+                let mut set_tab_time = None;
                 if try_strip_prefix(&mut buf, UP_ARROW) {
                     if inner.history_pos == inner.history.len() {
                         continue;
@@ -297,6 +318,44 @@ impl Repl {
                         } else {
                             inner.cmd_overflow.push_back(got);
                         }
+                    } else if byte == b'\t' {
+                        let got = String::from_iter(inner.cmd_buf.iter().copied());
+                        let completions = completer(got, inner.cursor_pos).await;
+                        let double_tab = tab_time
+                            .take()
+                            .map(|x| Instant::now().duration_since(x) <= DOUBLE_TAB_TIME)
+                            .unwrap_or(false);
+
+                        if double_tab && completions.len() > 1 {
+                            print!(
+                                "\r\n{}\r\n",
+                                completions
+                                    .into_iter()
+                                    .map(|x| x.0.trim().to_owned())
+                                    .collect::<Vec<_>>()
+                                    .join("  ")
+                            );
+                        } else {
+                            set_tab_time = Some(Instant::now());
+
+                            let singular = completions
+                                .into_iter()
+                                .reduce(|prev, e| {
+                                    if e.1 != prev.1 {
+                                        (String::new(), 0)
+                                    } else {
+                                        (common_prefix(&e.0, &prev.0).to_owned(), prev.1)
+                                    }
+                                })
+                                .filter(|x| !x.0.is_empty());
+
+                            if let Some((completion, start)) = singular {
+                                let cursor_pos = inner.cursor_pos;
+                                assert!(start <= cursor_pos, "Completion starts after cursor!");
+                                inner.cmd_buf.splice(start..cursor_pos, completion.chars());
+                                inner.cursor_pos = completion.chars().count();
+                            }
+                        }
                     } else if byte <= 0x7f {
                         let ch = std::str::from_utf8(&[byte]).unwrap().chars().next().unwrap();
 
@@ -307,6 +366,8 @@ impl Repl {
                         }
                     }
                 }
+
+                tab_time = set_tab_time;
             }
             inner.repaint();
         }
@@ -379,5 +440,35 @@ impl<'a> AsyncWrite for ReplWriter<'a> {
 
     fn poll_close(self: Pin<&mut Self>, _ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn common_prefix_test() {
+        assert_eq!("abc", common_prefix("abcd", "abcf"));
+    }
+
+    #[test]
+    fn common_prefix_test_one_empty() {
+        assert_eq!("", common_prefix("abcd", ""));
+    }
+
+    #[test]
+    fn common_prefix_test_two_empty() {
+        assert_eq!("", common_prefix("", ""));
+    }
+
+    #[test]
+    fn common_prefix_test_all() {
+        assert_eq!("abc", common_prefix("abc", "abc"));
+    }
+
+    #[test]
+    fn common_prefix_test_none() {
+        assert_eq!("", common_prefix("abc", "def"));
     }
 }
