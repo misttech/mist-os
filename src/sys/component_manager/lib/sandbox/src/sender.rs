@@ -12,7 +12,13 @@ use vfs::service::endpoint;
 
 #[derive(Debug)]
 pub struct Message {
-    pub payload: fsandbox::ProtocolPayload,
+    pub channel: fidl::Channel,
+}
+
+impl From<fsandbox::ProtocolPayload> for Message {
+    fn from(payload: fsandbox::ProtocolPayload) -> Self {
+        Message { channel: payload.channel }
+    }
 }
 
 /// Types that implement [`Sendable`] let the holder send channels
@@ -55,8 +61,7 @@ impl Sender {
     }
 
     pub(crate) fn send_channel(&self, channel: zx::Channel) -> Result<(), ()> {
-        let msg = Message { payload: fsandbox::ProtocolPayload { channel } };
-        self.send(msg)
+        self.send(Message { channel })
     }
 
     pub fn send(&self, msg: Message) -> Result<(), ()> {

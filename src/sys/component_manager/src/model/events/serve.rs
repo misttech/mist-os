@@ -436,7 +436,7 @@ fn create_capability_requested_payload(
                 };
                 let payload = fcomponent::CapabilityRequestedPayload {
                     name: Some(name),
-                    capability: Some(message.payload.channel),
+                    capability: Some(message.channel),
                     ..Default::default()
                 };
                 Some((Ok(fcomponent::EventPayload::CapabilityRequested(payload)), receiver))

@@ -211,9 +211,7 @@ mod tests {
                 loop {
                     let msg = receiver.receive().await.unwrap();
                     let stream: fecho::EchoRequestStream =
-                        ServerEnd::<fecho::EchoMarker>::from(msg.payload.channel)
-                            .into_stream()
-                            .unwrap();
+                        ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream().unwrap();
                     handle_echo_request_stream(response, stream).await;
                 }
             }));
@@ -277,9 +275,7 @@ mod tests {
             tasks.add(fasync::Task::spawn(async move {
                 while let Some(msg) = receiver.receive().await {
                     let stream: fecho::EchoRequestStream =
-                        ServerEnd::<fecho::EchoMarker>::from(msg.payload.channel)
-                            .into_stream()
-                            .unwrap();
+                        ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream().unwrap();
                     handle_echo_request_stream("hello", stream).await;
                 }
             }));

@@ -509,9 +509,7 @@ mod tests {
 
         drop(receiver);
         let (ch1, _ch2) = zx::Channel::create();
-        assert!(sender
-            .send(Message { payload: fsandbox::ProtocolPayload { channel: ch1 } })
-            .is_err());
+        assert!(sender.send(Message { channel: ch1 }).is_err());
     }
 
     #[fuchsia::test]

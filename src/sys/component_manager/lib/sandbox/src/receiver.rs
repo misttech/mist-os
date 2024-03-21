@@ -52,8 +52,7 @@ impl Receiver {
                     let Some(msg) = msg else {
                         return;
                     };
-                    let p = msg.payload;
-                    if let Err(_) = receiver_proxy.receive(p.channel) {
+                    if let Err(_) = receiver_proxy.receive(msg.channel) {
                         return;
                     }
                 }
@@ -84,7 +83,7 @@ mod tests {
         let message = receiver.receive().await.unwrap();
 
         // Check connectivity.
-        message.payload.channel.signal_peer(zx::Signals::empty(), zx::Signals::USER_1).unwrap();
+        message.channel.signal_peer(zx::Signals::empty(), zx::Signals::USER_1).unwrap();
         ch2.wait_handle(zx::Signals::USER_1, zx::Time::INFINITE).unwrap();
     }
 

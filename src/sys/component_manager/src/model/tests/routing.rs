@@ -1094,7 +1094,7 @@ async fn create_child_with_dict() {
             let Some(message) = receiver.receive().await else {
                 return;
             };
-            let server_end = ServerEnd::<echo::EchoMarker>::new(message.payload.channel);
+            let server_end = ServerEnd::<echo::EchoMarker>::new(message.channel);
             let stream: echo::EchoRequestStream = server_end.into_stream().unwrap();
             tasks.add(fasync::Task::spawn(async move {
                 EchoProtocol::serve(stream).await.expect("failed to serve Echo");

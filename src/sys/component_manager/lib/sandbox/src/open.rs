@@ -56,7 +56,7 @@ impl Sendable for Open {
             ExecutionScope::new(),
             fio::OpenFlags::empty(),
             vfs::path::Path::dot(),
-            message.payload.channel,
+            message.channel,
         );
         Ok(())
     }
@@ -360,7 +360,7 @@ mod tests {
         let msg = receiver.receive().await.unwrap();
         assert_eq!(
             client_end.basic_info().unwrap().related_koid,
-            msg.payload.channel.basic_info().unwrap().koid
+            msg.channel.basic_info().unwrap().koid
         );
     }
 
@@ -401,7 +401,7 @@ mod tests {
         let msg = receiver.receive().await.unwrap();
         assert_eq!(
             client_end.basic_info().unwrap().related_koid,
-            msg.payload.channel.basic_info().unwrap().koid
+            msg.channel.basic_info().unwrap().koid
         );
     }
 

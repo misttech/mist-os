@@ -8,7 +8,6 @@ use crate::model::{
 };
 use async_trait::async_trait;
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_inspect::InspectSinkMarker;
 use fuchsia_async::TaskGroup;
 use fuchsia_inspect::Inspector;
@@ -63,9 +62,7 @@ impl EventSynthesisProvider for InspectSinkProvider {
             };
 
             let (receiver, sender) = CapabilityReceiver::new();
-            let _ = sender.send(Message {
-                payload: fsandbox::ProtocolPayload { channel: server.into_channel() },
-            });
+            let _ = sender.send(Message { channel: server.into_channel() });
             vec![Event::new_builtin(EventPayload::CapabilityRequested {
                 source_moniker,
                 name: InspectSinkMarker::PROTOCOL_NAME.into(),
