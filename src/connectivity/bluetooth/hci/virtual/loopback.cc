@@ -5,6 +5,7 @@
 #include "loopback.h"
 
 #include <assert.h>
+#include <lib/async/default.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -19,8 +20,10 @@
 
 namespace bt_hci_virtual {
 
-LoopbackDevice::LoopbackDevice(zx_device_t* parent, async_dispatcher_t* dispatcher)
-    : LoopbackDeviceType(parent), dispatcher_(dispatcher) {}
+LoopbackDevice::LoopbackDevice(zx_device_t* parent)
+    : LoopbackDeviceType(parent),
+      dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {}
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 LoopbackDevice::Wait::Wait(LoopbackDevice* uart, zx::channel* channel) {
@@ -56,28 +59,6 @@ size_t LoopbackDevice::ScoPacketLength() {
   // add 4 bytes for packet indicator, handle, and length byte
   return sco_buffer_offset_ > 3 ? (sco_buffer_[3] + 4) : 0;
 }
-
-zx_status_t LoopbackDevice::BtHciOpenCommandChannel(zx::channel in) {
-  zxlogf(TRACE, "LoopbackDevice::BtHciOpenCommandChannel");
-  return HciOpenChannel(&cmd_channel_, in.release());
-}
-
-zx_status_t LoopbackDevice::BtHciOpenAclDataChannel(zx::channel in) {
-  zxlogf(TRACE, "LoopbackDevice::BtHciOpenAclDataChannel");
-  return HciOpenChannel(&acl_channel_, in.release());
-}
-
-zx_status_t LoopbackDevice::BtHciOpenSnoopChannel(zx::channel in) {
-  zxlogf(TRACE, "LoopbackDevice::BtHciOpenSnoopChannel");
-  return HciOpenChannel(&snoop_channel_, in.release());
-}
-
-zx_status_t LoopbackDevice::BtHciOpenScoChannel(zx::channel in) {
-  zxlogf(TRACE, "LoopbackDevice::BtHciOpenScoChannel");
-  return HciOpenChannel(&sco_channel_, in.release());
-}
-
-zx_status_t LoopbackDevice::BtHciOpenIsoDataChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
 
 void LoopbackDevice::ChannelCleanupLocked(zx::channel* channel) {
   zxlogf(TRACE, "LoopbackDevice::ChannelCleanupLocked");
@@ -310,9 +291,7 @@ void LoopbackDevice::ProcessNextUartPacketFromReadBuffer(
 
   size_t remaining = uart_end - *uart_src;
   size_t copy_size = packet_length - *buffer_offset;
-  if (copy_size > remaining) {
-    copy_size = remaining;
-  }
+  copy_size = std::min(copy_size, remaining);
 
   ZX_ASSERT(*buffer_offset + copy_size <= buffer_size);
   memcpy(buffer + *buffer_offset, *uart_src, copy_size);
@@ -427,20 +406,6 @@ void LoopbackDevice::HciHandleClientChannel(zx::channel* chan, zx_signals_t pend
   }
 }
 
-void LoopbackDevice::BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
-                                       sco_sample_rate_t sample_rate,
-                                       bt_hci_configure_sco_callback callback, void* cookie) {
-  zxlogf(TRACE, "LoopbackDevice::BtHciConfigureSco");
-  // UART doesn't require any SCO configuration.
-  callback(cookie, ZX_OK);
-}
-
-void LoopbackDevice::BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie) {
-  zxlogf(TRACE, "LoopbackDevice::BtHciResetSco");
-  // UART doesn't require any SCO configuration, so there's nothing to do.
-  callback(cookie, ZX_OK);
-}
-
 void LoopbackDevice::DdkUnbind(ddk::UnbindTxn txn) {
   zxlogf(TRACE, "LoopbackDevice::DdkUnbind");
   // We are now shutting down.  Make sure that any pending callbacks in
@@ -506,7 +471,7 @@ void LoopbackDevice::handle_unknown_method(
 
 void LoopbackDevice::OpenCommandChannel(OpenCommandChannelRequestView request,
                                         OpenCommandChannelCompleter::Sync& completer) {
-  if (zx_status_t status = BtHciOpenCommandChannel(zx::channel(request->channel.release()));
+  if (zx_status_t status = HciOpenChannel(&cmd_channel_, request->channel.release());
       status != ZX_OK) {
     completer.ReplyError(status);
   }
@@ -515,7 +480,7 @@ void LoopbackDevice::OpenCommandChannel(OpenCommandChannelRequestView request,
 
 void LoopbackDevice::OpenAclDataChannel(OpenAclDataChannelRequestView request,
                                         OpenAclDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = BtHciOpenAclDataChannel(zx::channel(request->channel.release()));
+  if (zx_status_t status = HciOpenChannel(&acl_channel_, request->channel.release());
       status != ZX_OK) {
     completer.ReplyError(status);
   }
@@ -524,34 +489,33 @@ void LoopbackDevice::OpenAclDataChannel(OpenAclDataChannelRequestView request,
 
 void LoopbackDevice::OpenScoDataChannel(OpenScoDataChannelRequestView request,
                                         OpenScoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void LoopbackDevice::ConfigureSco(ConfigureScoRequestView request,
-                                  ConfigureScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void LoopbackDevice::ResetSco(ResetScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void LoopbackDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                                        OpenIsoDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = BtHciOpenIsoDataChannel(zx::channel(request->channel.release()));
+  if (zx_status_t status = HciOpenChannel(&sco_channel_, request->channel.release());
       status != ZX_OK) {
     completer.ReplyError(status);
-    return;
   }
   completer.ReplySuccess();
 }
 
+void LoopbackDevice::ConfigureSco(ConfigureScoRequestView request,
+                                  ConfigureScoCompleter::Sync& completer) {
+  // UART doesn't require any SCO configuration.
+  completer.ReplySuccess();
+}
+
+void LoopbackDevice::ResetSco(ResetScoCompleter::Sync& completer) {
+  // UART doesn't require any SCO configuration, so there's nothing to do.
+  completer.ReplySuccess();
+}
+
+void LoopbackDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                                        OpenIsoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 void LoopbackDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
                                       OpenSnoopChannelCompleter::Sync& completer) {
-  if (zx_status_t status = BtHciOpenSnoopChannel(zx::channel(request->channel.release()));
+  if (zx_status_t status = HciOpenChannel(&snoop_channel_, request->channel.release());
       status != ZX_OK) {
     completer.ReplyError(status);
   };
@@ -565,14 +529,24 @@ void LoopbackDevice::handle_unknown_method(
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t LoopbackDevice::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
-  if (proto_id != ZX_PROTOCOL_BT_HCI) {
-    return ZX_ERR_NOT_SUPPORTED;
+zx_status_t LoopbackDevice::ServeHciProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+  auto protocol = [this](fidl::ServerEnd<fuchsia_hardware_bluetooth::Hci> server_end) mutable {
+    hci_binding_group_.AddBinding(dispatcher_, std::move(server_end), this,
+                                  fidl::kIgnoreBindingClosure);
+  };
+  fuchsia_hardware_bluetooth::HciService::InstanceHandler handler({.hci = std::move(protocol)});
+  auto status =
+      outgoing_dir_.AddService<fuchsia_hardware_bluetooth::HciService>(std::move(handler));
+  if (status.is_error()) {
+    zxlogf(ERROR, "Failed to add service to outgoing directory: %s\n", status.status_string());
+    return status.error_value();
+  }
+  auto result = outgoing_dir_.Serve(std::move(server_end));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to serve outgoing directory: %s\n", result.status_string());
+    return result.error_value();
   }
 
-  bt_hci_protocol_t* hci_proto = static_cast<bt_hci_protocol*>(out_proto);
-  hci_proto->ops = &bt_hci_protocol_ops_;
-  hci_proto->ctx = this;
   return ZX_OK;
 }
 
@@ -615,8 +589,26 @@ zx_status_t LoopbackDevice::Bind(zx_handle_t channel, std::string_view name) {
     in_channel_wait_.pending = true;
   }
 
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    zxlogf(ERROR, "Failed to create endpoints: %s\n", endpoints.status_string());
+    return endpoints.status_value();
+  }
+
+  auto status = ServeHciProtocol(std::move(endpoints->server));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve Hci protocol: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  std::array offers = {
+      fuchsia_hardware_bluetooth::HciService::Name,
+  };
+
   ddk::DeviceAddArgs args(name.data());
   args.set_proto_id(ZX_PROTOCOL_BT_HCI);
+  args.set_fidl_service_offers(offers);
+  args.set_outgoing_dir(endpoints->client.TakeChannel());
   return DdkAdd(args);
 }
 

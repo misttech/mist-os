@@ -55,7 +55,7 @@ class VirtualController : public VirtualControllerDeviceType {
     // chain new looback device off this device.
     fbl::StringBuffer<ZX_MAX_NAME_LEN> name;
     name.AppendPrintf("bt-transport-loopback-%u", num_devices_++);
-    auto dev = std::make_unique<bt_hci_virtual::LoopbackDevice>(zxdev(), nullptr);
+    auto dev = std::make_unique<bt_hci_virtual::LoopbackDevice>(zxdev());
     auto channel = request->channel.release();
     zx_status_t status = dev->Bind(channel, std::string_view(name));
     if (status != ZX_OK) {

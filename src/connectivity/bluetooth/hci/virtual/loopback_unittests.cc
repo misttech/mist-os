@@ -26,24 +26,21 @@ enum PacketIndicator {
   kHciEvent = 4,
 };
 
-class LoopbackTest : public ::gtest::TestLoopFixture {
+class LoopbackTest : public ::testing::Test {
  public:
   explicit LoopbackTest() {}
 
   void SetUp() override {
     FX_LOGS(TRACE) << "SetUp";
-    root_device_ = MockDevice::FakeRootParent();
-
-    auto name = "bt-transport-loopback-test";
 
     zx::channel server_end;
     ASSERT_EQ(zx::channel::create(0, &serial_chan_, &server_end), ZX_OK);
 
+    auto dev = std::make_unique<bt_hci_virtual::LoopbackDevice>(root_device_.get());
     auto server_channel = server_end.release();
-    auto dev = std::make_unique<bt_hci_virtual::LoopbackDevice>(root_device_.get(), dispatcher());
-    ASSERT_EQ(dev->Bind(server_channel, std::string_view(name)), ZX_OK);
+    ASSERT_EQ(dev->Bind(server_channel, std::string_view("bt-transport-loopback-test")), ZX_OK);
     FX_LOGS(TRACE) << "made device";
-    RunLoopUntilIdle();
+    RunUntilIdle();
 
     // The driver runtime has taken ownership of |dev|.
     [[maybe_unused]] bt_hci_virtual::LoopbackDevice* unused = dev.release();
@@ -52,17 +49,23 @@ class LoopbackTest : public ::gtest::TestLoopFixture {
     ASSERT_EQ(1u, root_dev()->child_count());
     ASSERT_TRUE(dut());
 
-    // TODO(https://fxbug.dev/42173055): Due to Mock DDK limitations, we need to add the BT_HCI
-    // protocol to the BtTransportUart MockDevice so that BtHciProtocolClient (and
-    // device_get_protocol) work.
-    bt_hci_protocol_t proto;
-    dut()->GetDeviceContext<bt_hci_virtual::LoopbackDevice>()->DdkGetProtocol(ZX_PROTOCOL_BT_HCI,
-                                                                              &proto);
-    dut()->AddProtocol(ZX_PROTOCOL_BT_HCI, proto.ops, proto.ctx);
+    // Connect to the DUT's Vendor protocol server.
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
+    ASSERT_FALSE(endpoints.is_error());
+    hci_client_.Bind(std::move(endpoints->client));
+
+    libsync::Completion bind;
+    async::PostTask(hci_dispatcher_->async_dispatcher(), [&]() {
+      fidl::BindServer(hci_dispatcher_->async_dispatcher(), std::move(endpoints->server),
+                       dut()->GetDeviceContext<bt_hci_virtual::LoopbackDevice>());
+      bind.Signal();
+    });
+    bind.Wait();
 
     // Configure wait for readable signal on serial channel.
     serial_chan_readable_wait_.set_object(serial_chan_.get());
-    zx_status_t wait_begin_status = serial_chan_readable_wait_.Begin(dispatcher());
+    zx_status_t wait_begin_status =
+        serial_chan_readable_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
     FX_LOGS(TRACE) << "serial_chan_readable_wait_";
     ASSERT_EQ(wait_begin_status, ZX_OK) << zx_status_get_string(wait_begin_status);
   }
@@ -73,14 +76,16 @@ class LoopbackTest : public ::gtest::TestLoopFixture {
     FX_LOGS(TRACE) << "Cancel";
     serial_chan_.reset();
     FX_LOGS(TRACE) << "Reset";
-    RunLoopUntilIdle();
+    RunUntilIdle();
     FX_LOGS(TRACE) << "RunLoopUntilIdle 1";
     dut()->UnbindOp();
-    RunLoopUntilIdle();
+    RunUntilIdle();
     FX_LOGS(TRACE) << "RunLoopUntilIdle 2";
     EXPECT_EQ(dut()->UnbindReplyCallStatus(), ZX_OK);
     dut()->ReleaseOp();
   }
+
+  void RunUntilIdle() { mock_ddk::GetDriverRuntime()->RunUntilIdle(); }
 
   const std::vector<std::vector<uint8_t>>& received_serial_packets() const {
     return serial_chan_received_packets_;
@@ -91,6 +96,8 @@ class LoopbackTest : public ::gtest::TestLoopFixture {
   MockDevice* root_dev() const { return root_device_.get(); }
 
   MockDevice* dut() const { return root_device_->GetLatestChild(); }
+
+  fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci> hci_client_;
 
  private:
   void OnChannelReady(async_dispatcher_t*, async::WaitBase* wait, zx_status_t status,
@@ -109,17 +116,19 @@ class LoopbackTest : public ::gtest::TestLoopFixture {
     serial_chan_received_packets_.push_back(std::move(bytes));
 
     // The wait needs to be restarted.
-    zx_status_t wait_begin_status = wait->Begin(dispatcher());
+    zx_status_t wait_begin_status = wait->Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
     ASSERT_EQ(wait_begin_status, ZX_OK) << zx_status_get_string(wait_begin_status);
   }
 
+  std::shared_ptr<MockDevice> root_device_ = MockDevice::FakeRootParent();
+
+  fdf::UnownedSynchronizedDispatcher hci_dispatcher_ =
+      mock_ddk::GetDriverRuntime()->StartBackgroundDispatcher();
+
+  zx::channel serial_chan_;
+  std::vector<std::vector<uint8_t>> serial_chan_received_packets_;
   async::WaitMethod<LoopbackTest, &LoopbackTest::OnChannelReady> serial_chan_readable_wait_{
       this, zx_handle_t(), ZX_CHANNEL_READABLE};
-
-  std::vector<std::vector<uint8_t>> serial_chan_received_packets_;
-
-  std::shared_ptr<MockDevice> root_device_;
-  zx::channel serial_chan_;
 };
 
 // Test fixture that opens all channels and has helpers for reading/writing data.
@@ -128,43 +137,58 @@ class LoopbackHciProtocolTest : public LoopbackTest {
   void SetUp() override {
     LoopbackTest::SetUp();
 
-    ddk::BtHciProtocolClient client(static_cast<zx_device_t*>(dut()));
-    ASSERT_TRUE(client.is_valid());
-
     zx::channel cmd_chan_driver_end;
     ASSERT_EQ(zx::channel::create(/*flags=*/0, &cmd_chan_, &cmd_chan_driver_end), ZX_OK);
-    ASSERT_EQ(client.OpenCommandChannel(std::move(cmd_chan_driver_end)), ZX_OK);
+    {
+      auto result = hci_client_->OpenCommandChannel(std::move(cmd_chan_driver_end));
+      ASSERT_TRUE(result.ok());
+      ASSERT_FALSE(result->is_error());
+    }
 
     // Configure wait for readable signal on command channel.
     cmd_chan_readable_wait_.set_object(cmd_chan_.get());
-    zx_status_t wait_begin_status = cmd_chan_readable_wait_.Begin(dispatcher());
+    zx_status_t wait_begin_status =
+        cmd_chan_readable_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
     ASSERT_EQ(wait_begin_status, ZX_OK) << zx_status_get_string(wait_begin_status);
 
     zx::channel acl_chan_driver_end;
     ASSERT_EQ(zx::channel::create(/*flags=*/0, &acl_chan_, &acl_chan_driver_end), ZX_OK);
-    ASSERT_EQ(client.OpenAclDataChannel(std::move(acl_chan_driver_end)), ZX_OK);
+    {
+      auto result = hci_client_->OpenAclDataChannel(std::move(acl_chan_driver_end));
+      ASSERT_TRUE(result.ok());
+      ASSERT_FALSE(result->is_error());
+    }
 
     // Configure wait for readable signal on ACL channel.
     acl_chan_readable_wait_.set_object(acl_chan_.get());
-    wait_begin_status = acl_chan_readable_wait_.Begin(dispatcher());
+    wait_begin_status =
+        acl_chan_readable_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
     ASSERT_EQ(wait_begin_status, ZX_OK) << zx_status_get_string(wait_begin_status);
 
     zx::channel sco_chan_driver_end;
     ASSERT_EQ(zx::channel::create(/*flags=*/0, &sco_chan_, &sco_chan_driver_end), ZX_OK);
-    ASSERT_EQ(client.OpenScoChannel(std::move(sco_chan_driver_end)), ZX_OK);
-
+    {
+      auto result = hci_client_->OpenScoDataChannel(std::move(sco_chan_driver_end));
+      ASSERT_TRUE(result.ok());
+      ASSERT_FALSE(result->is_error());
+    }
     // Configure wait for readable signal on SCO channel.
     sco_chan_readable_wait_.set_object(sco_chan_.get());
-    wait_begin_status = sco_chan_readable_wait_.Begin(dispatcher());
+    wait_begin_status =
+        sco_chan_readable_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
     ASSERT_EQ(wait_begin_status, ZX_OK) << zx_status_get_string(wait_begin_status);
 
     zx::channel snoop_chan_driver_end;
     ZX_ASSERT(zx::channel::create(/*flags=*/0, &snoop_chan_, &snoop_chan_driver_end) == ZX_OK);
-    ASSERT_EQ(client.OpenSnoopChannel(std::move(snoop_chan_driver_end)), ZX_OK);
-
+    {
+      auto result = hci_client_->OpenSnoopChannel(std::move(snoop_chan_driver_end));
+      ASSERT_TRUE(result.ok());
+      ASSERT_FALSE(result->is_error());
+    }
     // Configure wait for readable signal on snoop channel.
     snoop_chan_readable_wait_.set_object(snoop_chan_.get());
-    wait_begin_status = snoop_chan_readable_wait_.Begin(dispatcher());
+    wait_begin_status =
+        snoop_chan_readable_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
     ASSERT_EQ(wait_begin_status, ZX_OK) << zx_status_get_string(wait_begin_status);
   }
 
@@ -242,7 +266,7 @@ class LoopbackHciProtocolTest : public LoopbackTest {
     received_packets->push_back(std::move(bytes));
 
     // The wait needs to be restarted.
-    zx_status_t wait_begin_status = wait->Begin(dispatcher());
+    zx_status_t wait_begin_status = wait->Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
     ASSERT_EQ(wait_begin_status, ZX_OK) << zx_status_get_string(wait_begin_status);
   }
 
@@ -297,7 +321,7 @@ TEST_F(LoopbackHciProtocolTest, SendAclPackets) {
     ASSERT_EQ(write_status, ZX_OK);
   }
   // Allow ACL packets to be processed and sent to the serial device.
-  RunLoopUntilIdle();
+  RunUntilIdle();
 
   const std::vector<std::vector<uint8_t>>& packets = received_serial_packets();
   ASSERT_EQ(packets.size(), kNumPackets);
@@ -346,7 +370,7 @@ TEST_F(LoopbackHciProtocolTest, ReceiveAclPacketsIn2Parts) {
                              /*num_handles=*/0);
     ASSERT_EQ(write_status, ZX_OK);
 
-    RunLoopUntilIdle();
+    RunUntilIdle();
   }
 
   ASSERT_EQ(received_acl_packets().size(), static_cast<size_t>(kNumPackets));
@@ -355,7 +379,7 @@ TEST_F(LoopbackHciProtocolTest, ReceiveAclPacketsIn2Parts) {
     EXPECT_EQ(packet, kAclBuffer);
   }
 
-  RunLoopUntilIdle();
+  RunUntilIdle();
   ASSERT_EQ(snoop_packets().size(), static_cast<size_t>(kNumPackets));
   for (const std::vector<uint8_t>& packet : snoop_packets()) {
     EXPECT_EQ(packet, kSnoopAclBuffer);
@@ -377,7 +401,7 @@ TEST_F(LoopbackHciProtocolTest, SendHciCommands) {
                         /*handles=*/nullptr,
                         /*num_handles=*/0);
   EXPECT_EQ(write_status, ZX_OK);
-  RunLoopUntilIdle();
+  RunUntilIdle();
   EXPECT_EQ(received_serial_packets().size(), 1u);
 
   const std::vector<uint8_t> kSnoopCmd1 = {
@@ -393,14 +417,14 @@ TEST_F(LoopbackHciProtocolTest, SendHciCommands) {
                                    /*handles=*/nullptr,
                                    /*num_handles=*/0);
   EXPECT_EQ(write_status, ZX_OK);
-  RunLoopUntilIdle();
+  RunUntilIdle();
 
   const std::vector<std::vector<uint8_t>>& packets = received_serial_packets();
   ASSERT_EQ(packets.size(), 2u);
   EXPECT_EQ(packets[0], kUartCmd0);
   EXPECT_EQ(packets[1], kUartCmd1);
 
-  RunLoopUntilIdle();
+  RunUntilIdle();
   ASSERT_EQ(snoop_packets().size(), 2u);
   EXPECT_EQ(snoop_packets()[0], kSnoopCmd0);
   EXPECT_EQ(snoop_packets()[1], kSnoopCmd1);
@@ -432,7 +456,7 @@ TEST_F(LoopbackHciProtocolTest, ReceiveManyHciEventsSplitIntoTwoResponses) {
                              /*handles=*/nullptr,
                              /*num_handles=*/0);
     ASSERT_EQ(write_status, ZX_OK);
-    RunLoopUntilIdle();
+    RunUntilIdle();
   }
 
   ASSERT_EQ(hci_events().size(), static_cast<size_t>(kNumEvents));
@@ -457,7 +481,7 @@ TEST_F(LoopbackHciProtocolTest, SendScoPackets) {
     ASSERT_EQ(write_status, ZX_OK);
   }
   // Allow SCO packets to be processed and sent to the serial device.
-  RunLoopUntilIdle();
+  RunUntilIdle();
 
   const std::vector<std::vector<uint8_t>>& packets = received_serial_packets();
   ASSERT_EQ(packets.size(), kNumPackets);
@@ -502,7 +526,7 @@ TEST_F(LoopbackHciProtocolTest, ReceiveScoPacketsIn2Parts) {
                              /*handles=*/nullptr,
                              /*num_handles=*/0);
     ASSERT_EQ(write_status, ZX_OK);
-    RunLoopUntilIdle();
+    RunUntilIdle();
   }
 
   ASSERT_EQ(received_sco_packets().size(), static_cast<size_t>(kNumPackets));
@@ -511,7 +535,7 @@ TEST_F(LoopbackHciProtocolTest, ReceiveScoPacketsIn2Parts) {
     EXPECT_EQ(packet, kScoBuffer);
   }
 
-  RunLoopUntilIdle();
+  RunUntilIdle();
   ASSERT_EQ(snoop_packets().size(), static_cast<size_t>(kNumPackets));
   for (const std::vector<uint8_t>& packet : snoop_packets()) {
     EXPECT_EQ(packet, kSnoopScoBuffer);

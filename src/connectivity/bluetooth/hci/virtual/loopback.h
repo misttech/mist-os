@@ -5,10 +5,10 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VIRTUAL_LOOPBACK_H_
 
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
-#include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fit/thread_checker.h>
 #include <lib/zx/event.h>
 #include <threads.h>
@@ -26,25 +26,13 @@ namespace bt_hci_virtual {
 // This driver is greatly taken from the bt_transport_uart driver. The key differences are that this
 // doesn't bind to service device but to a zx::channel as a virtual loopback UART device.
 class LoopbackDevice;
-using LoopbackDeviceType = ddk::Device<LoopbackDevice, ddk::GetProtocolable, ddk::Unbindable,
+using LoopbackDeviceType = ddk::Device<LoopbackDevice, ddk::Unbindable,
                                        ddk::Messageable<fuchsia_hardware_bluetooth::Vendor>::Mixin>;
 
 class LoopbackDevice : public LoopbackDeviceType,
-                       public ddk::BtHciProtocol<LoopbackDevice>,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
  public:
-  explicit LoopbackDevice(zx_device_t* parent, async_dispatcher_t* dispatcher);
-
-  // ddk::BtHciProtocol mixins:
-  zx_status_t BtHciOpenCommandChannel(zx::channel channel);
-  zx_status_t BtHciOpenAclDataChannel(zx::channel channel);
-  zx_status_t BtHciOpenScoChannel(zx::channel channel);
-  void BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
-                         sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
-                         void* cookie);
-  void BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie);
-  zx_status_t BtHciOpenIsoDataChannel(zx::channel channel);
-  zx_status_t BtHciOpenSnoopChannel(zx::channel channel);
+  explicit LoopbackDevice(zx_device_t* parent);
 
   // fuchsia_hardware_bluetooth::Vendor protocol interface implementations.
   void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
@@ -157,6 +145,8 @@ class LoopbackDevice : public LoopbackDeviceType,
 
   zx_status_t HciOpenChannel(zx::channel* in_channel, zx_handle_t in) __TA_EXCLUDES(mutex_);
 
+  zx_status_t ServeHciProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+
   // 1 byte packet indicator + 3 byte header + payload
   static constexpr uint32_t kCmdBufSize = 255 + 4;
 
@@ -227,9 +217,15 @@ class LoopbackDevice : public LoopbackDeviceType,
   std::mutex mutex_;
 
   std::optional<async::Loop> loop_;
-  // In production, this is loop_.dispatcher(). In tests, this is the test
-  // dispatcher.
+  // In production, this is loop_.dispatcher(). In tests, this is the test dispatcher.
   async_dispatcher_t* dispatcher_ = nullptr;
+
+  // To expose a FIDL protocol from a driver in DFv1, we need to manually add the corresponding
+  // service to the outgoing directory of the driver and wait for the child driver to connect to.
+  // This object is the outgoing directory instance that this driver provides to the child device.
+  fdf::OutgoingDirectory outgoing_dir_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Hci> hci_binding_group_;
 };
 
 }  // namespace bt_hci_virtual
