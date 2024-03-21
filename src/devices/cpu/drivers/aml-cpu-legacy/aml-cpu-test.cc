@@ -51,7 +51,6 @@ class FakeMmio {
 
 using CpuCtrlSyncClient = fidl::WireSyncClient<fuchsia_cpuctrl::Device>;
 using ThermalSyncClient = fidl::WireSyncClient<fuchsia_thermal::Device>;
-using fuchsia_hardware_cpu_ctrl::wire::kMaxDevicePerformanceStates;
 
 constexpr size_t kBigClusterIdx =
     static_cast<size_t>(fuchsia_thermal::wire::PowerDomain::kBigClusterPowerDomain);
@@ -386,44 +385,43 @@ void AmlCpuTestFixture::SetUp() {
   cpu_client_ = CpuCtrlSyncClient(std::move(cpu_eps->client));
 }
 
-TEST_F(AmlCpuTestFixture, TestGetPerformanceStateInfo) {
-  // Make sure that we can get information about all the supported pstates.
+TEST_F(AmlCpuTestFixture, TestGetOperatingPointInfo) {
+  // Make sure that we can get information about all the supported opps.
   for (uint32_t i = 0; i < kFakeOperatingPoints.count; i++) {
-    auto pstateInfo = cpu_client_->GetPerformanceStateInfo(i);
+    auto oppInfo = cpu_client_->GetOperatingPointInfo(i);
 
     // First, make sure there were no transport errors.
-    ASSERT_OK(pstateInfo.status());
+    ASSERT_OK(oppInfo.status());
 
     // Then make sure that the driver accepted the call.
-    ASSERT_FALSE(pstateInfo->is_error());
+    ASSERT_FALSE(oppInfo->is_error());
 
     // Then make sure that we're getting the accepted frequency and voltage values.
-    EXPECT_EQ(pstateInfo->value()->info.frequency_hz,
+    EXPECT_EQ(oppInfo->value()->info.frequency_hz,
               kFakeOperatingPoints.opp[kFakeOperatingPoints.count - i - 1].freq_hz);
-    EXPECT_EQ(pstateInfo->value()->info.voltage_uv,
+    EXPECT_EQ(oppInfo->value()->info.voltage_uv,
               kFakeOperatingPoints.opp[kFakeOperatingPoints.count - i - 1].volt_uv);
   }
 
-  // Make sure that we can't get any information about pstates that don't
-  // exist.
-  for (uint32_t i = kFakeOperatingPoints.count; i < kMaxDevicePerformanceStates; i++) {
-    auto pstateInfo = cpu_client_->GetPerformanceStateInfo(i);
+  // Make sure that we can't get any information about opps that don't exist.
+  for (uint32_t i = kFakeOperatingPoints.count; i < kFakeOperatingPoints.count + 10; i++) {
+    auto oppInfo = cpu_client_->GetOperatingPointInfo(i);
 
-    // Even if it's an unsupported pstate, we still expect the transport to
+    // Even if it's an unsupported opp, we still expect the transport to
     // deliver the message successfully.
-    ASSERT_OK(pstateInfo.status());
+    ASSERT_OK(oppInfo.status());
 
     // Make sure that the driver returns an error, however.
-    EXPECT_TRUE(pstateInfo->is_error());
+    EXPECT_TRUE(oppInfo->is_error());
   }
 }
 
-TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
-  // Make sure that we can drive the CPU to all of the supported performance
-  // states.
+TEST_F(AmlCpuTestFixture, TestSetCurrentOperatingPoint) {
+  // Make sure that we can drive the CPU to all of the supported operating
+  // points.
   for (uint32_t i = 0; i < kFakeOperatingPoints.count; i++) {
     uint32_t out_state = UINT32_MAX;
-    zx_status_t st = dut_->SetPerformanceStateInternal(i, &out_state);
+    zx_status_t st = dut_->SetCurrentOperatingPointInternal(i, &out_state);
 
     // Make sure the call succeeded.
     EXPECT_OK(st);
@@ -439,13 +437,13 @@ TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
   }
 
   // Next make sure that we can't drive the CPU into any unsupported
-  // performance states.
-  for (uint32_t i = kFakeOperatingPoints.count; i < kMaxDevicePerformanceStates; i++) {
+  // operating points.
+  for (uint32_t i = kFakeOperatingPoints.count; i < kFakeOperatingPoints.count + 10; i++) {
     const uint16_t kInitialOperatingPoint = thermal_.ActiveOperatingPoint();
     uint32_t out_state = UINT32_MAX;
-    zx_status_t st = dut_->SetPerformanceStateInternal(i, &out_state);
+    zx_status_t st = dut_->SetCurrentOperatingPointInternal(i, &out_state);
 
-    // This is not a supported performance state.
+    // This is not a supported operating point.
     EXPECT_NOT_OK(st);
 
     // Make sure we haven't meddled with `out_state`
@@ -473,6 +471,14 @@ TEST_F(AmlCpuTestFixture, TestSetCpuInfo) {
   // cpu_package_id : 2
   ASSERT_NO_FATAL_FAILURE(
       CheckProperty(cpu_info->node(), "cpu_package_id", inspect::UintPropertyValue(2)));
+}
+
+TEST_F(AmlCpuTestFixture, TestGetOperatingPointCount) {
+  auto resp = cpu_client_->GetOperatingPointCount();
+
+  ASSERT_OK(resp.status());
+
+  EXPECT_EQ(resp.value()->count, kFakeOperatingPoints.count);
 }
 
 TEST_F(AmlCpuTestFixture, TestGetNumLogicalCores) {

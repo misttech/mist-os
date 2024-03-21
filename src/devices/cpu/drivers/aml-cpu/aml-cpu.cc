@@ -24,7 +24,7 @@ namespace {
 constexpr uint32_t kCpuGetDvfsTableIndexFuncId = 0x82000088;
 constexpr uint64_t kDefaultClusterId = 0;
 
-constexpr uint32_t kInitialPstate = fuchsia_hardware_cpu_ctrl::wire::kDevicePerformanceStateP0;
+constexpr uint32_t kInitialOpp = fuchsia_hardware_cpu_ctrl::wire::kDeviceOperatingPointP0;
 
 }  // namespace
 
@@ -132,40 +132,39 @@ std::vector<operating_point_t> PerformanceDomainOpPoints(const perf_domain_t& pe
   return pd_op_points;
 }
 
-zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32_t* out_state) {
+zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uint32_t* out_opp) {
   std::scoped_lock lock(lock_);
 
-  if (requested_state >= operating_points_.size()) {
-    zxlogf(ERROR, "Requested performance state is out of bounds, state = %u\n", requested_state);
+  if (requested_opp >= operating_points_.size()) {
+    zxlogf(ERROR, "Requested opp is out of bounds, opp = %u\n", requested_opp);
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  if (!out_state) {
-    zxlogf(ERROR, "out_state may not be null");
+  if (!out_opp) {
+    zxlogf(ERROR, "out_opp may not be null");
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // There is no condition under which this function will return ZX_OK but out_state will not
-  // be requested_state so we're going to go ahead and set that up front.
-  *out_state = requested_state;
+  // There is no condition under which this function will return ZX_OK but out_opp will not
+  // be requested_opp so we're going to go ahead and set that up front.
+  *out_opp = requested_opp;
 
-  const operating_point_t& target_state = operating_points_[requested_state];
-  const operating_point_t& initial_state = operating_points_[current_pstate_];
+  const operating_point_t& target_opp = operating_points_[requested_opp];
+  const operating_point_t& initial_opp = operating_points_[current_operating_point_];
 
-  zxlogf(INFO, "Scaling from %u MHz %u mV to %u MHz %u mV", initial_state.freq_hz / 1000000,
-         initial_state.volt_uv / 1000, target_state.freq_hz / 1000000, target_state.volt_uv / 1000);
+  zxlogf(INFO, "Scaling from %u MHz %u mV to %u MHz %u mV", initial_opp.freq_hz / 1000000,
+         initial_opp.volt_uv / 1000, target_opp.freq_hz / 1000000, target_opp.volt_uv / 1000);
 
-  if (initial_state.freq_hz == target_state.freq_hz &&
-      initial_state.volt_uv == target_state.volt_uv) {
+  if (initial_opp.freq_hz == target_opp.freq_hz && initial_opp.volt_uv == target_opp.volt_uv) {
     // Nothing to be done.
     return ZX_OK;
   }
 
-  if (target_state.volt_uv > initial_state.volt_uv) {
+  if (target_opp.volt_uv > initial_opp.volt_uv) {
     // If we're increasing the voltage we need to do it before setting the
     // frequency.
     ZX_ASSERT(pwr_.is_valid());
-    fidl::WireResult result = pwr_->RequestVoltage(target_state.volt_uv);
+    fidl::WireResult result = pwr_->RequestVoltage(target_opp.volt_uv);
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to send RequestVoltage request: %s", result.status_string());
       return result.error().status();
@@ -178,21 +177,21 @@ zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32
     }
 
     uint32_t actual_voltage = result->value()->actual_voltage;
-    if (actual_voltage != target_state.volt_uv) {
-      zxlogf(ERROR, "Actual voltage does not match, requested = %u, got = %u", target_state.volt_uv,
+    if (actual_voltage != target_opp.volt_uv) {
+      zxlogf(ERROR, "Actual voltage does not match, requested = %u, got = %u", target_opp.volt_uv,
              actual_voltage);
       return ZX_OK;
     }
   }
 
   // Set the frequency next.
-  fidl::WireResult result = cpuscaler_->SetRate(target_state.freq_hz);
+  fidl::WireResult result = cpuscaler_->SetRate(target_opp.freq_hz);
   if (!result.ok() || result->is_error()) {
     zxlogf(ERROR, "Could not set CPU frequency: %s", result.FormatDescription().c_str());
 
     // Put the voltage back if frequency scaling fails.
     if (pwr_.is_valid()) {
-      fidl::WireResult result = pwr_->RequestVoltage(initial_state.volt_uv);
+      fidl::WireResult result = pwr_->RequestVoltage(initial_opp.volt_uv);
       if (!result.ok()) {
         zxlogf(ERROR, "Failed to send RequestVoltage request: %s", result.status_string());
         return result.error().status();
@@ -213,9 +212,9 @@ zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32
 
   // If we're decreasing the voltage, then we do it after the frequency has been
   // reduced to avoid undervolt conditions.
-  if (target_state.volt_uv < initial_state.volt_uv) {
+  if (target_opp.volt_uv < initial_opp.volt_uv) {
     ZX_ASSERT(pwr_.is_valid());
-    fidl::WireResult result = pwr_->RequestVoltage(target_state.volt_uv);
+    fidl::WireResult result = pwr_->RequestVoltage(target_opp.volt_uv);
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to send RequestVoltage request: %s", result.status_string());
       return result.error().status();
@@ -228,18 +227,18 @@ zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32
     }
 
     uint32_t actual_voltage = result->value()->actual_voltage;
-    if (actual_voltage != target_state.volt_uv) {
+    if (actual_voltage != target_opp.volt_uv) {
       zxlogf(ERROR,
              "Failed to set cpu voltage, requested = %u, got = %u. "
              "Voltage and frequency mismatch!",
-             target_state.volt_uv, actual_voltage);
+             target_opp.volt_uv, actual_voltage);
       return ZX_OK;
     }
   }
 
   zxlogf(INFO, "Success\n");
 
-  current_pstate_ = requested_state;
+  current_operating_point_ = requested_opp;
 
   return ZX_OK;
 }
@@ -313,16 +312,15 @@ zx_status_t AmlCpu::Init(fidl::ClientEnd<fuchsia_hardware_clock::Clock> plldiv16
 
   uint32_t actual;
   // Returns ZX_ERR_OUT_OF_RANGE if `operating_points_` is empty.
-  zx_status_t result = SetPerformanceStateInternal(kInitialPstate, &actual);
+  zx_status_t result = SetCurrentOperatingPointInternal(kInitialOpp, &actual);
 
   if (result != ZX_OK) {
-    zxlogf(ERROR, "Failed to set initial performance state, st = %d", result);
+    zxlogf(ERROR, "Failed to set initial opp, st = %d", result);
     return result;
   }
 
-  if (actual != kInitialPstate) {
-    zxlogf(ERROR, "Failed to set initial performance state, requested = %u, actual = %u",
-           kInitialPstate, actual);
+  if (actual != kInitialOpp) {
+    zxlogf(ERROR, "Failed to set initial opp, requested = %u, actual = %u", kInitialOpp, actual);
     return ZX_ERR_INTERNAL;
   }
 
@@ -342,35 +340,39 @@ void AmlCpu::SetCpuInfo(uint32_t cpu_version_packed) {
   cpu_info_.CreateUint("cpu_package_id", cpu_package_id, &inspector_);
 }
 
-void AmlCpu::GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
-                                     GetPerformanceStateInfoCompleter::Sync& completer) {
+void AmlCpu::GetOperatingPointInfo(GetOperatingPointInfoRequestView request,
+                                   GetOperatingPointInfoCompleter::Sync& completer) {
   auto operating_points = GetOperatingPoints();
-  if (request->state >= operating_points.size()) {
-    zxlogf(INFO, "Requested an operating point that's out of bounds, %u\n", request->state);
+  if (request->opp >= operating_points.size()) {
+    zxlogf(INFO, "Requested an operating point that's out of bounds, %u\n", request->opp);
     completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
     return;
   }
 
-  fuchsia_hardware_cpu_ctrl::wire::CpuPerformanceStateInfo result;
-  result.frequency_hz = operating_points[request->state].freq_hz;
-  result.voltage_uv = operating_points[request->state].volt_uv;
+  fuchsia_hardware_cpu_ctrl::wire::CpuOperatingPointInfo result;
+  result.frequency_hz = operating_points[request->opp].freq_hz;
+  result.voltage_uv = operating_points[request->opp].volt_uv;
 
   completer.ReplySuccess(result);
 }
 
-void AmlCpu::SetPerformanceState(SetPerformanceStateRequestView request,
-                                 SetPerformanceStateCompleter::Sync& completer) {
-  uint32_t out_state = 0;
-  zx_status_t status = SetPerformanceStateInternal(request->requested_state, &out_state);
+void AmlCpu::SetCurrentOperatingPoint(SetCurrentOperatingPointRequestView request,
+                                      SetCurrentOperatingPointCompleter::Sync& completer) {
+  uint32_t out_opp = 0;
+  zx_status_t status = SetCurrentOperatingPointInternal(request->requested_opp, &out_opp);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {
-    completer.ReplySuccess(out_state);
+    completer.ReplySuccess(out_opp);
   }
 }
 
-void AmlCpu::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
-  completer.Reply(GetCurrentPState());
+void AmlCpu::GetCurrentOperatingPoint(GetCurrentOperatingPointCompleter::Sync& completer) {
+  completer.Reply(GetCurrentOperatingPoint());
+}
+
+void AmlCpu::GetOperatingPointCount(GetOperatingPointCountCompleter::Sync& completer) {
+  completer.ReplySuccess(GetOperatingPointCount());
 }
 
 void AmlCpu::GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) {

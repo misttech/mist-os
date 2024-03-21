@@ -13,13 +13,13 @@
 
 namespace {
 
-constexpr cpuctrl::wire::CpuPerformanceStateInfo kTestPstates[] = {
+constexpr cpuctrl::wire::CpuOperatingPointInfo kTestOpps[] = {
     {.frequency_hz = 1000, .voltage_uv = 100}, {.frequency_hz = 800, .voltage_uv = 90},
     {.frequency_hz = 600, .voltage_uv = 80},   {.frequency_hz = 400, .voltage_uv = 70},
     {.frequency_hz = 200, .voltage_uv = 60},
 };
 
-constexpr uint32_t kInitialPstate = 0;
+constexpr uint32_t kInitialOperatingPoint = 0;
 
 constexpr uint32_t kNumLogicalCores = 4;
 
@@ -27,7 +27,7 @@ constexpr uint64_t kLogicalCoreIds[kNumLogicalCores] = {1, 2, 3, 4};
 
 class FakeCpuDevice : public fidl::testing::WireTestBase<cpuctrl::Device> {
  public:
-  unsigned int PstateSetCount() const { return pstate_set_count_; }
+  unsigned int OppSetCount() const { return opp_set_count_; }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     ADD_FAILURE("unexpected call to %s", name.c_str());
@@ -35,26 +35,31 @@ class FakeCpuDevice : public fidl::testing::WireTestBase<cpuctrl::Device> {
   }
 
  private:
-  void SetPerformanceState(SetPerformanceStateRequestView request,
-                           SetPerformanceStateCompleter::Sync& completer) override;
-  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
-  void GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
-                               GetPerformanceStateInfoCompleter::Sync& completer) override;
+  void SetCurrentOperatingPoint(SetCurrentOperatingPointRequestView request,
+                                SetCurrentOperatingPointCompleter::Sync& completer) override;
+  void GetCurrentOperatingPoint(GetCurrentOperatingPointCompleter::Sync& completer) override;
+  void GetOperatingPointInfo(GetOperatingPointInfoRequestView request,
+                             GetOperatingPointInfoCompleter::Sync& completer) override;
+  void GetOperatingPointCount(GetOperatingPointCountCompleter::Sync& completer) override;
   void GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) override;
   void GetLogicalCoreId(GetLogicalCoreIdRequestView request,
                         GetLogicalCoreIdCompleter::Sync& completer) override;
 
-  uint32_t current_pstate_ = kInitialPstate;
-  unsigned int pstate_set_count_ = 0;
+  uint32_t current_opp_ = kInitialOperatingPoint;
+  unsigned int opp_set_count_ = 0;
 };
 
-void FakeCpuDevice::GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
-                                            GetPerformanceStateInfoCompleter::Sync& completer) {
-  if (request->state >= std::size(kTestPstates)) {
+void FakeCpuDevice::GetOperatingPointInfo(GetOperatingPointInfoRequestView request,
+                                          GetOperatingPointInfoCompleter::Sync& completer) {
+  if (request->opp >= std::size(kTestOpps)) {
     completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
   } else {
-    completer.ReplySuccess(kTestPstates[request->state]);
+    completer.ReplySuccess(kTestOpps[request->opp]);
   }
+}
+
+void FakeCpuDevice::GetOperatingPointCount(GetOperatingPointCountCompleter::Sync& completer) {
+  completer.ReplySuccess(std::size(kTestOpps));
 }
 
 void FakeCpuDevice::GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) {
@@ -69,21 +74,20 @@ void FakeCpuDevice::GetLogicalCoreId(GetLogicalCoreIdRequestView request,
   completer.Reply(kLogicalCoreIds[request->index]);
 }
 
-void FakeCpuDevice::SetPerformanceState(SetPerformanceStateRequestView request,
-                                        SetPerformanceStateCompleter::Sync& completer) {
-  if (request->requested_state > std::size(kTestPstates)) {
+void FakeCpuDevice::SetCurrentOperatingPoint(SetCurrentOperatingPointRequestView request,
+                                             SetCurrentOperatingPointCompleter::Sync& completer) {
+  if (request->requested_opp > std::size(kTestOpps)) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
-  pstate_set_count_++;
-  current_pstate_ = request->requested_state;
-  completer.ReplySuccess(request->requested_state);
+  opp_set_count_++;
+  current_opp_ = request->requested_opp;
+  completer.ReplySuccess(request->requested_opp);
 }
 
-void FakeCpuDevice::GetCurrentPerformanceState(
-    GetCurrentPerformanceStateCompleter::Sync& completer) {
-  completer.Reply(current_pstate_);
+void FakeCpuDevice::GetCurrentOperatingPoint(GetCurrentOperatingPointCompleter::Sync& completer) {
+  completer.Reply(current_opp_);
 }
 
 class TestCpuPerformanceDomain : public CpuPerformanceDomain {
@@ -124,51 +128,53 @@ TEST_F(PerformanceDomainTest, TestNumLogicalCores) {
   EXPECT_EQ(core_count, kNumLogicalCores);
 }
 
-TEST_F(PerformanceDomainTest, TestGetCurrentPerformanceState) {
-  const auto [st, pstate, pstate_info] = pd().GetCurrentPerformanceState();
+TEST_F(PerformanceDomainTest, TestGetCurrentOperatingPoint) {
+  const auto [st, opp, opp_info] = pd().GetCurrentOperatingPoint();
   EXPECT_OK(st);
-  EXPECT_EQ(pstate, kInitialPstate);
-  EXPECT_EQ(pstate_info.frequency_hz, kTestPstates[kInitialPstate].frequency_hz);
-  EXPECT_EQ(pstate_info.voltage_uv, kTestPstates[kInitialPstate].voltage_uv);
+  EXPECT_EQ(opp, kInitialOperatingPoint);
+  EXPECT_EQ(opp_info.frequency_hz, kTestOpps[kInitialOperatingPoint].frequency_hz);
+  EXPECT_EQ(opp_info.voltage_uv, kTestOpps[kInitialOperatingPoint].voltage_uv);
 }
 
-TEST_F(PerformanceDomainTest, TestGetPerformanceStates) {
-  const auto pstates = pd().GetPerformanceStates();
+TEST_F(PerformanceDomainTest, TestGetOperatingPoints) {
+  const auto [st, opps] = pd().GetOperatingPoints();
 
-  ASSERT_EQ(pstates.size(), std::size(kTestPstates));
+  EXPECT_OK(st);
 
-  for (size_t i = 0; i < pstates.size(); i++) {
-    EXPECT_EQ(pstates[i].voltage_uv, kTestPstates[i].voltage_uv);
-    EXPECT_EQ(pstates[i].frequency_hz, kTestPstates[i].frequency_hz);
+  ASSERT_EQ(opps.size(), std::size(kTestOpps));
+
+  for (size_t i = 0; i < opps.size(); i++) {
+    EXPECT_EQ(opps[i].voltage_uv, kTestOpps[i].voltage_uv);
+    EXPECT_EQ(opps[i].frequency_hz, kTestOpps[i].frequency_hz);
   }
 }
 
-TEST_F(PerformanceDomainTest, TestSetPerformanceState) {
-  // Just move to the next sequential pstate with wraparound.
-  const uint32_t test_pstate = (kInitialPstate + 1) % std::size(kTestPstates);
-  const uint32_t invalid_pstate = std::size(kTestPstates) + 1;
-  zx_status_t st = pd().SetPerformanceState(test_pstate);
+TEST_F(PerformanceDomainTest, TestSetCurrentOperatingPoint) {
+  // Just move to the next sequential opp with wraparound.
+  const uint32_t test_opp = (kInitialOperatingPoint + 1) % std::size(kTestOpps);
+  const uint32_t invalid_opp = std::size(kTestOpps) + 1;
+  zx_status_t st = pd().SetCurrentOperatingPoint(test_opp);
 
   EXPECT_OK(st);
 
   {
-    const auto [res, new_pstate, info] = pd().GetCurrentPerformanceState();
+    const auto [res, new_opp, info] = pd().GetCurrentOperatingPoint();
     EXPECT_OK(res);
-    EXPECT_EQ(new_pstate, test_pstate);
+    EXPECT_EQ(new_opp, test_opp);
   }
 
-  st = pd().SetPerformanceState(invalid_pstate);
+  st = pd().SetCurrentOperatingPoint(invalid_opp);
   EXPECT_NOT_OK(st);
 
   {
-    // Make sure the pstate hasn't changed.
-    const auto [res, new_pstate, info] = pd().GetCurrentPerformanceState();
+    // Make sure the opp hasn't changed.
+    const auto [res, new_opp, info] = pd().GetCurrentOperatingPoint();
     EXPECT_OK(res);
-    EXPECT_EQ(new_pstate, test_pstate);
+    EXPECT_EQ(new_opp, test_opp);
   }
 
-  // Make sure there was exactly one successful call to SetPerformanceState.
-  EXPECT_EQ(cpu().PstateSetCount(), 1);
+  // Make sure there was exactly one successful call to SetCurrentOperatingPoint.
+  EXPECT_EQ(cpu().OppSetCount(), 1);
 }
 
 }  // namespace

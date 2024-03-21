@@ -199,7 +199,7 @@
                                 "items": {
                                     "type": "object",
                                     "properties": {
-                                        "cluster_pstates": {
+                                        "cluster_opps": {
                                             "type": "array",
                                             "minItems": 1,
                                             "items": {
@@ -223,7 +223,7 @@
                                 },
                                 "additionalProperties": false,
                                 "required": [
-                                    "cluster_pstates",
+                                    "cluster_opps",
                                     "min_performance_normperfs",
                                     "static_power_w",
                                     "dynamic_power_per_normperf_w"

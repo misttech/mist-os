@@ -220,9 +220,9 @@ impl ops::Div<Hertz> for f64 {
     }
 }
 
-/// Describes a processor performance state.
+/// Describes a processor operating point.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PState {
+pub struct OperatingPoint {
     pub frequency: Hertz,
     pub voltage: Volts,
 }

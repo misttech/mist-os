@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::cpu_device_handler;
 use crate::error::CpuManagerError;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
-use crate::types::{Farads, Hertz, PState, ThermalLoad, Volts, Watts};
+use crate::types::{Farads, Hertz, OperatingPoint, ThermalLoad, Volts, Watts};
 use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
@@ -25,10 +24,10 @@ use std::rc::Rc;
 
 /// Node: CpuControlHandler
 ///
-/// Summary: Provides a mechanism for controlling the performance state of a CPU domain. The node
+/// Summary: Provides a mechanism for controlling the operating point of a CPU domain. The node
 ///          mostly relies on functionality provided by the DeviceControlHandler node for
-///          performance state control, but this node enhances that basic functionality by
-///          integrating performance state metadata (CPU P-state information) from the CpuCtrl
+///          operating point control, but this node enhances that basic functionality by
+///          integrating operating point metadata (CPU opp information) from the CpuCtrl
 ///          interface.
 ///
 /// Handles Messages:
@@ -36,8 +35,8 @@ use std::rc::Rc;
 ///
 /// Sends Messages:
 ///     - GetCpuLoads
-///     - GetPerformanceState
-///     - SetPerformanceState
+///     - GetOperatingPoint
+///     - SetOperatingPoint
 ///
 /// FIDL dependencies:
 ///     - fuchsia.hardware.cpu.ctrl.Device: the node uses this protocol to communicate with the
@@ -45,9 +44,9 @@ use std::rc::Rc;
 
 /// Describes the parameters of the CPU domain.
 pub struct CpuControlParams {
-    /// Available P-states of the CPU. These must be in order of descending power usage, per
+    /// Available opps of the CPU. These must be in order of descending power usage, per
     /// section 8.4.6.2 of ACPI spec version 6.3.
-    pub p_states: Vec<PState>,
+    pub opps: Vec<OperatingPoint>,
     /// Model capacitance of each CPU core. Required to estimate power usage.
     pub capacitance: Farads,
     /// Logical CPU numbers contained within this CPU domain.
@@ -55,7 +54,7 @@ pub struct CpuControlParams {
 }
 
 impl CpuControlParams {
-    /// Checks that the list of P-states is valid:
+    /// Checks that the list of opps is valid:
     ///  - Contains at least one element;
     ///  - Is in order of decreasing nominal power consumption.
     fn validate(&self) -> Result<(), Error> {
@@ -65,20 +64,17 @@ impl CpuControlParams {
         if !self.logical_cpu_numbers.windows(2).all(|w| w[0] < w[1]) {
             return Err(format_err!("CPUs must be sorted and non-repeating"));
         }
-        if self.p_states.len() == 0 {
-            return Err(format_err!("Must have at least one P-state"));
-        } else if self.p_states.len() > 1 {
-            let mut last_power = get_cpu_power(
-                self.capacitance,
-                self.p_states[0].voltage,
-                self.p_states[0].frequency,
-            );
-            for i in 1..self.p_states.len() {
-                let p_state = &self.p_states[i];
-                let power = get_cpu_power(self.capacitance, p_state.voltage, p_state.frequency);
+        if self.opps.len() == 0 {
+            return Err(format_err!("Must have at least one opp"));
+        } else if self.opps.len() > 1 {
+            let mut last_power =
+                get_cpu_power(self.capacitance, self.opps[0].voltage, self.opps[0].frequency);
+            for i in 1..self.opps.len() {
+                let opp = &self.opps[i];
+                let power = get_cpu_power(self.capacitance, opp.voltage, opp.frequency);
                 if power >= last_power {
                     return Err(format_err!(
-                        "P-states must be in order of decreasing power consumption \
+                        "opps must be in order of decreasing power consumption \
                          (violated by state {})",
                         i
                     ));
@@ -239,9 +235,9 @@ impl<'a> CpuControlHandlerBuilder<'a> {
             InspectData::new(inspect_root, format!("CpuControlHandler ({})", cpu_driver_path));
 
         let mutable_inner = MutableInner {
-            current_p_state_index: 0,
+            current_opp_index: 0,
             cpu_control_params: CpuControlParams {
-                p_states: Vec::new(),
+                opps: Vec::new(),
                 capacitance,
                 logical_cpu_numbers,
             },
@@ -292,8 +288,8 @@ pub struct CpuControlHandler {
     /// the GetCpuLoads message.
     cpu_stats_handler: Rc<dyn Node>,
 
-    /// The node to be used for CPU performance state control. It is expected that this node
-    /// responds to the Get/SetPerformanceState messages.
+    /// The node to be used for CPU operating point control. It is expected that this node
+    /// responds to the Get/SetOperatingPoint messages.
     cpu_dev_handler: Rc<dyn Node>,
 
     /// A struct for managing Component Inspection data
@@ -302,7 +298,7 @@ pub struct CpuControlHandler {
     /// Identifies trace counters between CpuControlHandler instances for different drivers.
     trace_counter_id: u64,
 
-    /// Minimum CPU clock speed to set. Selectable CPU P-states with a frequency below this value
+    /// Minimum CPU clock speed to set. Selectable CPU opps with a frequency below this value
     /// are filtered out.
     min_cpu_clock_speed: Hertz,
 
@@ -341,17 +337,17 @@ impl CpuControlHandler {
             .sum())
     }
 
-    /// Returns the current CPU P-state index
-    async fn get_current_p_state_index(&self) -> Result<usize, Error> {
+    /// Returns the current CPU opp index
+    async fn get_current_opp_index(&self) -> Result<usize, Error> {
         fuchsia_trace::duration!(
             c"cpu_manager",
-            c"CpuControlHandler::get_current_p_state_index",
+            c"CpuControlHandler::get_current_opp_index",
             "driver" => self.cpu_driver_path.as_str()
         );
-        match self.send_message(&self.cpu_dev_handler, &Message::GetPerformanceState).await {
-            Ok(MessageReturn::GetPerformanceState(state)) => Ok(state as usize),
-            Ok(r) => Err(format_err!("GetPerformanceState had unexpected return value: {:?}", r)),
-            Err(e) => Err(format_err!("GetPerformanceState failed: {:?}", e)),
+        match self.send_message(&self.cpu_dev_handler, &Message::GetOperatingPoint).await {
+            Ok(MessageReturn::GetOperatingPoint(state)) => Ok(state as usize),
+            Ok(r) => Err(format_err!("GetOperatingPoint had unexpected return value: {:?}", r)),
+            Err(e) => Err(format_err!("GetOperatingPoint failed: {:?}", e)),
         }
     }
 
@@ -405,12 +401,12 @@ impl CpuControlHandler {
         Watts(power_available)
     }
 
-    /// Sets the P-state to the highest-power state with consumption below `max_power`.
+    /// Sets the opp to the highest-power state with consumption below `max_power`.
     ///
     /// The estimated power consumption depends on the operation completion rate by the CPU.
     /// We assume that the rate of operations requested over the next sample interval will be
     /// the same as it was over the previous sample interval, up to CPU's max completion rate
-    /// for a P-state under consideration.
+    /// for a opp under consideration.
     async fn set_max_power_consumption(&self, max_power: &Watts) -> Result<(), Error> {
         fuchsia_trace::duration!(
             c"cpu_manager",
@@ -421,7 +417,7 @@ impl CpuControlHandler {
 
         self.init_done.wait().await;
 
-        let current_p_state_index = self.mutable_inner.borrow().current_p_state_index;
+        let current_opp_index = self.mutable_inner.borrow().current_opp_index;
 
         // This is reused several times.
         let num_cores = self.cpu_control_params().logical_cpu_numbers.len() as f64;
@@ -442,8 +438,7 @@ impl CpuControlHandler {
                 self.cpu_driver_path.as_str() => last_load
             );
 
-            let last_frequency =
-                self.cpu_control_params().p_states[current_p_state_index].frequency;
+            let last_frequency = self.cpu_control_params().opps[current_opp_index].frequency;
             (last_frequency.mul_scalar(last_load), last_frequency.mul_scalar(num_cores))
         };
 
@@ -453,17 +448,17 @@ impl CpuControlHandler {
             c"CpuControlHandler::set_max_power_consumption_data",
             fuchsia_trace::Scope::Thread,
             "driver" => self.cpu_driver_path.as_str(),
-            "current_p_state_index" => current_p_state_index as u32,
+            "current_opp_index" => current_opp_index as u32,
             "last_op_rate" => last_op_rate.0
         );
 
-        let mut p_state_index = 0;
+        let mut opp_index = 0;
         let mut estimated_power = Watts(0.0);
 
-        // Iterate through the list of available P-states (guaranteed to be sorted in order of
+        // Iterate through the list of available opps (guaranteed to be sorted in order of
         // decreasing power consumption) and choose the first that will operate within the
         // `max_power` constraint.
-        for (i, state) in self.cpu_control_params().p_states.iter().enumerate() {
+        for (i, state) in self.cpu_control_params().opps.iter().enumerate() {
             // We assume that the last operation rate carries over to the next interval unless:
             //  - It exceeds the max operation rate at the new frequency, in which case it is
             //    truncated to the new max.
@@ -479,7 +474,7 @@ impl CpuControlHandler {
                 last_op_rate
             };
 
-            p_state_index = i;
+            opp_index = i;
             estimated_power = get_cpu_power(
                 self.cpu_control_params().capacitance,
                 state.voltage,
@@ -498,33 +493,30 @@ impl CpuControlHandler {
             "value (W)" => estimated_power.0
         );
 
-        if p_state_index != current_p_state_index {
+        if opp_index != current_opp_index {
             fuchsia_trace::instant!(
                 c"cpu_manager",
-                c"CpuControlHandler::updated_p_state_index",
+                c"CpuControlHandler::updated_opp_index",
                 fuchsia_trace::Scope::Thread,
                 "driver" => self.cpu_driver_path.as_str(),
-                "old_index" => current_p_state_index as u32,
-                "new_index" => p_state_index as u32
+                "old_index" => current_opp_index as u32,
+                "new_index" => opp_index as u32
             );
 
-            // Tell the CPU DeviceControlHandler to update the performance state
-            self.send_message(
-                &self.cpu_dev_handler,
-                &Message::SetPerformanceState(p_state_index as u32),
-            )
-            .await?;
+            // Tell the CPU DeviceControlHandler to update the operating point
+            self.send_message(&self.cpu_dev_handler, &Message::SetOperatingPoint(opp_index as u32))
+                .await?;
 
-            // Cache the new P-state index for calculations on the next iteration
-            self.mutable_inner.borrow_mut().current_p_state_index = p_state_index;
-            self.inspect.p_state_index.set(p_state_index as u64);
+            // Cache the new opp index for calculations on the next iteration
+            self.mutable_inner.borrow_mut().current_opp_index = opp_index;
+            self.inspect.opp_index.set(opp_index as u64);
         }
 
         fuchsia_trace::counter!(
             c"cpu_manager",
-            c"CpuControlHandler p_state",
+            c"CpuControlHandler opp",
             self.trace_counter_id,
-            self.cpu_driver_path.as_str() => p_state_index as u32
+            self.cpu_driver_path.as_str() => opp_index as u32
         );
         Ok(())
     }
@@ -534,8 +526,8 @@ struct MutableInner {
     /// The parameters of the CPU domain which are queried from the CPU driver.
     cpu_control_params: CpuControlParams,
 
-    /// The current CPU P-state index which is queried from the CPU DeviceControlHandler node.
-    current_p_state_index: usize,
+    /// The current CPU opp index which is queried from the CPU DeviceControlHandler node.
+    current_opp_index: usize,
 
     /// A proxy handle to communicate with the CPU driver CpuCtrl interface.
     cpu_ctrl_proxy: Option<fcpuctrl::DeviceProxy>,
@@ -585,23 +577,22 @@ impl Node for CpuControlHandler {
             }
         };
 
-        // Query the CPU P-states
-        let p_states =
-            get_p_states(&self.cpu_driver_path, &cpu_ctrl_proxy, self.min_cpu_clock_speed)
-                .await
-                .context("Failed to get CPU P-states")?;
+        // Query the CPU opps
+        let opps = get_opps(&self.cpu_driver_path, &cpu_ctrl_proxy, self.min_cpu_clock_speed)
+            .await
+            .context("Failed to get CPU opps")?;
 
-        let current_p_state = self.get_current_p_state_index().await?;
+        let current_opp = self.get_current_opp_index().await?;
 
         {
             let mut mutable_inner = self.mutable_inner.borrow_mut();
             let cpu_control_params = &mut mutable_inner.cpu_control_params;
-            cpu_control_params.p_states = p_states;
+            cpu_control_params.opps = opps;
             cpu_control_params.validate().context("Invalid CPU control params")?;
             self.inspect.set_cpu_control_params(&cpu_control_params);
 
             mutable_inner.cpu_ctrl_proxy = Some(cpu_ctrl_proxy);
-            mutable_inner.current_p_state_index = current_p_state;
+            mutable_inner.current_opp_index = current_opp;
         }
 
         self.init_done.signal();
@@ -624,7 +615,7 @@ struct InspectData {
     root_node: inspect::Node,
 
     // Properties
-    p_state_index: inspect::UintProperty,
+    opp_index: inspect::UintProperty,
     last_op_rate: inspect::DoubleProperty,
     last_load: inspect::DoubleProperty,
 }
@@ -633,25 +624,25 @@ impl InspectData {
     fn new(parent: &inspect::Node, node_name: String) -> Self {
         // Create a local root node and properties
         let root_node = parent.create_child(node_name);
-        let p_state_index = root_node.create_uint("p_state_index", 0);
+        let opp_index = root_node.create_uint("opp_index", 0);
         let last_op_rate = root_node.create_double("last_op_rate", 0.0);
         let last_load = root_node.create_double("last_load", 0.0);
 
-        InspectData { root_node, p_state_index, last_op_rate, last_load }
+        InspectData { root_node, opp_index, last_op_rate, last_load }
     }
 
     fn set_cpu_control_params(&self, params: &CpuControlParams) {
         let cpu_params_node = self.root_node.create_child("cpu_control_params");
 
-        // Iterate `params.p_states` in reverse order so that the Inspect nodes appear in the same
+        // Iterate `params.opps` in reverse order so that the Inspect nodes appear in the same
         // order as the vector (`create_child` inserts nodes at the head).
-        for (i, p_state) in params.p_states.iter().enumerate().rev() {
-            let p_state_node = cpu_params_node.create_child(format!("p_state_{}", i));
-            p_state_node.record_double("voltage (V)", p_state.voltage.0);
-            p_state_node.record_double("frequency (Hz)", p_state.frequency.0);
+        for (i, opp) in params.opps.iter().enumerate().rev() {
+            let opp_node = cpu_params_node.create_child(format!("opp_{}", i));
+            opp_node.record_double("voltage (V)", opp.voltage.0);
+            opp_node.record_double("frequency (Hz)", opp.frequency.0);
 
-            // Pass ownership of the new P-state node to the parent `cpu_params_node`
-            cpu_params_node.record(p_state_node);
+            // Pass ownership of the new opp node to the parent `cpu_params_node`
+            cpu_params_node.record(opp_node);
         }
 
         cpu_params_node.record_double("capacitance (F)", params.capacitance.0);
@@ -665,50 +656,66 @@ impl InspectData {
     }
 }
 
-/// Query the CPU P-states from the CpuCtrl driver.
-async fn get_p_states(
+/// Query the CPU opps from the CpuCtrl driver.
+async fn get_opps(
     cpu_driver_path: &str,
     cpu_ctrl_proxy: &fcpuctrl::DeviceProxy,
     min_cpu_clock_speed: Hertz,
-) -> Result<Vec<PState>, Error> {
+) -> Result<Vec<OperatingPoint>, Error> {
     fuchsia_trace::duration!(
         c"cpu_manager",
-        c"cpu_control_handler::get_p_states",
+        c"cpu_control_handler::get_opps",
         "driver" => cpu_driver_path
     );
 
-    // Query P-state metadata from the CpuCtrl interface. Each supported performance state has
-    // accompanying P-state metadata.
-    let mut p_states = Vec::new();
-    let mut skipped_p_states = Vec::new();
-    for i in 0..cpu_device_handler::MAX_PERF_STATES {
-        if let Ok(info) = cpu_ctrl_proxy.get_performance_state_info(i).await? {
-            let frequency = Hertz(info.frequency_hz as f64);
-            let voltage = Volts(info.voltage_uv as f64 / 1e6);
-            let p_state = PState { frequency, voltage };
+    // Query opp metadata from the CpuCtrl interface. Each supported operating point has
+    // accompanying opp metadata.
+    let mut opps = Vec::new();
+    let mut skipped_opps = Vec::new();
+    let opp_count = cpu_ctrl_proxy
+        .get_operating_point_count()
+        .await
+        .map_err(|e| {
+            format_err!("{}: get_operating_point_count IPC failed: {}", cpu_driver_path, e)
+        })?
+        .map_err(|e| {
+            format_err!("{}: get_operating_point_count returned error: {}", cpu_driver_path, e)
+        })?;
 
-            // Filter out P-states where CPU frequency is unacceptably low
-            if frequency >= min_cpu_clock_speed {
-                p_states.push(p_state);
-            } else {
-                skipped_p_states.push(p_state);
-            }
+    for i in 0..opp_count {
+        let info = cpu_ctrl_proxy
+            .get_operating_point_info(i)
+            .await
+            .map_err(|e| {
+                format_err!("{}: get_operating_point_info IPC failed: {}", cpu_driver_path, e)
+            })?
+            .map_err(|e| {
+                format_err!("{}: get_operating_point_info returned error: {}", cpu_driver_path, e)
+            })?;
+
+        let frequency = Hertz(info.frequency_hz as f64);
+        let voltage = Volts(info.voltage_uv as f64 / 1e6);
+        let opp = OperatingPoint { frequency, voltage };
+
+        // Filter out opps where CPU frequency is unacceptably low
+        if frequency >= min_cpu_clock_speed {
+            opps.push(opp);
         } else {
-            break;
+            skipped_opps.push(opp);
         }
     }
 
     fuchsia_trace::instant!(
         c"cpu_manager",
-        c"cpu_control_handler::received_cpu_p_states",
+        c"cpu_control_handler::received_cpu_opps",
         fuchsia_trace::Scope::Thread,
         "driver" => cpu_driver_path,
         "valid" => 1,
-        "p_states" => format!("{:?}", p_states).as_str(),
-        "skipped_p_states" => format!("{:?}", skipped_p_states).as_str()
+        "opps" => format!("{:?}", opps).as_str(),
+        "skipped_opps" => format!("{:?}", skipped_opps).as_str()
     );
 
-    Ok(p_states)
+    Ok(opps)
 }
 
 #[cfg(test)]
@@ -723,33 +730,36 @@ pub mod tests {
     use futures::TryStreamExt;
     use std::collections::HashSet;
 
-    // Returns a proxy to a fake CpuCtrl driver pre-baked to return a single (fake) CPU P-state.
+    // Returns a proxy to a fake CpuCtrl driver pre-baked to return a single (fake) CPU opp.
     fn fake_cpu_ctrl_driver() -> fcpuctrl::DeviceProxy {
-        fake_cpu_ctrl_driver_with_p_states(vec![PState {
+        fake_cpu_ctrl_driver_with_opps(vec![OperatingPoint {
             frequency: Hertz(0.0),
             voltage: Volts(0.0),
         }])
     }
 
-    // Returns a proxy to a fake CpuCtrl driver pre-baked to return the given set of CPU P-states.
-    pub fn fake_cpu_ctrl_driver_with_p_states(p_states: Vec<PState>) -> fcpuctrl::DeviceProxy {
+    // Returns a proxy to a fake CpuCtrl driver pre-baked to return the given set of CPU opps.
+    pub fn fake_cpu_ctrl_driver_with_opps(opps: Vec<OperatingPoint>) -> fcpuctrl::DeviceProxy {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<fcpuctrl::DeviceMarker>().unwrap();
 
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {
-                    Some(fcpuctrl::DeviceRequest::GetPerformanceStateInfo { state, responder }) => {
-                        let index = state as usize;
-                        let result = if index < p_states.len() {
-                            Ok(fcpuctrl::CpuPerformanceStateInfo {
-                                frequency_hz: p_states[index].frequency.0 as i64,
-                                voltage_uv: (p_states[index].voltage.0 * 1e6) as i64,
+                    Some(fcpuctrl::DeviceRequest::GetOperatingPointInfo { opp, responder }) => {
+                        let index = opp as usize;
+                        let result = if index < opps.len() {
+                            Ok(fcpuctrl::CpuOperatingPointInfo {
+                                frequency_hz: opps[index].frequency.0 as i64,
+                                voltage_uv: (opps[index].voltage.0 * 1e6) as i64,
                             })
                         } else {
                             Err(zx::Status::NOT_SUPPORTED.into_raw())
                         };
                         let _ = responder.send(result.as_ref().map_err(|e| *e));
+                    }
+                    Some(fcpuctrl::DeviceRequest::GetOperatingPointCount { responder }) => {
+                        let _ = responder.send(Ok(opps.len() as u32));
                     }
                     _ => assert!(false),
                 }
@@ -772,8 +782,8 @@ pub mod tests {
         let devhost_node = mock_maker.make(
             "DevHostNode",
             vec![
-                // CpuControlHandler queries performance state during its initialization
-                (msg_eq!(GetPerformanceState), msg_ok_return!(GetPerformanceState(0))),
+                // CpuControlHandler queries operating point during its initialization
+                (msg_eq!(GetOperatingPoint), msg_ok_return!(GetOperatingPoint(0))),
             ],
         );
 
@@ -795,7 +805,7 @@ pub mod tests {
         // Empty CPUs
         assert!(CpuControlParams {
             logical_cpu_numbers: vec![],
-            p_states: vec![PState { frequency: Hertz(0.0), voltage: Volts(0.0) }],
+            opps: vec![OperatingPoint { frequency: Hertz(0.0), voltage: Volts(0.0) }],
             capacitance: Farads(100e-12),
         }
         .validate()
@@ -804,7 +814,7 @@ pub mod tests {
         // Repeating CPUs
         assert!(CpuControlParams {
             logical_cpu_numbers: vec![0, 0],
-            p_states: vec![PState { frequency: Hertz(0.0), voltage: Volts(0.0) }],
+            opps: vec![OperatingPoint { frequency: Hertz(0.0), voltage: Volts(0.0) }],
             capacitance: Farads(100e-12)
         }
         .validate()
@@ -813,39 +823,39 @@ pub mod tests {
         // Non-ascending CPUs
         assert!(CpuControlParams {
             logical_cpu_numbers: vec![1, 0],
-            p_states: vec![PState { frequency: Hertz(0.0), voltage: Volts(0.0) }],
+            opps: vec![OperatingPoint { frequency: Hertz(0.0), voltage: Volts(0.0) }],
             capacitance: Farads(100e-12)
         }
         .validate()
         .is_err());
 
-        // Empty p_states
+        // Empty opps
         assert!(CpuControlParams {
             logical_cpu_numbers: vec![0],
-            p_states: vec![],
+            opps: vec![],
             capacitance: Farads(100e-12)
         }
         .validate()
         .is_err());
 
-        // p_states in order of increasing power usage
+        // opps in order of increasing power usage
         assert!(CpuControlParams {
             logical_cpu_numbers: vec![0],
-            p_states: vec![
-                PState { frequency: Hertz(1.0), voltage: Volts(1.0) },
-                PState { frequency: Hertz(2.0), voltage: Volts(1.0) }
+            opps: vec![
+                OperatingPoint { frequency: Hertz(1.0), voltage: Volts(1.0) },
+                OperatingPoint { frequency: Hertz(2.0), voltage: Volts(1.0) }
             ],
             capacitance: Farads(100e-12)
         }
         .validate()
         .is_err());
 
-        // p_states with identical power usage
+        // opps with identical power usage
         assert!(CpuControlParams {
             logical_cpu_numbers: vec![0],
-            p_states: vec![
-                PState { frequency: Hertz(1.0), voltage: Volts(1.0) },
-                PState { frequency: Hertz(1.0), voltage: Volts(1.0) }
+            opps: vec![
+                OperatingPoint { frequency: Hertz(1.0), voltage: Volts(1.0) },
+                OperatingPoint { frequency: Hertz(1.0), voltage: Volts(1.0) }
             ],
             capacitance: Farads(100e-12)
         }
@@ -853,39 +863,39 @@ pub mod tests {
         .is_err());
     }
 
-    async fn get_perf_state(devhost_node: Rc<dyn Node>) -> u32 {
-        match devhost_node.handle_message(&Message::GetPerformanceState).await.unwrap() {
-            MessageReturn::GetPerformanceState(state) => state,
+    async fn get_operating_point(devhost_node: Rc<dyn Node>) -> u32 {
+        match devhost_node.handle_message(&Message::GetOperatingPoint).await.unwrap() {
+            MessageReturn::GetOperatingPoint(state) => state,
             e => panic!("Unexpected return value: {:?}", e),
         }
     }
 
     /// Tests that the UpdateThermalLoad message causes the node to correctly consider CPU load
-    /// and parameters to choose the appropriate P-states.
+    /// and parameters to choose the appropriate opps.
     #[fasync::run_singlethreaded(test)]
     async fn test_update_thermal_load() {
         let mut mock_maker = MockNodeMaker::new();
 
-        // Arbitrary CpuControlParams chosen to allow the node to demonstrate P-state selection
+        // Arbitrary CpuControlParams chosen to allow the node to demonstrate opp selection
         let cpu_params = CpuControlParams {
             logical_cpu_numbers: vec![0, 1, 2, 3],
-            p_states: vec![
-                PState { frequency: Hertz(2.0e9), voltage: Volts(5.0) },
-                PState { frequency: Hertz(2.0e9), voltage: Volts(4.0) },
-                PState { frequency: Hertz(2.0e9), voltage: Volts(3.0) },
+            opps: vec![
+                OperatingPoint { frequency: Hertz(2.0e9), voltage: Volts(5.0) },
+                OperatingPoint { frequency: Hertz(2.0e9), voltage: Volts(4.0) },
+                OperatingPoint { frequency: Hertz(2.0e9), voltage: Volts(3.0) },
             ],
             capacitance: Farads(100.0e-12),
         };
 
-        // The modeled power consumption at each P-state
+        // The modeled power consumption at each opp
         let power_consumption: Vec<Watts> = cpu_params
-            .p_states
+            .opps
             .iter()
-            .map(|p_state| {
+            .map(|opp| {
                 get_cpu_power(
                     cpu_params.capacitance,
-                    p_state.voltage,
-                    p_state.frequency.mul_scalar(cpu_params.logical_cpu_numbers.len() as f64),
+                    opp.voltage,
+                    opp.frequency.mul_scalar(cpu_params.logical_cpu_numbers.len() as f64),
                 )
             })
             .collect();
@@ -905,18 +915,18 @@ pub mod tests {
         let devhost_node = mock_maker.make(
             "DevHostNode",
             vec![
-                // CpuControlHandler queries performance state during its initialization
-                (msg_eq!(GetPerformanceState), msg_ok_return!(GetPerformanceState(0))),
-                // The test queries for current performance state
-                (msg_eq!(GetPerformanceState), msg_ok_return!(GetPerformanceState(0))),
-                // CpuControlHandler changes performance state to 1
-                (msg_eq!(SetPerformanceState(1)), msg_ok_return!(SetPerformanceState)),
-                // The test queries for current performance state
-                (msg_eq!(GetPerformanceState), msg_ok_return!(GetPerformanceState(1))),
-                // CpuControlHandler changes performance state to 2
-                (msg_eq!(SetPerformanceState(2)), msg_ok_return!(SetPerformanceState)),
-                // The test queries for current performance state
-                (msg_eq!(GetPerformanceState), msg_ok_return!(GetPerformanceState(1))),
+                // CpuControlHandler queries operating point during its initialization
+                (msg_eq!(GetOperatingPoint), msg_ok_return!(GetOperatingPoint(0))),
+                // The test queries for current operating point
+                (msg_eq!(GetOperatingPoint), msg_ok_return!(GetOperatingPoint(0))),
+                // CpuControlHandler changes operating point to 1
+                (msg_eq!(SetOperatingPoint(1)), msg_ok_return!(SetOperatingPoint)),
+                // The test queries for current operating point
+                (msg_eq!(GetOperatingPoint), msg_ok_return!(GetOperatingPoint(1))),
+                // CpuControlHandler changes operating point to 2
+                (msg_eq!(SetOperatingPoint(2)), msg_ok_return!(SetOperatingPoint)),
+                // The test queries for current operating point
+                (msg_eq!(GetOperatingPoint), msg_ok_return!(GetOperatingPoint(1))),
             ],
         );
         let cpu_ctrl_node = CpuControlHandlerBuilder::new()
@@ -924,14 +934,14 @@ pub mod tests {
             .power_gain(power_consumption[0].mul_scalar(0.015))
             .cpu_stats_handler(stats_node)
             .cpu_dev_handler(devhost_node.clone())
-            .cpu_ctrl_proxy(fake_cpu_ctrl_driver_with_p_states(cpu_params.p_states))
+            .cpu_ctrl_proxy(fake_cpu_ctrl_driver_with_opps(cpu_params.opps))
             .capacitance(cpu_params.capacitance)
             .logical_cpu_numbers(cpu_params.logical_cpu_numbers)
             .build_and_init()
             .await;
 
-        // Test case 1: Select a thermal load that allows power consumption of the highest P-state;
-        // expect to be in P-state 0
+        // Test case 1: Select a thermal load that allows power consumption of the highest opp;
+        // expect to be in opp 0
         let available_power = power_consumption[0].mul_scalar(1.01);
         // Thermal load is calculated to ensure that `available_power` is the approximate output of
         // `calculate_available_power`
@@ -941,10 +951,10 @@ pub mod tests {
         );
         let result = cpu_ctrl_node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
-        assert_eq!(get_perf_state(devhost_node.clone()).await, 0);
+        assert_eq!(get_operating_point(devhost_node.clone()).await, 0);
 
-        // Test case 2: Select a thermal load that lowers power consumption to that of P-state 1;
-        // expect to be in P-state 1
+        // Test case 2: Select a thermal load that lowers power consumption to that of opp 1;
+        // expect to be in opp 1
         let available_power = power_consumption[1].mul_scalar(1.01);
         // Thermal load is calculated to ensure that `available_power` is the approximate output of
         // `calculate_available_power`
@@ -954,10 +964,10 @@ pub mod tests {
         );
         let result = cpu_ctrl_node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
-        assert_eq!(get_perf_state(devhost_node.clone()).await, 1);
+        assert_eq!(get_operating_point(devhost_node.clone()).await, 1);
 
         // Test case 3: Select a thermal load that reduce the power consumption limit below the
-        // lowest P-state; expect to drop to the lowest P-state
+        // lowest opp; expect to drop to the lowest opp
         let available_power = Watts(0.0);
         // Thermal load is calculated to ensure that `available_power` is the approximate output of
         // `calculate_available_power`
@@ -967,32 +977,32 @@ pub mod tests {
         );
         let result = cpu_ctrl_node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
-        assert_eq!(get_perf_state(devhost_node.clone()).await, 1);
+        assert_eq!(get_operating_point(devhost_node.clone()).await, 1);
     }
 
-    /// Tests that when a minimum CPU clock speed is specified, a P-state with a lower CPU frequency
+    /// Tests that when a minimum CPU clock speed is specified, a opp with a lower CPU frequency
     /// is never selected.
     #[fasync::run_singlethreaded(test)]
     async fn test_min_cpu_clock_speed() {
         let mut mock_maker = MockNodeMaker::new();
 
-        // Arbitrary CpuControlParams chosen to allow the node to demonstrate P-state selection
+        // Arbitrary CpuControlParams chosen to allow the node to demonstrate opp selection
         let capacitance = Farads(100.0e-12);
         let logical_cpu_numbers = vec![0, 1, 2, 3];
-        let p_states = vec![
-            PState { frequency: Hertz(2.0e9), voltage: Volts(3.0) },
-            PState { frequency: Hertz(1.0e9), voltage: Volts(3.0) },
-            PState { frequency: Hertz(0.5e9), voltage: Volts(3.0) },
+        let opps = vec![
+            OperatingPoint { frequency: Hertz(2.0e9), voltage: Volts(3.0) },
+            OperatingPoint { frequency: Hertz(1.0e9), voltage: Volts(3.0) },
+            OperatingPoint { frequency: Hertz(0.5e9), voltage: Volts(3.0) },
         ];
 
-        // The modeled power consumption at each P-state
-        let power_consumption: Vec<Watts> = p_states
+        // The modeled power consumption at each opp
+        let power_consumption: Vec<Watts> = opps
             .iter()
-            .map(|p_state| {
+            .map(|opp| {
                 get_cpu_power(
                     capacitance,
-                    p_state.voltage,
-                    Hertz(p_state.frequency.0 * logical_cpu_numbers.len() as f64),
+                    opp.voltage,
+                    Hertz(opp.frequency.0 * logical_cpu_numbers.len() as f64),
                 )
             })
             .collect();
@@ -1009,21 +1019,21 @@ pub mod tests {
         let devhost_node = mock_maker.make(
             "DevHostNode",
             vec![
-                // CpuControlHandler lazy queries performance state during its initialization
-                (msg_eq!(GetPerformanceState), msg_ok_return!(GetPerformanceState(0))),
-                // The test queries for current performance state
-                (msg_eq!(GetPerformanceState), msg_ok_return!(GetPerformanceState(0))),
-                // CpuControlHandler changes performance state to 1
-                (msg_eq!(SetPerformanceState(1)), msg_ok_return!(SetPerformanceState)),
-                // The test queries for current performance state
-                (msg_eq!(GetPerformanceState), msg_ok_return!(GetPerformanceState(1))),
+                // CpuControlHandler lazy queries operating point during its initialization
+                (msg_eq!(GetOperatingPoint), msg_ok_return!(GetOperatingPoint(0))),
+                // The test queries for current operating point
+                (msg_eq!(GetOperatingPoint), msg_ok_return!(GetOperatingPoint(0))),
+                // CpuControlHandler changes operating point to 1
+                (msg_eq!(SetOperatingPoint(1)), msg_ok_return!(SetOperatingPoint)),
+                // The test queries for current operating point
+                (msg_eq!(GetOperatingPoint), msg_ok_return!(GetOperatingPoint(1))),
             ],
         );
 
         let cpu_ctrl_node = CpuControlHandlerBuilder::new()
             .sustainable_power(power_consumption[0].mul_scalar(1.5))
             .power_gain(power_consumption[0].mul_scalar(0.015))
-            .cpu_ctrl_proxy(fake_cpu_ctrl_driver_with_p_states(p_states))
+            .cpu_ctrl_proxy(fake_cpu_ctrl_driver_with_opps(opps))
             .capacitance(capacitance)
             .logical_cpu_numbers(logical_cpu_numbers)
             .cpu_stats_handler(stats_node)
@@ -1032,8 +1042,8 @@ pub mod tests {
             .build_and_init()
             .await;
 
-        // Test case 1: Select a thermal load that allows power consumption of the highest P-state;
-        // expect to be in P-state 0
+        // Test case 1: Select a thermal load that allows power consumption of the highest opp;
+        // expect to be in opp 0
         let available_power = power_consumption[0].mul_scalar(1.01);
         // Thermal load is calculated to ensure that `available_power` is the approximate output of
         // `calculate_available_power`
@@ -1043,10 +1053,10 @@ pub mod tests {
         );
         let result = cpu_ctrl_node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
-        assert_eq!(get_perf_state(devhost_node.clone()).await, 0);
+        assert_eq!(get_operating_point(devhost_node.clone()).await, 0);
 
         // Test case 2: Select a thermal load that reduces power consumption to below the lowest
-        // P-state; expect to be in P-state 1 (state 2 should be disallowed).
+        // opp; expect to be in opp 1 (state 2 should be disallowed).
         let available_power = Watts(0.0);
         // Thermal load is calculated to ensure that `available_power` is the approximate output of
         // `calculate_available_power`
@@ -1056,7 +1066,7 @@ pub mod tests {
         );
         let result = cpu_ctrl_node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
-        assert_eq!(get_perf_state(devhost_node.clone()).await, 1);
+        assert_eq!(get_operating_point(devhost_node.clone()).await, 1);
     }
 
     /// Tests for the presence and correctness of dynamically-added inspect data
@@ -1066,20 +1076,20 @@ pub mod tests {
         let devhost_node = mock_maker.make(
             "DevHostNode",
             vec![
-                // CpuControlHandler queries performance state during its initialization
-                (msg_eq!(GetPerformanceState), msg_ok_return!(GetPerformanceState(0))),
+                // CpuControlHandler queries operating point during its initialization
+                (msg_eq!(GetOperatingPoint), msg_ok_return!(GetOperatingPoint(0))),
             ],
         );
 
         // Some dummy CpuControlParams to verify the params get published in Inspect
-        let p_state = PState { frequency: Hertz(2.0e9), voltage: Volts(4.5) };
+        let opp = OperatingPoint { frequency: Hertz(2.0e9), voltage: Volts(4.5) };
         let capacitance = Farads(100.0e-12);
         let logical_cpu_numbers = vec![0, 1, 2, 3];
 
         let inspector = inspect::Inspector::default();
 
         let _node = CpuControlHandlerBuilder::new()
-            .cpu_ctrl_proxy(fake_cpu_ctrl_driver_with_p_states(vec![p_state]))
+            .cpu_ctrl_proxy(fake_cpu_ctrl_driver_with_opps(vec![opp]))
             .cpu_dev_handler(devhost_node)
             .capacitance(capacitance)
             .logical_cpu_numbers(logical_cpu_numbers)
@@ -1094,7 +1104,7 @@ pub mod tests {
                     cpu_control_params: {
                         "capacitance (F)": 100.0e-12,
                         logical_cpu_numbers: "[0, 1, 2, 3]",
-                        p_state_0: {
+                        opp_0: {
                             "voltage (V)": 4.5,
                             "frequency (Hz)": 2.0e9
                         }

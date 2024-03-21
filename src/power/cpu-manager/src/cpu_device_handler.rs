@@ -6,7 +6,7 @@ use crate::error::CpuManagerError;
 use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
-use crate::types::{Hertz, PState, Volts};
+use crate::types::{Hertz, OperatingPoint, Volts};
 use anyhow::{format_err, Context as _, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
@@ -27,16 +27,14 @@ use std::rc::Rc;
 ///          more narrowly-scoped, as it does not administer thermal policy.
 ///
 /// Handles Messages:
-///     - GetPerformanceState
-///     - SetPerformanceState
-///     - GetCpuPerformanceStates
+///     - GetOperatingPoint
+///     - SetOperatingPoint
+///     - GetCpuOperatingPoints
 ///
 /// FIDL dependencies:
-///     - fuchsia.hardware.cpu_ctrl.Device: used to query descriptions of CPU performance states
+///     - fuchsia.hardware.cpu_ctrl.Device: used to query descriptions of CPU operating points
 //
 // TODO(https://fxbug.dev/42164952): Update summary when CpuControlHandler is removed.
-
-pub const MAX_PERF_STATES: u32 = fcpu_ctrl::MAX_DEVICE_PERFORMANCE_STATES;
 
 /// Builder struct for CpuDeviceHandler.
 pub struct CpuDeviceHandlerBuilder<'a> {
@@ -87,8 +85,7 @@ impl<'a> CpuDeviceHandlerBuilder<'a> {
         let inspect =
             InspectData::new(inspect_root, format!("CpuDeviceHandler ({})", self.driver_path));
 
-        let mutable_inner =
-            MutableInner { cpu_ctrl_proxy: self.cpu_ctrl_proxy, pstates: Vec::new() };
+        let mutable_inner = MutableInner { cpu_ctrl_proxy: self.cpu_ctrl_proxy, opps: Vec::new() };
 
         Ok(Rc::new(CpuDeviceHandler {
             init_done: AsyncEvent::new(),
@@ -122,76 +119,78 @@ pub struct CpuDeviceHandler {
 }
 
 impl CpuDeviceHandler {
-    async fn handle_get_cpu_performance_states(&self) -> Result<MessageReturn, CpuManagerError> {
+    async fn handle_get_cpu_operating_points(&self) -> Result<MessageReturn, CpuManagerError> {
         fuchsia_trace::duration!(
             c"cpu_manager",
-            c"CpuDeviceHandler::handle_get_cpu_performance_states",
+            c"CpuDeviceHandler::handle_get_cpu_operating_points",
             "driver" => self.driver_path.as_str()
         );
 
         self.init_done.wait().await;
 
-        Ok(MessageReturn::GetCpuPerformanceStates(self.mutable_inner.borrow().pstates.clone()))
+        Ok(MessageReturn::GetCpuOperatingPoints(self.mutable_inner.borrow().opps.clone()))
     }
 
-    async fn handle_get_performance_state(&self) -> Result<MessageReturn, CpuManagerError> {
+    async fn handle_get_operating_point(&self) -> Result<MessageReturn, CpuManagerError> {
         fuchsia_trace::duration!(
             c"cpu_manager",
-            c"CpuDeviceHandler::handle_get_performance_state",
+            c"CpuDeviceHandler::handle_get_operating_point",
             "driver" => self.driver_path.as_str()
         );
 
         self.init_done.wait().await;
 
-        let result = self.get_performance_state().await;
-        log_if_err!(result, "Failed to get performance state");
+        let result = self.get_operating_point().await;
+        log_if_err!(result, "Failed to get operating point");
         fuchsia_trace::instant!(
             c"cpu_manager",
-            c"CpuDeviceHandler::get_performance_state_result",
+            c"CpuDeviceHandler::get_operating_point_result",
             fuchsia_trace::Scope::Thread,
             "driver" => self.driver_path.as_str(),
             "result" => format!("{:?}", result).as_str()
         );
 
         match result {
-            Ok(state) => Ok(MessageReturn::GetPerformanceState(state)),
+            Ok(opp) => Ok(MessageReturn::GetOperatingPoint(opp)),
             Err(e) => {
-                self.inspect.get_performance_state_errors.add(1);
+                self.inspect.get_operating_point_errors.add(1);
                 Err(CpuManagerError::GenericError(e))
             }
         }
     }
 
-    async fn get_performance_state(&self) -> Result<u32, Error> {
+    async fn get_operating_point(&self) -> Result<u32, Error> {
         let proxy = &self.mutable_inner.borrow().cpu_ctrl_proxy;
 
         proxy
             .as_ref()
             .ok_or(format_err!("Missing driver_proxy"))
             .or_debug_panic()?
-            .get_current_performance_state()
+            .get_current_operating_point()
             .await
-            .map_err(|e| format_err!("{}: get_performance_state IPC failed: {}", self.name(), e))
+            .map_err(|e| {
+                format_err!("{}: get_current_operating_point IPC failed: {}", self.name(), e)
+            })
     }
 
-    async fn handle_set_performance_state(
+    async fn handle_set_operating_point(
         &self,
-        in_state: u32,
+        in_opp: u32,
     ) -> Result<MessageReturn, CpuManagerError> {
         fuchsia_trace::duration!(
             c"cpu_manager",
-            c"CpuDeviceHandler::handle_set_performance_state",
+            c"CpuDeviceHandler::handle_set_operating_point",
             "driver" => self.driver_path.as_str(),
-            "state" => in_state
+            "opp" => in_opp
         );
 
         self.init_done.wait().await;
 
-        let result = self.set_performance_state(in_state).await;
-        log_if_err!(result, "Failed to set performance state");
+        let result = self.set_operating_point(in_opp).await;
+        log_if_err!(result, "Failed to set operating point");
         fuchsia_trace::instant!(
             c"cpu_manager",
-            c"CpuDeviceHandler::set_performance_state_result",
+            c"CpuDeviceHandler::set_operating_point_result",
             fuchsia_trace::Scope::Thread,
             "driver" => self.driver_path.as_str(),
             "result" => format!("{:?}", result).as_str()
@@ -199,30 +198,36 @@ impl CpuDeviceHandler {
 
         match result {
             Ok(_) => {
-                self.inspect.perf_state.set(in_state.into());
-                Ok(MessageReturn::SetPerformanceState)
+                self.inspect.operating_point.set(in_opp.into());
+                Ok(MessageReturn::SetOperatingPoint)
             }
             Err(e) => {
-                self.inspect.set_performance_state_errors.add(1);
-                self.inspect.last_set_performance_state_error.set(format!("{}", e).as_str());
+                self.inspect.set_operating_point_errors.add(1);
+                self.inspect.last_set_operating_point_error.set(format!("{}", e).as_str());
                 Err(CpuManagerError::GenericError(e))
             }
         }
     }
 
-    async fn set_performance_state(&self, in_state: u32) -> Result<(), Error> {
+    async fn set_operating_point(&self, in_opp: u32) -> Result<(), Error> {
         let proxy = &self.mutable_inner.borrow().cpu_ctrl_proxy;
 
         // Make the FIDL call
-        let _out_state = proxy
+        let _out_opp = proxy
             .as_ref()
             .ok_or(format_err!("Missing driver_proxy"))
             .or_debug_panic()?
-            .set_performance_state(in_state)
+            .set_current_operating_point(in_opp)
             .await
-            .map_err(|e| format_err!("{}: set_performance_state IPC failed: {}", self.name(), e))?
             .map_err(|e| {
-                format_err!("{}: set_performance_state driver returned error: {}", self.name(), e)
+                format_err!("{}: set_current_operating_point IPC failed: {}", self.name(), e)
+            })?
+            .map_err(|e| {
+                format_err!(
+                    "{}: set_current_operating_point driver returned error: {}",
+                    self.name(),
+                    e
+                )
             })?;
 
         Ok(())
@@ -232,8 +237,8 @@ impl CpuDeviceHandler {
 struct MutableInner {
     cpu_ctrl_proxy: Option<fcpu_ctrl::DeviceProxy>,
 
-    /// All P-states provided by the underlying CPU driver
-    pstates: Vec<PState>,
+    /// All opps provided by the underlying CPU driver
+    opps: Vec<OperatingPoint>,
 }
 
 #[async_trait(?Send)]
@@ -275,17 +280,16 @@ impl Node for CpuDeviceHandler {
             }
         };
 
-        // Query the CPU P-states
-        let pstates = get_pstates(&self.driver_path, &cpu_ctrl_proxy)
-            .await
-            .context("Failed to get CPU P-states")?;
-        validate_pstates(&pstates).context("Invalid CPU control params")?;
-        self.inspect.record_pstates(&pstates);
+        // Query the CPU opps
+        let opps =
+            get_opps(&self.driver_path, &cpu_ctrl_proxy).await.context("Failed to get CPU opps")?;
+        validate_opps(&opps).context("Invalid CPU control params")?;
+        self.inspect.record_opps(&opps);
 
         {
             let mut mutable_inner = self.mutable_inner.borrow_mut();
             mutable_inner.cpu_ctrl_proxy = Some(cpu_ctrl_proxy);
-            mutable_inner.pstates = pstates;
+            mutable_inner.opps = opps;
         }
 
         self.init_done.signal();
@@ -295,57 +299,73 @@ impl Node for CpuDeviceHandler {
 
     async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, CpuManagerError> {
         match msg {
-            Message::GetPerformanceState => self.handle_get_performance_state().await,
-            Message::SetPerformanceState(state) => self.handle_set_performance_state(*state).await,
-            Message::GetCpuPerformanceStates => self.handle_get_cpu_performance_states().await,
+            Message::GetOperatingPoint => self.handle_get_operating_point().await,
+            Message::SetOperatingPoint(opp) => self.handle_set_operating_point(*opp).await,
+            Message::GetCpuOperatingPoints => self.handle_get_cpu_operating_points().await,
             _ => Err(CpuManagerError::Unsupported),
         }
     }
 }
 
-/// Retrieves all P-states from the provided cpu_ctrl proxy.
-async fn get_pstates(
+/// Retrieves all opps from the provided cpu_ctrl proxy.
+async fn get_opps(
     cpu_driver_path: &str,
     cpu_ctrl_proxy: &fcpu_ctrl::DeviceProxy,
-) -> Result<Vec<PState>, Error> {
+) -> Result<Vec<OperatingPoint>, Error> {
     fuchsia_trace::duration!(
         c"cpu_manager",
-        c"CpuDeviceHandler::get_pstates",
+        c"CpuDeviceHandler::get_opps",
         "driver" => cpu_driver_path
     );
 
-    // Query P-state metadata from the cpu_ctrl interface. Each supported performance state has
-    // accompanying P-state metadata.
-    let mut pstates = Vec::new();
+    // Query opp metadata from the cpu_ctrl interface. Each supported operating point has
+    // accompanying opp metadata.
+    let mut opps = Vec::new();
 
-    for i in 0..MAX_PERF_STATES {
-        if let Ok(info) = cpu_ctrl_proxy.get_performance_state_info(i).await? {
-            pstates.push(PState {
-                frequency: Hertz(info.frequency_hz as f64),
-                voltage: Volts(info.voltage_uv as f64 / 1e6),
-            })
-        } else {
-            break;
-        }
+    let opp_count = cpu_ctrl_proxy
+        .get_operating_point_count()
+        .await
+        .map_err(|e| {
+            format_err!("{}: get_operating_point_count IPC failed: {}", cpu_driver_path, e)
+        })?
+        .map_err(|e| {
+            format_err!("{}: get_operating_point_count returned error: {}", cpu_driver_path, e)
+        })?;
+
+    for i in 0..opp_count {
+        let info = cpu_ctrl_proxy
+            .get_operating_point_info(i)
+            .await
+            .map_err(|e| {
+                format_err!("{}: get_operating_point_info IPC failed: {}", cpu_driver_path, e)
+            })?
+            .map_err(|e| {
+                format_err!("{}: get_operating_point_info returned error: {}", cpu_driver_path, e)
+            })?;
+
+        opps.push(OperatingPoint {
+            frequency: Hertz(info.frequency_hz as f64),
+            voltage: Volts(info.voltage_uv as f64 / 1e6),
+        });
     }
 
-    Ok(pstates)
+    Ok(opps)
 }
 
-/// Checks that the given list of P-states satisfies the following conditions:
+/// Checks that the given list of opps satisfies the following conditions:
 ///  - Contains at least one element;
 ///  - Is primarily sorted by frequency;
 ///  - Is strictly secondarily sorted by voltage.
-fn validate_pstates(pstates: &Vec<PState>) -> Result<(), Error> {
-    if pstates.len() == 0 {
-        anyhow::bail!("Must have at least one P-state");
-    } else if pstates.len() > 1 {
-        for pair in pstates.as_slice().windows(2) {
+fn validate_opps(opps: &Vec<OperatingPoint>) -> Result<(), Error> {
+    if opps.len() == 0 {
+        anyhow::bail!("Must have at least one opp");
+    } else if opps.len() > 1 {
+        for pair in opps.as_slice().windows(2) {
             if pair[1].frequency > pair[0].frequency
                 || (pair[1].frequency == pair[0].frequency && pair[1].voltage >= pair[0].voltage)
             {
                 anyhow::bail!(
-                    "P-states must be primarily sorted by decreasing frequency and secondarily \
+                    "opps must be primarily sorted by decreasing frequency and secondarily \
                     sorted by decreasing voltage; violated by {:?} and {:?}.",
                     pair[0],
                     pair[1]
@@ -360,10 +380,10 @@ struct InspectData {
     // Nodes
     root_node: inspect::Node,
 
-    perf_state: inspect::UintProperty,
-    get_performance_state_errors: inspect::UintProperty,
-    set_performance_state_errors: inspect::UintProperty,
-    last_set_performance_state_error: inspect::StringProperty,
+    operating_point: inspect::UintProperty,
+    get_operating_point_errors: inspect::UintProperty,
+    set_operating_point_errors: inspect::UintProperty,
+    last_set_operating_point_error: inspect::StringProperty,
 }
 
 impl InspectData {
@@ -371,33 +391,33 @@ impl InspectData {
         // Create a local root node and properties
         let root_node = parent.create_child(node_name);
 
-        let current_perf_state = root_node.create_child("current_perf_state");
-        let perf_state = current_perf_state.create_uint("perf_state", 0);
-        let get_performance_state_errors =
-            current_perf_state.create_uint("get_performance_state_errors", 0);
-        let set_performance_state_errors =
-            current_perf_state.create_uint("set_performance_state_errors", 0);
-        let last_set_performance_state_error =
-            current_perf_state.create_string("last_set_performance_state_error", "");
-        root_node.record(current_perf_state);
+        let current_operating_point = root_node.create_child("current_operating_point");
+        let operating_point = current_operating_point.create_uint("operating_point", 0);
+        let get_operating_point_errors =
+            current_operating_point.create_uint("get_operating_point_errors", 0);
+        let set_operating_point_errors =
+            current_operating_point.create_uint("set_operating_point_errors", 0);
+        let last_set_operating_point_error =
+            current_operating_point.create_string("last_set_operating_point_error", "");
+        root_node.record(current_operating_point);
 
         InspectData {
             root_node,
-            perf_state,
-            get_performance_state_errors,
-            set_performance_state_errors,
-            last_set_performance_state_error,
+            operating_point,
+            get_operating_point_errors,
+            set_operating_point_errors,
+            last_set_operating_point_error,
         }
     }
 
-    fn record_pstates(&self, pstates: &Vec<PState>) {
-        self.root_node.record_child("P-states", |pstates_node| {
-            // Iterate P-states in reverse order so that the Inspect nodes appear in the same order
+    fn record_opps(&self, opps: &Vec<OperatingPoint>) {
+        self.root_node.record_child("opps", |opps_node| {
+            // Iterate opps in reverse order so that the Inspect nodes appear in the same order
             // as the vector (`record_child` inserts nodes at the head).
-            for (i, pstate) in pstates.iter().enumerate().rev() {
-                pstates_node.record_child(format!("pstate_{:02}", i), |node| {
-                    node.record_double("voltage (V)", pstate.voltage.0);
-                    node.record_double("frequency (Hz)", pstate.frequency.0);
+            for (i, opp) in opps.iter().enumerate().rev() {
+                opps_node.record_child(format!("opp_{:02}", i), |node| {
+                    node.record_double("voltage (V)", opp.voltage.0);
+                    node.record_double("frequency (Hz)", opp.frequency.0);
                 });
             }
         });
@@ -414,13 +434,13 @@ mod tests {
     use std::cell::Cell;
 
     /// Creates a fake fuchsia.hardware.cpu_ctrl.Device proxy
-    fn setup_fake_cpu_ctrl_proxy(pstates: Vec<PState>) -> fcpu_ctrl::DeviceProxy {
-        let perf_state = Rc::new(Cell::new(0));
-        let perf_state_clone_1 = perf_state.clone();
-        let perf_state_clone_2 = perf_state.clone();
-        let get_performance_state = move || perf_state_clone_1.get();
-        let set_performance_state = move |state| {
-            perf_state_clone_2.set(state);
+    fn setup_fake_cpu_ctrl_proxy(opps: Vec<OperatingPoint>) -> fcpu_ctrl::DeviceProxy {
+        let operating_point = Rc::new(Cell::new(0));
+        let operating_point_clone_1 = operating_point.clone();
+        let operating_point_clone_2 = operating_point.clone();
+        let get_operating_point = move || operating_point_clone_1.get();
+        let set_operating_point = move |opp| {
+            operating_point_clone_2.set(opp);
         };
 
         let (proxy, mut stream) =
@@ -429,30 +449,30 @@ mod tests {
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {
-                    Some(fcpu_ctrl::DeviceRequest::GetPerformanceStateInfo {
-                        state,
-                        responder,
-                    }) => {
-                        let index = state as usize;
-                        let result = if index < pstates.len() {
-                            Ok(fcpu_ctrl::CpuPerformanceStateInfo {
-                                frequency_hz: pstates[index].frequency.0 as i64,
-                                voltage_uv: (pstates[index].voltage.0 * 1e6) as i64,
+                    Some(fcpu_ctrl::DeviceRequest::GetOperatingPointInfo { opp, responder }) => {
+                        let index = opp as usize;
+                        let result = if index < opps.len() {
+                            Ok(fcpu_ctrl::CpuOperatingPointInfo {
+                                frequency_hz: opps[index].frequency.0 as i64,
+                                voltage_uv: (opps[index].voltage.0 * 1e6) as i64,
                             })
                         } else {
                             Err(zx::Status::NOT_SUPPORTED.into_raw())
                         };
                         let _ = responder.send(result.as_ref().map_err(|e| *e));
                     }
-                    Some(fcpu_ctrl::DeviceRequest::GetCurrentPerformanceState { responder }) => {
-                        let _ = responder.send(get_performance_state());
+                    Some(fcpu_ctrl::DeviceRequest::GetOperatingPointCount { responder }) => {
+                        let _ = responder.send(Ok(opps.len() as u32));
                     }
-                    Some(fcpu_ctrl::DeviceRequest::SetPerformanceState {
-                        requested_state,
+                    Some(fcpu_ctrl::DeviceRequest::GetCurrentOperatingPoint { responder }) => {
+                        let _ = responder.send(get_operating_point());
+                    }
+                    Some(fcpu_ctrl::DeviceRequest::SetCurrentOperatingPoint {
+                        requested_opp,
                         responder,
                     }) => {
-                        set_performance_state(requested_state as u32);
-                        let _ = responder.send(Ok(requested_state));
+                        set_operating_point(requested_opp as u32);
+                        let _ = responder.send(Ok(requested_opp));
                     }
                     Some(other) => panic!("Unexpected request: {:?}", other),
                     None => break, // Stream terminates when client is dropped
@@ -464,10 +484,10 @@ mod tests {
         proxy
     }
 
-    async fn setup_simple_test_node(pstates: Vec<PState>) -> Rc<CpuDeviceHandler> {
+    async fn setup_simple_test_node(opps: Vec<OperatingPoint>) -> Rc<CpuDeviceHandler> {
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_cpu_ctrl_proxy(pstates),
+            setup_fake_cpu_ctrl_proxy(opps),
         );
         builder.build_and_init().await
     }
@@ -475,112 +495,112 @@ mod tests {
     /// Tests that an unsupported message is handled gracefully and an Unsupported error is returned
     #[fasync::run_singlethreaded(test)]
     async fn test_unsupported_msg() {
-        let pstates = vec![PState { frequency: Hertz(1e9), voltage: Volts(1.0) }];
-        let node = setup_simple_test_node(pstates).await;
+        let opps = vec![OperatingPoint { frequency: Hertz(1e9), voltage: Volts(1.0) }];
+        let node = setup_simple_test_node(opps).await;
         match node.handle_message(&Message::GetCpuLoads).await {
             Err(CpuManagerError::Unsupported) => {}
             e => panic!("Unexpected return value: {:?}", e),
         }
     }
 
-    /// Tests that the Get/SetPerformanceState messages cause the node to call the appropriate
+    /// Tests that the Get/SetOperatingPoint messages cause the node to call the appropriate
     /// device controller FIDL APIs.
     #[fasync::run_singlethreaded(test)]
-    async fn test_performance_state() {
-        let pstates = vec![PState { frequency: Hertz(1e9), voltage: Volts(1.0) }];
-        let node = setup_simple_test_node(pstates).await;
+    async fn test_operating_point() {
+        let opps = vec![OperatingPoint { frequency: Hertz(1e9), voltage: Volts(1.0) }];
+        let node = setup_simple_test_node(opps).await;
 
-        // Send SetPerformanceState message to set a state of 1
-        let commanded_perf_state = 1;
+        // Send SetOperatingPoint message to set an opp of 1
+        let commanded_operating_point = 1;
         match node
-            .handle_message(&Message::SetPerformanceState(commanded_perf_state))
+            .handle_message(&Message::SetOperatingPoint(commanded_operating_point))
             .await
             .unwrap()
         {
-            MessageReturn::SetPerformanceState => {}
+            MessageReturn::SetOperatingPoint => {}
             e => panic!("Unexpected return value: {:?}", e),
         }
 
-        // Verify GetPerformanceState reads back the same state
-        let received_perf_state =
-            match node.handle_message(&Message::GetPerformanceState).await.unwrap() {
-                MessageReturn::GetPerformanceState(state) => state,
+        // Verify GetOperatingPoint reads back the same opp
+        let received_operating_point =
+            match node.handle_message(&Message::GetOperatingPoint).await.unwrap() {
+                MessageReturn::GetOperatingPoint(opp) => opp,
                 e => panic!("Unexpected return value: {:?}", e),
             };
-        assert_eq!(commanded_perf_state, received_perf_state);
+        assert_eq!(commanded_operating_point, received_operating_point);
 
-        // Send SetPerformanceState message to set a state of 2
-        let commanded_perf_state = 2;
+        // Send SetOperatingPoint message to set a opp of 2
+        let commanded_operating_point = 2;
         match node
-            .handle_message(&Message::SetPerformanceState(commanded_perf_state))
+            .handle_message(&Message::SetOperatingPoint(commanded_operating_point))
             .await
             .unwrap()
         {
-            MessageReturn::SetPerformanceState => {}
+            MessageReturn::SetOperatingPoint => {}
             e => panic!("Unexpected return value: {:?}", e),
         }
 
-        // Verify GetPerformanceState reads back the same state
-        let received_perf_state =
-            match node.handle_message(&Message::GetPerformanceState).await.unwrap() {
-                MessageReturn::GetPerformanceState(state) => state,
+        // Verify GetOperatingPoint reads back the same opp
+        let received_operating_point =
+            match node.handle_message(&Message::GetOperatingPoint).await.unwrap() {
+                MessageReturn::GetOperatingPoint(opp) => opp,
                 e => panic!("Unexpected return value: {:?}", e),
             };
-        assert_eq!(commanded_perf_state, received_perf_state);
+        assert_eq!(commanded_operating_point, received_operating_point);
     }
 
-    /// Tests that a GetCpuPerformanceStates message is handled properly.
+    /// Tests that a GetCpuOperatingPoints message is handled properly.
     #[fasync::run_singlethreaded(test)]
-    async fn test_get_cpu_performance_states() {
-        let pstates = vec![
-            PState { frequency: Hertz(1.4e9), voltage: Volts(0.9) },
-            PState { frequency: Hertz(1.3e9), voltage: Volts(0.8) },
-            PState { frequency: Hertz(1.2e9), voltage: Volts(0.7) },
+    async fn test_get_cpu_operating_points() {
+        let opps = vec![
+            OperatingPoint { frequency: Hertz(1.4e9), voltage: Volts(0.9) },
+            OperatingPoint { frequency: Hertz(1.3e9), voltage: Volts(0.8) },
+            OperatingPoint { frequency: Hertz(1.2e9), voltage: Volts(0.7) },
         ];
-        let node = setup_simple_test_node(pstates.clone()).await;
+        let node = setup_simple_test_node(opps.clone()).await;
 
-        let received_pstates =
-            match node.handle_message(&Message::GetCpuPerformanceStates).await.unwrap() {
-                MessageReturn::GetCpuPerformanceStates(v) => v,
+        let received_opps =
+            match node.handle_message(&Message::GetCpuOperatingPoints).await.unwrap() {
+                MessageReturn::GetCpuOperatingPoints(v) => v,
                 e => panic!("Unexpected return value: {:?}", e),
             };
 
-        assert_eq!(pstates, received_pstates);
+        assert_eq!(opps, received_opps);
     }
 
-    /// Tests that P-state validation works as expected.
+    /// Tests that opp validation works as expected.
     #[fasync::run_singlethreaded(test)]
-    async fn test_pstate_validation() {
+    async fn test_opp_validation() {
         // Primary sort by frequency is violated.
-        let pstates = vec![
-            PState { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
-            PState { frequency: Hertz(1.6e9), voltage: Volts(1.0) },
+        let opps = vec![
+            OperatingPoint { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
+            OperatingPoint { frequency: Hertz(1.6e9), voltage: Volts(1.0) },
         ];
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_cpu_ctrl_proxy(pstates),
+            setup_fake_cpu_ctrl_proxy(opps),
         );
         assert!(builder.build().unwrap().init().await.is_err());
 
         // Secondary sort by voltage is violated.
-        let pstates = vec![
-            PState { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
-            PState { frequency: Hertz(1.5e9), voltage: Volts(1.1) },
+        let opps = vec![
+            OperatingPoint { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
+            OperatingPoint { frequency: Hertz(1.5e9), voltage: Volts(1.1) },
         ];
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_cpu_ctrl_proxy(pstates),
+            setup_fake_cpu_ctrl_proxy(opps),
         );
         assert!(builder.build().unwrap().init().await.is_err());
 
-        // Duplicated P-state (detected as violation of secondary sort by voltage).
-        let pstates = vec![
-            PState { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
-            PState { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
+        // Duplicated opp (detected as violation of secondary sort by voltage).
+        let opps = vec![
+            OperatingPoint { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
+            OperatingPoint { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
         ];
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_cpu_ctrl_proxy(pstates),
+            setup_fake_cpu_ctrl_proxy(opps),
         );
         assert!(builder.build().unwrap().init().await.is_err());
     }
@@ -588,15 +608,15 @@ mod tests {
     /// Tests that Inspect data is populated as expected
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
-        let pstates = vec![
-            PState { frequency: Hertz(1.3e9), voltage: Volts(0.8) },
-            PState { frequency: Hertz(1.2e9), voltage: Volts(0.7) },
+        let opps = vec![
+            OperatingPoint { frequency: Hertz(1.3e9), voltage: Volts(0.8) },
+            OperatingPoint { frequency: Hertz(1.2e9), voltage: Volts(0.7) },
         ];
 
         let inspector = inspect::Inspector::default();
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_cpu_ctrl_proxy(pstates.clone()),
+            setup_fake_cpu_ctrl_proxy(opps.clone()),
         )
         .with_inspect_root(inspector.root());
 
@@ -606,17 +626,17 @@ mod tests {
             inspector,
             root: {
                 "CpuDeviceHandler (fake_path)": {
-                    "P-states": {
-                        pstate_00: {
-                            "frequency (Hz)": pstates[0].frequency.0,
-                            "voltage (V)": pstates[0].voltage.0,
+                    "opps": {
+                        opp_00: {
+                            "frequency (Hz)": opps[0].frequency.0,
+                            "voltage (V)": opps[0].voltage.0,
                         },
-                        pstate_01: {
-                            "frequency (Hz)": pstates[1].frequency.0,
-                            "voltage (V)": pstates[1].voltage.0,
+                        opp_01: {
+                            "frequency (Hz)": opps[1].frequency.0,
+                            "voltage (V)": opps[1].voltage.0,
                         },
                     },
-                    "current_perf_state": contains {}
+                    "current_operating_point": contains {}
                 }
             }
         );

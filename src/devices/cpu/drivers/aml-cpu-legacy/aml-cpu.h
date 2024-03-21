@@ -35,22 +35,23 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
         thermal_client_(std::move(thermal_client)),
         power_domain_index_(power_domain_index),
         cluster_core_count_(cluster_core_count),
-        current_pstate_(fuchsia_cpuctrl::wire::kDevicePerformanceStateP0) {}
+        current_operating_point_(fuchsia_cpuctrl::wire::kDeviceOperatingPointP0) {}
 
   static zx_status_t Create(void* context, zx_device_t* device);
 
   // Implements DDK Device Ops
   void DdkRelease();
 
-  zx_status_t SetPerformanceStateInternal(uint32_t requested_state, uint32_t* out_state);
+  zx_status_t SetCurrentOperatingPointInternal(uint32_t requested_opp, uint32_t* out_opp);
   zx_status_t DdkConfigureAutoSuspend(bool enable, uint8_t requested_sleep_state);
 
   // Fidl server interface implementation.
-  void GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
-                               GetPerformanceStateInfoCompleter::Sync& completer) override;
-  void SetPerformanceState(SetPerformanceStateRequestView request,
-                           SetPerformanceStateCompleter::Sync& completer) override;
-  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
+  void GetOperatingPointInfo(GetOperatingPointInfoRequestView request,
+                             GetOperatingPointInfoCompleter::Sync& completer) override;
+  void SetCurrentOperatingPoint(SetCurrentOperatingPointRequestView request,
+                                SetCurrentOperatingPointCompleter::Sync& completer) override;
+  void GetCurrentOperatingPoint(GetCurrentOperatingPointCompleter::Sync& completer) override;
+  void GetOperatingPointCount(GetOperatingPointCountCompleter::Sync& completer) override;
   void GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) override;
   void GetLogicalCoreId(GetLogicalCoreIdRequestView request,
                         GetLogicalCoreIdCompleter::Sync& completer) override;
@@ -69,7 +70,7 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   uint32_t cluster_core_count_;
 
   std::mutex lock_;
-  uint32_t current_pstate_ __TA_GUARDED(lock_);
+  uint32_t current_operating_point_ __TA_GUARDED(lock_);
 
  protected:
   inspect::Inspector inspector_;

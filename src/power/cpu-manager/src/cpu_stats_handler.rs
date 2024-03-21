@@ -523,7 +523,7 @@ pub mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_unsupported_msg() {
         let node = setup_simple_test_node().await;
-        match node.handle_message(&Message::GetCpuPerformanceStates).await {
+        match node.handle_message(&Message::GetCpuOperatingPoints).await {
             Err(CpuManagerError::Unsupported) => {}
             e => panic!("Unexpected return value: {:?}", e),
         }

@@ -24,19 +24,10 @@
 #include "fidl/fuchsia.hardware.thermal/cpp/wire.h"
 
 namespace {
-using fuchsia_hardware_cpu_ctrl::wire::kMaxDevicePerformanceStates;
 using fuchsia_hardware_thermal::wire::kMaxDvfsDomains;
 using fuchsia_hardware_thermal::wire::PowerDomain;
 
 constexpr zx_off_t kCpuVersionOffset = 0x220;
-
-uint16_t PstateToOperatingPoint(const uint32_t pstate, const size_t n_operating_points) {
-  ZX_ASSERT(pstate < n_operating_points);
-  ZX_ASSERT(n_operating_points < kMaxDevicePerformanceStates);
-
-  // Operating points are indexed 0 to N-1.
-  return static_cast<uint16_t>(n_operating_points - pstate - 1);
-}
 
 fidl::WireSyncClient<amlogic_cpu::fuchsia_thermal::Device> CreateFidlClient(
     const ddk::ThermalProtocolClient& protocol_client, zx_status_t* status) {
@@ -166,11 +157,6 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
       continue;
     }
 
-    if (opps.count > kMaxDevicePerformanceStates) {
-      zxlogf(ERROR, "aml-cpu: cpu power domain %zu has more operating points than we support\n", i);
-      return ZX_ERR_INTERNAL;
-    }
-
     const auto& cluster_core_count = cluster_core_counts.find(i);
     if (cluster_core_count == cluster_core_counts.end()) {
       zxlogf(ERROR, "aml-cpu: Could not find cluster core count for cluster %lu", i);
@@ -216,7 +202,7 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
 
 void AmlCpu::DdkRelease() { delete this; }
 
-zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32_t* out_state) {
+zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uint32_t* out_opp) {
   zx_status_t status;
   fuchsia_thermal::wire::OperatingPoint opps;
   std::scoped_lock lock(lock_);
@@ -227,23 +213,22 @@ zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32
     return status;
   }
 
-  // States in range [0, opps.count) are supported.
-  if (requested_state >= opps.count) {
+  // Opps in range [0, opps.count) are supported.
+  if (requested_opp >= opps.count) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  const uint16_t pstate = PstateToOperatingPoint(requested_state, opps.count);
-
   const auto result =
-      thermal_client_->SetDvfsOperatingPoint(pstate, static_cast<PowerDomain>(power_domain_index_));
+      thermal_client_->SetDvfsOperatingPoint(static_cast<uint16_t>(opps.count - requested_opp - 1),
+                                             static_cast<PowerDomain>(power_domain_index_));
 
   if (!result.ok() || result.value().status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to set dvfs operating point.", __func__);
     return ZX_ERR_INTERNAL;
   }
 
-  *out_state = requested_state;
-  current_pstate_ = requested_state;
+  *out_opp = requested_opp;
+  current_operating_point_ = requested_opp;
 
   return ZX_OK;
 }
@@ -252,9 +237,9 @@ zx_status_t AmlCpu::DdkConfigureAutoSuspend(bool enable, uint8_t requested_sleep
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-void AmlCpu::GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
-                                     GetPerformanceStateInfoCompleter::Sync& completer) {
-  // Get all performance states.
+void AmlCpu::GetOperatingPointInfo(GetOperatingPointInfoRequestView request,
+                                   GetOperatingPointInfoCompleter::Sync& completer) {
+  // Get all operating points.
   zx_status_t status;
   fuchsia_thermal::wire::OperatingPoint opps;
 
@@ -264,33 +249,47 @@ void AmlCpu::GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
     completer.ReplyError(status);
   }
 
-  // Make sure that the state is in bounds?
-  if (request->state >= opps.count) {
+  // Make sure that the opp is in bounds?
+  if (request->opp >= opps.count) {
     completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
     return;
   }
 
-  const uint16_t pstate = PstateToOperatingPoint(request->state, opps.count);
+  const uint16_t index = static_cast<uint16_t>(opps.count - request->opp - 1);
 
-  fuchsia_cpuctrl::wire::CpuPerformanceStateInfo result;
-  result.frequency_hz = opps.opp[pstate].freq_hz;
-  result.voltage_uv = opps.opp[pstate].volt_uv;
+  fuchsia_cpuctrl::wire::CpuOperatingPointInfo result;
+  result.frequency_hz = opps.opp[index].freq_hz;
+  result.voltage_uv = opps.opp[index].volt_uv;
   completer.ReplySuccess(result);
 }
 
-void AmlCpu::SetPerformanceState(SetPerformanceStateRequestView request,
-                                 SetPerformanceStateCompleter::Sync& completer) {
-  uint32_t out_state = 0;
-  zx_status_t status = SetPerformanceStateInternal(request->requested_state, &out_state);
+void AmlCpu::SetCurrentOperatingPoint(SetCurrentOperatingPointRequestView request,
+                                      SetCurrentOperatingPointCompleter::Sync& completer) {
+  uint32_t out_opp = 0;
+  zx_status_t status = SetCurrentOperatingPointInternal(request->requested_opp, &out_opp);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   }
-  completer.ReplySuccess(out_state);
+  completer.ReplySuccess(out_opp);
 }
 
-void AmlCpu::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
+void AmlCpu::GetCurrentOperatingPoint(GetCurrentOperatingPointCompleter::Sync& completer) {
   std::scoped_lock lock(lock_);
-  completer.Reply(current_pstate_);
+  completer.Reply(current_operating_point_);
+}
+
+void AmlCpu::GetOperatingPointCount(GetOperatingPointCountCompleter::Sync& completer) {
+  zx_status_t status;
+  fuchsia_thermal::wire::OperatingPoint opps;
+  std::scoped_lock lock(lock_);
+
+  status = GetThermalOperatingPoints(&opps);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: Failed to get Thermal operating points, st = %d", __func__, status);
+    completer.ReplyError(status);
+  }
+
+  completer.ReplySuccess(opps.count);
 }
 
 zx_status_t AmlCpu::GetThermalOperatingPoints(fuchsia_thermal::wire::OperatingPoint* out) {

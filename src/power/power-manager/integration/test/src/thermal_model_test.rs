@@ -15,7 +15,7 @@ use {
     serde_json as json,
     test_util::assert_near,
     tracing::info,
-    types::{Celsius, Farads, Hertz, Nanoseconds, PState, Seconds, Volts, Watts},
+    types::{Celsius, Farads, Hertz, Nanoseconds, OperatingPoint, Seconds, Volts, Watts},
 };
 
 const DEADLINE_ID: DeadlineId<'static> = DeadlineId::new("power-manager", "thermal-policy-timer");
@@ -39,7 +39,7 @@ struct SimulatorParams {
 #[derive(Clone, Debug)]
 struct SimulatedCpuParams {
     logical_cpu_numbers: Vec<u32>,
-    p_states: Vec<PState>,
+    opps: Vec<OperatingPoint>,
     capacitance: Farads,
 }
 
@@ -129,8 +129,8 @@ struct Simulator {
     idle_times: Vec<Nanoseconds>,
     /// Parameters for the simulated CPUs.
     cpu_params: SimulatedCpuParams,
-    /// Index of the simulated CPUs' current P-state.
-    p_state_index: usize,
+    /// Index of the simulated CPUs' current opp.
+    opp_index: usize,
     /// Parameters for the thermal dynamics model.
     thermal_model_params: ThermalModelParams,
 }
@@ -231,7 +231,7 @@ impl Simulator {
             sample_interval,
             op_scheduler: p.op_scheduler,
             idle_times,
-            p_state_index: 0,
+            opp_index: 0,
             thermal_model_params: p.thermal_model_params,
             cpu_params: p.cpu_params,
         }
@@ -250,8 +250,8 @@ impl Simulator {
         panic!("Can not find thermal policy sampling interval in config file")
     }
 
-    async fn get_cpu_p_state_index(&self) -> u32 {
-        self.cpu_proxy.get_current_performance_state().await.unwrap()
+    async fn get_cpu_opp_index(&self) -> u32 {
+        self.cpu_proxy.get_current_operating_point().await.unwrap()
     }
 
     async fn set_temperature(&self, temperature: f32) {
@@ -291,12 +291,12 @@ impl Simulator {
         std::mem::drop(deadline_set_event);
     }
 
-    /// Returns the power consumed by the simulated CPU at the indicated P-state and operation
+    /// Returns the power consumed by the simulated CPU at the indicated opp and operation
     /// rate.
-    fn get_cpu_power(&self, p_state_index: usize, operation_rate: Hertz) -> Watts {
+    fn get_cpu_power(&self, opp_index: usize, operation_rate: Hertz) -> Watts {
         Watts(
             self.cpu_params.capacitance.0
-                * self.cpu_params.p_states[p_state_index].voltage.0.powi(2)
+                * self.cpu_params.opps[opp_index].voltage.0.powi(2)
                 * operation_rate.0,
         )
     }
@@ -323,7 +323,7 @@ impl Simulator {
         self.op_scheduler.step(self.time, dt);
 
         // `step_cpu` needs to run before `step_thermal_model`, so we know how many operations
-        // can actually be completed at the current P-state.
+        // can actually be completed at the current opp.
         let num_operations_completed = self.step_cpu(dt, self.op_scheduler.num_operations).await;
         self.op_scheduler.complete_operations(num_operations_completed);
 
@@ -335,13 +335,13 @@ impl Simulator {
         // we should find a better way to synchronize CpuManager.
         fasync::Timer::new(std::time::Duration::from_millis(20)).await;
 
-        // Get current Pstate index by querying the cpu-ctrl driver.
-        self.p_state_index = self.get_cpu_p_state_index().await.try_into().unwrap();
+        // Get current operating point index by querying the cpu-ctrl driver.
+        self.opp_index = self.get_cpu_opp_index().await.try_into().unwrap();
     }
 
-    /// Returns the current P-state of the simulated CPU.
-    fn get_p_state(&self) -> &PState {
-        &self.cpu_params.p_states[self.p_state_index]
+    /// Returns the current opp of the simulated CPU.
+    fn get_opp(&self) -> &OperatingPoint {
+        &self.cpu_params.opps[self.opp_index]
     }
 
     /// Steps the thermal model ahead in time by `dt`.
@@ -357,7 +357,7 @@ impl Simulator {
             let c0 = p.cpu_thermal_capacity;
             let c1 = p.heat_sink_thermal_capacity;
 
-            let power = self.get_cpu_power(self.p_state_index, num_operations / dt);
+            let power = self.get_cpu_power(self.opp_index, num_operations / dt);
             vec![
                 (a01 * (y[1] - y[0]) + power.0) / c0,
                 (a01 * (y[0] - y[1]) + a1env * (self.environment_temperature.0 - y[1])) / c1,
@@ -388,7 +388,7 @@ impl Simulator {
     /// Steps the simulated CPU ahead by `dt`, updating `self.idle_times` and returning the
     /// number of operations completed.
     async fn step_cpu(&mut self, dt: Seconds, num_operations_requested: f64) -> f64 {
-        let frequency = self.get_p_state().frequency;
+        let frequency = self.get_opp().frequency;
         let num_operations_completed = f64::min(
             num_operations_requested,
             frequency * dt * self.cpu_params.logical_cpu_numbers.len() as f64,
@@ -443,14 +443,14 @@ fn idle_times_to_cpu_stats(idle_times: &Vec<Nanoseconds>) -> fkernel::CpuStats {
     }
 }
 
-/// Consistent with CpuControlHandler configs / P states retrieved from `cpu-ctrl` driver.
+/// Consistent with CpuControlHandler configs / opps retrieved from `cpu-ctrl` driver.
 fn default_cpu_params() -> SimulatedCpuParams {
     SimulatedCpuParams {
         logical_cpu_numbers: vec![0, 1, 2, 3],
-        p_states: vec![
-            PState { frequency: Hertz(2.0e9), voltage: Volts(1.0) },
-            PState { frequency: Hertz(1.5e9), voltage: Volts(0.8) },
-            PState { frequency: Hertz(1.2e9), voltage: Volts(0.7) },
+        opps: vec![
+            OperatingPoint { frequency: Hertz(2.0e9), voltage: Volts(1.0) },
+            OperatingPoint { frequency: Hertz(1.5e9), voltage: Volts(0.8) },
+            OperatingPoint { frequency: Hertz(1.2e9), voltage: Volts(0.7) },
         ],
         capacitance: Farads(150.0e-12),
     }
@@ -533,8 +533,8 @@ async fn test_average_temperature() {
     .await;
 
     // Make sure that for the operation rate we're using, the steady-state temperature for the
-    // highest-power P-state is above the target temperature, while the one for the
-    // lowest-power P-state is below it.
+    // highest-power opp is above the target temperature, while the one for the
+    // lowest-power opp is below it.
     assert!(
         thermal_test_simulator.get_steady_state_cpu_temperature(
             thermal_test_simulator.get_cpu_power(0, operation_rate)
@@ -542,10 +542,8 @@ async fn test_average_temperature() {
     );
     assert!(
         thermal_test_simulator.get_steady_state_cpu_temperature(
-            thermal_test_simulator.get_cpu_power(
-                thermal_test_simulator.cpu_params.p_states.len() - 1,
-                operation_rate
-            )
+            thermal_test_simulator
+                .get_cpu_power(thermal_test_simulator.cpu_params.opps.len() - 1, operation_rate)
         ) < target_temperature
     );
 
@@ -566,7 +564,7 @@ async fn test_average_temperature() {
     thermal_test_simulator.destroy().await;
 }
 
-// Tests for a bug that led to jitter in P-state selection at max load.
+// Tests for a bug that led to jitter in opp selection at max load.
 //
 // CpuControlHandler was originally implemented to estimate the operation rate in the upcoming
 // cycle as the operation rate over the previous cycle, even if the previous rate was maximal.
@@ -576,14 +574,14 @@ async fn test_average_temperature() {
 // saturated, its operation rate was 6.0 GHz. If we raise the clock speed to 2GHz and the CPU
 // remains saturated, we will have underpredicted its operation rate by 25%.
 //
-// This underestimation manifested as unwanted jitter between P-states. After transitioning from
+// This underestimation manifested as unwanted jitter between opps. After transitioning from
 // P0 to P1, for example, the available power required to select P0 would drop by the ratio of
 // frequencies, f1/f0. This made an immediate transition back to P0 very likely.
 //
 // Note that since the CPU temperature immediately drops when its clock speed is lowered, this
 // behavior of dropping clock speed for a single cycle may occur for good reason. To isolate the
 // undesired behavior in this test, we use an extremely large time constant. Doing so mostly
-// eliminates the change in filtered temperature in the cycles immediately following a P-state
+// eliminates the change in filtered temperature in the cycles immediately following a opp
 // transition.
 #[fuchsia::test]
 async fn test_no_jitter_at_max_load() {
@@ -620,11 +618,8 @@ async fn test_no_jitter_at_max_load() {
     let mut throttling_started = false;
     for _ in 0..max_iterations {
         thermal_test_simulator.iterate_n_times(1).await;
-        if thermal_test_simulator.p_state_index > 0 {
-            assert_eq!(
-                thermal_test_simulator.p_state_index, 1,
-                "Should have transitioned to P-state 1."
-            );
+        if thermal_test_simulator.opp_index > 0 {
+            assert_eq!(thermal_test_simulator.opp_index, 1, "Should have transitioned to opp 1.");
             throttling_started = true;
             break;
         }
@@ -637,7 +632,7 @@ async fn test_no_jitter_at_max_load() {
 
     // Iterated one more time, and make sure the clock speed is still reduced.
     thermal_test_simulator.iterate_n_times(1).await;
-    assert_ne!(thermal_test_simulator.p_state_index, 0);
+    assert_ne!(thermal_test_simulator.opp_index, 0);
 
     thermal_test_simulator.destroy().await;
 }

@@ -49,7 +49,7 @@ class AmlCpu : public fidl::WireServer<fuchsia_hardware_cpu_ctrl::Device> {
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlCpu);
   explicit AmlCpu(const std::vector<operating_point_t>& operating_points,
                   const perf_domain_t& perf_domain)
-      : current_pstate_(
+      : current_operating_point_(
             static_cast<uint32_t>(operating_points.size() -
                                   1))  // Assume the core is running at the slowest clock to begin.
         ,
@@ -61,14 +61,18 @@ class AmlCpu : public fidl::WireServer<fuchsia_hardware_cpu_ctrl::Device> {
                    fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpuscaler,
                    fidl::ClientEnd<fuchsia_hardware_power::Device> pwr);
 
-  zx_status_t SetPerformanceStateInternal(uint32_t requested_state, uint32_t* out_state);
+  zx_status_t SetCurrentOperatingPointInternal(uint32_t requested_opp, uint32_t* out_opp);
 
   // Set CpuInfo in inspect.
   void SetCpuInfo(uint32_t cpu_version_packed);
 
-  uint32_t GetCurrentPState() {
+  uint32_t GetCurrentOperatingPoint() {
     std::scoped_lock lock(lock_);
-    return current_pstate_;
+    return current_operating_point_;
+  }
+
+  uint32_t GetOperatingPointCount() const {
+    return static_cast<uint32_t>(operating_points_.size());
   }
 
   const std::vector<operating_point_t>& GetOperatingPoints() { return operating_points_; }
@@ -78,11 +82,12 @@ class AmlCpu : public fidl::WireServer<fuchsia_hardware_cpu_ctrl::Device> {
   const char* GetName() const { return perf_domain_.name; }
 
   // Fidl server interface implementation.
-  void GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
-                               GetPerformanceStateInfoCompleter::Sync& completer) override;
-  void SetPerformanceState(SetPerformanceStateRequestView request,
-                           SetPerformanceStateCompleter::Sync& completer) override;
-  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
+  void GetOperatingPointInfo(GetOperatingPointInfoRequestView request,
+                             GetOperatingPointInfoCompleter::Sync& completer) override;
+  void SetCurrentOperatingPoint(SetCurrentOperatingPointRequestView request,
+                                SetCurrentOperatingPointCompleter::Sync& completer) override;
+  void GetCurrentOperatingPoint(GetCurrentOperatingPointCompleter::Sync& completer) override;
+  void GetOperatingPointCount(GetOperatingPointCountCompleter::Sync& completer) override;
   void GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) override;
   void GetLogicalCoreId(GetLogicalCoreIdRequestView request,
                         GetLogicalCoreIdCompleter::Sync& completer) override;
@@ -99,7 +104,7 @@ class AmlCpu : public fidl::WireServer<fuchsia_hardware_cpu_ctrl::Device> {
   fidl::WireSyncClient<fuchsia_hardware_power::Device> pwr_;
 
   std::mutex lock_;
-  uint32_t current_pstate_ __TA_GUARDED(lock_);
+  uint32_t current_operating_point_ __TA_GUARDED(lock_);
   const std::vector<operating_point_t> operating_points_;
 
   perf_domain_t perf_domain_;

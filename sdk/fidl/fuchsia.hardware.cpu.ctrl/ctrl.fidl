@@ -5,18 +5,17 @@ library fuchsia.hardware.cpu.ctrl;
 
 using zx;
 
-/// CpuPerformanceStateInfo::frequency_hz and CpuPerformanceStateInfo::voltage_uv
-/// are set to this if the frequency and voltage for the given performance state
+/// CpuOperatingPointInfo::frequency_hz and CpuOperatingPointInfo::voltage_uv
+/// are set to this if the frequency and voltage for the given operating point
 /// are unknown respectively.
 const FREQUENCY_UNKNOWN int64 = -1;
 const VOLTAGE_UNKNOWN int64 = -1;
 
-const DEVICE_PERFORMANCE_STATE_P0 uint32 = 0;
-const MAX_DEVICE_PERFORMANCE_STATES uint32 = 20;
+const DEVICE_OPERATING_POINT_P0 uint32 = 0;
 
-/// A collection of some basic information for a given performance state.
-type CpuPerformanceStateInfo = struct {
-    /// Frequency the core is operating at in hertz.
+/// A collection of some basic information for a given operating point.
+type CpuOperatingPointInfo = struct {
+    // Frequency the core is operating at in hertz.
     frequency_hz int64;
 
     // Voltage the core is operating at in microvolts.
@@ -24,28 +23,34 @@ type CpuPerformanceStateInfo = struct {
 };
 
 closed protocol Device {
-    /// Returns information about a given performance state for this performance
+    /// Returns information about a given operating point for this performance
     /// domain.
-    strict GetPerformanceStateInfo(struct {
-        state uint32;
+    strict GetOperatingPointInfo(struct {
+        // Operating point for which information is queried.
+        opp uint32;
     }) -> (struct {
-        info CpuPerformanceStateInfo;
+        info CpuOperatingPointInfo;
     }) error zx.Status;
 
-    /// Gets the current performance state of the device.
-    strict GetCurrentPerformanceState() -> (struct {
-        out_state uint32;
+    /// Gets the current operating point of the device.
+    strict GetCurrentOperatingPoint() -> (struct {
+        out_opp uint32;
     });
 
-    /// Set the performance state of this device to the requested performance state.
-    /// Returns ZX_OK, if the device is in a working state and the performance state is changed to
-    /// requested_state successfully. out_state will be same as requested_state.
-    /// Returns error status, if switching to the requested_state was unsuccessful. out_state
-    /// is the state that the device is currently in.
-    strict SetPerformanceState(struct {
-        requested_state uint32;
+    /// Set the operating point of this device to the requested operating point.
+    /// Returns ZX_OK, if the device is in a working state and the operating point is changed to
+    /// requested_opp successfully. out_opp will be same as requested_opp.
+    /// Returns error status, if switching to the requested_opp was unsuccessful. out_opp
+    /// is the operating performance point (OPP) that the device is currently in.
+    strict SetCurrentOperatingPoint(struct {
+        requested_opp uint32;
     }) -> (struct {
-        out_state uint32;
+        out_opp uint32;
+    }) error zx.Status;
+
+    /// Returns the number of operating points within this performance domain.
+    strict GetOperatingPointCount() -> (struct {
+        count uint32;
     }) error zx.Status;
 
     /// Returns the number of logical cores contained within this performance

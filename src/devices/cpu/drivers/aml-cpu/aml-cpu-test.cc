@@ -27,7 +27,6 @@
 
 namespace amlogic_cpu {
 
-using fuchsia_hardware_cpu_ctrl::wire::kMaxDevicePerformanceStates;
 using CpuCtrlClient = fidl::WireSyncClient<fuchsia_hardware_cpu_ctrl::Device>;
 
 #define MHZ(x) ((x) * 1000000)
@@ -344,9 +343,9 @@ TEST_F(AmlCpuBindingTest, UnorderedOperatingPoints) {
   MockDevice* child = root_->GetLatestChild();
   AmlCpuV1* dev = child->GetDeviceContext<AmlCpuV1>();
 
-  uint32_t out_state;
-  EXPECT_OK(dev->aml_cpu_for_testing().SetPerformanceStateInternal(0, &out_state));
-  EXPECT_EQ(out_state, 0ul);
+  uint32_t out_opp;
+  EXPECT_OK(dev->aml_cpu_for_testing().SetCurrentOperatingPointInternal(0, &out_opp));
+  EXPECT_EQ(out_opp, 0ul);
 
   incoming_.SyncCall([](IncomingNamespace* infra) {
     uint32_t voltage = infra->power_server.voltage();
@@ -422,8 +421,8 @@ class AmlCpuTestFixture : public testing::Test {
   void SetUp() override {
     // Notes on AmlCpu Initialization:
     //  + Should enable the CPU and PLL clocks.
-    //  + Should initially assume that the device is in it's lowest performance state.
-    //  + Should configure the device to it's highest performance state.
+    //  + Should initially assume that the device is in it's lowest opp.
+    //  + Should configure the device to it's highest opp.
 
     const operating_point_t& slowest = operating_points_.back();
     const operating_point_t& fastest = operating_points_.front();
@@ -431,7 +430,7 @@ class AmlCpuTestFixture : public testing::Test {
     // The DUT should initialize.
     power_.SetSupportedVoltageRange(slowest.volt_uv, fastest.volt_uv);
 
-    // The DUT scales up to the fastest available pstate.
+    // The DUT scales up to the fastest available opp.
     power_.SetVoltage(fastest.volt_uv);
 
     ASSERT_OK(dut_.aml_cpu_for_testing().Init(pll_clock_.Connect(), cpu_clock_.Connect(),
@@ -461,87 +460,88 @@ class AmlCpuTestFixture : public testing::Test {
   const std::vector<operating_point_t> operating_points_;
 };
 
-TEST_F(AmlCpuTestFixture, TestGetPerformanceStateInfo) {
-  // Make sure that we can get information about all the supported pstates.
-  for (size_t i = 0; i < kTestOperatingPoints.size(); i++) {
-    const uint32_t pstate = static_cast<uint32_t>(i);
-    auto pstateInfo = cpu_client_->GetPerformanceStateInfo(pstate);
+TEST_F(AmlCpuTestFixture, TestGetOperatingPointInfo) {
+  auto opp_size = kTestOperatingPoints.size();
+  // Make sure that we can get information about all the supported opps.
+  for (size_t i = 0; i < opp_size; i++) {
+    const uint32_t opp = static_cast<uint32_t>(i);
+    auto oppInfo = cpu_client_->GetOperatingPointInfo(opp);
 
     // First, make sure there were no transport errors.
-    ASSERT_OK(pstateInfo.status());
+    ASSERT_OK(oppInfo.status());
 
     // Then make sure that the driver accepted the call.
-    ASSERT_FALSE(pstateInfo->is_error());
+    ASSERT_FALSE(oppInfo->is_error());
 
     // Then make sure that we're getting the expected frequency and voltage values.
-    EXPECT_EQ(pstateInfo->value()->info.frequency_hz, kTestOperatingPoints[i].freq_hz);
-    EXPECT_EQ(pstateInfo->value()->info.voltage_uv, kTestOperatingPoints[i].volt_uv);
+    EXPECT_EQ(oppInfo->value()->info.frequency_hz, kTestOperatingPoints[i].freq_hz);
+    EXPECT_EQ(oppInfo->value()->info.voltage_uv, kTestOperatingPoints[i].volt_uv);
   }
 
-  // Make sure that we can't get any information about pstates that don't
+  // Make sure that we can't get any information about opps that don't
   // exist.
-  for (size_t i = kTestOperatingPoints.size(); i < kMaxDevicePerformanceStates; i++) {
-    const uint32_t pstate = static_cast<uint32_t>(i);
-    auto pstateInfo = cpu_client_->GetPerformanceStateInfo(pstate);
+  for (size_t i = opp_size; i < opp_size + 10; i++) {
+    const uint32_t opp = static_cast<uint32_t>(i);
+    auto oppInfo = cpu_client_->GetOperatingPointInfo(opp);
 
-    // Even if it's an unsupported pstate, we still expect the transport to
+    // Even if it's an unsupported opp, we still expect the transport to
     // deliver the message successfully.
-    ASSERT_OK(pstateInfo.status());
+    ASSERT_OK(oppInfo.status());
 
     // Make sure that the driver returns an error, however.
-    EXPECT_TRUE(pstateInfo->is_error());
+    EXPECT_TRUE(oppInfo->is_error());
   }
 }
 
-TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
-  // Scale to the lowest performance state.
-  const uint32_t min_pstate_index = static_cast<uint32_t>(kTestOperatingPoints.size() - 1);
-  const operating_point_t& min_pstate = kTestOperatingPoints[min_pstate_index];
+TEST_F(AmlCpuTestFixture, TestSetCurrentOperatingPoint) {
+  // Scale to the lowest opp.
+  const uint32_t min_opp_index = static_cast<uint32_t>(kTestOperatingPoints.size() - 1);
+  const operating_point_t& min_opp = kTestOperatingPoints[min_opp_index];
 
-  power_.SetVoltage(min_pstate.volt_uv);
+  power_.SetVoltage(min_opp.volt_uv);
 
-  auto min_result = cpu_client_->SetPerformanceState(min_pstate_index);
+  auto min_result = cpu_client_->SetCurrentOperatingPoint(min_opp_index);
   EXPECT_OK(min_result.status());
   EXPECT_TRUE(min_result->is_ok());
-  EXPECT_EQ(min_result->value()->out_state, min_pstate_index);
+  EXPECT_EQ(min_result->value()->out_opp, min_opp_index);
   auto rate = scaler_clock_.rate();
   ASSERT_TRUE(rate.has_value());
-  ASSERT_EQ(rate.value(), min_pstate.freq_hz);
+  ASSERT_EQ(rate.value(), min_opp.freq_hz);
 
-  // Check that we get the same value back from GetPerformanceState
-  auto min_result_again = cpu_client_->GetCurrentPerformanceState();
+  // Check that we get the same value back from GetCurrentOperatingPoint
+  auto min_result_again = cpu_client_->GetCurrentOperatingPoint();
   EXPECT_OK(min_result_again.status());
-  EXPECT_EQ(min_result_again.value().out_state, min_pstate_index);
+  EXPECT_EQ(min_result_again.value().out_opp, min_opp_index);
 
-  // Scale to the highest performance state.
-  const uint32_t max_pstate_index = 0;
-  const operating_point_t& max_pstate = kTestOperatingPoints[max_pstate_index];
+  // Scale to the highest opp.
+  const uint32_t max_opp_index = 0;
+  const operating_point_t& max_opp = kTestOperatingPoints[max_opp_index];
 
-  power_.SetVoltage(max_pstate.volt_uv);
+  power_.SetVoltage(max_opp.volt_uv);
 
-  auto max_result = cpu_client_->SetPerformanceState(max_pstate_index);
+  auto max_result = cpu_client_->SetCurrentOperatingPoint(max_opp_index);
   EXPECT_OK(max_result.status());
   EXPECT_TRUE(max_result->is_ok());
-  EXPECT_EQ(max_result->value()->out_state, max_pstate_index);
+  EXPECT_EQ(max_result->value()->out_opp, max_opp_index);
   rate = scaler_clock_.rate();
   ASSERT_TRUE(rate.has_value());
-  ASSERT_EQ(rate.value(), max_pstate.freq_hz);
+  ASSERT_EQ(rate.value(), max_opp.freq_hz);
 
-  // Check that we get the same value back from GetPerformanceState
-  auto max_result_again = cpu_client_->GetCurrentPerformanceState();
+  // Check that we get the same value back from GetCurrentOperatingPoint
+  auto max_result_again = cpu_client_->GetCurrentOperatingPoint();
   EXPECT_OK(max_result_again.status());
-  EXPECT_EQ(max_result_again.value().out_state, max_pstate_index);
+  EXPECT_EQ(max_result_again.value().out_opp, max_opp_index);
 
-  // Set to the pstate that we're already at and make sure that it's a no-op.
-  auto same_result = cpu_client_->SetPerformanceState(max_pstate_index);
+  // Set to the opp that we're already at and make sure that it's a no-op.
+  auto same_result = cpu_client_->SetCurrentOperatingPoint(max_opp_index);
   EXPECT_OK(same_result.status());
   EXPECT_TRUE(same_result->is_ok());
-  EXPECT_EQ(same_result->value()->out_state, max_pstate_index);
+  EXPECT_EQ(same_result->value()->out_opp, max_opp_index);
 
-  // Check that we get the same value back from GetPerformanceState
-  auto same_result_again = cpu_client_->GetCurrentPerformanceState();
+  // Check that we get the same value back from GetCurrentOperatingPoint
+  auto same_result_again = cpu_client_->GetCurrentOperatingPoint();
   EXPECT_OK(same_result_again.status());
-  EXPECT_EQ(same_result_again.value().out_state, max_pstate_index);
+  EXPECT_EQ(same_result_again.value().out_opp, max_opp_index);
 }
 
 TEST_F(AmlCpuTestFixture, TestSetCpuInfo) {
@@ -558,6 +558,14 @@ TEST_F(AmlCpuTestFixture, TestSetCpuInfo) {
   EXPECT_THAT(*cpu_info, NodeMatches(AllOf(PropertyList(::testing::UnorderedElementsAre(
                              UintIs("cpu_major_revision", 40), UintIs("cpu_minor_revision", 11),
                              UintIs("cpu_package_id", 2))))));
+}
+
+TEST_F(AmlCpuTestFixture, TestGetOperatingPointCount) {
+  auto resp = cpu_client_->GetOperatingPointCount();
+
+  ASSERT_OK(resp.status());
+
+  EXPECT_EQ(resp.value()->count, kTestOperatingPoints.size());
 }
 
 TEST_F(AmlCpuTestFixture, TestGetLogicalCoreCount) {

@@ -25,7 +25,6 @@
 
 #include "performance-domain.h"
 
-using cpuctrl::wire::kMaxDevicePerformanceStates;
 using ListCb = std::function<void(const char*)>;
 
 constexpr char kCpuDevicePath[] = "/dev/class/cpu-ctrl";
@@ -37,7 +36,7 @@ constexpr uint64_t kDefaultStressTestIterations = 1000;
 constexpr uint64_t kDefaultStressTestTimeoutMs =
     100;  // Milliseconds to wait before issuing another dvfs opp.
 
-void print_frequency(const cpuctrl::wire::CpuPerformanceStateInfo& info) {
+void print_frequency(const cpuctrl::wire::CpuOperatingPointInfo& info) {
   if (info.frequency_hz == cpuctrl::wire::kFrequencyUnknown) {
     std::cout << "(unknown)";
   } else {
@@ -45,7 +44,7 @@ void print_frequency(const cpuctrl::wire::CpuPerformanceStateInfo& info) {
   }
 }
 
-void print_voltage(const cpuctrl::wire::CpuPerformanceStateInfo& info) {
+void print_voltage(const cpuctrl::wire::CpuOperatingPointInfo& info) {
   if (info.voltage_uv == cpuctrl::wire::kVoltageUnknown) {
     std::cout << "(unknown)";
   } else {
@@ -67,19 +66,19 @@ void usage(const char* cmd) {
   fprintf(stderr, "\nInteract with the CPU\n");
   fprintf(stderr, "\t%s help                     Print this message and quit.\n", cmd);
   fprintf(stderr, "\t%s list                     List this system's performance domains\n", cmd);
-  fprintf(stderr, "\t%s describe [domain]        Describes a given performance domain's performance states\n",
+  fprintf(stderr, "\t%s describe [domain]        Describes a given performance domain's operating points\n",
           cmd);
   fprintf(stderr, "\t%s                          describes all domains if `domain` is omitted.\n",
           spaces);
-  
-  fprintf(stderr, "\t%s pstate <domain> [state]  Set the CPU's performance state to `state`. \n",
+
+  fprintf(stderr, "\t%s opp <domain> [opp]       Set the CPU's operating point to `opp`. \n",
           cmd);
-  fprintf(stderr, "\t%s                          Returns the current state if `state` is omitted.\n",
+  fprintf(stderr, "\t%s                          Returns the current opp if `opp` is omitted.\n",
           spaces);
 
   fprintf(stderr, "\t%s stress [-d domains] [-t timeout] [-c count]\n", cmd);
   fprintf(stderr, "\t%s                          ex: %s stress -d /dev/class/cpu/000,/dev/class/cpu/001 -c 100 -t 10\n", spaces, cmd);
-  fprintf(stderr, "\t%s                          Stress test by rapidly and randomly assigning pstates.\n", spaces);
+  fprintf(stderr, "\t%s                          Stress test by rapidly and randomly assigning opps.\n", spaces);
   fprintf(stderr, "\t%s                          `domains` is a commas separated list of performance domains to test\n", spaces);
   fprintf(stderr, "\t%s                          If `domains` is omitted, all domains are tested.\n", spaces);
   fprintf(stderr, "\t%s                          `timeout` defines the number of milliseconds to wait before assigning a domain\n", spaces);
@@ -148,29 +147,26 @@ void describe(const char* domain_name) {
     std::cout << core_count << " logical cores" << std::endl;
   }
 
-  const auto& pstates = client.GetPerformanceStates();
-  for (size_t i = 0; i < pstates.size(); i++) {
-    std::cout << " + pstate: " << i << std::endl;
+  const auto [status, opps] = client.GetOperatingPoints();
+  if (status != ZX_OK) {
+    std::cerr << "Failed to get operating points, st = " << status << std::endl;
+    return;
+  }
+
+  for (size_t i = 0; i < opps.size(); i++) {
+    std::cout << " + opps: " << i << std::endl;
 
     std::cout << "   - freq: ";
-    print_frequency(pstates[i]);
+    print_frequency(opps[i]);
     std::cout << std::endl;
 
     std::cout << "   - volt: ";
-    print_voltage(pstates[i]);
+    print_voltage(opps[i]);
     std::cout << std::endl;
   }
 }
 
-void set_performance_state(const char* domain_name, const char* pstate) {
-  int64_t desired_state_l = parse_positive_long(pstate);
-  if (desired_state_l < 0 || desired_state_l > kMaxDevicePerformanceStates) {
-    fprintf(stderr, "Bad pstate '%s', must be a positive integer between 0 and %u\n", pstate,
-            kMaxDevicePerformanceStates);
-    return;
-  }
-
-  uint32_t desired_state = static_cast<uint32_t>(desired_state_l);
+void set_current_operating_point(const char* domain_name, const char* opp) {
   char path[kMaxPathLen];
   snprintf(path, kMaxPathLen, kCpuDeviceFormat, domain_name);
 
@@ -180,29 +176,49 @@ void set_performance_state(const char* domain_name, const char* pstate) {
               << " st = " << domain.status_string() << std::endl;
     return;
   }
-
   CpuPerformanceDomain& client = domain.value();
-  zx_status_t status = client.SetPerformanceState(static_cast<uint32_t>(desired_state));
-  if (status != ZX_OK) {
-    std::cerr << "Failed to set performance state, st = " << status << std::endl;
+
+  const auto [opp_count_status, opp_count] = client.GetOperatingPointCount();
+
+  if (opp_count_status != ZX_OK) {
+    std::cerr << "Failed to get operating point counts, st = " << opp_count_status << std::endl;
     return;
   }
 
-  std::cout << "PD: " << domain_name << " set pstate to " << desired_state << std::endl;
+  int64_t desired_opp_l = parse_positive_long(opp);
+  if (desired_opp_l < 0 || desired_opp_l > opp_count) {
+    std::cerr << "Bad opp '%s', must be a positive integer between 0 and %u\n" << opp << opp_count;
+    return;
+  }
 
-  const auto& pstates = client.GetPerformanceStates();
-  if (desired_state < pstates.size()) {
+  uint32_t desired_opp = static_cast<uint32_t>(desired_opp_l);
+
+  zx_status_t status = client.SetCurrentOperatingPoint(static_cast<uint32_t>(desired_opp));
+  if (status != ZX_OK) {
+    std::cerr << "Failed to set operating point, st = " << status << std::endl;
+    return;
+  }
+
+  std::cout << "PD: " << domain_name << " set opp to " << desired_opp << std::endl;
+
+  const auto [st, opps] = client.GetOperatingPoints();
+  if (st != ZX_OK) {
+    std::cerr << "Failed to get operating points, st = " << st << std::endl;
+    return;
+  }
+
+  if (desired_opp < opps.size()) {
     std::cout << "freq: ";
-    print_frequency(pstates[desired_state]);
+    print_frequency(opps[desired_opp]);
     std::cout << " ";
 
     std::cout << "volt: ";
-    print_voltage(pstates[desired_state]);
+    print_voltage(opps[desired_opp]);
     std::cout << std::endl;
   }
 }
 
-void get_performance_state(const char* domain_name) {
+void get_current_operating_point(const char* domain_name) {
   char path[kMaxPathLen];
   snprintf(path, kMaxPathLen, kCpuDeviceFormat, domain_name);
 
@@ -214,19 +230,19 @@ void get_performance_state(const char* domain_name) {
   }
 
   CpuPerformanceDomain& client = domain.value();
-  const auto [status, ps_index, pstate] = client.GetCurrentPerformanceState();
+  const auto [status, ps_index, opp] = client.GetCurrentOperatingPoint();
 
   if (status != ZX_OK) {
-    std::cout << "Failed to get current performance state, st = " << status << std::endl;
+    std::cout << "Failed to get current operating point, st = " << status << std::endl;
     return;
   }
 
-  std::cout << "Current Pstate = " << ps_index << std::endl;
+  std::cout << "Current opp = " << ps_index << std::endl;
   std::cout << "  Frequency: ";
-  print_frequency(pstate);
+  print_frequency(opp);
   std::cout << std::endl;
   std::cout << "    Voltage: ";
-  print_voltage(pstate);
+  print_voltage(opp);
   std::cout << std::endl;
 }
 
@@ -258,18 +274,17 @@ void stress(std::vector<std::string> names, const size_t iterations, const uint6
   // Put things back the way they were before the test started.
   std::vector<fit::deferred_action<std::function<void(void)>>> autoreset;
   for (auto& domain : domains) {
-    const auto current_pstate = domain.GetCurrentPerformanceState();
-    if (std::get<0>(current_pstate) != ZX_OK) {
-      std::cerr << "Could not get initial pstate for domain, won't reset when finished"
-                << std::endl;
+    const auto current_opp = domain.GetCurrentOperatingPoint();
+    if (std::get<0>(current_opp) != ZX_OK) {
+      std::cerr << "Could not get initial opp for domain, won't reset when finished" << std::endl;
       continue;
     }
 
-    autoreset.emplace_back([&domain, current_pstate]() {
-      uint32_t pstate = static_cast<uint32_t>(std::get<1>(current_pstate));
-      zx_status_t st = domain.SetPerformanceState(pstate);
+    autoreset.emplace_back([&domain, current_opp]() {
+      uint32_t opp = static_cast<uint32_t>(std::get<1>(current_opp));
+      zx_status_t st = domain.SetCurrentOperatingPoint(opp);
       if (st != ZX_OK) {
-        std::cerr << "Failed to reset initial pstate" << std::endl;
+        std::cerr << "Failed to reset initial opp" << std::endl;
       }
     });
   }
@@ -282,12 +297,16 @@ void stress(std::vector<std::string> names, const size_t iterations, const uint6
 
     // Pick a random operating point for this domain.
     auto& selected_domain = domains[selected_domain_idx];
-    const auto& ops = selected_domain.GetPerformanceStates();
-    const uint32_t selected_op_pt = rand() % ops.size();
-    zx_status_t status = selected_domain.SetPerformanceState(selected_op_pt);
+    const auto [opp_count_status, opp_count] = selected_domain.GetOperatingPointCount();
+    if (opp_count_status != ZX_OK) {
+      std::cerr << "Failed to get operating point counts, st = " << opp_count_status << std::endl;
+      return;
+    }
+    const uint32_t selected_opp = rand() % opp_count;
+    zx_status_t status = selected_domain.SetCurrentOperatingPoint(selected_opp);
     if (status != ZX_OK) {
-      std::cout << "Stress test failed to drive domain " << selected_domain_idx << " into pstate "
-                << selected_op_pt << std::endl;
+      std::cout << "Stress test failed to drive domain " << selected_domain_idx << " into opp "
+                << selected_opp << std::endl;
       return;
     }
 
@@ -334,13 +353,13 @@ int main(int argc, char* argv[]) {
     }
     return describe_all() == ZX_OK ? 0 : -1;
   }
-  if (!strncmp(subcmd, "pstate", 6)) {
+  if (!strncmp(subcmd, "opp", 6)) {
     if (argc == 4) {
-      set_performance_state(argv[2], argv[3]);
+      set_current_operating_point(argv[2], argv[3]);
     } else if (argc == 3) {
-      get_performance_state(argv[2]);
+      get_current_operating_point(argv[2]);
     } else {
-      fprintf(stderr, "pstate <domain> [pstate]\n");
+      fprintf(stderr, "opp <domain> [opp]\n");
       usage(cmd);
       return -1;
     }

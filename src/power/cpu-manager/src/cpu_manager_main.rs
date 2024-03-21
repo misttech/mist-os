@@ -7,7 +7,7 @@ use crate::error::CpuManagerError;
 use crate::message::{Message, MessageResult, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
-use crate::types::{NormPerfs, PState, ThermalLoad, Watts};
+use crate::types::{NormPerfs, OperatingPoint, ThermalLoad, Watts};
 use anyhow::{bail, format_err, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
@@ -34,9 +34,9 @@ use std::rc::Rc;
 ///
 /// Sends Messages:
 ///     - GetCpuLoads
-///     - GetCpuPerformanceStates
-///     - GetPerformanceState
-///     - SetPerformanceState
+///     - GetCpuOperatingPoints
+///     - GetOperatingPoint
+///     - SetOperatingPoint
 ///     - SetCpuPerformanceInfo
 ///
 /// FIDL dependencies: No direct dependencies
@@ -85,9 +85,9 @@ struct CpuCluster {
     cluster_index: usize,
 
     /// Handler that manages the corresponding CPU driver. Must respond to:
-    ///  - GetPerformanceState
-    ///  - SetPerformanceState
-    ///  - GetCpuPerformanceStates
+    ///  - GetOperatingPoint
+    ///  - SetOperatingPoint
+    ///  - GetCpuOperatingPoints
     handler: Rc<dyn Node>,
 
     /// Logical CPU numbers of the CPUs in this cluster.
@@ -96,52 +96,52 @@ struct CpuCluster {
     /// Normalized performance of this cluster per GHz of CPU speed.
     performance_per_ghz: NormPerfs,
 
-    /// All P-states supported by this cluster. The handler guarantees that they are sorted
+    /// All opps supported by this cluster. The handler guarantees that they are sorted
     /// primairly by frequency and secondarily by voltage.
-    pstates: Vec<PState>,
+    opps: Vec<OperatingPoint>,
 
-    /// Index of this cluster's current P-state. If an update to the P-state fails, we will assume
+    /// Index of this cluster's current opp. If an update to the opp fails, we will assume
     /// that it is between the previous and desired states (inclusive), so that pessimistic guesses
-    /// of the P-state may be used accordingly.
+    /// of the opp may be used accordingly.
     // TODO(https://fxbug.dev/42165500): Look into richer specification of failure modes in the CPU
     // device protocols.
-    current_pstate: Cell<RangedValue<usize>>,
+    current_opp: Cell<RangedValue<usize>>,
 }
 
 impl CpuCluster {
     /// Given fractional loads for all system CPUs, gives this cluster's corresponding load and its
-    /// estimated normalized performance. If the current P-state is unknown, the highest-possible
+    /// estimated normalized performance. If the current opp is unknown, the highest-possible
     /// frequency will be used to ensure that performance (and thus contribution to thermals) is
     /// not underestimated.
     fn process_fractional_loads(&self, all_cpu_loads: &Vec<f32>) -> (f32, NormPerfs) {
         let cluster_load: f32 =
             self.logical_cpu_numbers.iter().map(|i| all_cpu_loads[*i as usize]).sum();
 
-        // P-states are sorted with frequency as primary key, so the lowest-possible index has the
+        // opps are sorted with frequency as primary key, so the lowest-possible index has the
         // highest-possible frequency.
-        let pstate_index = self.current_pstate.get().lower();
-        let frequency = self.pstates[pstate_index].frequency;
+        let opp_index = self.current_opp.get().lower();
+        let frequency = self.opps[opp_index].frequency;
 
         let performance =
             self.performance_per_ghz.mul_scalar(frequency.0 / 1e9 * cluster_load as f64);
         (cluster_load, performance)
     }
 
-    /// Gets the performance capacity of the indicated P-state.
-    fn get_performance_capacity(&self, pstate_index: usize) -> NormPerfs {
-        let pstate = &self.pstates[pstate_index];
+    /// Gets the performance capacity of the indicated opp.
+    fn get_performance_capacity(&self, opp_index: usize) -> NormPerfs {
+        let opp = &self.opps[opp_index];
         let num_cores = self.logical_cpu_numbers.len() as f64;
-        self.performance_per_ghz.mul_scalar(num_cores * pstate.frequency.0 / 1e9)
+        self.performance_per_ghz.mul_scalar(num_cores * opp.frequency.0 / 1e9)
     }
 
-    // Updates the kernel's CPU performance info to match the provided P-state.
+    // Updates the kernel's CPU performance info to match the provided opp.
     async fn update_kernel_performance_info(
         &self,
         syscall_handler: &Rc<dyn Node>,
-        target_pstate: &PState,
+        target_opp: &OperatingPoint,
     ) -> Result<(), CpuManagerError> {
         let performance_scale: sys::zx_cpu_performance_scale_t =
-            self.performance_per_ghz.mul_scalar(target_pstate.frequency.0 / 1e9).try_into()?;
+            self.performance_per_ghz.mul_scalar(target_opp.frequency.0 / 1e9).try_into()?;
 
         let performance_info = self
             .logical_cpu_numbers
@@ -157,81 +157,81 @@ impl CpuCluster {
         }
     }
 
-    // Carries out a P-state change for this cluster.
-    async fn update_pstate(
+    // Carries out a opp change for this cluster.
+    async fn update_opp(
         &self,
         syscall_handler: &Rc<dyn Node>,
         index: usize,
     ) -> Result<(), CpuManagerError> {
         fuchsia_trace::counter!(
             c"cpu_manager",
-            c"CpuManagerMain P-state",
+            c"CpuManagerMain opp",
             self.cluster_index as u64,
             &self.name => index as u32
         );
 
-        // If the current P-state is known and equal to the new one, no update is needed.
-        if let RangedValue::Known(current) = self.current_pstate.get() {
+        // If the current opp is known and equal to the new one, no update is needed.
+        if let RangedValue::Known(current) = self.current_opp.get() {
             if current == index {
                 return Ok(());
             }
         }
 
-        // If the P-state is unknown, the lowest-possible frequency (highest-possible P-state index)
+        // If the opp is unknown, the lowest-possible frequency (highest-possible opp index)
         // is what was used to inform the last `update_kernel_performance_info` call.
-        let current_frequency = self.pstates[self.current_pstate.get().upper()].frequency;
+        let current_frequency = self.opps[self.current_opp.get().upper()].frequency;
 
-        let target_pstate = &self.pstates[index];
+        let target_opp = &self.opps[index];
 
-        // If lowering frequency, we update the kernel before changing P-states. Otherwise, the
+        // If lowering frequency, we update the kernel before changing opps. Otherwise, the
         // kernel will be updated after the change.
-        let kernel_updated = if target_pstate.frequency < current_frequency {
-            self.update_kernel_performance_info(&syscall_handler, target_pstate).await?;
+        let kernel_updated = if target_opp.frequency < current_frequency {
+            self.update_kernel_performance_info(&syscall_handler, target_opp).await?;
             true
         } else {
             false
         };
 
-        // If the current P-state is unknown or not equal to the new one, attempt an update.
-        match self.handler.handle_message(&Message::SetPerformanceState(index as u32)).await {
-            Ok(MessageReturn::SetPerformanceState) => {
-                self.current_pstate.set(RangedValue::Known(index));
+        // If the current opp is unknown or not equal to the new one, attempt an update.
+        match self.handler.handle_message(&Message::SetOperatingPoint(index as u32)).await {
+            Ok(MessageReturn::SetOperatingPoint) => {
+                self.current_opp.set(RangedValue::Known(index));
 
                 if !kernel_updated {
-                    self.update_kernel_performance_info(&syscall_handler, target_pstate).await?;
+                    self.update_kernel_performance_info(&syscall_handler, target_opp).await?;
                 }
                 Ok(())
             }
             Ok(r) => {
                 // Programming error
-                panic!("Wrong response type for SetPerformanceState: {:?}", r);
+                panic!("Wrong response type for SetOperatingPoint: {:?}", r);
             }
             Err(e) => {
-                tracing::error!("SetPerformanceState failed: {:?}", e);
+                tracing::error!("SetOperatingPoint failed: {:?}", e);
 
                 // If the update failed, query the value, so at least the current state is known. If
                 // that fails, too, record a range of possible values based on the previous and
-                // desired values. Regardless, propagate the error from SetPerformanceState.
-                match self.handler.handle_message(&Message::GetPerformanceState).await {
-                    Ok(MessageReturn::GetPerformanceState(i)) => {
-                        self.current_pstate.set(RangedValue::Known(i as usize));
+                // desired values. Regardless, propagate the error from SetOperatingPoint.
+                match self.handler.handle_message(&Message::GetOperatingPoint).await {
+                    Ok(MessageReturn::GetOperatingPoint(i)) => {
+                        self.current_opp.set(RangedValue::Known(i as usize));
                     }
                     result => {
-                        tracing::error!("Unexpected result from GetPerformanceState: {:?}", result);
+                        tracing::error!("Unexpected result from GetOperatingPoint: {:?}", result);
                         let range = Range {
-                            lower: std::cmp::min(self.current_pstate.get().lower(), index),
-                            upper: std::cmp::max(self.current_pstate.get().upper(), index),
+                            lower: std::cmp::min(self.current_opp.get().lower(), index),
+                            upper: std::cmp::max(self.current_opp.get().upper(), index),
                         };
-                        self.current_pstate.set(RangedValue::InRange(range));
+                        self.current_opp.set(RangedValue::InRange(range));
                     }
                 }
 
                 // If we already updated the kernel, make a new update using the lowest-possible
-                // CPU frequency (highest-possbile P-state index) to provide a pessimistic estimate
+                // CPU frequency (highest-possbile opp index) to provide a pessimistic estimate
                 // of CPU performance.
                 if kernel_updated {
-                    let pstate = &self.pstates[self.current_pstate.get().upper()];
-                    self.update_kernel_performance_info(&syscall_handler, pstate).await?;
+                    let opp = &self.opps[self.current_opp.get().upper()];
+                    self.update_kernel_performance_info(&syscall_handler, opp).await?;
                 }
 
                 Err(e)
@@ -246,8 +246,8 @@ impl CpuCluster {
 //      power = static_power + dynamic_power_per_normperf * performance.
 #[derive(Clone, Debug)]
 struct ThermalState {
-    /// Index of the P-state to be used for each CPU cluster.
-    cluster_pstates: Vec<usize>,
+    /// Index of the opp to be used for each CPU cluster.
+    cluster_opps: Vec<usize>,
 
     /// Minimum performance at which this thermal state will be used. At low performance values,
     /// it is common for different thermal states to have very similar power requirements. The
@@ -266,11 +266,11 @@ struct ThermalState {
     ///     operation_rate * performance_per_ghz * capacitance * voltage**2.
     /// The multi-cluster case is somewhat more complicated, and we furthermore don't require use
     /// of the switching power model. But the voltage term captures a typical way that this value
-    /// depends on the underlying P-states.
+    /// depends on the underlying opps.
     dynamic_power_per_normperf: Watts,
 
     /// Maximum performance that this thermal state can provide, i.e. the performance that will be
-    /// achieved when all CPUs are saturated. This value is derived directly from the P-states
+    /// achieved when all CPUs are saturated. This value is derived directly from the opps
     /// specified by this thermal state.
     ///
     /// The term "capacity" is used in agreement with the kernel scheduler.
@@ -397,7 +397,7 @@ struct ClusterConfig {
 
 #[derive(Clone, Deserialize)]
 struct ThermalStateConfig {
-    cluster_pstates: Vec<usize>,
+    cluster_opps: Vec<usize>,
     min_performance_normperfs: f64,
     static_power_w: f64,
     dynamic_power_per_normperf_w: f64,
@@ -630,21 +630,21 @@ impl CpuManagerMain {
 
         let mut inner = self.mutable_inner.borrow_mut();
 
-        // Return early if no update is required. We're assuming that P-states have not changed.
+        // Return early if no update is required. We're assuming that opps have not changed.
         if inner.current_thermal_state == Some(index) {
             return Ok(());
         }
 
-        let pstate_indices = &inner.thermal_states[index].cluster_pstates;
+        let opp_indices = &inner.thermal_states[index].cluster_opps;
         let cluster_update_futures: Vec<_> = inner
             .clusters
             .iter()
             .map(|cluster| {
-                cluster.update_pstate(&self.syscall_handler, pstate_indices[cluster.cluster_index])
+                cluster.update_opp(&self.syscall_handler, opp_indices[cluster.cluster_index])
             })
             .collect();
 
-        // Aggregate any errors that may have occurred when setting P-states.
+        // Aggregate any errors that may have occurred when setting opps.
         let errors: Vec<_> = futures::future::join_all(cluster_update_futures)
             .await
             .into_iter()
@@ -659,7 +659,7 @@ impl CpuManagerMain {
         } else {
             inner.current_thermal_state = None;
 
-            let msg = format!("P-state update(s) failed: {:?}", errors);
+            let msg = format!("opp update(s) failed: {:?}", errors);
             self.inspect.thermal_state_index.set(&format!("Unknown; {}", msg));
             Err(format_err!(msg).into())
         }
@@ -875,18 +875,18 @@ impl Node for CpuManagerMain {
         for (cluster_config, handler) in
             cluster_configs.into_iter().zip(cluster_handlers.into_iter())
         {
-            let pstates = match handler.handle_message(&Message::GetCpuPerformanceStates).await {
-                Ok(MessageReturn::GetCpuPerformanceStates(pstates)) => pstates,
+            let opps = match handler.handle_message(&Message::GetCpuOperatingPoints).await {
+                Ok(MessageReturn::GetCpuOperatingPoints(opps)) => opps,
                 Ok(r) => {
-                    bail!("GetCpuPerformanceStates returned unexpected value: {:?}", r)
+                    bail!("GetCpuOperatingPoints returned unexpected value: {:?}", r)
                 }
-                Err(e) => bail!("Error fetching performance states: {}", e),
+                Err(e) => bail!("Error fetching operating points: {}", e),
             };
 
-            // The current P-state will be set when CpuManagerMain's thermal state is initialized below,
+            // The current opp will be set when CpuManagerMain's thermal state is initialized below,
             // so initialize it to a range of all possible values for now.
-            let pstate_range = Range { lower: 0, upper: pstates.len() - 1 };
-            let current_pstate = Cell::new(RangedValue::InRange(pstate_range));
+            let opp_range = Range { lower: 0, upper: opps.len() - 1 };
+            let current_opp = Cell::new(RangedValue::InRange(opp_range));
 
             clusters.push(CpuCluster {
                 name: cluster_config.name,
@@ -894,8 +894,8 @@ impl Node for CpuManagerMain {
                 handler,
                 logical_cpu_numbers: cluster_config.logical_cpu_numbers,
                 performance_per_ghz: NormPerfs(cluster_config.normperfs_per_ghz),
-                pstates,
-                current_pstate,
+                opps,
+                current_opp,
             });
         }
 
@@ -903,8 +903,8 @@ impl Node for CpuManagerMain {
             clusters
                 .iter()
                 .map(|cluster| {
-                    let pstate_index = thermal_state_config.cluster_pstates[cluster.cluster_index];
-                    cluster.get_performance_capacity(pstate_index)
+                    let opp_index = thermal_state_config.cluster_opps[cluster.cluster_index];
+                    cluster.get_performance_capacity(opp_index)
                 })
                 .sum()
         };
@@ -914,7 +914,7 @@ impl Node for CpuManagerMain {
             .map(|t| {
                 let performance_capacity = get_performance_capacity(&t);
                 ThermalState {
-                    cluster_pstates: t.cluster_pstates,
+                    cluster_opps: t.cluster_opps,
                     min_performance: NormPerfs(t.min_performance_normperfs),
                     static_power: Watts(t.static_power_w),
                     dynamic_power_per_normperf: Watts(t.dynamic_power_per_normperf_w),
@@ -933,7 +933,7 @@ impl Node for CpuManagerMain {
             inner.thermal_states = thermal_states;
         }
 
-        // Update cluster P-states to match the highest power operating condition.
+        // Update cluster opps to match the highest power operating condition.
         self.update_thermal_state(0).await?;
 
         self.init_done.signal();
@@ -1011,9 +1011,9 @@ impl InspectData {
         for (i, state) in states.iter().enumerate().rev() {
             let node = states_node.create_child(format!("thermal_state_{:02}", i));
 
-            let pstates = node.create_uint_array("cluster_pstates", state.cluster_pstates.len());
-            state.cluster_pstates.iter().enumerate().for_each(|(i, p)| pstates.set(i, *p as u64));
-            node.record(pstates);
+            let opps = node.create_uint_array("cluster_opps", state.cluster_opps.len());
+            state.cluster_opps.iter().enumerate().for_each(|(i, p)| opps.set(i, *p as u64));
+            node.record(opps);
 
             node.record_double("min_performance (NormPerfs)", state.min_performance.0);
             node.record_double("static_power (W)", state.static_power.0);
@@ -1045,18 +1045,18 @@ mod tests {
 
     // Common test configurations for big and little clusters.
     static BIG_CPU_NUMBERS: [u32; 2] = [0, 1];
-    static BIG_PSTATES: [PState; 3] = [
-        PState { frequency: Hertz(2.0e9), voltage: Volts(1.0) },
-        PState { frequency: Hertz(1.9e9), voltage: Volts(0.9) },
-        PState { frequency: Hertz(1.8e9), voltage: Volts(0.8) },
+    static BIG_OPPS: [OperatingPoint; 3] = [
+        OperatingPoint { frequency: Hertz(2.0e9), voltage: Volts(1.0) },
+        OperatingPoint { frequency: Hertz(1.9e9), voltage: Volts(0.9) },
+        OperatingPoint { frequency: Hertz(1.8e9), voltage: Volts(0.8) },
     ];
     static BIG_PERFORMANCE_PER_GHZ: NormPerfs = NormPerfs(1.0);
 
     static LITTLE_CPU_NUMBERS: [u32; 2] = [2, 3];
-    static LITTLE_PSTATES: [PState; 3] = [
-        PState { frequency: Hertz(1.0e9), voltage: Volts(0.5) },
-        PState { frequency: Hertz(0.9e9), voltage: Volts(0.4) },
-        PState { frequency: Hertz(0.8e9), voltage: Volts(0.3) },
+    static LITTLE_OPPS: [OperatingPoint; 3] = [
+        OperatingPoint { frequency: Hertz(1.0e9), voltage: Volts(0.5) },
+        OperatingPoint { frequency: Hertz(0.9e9), voltage: Volts(0.4) },
+        OperatingPoint { frequency: Hertz(0.8e9), voltage: Volts(0.3) },
     ];
     static LITTLE_PERFORMANCE_PER_GHZ: NormPerfs = NormPerfs(0.5);
 
@@ -1099,19 +1099,19 @@ mod tests {
         fn new() -> Self {
             let mut mock_maker = MockNodeMaker::new();
 
-            // The big and little cluster handlers are initially queried for all performance states.
+            // The big and little cluster handlers are initially queried for all operating points.
             let big_cluster = mock_maker.make(
                 "big_cluster_handler",
                 vec![(
-                    msg_eq!(GetCpuPerformanceStates),
-                    msg_ok_return!(GetCpuPerformanceStates(Vec::from(&BIG_PSTATES[..]))),
+                    msg_eq!(GetCpuOperatingPoints),
+                    msg_ok_return!(GetCpuOperatingPoints(Vec::from(&BIG_OPPS[..]))),
                 )],
             );
             let little_cluster = mock_maker.make(
                 "little_cluster_handler",
                 vec![(
-                    msg_eq!(GetCpuPerformanceStates),
-                    msg_ok_return!(GetCpuPerformanceStates(Vec::from(&LITTLE_PSTATES[..]))),
+                    msg_eq!(GetCpuOperatingPoints),
+                    msg_ok_return!(GetCpuOperatingPoints(Vec::from(&LITTLE_OPPS[..]))),
                 )],
             );
 
@@ -1128,9 +1128,9 @@ mod tests {
                 Self { big_cluster, little_cluster, syscall, cpu_stats, _mock_maker: mock_maker };
 
             // During initialization, CpuManagerMain configures the highest-power thermal state, with
-            // both clusters at their respective 0th P-states.
-            handlers.expect_big_pstate(0);
-            handlers.expect_little_pstate(0);
+            // both clusters at their respective 0th opp.
+            handlers.expect_big_opp(0);
+            handlers.expect_little_opp(0);
 
             handlers
         }
@@ -1152,24 +1152,24 @@ mod tests {
             ));
         }
 
-        // Updates the handlers with expectations for a big cluster P-state change.
-        fn expect_big_pstate(&self, pstate_index: u32) {
+        // Updates the handlers with expectations for a big cluster opp change.
+        fn expect_big_opp(&self, opp_index: u32) {
             self.big_cluster.add_msg_response_pair((
-                msg_eq!(SetPerformanceState(pstate_index)),
-                msg_ok_return!(SetPerformanceState),
+                msg_eq!(SetOperatingPoint(opp_index)),
+                msg_ok_return!(SetOperatingPoint),
             ));
-            let frequency = &BIG_PSTATES[pstate_index as usize].frequency;
+            let frequency = &BIG_OPPS[opp_index as usize].frequency;
             let float_scale = BIG_PERFORMANCE_PER_GHZ.0 * frequency.0 / 1e9;
             self.expect_performance_scale(&BIG_CPU_NUMBERS, float_scale);
         }
 
-        // Updates the handlers with expectations for a little cluster P-state change.
-        fn expect_little_pstate(&self, pstate_index: u32) {
+        // Updates the handlers with expectations for a little cluster opp change.
+        fn expect_little_opp(&self, opp_index: u32) {
             self.little_cluster.add_msg_response_pair((
-                msg_eq!(SetPerformanceState(pstate_index)),
-                msg_ok_return!(SetPerformanceState),
+                msg_eq!(SetOperatingPoint(opp_index)),
+                msg_ok_return!(SetOperatingPoint),
             ));
-            let frequency = &LITTLE_PSTATES[pstate_index as usize].frequency;
+            let frequency = &LITTLE_OPPS[opp_index as usize].frequency;
             let float_scale = LITTLE_PERFORMANCE_PER_GHZ.0 * frequency.0 / 1e9;
             self.expect_performance_scale(&LITTLE_CPU_NUMBERS, float_scale);
         }
@@ -1216,7 +1216,7 @@ mod tests {
                 ],
                 "thermal_states": [
                     {
-                      "cluster_pstates": [0, 0],
+                      "cluster_opps": [0, 0],
                       "min_performance_normperfs": 0.0,
                       "static_power_w": 0.9,
                       "dynamic_power_per_normperf_w": 0.6
@@ -1251,15 +1251,15 @@ mod tests {
                 let big_cluster = mock_maker.make(
                     "big_cluster_handler",
                     vec![(
-                        msg_eq!(GetCpuPerformanceStates),
-                        msg_ok_return!(GetCpuPerformanceStates(Vec::from(&BIG_PSTATES[..]))),
+                        msg_eq!(GetCpuOperatingPoints),
+                        msg_ok_return!(GetCpuOperatingPoints(Vec::from(&BIG_OPPS[..]))),
                     )],
                 );
                 let little_cluster = mock_maker.make(
                     "little_cluster_handler",
                     vec![(
-                        msg_eq!(GetCpuPerformanceStates),
-                        msg_ok_return!(GetCpuPerformanceStates(Vec::from(&LITTLE_PSTATES[..]))),
+                        msg_eq!(GetCpuOperatingPoints),
+                        msg_ok_return!(GetCpuOperatingPoints(Vec::from(&LITTLE_OPPS[..]))),
                     )],
                 );
 
@@ -1286,13 +1286,13 @@ mod tests {
         let handlers = Handlers::new_for_failed_validation();
         let thermal_state_configs = vec![
             ThermalStateConfig {
-                cluster_pstates: vec![0, 0],
+                cluster_opps: vec![0, 0],
                 min_performance_normperfs: 0.0,
                 static_power_w: 2.0,
                 dynamic_power_per_normperf_w: 1.0,
             },
             ThermalStateConfig {
-                cluster_pstates: vec![2, 2],
+                cluster_opps: vec![2, 2],
                 min_performance_normperfs: 0.0,
                 static_power_w: 1.5,
                 dynamic_power_per_normperf_w: 1.1,
@@ -1313,13 +1313,13 @@ mod tests {
         let handlers = Handlers::new_for_failed_validation();
         let thermal_state_configs = vec![
             ThermalStateConfig {
-                cluster_pstates: vec![2, 2],
+                cluster_opps: vec![2, 2],
                 min_performance_normperfs: 0.0,
                 static_power_w: 2.0,
                 dynamic_power_per_normperf_w: 1.0,
             },
             ThermalStateConfig {
-                cluster_pstates: vec![2, 1],
+                cluster_opps: vec![2, 1],
                 min_performance_normperfs: 0.0,
                 static_power_w: 1.5,
                 dynamic_power_per_normperf_w: 0.8,
@@ -1341,13 +1341,13 @@ mod tests {
         let handlers = Handlers::new();
         let thermal_state_configs = vec![
             ThermalStateConfig {
-                cluster_pstates: vec![0, 0],
+                cluster_opps: vec![0, 0],
                 min_performance_normperfs: 0.0,
                 static_power_w: 2.0,
                 dynamic_power_per_normperf_w: 1.0,
             },
             ThermalStateConfig {
-                cluster_pstates: vec![2, 2],
+                cluster_opps: vec![2, 2],
                 min_performance_normperfs: 1.0,
                 static_power_w: 2.1,
                 dynamic_power_per_normperf_w: 0.8,
@@ -1369,13 +1369,13 @@ mod tests {
         let handlers = Handlers::new_for_failed_validation();
         let thermal_state_configs = vec![
             ThermalStateConfig {
-                cluster_pstates: vec![0, 0],
+                cluster_opps: vec![0, 0],
                 min_performance_normperfs: 0.0,
                 static_power_w: 2.0,
                 dynamic_power_per_normperf_w: 1.0,
             },
             ThermalStateConfig {
-                cluster_pstates: vec![2, 2],
+                cluster_opps: vec![2, 2],
                 min_performance_normperfs: 1.0,
                 static_power_w: 2.5,
                 dynamic_power_per_normperf_w: 0.8,
@@ -1399,7 +1399,7 @@ mod tests {
     async fn test_validate_all_cpus_spanned() {
         let mut mock_maker = MockNodeMaker::new();
 
-        // The big and little cluster handlers are initially queried for all performance states.
+        // The big and little cluster handlers are initially queried for all operating points.
         let big_cluster_handler = create_dummy_node();
         let little_cluster_handler = create_dummy_node();
 
@@ -1413,7 +1413,7 @@ mod tests {
         let cpu_stats_handler = mock_maker.make("cpu_stats_handler", Vec::new());
 
         let thermal_state_configs = vec![ThermalStateConfig {
-            cluster_pstates: vec![0, 0],
+            cluster_opps: vec![0, 0],
             min_performance_normperfs: 0.0,
             static_power_w: 2.0,
             dynamic_power_per_normperf_w: 1.0,
@@ -1437,19 +1437,19 @@ mod tests {
 
         let thermal_state_configs = vec![
             ThermalStateConfig {
-                cluster_pstates: vec![0, 0],
+                cluster_opps: vec![0, 0],
                 min_performance_normperfs: 0.0,
                 static_power_w: 2.0,
                 dynamic_power_per_normperf_w: 1.0,
             },
             ThermalStateConfig {
-                cluster_pstates: vec![0, 1],
+                cluster_opps: vec![0, 1],
                 min_performance_normperfs: 0.2,
                 static_power_w: 1.5,
                 dynamic_power_per_normperf_w: 0.8,
             },
             ThermalStateConfig {
-                cluster_pstates: vec![1, 2],
+                cluster_opps: vec![1, 2],
                 min_performance_normperfs: 0.4,
                 static_power_w: 1.0,
                 dynamic_power_per_normperf_w: 0.6,
@@ -1469,35 +1469,35 @@ mod tests {
         .await;
 
         // The thermal load is 52, we have max power consumption of 2.985W.
-        // The current P-state is 0, so with 0.1 fractional utililzation per core, we have:
+        // The current opp is 0, so with 0.1 fractional utililzation per core, we have:
         //   Big cluster: 0.2 cores load -> 0.4GHz utilized -> 0.4 NormPerfs
         //   Little cluster: 0.2 cores load -> 0.2GHz utilized -> 0.1 NormPerfs
         // At thermal state 0, the projected power use at 0.5 NormPerfs is
         //   2W static + 0.5W dynamic = 2.5W
-        // This is within the 2.985W budget, so there are no P-state changes.
+        // This is within the 2.985W budget, so there are no opp changes.
         handlers.enqueue_cpu_loads(vec![0.1; 4]);
         let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(52))).await;
         result.unwrap();
 
         // The thermal load is 52, we have max power consumption of 2.985W.
-        // The current P-state is 0, so with 0.25 fractional utililzation per core, we have:
+        // The current opp is 0, so with 0.25 fractional utililzation per core, we have:
         //   Big cluster: 0.5 cores load -> 1GHz utilized -> 1 NormPerfs
         //   Little cluster: 0.5 cores load -> 0.5GHz utilized -> 0.25 NormPerfs
         // Projected power usage at 1.25 NormPerfs is:
         //   Thermal state 0: 2W static + 1.25 dynamic = 3.25W => over 2.985W budget
         //   Thermal state 1: 1.5W static + 1W dynamic = 2.5W => within 2.985W budget
-        // So the new thermal state is 1, for which the little cluster changes to P-state 1.
+        // So the new thermal state is 1, for which the little cluster changes to opp 1.
         handlers.enqueue_cpu_loads(vec![0.25; 4]);
-        handlers.expect_little_pstate(1);
+        handlers.expect_little_opp(1);
         let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(52))).await;
         result.unwrap();
 
         // The thermal load is 61, we have max power consumption of 2.426W.
         // CPU load stays the same, but the power budget drops to 2.426W, below allocation for thermal
-        // state 1. This pushes us to thermal state 2, with big P-state 1 and little P-state 2.
+        // state 1. This pushes us to thermal state 2, with big opp 1 and little opp 2.
         handlers.enqueue_cpu_loads(vec![0.25; 4]);
-        handlers.expect_big_pstate(1);
-        handlers.expect_little_pstate(2);
+        handlers.expect_big_opp(1);
+        handlers.expect_little_opp(2);
         let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(61))).await;
         result.unwrap();
 
@@ -1506,8 +1506,8 @@ mod tests {
         // at 0.05 fractional utilization per core, the projected performance is 0.25 Perfs, which
         // makes thermal state 2 inadmissible. Thus, we fall back to thermal state 1.
         handlers.enqueue_cpu_loads(vec![0.05; 4]);
-        handlers.expect_big_pstate(0);
-        handlers.expect_little_pstate(1);
+        handlers.expect_big_opp(0);
+        handlers.expect_little_opp(1);
         let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(77))).await;
         result.unwrap();
 
@@ -1515,7 +1515,7 @@ mod tests {
         // At 0.01 fractional utilization per core, the projected performance is 0.05 Perfs, so now
         // thermal state 1 is inadmissible. This drives us to thermal state 0.
         handlers.enqueue_cpu_loads(vec![0.01; 4]);
-        handlers.expect_little_pstate(0);
+        handlers.expect_little_opp(0);
         let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(84))).await;
         result.unwrap();
     }
@@ -1527,19 +1527,19 @@ mod tests {
 
         let thermal_state_configs = vec![
             ThermalStateConfig {
-                cluster_pstates: vec![0, 0],
+                cluster_opps: vec![0, 0],
                 min_performance_normperfs: 0.0,
                 static_power_w: 2.0,
                 dynamic_power_per_normperf_w: 1.0,
             },
             ThermalStateConfig {
-                cluster_pstates: vec![1, 1],
+                cluster_opps: vec![1, 1],
                 min_performance_normperfs: 4.5,
                 static_power_w: 1.5,
                 dynamic_power_per_normperf_w: 0.8,
             },
             ThermalStateConfig {
-                cluster_pstates: vec![2, 2],
+                cluster_opps: vec![2, 2],
                 min_performance_normperfs: 0.0,
                 static_power_w: 1.0,
                 dynamic_power_per_normperf_w: 0.6,
@@ -1560,8 +1560,8 @@ mod tests {
 
         // Start with low power to force thermal state 2.
         handlers.enqueue_cpu_loads(vec![0.1; 4]);
-        handlers.expect_big_pstate(2);
-        handlers.expect_little_pstate(2);
+        handlers.expect_big_opp(2);
+        handlers.expect_little_opp(2);
         let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(85))).await;
         result.unwrap();
 
@@ -1581,8 +1581,8 @@ mod tests {
         // Now we confirm that:
         //  - State 1 is selected, verifying that its min performance was disregarded due to CPU
         //    saturation.
-        handlers.expect_big_pstate(1);
-        handlers.expect_little_pstate(1);
+        handlers.expect_big_opp(1);
+        handlers.expect_little_opp(1);
         let result = node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
     }
@@ -1594,13 +1594,13 @@ mod tests {
 
         let thermal_states = vec![
             ThermalStateConfig {
-                cluster_pstates: vec![0, 0],
+                cluster_opps: vec![0, 0],
                 min_performance_normperfs: 0.0,
                 static_power_w: 2.0,
                 dynamic_power_per_normperf_w: 1.0,
             },
             ThermalStateConfig {
-                cluster_pstates: vec![1, 2],
+                cluster_opps: vec![1, 2],
                 min_performance_normperfs: 0.2,
                 static_power_w: 1.5,
                 dynamic_power_per_normperf_w: 0.8,
@@ -1623,8 +1623,8 @@ mod tests {
         // The power budget of 1W exceeds the static power of thermal state 0, so we are pushed
         // to thermal state 1.
         handlers.enqueue_cpu_loads(vec![1.0; 4]);
-        handlers.expect_big_pstate(1);
-        handlers.expect_little_pstate(2);
+        handlers.expect_big_opp(1);
+        handlers.expect_little_opp(2);
         let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(84))).await;
         assert_matches!(result, Ok(_));
 
@@ -1651,14 +1651,14 @@ mod tests {
                     },
                     "thermal_states": {
                         "thermal_state_00": {
-                            "cluster_pstates": vec![0u64, 0],
+                            "cluster_opps": vec![0u64, 0],
                             "min_performance (NormPerfs)": 0.0,
                             "static_power (W)": 2.0,
                             "dynamic_power_per_normperf (W)": 1.0,
                             "performance_capacity (NormPerfs)": 5.0,
                         },
                         "thermal_state_01": {
-                            "cluster_pstates": vec![1u64, 2],
+                            "cluster_opps": vec![1u64, 2],
                             "min_performance (NormPerfs)": 0.2,
                             "static_power (W)": 1.5,
                             "dynamic_power_per_normperf (W)": 0.8,

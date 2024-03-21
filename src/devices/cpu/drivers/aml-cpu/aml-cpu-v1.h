@@ -41,16 +41,19 @@ class AmlCpuV1 : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CT
   }
 
   // Fidl server interface implementation.
-  void GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
-                               GetPerformanceStateInfoCompleter::Sync& completer) override {
-    aml_cpu_.GetPerformanceStateInfo(request, completer);
+  void GetOperatingPointInfo(GetOperatingPointInfoRequestView request,
+                             GetOperatingPointInfoCompleter::Sync& completer) override {
+    aml_cpu_.GetOperatingPointInfo(request, completer);
   }
-  void SetPerformanceState(SetPerformanceStateRequestView request,
-                           SetPerformanceStateCompleter::Sync& completer) override {
-    aml_cpu_.SetPerformanceState(request, completer);
+  void SetCurrentOperatingPoint(SetCurrentOperatingPointRequestView request,
+                                SetCurrentOperatingPointCompleter::Sync& completer) override {
+    aml_cpu_.SetCurrentOperatingPoint(request, completer);
   }
-  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override {
-    aml_cpu_.GetCurrentPerformanceState(completer);
+  void GetCurrentOperatingPoint(GetCurrentOperatingPointCompleter::Sync& completer) override {
+    aml_cpu_.GetCurrentOperatingPoint(completer);
+  }
+  void GetOperatingPointCount(GetOperatingPointCountCompleter::Sync& completer) override {
+    aml_cpu_.GetOperatingPointCount(completer);
   }
   void GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) override {
     aml_cpu_.GetNumLogicalCores(completer);

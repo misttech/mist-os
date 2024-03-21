@@ -223,13 +223,13 @@ mod tests {
         let mock_node = mock_maker.make(
             "MockNode",
             vec![(
-                MessageMatcher::Eq(Message::GetPerformanceState),
-                Ok(MessageReturn::GetPerformanceState(3)),
+                MessageMatcher::Eq(Message::GetOperatingPoint),
+                Ok(MessageReturn::GetOperatingPoint(3)),
             )],
         );
 
-        match mock_node.handle_message(&Message::GetPerformanceState).await {
-            Ok(MessageReturn::GetPerformanceState(3)) => {}
+        match mock_node.handle_message(&Message::GetOperatingPoint).await {
+            Ok(MessageReturn::GetOperatingPoint(3)) => {}
             e => panic!("Unexpected return value: {:?}", e),
         }
     }
@@ -243,11 +243,11 @@ mod tests {
         let mock_node = mock_maker.make(
             "MockNode",
             vec![(
-                MessageMatcher::Eq(Message::SetPerformanceState(2)),
-                Ok(MessageReturn::SetPerformanceState),
+                MessageMatcher::Eq(Message::SetOperatingPoint(2)),
+                Ok(MessageReturn::SetOperatingPoint),
             )],
         );
-        let _ = mock_node.handle_message(&Message::SetPerformanceState(1)).await;
+        let _ = mock_node.handle_message(&Message::SetOperatingPoint(1)).await;
     }
 
     /// Tests that dropping a MockNode while it's still expecting to receive a Message results in a
@@ -277,8 +277,8 @@ mod tests {
     #[test]
     fn test_msg_matcher_macros() {
         // Test the `msg_eq` macro
-        match msg_eq!(SetPerformanceState(1)) {
-            MessageMatcher::Eq(Message::SetPerformanceState(1)) => {}
+        match msg_eq!(SetOperatingPoint(1)) {
+            MessageMatcher::Eq(Message::SetOperatingPoint(1)) => {}
             e => panic!("Unexpected value expanded from msg_eq!(): {:?}", e),
         }
     }
@@ -302,7 +302,7 @@ mod tests {
     async fn test_dummy_node() {
         let node = create_dummy_node();
         assert_matches!(
-            node.handle_message(&Message::SetPerformanceState(1)).await,
+            node.handle_message(&Message::SetOperatingPoint(1)).await,
             Err(CpuManagerError::Unsupported)
         )
     }

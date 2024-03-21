@@ -9,8 +9,6 @@
 
 #include <iostream>
 
-using cpuctrl::wire::kMaxDevicePerformanceStates;
-
 namespace {
 const std::string kDeviceSuffix = "device_protocol";
 }  // namespace
@@ -26,63 +24,80 @@ zx::result<CpuPerformanceDomain> CpuPerformanceDomain::CreateFromPath(const std:
   return zx::ok(CpuPerformanceDomain(std::move(cpu.value())));
 }
 
+std::pair<zx_status_t, uint32_t> CpuPerformanceDomain::GetOperatingPointCount() {
+  auto resp = cpu_client_->GetOperatingPointCount();
+  return std::make_pair(resp.status(), resp.status() == ZX_OK ? resp.value()->count : 0);
+}
+
 std::pair<zx_status_t, uint64_t> CpuPerformanceDomain::GetNumLogicalCores() {
   auto resp = cpu_client_->GetNumLogicalCores();
   return std::make_pair(resp.status(), resp.status() == ZX_OK ? resp.value().count : 0);
 }
 
-std::tuple<zx_status_t, uint64_t, cpuctrl::wire::CpuPerformanceStateInfo>
-CpuPerformanceDomain::GetCurrentPerformanceState() {
-  constexpr cpuctrl::wire::CpuPerformanceStateInfo kEmptyPstate = {
+std::tuple<zx_status_t, uint64_t, cpuctrl::wire::CpuOperatingPointInfo>
+CpuPerformanceDomain::GetCurrentOperatingPoint() {
+  constexpr cpuctrl::wire::CpuOperatingPointInfo kEmptyOpp = {
       .frequency_hz = cpuctrl::wire::kFrequencyUnknown,
       .voltage_uv = cpuctrl::wire::kVoltageUnknown,
   };
-  auto resp = cpu_client_->GetCurrentPerformanceState();
+  auto resp = cpu_client_->GetCurrentOperatingPoint();
 
   if (resp.status() != ZX_OK) {
-    return std::make_tuple(resp.status(), 0, kEmptyPstate);
+    return std::make_tuple(resp.status(), 0, kEmptyOpp);
   }
 
-  const auto& pstates = GetPerformanceStates();
+  const auto [status, opps] = GetOperatingPoints();
+  if (status != ZX_OK) {
+    return std::make_tuple(status, 0, kEmptyOpp);
+  }
 
-  uint64_t current_pstate = resp.value().out_state;
+  uint64_t current_opp = resp.value().out_opp;
 
-  cpuctrl::wire::CpuPerformanceStateInfo pstate_result = kEmptyPstate;
-  if (current_pstate >= pstates.size()) {
-    std::cerr << "No description for current pstate." << std::endl;
+  cpuctrl::wire::CpuOperatingPointInfo opp_result = kEmptyOpp;
+  if (current_opp >= opps.size()) {
+    std::cerr << "No description for current opp." << std::endl;
   } else {
-    pstate_result = pstates[current_pstate];
+    opp_result = opps[current_opp];
   }
 
-  return std::make_tuple(ZX_OK, current_pstate, pstate_result);
+  return std::make_tuple(ZX_OK, current_opp, opp_result);
 }
 
-const std::vector<cpuctrl::wire::CpuPerformanceStateInfo>&
-CpuPerformanceDomain::GetPerformanceStates() {
+std::tuple<zx_status_t, const std::vector<cpuctrl::wire::CpuOperatingPointInfo>&>
+CpuPerformanceDomain::GetOperatingPoints() {
   // If we've already fetched this in the past, there's no need to fetch again.
-  if (!cached_pstates_.empty()) {
-    return cached_pstates_;
+  if (!cached_opps_.empty()) {
+    return std::make_tuple(ZX_OK, std::ref(cached_opps_));
   }
 
-  for (uint32_t i = 0; i < kMaxDevicePerformanceStates; i++) {
-    auto resp = cpu_client_->GetPerformanceStateInfo(i);
+  auto opp_count_resp = cpu_client_->GetOperatingPointCount();
+  if (opp_count_resp.status() != ZX_OK) {
+    std::cerr << "GetOperatingPointCount failed with error: " << opp_count_resp.status()
+              << std::endl;
+    return std::make_tuple(opp_count_resp.status(), std::ref(cached_opps_));
+  }
+
+  if (opp_count_resp->is_error()) {
+    std::cerr << "GetOperatingPointCount failed with error: " << opp_count_resp->error_value()
+              << std::endl;
+    return std::make_tuple(opp_count_resp->error_value(), std::ref(cached_opps_));
+  }
+
+  for (uint32_t i = 0; i < opp_count_resp->value()->count; i++) {
+    auto resp = cpu_client_->GetOperatingPointInfo(i);
 
     if (resp.status() != ZX_OK || resp->is_error()) {
       continue;
     }
 
-    cached_pstates_.push_back(resp->value()->info);
+    cached_opps_.push_back(resp->value()->info);
   }
 
-  return cached_pstates_;
+  return std::make_tuple(ZX_OK, std::ref(cached_opps_));
 }
 
-zx_status_t CpuPerformanceDomain::SetPerformanceState(uint32_t new_performance_state) {
-  if (new_performance_state >= kMaxDevicePerformanceStates) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  auto result = cpu_client_->SetPerformanceState(new_performance_state);
+zx_status_t CpuPerformanceDomain::SetCurrentOperatingPoint(uint32_t new_opp) {
+  auto result = cpu_client_->SetCurrentOperatingPoint(new_opp);
 
   if (result.status() != ZX_OK) {
     return result.status();
@@ -92,7 +107,7 @@ zx_status_t CpuPerformanceDomain::SetPerformanceState(uint32_t new_performance_s
     return result->error_value();
   }
 
-  if (result->value()->out_state != new_performance_state) {
+  if (result->value()->out_opp != new_opp) {
     return ZX_ERR_INTERNAL;
   }
 
