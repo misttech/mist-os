@@ -135,7 +135,7 @@ test("logging_cpp_unittests") {
     deps += [
       "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
       "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
-      "//src/diagnostics/lib/cpp-log-tester:cpp_log_tester",
+      "//src/diagnostics/lib/cpp-log-tester:cpp-log-tester",
       "//src/lib/diagnostics/accessor2logger",
       "//src/lib/fsl",
       "//third_party/rapidjson",

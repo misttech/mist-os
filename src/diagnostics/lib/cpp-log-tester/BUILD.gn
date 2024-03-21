@@ -11,7 +11,7 @@ executable("cpp-log-tester-unittest") {
   testonly = true
   sources = [ "test.cc" ]
   deps = [
-    ":cpp_log_tester",
+    ":cpp-log-tester",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
@@ -20,7 +20,7 @@ executable("cpp-log-tester-unittest") {
   ]
 }
 
-source_set("cpp_log_tester") {
+source_set("cpp-log-tester") {
   sources = [
     "log_tester.cc",
     "log_tester.h",

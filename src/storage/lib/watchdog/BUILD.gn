@@ -19,7 +19,7 @@ test("watchdog_unittest") {
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
     "//sdk/lib/syslog/cpp",
     "//src/diagnostics/lib/cpp-log-decoder:lib",
-    "//src/diagnostics/lib/cpp-log-tester:cpp_log_tester",
+    "//src/diagnostics/lib/cpp-log-tester:cpp-log-tester",
     "//src/lib/diagnostics/accessor2logger",
     "//src/lib/fsl",
     "//src/lib/uuid",
