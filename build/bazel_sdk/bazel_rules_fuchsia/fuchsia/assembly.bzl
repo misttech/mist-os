@@ -59,6 +59,7 @@ load(
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product.bzl",
+    _PACKAGE_MODE = "PACKAGE_MODE",
     _fuchsia_product = "fuchsia_product",
     _fuchsia_product_assembly = "fuchsia_product_assembly",
 )
@@ -165,6 +166,7 @@ SLOT = _SLOT
 ARCH = _ARCH
 INPUT_DEVICE_TYPE = _INPUT_DEVICE_TYPE
 DELIVERY_BLOB_TYPE = _DELIVERY_BLOB_TYPE
+PACKAGE_MODE = _PACKAGE_MODE
 
 # Helper functions
 ota_realm = _ota_realm
