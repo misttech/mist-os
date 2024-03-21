@@ -1,0 +1,183 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+############# STEPS FOR ADDING LACEWING USER TEST TO INFRA - START #############
+# 1. Identify which all <PRODUCT>.<BOARD> you like to run this test on
+# 2. For each of the <PRODUCT>.<BOARD> there is a Test group and Package group
+#    defined below. Accordingly update each of <PRODUCT>.<BOARD> Infra Test and
+#    Package group where you like to run the test
+#    Note: Update the Package group only if your test depends on any packages
+############## STEPS FOR ADDING LACEWING SELF TEST TO INFRA - END ##############
+
+# Infra Test and Package groups:
+# For every <PRODUCT>.<BOARD> that we plans to run the tests on, below test
+# and package groups are created:
+#     Test groups
+#         <PRODUCT>.<BOARD>
+#             Stable (Tests that passed for at least 200+ consecutive runs)
+#                 Tests that require SL4F transport, if any
+#                 Tests that does not require SL4F transport
+#             Unstable (Tests that are yet to pass 200 consecutive runs)
+#                 Tests that require SL4F transport, if any
+#                 Tests that does not require SL4F transport
+#             Staging (Stable test group + Unstable test group)
+#                 Tests that require SL4F transport, if any
+#                 Tests that does not require SL4F transport
+#     Package groups
+#         <PRODUCT>.<BOARD>
+#             Stable (Packages needed for Stable test groups)
+#                 Packages needed for SL4F test groups, if any
+#                 Packages needed for non-SL4F test groups
+#             Unstable (Packages needed for Stable test groups)
+#                 Packages needed for SL4F test groups, if any
+#                 Packages needed for non-SL4F test groups
+# Exception: Instead of `x64` board, we will use `nuc` and `emulator`.
+
+template("group_with_no_dir_target_deps") {
+  group(target_name) {
+    forward_variables_from(invoker, "*")
+    assert_no_deps = [ ":*" ]
+    if (defined(invoker.assert_no_deps)) {
+      assert_no_deps += invoker.assert_no_deps
+    }
+  }
+}
+
+############################# Test groups - Start ##############################
+
+if (is_host) {
+  # workbench.emulator
+  # Note - workbench does not support SL4F
+  group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
+    testonly = true
+    public_deps = [
+      "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests",
+      "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
+    ]
+  }
+
+  group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group("workbench_emulator_staging_tests") {
+    testonly = true
+    public_deps = [
+      ":workbench_emulator_stable_tests",
+      ":workbench_emulator_unstable_tests",
+    ]
+  }
+
+  # workbench.vim3
+  # Note - workbench does not support SL4F
+  group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
+    testonly = true
+    public_deps = [
+      "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests",
+      "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
+      "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
+    ]
+  }
+
+  group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
+    testonly = true
+    public_deps = [ "//src/firmware/tests/lacewing:lacewing($host_toolchain)" ]
+  }
+
+  group("workbench_vim3_staging_tests") {
+    testonly = true
+    public_deps = [
+      ":workbench_vim3_stable_tests",
+      ":workbench_vim3_unstable_tests",
+    ]
+  }
+
+  # workbench.nuc
+  # Note - workbench does not support SL4F
+  group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
+    testonly = true
+    public_deps = [
+      "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests",
+      "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
+    ]
+  }
+
+  group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group("workbench_nuc_staging_tests") {
+    testonly = true
+    public_deps = [
+      ":workbench_nuc_stable_tests",
+      ":workbench_nuc_unstable_tests",
+    ]
+  }
+}
+
+############################## Test groups - End ###############################
+
+############################ Package groups - Start ############################
+# workbench.emulator
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_emulator_stable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group_with_no_dir_target_deps("workbench_emulator_unstable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group("workbench_emulator_staging_packages") {
+  testonly = true
+  public_deps = [
+    ":workbench_emulator_stable_packages",
+    ":workbench_emulator_unstable_packages",
+  ]
+}
+
+# workbench.vim3
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_vim3_stable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group_with_no_dir_target_deps("workbench_vim3_unstable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group("workbench_vim3_staging_packages") {
+  testonly = true
+  public_deps = [
+    ":workbench_vim3_stable_packages",
+    ":workbench_vim3_unstable_packages",
+  ]
+}
+
+# workbench.nuc
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_nuc_stable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group_with_no_dir_target_deps("workbench_nuc_unstable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group("workbench_nuc_staging_packages") {
+  testonly = true
+  public_deps = [
+    ":workbench_nuc_stable_packages",
+    ":workbench_nuc_unstable_packages",
+  ]
+}
+############################ Package groups - End ##############################
