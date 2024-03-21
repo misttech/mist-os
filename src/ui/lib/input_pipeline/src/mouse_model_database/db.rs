@@ -14,7 +14,6 @@ use {
 /// database to understand how far the mouse moved.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct MouseModel {
-    #[allow(dead_code)]
     pub(crate) identifier: &'static str,
     pub(crate) vendor_id: &'static str,
     pub(crate) product_id: &'static str,

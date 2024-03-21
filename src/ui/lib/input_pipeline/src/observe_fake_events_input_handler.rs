@@ -14,7 +14,7 @@ pub struct ObserveFakeEventsInputHandler {
     event_sender: RefCell<Sender<input_device::InputEvent>>,
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 impl ObserveFakeEventsInputHandler {
     pub fn new(event_sender: Sender<input_device::InputEvent>) -> Rc<Self> {
         Rc::new(ObserveFakeEventsInputHandler { event_sender: RefCell::new(event_sender) })

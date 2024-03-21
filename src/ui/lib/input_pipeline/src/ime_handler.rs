@@ -101,7 +101,6 @@ impl UnhandledInputHandler for ImeHandler {
     }
 }
 
-#[allow(dead_code)]
 impl ImeHandler {
     /// Creates a new [`ImeHandler`] by connecting out to the key event injector.
     pub async fn new(

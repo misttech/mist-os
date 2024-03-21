@@ -54,14 +54,6 @@ const OPTION_MOUSE_CPI: &'static str = r#""Mouse CPI""#;
 
 pub(crate) type NomSpan<'a> = LocatedSpan<&'a str>;
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/330168226)
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Span<'a> {
-    pub offset: usize,
-    pub line: u32,
-    pub fragment: &'a str,
-}
-
 #[derive(Debug, Error, Clone, PartialEq)]
 pub(crate) enum XOrgConfParserError {
     NotEof,

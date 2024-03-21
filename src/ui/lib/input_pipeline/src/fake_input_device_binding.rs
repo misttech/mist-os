@@ -13,7 +13,7 @@ pub struct FakeInputDeviceBinding {
     event_sender: UnboundedSender<input_device::InputEvent>,
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 impl FakeInputDeviceBinding {
     pub fn new(input_event_sender: UnboundedSender<input_device::InputEvent>) -> Self {
         FakeInputDeviceBinding { event_sender: input_event_sender }
