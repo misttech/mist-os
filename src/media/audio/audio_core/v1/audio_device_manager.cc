@@ -372,6 +372,16 @@ void AudioDeviceManager::SetDeviceGain(uint64_t device_token,
   NotifyDeviceGainChanged(*dev);
 }
 
+void AudioDeviceManager::GetDefaultInputDevice(GetDefaultInputDeviceCallback callback) {
+  FX_LOGS(ERROR) << "AudioDeviceManager::GetDefaultInputDevice is not supported";
+  callback(default_input_token_);
+}
+
+void AudioDeviceManager::GetDefaultOutputDevice(GetDefaultOutputDeviceCallback callback) {
+  FX_LOGS(ERROR) << "AudioDeviceManager::GetDefaultOutputDevice is not supported";
+  callback(default_input_token_);
+}
+
 std::shared_ptr<AudioDevice> AudioDeviceManager::FindLastPlugged(AudioObject::Type type,
                                                                  bool allow_unplugged) {
   TRACE_DURATION("audio", "AudioDeviceManager::FindLastPlugged");

@@ -120,12 +120,12 @@ closed protocol AudioDeviceEnumerator {
     /// Fetch the device ID of the current default input or output device, or
     /// `ZX_KOID_INVALID` if no such device exists.
     @deprecated
-    @available(removed=15)
+    @available(removed=15, legacy=true)
     strict GetDefaultInputDevice() -> (struct {
         device_token uint64;
     });
     @deprecated
-    @available(removed=15)
+    @available(removed=15, legacy=true)
     strict GetDefaultOutputDevice() -> (struct {
         device_token uint64;
     });

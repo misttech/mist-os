@@ -24,15 +24,15 @@ closed protocol Audio {
         loopback bool;
     });
 
-    @available(removed=15)
+    @available(removed=15, legacy=true)
     strict SetSystemMute(struct {
         muted bool;
     });
-    @available(removed=15)
+    @available(removed=15, legacy=true)
     strict SetSystemGain(struct {
         gain_db float32;
     });
-    @available(removed=15)
+    @available(removed=15, legacy=true)
     strict -> SystemGainMuteChanged(struct {
         gain_db float32;
         muted bool;

@@ -30,6 +30,8 @@ class AudioImpl : public fuchsia::media::Audio {
       bool loopback) final {
     audio_core_.CreateAudioCapturer(loopback, std::move(audio_capturer_request));
   }
+  void SetSystemGain(float gain_db) final { ZX_PANIC("Not implemented"); }
+  void SetSystemMute(bool muted) final { ZX_PANIC("Not implemented"); }
 
  private:
   fidl::BindingSet<fuchsia::media::Audio> bindings_;

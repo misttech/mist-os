@@ -62,6 +62,16 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
     FX_NOTIMPLEMENTED();
   }
 
+  void SetSystemGain(SetSystemGainRequest& request,
+                     SetSystemGainCompleter::Sync& completer) override {
+    FX_NOTIMPLEMENTED();
+  }
+
+  void SetSystemMute(SetSystemMuteRequest& request,
+                     SetSystemMuteCompleter::Sync& completer) override {
+    FX_NOTIMPLEMENTED();
+  }
+
   void SetRenderUsageGain(SetRenderUsageGainRequest& request,
                           SetRenderUsageGainCompleter::Sync& completer) override {
     FX_NOTIMPLEMENTED();

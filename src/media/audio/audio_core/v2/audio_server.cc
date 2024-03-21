@@ -48,4 +48,16 @@ void AudioServer::CreateAudioCapturer(CreateAudioCapturerRequestView request,
                            /*format=*/std::nullopt, /*notify_clock=*/nullptr);
 }
 
+void AudioServer::SetSystemMute(SetSystemMuteRequestView request,
+                                SetSystemMuteCompleter::Sync& completer) {
+  FX_LOGS(WARNING) << "SetSystemMute: not supported";
+  Shutdown(ZX_ERR_NOT_SUPPORTED);
+}
+
+void AudioServer::SetSystemGain(SetSystemGainRequestView request,
+                                SetSystemGainCompleter::Sync& completer) {
+  FX_LOGS(WARNING) << "SetSystemGain: not supported";
+  Shutdown(ZX_ERR_NOT_SUPPORTED);
+}
+
 }  // namespace media_audio

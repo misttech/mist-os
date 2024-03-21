@@ -36,6 +36,12 @@ class AudioServer : public BaseFidlServer<AudioServer, fidl::WireServer, fuchsia
   void CreateAudioCapturer(CreateAudioCapturerRequestView request,
                            CreateAudioCapturerCompleter::Sync& completer) final;
 
+  void SetSystemMute(SetSystemMuteRequestView request,
+                     SetSystemMuteCompleter::Sync& completer) final;
+
+  void SetSystemGain(SetSystemGainRequestView request,
+                     SetSystemGainCompleter::Sync& completer) final;
+
  private:
   static inline constexpr std::string_view kClassName = "AudioServer";
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
