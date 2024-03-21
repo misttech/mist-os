@@ -130,10 +130,11 @@ pub(crate) enum DynamicNeighborUpdateSource {
     Confirmation(ConfirmationFlags),
 }
 
-#[derive(Debug, Derivative)]
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
 #[cfg_attr(test, derivative(Clone, PartialEq(bound = ""), Eq))]
-enum NeighborState<D: LinkDevice, I: Instant, N: LinkResolutionNotifier<D>> {
-    Dynamic(DynamicNeighborState<D, I, N>),
+enum NeighborState<D: LinkDevice, BT: NudBindingsTypes<D>> {
+    Dynamic(DynamicNeighborState<D, BT>),
     Static(D::Address),
 }
 
@@ -143,21 +144,22 @@ enum NeighborState<D: LinkDevice, I: Instant, N: LinkResolutionNotifier<D>> {
 ///
 /// [RFC 4861 section 7.3.2]: https://tools.ietf.org/html/rfc4861#section-7.3.2
 /// [RFC 7048 section 3]: https://tools.ietf.org/html/rfc7048#section-3
-#[derive(Debug, Derivative)]
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
 #[cfg_attr(test, derivative(Clone(bound = ""), PartialEq(bound = ""), Eq))]
-pub(crate) enum DynamicNeighborState<D: LinkDevice, I: Instant, N: LinkResolutionNotifier<D>> {
+pub(crate) enum DynamicNeighborState<D: LinkDevice, BT: NudBindingsTypes<D>> {
     /// Address resolution is being performed on the entry.
     ///
     /// Specifically, a probe has been sent to the solicited-node multicast
     /// address of the target, but the corresponding confirmation has not yet
     /// been received.
-    Incomplete(Incomplete<D, N>),
+    Incomplete(Incomplete<D, BT::Notifier>),
 
     /// Positive confirmation was received within the last ReachableTime
     /// milliseconds that the forward path to the neighbor was functioning
     /// properly. While `Reachable`, no special action takes place as packets
     /// are sent.
-    Reachable(Reachable<D, I>),
+    Reachable(Reachable<D, BT::Instant>),
 
     /// More than ReachableTime milliseconds have elapsed since the last
     /// positive confirmation was received that the forward path was functioning
@@ -838,7 +840,7 @@ impl<D: LinkDevice> Unreachable<D> {
     }
 }
 
-impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> NeighborState<D, Time, N> {
+impl<D: LinkDevice, BT: NudBindingsTypes<D>> NeighborState<D, BT> {
     fn to_event_state(&self) -> EventState<D::Address> {
         match self {
             NeighborState::Dynamic(dynamic_state) => {
@@ -849,7 +851,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> NeighborState<D
     }
 }
 
-impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighborState<D, Time, N> {
+impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
     fn cancel_timer<I, BC, DeviceId>(
         &mut self,
         bindings_ctx: &mut BC,
@@ -988,7 +990,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         link_address: D::Address,
     ) where
         I: Ip,
-        BC: NudBindingsContext<I, D, CC::DeviceId, Instant = Time>,
+        BC: NudBindingsContext<I, D, CC::DeviceId, Instant = BT::Instant>,
         CC: NudSenderContext<I, D, BC>,
     {
         // TODO(https://fxbug.dev/42075782): if the new state matches the current state,
@@ -1104,7 +1106,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     where
         I: Ip,
         DeviceId: StrongId,
-        BC: NudBindingsContext<I, D, DeviceId, Notifier = N>,
+        BC: NudBindingsContext<I, D, DeviceId, Notifier = BT::Notifier>,
         CC: NudConfigContext<I>,
     {
         match self {
@@ -1299,7 +1301,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         last_gc: &mut Option<BC::Instant>,
     ) where
         I: Ip,
-        BC: NudBindingsContext<I, D, CC::DeviceId, Instant = Time>,
+        BC: NudBindingsContext<I, D, CC::DeviceId, Instant = BT::Instant>,
         CC: NudSenderContext<I, D, BC>,
     {
         let ConfirmationFlags { solicited_flag, override_flag } = flags;
@@ -1434,7 +1436,7 @@ pub(crate) mod testutil {
         core_ctx: &mut CC,
         device_id: CC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
-        expected_state: DynamicNeighborState<D, BC::Instant, BC::Notifier>,
+        expected_state: DynamicNeighborState<D, BC>,
     ) where
         I: Ip,
         D: LinkDevice + PartialEq,
@@ -1500,10 +1502,10 @@ enum NudTimerInner<I: Ip, D: LinkDevice> {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-pub struct NudState<I: Ip, D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> {
+pub struct NudState<I: Ip, D: LinkDevice, BT: NudBindingsTypes<D>> {
     // TODO(https://fxbug.dev/42076887): Key neighbors by `UnicastAddr`.
-    neighbors: HashMap<SpecifiedAddr<I::Addr>, NeighborState<D, Time, N>>,
-    last_gc: Option<Time>,
+    neighbors: HashMap<SpecifiedAddr<I::Addr>, NeighborState<D, BT>>,
+    last_gc: Option<BT::Instant>,
 }
 /// The bindings context for NUD.
 pub trait NudBindingsContext<I: Ip, D: LinkDevice, DeviceId>:
@@ -1521,6 +1523,16 @@ impl<
             + LinkResolutionContext<D>
             + EventContext<Event<D::Address, DeviceId, I, <Self as InstantBindingsTypes>::Instant>>,
     > NudBindingsContext<I, D, DeviceId> for BC
+{
+}
+
+/// A marker trait for types provided by bindings to NUD.
+pub trait NudBindingsTypes<D: LinkDevice>: LinkResolutionContext<D> + InstantBindingsTypes {}
+
+impl<BT, D> NudBindingsTypes<D> for BT
+where
+    D: LinkDevice,
+    BT: LinkResolutionContext<D> + InstantBindingsTypes,
 {
 }
 
@@ -1558,7 +1570,7 @@ pub trait NudContext<I: Ip, D: LinkDevice, BC: NudBindingsContext<I, D, Self::De
     /// core sender context.
     fn with_nud_state_mut_and_sender_ctx<
         O,
-        F: FnOnce(&mut NudState<I, D, BC::Instant, BC::Notifier>, &mut Self::SenderCtx<'_>) -> O,
+        F: FnOnce(&mut NudState<I, D, BC>, &mut Self::SenderCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -1567,17 +1579,14 @@ pub trait NudContext<I: Ip, D: LinkDevice, BC: NudBindingsContext<I, D, Self::De
 
     /// Calls the function with a mutable reference to the NUD state and NUD
     /// configuration for the device.
-    fn with_nud_state_mut<
-        O,
-        F: FnOnce(&mut NudState<I, D, BC::Instant, BC::Notifier>, &mut Self::ConfigCtx<'_>) -> O,
-    >(
+    fn with_nud_state_mut<O, F: FnOnce(&mut NudState<I, D, BC>, &mut Self::ConfigCtx<'_>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
 
     /// Calls the function with an immutable reference to the NUD state.
-    fn with_nud_state<O, F: FnOnce(&NudState<I, D, BC::Instant, BC::Notifier>) -> O>(
+    fn with_nud_state<O, F: FnOnce(&NudState<I, D, BC>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
@@ -2400,8 +2409,8 @@ where
         // tracking when they were last updated, consider using this timestamp to break
         // ties between entries in the same state, so that we discard less recently
         // updated entries before more recently updated ones.
-        fn gc_priority<D: LinkDevice, I: Instant, N: LinkResolutionNotifier<D>>(
-            state: &DynamicNeighborState<D, I, N>,
+        fn gc_priority<D: LinkDevice, BT: NudBindingsTypes<D>>(
+            state: &DynamicNeighborState<D, BT>,
         ) -> usize {
             match state {
                 DynamicNeighborState::Incomplete(_)
@@ -2424,25 +2433,18 @@ where
             }
         }
 
-        struct SortEntry<'a, K: Eq, D: LinkDevice, I: Instant, N: LinkResolutionNotifier<D>> {
+        struct SortEntry<'a, K: Eq, D: LinkDevice, BT: NudBindingsTypes<D>> {
             key: K,
-            state: &'a mut DynamicNeighborState<D, I, N>,
+            state: &'a mut DynamicNeighborState<D, BT>,
         }
 
-        impl<K: Eq, D: LinkDevice, I: Instant, N: LinkResolutionNotifier<D>> PartialEq
-            for SortEntry<'_, K, D, I, N>
-        {
+        impl<K: Eq, D: LinkDevice, BT: NudBindingsTypes<D>> PartialEq for SortEntry<'_, K, D, BT> {
             fn eq(&self, other: &Self) -> bool {
                 self.key == other.key && gc_priority(self.state) == gc_priority(other.state)
             }
         }
-        impl<K: Eq, D: LinkDevice, I: Instant, N: LinkResolutionNotifier<D>> Eq
-            for SortEntry<'_, K, D, I, N>
-        {
-        }
-        impl<K: Eq, D: LinkDevice, I: Instant, N: LinkResolutionNotifier<D>> Ord
-            for SortEntry<'_, K, D, I, N>
-        {
+        impl<K: Eq, D: LinkDevice, BT: NudBindingsTypes<D>> Eq for SortEntry<'_, K, D, BT> {}
+        impl<K: Eq, D: LinkDevice, BT: NudBindingsTypes<D>> Ord for SortEntry<'_, K, D, BT> {
             fn cmp(&self, other: &Self) -> core::cmp::Ordering {
                 // Sort in reverse order so `BinaryHeap` will function as a min-heap rather than
                 // a max-heap. This means it will maintain the minimum (i.e. most useful) entry
@@ -2450,9 +2452,7 @@ where
                 gc_priority(self.state).cmp(&gc_priority(other.state)).reverse()
             }
         }
-        impl<K: Eq, D: LinkDevice, I: Instant, N: LinkResolutionNotifier<D>> PartialOrd
-            for SortEntry<'_, K, D, I, N>
-        {
+        impl<K: Eq, D: LinkDevice, BT: NudBindingsTypes<D>> PartialOrd for SortEntry<'_, K, D, BT> {
             fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
                 Some(self.cmp(&other))
             }
@@ -2488,7 +2488,7 @@ where
                                 .expect("heap should have at least 1 entry");
                             let candidate = SortEntry { key: ip, state };
                             if &candidate > minimum {
-                                let _: SortEntry<'_, _, _, _, _> = entries_to_remove.pop().unwrap();
+                                let _: SortEntry<'_, _, _, _> = entries_to_remove.pop().unwrap();
                                 entries_to_remove.push(candidate);
                             }
                         }
@@ -2545,9 +2545,9 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant,
-                FakeLinkResolutionNotifier, FakeNetwork, FakeNetworkContext as _, FakeNetworkLinks,
-                FakeTimerCtxExt as _, WrappedFakeCoreCtx,
+                FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant, FakeNetwork,
+                FakeNetworkContext as _, FakeNetworkLinks, FakeTimerCtxExt as _,
+                WrappedFakeCoreCtx,
             },
             CtxPair, InstantContext, SendFrameContext as _,
         },
@@ -2576,7 +2576,7 @@ mod tests {
     };
 
     struct FakeNudContext<I: Ip, D: LinkDevice> {
-        nud: NudState<I, D, FakeInstant, FakeLinkResolutionNotifier<D>>,
+        nud: NudState<I, D, FakeBindingsCtxImpl<I>>,
         counters: NudCounters<I>,
     }
 
@@ -2657,12 +2657,7 @@ mod tests {
         fn with_nud_state_mut_and_sender_ctx<
             O,
             F: FnOnce(
-                &mut NudState<
-                    I,
-                    FakeLinkDevice,
-                    FakeInstant,
-                    FakeLinkResolutionNotifier<FakeLinkDevice>,
-                >,
+                &mut NudState<I, FakeLinkDevice, FakeBindingsCtxImpl<I>>,
                 &mut Self::SenderCtx<'_>,
             ) -> O,
         >(
@@ -2677,12 +2672,7 @@ mod tests {
         fn with_nud_state_mut<
             O,
             F: FnOnce(
-                &mut NudState<
-                    I,
-                    FakeLinkDevice,
-                    FakeInstant,
-                    FakeLinkResolutionNotifier<FakeLinkDevice>,
-                >,
+                &mut NudState<I, FakeLinkDevice, FakeBindingsCtxImpl<I>>,
                 &mut Self::ConfigCtx<'_>,
             ) -> O,
         >(
@@ -2695,14 +2685,7 @@ mod tests {
 
         fn with_nud_state<
             O,
-            F: FnOnce(
-                &NudState<
-                    I,
-                    FakeLinkDevice,
-                    FakeInstant,
-                    FakeLinkResolutionNotifier<FakeLinkDevice>,
-                >,
-            ) -> O,
+            F: FnOnce(&NudState<I, FakeLinkDevice, FakeBindingsCtxImpl<I>>) -> O,
         >(
             &mut self,
             &FakeLinkDeviceId: &FakeLinkDeviceId,
@@ -3174,8 +3157,7 @@ mod tests {
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         state: InitialState,
-    ) -> DynamicNeighborState<FakeLinkDevice, FakeInstant, FakeLinkResolutionNotifier<FakeLinkDevice>>
-    {
+    ) -> DynamicNeighborState<FakeLinkDevice, FakeBindingsCtxImpl<I>> {
         match state {
             InitialState::Incomplete => {
                 let _: VecDeque<Buf<Vec<u8>>> =
@@ -3263,11 +3245,7 @@ mod tests {
     fn assert_neighbor_state<I: Ip + TestIpExt>(
         core_ctx: &FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
-        state: DynamicNeighborState<
-            FakeLinkDevice,
-            FakeInstant,
-            FakeLinkResolutionNotifier<FakeLinkDevice>,
-        >,
+        state: DynamicNeighborState<FakeLinkDevice, FakeBindingsCtxImpl<I>>,
         event_kind: Option<ExpectedEvent>,
     ) {
         assert_neighbor_state_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, state, event_kind);
@@ -3284,11 +3262,7 @@ mod tests {
         core_ctx: &FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         neighbor: SpecifiedAddr<I::Addr>,
-        state: DynamicNeighborState<
-            FakeLinkDevice,
-            FakeInstant,
-            FakeLinkResolutionNotifier<FakeLinkDevice>,
-        >,
+        state: DynamicNeighborState<FakeLinkDevice, FakeBindingsCtxImpl<I>>,
         expected_event: Option<ExpectedEvent>,
     ) {
         if let Some(expected_event) = expected_event {
@@ -4460,10 +4434,7 @@ mod tests {
     >(
         core_ctx: &mut CC,
         device_id: &CC::DeviceId,
-        expected: HashMap<
-            SpecifiedAddr<I::Addr>,
-            NeighborState<EthernetLinkDevice, BC::Instant, BC::Notifier>,
-        >,
+        expected: HashMap<SpecifiedAddr<I::Addr>, NeighborState<EthernetLinkDevice, BC>>,
     ) {
         NudContext::<I, EthernetLinkDevice, _>::with_nud_state_mut(
             core_ctx,
