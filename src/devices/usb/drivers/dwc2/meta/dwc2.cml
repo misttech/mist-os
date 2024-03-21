@@ -21,10 +21,7 @@
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.scheduler.ProfileProvider",
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.usb.phy.Service" },

@@ -37,7 +37,6 @@
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.index.DevelopmentManager",
                 "fuchsia.driver.index.DriverIndex",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "power-manager-outlives-driver-manager",
             ],

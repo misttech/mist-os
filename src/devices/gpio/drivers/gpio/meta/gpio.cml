@@ -20,10 +20,7 @@
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.scheduler.ProfileProvider",
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
         { service: 'fuchsia.hardware.gpioimpl.Service' },
     ],

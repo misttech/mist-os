@@ -22,7 +22,6 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.kernel.MexecResource",
                 "fuchsia.kernel.PowerResource",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
             ],
         },
