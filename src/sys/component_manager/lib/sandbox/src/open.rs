@@ -54,7 +54,7 @@ impl Sendable for Open {
     fn send(&self, message: crate::Message) -> Result<(), ()> {
         self.open(
             ExecutionScope::new(),
-            message.payload.flags,
+            fio::OpenFlags::empty(),
             vfs::path::Path::dot(),
             message.payload.channel,
         );

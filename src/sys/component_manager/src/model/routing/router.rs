@@ -510,9 +510,7 @@ mod tests {
         drop(receiver);
         let (ch1, _ch2) = zx::Channel::create();
         assert!(sender
-            .send(Message {
-                payload: fsandbox::ProtocolPayload { channel: ch1, flags: fio::OpenFlags::empty() },
-            })
+            .send(Message { payload: fsandbox::ProtocolPayload { channel: ch1 } })
             .is_err());
     }
 

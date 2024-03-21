@@ -415,7 +415,7 @@ mod tests {
         },
         assert_matches::assert_matches,
         cm_rust::{Availability, UseSource},
-        fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+        fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon as zx,
         futures::StreamExt,
         sandbox::Message,
         std::str::FromStr,
@@ -434,12 +434,7 @@ mod tests {
             },
         );
         sender
-            .send(Message {
-                payload: fsandbox::ProtocolPayload {
-                    channel: capability_server_end,
-                    flags: fio::OpenFlags::empty(),
-                },
-            })
+            .send(Message { payload: fsandbox::ProtocolPayload { channel: capability_server_end } })
             .unwrap();
         registry.dispatch(&event).await;
     }

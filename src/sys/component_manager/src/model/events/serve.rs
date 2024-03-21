@@ -7,7 +7,6 @@ use {
         events::{event::Event, registry::ComponentEventRoute, stream::EventStream},
         hooks::{CapabilityReceiver, EventPayload, EventType, HasEventType},
     },
-    crate::sandbox_util::ProtocolPayloadExt,
     async_utils::stream::FlattenUnorderedExt,
     cm_rust::{ChildRef, EventScope},
     cm_types::Name,
@@ -435,12 +434,9 @@ fn create_capability_requested_payload(
                 let Some(message) = receiver.receive().await else {
                     return None;
                 };
-                let Some(channel) = message.payload.unwrap_server_end_or_serve_node() else {
-                    return None;
-                };
                 let payload = fcomponent::CapabilityRequestedPayload {
                     name: Some(name),
-                    capability: Some(channel),
+                    capability: Some(message.payload.channel),
                     ..Default::default()
                 };
                 Some((Ok(fcomponent::EventPayload::CapabilityRequested(payload)), receiver))

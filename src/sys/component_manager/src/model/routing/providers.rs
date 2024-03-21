@@ -17,8 +17,8 @@ use {
     cm_types::{Name, Path},
     cm_util::{channel, TaskGroup},
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    sandbox::Message,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    sandbox::Open,
     std::{path::PathBuf, sync::Arc},
     vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope},
 };
@@ -78,12 +78,13 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         // If a component intercepts the capability request through hooks, then
         // send them the channel.
         if receiver.is_taken() {
-            let _ = sender.send(Message {
-                payload: fsandbox::ProtocolPayload {
-                    channel: channel::take_channel(server_end),
-                    flags,
-                },
-            });
+            let open: Open = sender.into();
+            open.open(
+                ExecutionScope::new(),
+                flags,
+                vfs::path::Path::dot(),
+                channel::take_channel(server_end),
+            );
             return Ok(());
         }
 

@@ -157,8 +157,6 @@ open protocol Receiver {
 /// Contains a protocol open request.
 type ProtocolPayload = resource struct {
     channel zx.Handle:CHANNEL;
-    // TODO(https://fxbug.dev/313998675): Decide whether to replace this with a more specific type
-    flags fuchsia.io.OpenFlags;
 };
 
 /// Entrypoint for instantiation of sandbox types.

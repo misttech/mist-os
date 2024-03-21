@@ -53,7 +53,7 @@ impl Receiver {
                         return;
                     };
                     let p = msg.payload;
-                    if let Err(_) = receiver_proxy.receive(p.channel, p.flags) {
+                    if let Err(_) = receiver_proxy.receive(p.channel) {
                         return;
                     }
                 }
@@ -68,7 +68,6 @@ impl Receiver {
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use fidl_fuchsia_io as fio;
     use fuchsia_async as fasync;
     use fuchsia_zircon::{self as zx, AsHandleRef};
     use zx::Peered;
@@ -80,7 +79,7 @@ mod tests {
         let (receiver, sender) = Receiver::new();
 
         let (ch1, ch2) = zx::Channel::create();
-        sender.send_channel(ch1, fio::OpenFlags::empty()).unwrap();
+        sender.send_channel(ch1).unwrap();
 
         let message = receiver.receive().await.unwrap();
 
@@ -96,7 +95,7 @@ mod tests {
         drop(receiver);
 
         let (ch1, _ch2) = zx::Channel::create();
-        sender.send_channel(ch1, fio::OpenFlags::empty()).unwrap_err();
+        sender.send_channel(ch1).unwrap_err();
     }
 
     #[test]
@@ -122,7 +121,7 @@ mod tests {
         let (receiver, sender) = Receiver::new();
 
         let (ch1, _ch2) = zx::Channel::create();
-        sender.send_channel(ch1, fio::OpenFlags::empty()).unwrap();
+        sender.send_channel(ch1).unwrap();
 
         // Even if all the senders are closed after sending a message, it should still be
         // possible to receive that message.
@@ -140,7 +139,7 @@ mod tests {
         let (receiver, sender) = Receiver::new();
 
         let (ch1, ch2) = zx::Channel::create();
-        sender.send_channel(ch1, fio::OpenFlags::empty()).unwrap();
+        sender.send_channel(ch1).unwrap();
 
         let (receiver_proxy, mut receiver_stream) =
             fidl::endpoints::create_proxy_and_stream::<fsandbox::ReceiverMarker>().unwrap();

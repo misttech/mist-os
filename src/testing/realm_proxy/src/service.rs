@@ -11,9 +11,7 @@ use {
     fuchsia_component_test::RealmInstance,
     fuchsia_zircon::{self as zx},
     futures::{Future, StreamExt, TryStreamExt},
-    std::sync::Mutex,
     tracing::{error, info, warn},
-    vfs::{execution_scope::ExecutionScope, ToObjectRequest},
 };
 
 // RealmProxy mediates a test suite's access to the services in a test realm.
@@ -231,30 +229,16 @@ where
     Fut: Future<Output = ()> + Send,
     F: Fn(T::RequestStream) -> Fut + Send + Sync + Copy + 'static,
 {
-    let task_group = Mutex::new(fasync::TaskGroup::new());
-    // Alternatively, we could handle the flags directly. That would avoid linking
-    // in vfs
-    let service =
-        vfs::service::endpoint(move |_scope: ExecutionScope, channel: fuchsia_async::Channel| {
-            let mut task_group = task_group.lock().unwrap();
-            task_group.spawn(async move {
-                let server_end = endpoints::ServerEnd::<T>::new(channel.into());
-                let stream: T::RequestStream = server_end.into_stream().unwrap();
-                request_stream_handler(stream).await;
-            });
-        });
+    let mut task_group = fasync::TaskGroup::new();
     while let Some(request) =
         receiver_stream.try_next().await.context("failed to read request from stream")?
     {
         match request {
-            fsandbox::ReceiverRequest::Receive { channel, flags, control_handle: _ } => {
-                flags.to_object_request(channel).handle(|object_request| {
-                    vfs::service::serve(
-                        service.clone(),
-                        ExecutionScope::new(),
-                        &flags,
-                        object_request,
-                    )
+            fsandbox::ReceiverRequest::Receive { channel, control_handle: _ } => {
+                task_group.spawn(async move {
+                    let server_end = endpoints::ServerEnd::<T>::new(channel.into());
+                    let stream: T::RequestStream = server_end.into_stream().unwrap();
+                    request_stream_handler(stream).await;
                 });
             }
             fsandbox::ReceiverRequest::_UnknownMethod { .. } => {

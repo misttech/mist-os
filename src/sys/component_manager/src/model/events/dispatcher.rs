@@ -161,8 +161,8 @@ impl EventDispatcherScope {
 mod tests {
     use {
         super::*, crate::model::hooks::CapabilityReceiver, assert_matches::assert_matches,
-        fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-        futures::StreamExt, moniker::Moniker, sandbox::Message, std::sync::Arc,
+        fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon as zx, futures::StreamExt,
+        moniker::Moniker, sandbox::Message, std::sync::Arc,
     };
 
     struct EventDispatcherFactory {
@@ -206,12 +206,7 @@ mod tests {
             },
         );
         sender
-            .send(Message {
-                payload: fsandbox::ProtocolPayload {
-                    channel: capability_server_end,
-                    flags: fio::OpenFlags::empty(),
-                },
-            })
+            .send(Message { payload: fsandbox::ProtocolPayload { channel: capability_server_end } })
             .unwrap();
         dispatcher.dispatch(&event).await
     }

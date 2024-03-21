@@ -4,7 +4,6 @@
 use crate::{registry, CapabilityTrait, ConversionError, Open};
 use fidl::endpoints::{create_request_stream, ClientEnd, ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{channel::mpsc, TryStreamExt};
 use std::fmt::Debug;
@@ -55,12 +54,8 @@ impl Sender {
         Self { inner: std::sync::Arc::new(sender), client_end: None }
     }
 
-    pub(crate) fn send_channel(
-        &self,
-        channel: zx::Channel,
-        flags: fio::OpenFlags,
-    ) -> Result<(), ()> {
-        let msg = Message { payload: fsandbox::ProtocolPayload { channel, flags } };
+    pub(crate) fn send_channel(&self, channel: zx::Channel) -> Result<(), ()> {
+        let msg = Message { payload: fsandbox::ProtocolPayload { channel } };
         self.send(msg)
     }
 
@@ -71,8 +66,8 @@ impl Sender {
     async fn serve_sender(self, mut stream: fsandbox::SenderRequestStream) {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                fsandbox::SenderRequest::Send_ { channel, flags, control_handle: _ } => {
-                    if let Err(_err) = self.send_channel(channel, flags) {
+                fsandbox::SenderRequest::Send_ { channel, control_handle: _ } => {
+                    if let Err(_err) = self.send_channel(channel) {
                         stream.control_handle().shutdown_with_epitaph(zx::Status::PEER_CLOSED);
                         return;
                     }
@@ -112,8 +107,7 @@ impl Sender {
 impl From<Sender> for Open {
     fn from(sender: Sender) -> Self {
         Self::new(endpoint(move |_scope, server_end| {
-            let _ =
-                sender.send_channel(server_end.into_zx_channel().into(), fio::OpenFlags::empty());
+            let _ = sender.send_channel(server_end.into_zx_channel().into());
         }))
     }
 }
@@ -146,8 +140,12 @@ impl From<Sender> for fsandbox::Capability {
 mod tests {
     use super::*;
     use crate::Receiver;
+    use assert_matches::assert_matches;
     use fidl::endpoints::create_endpoints;
+    use fidl_fuchsia_io as fio;
     use fidl_fuchsia_unknown as funknown;
+    use futures::StreamExt;
+    use vfs::execution_scope::ExecutionScope;
 
     // NOTE: sending-and-receiving tests are written in `receiver.rs`.
 
@@ -159,7 +157,7 @@ mod tests {
 
         // Send a channel through the Sender.
         let (ch1, _ch2) = zx::Channel::create();
-        sender.send_channel(ch1, fio::OpenFlags::empty()).unwrap();
+        sender.send_channel(ch1).unwrap();
 
         // Convert the Sender to a FIDL proxy.
         let client_end: ClientEnd<fsandbox::SenderMarker> = sender.into();
@@ -174,11 +172,85 @@ mod tests {
 
         // Send a channel through the cloned Sender.
         let (ch1, _ch2) = zx::Channel::create();
-        clone_proxy.send_(ch1, fio::OpenFlags::empty()).unwrap();
+        clone_proxy.send_(ch1).unwrap();
 
         // The Receiver should receive two channels, one from each sender.
         for _ in 0..2 {
             let _ch = receiver.receive().await.unwrap();
         }
+    }
+
+    #[fuchsia::test]
+    async fn unwrap_server_end_or_serve_node_node_reference_and_describe() {
+        let receiver = {
+            let (receiver, sender) = Receiver::new();
+            let open: Open = sender.into();
+            let (client_end, server_end) = zx::Channel::create();
+            let scope = ExecutionScope::new();
+            open.open(
+                scope,
+                fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE,
+                ".",
+                server_end,
+            );
+
+            // The NODE_REFERENCE connection should be terminated on the sender side.
+            let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
+            let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+            let result = node.take_event_stream().next().await.unwrap();
+            assert_matches!(
+                result,
+                Ok(fio::NodeEvent::OnOpen_ { s, info })
+                    if s == zx::Status::OK.into_raw()
+                    && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
+            );
+
+            receiver
+        };
+
+        // After closing the sender, the receiver should be done.
+        assert_matches!(receiver.receive().await, None);
+    }
+
+    #[fuchsia::test]
+    async fn unwrap_server_end_or_serve_node_describe() {
+        let (receiver, sender) = Receiver::new();
+        let open: Open = sender.into();
+
+        let (client_end, server_end) = zx::Channel::create();
+        // The VFS should send the DESCRIBE event, then hand us the channel.
+        open.open(ExecutionScope::new(), fio::OpenFlags::DESCRIBE, ".", server_end);
+
+        // Check we got the channel.
+        assert_matches!(receiver.receive().await, Some(_));
+
+        // Check the client got describe.
+        let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
+        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+        let result = node.take_event_stream().next().await.unwrap();
+        assert_matches!(
+            result,
+            Ok(fio::NodeEvent::OnOpen_ { s, info })
+            if s == zx::Status::OK.into_raw()
+            && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
+        );
+    }
+
+    #[fuchsia::test]
+    async fn unwrap_server_end_or_serve_node_empty() {
+        let (receiver, sender) = Receiver::new();
+        let open: Open = sender.into();
+
+        let (client_end, server_end) = zx::Channel::create();
+        // The VFS should not send any event, but directly hand us the channel.
+        open.open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
+
+        // Check that we got the channel.
+        assert_matches!(receiver.receive().await, Some(_));
+
+        // Check that there's no event.
+        let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
+        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+        assert_matches!(node.take_event_stream().next().await, None);
     }
 }

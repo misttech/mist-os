@@ -10,7 +10,6 @@ use async_trait::async_trait;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_inspect::InspectSinkMarker;
-use fidl_fuchsia_io as fio;
 use fuchsia_async::TaskGroup;
 use fuchsia_inspect::Inspector;
 use futures::lock::Mutex;
@@ -65,10 +64,7 @@ impl EventSynthesisProvider for InspectSinkProvider {
 
             let (receiver, sender) = CapabilityReceiver::new();
             let _ = sender.send(Message {
-                payload: fsandbox::ProtocolPayload {
-                    channel: server.into_channel(),
-                    flags: fio::OpenFlags::empty(),
-                },
+                payload: fsandbox::ProtocolPayload { channel: server.into_channel() },
             });
             vec![Event::new_builtin(EventPayload::CapabilityRequested {
                 source_moniker,

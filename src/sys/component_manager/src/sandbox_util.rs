@@ -22,62 +22,20 @@ use {
         epitaph::ChannelEpitaphExt,
         AsyncChannel,
     },
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx},
     futures::future::BoxFuture,
     futures::FutureExt,
     sandbox::{Capability, Dict, Open},
     std::iter,
-    std::sync::{self, Arc},
+    std::sync::Arc,
     tracing::warn,
-    vfs::{execution_scope::ExecutionScope, service::endpoint, ToObjectRequest},
+    vfs::{execution_scope::ExecutionScope, service::endpoint},
 };
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
     let channel = AsyncChannel::from_channel(channel);
     P::RequestStream::from_channel(channel)
-}
-
-/// If the protocol connection request requires serving the `fuchsia.io/Node`
-/// protocol, serve that internally and return `None`. Otherwise, handle the
-/// connection flags such as `DESCRIBE` and return the server endpoint such
-/// that a custom FIDL protocol may be served on it.
-fn unwrap_server_end_or_serve_node(
-    channel: zx::Channel,
-    flags: fidl_fuchsia_io::OpenFlags,
-) -> Option<zx::Channel> {
-    let server_end_return = Arc::new(sync::Mutex::new(None));
-    let server_end_return_clone = server_end_return.clone();
-    let service = vfs::service::endpoint(
-        move |_scope: ExecutionScope, server_end: fuchsia_async::Channel| {
-            let mut server_end_return = server_end_return_clone.lock().unwrap();
-            *server_end_return = Some(server_end.into_zx_channel());
-        },
-    );
-    flags.to_object_request(channel).handle(|object_request| {
-        vfs::service::serve(service, ExecutionScope::new(), &flags, object_request)
-    });
-
-    let mut server_end_return = server_end_return.lock().unwrap();
-    if let Some(server_end) = server_end_return.take() {
-        Some(server_end)
-    } else {
-        None
-    }
-}
-
-pub trait ProtocolPayloadExt {
-    /// If the protocol connection request requires serving the `fuchsia.io/Node`
-    /// protocol, serve that internally and return `None`. Otherwise, handle the
-    /// connection flags such as `DESCRIBE` and return the server endpoint such
-    /// that a custom FIDL protocol may be served on it.
-    fn unwrap_server_end_or_serve_node(self) -> Option<zx::Channel>;
-}
-
-impl ProtocolPayloadExt for fsandbox::ProtocolPayload {
-    fn unwrap_server_end_or_serve_node(self) -> Option<zx::Channel> {
-        unwrap_server_end_or_serve_node(self.channel, self.flags)
-    }
 }
 
 // TODO: use the `Name` type in `Dict`, so that Dicts aren't holding duplicate strings.
@@ -368,81 +326,7 @@ pub mod tests {
     use assert_matches::assert_matches;
     use bedrock_error::DowncastErrorForTest;
     use cm_rust::Availability;
-    use fidl::endpoints::ClientEnd;
-    use futures::StreamExt;
     use sandbox::{Data, Receiver};
-
-    #[fuchsia::test]
-    async fn unwrap_server_end_or_serve_node_node_reference_and_describe() {
-        let receiver = {
-            let (receiver, sender) = Receiver::new();
-            let open: Open = sender.into();
-            let (client_end, server_end) = zx::Channel::create();
-            let scope = ExecutionScope::new();
-            open.open(
-                scope,
-                fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE,
-                ".",
-                server_end,
-            );
-
-            // The NODE_REFERENCE connection should be terminated on the sender side.
-            let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
-            let node: fio::NodeProxy = client_end.into_proxy().unwrap();
-            let result = node.take_event_stream().next().await.unwrap();
-            assert_matches!(
-                result,
-                Ok(fio::NodeEvent::OnOpen_ { s, info })
-                    if s == zx::Status::OK.into_raw()
-                    && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
-            );
-
-            receiver
-        };
-
-        // After closing the sender, the receiver should be done.
-        assert_matches!(receiver.receive().await, None);
-    }
-
-    #[fuchsia::test]
-    async fn unwrap_server_end_or_serve_node_describe() {
-        let (receiver, sender) = Receiver::new();
-        let open: Open = sender.into();
-        let (client_end, server_end) = zx::Channel::create();
-        let scope = ExecutionScope::new();
-        open.open(scope, fio::OpenFlags::DESCRIBE, ".", server_end);
-        let message = receiver.receive().await.unwrap();
-
-        // The VFS should send the DESCRIBE event, then hand us the channel.
-        assert_matches!(message.payload.unwrap_server_end_or_serve_node(), Some(_));
-
-        let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
-        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
-        let result = node.take_event_stream().next().await.unwrap();
-        assert_matches!(
-            result,
-            Ok(fio::NodeEvent::OnOpen_ { s, info })
-            if s == zx::Status::OK.into_raw()
-            && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
-        );
-    }
-
-    #[fuchsia::test]
-    async fn unwrap_server_end_or_serve_node_empty() {
-        let (receiver, sender) = Receiver::new();
-        let open: Open = sender.into();
-        let (client_end, server_end) = zx::Channel::create();
-        let scope = ExecutionScope::new();
-        open.open(scope, fio::OpenFlags::empty(), ".", server_end);
-        let message = receiver.receive().await.unwrap();
-
-        // The VFS should not send any event, but directly hand us the channel.
-        assert_matches!(message.payload.unwrap_server_end_or_serve_node(), Some(_));
-
-        let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
-        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
-        assert_matches!(node.take_event_stream().next().await, None);
-    }
 
     #[fuchsia::test]
     async fn get_capability() {

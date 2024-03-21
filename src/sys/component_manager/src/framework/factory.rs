@@ -220,7 +220,7 @@ mod tests {
 
         let (ch1, _ch2) = zx::Channel::create();
         let expected_koid = ch1.get_koid().unwrap();
-        sender_proxy.send_(ch1, fio::OpenFlags::empty()).unwrap();
+        sender_proxy.send_(ch1).unwrap();
 
         let request = receiver_stream.try_next().await.unwrap().unwrap();
         if let fsandbox::ReceiverRequest::Receive { channel, .. } = request {
