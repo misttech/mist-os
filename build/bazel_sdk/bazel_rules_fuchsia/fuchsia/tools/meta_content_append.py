@@ -115,6 +115,10 @@ def main():
                 else:
                     content_map[blob["path"]] = blob_source_path
 
+    # Remove ABI stamp file. It gets specified on the command line of `ffx
+    # package build`, and therefore can't appear in manifests.
+    del content_map["meta/fuchsia.abi/abi-revision"]
+
     write_file(args.manifest_path, content_map)
 
 

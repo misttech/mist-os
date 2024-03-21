@@ -545,6 +545,12 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
 
             The packages included in this list will be cracked open and all the
             components included will be include in the parent package.
+
+            This is a workaround for lack of support for subpackages in
+            driver_test_realm. Please don't use it without consulting with the
+            SDK Experiences team!
+
+            TODO(https://fxbug.dev/330189874): Remove this attribute.
             """,
             providers = [FuchsiaPackageInfo],
         ),
