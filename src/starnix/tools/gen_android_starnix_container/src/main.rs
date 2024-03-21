@@ -253,7 +253,7 @@ mod tests {
     fn fake_base(outdir: &Utf8Path) -> Utf8PathBuf {
         // Build a fake "base".
         let base_manifest_path = outdir.join("base_package_manifest.json");
-        let mut builder = PackageBuilder::new_without_abi_revision("test-base");
+        let mut builder = PackageBuilder::new_platform_internal_package("test-base");
         builder.add_contents_as_blob("data/test", "test-base-blob", &outdir).unwrap();
         builder.manifest_path(&base_manifest_path);
         let _ = builder.build(&outdir, outdir.join("base-meta.far")).unwrap();
@@ -268,7 +268,7 @@ mod tests {
 
         // Build a fake HAL.
         let hal_manifest_path = outdir.join("hal_package_manifest.json");
-        let mut builder = PackageBuilder::new_without_abi_revision("test-hal");
+        let mut builder = PackageBuilder::new_platform_internal_package("test-hal");
         builder.add_contents_as_blob("data/hal", "test-hal-blob", &outdir).unwrap();
         builder.manifest_path(&hal_manifest_path);
         let _ = builder.build(&outdir, outdir.join("hal-meta.far")).unwrap();
@@ -319,7 +319,7 @@ mod tests {
 
         // Build a fake HAL with an init.rc file.
         let hal_manifest_path = outdir.join("hal_package_manifest.json");
-        let mut builder = PackageBuilder::new_without_abi_revision("test-hal");
+        let mut builder = PackageBuilder::new_platform_internal_package("test-hal");
         builder.add_contents_as_blob("data/hal", "test-hal-blob", &outdir).unwrap();
         builder.add_contents_as_blob("system/init.rc", "service foo bar", &outdir).unwrap();
         builder
@@ -390,7 +390,7 @@ mod tests {
 
         // Build a fake HAL with an init.rc file.
         let hal_manifest_path = outdir.join("hal_package_manifest.json");
-        let mut builder = PackageBuilder::new_without_abi_revision("test-hal");
+        let mut builder = PackageBuilder::new_platform_internal_package("test-hal");
         builder.add_contents_as_blob("data/hal", "test-hal-blob", &outdir).unwrap();
         builder
             .add_contents_as_blob("system/manifest.xml", "<manifest></manifest>", &outdir)
