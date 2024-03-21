@@ -298,10 +298,6 @@ pub(crate) struct MldConfig {
     send_leave_anyway: bool,
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/330168037)
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub(crate) struct ImmediateIdleState;
-
 /// The default value for `unsolicited_report_interval` [RFC 2710 Section 7.10]
 ///
 /// [RFC 2710 Section 7.10]: https://tools.ietf.org/html/rfc2710#section-7.10

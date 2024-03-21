@@ -3053,7 +3053,6 @@ mod tests {
     use alloc::{vec, vec::Vec};
     use assert_matches::assert_matches;
     use core::{
-        fmt::Debug,
         ops::{Deref, DerefMut},
         time::Duration,
     };
@@ -3349,20 +3348,14 @@ mod tests {
     impl<I: socket::IpExt> IcmpEchoBindingsContext<I, FakeDeviceId> for FakeIcmpBindingsCtx<I> {
         fn receive_icmp_echo_reply<B: BufferMut>(
             &mut self,
-            conn: &IcmpSocketId<I, FakeWeakDeviceId<FakeDeviceId>, FakeIcmpBindingsCtx<I>>,
+            _conn: &IcmpSocketId<I, FakeWeakDeviceId<FakeDeviceId>, FakeIcmpBindingsCtx<I>>,
             _device_id: &FakeDeviceId,
-            src_ip: I::Addr,
-            dst_ip: I::Addr,
-            id: u16,
-            data: B,
+            _src_ip: I::Addr,
+            _dst_ip: I::Addr,
+            _id: u16,
+            _data: B,
         ) {
-            self.state_mut().receive_icmp_echo_reply.push(ReceiveIcmpEchoReply {
-                conn: conn.clone(),
-                src_ip,
-                dst_ip,
-                id,
-                data: data.as_ref().to_vec(),
-            });
+            unimplemented!()
         }
     }
 
@@ -4003,39 +3996,9 @@ mod tests {
     // `FakeCtx` to provide automatic implementations of a number of required
     // traits. The rest we implement manually.
 
-    // The arguments to `InnerIcmpContext::send_icmp_reply`.
-    #[allow(dead_code)] // TODO(https://fxbug.dev/330168037)
-    #[derive(Debug, PartialEq)]
-    struct SendIcmpReplyArgs<A: IpAddress> {
-        device: Option<FakeDeviceId>,
-        src_ip: SpecifiedAddr<A>,
-        dst_ip: SpecifiedAddr<A>,
-        body: Vec<u8>,
-    }
-
-    // The arguments to `InnerIcmpContext::send_icmp_error_message`.
-    #[allow(dead_code)] // TODO(https://fxbug.dev/330168037)
-    #[derive(Debug, PartialEq)]
-    struct SendIcmpErrorMessageArgs<I: IcmpIpExt> {
-        src_ip: SpecifiedAddr<I::Addr>,
-        dst_ip: SpecifiedAddr<I::Addr>,
-        body: Vec<u8>,
-        ip_mtu: Option<u32>,
-    }
-
-    // The arguments to `BufferIcmpContext::receive_icmp_echo_reply`.
-    #[allow(unused)] // TODO(joshlf): Remove once we access these fields.
-    struct ReceiveIcmpEchoReply<I: socket::IpExt> {
-        conn: IcmpSocketId<I, FakeWeakDeviceId<FakeDeviceId>, FakeIcmpBindingsCtx<I>>,
-        src_ip: I::Addr,
-        dst_ip: I::Addr,
-        id: u16,
-        data: Vec<u8>,
-    }
-
     #[derive(Default)]
     pub(super) struct FakeIcmpBindingsCtxState<I: socket::IpExt> {
-        receive_icmp_echo_reply: Vec<ReceiveIcmpEchoReply<I>>,
+        _marker: core::marker::PhantomData<I>,
     }
 
     impl InnerIcmpv4Context<FakeIcmpBindingsCtx<Ipv4>> for FakeIcmpInnerCoreCtx<Ipv4> {
