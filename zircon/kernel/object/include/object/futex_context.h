@@ -360,7 +360,7 @@ class FutexContext {
     // Sadly, there is no good way to express this using static annotations.
     uint32_t pending_operation_count_ = 0;
 
-    DECLARE_MUTEX(FutexState) lock_ TA_ACQ_BEFORE(thread_lock);
+    DECLARE_SPINLOCK(FutexState) lock_ TA_ACQ_BEFORE(thread_lock);
   };
 
   // Definition of two small callback hooks used with OwnedWaitQueue::Wake and

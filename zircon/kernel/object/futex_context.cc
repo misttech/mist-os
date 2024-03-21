@@ -316,6 +316,13 @@ class TA_SCOPED_CAP FutexContext::NullableDispatcherGuard {
     }
   }
 
+  void Release() TA_REL() {
+    if (t_ != nullptr) {
+      t_->get_lock()->lock().Release();
+      t_ = nullptr;
+    }
+  }
+
  private:
   ThreadDispatcher* t_;
 };
@@ -370,23 +377,45 @@ zx_status_t FutexContext::FutexWait(user_in_ptr<const zx_futex_t> value_ptr,
     // operating at the very end of our slice, it is best to disable preemption
     // until we manage to join the wait queue, or abort because of state
     // validation issues.
-    // TODO: Make this a IRQ-disable spin lock once there is a way to manage IRQ
-    // state between this and the thread_lock acquisition.
     while (1) {
-      AnnotatedAutoPreemptDisabler preempt_disabler;
-      Guard<Mutex> guard{&futex_ref->lock_};
+      // The lock ordering in this loop body is a bit subtle. Here are the locks we acquire in the
+      // order we acquire them, along with some rationale as to why they're acquired and released
+      // in that order:
+      //
+      // 1. We start by acquiring the futex_owner_thread's ThreadDispatcher lock, if the futex
+      //    owner is not nullptr. We need to hold this lock to verify that the thread has not died
+      //    during this Wait operation. It needs to be acquired before the FutexState's spinlock,
+      //    as acquiring a mutex while holding a spinlock is not allowed.
+      // 2. Then, we acuire the FutexState's spinlock. We need to hold this lock to verify that the
+      //    value of the futex hasn't changed during this Wait operation. Acquiring this spinlock
+      //    requires disabling interrupts. We do so explicitly with an `InterruptDisableGuard`
+      //    instead of using the `IrqSave` option in the `Guard` because we acquire the thread lock
+      //    later in this method, and we want IRQs to be disabled for this entire duration.
+      // 3. We then validate the futex's state and the futex owner's state.
+      // 4. Once validation is complete, we acquire the ThreadLock, which allows us to release both
+      //    the FutexState lock and the ThreadDispatcher lock.
+      // 4. We then block this thread and release the ThreadLock.
+      NullableDispatcherGuard futex_owner_guard(futex_owner_thread.get());
+      InterruptDisableGuard irqd;
+      Guard<SpinLock, NoIrqSave> futex_state_guard{&futex_ref->lock_};
 
       // Sanity check, bookkeeping should not indicate that we are blocked on
       // a futex at this point in time.
       DEBUG_ASSERT(current_thread->blocking_futex_id_ == FutexId::Null());
 
       int value;
-      UserCopyCaptureFaultsResult copy_result = value_ptr.copy_from_user_capture_faults(&value);
+      UserCopyCaptureFaultsResult copy_result = arch_copy_from_user_capture_faults(
+          &value, value_ptr.get(), sizeof(int), CopyContext::kBlockingNotAllowed);
       if (copy_result.status != ZX_OK) {
         // At this point we are committed to either returning from the function, or restarting the
-        // loop, so we can drop the lock and preempt disable that are local to this loop iteration.
-        guard.Release();
-        preempt_disabler.Enable();
+        // loop, so we:
+        // 1. Drop the futex state lock.
+        // 2. Re-enable interrupts.
+        // 3. Drop the futex owner lock.
+        // 4. Either return with an error or resolve the fault and continue the loop.
+        futex_state_guard.Release();
+        irqd.Reenable();
+        futex_owner_guard.Release();
         if (auto fault = copy_result.fault_info) {
           result = Thread::Current::SoftFault(fault->pf_va, fault->pf_flags);
           if (result != ZX_OK) {
@@ -409,7 +438,9 @@ zx_status_t FutexContext::FutexWait(user_in_ptr<const zx_futex_t> value_ptr,
         return validator_status;
       }
 
-      NullableDispatcherGuard futex_owner_guard(futex_owner_thread.get());
+      // Now that the futex state has been validated, we can validate the state of the futex owner
+      // thread (if one exists). We must do this after validating the futex state to avoid the race
+      // condition outlined in https://fxbug.dev/42109683.
       Thread* new_owner = nullptr;
       if (futex_owner_thread != nullptr) {
         // When attempting to wait, the new owner of the futex (if any) may not be
@@ -447,10 +478,10 @@ zx_status_t FutexContext::FutexWait(user_in_ptr<const zx_futex_t> value_ptr,
             kFutexBlockTracingEnabled, "kernel:sched", "futex_block", ("futex_id", futex_id.get()),
             ("blocking_tid", new_owner ? new_owner->tid() : ZX_KOID_INVALID));
 
-        AutoEagerReschedDisabler eager_resched_disabler;
-        Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+        AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
+        Guard<MonitoredSpinLock, NoIrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
         ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::FUTEX);
-        guard.Release(MutexPolicy::ThreadLockHeld);
+        futex_state_guard.Release();
         futex_owner_guard.ReleaseThreadLockHeld();
 
         // We have just released |futex_owner_thread|'s lock (|new_owner_guard|).  At this point,
@@ -572,16 +603,15 @@ zx_status_t FutexContext::FutexWake(user_in_ptr<const zx_futex_t> value_ptr, uin
   // lock and see if there are any actual waiters to wake up.
   ResetBlockingFutexIdState wake_op;
   {
-    // Optimize lock contention by delaying local/remote reschedules until the
-    // mutex is released.
+    // Optimize lock contention by delaying local/remote reschedules until the mutex is released.
     AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
-    Guard<Mutex> guard{&futex_ref->lock_};
+    Guard<SpinLock, IrqSave> guard{&futex_ref->lock_};
 
     // Now, enter the thread lock and actually wake up the threads.
     // OwnedWakeQueue will handle the ownership bookkeeping for us.
     {
       using Action = OwnedWaitQueue::Hook::Action;
-      Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+      Guard<MonitoredSpinLock, NoIrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
 
       // Attempt to wake |wake_count| threads.  Count the number of thread that
       // we have successfully woken, and assign each of their blocking futex IDs
@@ -679,16 +709,21 @@ zx_status_t FutexContext::FutexRequeue(user_in_ptr<const zx_futex_t> wake_ptr, u
   ResetBlockingFutexIdState wake_op;
   SetBlockingFutexIdState requeue_op(requeue_id);
   while (1) {
+    // See the comment in FutexWait about the structure of lock ordering in this method.
+    NullableDispatcherGuard requeue_owner_guard(requeue_owner_thread.get());
     AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
-    GuardMultiple<2, Mutex> futex_guards{&wake_futex_ref->lock_, &requeue_futex_ref->lock_};
+    GuardMultiple<2, SpinLock, IrqSave> futex_guards{&wake_futex_ref->lock_,
+                                                     &requeue_futex_ref->lock_};
 
     // Validate the futex storage state.
     int value;
-    UserCopyCaptureFaultsResult copy_result = wake_ptr.copy_from_user_capture_faults(&value);
+    UserCopyCaptureFaultsResult copy_result = arch_copy_from_user_capture_faults(
+        &value, wake_ptr.get(), sizeof(int), CopyContext::kBlockingNotAllowed);
     if (copy_result.status != ZX_OK) {
       // At this point we are committed to either returning from the function, or restarting the
       // loop, so we can drop the locks and resched disable that are local to this loop iteration.
       futex_guards.Release();
+      requeue_owner_guard.Release();
       eager_resched_disabler.Enable();
       if (auto fault = copy_result.fault_info) {
         result = Thread::Current::SoftFault(fault->pf_va, fault->pf_flags);
@@ -713,7 +748,6 @@ zx_status_t FutexContext::FutexRequeue(user_in_ptr<const zx_futex_t> wake_ptr, u
       return validator_status;
     }
 
-    NullableDispatcherGuard requeue_owner_guard(requeue_owner_thread.get());
     Thread* new_requeue_owner = nullptr;
     if (requeue_owner_thread) {
       // Verify that the thread we are attempting to make the requeue target's
@@ -740,7 +774,7 @@ zx_status_t FutexContext::FutexRequeue(user_in_ptr<const zx_futex_t> wake_ptr, u
     {
       DEBUG_ASSERT(wake_futex_ref != nullptr);
       // Exchange ThreadDispatcher's object lock for the global ThreadLock.
-      Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+      Guard<MonitoredSpinLock, NoIrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
       requeue_owner_guard.ReleaseThreadLockHeld();
 
       // We have just released |requeue_owner_thread|'s lock (|new_owner_guard|).  At this point,
