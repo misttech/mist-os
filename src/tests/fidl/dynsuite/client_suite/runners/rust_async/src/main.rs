@@ -299,9 +299,9 @@ async fn handle_runner_request(request: RunnerRequest) {
         RunnerRequest::ReceiveClosedEvents { target, reporter, responder } => {
             fasync::Task::spawn(async move {
                 println!("Listening for ClosedTarget events...");
-                let client = target.into_proxy().unwrap();
+                let mut event_stream = target.into_proxy().unwrap().take_event_stream();
                 let reporter = reporter.into_proxy().unwrap();
-                while let Some(event) = client.take_event_stream().next().await {
+                while let Some(event) = event_stream.next().await {
                     match &event {
                         Ok(event) => {
                             println!("Received ClosedTarget event: {}", method_name(event));
@@ -339,9 +339,9 @@ async fn handle_runner_request(request: RunnerRequest) {
         RunnerRequest::ReceiveAjarEvents { target, reporter, responder } => {
             fasync::Task::spawn(async move {
                 println!("Listening for AjarTarget events...");
-                let client = target.into_proxy().unwrap();
+                let mut event_stream = target.into_proxy().unwrap().take_event_stream();
                 let reporter = reporter.into_proxy().unwrap();
-                while let Some(event) = client.take_event_stream().next().await {
+                while let Some(event) = event_stream.next().await {
                     match &event {
                         Ok(event) => println!("Received AjarTarget event: {}", method_name(event)),
                         Err(err) => println!("Failed reading AjarTarget event: {}", err),
@@ -368,9 +368,9 @@ async fn handle_runner_request(request: RunnerRequest) {
         RunnerRequest::ReceiveOpenEvents { target, reporter, responder } => {
             fasync::Task::spawn(async move {
                 println!("Listening for OpenTarget events...");
-                let client = target.into_proxy().unwrap();
+                let mut event_stream = target.into_proxy().unwrap().take_event_stream();
                 let reporter = reporter.into_proxy().unwrap();
-                while let Some(event) = client.take_event_stream().next().await {
+                while let Some(event) = event_stream.next().await {
                     match &event {
                         Ok(event) => println!("Received OpenTarget event: {}", method_name(&event)),
                         Err(err) => println!("Failed reading OpenTarget event: {}", err),

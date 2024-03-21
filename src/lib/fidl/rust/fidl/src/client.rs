@@ -127,7 +127,7 @@ impl Client {
             inner: Arc::new(ClientInner {
                 channel,
                 interests: Mutex::default(),
-                epitaph: Mutex::default(),
+                terminal_error: Mutex::default(),
                 protocol_name,
             }),
         }
@@ -351,7 +351,7 @@ impl MessageInterest {
 #[derive(Debug)]
 enum EventReceiverState {
     Active,
-    Epitaph,
+    Terminal,
     Terminated,
 }
 
@@ -383,7 +383,7 @@ impl Stream for EventReceiver {
             EventReceiverState::Terminated => {
                 panic!("polled EventReceiver after `None`");
             }
-            EventReceiverState::Epitaph => {
+            EventReceiverState::Terminal => {
                 self.state = EventReceiverState::Terminated;
                 return Poll::Ready(None);
             }
@@ -397,13 +397,12 @@ impl Stream for EventReceiver {
                 self.state = EventReceiverState::Terminated;
                 None
             }
-            err @ Err(Error::ClientChannelClosed { .. }) => {
-                // The channel is closed with an epitaph. Return the epitaph and set our internal
-                // state so that on the next poll_next() we return a None and terminate the stream.
-                self.state = EventReceiverState::Epitaph;
+            err @ Err(_) => {
+                // We've received a terminal error. Return it and set our internal state so that on
+                // the next poll_next() we return a None and terminate the stream.
+                self.state = EventReceiverState::Terminal;
                 Some(err)
             }
-            Err(e) => Some(Err(e)),
         })
     }
 }
@@ -458,8 +457,9 @@ struct ClientInner {
     /// Tracks the state of responses to two-way messages and events.
     interests: Mutex<Interests>,
 
-    /// The server provided epitaph, or None if the channel is not closed.
-    epitaph: Mutex<Option<zx_status::Status>>,
+    /// A terminal error, which can be a server provided epitaph, or None if the channel is still
+    /// active.
+    terminal_error: Mutex<Option<Error>>,
 
     /// The `ProtocolMarker::DEBUG_NAME` for the service this client connects to.
     protocol_name: &'static str,
@@ -592,20 +592,14 @@ impl ClientInner {
 
         // Process any data on the channel, registering any tasks still waiting to wake when the
         // channel becomes ready.
-        let epitaph = self.recv_all(Txid(0))?;
+        let maybe_terminal_error = self.recv_all(Txid(0));
 
         let mut lock = self.interests.lock();
 
         if let Some(msg_buf) = lock.events.pop_front() {
             Poll::Ready(Ok(msg_buf))
-        } else if let Some(status) = epitaph {
-            Poll::Ready(Err(Error::ClientChannelClosed {
-                status,
-                protocol_name: self.protocol_name,
-                #[cfg(not(target_os = "fuchsia"))]
-                reason: self.channel.closed_reason(),
-            }))
         } else {
+            maybe_terminal_error?;
             Poll::Pending
         }
     }
@@ -624,7 +618,7 @@ impl ClientInner {
 
         // Process any data on the channel, registering tasks still waiting for wake when the
         // channel becomes ready.
-        let epitaph = self.recv_all(txid)?;
+        let maybe_terminal_error = self.recv_all(txid);
 
         let InterestId(raw_id) = InterestId::from_txid(txid);
         let mut interests = self.interests.lock();
@@ -633,14 +627,8 @@ impl ClientInner {
             // space for a new message.
             let buf = interests.messages.remove(raw_id).unwrap_received();
             Poll::Ready(Ok(buf))
-        } else if let Some(status) = epitaph {
-            Poll::Ready(Err(Error::ClientChannelClosed {
-                status,
-                protocol_name: self.protocol_name,
-                #[cfg(not(target_os = "fuchsia"))]
-                reason: self.channel.closed_reason(),
-            }))
         } else {
+            maybe_terminal_error?;
             Poll::Pending
         }
     }
@@ -649,41 +637,41 @@ impl ClientInner {
     /// Wakers present in any MessageInterest or the EventReceiver when this is called will be
     /// notified when their message arrives or when there is new data if the channel is empty.
     ///
-    /// Returns the epitaph (or PEER_CLOSED) if the channel was closed, and None otherwise.
-    fn recv_all(&self, want_txid: Txid) -> Result<Option<zx_status::Status>, Error> {
-        // TODO(cramertj) return errors if one has occurred _ever_ in recv_all, not just if
-        // one happens on this call.
-        loop {
-            // Acquire a mutex so that only one thread can read from the underlying channel
-            // at a time. Channel is already synchronized, but we need to also decode the
-            // FIDL message header atomically so that epitaphs can be properly handled.
-            let mut epitaph_lock = self.epitaph.lock();
-            if epitaph_lock.is_some() {
-                return Ok(*epitaph_lock);
-            }
-            let buf = {
-                // Get a combined waker that will wake up everyone who is waiting.
-                let waker = self.get_combined_waker();
-                let cx = &mut Context::from_waker(&waker);
+    /// All errors are terminal, so once an error has been encountered, all subsequent calls will
+    /// produce the same error.  The error might be due to the reception of an epitaph, the peer end
+    /// of the channel being closed, a decode error or some other error.  Before using this terminal
+    /// error, callers *should* check to see if a response or event has been received as they
+    /// should normally, at least for the PEER_CLOSED case, be delivered before the terminal error.
+    fn recv_all(&self, want_txid: Txid) -> Result<(), Error> {
+        // Acquire a mutex so that only one thread can read from the underlying channel
+        // at a time. Channel is already synchronized, but we need to also decode the
+        // FIDL message header atomically so that epitaphs can be properly handled.
+        let mut terminal_error = self.terminal_error.lock();
+        if let Some(error) = terminal_error.as_ref() {
+            return Err(error.clone());
+        }
 
-                let mut buf = MessageBufEtc::new();
-                let result = self.channel.recv_etc_from(cx, &mut buf);
-                match result {
-                    Poll::Ready(Ok(())) => {}
-                    Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
-                        // The channel has been closed, and no epitaph was received.
-                        // Set the epitaph to PEER_CLOSED.
-                        *epitaph_lock = Some(zx_status::Status::PEER_CLOSED);
-                        // Wake up everyone waiting, since an epitaph is broadcast to all receivers.
-                        self.wake_all();
-                        return Ok(*epitaph_lock);
-                    }
-                    Poll::Ready(Err(e)) => return Err(Error::ClientRead(e)),
-                    Poll::Pending => {
-                        return Ok(None);
-                    }
-                };
-                buf
+        let recv_once = || {
+            // Get a combined waker that will wake up everyone who is waiting.
+            let waker = self.get_combined_waker();
+            let cx = &mut Context::from_waker(&waker);
+
+            let mut buf = MessageBufEtc::new();
+            let result = self.channel.recv_etc_from(cx, &mut buf);
+            match result {
+                Poll::Ready(Ok(())) => {}
+                Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                    // The channel has been closed, and no epitaph was received.
+                    // Set the epitaph to PEER_CLOSED.
+                    return Err(Error::ClientChannelClosed {
+                        status: zx_status::Status::PEER_CLOSED,
+                        protocol_name: self.protocol_name,
+                        #[cfg(not(target_os = "fuchsia"))]
+                        reason: self.channel.closed_reason(),
+                    });
+                }
+                Poll::Ready(Err(e)) => return Err(Error::ClientRead(e)),
+                Poll::Pending => return Ok(true),
             };
 
             let (header, body_bytes) = decode_transaction_header(buf.bytes())?;
@@ -697,18 +685,18 @@ impl ClientInner {
                     handles,
                     &mut epitaph_body,
                 )?;
-                *epitaph_lock = Some(epitaph_body.error);
-                // Wake up everyone waiting, since an epitaph is broadcast to all receivers.
-                self.wake_all();
-                return Ok(*epitaph_lock);
+                return Err(Error::ClientChannelClosed {
+                    status: epitaph_body.error,
+                    protocol_name: self.protocol_name,
+                    #[cfg(not(target_os = "fuchsia"))]
+                    reason: self.channel.closed_reason(),
+                });
             }
 
             let mut interests = self.interests.lock();
 
-            // Epitaph handling is done, so the lock is no longer required.
-            drop(epitaph_lock);
-
             assert!(interests.pending > 0, "{}", header.tx_id);
+
             if header.tx_id == 0 {
                 if let Some(waker) = interests.push_event(buf) {
                     if want_txid != Txid(0) {
@@ -720,7 +708,21 @@ impl ClientInner {
                 interests.push_message(txid, buf, want_txid != txid)?;
             }
             if interests.pending == 0 {
-                return Ok(None);
+                return Ok(true);
+            }
+
+            Ok(false)
+        };
+
+        loop {
+            match recv_once() {
+                Ok(true) => return Ok(()),
+                Ok(false) => {}
+                Err(error) => {
+                    // Broadcast all errors.
+                    self.wake_all();
+                    return Err(terminal_error.insert(error).clone());
+                }
             }
         }
     }
@@ -931,9 +933,9 @@ mod tests {
         fuchsia_async::{DurationExt, TimeoutExt},
         fuchsia_zircon as zx,
         fuchsia_zircon::{AsHandleRef, DurationNum},
-        futures::{join, StreamExt, TryFutureExt},
+        futures::{join, stream::FuturesUnordered, StreamExt, TryFutureExt},
         futures_test::task::new_count_waker,
-        std::thread,
+        std::{future::pending, thread},
     };
 
     const SEND_ORDINAL_HIGH_BYTE: u8 = 42;
@@ -1862,5 +1864,51 @@ mod tests {
         let ((), ()) = join!(receiver, sender);
 
         assert!(client.into_channel().is_ok());
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn client_decode_errors_are_broadcast() {
+        let (client_end, server_end) = zx::Channel::create();
+        let client_end = AsyncChannel::from_channel(client_end);
+        let client = Client::new(client_end, "test_protocol");
+
+        let server = AsyncChannel::from_channel(server_end);
+
+        let _server = fasync::Task::spawn(async move {
+            let mut buffer = MessageBufEtc::new();
+            server.recv_etc_msg(&mut buffer).await.expect("failed to recv msg");
+            let two_way_tx_id = 1u8;
+            assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id));
+
+            let (bytes, handles) = (&mut vec![], &mut vec![]);
+            let header =
+                TransactionHeader::new(two_way_tx_id as u32, SEND_ORDINAL, DynamicFlags::empty());
+            encode_transaction(header, bytes, handles);
+            // Zero out the at-rest flags which will give this message an invalid version.
+            bytes[4] = 0;
+            server.write_etc(bytes, handles).expect("Server channel write failed");
+
+            // Wait forever to stop the channel from being closed.
+            pending::<()>().await;
+        });
+
+        let futures = FuturesUnordered::new();
+
+        for _ in 0..4 {
+            futures.push(async {
+                assert_matches!(
+                    client
+                        .send_query::<u8, u8, SEND_ORDINAL>(SEND_DATA, DynamicFlags::empty())
+                        .map_ok(|x| assert_eq!(x, SEND_DATA))
+                        .await,
+                    Err(crate::Error::UnsupportedWireFormatVersion)
+                );
+            });
+        }
+
+        futures
+            .collect::<Vec<_>>()
+            .on_timeout(1.seconds().after_now(), || panic!("timed out!"))
+            .await;
     }
 }
