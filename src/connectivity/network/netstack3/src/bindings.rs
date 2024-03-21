@@ -91,6 +91,7 @@ use netstack3_core::{
     },
     neighbor,
     routes::RawMetric,
+    sync::RwLock as CoreRwLock,
     udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
     EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext, StackState,
     TimerBindingsTypes, TimerContext, TimerContext2, TimerId, TracingContext,
@@ -535,7 +536,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         let EthernetInfo { mac: _, _mac_proxy: _, common_info: _, netdevice, dynamic_info } =
             device.external_state();
-        let dynamic_info = dynamic_info.read().unwrap();
+        let dynamic_info = dynamic_info.read();
         send_netdevice_frame(
             netdevice,
             &dynamic_info.netdevice,
@@ -555,7 +556,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
             IpVersion::V6 => fhardware_network::FrameType::Ipv6,
         };
         let PureIpDeviceInfo { common_info: _, netdevice, dynamic_info } = device.external_state();
-        let dynamic_info = dynamic_info.read().unwrap();
+        let dynamic_info = dynamic_info.read();
         send_netdevice_frame(netdevice, &dynamic_info, packet, frame_type)
     }
 }
@@ -975,14 +976,13 @@ impl Netstack {
                 tx_notifier: Default::default(),
                 authorization_token: zx::Event::create(),
             },
-            dynamic_common_info: DynamicCommonInfo {
+            dynamic_common_info: CoreRwLock::new(DynamicCommonInfo {
                 mtu: DEFAULT_LOOPBACK_MTU,
                 admin_enabled: true,
                 events,
                 control_hook: control_sender,
                 addresses: HashMap::new(),
-            }
-            .into(),
+            }),
             rx_notifier: loopback_rx_notifier,
         };
 

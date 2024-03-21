@@ -268,21 +268,21 @@ pub(crate) struct FidlWorkerInfo<R> {
 #[derivative(Debug)]
 pub(crate) struct LoopbackInfo {
     pub(crate) static_common_info: StaticCommonInfo,
-    pub(crate) dynamic_common_info: std::sync::RwLock<DynamicCommonInfo>,
+    pub(crate) dynamic_common_info: CoreRwLock<DynamicCommonInfo>,
     #[derivative(Debug = "ignore")]
     pub(crate) rx_notifier: NeedsDataNotifier,
 }
 
 impl LoopbackInfo {
     pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
-        cb(self.dynamic_common_info.read().unwrap().deref())
+        cb(self.dynamic_common_info.read().deref())
     }
 
     pub(crate) fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicCommonInfo) -> O>(
         &self,
         cb: F,
     ) -> O {
-        cb(self.dynamic_common_info.write().unwrap().deref_mut())
+        cb(self.dynamic_common_info.write().deref_mut())
     }
 }
 
@@ -341,7 +341,7 @@ pub(crate) struct DynamicEthernetInfo {
 /// Ethernet device information.
 #[derive(Debug)]
 pub(crate) struct EthernetInfo {
-    pub(crate) dynamic_info: std::sync::RwLock<DynamicEthernetInfo>,
+    pub(crate) dynamic_info: CoreRwLock<DynamicEthernetInfo>,
     pub(crate) common_info: StaticCommonInfo,
     pub(crate) netdevice: StaticNetdeviceInfo,
     pub(crate) mac: UnicastAddr<Mac>,
@@ -352,7 +352,7 @@ pub(crate) struct EthernetInfo {
 
 impl EthernetInfo {
     pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicEthernetInfo) -> O>(&self, cb: F) -> O {
-        let dynamic = self.dynamic_info.read().unwrap();
+        let dynamic = self.dynamic_info.read();
         cb(dynamic.deref())
     }
 
@@ -360,7 +360,7 @@ impl EthernetInfo {
         &self,
         cb: F,
     ) -> O {
-        let mut dynamic = self.dynamic_info.write().unwrap();
+        let mut dynamic = self.dynamic_info.write();
         cb(dynamic.deref_mut())
     }
 }
@@ -376,12 +376,12 @@ impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for EthernetInfo {
 pub(crate) struct PureIpDeviceInfo {
     pub(crate) common_info: StaticCommonInfo,
     pub(crate) netdevice: StaticNetdeviceInfo,
-    pub(crate) dynamic_info: std::sync::RwLock<DynamicNetdeviceInfo>,
+    pub(crate) dynamic_info: CoreRwLock<DynamicNetdeviceInfo>,
 }
 
 impl PureIpDeviceInfo {
     pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicNetdeviceInfo) -> O>(&self, cb: F) -> O {
-        let dynamic = self.dynamic_info.read().unwrap();
+        let dynamic = self.dynamic_info.read();
         cb(dynamic.deref())
     }
 
@@ -389,7 +389,7 @@ impl PureIpDeviceInfo {
         &self,
         cb: F,
     ) -> O {
-        let mut dynamic = self.dynamic_info.write().unwrap();
+        let mut dynamic = self.dynamic_info.write();
         cb(dynamic.deref_mut())
     }
 }

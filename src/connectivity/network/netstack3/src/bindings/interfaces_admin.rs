@@ -1750,19 +1750,19 @@ mod enabled {
                         static_common_info: _,
                         dynamic_common_info,
                         rx_notifier: _,
-                    }) => (Info::Loopback(dynamic_common_info.write().unwrap()), None),
+                    }) => (Info::Loopback(dynamic_common_info.write()), None),
                     devices::DeviceSpecificInfo::Ethernet(devices::EthernetInfo {
                         netdevice,
                         common_info: _,
                         dynamic_info,
                         mac: _,
                         _mac_proxy: _,
-                    }) => (Info::Ethernet(dynamic_info.write().unwrap()), Some(&netdevice.handler)),
+                    }) => (Info::Ethernet(dynamic_info.write()), Some(&netdevice.handler)),
                     devices::DeviceSpecificInfo::PureIp(devices::PureIpDeviceInfo {
                         netdevice,
                         common_info: _,
                         dynamic_info,
-                    }) => (Info::PureIp(dynamic_info.write().unwrap()), Some(&netdevice.handler)),
+                    }) => (Info::PureIp(dynamic_info.write()), Some(&netdevice.handler)),
                 };
                 let common_info = match info {
                     Info::Loopback(ref mut common_info) => common_info.deref_mut(),

@@ -33,6 +33,7 @@ use netstack3_core::{
         SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
     },
     routes::RawMetric,
+    sync::RwLock as CoreRwLock,
 };
 use rand::Rng as _;
 
@@ -576,11 +577,10 @@ impl DeviceHandler {
                     _mac_proxy: mac_proxy,
                     netdevice: static_netdevice_info,
                     common_info: Default::default(),
-                    dynamic_info: devices::DynamicEthernetInfo {
+                    dynamic_info: CoreRwLock::new(devices::DynamicEthernetInfo {
                         netdevice: dynamic_netdevice_info_builder(max_frame_size.as_mtu()),
                         neighbor_event_sink: neighbor_event_sink.clone(),
-                    }
-                    .into(),
+                    }),
                 }
                 .into();
                 let core_ethernet_id = ctx.api().device::<EthernetLinkDevice>().add_device(
@@ -596,7 +596,7 @@ impl DeviceHandler {
                 let info = devices::PureIpDeviceInfo {
                     common_info: Default::default(),
                     netdevice: static_netdevice_info,
-                    dynamic_info: dynamic_netdevice_info_builder(max_frame_size).into(),
+                    dynamic_info: CoreRwLock::new(dynamic_netdevice_info_builder(max_frame_size)),
                 }
                 .into();
                 let core_pure_ip_id = ctx.api().device::<PureIpDevice>().add_device(
