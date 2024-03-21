@@ -267,13 +267,6 @@ async fn run_mocks(
     Ok(())
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/330168414)
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct Count {
-    total: usize,
-    rolled_out: usize,
-}
-
 /// A value indicating a message was sent by a particular puppet.
 #[derive(Clone, Debug, PartialEq)]
 struct MessageReceipt {

@@ -8,7 +8,7 @@ use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_logger::{LogLevelFilter, LogMarker, LogMessage, LogSinkMarker};
 use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, RealmInstance, Ref, Route};
-use fuchsia_syslog_listener::{run_log_listener_with_proxy, LogProcessor};
+use fuchsia_syslog_listener::run_log_listener_with_proxy;
 use fuchsia_zircon as zx;
 use futures::{channel::mpsc, FutureExt, StreamExt};
 use std::sync::{Arc, Mutex};
@@ -147,21 +147,6 @@ async fn timestamp_sorting_for_batches() {
         assert_eq!(final_listener.next().await.unwrap(), tort_expected);
         assert_eq!(final_listener.next().await.unwrap(), hare_expected2);
         assert_eq!(final_listener.next().await.unwrap(), tort_expected2);
-    }
-}
-
-#[allow(dead_code)] // TODO(https://fxbug.dev/330168414)
-struct Listener {
-    send_logs: mpsc::UnboundedSender<LogMessage>,
-}
-
-impl LogProcessor for Listener {
-    fn log(&mut self, message: LogMessage) {
-        self.send_logs.unbounded_send(message).unwrap();
-    }
-
-    fn done(&mut self) {
-        panic!("this should not be called");
     }
 }
 
