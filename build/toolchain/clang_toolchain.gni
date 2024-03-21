@@ -1150,11 +1150,8 @@ template("clang_toolchain") {
         }
       }
       _remote_dump_syms_prefix = ""
-      if (output_breakpad_syms) {
-        if (_link_rbe_enable) {
-          _remote_dump_syms_prefix =
-              _link_common.cxx_link_remote_dump_syms_prefix
-        }
+      if (defined(_link_common.cxx_link_remote_dump_syms_prefix)) {
+        _remote_dump_syms_prefix = _link_common.cxx_link_remote_dump_syms_prefix
       }
 
       command_suffix =
