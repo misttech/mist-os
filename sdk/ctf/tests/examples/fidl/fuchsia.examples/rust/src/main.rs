@@ -7,28 +7,29 @@ use anyhow::Result;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_examples::EchoMarker;
 use fidl_test_example as ftest;
-use fuchsia_component::client::connect_to_protocol;
-use realm_proxy_client::RealmProxyClient;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at};
+use realm_proxy_client::{extend_namespace, InstalledNamespace};
 use tracing::info;
 
-async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> {
+async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
-    let (client, server) = create_endpoints();
+    let (dict_client, dict_server) = create_endpoints();
 
     realm_factory
-        .create_realm(options, server)
+        .create_realm(options, dict_server)
         .await?
         .map_err(realm_proxy_client::Error::OperationError)?;
+    let ns = extend_namespace(realm_factory, dict_client).await?;
 
-    Ok(RealmProxyClient::from(client))
+    Ok(ns)
 }
 
 #[fuchsia::test]
 async fn test_example() -> Result<()> {
     let realm_options = ftest::RealmOptions { ..Default::default() };
-    let realm = create_realm(realm_options).await?;
+    let test_ns = create_realm(realm_options).await?;
 
-    let echo = realm.connect_to_protocol::<EchoMarker>().await?;
+    let echo = connect_to_protocol_at::<EchoMarker>(test_ns.prefix())?;
     let response = echo.echo_string("hello").await?;
     info!("response: {:?}", response);
 

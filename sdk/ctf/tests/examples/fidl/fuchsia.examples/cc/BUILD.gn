@@ -17,6 +17,8 @@ executable("bin") {
   deps = [
     "//examples/fidl/fuchsia.examples:fuchsia.examples_hlcpp",
     "//sdk/ctf/tests/examples/fidl/fuchsia.examples/testing/fidl:test.example_hlcpp",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",

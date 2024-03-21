@@ -6,7 +6,6 @@ use {
     anyhow::{Error, Result},
     fidl_fuchsia_examples::EchoMarker,
     fidl_test_example::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOptions},
-    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     futures::{StreamExt, TryStreamExt},
@@ -23,22 +22,19 @@ async fn main() -> Result<(), Error> {
 }
 
 async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
-    let mut task_group = fasync::TaskGroup::new();
+    let mut realms = vec![];
     let result: Result<(), Error> = async move {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 RealmFactoryRequest::_UnknownMethod { .. } => unimplemented!(),
-                RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
+                RealmFactoryRequest::CreateRealm { options, dictionary, responder } => {
                     let realm = create_realm(options).await?;
-                    let request_stream = realm_server.into_stream()?;
-                    task_group.spawn(async move {
-                        realm_proxy::service::serve(realm, request_stream).await.unwrap();
-                    });
+                    realm.root.controller().get_exposed_dictionary(dictionary).await?.unwrap();
+                    realms.push(realm);
                     responder.send(Ok(()))?;
                 }
             }
         }
-        task_group.join().await;
         Ok(())
     }
     .await;
