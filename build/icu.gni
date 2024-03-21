@@ -35,7 +35,7 @@ declare_args() {
   # Fuchsia, it can take a long time from an ICU commit to a fix rolling into
   # Fuchsia. This flag allows us to define the flag ahead of time in
   # //build/icu.gni, and remove the rollout issues.
-  icu_fuchsia_extra_compile_flags = []
+  icu_fuchsia_extra_compile_flags = [ "-Wno-newline-eof" ]
 
   # Similar to above, except it allows adding an entire `config` target.
   icu_fuchsia_extra_configs = []
