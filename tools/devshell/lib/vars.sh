@@ -1007,6 +1007,10 @@ function fx-run-ninja {
     user_rbe_env=(
       # Automatic auth with gcert (from re-client bootstrap) needs $USER.
       "USER=${USER}"
+      # A few tools need credentials for authentication, like remotetool.
+      # Explicitly set this variable without forwarding $HOME.
+      # User-overridable.
+      "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-$HOME/.config/gcloud/application_default_credentials.json}"
       # Honor environment variable to disable RBE build metrics.
       "FX_REMOTE_BUILD_METRICS=${FX_REMOTE_BUILD_METRICS}"
     )
