@@ -1763,7 +1763,7 @@ impl ResolvedInstanceState {
             let path = fuchsia_fs::canonicalize_path(path.as_str());
             let Some(open) = outgoing_dir.clone().downscope_path(
                 Path::validate_and_split(path).unwrap(),
-                ComponentCapability::from(capability.clone()).type_name().into(),
+                CapabilityTypeName::from(capability).into(),
             ) else {
                 warn!(
                     moniker = %component.moniker,

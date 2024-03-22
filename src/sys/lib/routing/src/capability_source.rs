@@ -514,40 +514,14 @@ impl ComponentCapability {
     /// Returns a name for the capability type.
     pub fn type_name(&self) -> CapabilityTypeName {
         match self {
-            ComponentCapability::Use(use_) => match use_ {
-                UseDecl::Protocol(_) => CapabilityTypeName::Protocol,
-                UseDecl::Directory(_) => CapabilityTypeName::Directory,
-                UseDecl::Service(_) => CapabilityTypeName::Service,
-                UseDecl::Storage(_) => CapabilityTypeName::Storage,
-                UseDecl::EventStream(_) => CapabilityTypeName::EventStream,
-                UseDecl::Runner(_) => CapabilityTypeName::Runner,
-                UseDecl::Config(_) => CapabilityTypeName::Config,
-            },
+            ComponentCapability::Use(use_) => use_.into(),
             ComponentCapability::Environment(env) => match env {
                 EnvironmentCapability::Runner { .. } => CapabilityTypeName::Runner,
                 EnvironmentCapability::Resolver { .. } => CapabilityTypeName::Resolver,
                 EnvironmentCapability::Debug { .. } => CapabilityTypeName::Protocol,
             },
-            ComponentCapability::Expose(expose) => match expose {
-                ExposeDecl::Protocol(_) => CapabilityTypeName::Protocol,
-                ExposeDecl::Directory(_) => CapabilityTypeName::Directory,
-                ExposeDecl::Service(_) => CapabilityTypeName::Service,
-                ExposeDecl::Runner(_) => CapabilityTypeName::Runner,
-                ExposeDecl::Resolver(_) => CapabilityTypeName::Resolver,
-                ExposeDecl::Dictionary(_) => CapabilityTypeName::Dictionary,
-                ExposeDecl::Config(_) => CapabilityTypeName::Config,
-            },
-            ComponentCapability::Offer(offer) => match offer {
-                OfferDecl::Protocol(_) => CapabilityTypeName::Protocol,
-                OfferDecl::Directory(_) => CapabilityTypeName::Directory,
-                OfferDecl::Service(_) => CapabilityTypeName::Service,
-                OfferDecl::Storage(_) => CapabilityTypeName::Storage,
-                OfferDecl::Runner(_) => CapabilityTypeName::Runner,
-                OfferDecl::Resolver(_) => CapabilityTypeName::Resolver,
-                OfferDecl::EventStream(_) => CapabilityTypeName::EventStream,
-                OfferDecl::Dictionary(_) => CapabilityTypeName::Dictionary,
-                OfferDecl::Config(_) => CapabilityTypeName::Config,
-            },
+            ComponentCapability::Expose(expose) => expose.into(),
+            ComponentCapability::Offer(offer) => offer.into(),
             ComponentCapability::Protocol(_) => CapabilityTypeName::Protocol,
             ComponentCapability::Directory(_) => CapabilityTypeName::Directory,
             ComponentCapability::Storage(_) => CapabilityTypeName::Storage,
