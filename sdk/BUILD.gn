@@ -32,9 +32,15 @@ if (override_target_api_level != -1) {
       _override_is_supported = true
     }
   }
-  assert(
-      _override_is_supported,
-      "`override_target_api_level` (${override_target_api_level}) is not one of the supported API levels: ${platform_version.build_time_supported_api_levels}")
+
+  # TODO(https://fxbug.dev/330709069): We should actually assert this, but doing
+  # so breaks some builders that are out of sync with the support levels. We
+  # should remove those builders and make this an assertion.
+  if (!_override_is_supported) {
+    print(
+        "`override_target_api_level` (${override_target_api_level}) is not one of the supported API levels: ${platform_version.build_time_supported_api_levels}")
+    print("Attempting to build anyways, but this may not go well...")
+  }
 }
 
 # A list of sdk_collection() targets that correspond to all
