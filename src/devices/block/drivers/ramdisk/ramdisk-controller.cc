@@ -7,6 +7,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -136,6 +137,8 @@ zx::result<std::string> RamdiskController::ConfigureDevice(zx::vmo vmo, uint64_t
   }
 
   if (zx_status_t status = ramdev->DdkAdd(ramdev->Name()); status != ZX_OK) {
+    zxlogf(ERROR, "Failed DdkAdd on ram device '%s': %s", ramdev->Name(),
+           zx_status_get_string(status));
     ramdev.release()->DdkRelease();
     return zx::error(status);
   }

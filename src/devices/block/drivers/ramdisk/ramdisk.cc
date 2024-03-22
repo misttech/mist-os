@@ -95,6 +95,11 @@ void Ramdisk::DdkUnbind(ddk::UnbindTxn txn) {
 }
 
 void Ramdisk::DdkRelease() {
+  {
+    // Idempotent, so if this has already been triggered earlier it is a no-op.
+    fbl::AutoLock lock(&lock_);
+    dead_ = true;
+  }
   // Wake up the worker thread, in case it is sleeping
   sync_completion_signal(&signal_);
 
