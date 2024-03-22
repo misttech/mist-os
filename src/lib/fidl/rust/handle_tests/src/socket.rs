@@ -76,30 +76,33 @@ pub async fn run(fixture: impl Fixture + 'static) {
     send_bytes(&fixture, sockets, &[7, 8, 9], AfterSend::CloseSender).await;
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/330168051)
-struct FidlFixture;
+#[cfg(test)]
+mod test {
+    use super::*;
 
-#[async_trait]
-impl Fixture for FidlFixture {
-    async fn create_handles(&self, opts: fidl::SocketOpts) -> (fidl::Socket, fidl::Socket) {
-        match opts {
-            fidl::SocketOpts::STREAM => fidl::Socket::create_stream(),
-            fidl::SocketOpts::DATAGRAM => fidl::Socket::create_datagram(),
+    struct FidlFixture;
 
-            #[cfg(target_os = "fuchsia")]
-            _ => panic!("unsupported socket options"),
+    #[async_trait]
+    impl Fixture for FidlFixture {
+        async fn create_handles(&self, opts: fidl::SocketOpts) -> (fidl::Socket, fidl::Socket) {
+            match opts {
+                fidl::SocketOpts::STREAM => fidl::Socket::create_stream(),
+                fidl::SocketOpts::DATAGRAM => fidl::Socket::create_datagram(),
+
+                #[cfg(target_os = "fuchsia")]
+                _ => panic!("unsupported socket options"),
+            }
         }
     }
-}
 
-impl LoggingFixture for FidlFixture {
-    fn log(&mut self, msg: &str) {
-        println!("{}", msg);
+    impl LoggingFixture for FidlFixture {
+        fn log(&mut self, msg: &str) {
+            println!("{}", msg);
+        }
     }
-}
 
-#[cfg(test)]
-#[fuchsia_async::run_singlethreaded(test)]
-async fn tests() {
-    run(FidlFixture).await
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn tests() {
+        run(FidlFixture).await
+    }
 }

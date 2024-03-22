@@ -413,24 +413,27 @@ pub async fn run(mut fixture: impl Fixture) {
     .await;
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/330168051)
-struct FidlFixture;
-
-#[async_trait]
-impl Fixture for FidlFixture {
-    async fn create_handles(&self, _: CreateHandlePurpose) -> (fidl::Channel, fidl::Channel) {
-        fidl::Channel::create()
-    }
-}
-
-impl LoggingFixture for FidlFixture {
-    fn log(&mut self, msg: &str) {
-        println!("{}", msg);
-    }
-}
-
 #[cfg(test)]
-#[fuchsia_async::run_singlethreaded(test)]
-async fn tests() {
-    run(FidlFixture).await
+mod test {
+    use super::*;
+
+    struct FidlFixture;
+
+    #[async_trait]
+    impl Fixture for FidlFixture {
+        async fn create_handles(&self, _: CreateHandlePurpose) -> (fidl::Channel, fidl::Channel) {
+            fidl::Channel::create()
+        }
+    }
+
+    impl LoggingFixture for FidlFixture {
+        fn log(&mut self, msg: &str) {
+            println!("{}", msg);
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn tests() {
+        run(FidlFixture).await
+    }
 }
