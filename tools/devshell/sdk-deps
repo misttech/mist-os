@@ -129,6 +129,9 @@ main() {
         if [[ "${dep}" == *"sdk/fidl"* ]]; then
             fidl="$(echo $dep | cut -d ":" -f1 | cut -d "/" -f5)"
             dep_sdk="//sdk/fidl/${fidl}:${fidl}_sdk"
+        elif [[ "${dep}" == *"src/devices/bind"* ]]; then
+            bind="$(echo $dep | cut -d ":" -f1 | cut -d "/" -f6)"
+            dep_sdk="//src/devices/bind/${bind}:${bind}_sdk"
         else
             dep_sdk="$(echo ${dep} | cut -d "(" -f1)_sdk"
         fi
