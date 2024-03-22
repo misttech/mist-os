@@ -15,7 +15,6 @@
 #include <mutex>
 #include <vector>
 
-#include <fbl/macros.h>
 #include <soc/aml-common/aml-cpu-metadata.h>
 
 namespace amlogic_cpu {
@@ -46,7 +45,6 @@ struct AmlCpuConfiguration {
 
 class AmlCpu : public fidl::WireServer<fuchsia_hardware_cpu_ctrl::Device> {
  public:
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlCpu);
   explicit AmlCpu(const std::vector<operating_point_t>& operating_points,
                   const perf_domain_t& perf_domain)
       : current_operating_point_(

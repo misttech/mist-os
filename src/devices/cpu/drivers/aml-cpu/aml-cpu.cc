@@ -16,8 +16,6 @@
 
 #include <vector>
 
-#include <fbl/string_buffer.h>
-
 namespace amlogic_cpu {
 
 namespace {
