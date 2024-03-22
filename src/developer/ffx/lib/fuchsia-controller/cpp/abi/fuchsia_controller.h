@@ -72,6 +72,7 @@ extern zx_status_t ffx_channel_write(ffx_lib_context_t* ctx, zx_handle_t handle,
 extern zx_status_t ffx_channel_write_etc(ffx_lib_context_t* ctx, zx_handle_t handle,
                                          const char* out_buf, uint64_t out_len,
                                          zx_handle_disposition_t* hdls, uint64_t hdls_len);
+extern zx_status_t ffx_handle_get_koid(ffx_lib_context_t* ctx, zx_handle_t handle, zx_koid_t* out);
 // Attempts to get a config value from the environment context.
 //
 // Will try to coerce said value into a string. `out_buf` should point to a caller-owned buffer,

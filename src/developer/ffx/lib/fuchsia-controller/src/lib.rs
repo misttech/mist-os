@@ -490,6 +490,24 @@ pub unsafe extern "C" fn ffx_channel_create(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn ffx_handle_get_koid(
+    ctx: *const LibContext,
+    hdl: zx_types::zx_handle_t,
+    out: *mut zx_types::zx_koid_t,
+) -> zx_status::Status {
+    let ctx = unsafe { get_arc(ctx) };
+    let (tx, rx) = mpsc::sync_channel(1);
+    let handle = unsafe { fidl::Handle::from_raw(hdl) };
+    ctx.run(LibraryCommand::HandleGetKoid { handle, responder: tx });
+    let koid = match rx.recv().unwrap() {
+        Ok(k) => k,
+        Err(e) => return e,
+    };
+    unsafe { *out = koid.raw_koid() };
+    zx_status::Status::OK
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn ffx_config_get_string(
     ctx: *const EnvContext,
     config_key: *const u8,

@@ -60,6 +60,10 @@ class Handle:
         """Returns the underlying handle as an integer."""
         return fuchsia_controller_internal.handle_as_int(self._handle)
 
+    def koid(self) -> int:
+        """Returns the underlying kernel object ID."""
+        return fuchsia_controller_internal.channel_koid(self._handle)
+
     def take(self) -> int:
         """Takes the underlying fidl handle, setting it internally to zero.
 
@@ -130,6 +134,10 @@ class Socket:
         through FIDL function calls.
         """
         return fuchsia_controller_internal.socket_take(self._handle)
+
+    def koid(self) -> int:
+        """Returns the underlying kernel object ID."""
+        return fuchsia_controller_internal.channel_koid(self._handle)
 
     def close(self):
         """Releases the underlying handle."""
@@ -337,6 +345,10 @@ class Channel:
         """Returns the underlying channel as an integer."""
         return fuchsia_controller_internal.channel_as_int(self._handle)
 
+    def koid(self) -> int:
+        """Returns the underlying kernel object ID."""
+        return fuchsia_controller_internal.channel_koid(self._handle)
+
     def take(self) -> int:
         """Takes the underlying fidl handle, setting it internally to zero.
 
@@ -418,6 +430,10 @@ class Event:
     def as_int(self) -> int:
         """Returns the underlying channel as an integer."""
         return fuchsia_controller_internal.event_as_int(self._handle)
+
+    def koid(self) -> int:
+        """Returns the underlying kernel object ID."""
+        return fuchsia_controller_internal.channel_koid(self._handle)
 
     def take(self) -> int:
         """Takes the underlying fidl handle, setting it internally to zero.

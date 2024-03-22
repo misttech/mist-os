@@ -10,6 +10,7 @@ use ffx_target::{knock_target, KnockError};
 use fidl::{
     AsHandleRef, HandleBased, HandleDisposition, HandleOp, ObjectType, Peered, Rights, Status,
 };
+use fuchsia_async::emulated_handle::Koid;
 use fuchsia_async::OnSignalsRef;
 use fuchsia_zircon_status as zx_status;
 use fuchsia_zircon_types as zx_types;
@@ -63,6 +64,10 @@ pub(crate) enum LibraryCommand {
     OpenRemoteControlProxy {
         env: Arc<EnvContext>,
         responder: Responder<CmdResult<zx_types::zx_handle_t>>,
+    },
+    HandleGetKoid {
+        handle: fidl::Handle,
+        responder: Responder<Result<Koid, zx_status::Status>>,
     },
     ChannelRead {
         lib: Arc<LibContext>,
@@ -202,6 +207,10 @@ impl LibraryCommand {
                         responder.send(Err(zx_status::Status::INTERNAL)).unwrap();
                     }
                 }
+            }
+            Self::HandleGetKoid { handle, responder } => {
+                let handle = ManuallyDrop::new(handle);
+                responder.send(handle.get_koid()).unwrap();
             }
             Self::OpenDeviceProxy { env, moniker, capability_name, responder } => {
                 match env.connect_device_proxy(moniker, capability_name).await {

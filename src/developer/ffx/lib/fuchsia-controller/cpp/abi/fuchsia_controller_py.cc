@@ -179,7 +179,7 @@ class PythonChannel : public PythonObject {
   explicit PythonChannel(zx_handle_t channel) : PythonObject(kChannelTypeID), channel_(channel) {}
   static constexpr PythonTypeID type_id = kChannelTypeID;
 
-  zx_handle_t channel() const { return channel_; }
+  zx_handle_t handle() const { return channel_; }
 
   uint64_t take() {
     auto ret = channel_;
@@ -434,6 +434,26 @@ PyObject *handle_as_int(PyObject *self, PyObject *args) {
   return PyLong_FromUnsignedLongLong(handle->handle());
 }
 
+template <typename T>
+PyObject *handle_koid_helper(PyObject *self, PyObject *args) {
+  PyObject *object;
+  if (!PyArg_ParseTuple(args, "O", &object)) {
+    return nullptr;
+  }
+  // Get C++ object from Python object
+  auto handle = DowncastPyObject<T>(object);
+  if (handle == nullptr) {
+    return nullptr;
+  }
+  zx_koid_t out;
+  zx_status_t status = ffx_handle_get_koid(mod::get_module_state()->ctx, handle->handle(), &out);
+  if (status != ZX_OK) {
+    PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
+    return nullptr;
+  }
+  return PyLong_FromUnsignedLongLong(out);
+}
+
 PyObject *handle_take(PyObject *self, PyObject *args) {
   PyObject *object;
   if (!PyArg_ParseTuple(args, "O", &object)) {
@@ -686,7 +706,7 @@ PyObject *channel_write(PyObject *self, PyObject *args) {
     return nullptr;
   }
   zx_status_t status =
-      ffx_channel_write_etc(mod::get_module_state()->ctx, channel->channel(),
+      ffx_channel_write_etc(mod::get_module_state()->ctx, channel->handle(),
                             static_cast<const char *>(view.buf), view.len, c_handles, handles_len);
   if (status != ZX_OK) {
     PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
@@ -714,7 +734,7 @@ PyObject *channel_read(PyObject *self, PyObject *args) {
   static uint64_t actual_bytes_count = 0;
   static uint64_t actual_handles_count = 0;
 
-  auto status = ffx_channel_read(mod::get_module_state()->ctx, channel->channel(), c_buf, c_buf_len,
+  auto status = ffx_channel_read(mod::get_module_state()->ctx, channel->handle(), c_buf, c_buf_len,
                                  handles, handles_len, &actual_bytes_count, &actual_handles_count);
   if (status != ZX_OK) {
     // Lint suppressed because we are asserting on the sizeof(long),
@@ -863,7 +883,7 @@ PyObject *channel_as_int(PyObject *self, PyObject *args) {
   if (!channel) {
     return nullptr;
   }
-  return PyLong_FromUnsignedLongLong(channel->channel());
+  return PyLong_FromUnsignedLongLong(channel->handle());
 }
 
 PyObject *channel_take(PyObject *self, PyObject *args) {
@@ -1036,6 +1056,8 @@ PyMethodDef FuchsiaControllerMethods[] = {
     {"handle_as_int", reinterpret_cast<PyCFunction>(handle_as_int), METH_VARARGS, nullptr},
     {"handle_take", reinterpret_cast<PyCFunction>(handle_take), METH_VARARGS, nullptr},
     {"handle_create", reinterpret_cast<PyCFunction>(handle_create), METH_VARARGS, nullptr},
+    {"handle_koid", reinterpret_cast<PyCFunction>(handle_koid_helper<PythonHandle>), METH_VARARGS,
+     nullptr},
 
     // v2 methods for Context
     {"context_create", reinterpret_cast<PyCFunction>(context_create), METH_VARARGS, nullptr},
@@ -1061,6 +1083,8 @@ PyMethodDef FuchsiaControllerMethods[] = {
     {"channel_take", reinterpret_cast<PyCFunction>(channel_take), METH_VARARGS, nullptr},
     {"channel_create", reinterpret_cast<PyCFunction>(channel_create), METH_NOARGS, nullptr},
     {"channel_from_int", reinterpret_cast<PyCFunction>(channel_from_int), METH_VARARGS, nullptr},
+    {"channel_koid", reinterpret_cast<PyCFunction>(handle_koid_helper<PythonChannel>), METH_VARARGS,
+     nullptr},
 
     // v2 methods for socket
     {"socket_read", reinterpret_cast<PyCFunction>(socket_read), METH_VARARGS, nullptr},
@@ -1071,6 +1095,8 @@ PyMethodDef FuchsiaControllerMethods[] = {
     {"connect_handle_notifier", reinterpret_cast<PyCFunction>(connect_handle_notifier),
      METH_VARARGS, nullptr},
     {"socket_from_int", reinterpret_cast<PyCFunction>(socket_from_int), METH_VARARGS, nullptr},
+    {"socket_koid", reinterpret_cast<PyCFunction>(handle_koid_helper<PythonSocket>), METH_VARARGS,
+     nullptr},
 
     // event methods
     {"event_from_int", reinterpret_cast<PyCFunction>(event_from_int), METH_VARARGS, nullptr},
@@ -1079,6 +1105,8 @@ PyMethodDef FuchsiaControllerMethods[] = {
     {"event_signal_peer", reinterpret_cast<PyCFunction>(event_signal_peer), METH_VARARGS, nullptr},
     {"event_create", reinterpret_cast<PyCFunction>(event_create), METH_NOARGS, nullptr},
     {"event_create_pair", reinterpret_cast<PyCFunction>(event_create_pair), METH_NOARGS, nullptr},
+    {"event_koid", reinterpret_cast<PyCFunction>(handle_koid_helper<PythonEvent>), METH_VARARGS,
+     nullptr},
 
     // v2 methods for IsolateDir (create, get name)
     {"isolate_dir_create", reinterpret_cast<PyCFunction>(isolate_dir_create), METH_VARARGS,
