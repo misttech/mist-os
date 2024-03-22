@@ -166,7 +166,13 @@ async fn unified_reader() -> Result<(), Error> {
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
-    retrieve_and_validate_results(accessor, Vec::new(), &UNIFIED_ALL_GOLDEN, 4).await;
+    // The following hierarchies are expected:
+    //  - puppet_inspect_sink: 1 hierarchy published with InspectSink
+    //  - puppet_diagnostics_dir_methods: 1 VMO, 1 Tree, 1 deprecated Inspect hierarchies
+    //  - archivist: archivist own hierarchy
+    const ALL_INSPECT_ENTRIES: usize = 5;
+    retrieve_and_validate_results(accessor, Vec::new(), &UNIFIED_ALL_GOLDEN, ALL_INSPECT_ENTRIES)
+        .await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
@@ -174,13 +180,21 @@ async fn unified_reader() -> Result<(), Error> {
         accessor,
         vec!["puppet*:*:lazy-*"],
         &UNIFIED_SINGLE_VALUE_GOLDEN,
+        // only one puppet exposes lazy nodes.
         1,
     )
     .await;
 
     // Then verify that subtree selection retrieves all trees under and including root.
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
-    retrieve_and_validate_results(accessor, vec!["puppet*:root"], &UNIFIED_ALL_GOLDEN, 4).await;
+    retrieve_and_validate_results(
+        accessor,
+        vec!["puppet*:root"],
+        &UNIFIED_ALL_GOLDEN,
+        // we are selecting puppets, so we don't expect archivist own Inspect
+        ALL_INSPECT_ENTRIES - 1,
+    )
+    .await;
 
     // Then verify that a selector with a correct moniker, but no resolved nodes
     // produces an error schema.
@@ -189,7 +203,8 @@ async fn unified_reader() -> Result<(), Error> {
         accessor,
         vec!["puppet*:root/non-existent-node:bloop"],
         &UNIFIED_FULL_FILTER_GOLDEN,
-        3,
+        // we are selecting puppet, so we don't expect archivist own inspect
+        ALL_INSPECT_ENTRIES - 1,
     )
     .await;
 
