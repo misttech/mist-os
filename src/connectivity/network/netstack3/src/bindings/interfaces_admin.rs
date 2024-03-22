@@ -513,7 +513,6 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
     let device_state = {
         device_state
             .then(|DeviceState { online }| async move {
-                tracing::debug!("observed interface {} online = {}", id, online);
                 enabled_controller.set_phy_up(online).await;
             })
             .fuse()
@@ -1810,23 +1809,41 @@ mod enabled {
         pub(super) async fn set_phy_up(&self, online: bool) {
             let Self { id, ctx } = self;
             let mut ctx = ctx.lock().await;
-            match ctx
-                .bindings_ctx()
-                .devices
-                .get_core_id(*id)
-                .expect("device not present")
-                .external_state()
-            {
+            let core_id = ctx.bindings_ctx().devices.get_core_id(*id).expect("device not present");
+            let original_state = match core_id.external_state() {
                 devices::DeviceSpecificInfo::Ethernet(i) => {
-                    i.with_dynamic_info_mut(|i| i.netdevice.phy_up = online)
+                    i.with_dynamic_info_mut(|i| std::mem::replace(&mut i.netdevice.phy_up, online))
                 }
                 i @ devices::DeviceSpecificInfo::Loopback(_) => {
                     unreachable!("unexpected device info {:?} for interface {}", i, *id)
                 }
                 devices::DeviceSpecificInfo::PureIp(i) => {
-                    i.with_dynamic_info_mut(|i| i.phy_up = online)
+                    i.with_dynamic_info_mut(|i| std::mem::replace(&mut i.phy_up, online))
                 }
             };
+
+            match (original_state, online) {
+                (true, true) | (false, false) => {
+                    tracing::debug!(
+                        "observed no-op port status update on interface {:?}. online = {}",
+                        core_id,
+                        online
+                    );
+                }
+                (true, false) => {
+                    tracing::warn!(
+                        "observed port status change to offline on interface {:?}",
+                        core_id
+                    )
+                }
+                (false, true) => {
+                    tracing::info!(
+                        "observed port status change to online on interface {:?}",
+                        core_id
+                    )
+                }
+            }
+
             // Enable or disable interface with context depending on new
             // online status. The helper functions take care of checking if
             // admin enable is the expected value.
@@ -1871,7 +1888,7 @@ mod enabled {
             // The update functions from core are already capable of identifying
             // deltas and return the previous values for us. Log the deltas for
             // info.
-            let v4_was_enabled = ctx
+            let was_v4_previously_enabled = ctx
                 .api()
                 .device_ip::<Ipv4>()
                 .update_configuration(
@@ -1883,7 +1900,7 @@ mod enabled {
                 .ip_enabled
                 .expect("ip enabled must be informed");
 
-            let v6_was_enabled = ctx
+            let was_v6_previously_enabled = ctx
                 .api()
                 .device_ip::<Ipv6>()
                 .update_configuration(
@@ -1895,7 +1912,10 @@ mod enabled {
                 .ip_enabled
                 .expect("ip enabled must be informed");
 
-            tracing::info!("updated core ip_enabled state to {dev_enabled}, prev v4={v4_was_enabled},v6={v6_was_enabled}");
+            tracing::info!(
+                "updated core IPv4 and IPv6 enabled state to {dev_enabled} on {core_id:?}, \
+                prev v4={was_v4_previously_enabled},v6={was_v6_previously_enabled}"
+            );
         }
     }
 }

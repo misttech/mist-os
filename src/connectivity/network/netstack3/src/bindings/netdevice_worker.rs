@@ -663,6 +663,7 @@ impl DeviceHandler {
             .update_configuration(&core_id, Ipv4DeviceConfigurationUpdate { ip_config })
             .unwrap();
 
+        tracing::info!("created interface {:?}", core_id);
         ctx.bindings_ctx().devices.add_device(binding_id, core_id);
 
         Ok((binding_id, status_stream, task))
