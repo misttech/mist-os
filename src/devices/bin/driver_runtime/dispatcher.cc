@@ -973,12 +973,16 @@ fit::result<Dispatcher::NonInlinedReason> Dispatcher::ShouldInline(
   //
   // If it is unknown which driver is calling this function, it is considered
   // to be potentially reentrant.
+  //
   // The call stack may be empty if the user writes to a channel, or registers a
   // read callback on a thread not managed by the driver runtime.
-  if (driver_context::IsCallStackEmpty()) {
+  // We use |GetCurrentDriver| rather than |IsCallStackEmpty| as this also
+  // handles the case where the testing dispatcher is set as the thread's default dispatcher.
+  if (!driver_context::GetCurrentDriver()) {
     return fit::error(NonInlinedReason::kUnknownThread);
   }
-  if (driver_context::IsDriverInCallStack(owner_)) {
+  if ((driver_context::GetCurrentDriver() == owner_) ||
+      driver_context::IsDriverInCallStack(owner_)) {
     return fit::error(NonInlinedReason::kReentrant);
   }
   return fit::ok();

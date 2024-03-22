@@ -37,8 +37,8 @@ TEST_F(ShutdownProcessTest, ShutdownProcessAsyncLoop) {
   libsync::Completion shutdown_completion;
   auto shutdown_handler = [&](fdf_dispatcher_t* dispatcher) { shutdown_completion.Signal(); };
 
-  auto dispatcher =
-      fdf_env::DispatcherBuilder::CreateUnsynchronizedWithOwner(driver, {}, "", shutdown_handler);
+  auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      driver, fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
 
   auto channels = fdf::ChannelPair::Create(0);
@@ -58,7 +58,7 @@ TEST_F(ShutdownProcessTest, ShutdownProcessAsyncLoop) {
       });
   ASSERT_OK(channel_read->Begin(dispatcher->get()));
 
-  // Call is reentrant, so the read will be queued on the async loop.
+  // The receiving dispatcher is blocking, so the read will be queued on the async loop.
   ASSERT_EQ(ZX_OK, fdf_channel_write(remote.get(), 0, nullptr, nullptr, 0, nullptr, 0));
   // This will queue the wait to run |Dispatcher::CompleteShutdown|.
   dispatcher->ShutdownAsync();

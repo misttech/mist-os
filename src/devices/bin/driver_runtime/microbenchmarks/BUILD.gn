@@ -37,10 +37,11 @@ executable("bin") {
   public_deps = [ "//zircon/system/ulib/perftest" ]
 }
 
-fuchsia_package_with_single_component("driver_runtime_microbenchmarks") {
-  testonly = true
-  deps = [ ":bin" ]
+fuchsia_unittest_package("driver_runtime_microbenchmarks") {
   manifest = "meta/driver_runtime_microbenchmarks.cml"
+
+  deps = [ ":bin" ]
+  test_type = "system"
 }
 
 fuchsia_component_perf_test("driver_runtime_microbenchmarks_test") {

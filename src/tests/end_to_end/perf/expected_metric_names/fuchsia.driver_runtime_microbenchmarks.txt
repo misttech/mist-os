@@ -90,5 +90,6 @@ fuchsia.driver_runtime: OneWay_Zircon_1024_64bytes
 fuchsia.driver_runtime: OneWay_Zircon_1024_65536bytes
 fuchsia.driver_runtime: OneWay_Zircon_1_64bytes
 fuchsia.driver_runtime: OneWay_Zircon_1_65536bytes
+fuchsia.driver_runtime: RoundTrip_ChannelCall
 fuchsia.driver_runtime: RoundTrip_ChannelDispatcher_AllowSyncCalls
 fuchsia.driver_runtime: RoundTrip_ChannelDispatcher_Synchronized
