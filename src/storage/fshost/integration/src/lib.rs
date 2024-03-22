@@ -7,6 +7,7 @@ use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback,
     fidl_fuchsia_fxfs::BlobReaderMarker,
     fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
+    fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol_at_dir_root,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_merkle::MerkleTreeBuilder,
@@ -16,6 +17,7 @@ use {
         FutureExt as _, StreamExt as _,
     },
     ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
+    std::time::Duration,
 };
 
 pub mod disk_builder;
@@ -324,8 +326,15 @@ impl TestFixture {
 
     pub async fn add_ramdisk(&mut self, vmo: zx::Vmo) {
         let dev = self.dir("dev-topological", fio::OpenFlags::empty());
-        let ramdisk =
-            RamdiskClientBuilder::new_with_vmo(vmo, Some(512)).dev_root(dev).build().await.unwrap();
+        let ramdisk = futures::select_biased!(
+            res = RamdiskClientBuilder::new_with_vmo(vmo, Some(512))
+                .dev_root(dev)
+                .build()
+                .fuse() => res,
+            _ = fasync::Timer::new(Duration::from_secs(120))
+                .fuse() => panic!("Timed out waiting for RamdiskClient"),
+        )
+        .unwrap();
         self.ramdisks.push(ramdisk);
     }
 
