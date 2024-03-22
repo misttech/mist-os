@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/dist/resource.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
@@ -13,6 +14,8 @@ import("//build/toolchain/zircon/user_basic_redirect.gni")
 # Everything in this list has can_be_in_process = true.
 in_process_executables = [
   ":ret17",
+  ":partial-page-bss",
+  ":partial-page-bss-garbage-at-eof",
   ":relative-reloc",
   ":symbolic-reloc",
   ":ld-dep",
@@ -387,6 +390,54 @@ config("test-executable.in-process.config") {
 test_executable("ret17") {
   can_be_in_process = true
   sources = [ "ret17.cc" ]
+}
+
+test_executable("partial-page-bss") {
+  can_be_in_process = true
+  sources = [ "partial-page-bss.cc" ]
+}
+
+# With --strip-sections, the file will usually end at the end of the last
+# segment's p_offset + p_filesz anyway, so there won't be any data in the
+# partial page needing zeroing and it will actually just be zero already in the
+# mapped file.  So gin up a version of the partial-page-bss executable that has
+# some nonzero garbage appended to the file so that the partial page will
+# certainly be nonzero and the logic for zeroing it will really get tested.
+foreach(suffix,
+        [
+          "",
+          ".in-process",
+          ".module",
+        ]) {
+  if (current_toolchain != shlib_toolchain || suffix == ".module") {
+    action("gen-partial-page-bss-garbage-at-eof$suffix") {
+      visibility = [ ":*" ]
+      testonly = true
+      script = "garbage-at-eof.sh"
+      deps = [ ":partial-page-bss$suffix" ]
+      if (suffix == ".module") {
+        suffix += ".so"
+      }
+      sources = [ "$root_out_dir/partial-page-bss$suffix" ]
+      outputs = [ "$root_out_dir/partial-page-bss-garbage-at-eof$suffix" ]
+      args = rebase_path(sources + outputs, root_build_dir)
+    }
+    resource("partial-page-bss-garbage-at-eof$suffix") {
+      visibility = [ ":*" ]
+      testonly = true
+      deps = [ ":gen-partial-page-bss-garbage-at-eof$suffix" ]
+      sources = get_target_outputs(deps[0])
+      outputs = [ "bin/{{source_file_part}}" ]
+      allow_binary_output_dir = true
+    }
+    if (!is_fuchsia) {
+      host_test_data("partial-page-bss-garbage-at-eof$suffix.host-test-data") {
+        deps = [ ":gen-partial-page-bss-garbage-at-eof$suffix" ]
+        sources = get_target_outputs(deps[0])
+        outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
+      }
+    }
+  }
 }
 
 test_executable("relative-reloc") {
