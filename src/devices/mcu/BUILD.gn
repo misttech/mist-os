@@ -4,18 +4,10 @@
 
 group("drivers") {
   testonly = true
-  deps = [
-    "drivers/chromiumos-ec-core",
-    "drivers/chromiumos-ec-lpc",
-    "drivers/vim3-mcu",
-  ]
+  deps = [ "drivers/vim3-mcu" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [
-    "drivers/chromiumos-ec-core:tests",
-    "drivers/chromiumos-ec-lpc:tests",
-    "drivers/vim3-mcu:tests",
-  ]
+  deps = [ "drivers/vim3-mcu:tests" ]
 }

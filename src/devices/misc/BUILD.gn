@@ -5,7 +5,6 @@
 group("drivers") {
   testonly = true
   deps = [
-    "drivers/chromeos-acpi",
     "drivers/compat",
     "drivers/packaged:component",
     "drivers/test",

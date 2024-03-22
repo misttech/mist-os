@@ -64,9 +64,6 @@ source_set("cpp_disable_synchronization_check") {
   visibility = [
     "//src/developer/adb/bin/adb-file-sync:adb-file-sync",
     "//src/devices/light-sensor/drivers/ams-light:ams-light-test-bin",
-    "//src/devices/mcu/drivers/chromiumos-ec-lpc:_driver.shlib-used.driver",
-    "//src/devices/mcu/drivers/chromiumos-ec-lpc:chromiumos-ec-lpc-unit-tests",
-    "//src/devices/mcu/drivers/chromiumos-ec-lpc:driver",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/ui/input/drivers/gt6853:gt6853-test",
   ]

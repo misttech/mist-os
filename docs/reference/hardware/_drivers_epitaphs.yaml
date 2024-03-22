@@ -572,3 +572,21 @@
   available_in_git: 'a471907b40917cc1a5274530ca34b45ac1ce0a84'
   areas: ['USB']
   path: '/src/devices/usb/drivers/a1-usb-phy'
+- short_description: 'chromiumos ec driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '916512'
+  available_in_git: '3e513d4cbd1b97750d4b92012ae56078084be57e'
+  areas: ['Board']
+  path: '/src/devices/mcu/drivers/chromiumos-ec-core'
+- short_description: 'chromiumos ec driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '916512'
+  available_in_git: '3e513d4cbd1b97750d4b92012ae56078084be57e'
+  areas: ['Board']
+  path: '/src/devices/mcu/drivers/chromiumos-ec-lpc'
+- short_description: 'chromiumos ec driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '916512'
+  available_in_git: '3e513d4cbd1b97750d4b92012ae56078084be57e'
+  areas: ['Board']
+  path: '/src/devices/mcu/drivers/chromiumos-acpi'
