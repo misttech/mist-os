@@ -57,6 +57,38 @@ bt_lacewing_vim3_env = {
   }
 }
 
+wlan_astro_ap_env = {
+  dimensions = {
+    access_points = "1"
+    device_type = "Astro"
+    pool = "fuchsia.tests.connectivity"
+  }
+}
+
+wlan_sherlock_ap_env = {
+  dimensions = {
+    access_points = "1"
+    device_type = "Sherlock"
+    pool = "fuchsia.tests.connectivity"
+  }
+}
+
+wlan_nelson_ap_env = {
+  dimensions = {
+    access_points = "1"
+    device_type = "Nelson"
+    pool = "fuchsia.tests.connectivity"
+  }
+}
+
+wlan_vim3_ap_env = {
+  dimensions = {
+    access_points = "1"
+    device_type = "Vim3"
+    pool = "fuchsia.tests.connectivity"
+  }
+}
+
 linux_env = {
   dimensions = {
     os = "Linux"
@@ -264,6 +296,14 @@ guest_vulkan_envs = guest_envs - [
 lacewing_bluetooth_envs = [
   bt_lacewing_sherlock_env,
   bt_lacewing_vim3_env,
+]
+
+# Set of environments for Honeydew WLAN testing with AP present.
+lacewing_wlan_ap_envs = [
+  wlan_astro_ap_env,
+  wlan_sherlock_ap_env,
+  wlan_nelson_ap_env,
+  wlan_vim3_ap_env,
 ]
 
 basic_envs = []
