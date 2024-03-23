@@ -2816,7 +2816,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "bool",
@@ -2869,7 +2868,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "bool",
@@ -2919,7 +2917,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "bool",
@@ -2972,7 +2969,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "response",
           "type": {
             "kind": "identifier",
@@ -2997,7 +2993,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "err",
           "type": {
             "kind": "primitive",
@@ -3049,7 +3044,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "response",
           "type": {
             "kind": "identifier",
@@ -3074,7 +3068,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "err",
           "type": {
             "kind": "primitive",
@@ -3126,7 +3119,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "response",
           "type": {
             "kind": "identifier",
@@ -3151,7 +3143,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "err",
           "type": {
             "kind": "primitive",
@@ -3203,7 +3194,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "response",
           "type": {
             "kind": "identifier",
@@ -3228,7 +3218,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "err",
           "type": {
             "kind": "primitive",
@@ -3280,7 +3269,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "response",
           "type": {
             "kind": "identifier",
@@ -3305,7 +3293,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "err",
           "type": {
             "kind": "primitive",
@@ -3357,7 +3344,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "response",
           "type": {
             "kind": "identifier",
@@ -3382,7 +3368,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "err",
           "type": {
             "kind": "primitive",
@@ -3434,7 +3419,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "response",
           "type": {
             "kind": "identifier",
@@ -3459,7 +3443,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "err",
           "type": {
             "kind": "primitive",
@@ -3542,7 +3525,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "x",
           "type": {
             "kind": "primitive",
@@ -3595,7 +3577,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "a",
           "type": {
             "kind": "primitive",
@@ -3649,7 +3630,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "a",
           "type": {
             "kind": "primitive",
@@ -3700,7 +3680,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "a",
           "type": {
             "kind": "primitive",

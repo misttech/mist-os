@@ -135,7 +135,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "string_array",
             "element_count": 100,
@@ -184,7 +183,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "string_array",
             "element_count": 2,
@@ -235,7 +233,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "a",
           "type": {
             "kind": "string_array",
@@ -285,7 +282,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "a",
           "type": {
             "kind": "string_array",

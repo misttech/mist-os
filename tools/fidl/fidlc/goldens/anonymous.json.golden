@@ -730,7 +730,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "string",
             "maybe_element_count": 100,
@@ -754,18 +753,7 @@
           }
         },
         {
-          "ordinal": 2,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
-            "line": 17,
-            "column": 9,
-            "length": 11
-          }
-        },
-        {
           "ordinal": 3,
-          "reserved": false,
           "type": {
             "kind": "vector",
             "element_type": {
@@ -804,7 +792,6 @@
         },
         {
           "ordinal": 4,
-          "reserved": false,
           "type": {
             "kind": "identifier",
             "identifier": "test.anonymous/Flags",
@@ -856,18 +843,7 @@
       },
       "members": [
         {
-          "ordinal": 1,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
-            "line": 32,
-            "column": 13,
-            "length": 11
-          }
-        },
-        {
           "ordinal": 2,
-          "reserved": false,
           "type": {
             "kind": "vector",
             "element_type": {
@@ -945,7 +921,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "value",
           "type": {
             "kind": "primitive",
@@ -969,7 +944,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "bin_op",
           "type": {
             "kind": "identifier",
@@ -994,7 +968,6 @@
         },
         {
           "ordinal": 3,
-          "reserved": false,
           "name": "function_application",
           "type": {
             "kind": "identifier",
@@ -1047,7 +1020,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "response",
           "type": {
             "kind": "identifier",
@@ -1072,7 +1044,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "err",
           "type": {
             "kind": "identifier",
@@ -1125,18 +1096,7 @@
       },
       "members": [
         {
-          "ordinal": 1,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
-            "line": 28,
-            "column": 13,
-            "length": 11
-          }
-        },
-        {
           "ordinal": 2,
-          "reserved": false,
           "name": "union_data",
           "type": {
             "kind": "primitive",

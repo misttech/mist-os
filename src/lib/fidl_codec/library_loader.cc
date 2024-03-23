@@ -132,15 +132,9 @@ std::string Bits::GetName(uint64_t absolute_value, bool negative) const {
 UnionMember::UnionMember(const Union& union_definition, Library* enclosing_library,
                          const rapidjson::Value* json_definition)
     : union_definition_(union_definition),
-      reserved_(
-          enclosing_library->ExtractBool(json_definition, "table member", "<unknown>", "reserved")),
-      name_(reserved_ ? "<reserved>"
-                      : enclosing_library->ExtractString(json_definition, "union member",
-                                                         "<unknown>", "name")),
+      name_(enclosing_library->ExtractString(json_definition, "union member", "<unknown>", "name")),
       ordinal_(enclosing_library->ExtractUint64(json_definition, "union member", name_, "ordinal")),
-      type_(reserved_
-                ? std::make_unique<InvalidType>()
-                : enclosing_library->ExtractType(json_definition, "union member", name_, "type")) {}
+      type_(enclosing_library->ExtractType(json_definition, "union member", name_, "type")) {}
 
 Union::Union(Library* enclosing_library, const rapidjson::Value* json_definition)
     : enclosing_library_(enclosing_library), json_definition_(json_definition) {}
@@ -168,9 +162,6 @@ void Union::DecodeTypes() {
 const UnionMember* Union::MemberFromOrdinal(Ordinal64 ordinal) const {
   for (const auto& member : members_) {
     if (member->ordinal() == ordinal) {
-      if (member->reserved()) {
-        return nullptr;
-      }
       return member.get();
     }
   }
@@ -261,15 +252,9 @@ std::string Struct::ToString(bool expand) const {
 }
 
 TableMember::TableMember(Library* enclosing_library, const rapidjson::Value* json_definition)
-    : reserved_(
-          enclosing_library->ExtractBool(json_definition, "table member", "<unknown>", "reserved")),
-      name_(reserved_ ? "<reserved>"
-                      : enclosing_library->ExtractString(json_definition, "table member",
-                                                         "<unknown>", "name")),
+    : name_(enclosing_library->ExtractString(json_definition, "table member", "<unknown>", "name")),
       ordinal_(enclosing_library->ExtractUint32(json_definition, "table member", name_, "ordinal")),
-      type_(reserved_
-                ? std::make_unique<InvalidType>()
-                : enclosing_library->ExtractType(json_definition, "table member", name_, "type")) {}
+      type_(enclosing_library->ExtractType(json_definition, "table member", name_, "type")) {}
 
 Table::Table(Library* enclosing_library, const rapidjson::Value* json_definition)
     : enclosing_library_(enclosing_library), json_definition_(json_definition) {}

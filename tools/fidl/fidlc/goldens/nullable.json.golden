@@ -719,7 +719,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "a",
           "type": {
             "kind": "primitive",
@@ -743,7 +742,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "b",
           "type": {
             "kind": "primitive",

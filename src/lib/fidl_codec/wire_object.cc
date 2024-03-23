@@ -411,7 +411,7 @@ bool TableValue::NeedsToLoadHandleInfo(int64_t timestamp, zx_koid_t tid,
 size_t TableValue::DisplaySize(const Type* for_type, size_t remaining_size) const {
   size_t size = 0;
   for (const auto& member : table_definition_.members()) {
-    if ((member != nullptr) && !member->reserved()) {
+    if (member != nullptr) {
       auto it = members_.find(member.get());
       if ((it == members_.end()) || (it->second == nullptr) || it->second->IsNull())
         continue;
@@ -437,7 +437,7 @@ void TableValue::PrettyPrint(const Type* for_type, PrettyPrinter& printer) const
   } else if (display_size <= printer.remaining_size()) {
     const char* separator = "{ ";
     for (const auto& member : table_definition_.members()) {
-      if ((member != nullptr) && !member->reserved()) {
+      if (member != nullptr) {
         auto it = members_.find(member.get());
         if ((it == members_.end()) || (it->second == nullptr) || it->second->IsNull())
           continue;
@@ -453,7 +453,7 @@ void TableValue::PrettyPrint(const Type* for_type, PrettyPrinter& printer) const
     {
       Indent indent(printer);
       for (const auto& member : table_definition_.members()) {
-        if ((member != nullptr) && !member->reserved()) {
+        if (member != nullptr) {
           auto it = members_.find(member.get());
           if ((it == members_.end()) || (it->second == nullptr) || it->second->IsNull())
             continue;

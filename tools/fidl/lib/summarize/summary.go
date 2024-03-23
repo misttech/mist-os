@@ -70,12 +70,8 @@ func (s *summarizer) addElement(e element) {
 func (s *summarizer) addUnions(unions []fidlgen.Union) {
 	for _, st := range unions {
 		for _, m := range st.Members {
-			if m.Reserved {
-				// Disregard reserved members.
-				continue
-			}
 			s.addElement(newMember(
-				&s.symbols, st.Name, m.Name, *m.Type, fidlgen.UnionDeclType, m.Ordinal, nil))
+				&s.symbols, st.Name, m.Name, m.Type, fidlgen.UnionDeclType, m.Ordinal, nil))
 		}
 		s.addElement(
 			newAggregateWithStrictness(
@@ -87,11 +83,7 @@ func (s *summarizer) addUnions(unions []fidlgen.Union) {
 func (s *summarizer) addTables(tables []fidlgen.Table) {
 	for _, st := range tables {
 		for _, m := range st.Members {
-			if m.Reserved {
-				// Disregard reserved members
-				continue
-			}
-			s.addElement(newMember(&s.symbols, st.Name, m.Name, *m.Type, fidlgen.TableDeclType, m.Ordinal, nil))
+			s.addElement(newMember(&s.symbols, st.Name, m.Name, m.Type, fidlgen.TableDeclType, m.Ordinal, nil))
 		}
 		s.addElement(newAggregate(st.Name, st.Resourceness, fidlgen.TableDeclType))
 	}

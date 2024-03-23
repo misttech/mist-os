@@ -27,7 +27,7 @@ lazy_static! {
         FieldShape { offset: Count(0), padding: Count(0) };
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Ordinal(#[serde(deserialize_with = "validate_ordinal")] pub u64);
 
@@ -517,20 +517,14 @@ impl Struct {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableMember {
-    pub reserved: bool,
     #[serde(rename = "type")]
-    pub _type: Option<Type>,
-    pub name: Option<Identifier>,
+    pub _type: Type,
+    pub name: Identifier,
     pub location: Option<Location>,
     pub ordinal: Ordinal,
-    pub size: Option<Count>,
-    pub max_out_of_line: Option<Count>,
-    pub alignment: Option<Count>,
-    pub offset: Option<Count>,
     pub maybe_attributes: Option<Vec<Attribute>>,
-    pub maybe_default_value: Option<Constant>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -549,13 +543,10 @@ pub struct Table {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnionMember {
     pub ordinal: Ordinal,
-    pub reserved: bool,
-    pub name: Option<Identifier>,
+    pub name: Identifier,
     #[serde(rename = "type")]
-    pub _type: Option<Type>,
+    pub _type: Type,
     pub location: Option<Location>,
-    pub max_out_of_line: Option<Count>,
-    pub offset: Option<Count>,
     pub maybe_attributes: Option<Vec<Attribute>>,
     pub experimental_maybe_from_alias: Option<TypeConstructor>,
 }
@@ -854,14 +845,12 @@ fn get_payload_parameters<'a>(
 
             // Flatten the table members into method parameters.
             for member in &table_decl.members {
-                let offset_field_shape = FieldShape {
-                    offset: member.offset.unwrap_or(Count(0)) + 16,
-                    padding: Count(0),
-                };
+                let offset_field_shape =
+                    FieldShape { offset: Count(member.ordinal.0 as u32 * 16), padding: Count(0) };
                 out.push(MethodParameter {
                     maybe_attributes: &member.maybe_attributes,
-                    _type: member._type.clone().unwrap(),
-                    name: &member.name.as_ref().unwrap(),
+                    _type: member._type.clone(),
+                    name: &member.name,
                     location: &member.location,
                     field_shape_v2: offset_field_shape,
                     experimental_maybe_from_alias: None,

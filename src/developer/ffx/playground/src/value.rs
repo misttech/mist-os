@@ -301,59 +301,34 @@ impl ValueExt for Value {
                     lib::LookupResult::Table(tbl) => FidlValue::Object(
                         a.into_iter()
                             .map(|(key, val)| {
-                                let ty = tbl
+                                let (_, member) = tbl
                                     .members
                                     .iter()
-                                    .find_map(|(_, x)| {
-                                        if let lib::TableOrUnionMember::Used {
-                                            name,
-                                            ty,
-                                            ordinal: _,
-                                        } = x
-                                        {
-                                            if name == &key {
-                                                Some(ty)
-                                            } else {
-                                                None
-                                            }
-                                        } else {
-                                            None
-                                        }
-                                    })
+                                    .find(|(_, x)| x.name == key)
                                     .ok_or(error!("{name} does not have a member {key}"))?;
-                                Ok((key, val.to_fidl_value(ns, ty)?))
+                                Ok((key, val.to_fidl_value(ns, &member.ty)?))
                             })
                             .collect::<Result<_>>()?,
                     ),
                     lib::LookupResult::Union(un) => {
                         let item = a.pop();
-                        let (member, value) =
-                            if let Some((member, value)) = item.filter(|_| a.is_empty()) {
-                                (member, value)
+                        let (key, value) =
+                            if let Some((key, value)) = item.filter(|_| a.is_empty()) {
+                                (key, value)
                             } else {
                                 return Err(error!(
                                     "Struct coerced to union must have exactly one member"
                                 ));
                             };
-                        let ty = un
+                        let (_, member) = un
                             .members
                             .iter()
-                            .find_map(|(_, x)| {
-                                if let lib::TableOrUnionMember::Used { name, ty, ordinal: _ } = x {
-                                    if name == &member {
-                                        Some(ty)
-                                    } else {
-                                        None
-                                    }
-                                } else {
-                                    None
-                                }
-                            })
-                            .ok_or(error!("{name} does not have a member {member}"))?;
+                            .find(|(_, x)| x.name == key)
+                            .ok_or(error!("{name} does not have a member {key}"))?;
                         FidlValue::Union(
                             name.clone(),
-                            member,
-                            Box::new(value.to_fidl_value(ns, ty)?),
+                            key,
+                            Box::new(value.to_fidl_value(ns, &member.ty)?),
                         )
                     }
                     other => {
@@ -386,10 +361,8 @@ impl ValueExt for Value {
                     ));
                 };
                 for member in union.members.values() {
-                    if let lib::TableOrUnionMember::Used { name, ty, ordinal: _ } = member {
-                        if name == &b {
-                            return Ok(FidlValue::Union(a, b, Box::new(c.to_fidl_value(ns, ty)?)));
-                        }
+                    if member.name == b {
+                        return Ok(FidlValue::Union(a, b, Box::new(c.to_fidl_value(ns, &member.ty)?)));
                     }
                 }
 
@@ -415,16 +388,14 @@ impl ValueExt for Value {
                         let mut members = Vec::with_capacity(a.len());
                         for (i, value) in a.into_iter().enumerate() {
                             let ordinal = i as u64 + 1;
-                            let Some(lib::TableOrUnionMember::Used { name, ty, ordinal: _ }) =
-                                tbl.members.get(&ordinal)
-                            else {
+                            let Some(member) = tbl.members.get(&ordinal) else {
                                 if matches!(value, Value::Null) {
                                     continue;
                                 } else {
                                     return Err(error!("Cannot convert list to table because cannot encode a value at ordinal {ordinal}"));
                                 }
                             };
-                            members.push((name.to_owned(), value.to_fidl_value(ns, ty)?));
+                            members.push((member.name.to_owned(), value.to_fidl_value(ns, &member.ty)?));
                         }
                         FidlValue::Object(members)
                     }

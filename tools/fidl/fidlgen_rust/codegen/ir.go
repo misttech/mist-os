@@ -1511,12 +1511,9 @@ func (c *compiler) compileUnion(val fidlgen.Union) Union {
 		Name:  c.compileDeclIdentifier(val.Name),
 	}
 	for _, v := range val.Members {
-		if v.Reserved {
-			continue
-		}
 		r.Members = append(r.Members, UnionMember{
 			UnionMember: v,
-			Type:        c.compileType(*v.Type),
+			Type:        c.compileType(v.Type),
 			Name:        compileCamelIdentifier(v.Name),
 			Ordinal:     v.Ordinal,
 		})
@@ -1531,12 +1528,9 @@ func (c *compiler) compileTable(table fidlgen.Table) Table {
 		Name:  c.compileDeclIdentifier(table.Name),
 	}
 	for _, member := range table.Members {
-		if member.Reserved {
-			continue
-		}
 		r.Members = append(r.Members, TableMember{
 			TableMember: member,
-			Type:        c.compileType(*member.Type),
+			Type:        c.compileType(member.Type),
 			Name:        compileSnakeIdentifier(member.Name),
 			Ordinal:     member.Ordinal,
 		})

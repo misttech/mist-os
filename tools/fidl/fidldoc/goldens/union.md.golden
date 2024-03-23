@@ -174,22 +174,6 @@
             </td>
             <td></td>
         </tr>
-        <tr id="ExplicitFlexibleUnion.">
-<td><h3 id="ExplicitFlexibleUnion." class="add-link hide-from-toc">2</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="ExplicitFlexibleUnion.">
-<td><h3 id="ExplicitFlexibleUnion." class="add-link hide-from-toc">3</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
         <tr id="ExplicitFlexibleUnion.f">
 <td><h3 id="ExplicitFlexibleUnion.f" class="add-link hide-from-toc">4</h3></td>
             <td><code>f</code></td>
@@ -220,14 +204,6 @@
             </td>
             <td></td>
         </tr>
-        <tr id="ExplicitFoo.">
-<td><h3 id="ExplicitFoo." class="add-link hide-from-toc">3</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
 </table>
 
 ### ExplicitPizzaOrPasta [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#ExplicitPizzaOrPasta data-text="ExplicitPizzaOrPasta"}
@@ -239,22 +215,6 @@
             <td><code>pizza</code></td>
             <td>
                 <code><a class='link' href='#Pizza'>Pizza</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="ExplicitPizzaOrPasta.">
-<td><h3 id="ExplicitPizzaOrPasta." class="add-link hide-from-toc">2</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="ExplicitPizzaOrPasta.">
-<td><h3 id="ExplicitPizzaOrPasta." class="add-link hide-from-toc">3</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
             </td>
             <td></td>
         </tr>
@@ -272,14 +232,6 @@
 *Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=86)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="ExplicitStrictFoo.">
-<td><h3 id="ExplicitStrictFoo." class="add-link hide-from-toc">1</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
         <tr id="ExplicitStrictFoo.i">
 <td><h3 id="ExplicitStrictFoo.i" class="add-link hide-from-toc">2</h3></td>
             <td><code>i</code></td>
@@ -307,14 +259,6 @@
             <td><code>Primitive</code></td>
             <td>
                 <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="ExplicitUnion.">
-<td><h3 id="ExplicitUnion." class="add-link hide-from-toc">2</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
             </td>
             <td></td>
         </tr>
@@ -470,17 +414,6 @@
 
 ### OnlyReservedFlexibleUnion [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#OnlyReservedFlexibleUnion data-text="OnlyReservedFlexibleUnion"}
 *Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=164)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="OnlyReservedFlexibleUnion.">
-<td><h3 id="OnlyReservedFlexibleUnion." class="add-link hide-from-toc">1</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
-</table>
 
 ### PizzaOrPasta [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#PizzaOrPasta data-text="PizzaOrPasta"}
 *Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=11)*
@@ -697,14 +630,6 @@
             <td><code>x</code></td>
             <td>
                 <code>int64</code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnionWithAttributes.">
-<td><h3 id="UnionWithAttributes." class="add-link hide-from-toc">2</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
             </td>
             <td></td>
         </tr>

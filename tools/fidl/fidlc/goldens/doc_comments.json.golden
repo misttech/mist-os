@@ -1167,7 +1167,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int32",
@@ -1284,7 +1283,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "Field",
           "type": {
             "kind": "primitive",
@@ -1400,7 +1398,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "Field",
           "type": {
             "kind": "primitive",

@@ -79,7 +79,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -102,38 +101,7 @@
           }
         },
         {
-          "ordinal": 2,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/table.test.fidl",
-            "line": 20,
-            "column": 5,
-            "length": 11
-          }
-        },
-        {
-          "ordinal": 3,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/table.test.fidl",
-            "line": 21,
-            "column": 5,
-            "length": 11
-          }
-        },
-        {
-          "ordinal": 4,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/table.test.fidl",
-            "line": 22,
-            "column": 5,
-            "length": 11
-          }
-        },
-        {
           "ordinal": 5,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -157,7 +125,6 @@
         },
         {
           "ordinal": 6,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -177,16 +144,6 @@
             "line": 24,
             "column": 8,
             "length": 1
-          }
-        },
-        {
-          "ordinal": 7,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/table.test.fidl",
-            "line": 25,
-            "column": 5,
-            "length": 11
           }
         }
       ],
@@ -216,7 +173,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -236,16 +192,6 @@
             "line": 14,
             "column": 8,
             "length": 1
-          }
-        },
-        {
-          "ordinal": 2,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/table.test.fidl",
-            "line": 15,
-            "column": 5,
-            "length": 11
           }
         }
       ],
@@ -275,7 +221,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -299,7 +244,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -323,7 +267,6 @@
         },
         {
           "ordinal": 3,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -372,7 +315,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -395,38 +337,7 @@
           }
         },
         {
-          "ordinal": 2,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/table.test.fidl",
-            "line": 7,
-            "column": 5,
-            "length": 11
-          }
-        },
-        {
-          "ordinal": 3,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/table.test.fidl",
-            "line": 8,
-            "column": 5,
-            "length": 11
-          }
-        },
-        {
-          "ordinal": 4,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/table.test.fidl",
-            "line": 9,
-            "column": 5,
-            "length": 11
-          }
-        },
-        {
           "ordinal": 5,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -475,7 +386,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -499,7 +409,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -523,7 +432,6 @@
         },
         {
           "ordinal": 3,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -547,7 +455,6 @@
         },
         {
           "ordinal": 4,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -571,7 +478,6 @@
         },
         {
           "ordinal": 5,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -595,7 +501,6 @@
         },
         {
           "ordinal": 6,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -619,7 +524,6 @@
         },
         {
           "ordinal": 7,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -643,7 +547,6 @@
         },
         {
           "ordinal": 8,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -667,7 +570,6 @@
         },
         {
           "ordinal": 9,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -691,7 +593,6 @@
         },
         {
           "ordinal": 10,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -715,7 +616,6 @@
         },
         {
           "ordinal": 11,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -739,7 +639,6 @@
         },
         {
           "ordinal": 12,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -763,7 +662,6 @@
         },
         {
           "ordinal": 13,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -787,7 +685,6 @@
         },
         {
           "ordinal": 14,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -811,7 +708,6 @@
         },
         {
           "ordinal": 15,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -835,7 +731,6 @@
         },
         {
           "ordinal": 16,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -859,7 +754,6 @@
         },
         {
           "ordinal": 17,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -883,7 +777,6 @@
         },
         {
           "ordinal": 18,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -907,7 +800,6 @@
         },
         {
           "ordinal": 19,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -931,7 +823,6 @@
         },
         {
           "ordinal": 20,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -955,7 +846,6 @@
         },
         {
           "ordinal": 21,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -979,7 +869,6 @@
         },
         {
           "ordinal": 22,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1003,7 +892,6 @@
         },
         {
           "ordinal": 23,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1027,7 +915,6 @@
         },
         {
           "ordinal": 24,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1051,7 +938,6 @@
         },
         {
           "ordinal": 25,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1075,7 +961,6 @@
         },
         {
           "ordinal": 26,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1099,7 +984,6 @@
         },
         {
           "ordinal": 27,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1123,7 +1007,6 @@
         },
         {
           "ordinal": 28,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1147,7 +1030,6 @@
         },
         {
           "ordinal": 29,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1171,7 +1053,6 @@
         },
         {
           "ordinal": 30,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1195,7 +1076,6 @@
         },
         {
           "ordinal": 31,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1219,7 +1099,6 @@
         },
         {
           "ordinal": 32,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1243,7 +1122,6 @@
         },
         {
           "ordinal": 33,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1267,7 +1145,6 @@
         },
         {
           "ordinal": 34,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1291,7 +1168,6 @@
         },
         {
           "ordinal": 35,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1315,7 +1191,6 @@
         },
         {
           "ordinal": 36,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1339,7 +1214,6 @@
         },
         {
           "ordinal": 37,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1363,7 +1237,6 @@
         },
         {
           "ordinal": 38,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1387,7 +1260,6 @@
         },
         {
           "ordinal": 39,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1411,7 +1283,6 @@
         },
         {
           "ordinal": 40,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1435,7 +1306,6 @@
         },
         {
           "ordinal": 41,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1459,7 +1329,6 @@
         },
         {
           "ordinal": 42,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1483,7 +1352,6 @@
         },
         {
           "ordinal": 43,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1507,7 +1375,6 @@
         },
         {
           "ordinal": 44,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1531,7 +1398,6 @@
         },
         {
           "ordinal": 45,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1555,7 +1421,6 @@
         },
         {
           "ordinal": 46,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1579,7 +1444,6 @@
         },
         {
           "ordinal": 47,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1603,7 +1467,6 @@
         },
         {
           "ordinal": 48,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1627,7 +1490,6 @@
         },
         {
           "ordinal": 49,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1651,7 +1513,6 @@
         },
         {
           "ordinal": 50,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1675,7 +1536,6 @@
         },
         {
           "ordinal": 51,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1699,7 +1559,6 @@
         },
         {
           "ordinal": 52,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1723,7 +1582,6 @@
         },
         {
           "ordinal": 53,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1747,7 +1605,6 @@
         },
         {
           "ordinal": 54,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1771,7 +1628,6 @@
         },
         {
           "ordinal": 55,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1795,7 +1651,6 @@
         },
         {
           "ordinal": 56,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1819,7 +1674,6 @@
         },
         {
           "ordinal": 57,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1843,7 +1697,6 @@
         },
         {
           "ordinal": 58,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1867,7 +1720,6 @@
         },
         {
           "ordinal": 59,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1891,7 +1743,6 @@
         },
         {
           "ordinal": 60,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1915,7 +1766,6 @@
         },
         {
           "ordinal": 61,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1939,7 +1789,6 @@
         },
         {
           "ordinal": 62,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1963,7 +1812,6 @@
         },
         {
           "ordinal": 63,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -1987,7 +1835,6 @@
         },
         {
           "ordinal": 64,
-          "reserved": false,
           "type": {
             "kind": "identifier",
             "identifier": "test.table/ExtensionTable",
@@ -2049,7 +1896,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "int64",
@@ -2077,28 +1923,6 @@
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/table.test.fidl",
                 "line": 36,
-                "column": 5,
-                "length": 4
-              }
-            }
-          ]
-        },
-        {
-          "ordinal": 2,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/table.test.fidl",
-            "line": 38,
-            "column": 5,
-            "length": 20
-          },
-          "maybe_attributes": [
-            {
-              "name": "baz",
-              "arguments": [],
-              "location": {
-                "filename": "../../tools/fidl/fidlc/testdata/table.test.fidl",
-                "line": 38,
                 "column": 5,
                 "length": 4
               }

@@ -584,11 +584,9 @@ impl<'n> EncodeBuffer<'n> {
 
         if let Some((variant, value)) = entry {
             for member in union.members.values() {
-                if let library::TableOrUnionMember::Used { name, ty, ordinal } = member {
-                    if *name == *variant {
-                        self.bytes.extend(&ordinal.to_le_bytes());
-                        return self.encode_envelope(ty, value);
-                    }
+                if *member.name == *variant {
+                    self.bytes.extend(&member.ordinal.to_le_bytes());
+                    return self.encode_envelope(&member.ty, value);
                 }
             }
 
@@ -621,12 +619,9 @@ impl<'n> EncodeBuffer<'n> {
                 if values_array.len() <= array_idx {
                     values_array.resize_with(array_idx + 1, || None);
                 }
-
-                if let library::TableOrUnionMember::Used { name, ty, .. } = member {
-                    if *name == value_name {
-                        values_array[array_idx] = Some((ty, value));
-                        break;
-                    }
+                if *member.name == value_name {
+                    values_array[array_idx] = Some((&member.ty, value));
+                    break;
                 }
             }
         }

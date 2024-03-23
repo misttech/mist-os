@@ -69,7 +69,6 @@ type UnionMember struct {
 	StorageName       name
 	TagName           nameVariants
 	WireOrdinalName   name
-	Offset            int
 	HandleInformation *HandleInformation
 	NaturalConstraint string
 	WireConstraint    string
@@ -114,12 +113,9 @@ func (c *compiler) compileUnion(val fidlgen.Union) *Union {
 
 	naturalIndex := 1
 	for _, mem := range val.Members {
-		if mem.Reserved {
-			continue
-		}
 		name := unionMemberContext.transform(mem.Name)
 		tag := unionMemberTagContext.transform(mem.Name)
-		t := c.compileType(*mem.Type)
+		t := c.compileType(mem.Type)
 		u.Members = append(u.Members, UnionMember{
 			Attributes:        Attributes{mem.Attributes},
 			Ordinal:           uint64(mem.Ordinal),
@@ -128,7 +124,6 @@ func (c *compiler) compileUnion(val fidlgen.Union) *Union {
 			StorageName:       name.appendName("_").HLCPP,
 			TagName:           u.TagEnum.nestVariants(tag),
 			WireOrdinalName:   u.WireOrdinalEnum.nest(tag.Wire.Name()),
-			Offset:            mem.Offset,
 			HandleInformation: c.fieldHandleInformation(mem.Type),
 			NaturalConstraint: t.NaturalFieldConstraint,
 			WireConstraint:    t.WireFieldConstraint,
@@ -157,7 +152,7 @@ func (c *compiler) compileResult(p Payloader, m *fidlgen.Method) *Result {
 	}
 
 	var memberTypeNames []name
-	result.ValueParameters = p.AsParameters(&valueType, c.fieldHandleInformation(m.ValueType))
+	result.ValueParameters = p.AsParameters(&valueType, c.fieldHandleInformation(*m.ValueType))
 	for _, sm := range result.ValueParameters {
 		memberTypeNames = append(memberTypeNames, sm.Type.HLCPP)
 	}

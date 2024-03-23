@@ -1569,45 +1569,21 @@
                 "^experimental_": {}
             },
             "properties": {
-                "alignment": {
-                    "$ref": "#/definitions/count",
-                    "description": "Alignment of table member"
-                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
-                },
-                "max_out_of_line": {
-                    "$ref": "#/definitions/count",
-                    "description": "Maximum size of the out-of-line payload"
                 },
                 "maybe_attributes": {
                     "$ref": "#/definitions/attributes-list",
                     "description": "Optional list of table member attributes"
                 },
-                "maybe_default_value": {
-                    "$ref": "#/definitions/constant",
-                    "description": "Optional default value for table member"
-                },
                 "name": {
                     "$ref": "#/definitions/identifier",
                     "description": "Name of table member"
                 },
-                "offset": {
-                    "$ref": "#/definitions/count",
-                    "description": "Offset of table member"
-                },
                 "ordinal": {
                     "$ref": "#/definitions/ordinal",
                     "description": "Ordinal value of table member"
-                },
-                "reserved": {
-                    "description": "Flag indicating that field is reserved",
-                    "type": "boolean"
-                },
-                "size": {
-                    "$ref": "#/definitions/count",
-                    "description": "Size of table member"
                 },
                 "type": {
                     "$ref": "#/definitions/type",
@@ -1617,7 +1593,7 @@
             "required": [
                 "location",
                 "ordinal",
-                "reserved"
+                "type"
             ],
             "type": "object"
         },
@@ -1861,10 +1837,6 @@
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
                 },
-                "max_out_of_line": {
-                    "$ref": "#/definitions/count",
-                    "description": "Maximum size of the out-of-line payload"
-                },
                 "maybe_attributes": {
                     "$ref": "#/definitions/attributes-list",
                     "description": "Optional list of extensible union member attributes"
@@ -1873,17 +1845,9 @@
                     "$ref": "#/definitions/identifier",
                     "description": "Name of extensible union member"
                 },
-                "offset": {
-                    "$ref": "#/definitions/count",
-                    "description": "Offset of extensible union member"
-                },
                 "ordinal": {
                     "$ref": "#/definitions/ordinal",
                     "description": "Ordinal value of extensible union member"
-                },
-                "reserved": {
-                    "description": "Flag indicating that the member is reserved",
-                    "type": "boolean"
                 },
                 "type": {
                     "$ref": "#/definitions/type",
@@ -1893,7 +1857,7 @@
             "required": [
                 "location",
                 "ordinal",
-                "reserved"
+                "type"
             ],
             "type": "object"
         },
@@ -1965,10 +1929,6 @@
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
                 },
-                "max_out_of_line": {
-                    "$ref": "#/definitions/count",
-                    "description": "Maximum size of the out-of-line payload"
-                },
                 "maybe_attributes": {
                     "$ref": "#/definitions/attributes-list",
                     "description": "Optional list of overlay member attributes"
@@ -1977,17 +1937,9 @@
                     "$ref": "#/definitions/identifier",
                     "description": "Name of overlay member"
                 },
-                "offset": {
-                    "$ref": "#/definitions/count",
-                    "description": "Offset of overlay member"
-                },
                 "ordinal": {
                     "$ref": "#/definitions/ordinal",
                     "description": "Ordinal value of overlay member"
-                },
-                "reserved": {
-                    "description": "Flag indicating that the member is reserved",
-                    "type": "boolean"
                 },
                 "type": {
                     "$ref": "#/definitions/type",
@@ -1997,7 +1949,7 @@
             "required": [
                 "location",
                 "ordinal",
-                "reserved"
+                "type"
             ],
             "type": "object"
         },

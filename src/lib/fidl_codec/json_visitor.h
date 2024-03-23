@@ -78,7 +78,7 @@ class JsonVisitor : public Visitor {
   void VisitTableValue(const TableValue* node, const Type* for_type) override {
     result_->SetObject();
     for (const auto& member : node->table_definition().members()) {
-      if ((member != nullptr) && !member->reserved()) {
+      if (member != nullptr) {
         auto it = node->members().find(member.get());
         if ((it == node->members().end()) || (it->second == nullptr) || it->second->IsNull())
           continue;

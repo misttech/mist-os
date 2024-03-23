@@ -91,7 +91,7 @@ fn hash_by_ordinal<'de, D: Deserializer<'de>>(
 ) -> std::result::Result<HashMap<u64, TableOrUnionMember>, D::Error> {
     let mut ret = HashMap::new();
     for item in Vec::<TableOrUnionMember>::deserialize(deserializer)? {
-        ret.insert(item.ordinal(), item);
+        ret.insert(item.ordinal, item);
     }
     Ok(ret)
 }
@@ -137,76 +137,12 @@ pub struct TableOrUnion {
 }
 named!(TableOrUnion);
 
-impl From<Union> for TableOrUnion {
-    fn from(un: Union) -> TableOrUnion {
-        TableOrUnion {
-            name: un.name,
-            strict: un.strict,
-            members: un
-                .members
-                .into_iter()
-                .map(TableOrUnionMember::from)
-                .map(|x| (x.ordinal(), x))
-                .collect(),
-        }
-    }
-}
-
 #[derive(Deserialize)]
-#[serde(try_from = "TableOrUnionMemberExpanded")]
-pub enum TableOrUnionMember {
-    Reserved(u64),
-    Used { name: String, ty: Type, ordinal: u64 },
-}
-
-impl TableOrUnionMember {
-    pub fn ordinal(&self) -> u64 {
-        match self {
-            TableOrUnionMember::Reserved(x) => *x,
-            TableOrUnionMember::Used { ordinal, .. } => *ordinal,
-        }
-    }
-}
-
-impl From<UnionMember> for TableOrUnionMember {
-    fn from(unm: UnionMember) -> TableOrUnionMember {
-        match unm {
-            UnionMember::Reserved(x) => TableOrUnionMember::Reserved(x),
-            UnionMember::Used { name, ty, ordinal, .. } => {
-                TableOrUnionMember::Used { name: name, ty: ty, ordinal }
-            }
-        }
-    }
-}
-
-#[derive(Deserialize)]
-struct TableOrUnionMemberExpanded {
-    name: Option<String>,
+pub struct TableOrUnionMember {
+    pub name: String,
     #[serde(rename = "type")]
-    ty: Option<Type>,
-    reserved: bool,
-    ordinal: u64,
-}
-
-impl TryFrom<TableOrUnionMemberExpanded> for TableOrUnionMember {
-    type Error = String;
-
-    fn try_from(
-        exp: TableOrUnionMemberExpanded,
-    ) -> std::result::Result<TableOrUnionMember, Self::Error> {
-        match exp {
-            TableOrUnionMemberExpanded {
-                name: Some(name),
-                ty: Some(ty),
-                reserved: false,
-                ordinal,
-            } => Ok(TableOrUnionMember::Used { name, ty, ordinal }),
-            TableOrUnionMemberExpanded { name: None, ty: None, reserved: true, ordinal } => {
-                Ok(TableOrUnionMember::Reserved(ordinal))
-            }
-            _ => Err("Malformed table member".to_owned()),
-        }
-    }
+    pub ty: Type,
+    pub ordinal: u64,
 }
 
 #[derive(Deserialize)]
@@ -353,48 +289,6 @@ pub struct Protocol {
     pub composed_protocols: Vec<String>,
 }
 named!(Protocol);
-
-#[derive(Deserialize)]
-pub struct Union {
-    pub name: String,
-    pub strict: bool,
-    pub members: Vec<UnionMember>,
-    pub size: usize,
-}
-
-#[derive(Deserialize)]
-#[serde(try_from = "UnionMemberData")]
-pub enum UnionMember {
-    Used { name: String, ty: Type, offset: usize, ordinal: u64 },
-    Reserved(u64),
-}
-
-#[derive(Deserialize)]
-struct UnionMemberData {
-    name: Option<String>,
-    ordinal: u64,
-    reserved: bool,
-    #[serde(rename = "type")]
-    ty: Option<Type>,
-    offset: Option<usize>,
-}
-
-impl TryFrom<UnionMemberData> for UnionMember {
-    type Error = String;
-
-    fn try_from(data: UnionMemberData) -> std::result::Result<Self, Self::Error> {
-        if data.reserved {
-            Ok(UnionMember::Reserved(data.ordinal))
-        } else {
-            Ok(UnionMember::Used {
-                name: data.name.ok_or("Missing name".to_owned())?,
-                ty: data.ty.ok_or("Missing type".to_owned())?,
-                offset: data.offset.ok_or("Missing offset".to_owned())?,
-                ordinal: data.ordinal,
-            })
-        }
-    }
-}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Struct {

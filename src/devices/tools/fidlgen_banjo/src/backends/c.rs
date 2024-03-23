@@ -610,25 +610,17 @@ impl<'a, W: io::Write> CBackend<'a, W> {
         let members = data
             .members
             .iter()
-            .filter_map(|f| {
-                if let Some(ty) = &f._type {
-                    match ty {
-                        Type::Vector { .. } => {
-                            Some(Err(anyhow!("unsupported for UnionField: {:?}", f)))
-                        }
-                        _ => Some(field_to_c_str(
-                            &f.maybe_attributes,
-                            &ty,
-                            &f.name.as_ref().unwrap(),
-                            "    ",
-                            false,
-                            &f.experimental_maybe_from_alias,
-                            ir,
-                        )),
-                    }
-                } else {
-                    None
-                }
+            .map(|f| match f._type {
+                Type::Vector { .. } => Err(anyhow!("unsupported for UnionField: {:?}", f)),
+                _ => field_to_c_str(
+                    &f.maybe_attributes,
+                    &f._type,
+                    &f.name,
+                    "    ",
+                    false,
+                    &f.experimental_maybe_from_alias,
+                    ir,
+                ),
             })
             .collect::<Result<Vec<_>, Error>>()?
             .join("\n");
@@ -703,17 +695,11 @@ impl<'a, W: io::Write> CBackend<'a, W> {
         let members = data
             .members
             .iter()
-            // Ignore reserved fields as they lack types and names.
-            .filter(|f| f.reserved == false)
             .map(|f| {
                 field_to_c_str(
                     &f.maybe_attributes,
-                    &f._type
-                        .as_ref()
-                        .unwrap_or_else(|| panic!("Missing type on table field {:?}", f)),
-                    &f.name
-                        .as_ref()
-                        .unwrap_or_else(|| panic!("Missing name on table field {:?}", f)),
+                    &f._type,
+                    &f.name,
                     "    ",
                     preserve_names,
                     &None,

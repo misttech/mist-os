@@ -167,14 +167,12 @@ class UnionMember {
               const rapidjson::Value* json_definition);
 
   const Union& union_definition() const { return union_definition_; }
-  bool reserved() const { return reserved_; }
   const std::string& name() const { return name_; }
   Ordinal64 ordinal() const { return ordinal_; }
   const Type* type() const { return type_.get(); }
 
  private:
   const Union& union_definition_;
-  const bool reserved_;
   const std::string name_;
   const Ordinal64 ordinal_;
   std::unique_ptr<Type> type_;
@@ -256,13 +254,11 @@ class TableMember {
  public:
   TableMember(Library* enclosing_library, const rapidjson::Value* json_definition);
 
-  bool reserved() const { return reserved_; }
   const std::string& name() const { return name_; }
   Ordinal32 ordinal() const { return ordinal_; }
   const Type* type() const { return type_.get(); }
 
  private:
-  const bool reserved_;
   const std::string name_;
   const Ordinal32 ordinal_;
   std::unique_ptr<Type> type_;

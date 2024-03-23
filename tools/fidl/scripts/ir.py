@@ -262,20 +262,13 @@ class TableMember(Declaration):
         return self.get("name")
 
     @property
-    def reserved(self) -> bool:
-        return self["reserved"]
-
-    @property
     def type(self) -> Type:
         return Type(self.library, self["type"])
 
     def decl(self, state: DeclState) -> str:
         ordinal = "%d: " % self["ordinal"]
-        if self.reserved:
-            return ordinal + "reserved"
-        else:
-            sub_state = state.nest(indent=" " * len(ordinal))
-            return ordinal + self.type.decl(sub_state) + " " + self.name
+        sub_state = state.nest(indent=" " * len(ordinal))
+        return ordinal + self.type.decl(sub_state) + " " + self.name
 
 
 class Table(Declaration):

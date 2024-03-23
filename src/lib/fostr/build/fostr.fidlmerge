@@ -216,7 +216,6 @@ std::ostream& operator<<(std::ostream& os, const {{ .Name.Parse.Name }}& value) 
 
   os << ::fostr::Indent;
         {{- range .Members }}
-          {{- if not .Reserved }}
   if (value.has_{{ .Name }}()) {
             {{- if or .Type.Nullable (or (eq .Type.Kind "vector") (eq .Type.Kind "array")) }}
     os << ::fostr::NewLine << "{{ .Name }}: " << ::fostr::Formatted(value.{{ .Name }}());
@@ -228,7 +227,6 @@ std::ostream& operator<<(std::ostream& os, const {{ .Name.Parse.Name }}& value) 
     os << ::fostr::NewLine << "{{ .Name }}: " << value.{{ .Name }}();
             {{- end }}
   }
-          {{- end }}
         {{- end }}
   return os << ::fostr::Outdent;
 }
@@ -244,7 +242,6 @@ std::ostream& operator<<(std::ostream& os, const {{ .Name.Parse.Name }}& value) 
   switch (value.Ordinal()) {
         {{- $type_name := .Name.Parse.Name }}
         {{- range .Members }}
-          {{- if not .Reserved }}
     case {{ $type_name }}::Tag::k{{ toUpperCamelCase .Name }}:
             {{- if or .Type.Nullable (or (eq .Type.Kind "vector") (eq .Type.Kind "array")) }}
       return os << "{{ .Name }} " << ::fostr::Formatted(value.{{ .Name }}());
@@ -255,7 +252,6 @@ std::ostream& operator<<(std::ostream& os, const {{ .Name.Parse.Name }}& value) 
             {{- else }}
       return os << "{{ .Name }} " << value.{{ .Name }}();
             {{- end }}
-          {{- end }}
         {{- end }}
     case static_cast<fidl_xunion_tag_t>({{ $type_name }}::Tag::Invalid):
       return os << "<empty union>";

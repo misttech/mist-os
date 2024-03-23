@@ -519,8 +519,6 @@ def union_type(ir, root_ir, recurse_guard=None) -> type:
     # prevented from within the object itself. If it cannot be prevented there should be some hook
     # that sets the previous union variants to None.
     for member in ir["members"]:
-        if member["reserved"]:
-            continue
         member_name = normalize_member_name(member["name"])
         member_type_name = member_name + "_type"
         member_constructor_name = member_name + "_variant"
@@ -579,8 +577,6 @@ def table_type(ir, root_ir, recurse_guard=None) -> type:
     name = fidl_ident_to_py_library_member(ir.name())
     members = []
     for member in ir["members"]:
-        if member["reserved"]:
-            continue
         optional_ty = type_annotation(member["type"], root_ir, recurse_guard)
         new_member = (
             normalize_member_name(member["name"]),
@@ -941,7 +937,6 @@ def create_method(
                 ),
             )
             for member in payload_ir["members"]
-            if not member["reserved"]
         ]
         method_impl = lambda_constructor(
             method, root_ir, get_type_by_identifier(payload_id, root_ir)
@@ -956,7 +951,6 @@ def create_method(
                 ),
             )
             for member in payload_ir["members"]
-            if not member["reserved"]
         ]
         method_impl = lambda_constructor(
             method, root_ir, get_type_by_identifier(payload_id, root_ir)

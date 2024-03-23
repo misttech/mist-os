@@ -77,7 +77,6 @@ type TableMember struct {
 	Attributes
 	nameVariants
 	Type               Type
-	DefaultValue       ConstantValue
 	Ordinal            int
 	FieldPresenceIsSet string
 	FieldPresenceSet   string
@@ -100,18 +99,12 @@ func (tm TableMember) StorageName() string {
 }
 
 func (c *compiler) compileTableMember(val fidlgen.TableMember, index int) TableMember {
-	t := c.compileType(*val.Type)
-
-	defaultValue := ConstantValue{}
-	if val.MaybeDefaultValue != nil {
-		defaultValue = c.compileConstant(*val.MaybeDefaultValue, &t, *val.Type)
-	}
+	t := c.compileType(val.Type)
 
 	return TableMember{
 		Attributes:         Attributes{val.Attributes},
 		nameVariants:       tableMemberContext.transform(val.Name),
 		Type:               t,
-		DefaultValue:       defaultValue,
 		Ordinal:            val.Ordinal,
 		FieldPresenceIsSet: fmt.Sprintf("field_presence_.IsSet<%d>()", val.Ordinal-1),
 		FieldPresenceSet:   fmt.Sprintf("field_presence_.Set<%d>()", val.Ordinal-1),
@@ -147,9 +140,6 @@ func (c *compiler) compileTable(val fidlgen.Table) *Table {
 	}
 
 	for i, v := range val.Members {
-		if v.Reserved {
-			continue
-		}
 		m := c.compileTableMember(v, i)
 		if m.Ordinal > r.BiggestOrdinal {
 			r.BiggestOrdinal = m.Ordinal

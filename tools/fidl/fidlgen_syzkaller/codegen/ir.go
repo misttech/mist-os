@@ -543,11 +543,7 @@ func (c *compiler) compileUnion(p fidlgen.Union) ([]StructMember, []StructMember
 	var i, o, h []StructMember
 
 	for _, m := range p.Members {
-		if m.Reserved {
-			continue
-		}
-
-		inLine, outOfLine, handles := c.compileStructMemberFromNameAndType(m.Name, *m.Type)
+		inLine, outOfLine, handles := c.compileStructMemberFromNameAndType(m.Name, m.Type)
 
 		i = append(i, StructMember{
 			Type: Type(fmt.Sprintf("fidl_union_member[%d, %s]", m.Ordinal, inLine.Type)),

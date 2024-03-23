@@ -108,7 +108,7 @@ class PythonDictVisitor : public fidl_codec::Visitor {
     auto res = py::Object(PyDict_New());
 
     for (const auto& member : node->table_definition().members()) {
-      if ((member != nullptr) && !member->reserved()) {
+      if (member != nullptr) {
         auto it = node->members().find(member.get());
         if (it == node->members().end()) {
           Py_IncRef(Py_None);

@@ -349,7 +349,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "s",
           "type": {
             "kind": "string",
@@ -373,7 +372,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "i",
           "type": {
             "kind": "primitive",
@@ -423,7 +421,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "s",
           "type": {
             "kind": "string",
@@ -447,7 +444,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "i",
           "type": {
             "kind": "primitive",

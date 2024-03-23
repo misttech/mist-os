@@ -15,13 +15,13 @@ type HandleInformation struct {
 	Rights     string
 }
 
-func (c *compiler) fieldHandleInformation(val *fidlgen.Type) *HandleInformation {
+func (c *compiler) fieldHandleInformation(val fidlgen.Type) *HandleInformation {
 	return FieldHandleInformation(val, c.decls)
 }
 
-func FieldHandleInformation(val *fidlgen.Type, decls fidlgen.DeclInfoMap) *HandleInformation {
+func FieldHandleInformation(val fidlgen.Type, decls fidlgen.DeclInfoMap) *HandleInformation {
 	for val.ElementType != nil {
-		val = val.ElementType
+		val = *val.ElementType
 	}
 	if val.Kind == fidlgen.RequestType {
 		return &HandleInformation{

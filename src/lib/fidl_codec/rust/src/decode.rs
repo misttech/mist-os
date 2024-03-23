@@ -704,18 +704,23 @@ fn decode_union<'u>(
             None if union.strict => {
                 Err(Error::DecodeError("Invalid Union ordinal.".to_owned()).into())
             }
-            None | Some(library::TableOrUnionMember::Reserved(_)) => Ok((bytes, envelope.skip())),
-            Some(library::TableOrUnionMember::Used { name, ty, .. }) => Ok((
+            None => Ok((bytes, envelope.skip())),
+            Some(member) => Ok((
                 bytes,
                 Defer::Action(Box::new(
                     move |bytes: &[u8],
                           handles: &mut Vec<fidl::HandleInfo>,
                           counter: RecursionCounter| {
-                        let (bytes, inner) =
-                            envelope.decode_type(ns, ty)?.complete(bytes, handles, counter)?;
+                        let (bytes, inner) = envelope
+                            .decode_type(ns, &member.ty)?
+                            .complete(bytes, handles, counter)?;
                         Ok((
                             bytes,
-                            Value::Union(union.name.to_owned(), name.to_owned(), Box::new(inner)),
+                            Value::Union(
+                                union.name.to_owned(),
+                                member.name.to_owned(),
+                                Box::new(inner),
+                            ),
                         ))
                     },
                 )),
@@ -750,16 +755,12 @@ fn decode_table<'t>(
                         let member = table.members.get(&expect_ord);
                         expect_ord += 1;
 
-                        let next_bytes = if let Some(library::TableOrUnionMember::Used {
-                            name,
-                            ty,
-                            ..
-                        }) = member
-                        {
-                            let (next_bytes, val) =
-                                envelope.decode_type(ns, ty)?.complete(bytes, handles, counter)?;
+                        let next_bytes = if let Some(member) = member {
+                            let (next_bytes, val) = envelope
+                                .decode_type(ns, &member.ty)?
+                                .complete(bytes, handles, counter)?;
                             if !matches!(val, Value::Null) {
-                                result.push((name.clone(), val));
+                                result.push((member.name.clone(), val));
                             }
                             next_bytes
                         } else {

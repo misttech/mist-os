@@ -434,7 +434,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "handle",
             "obj_type": 3,
@@ -547,7 +546,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "h",
           "type": {
             "kind": "handle",

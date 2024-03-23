@@ -241,7 +241,6 @@ const struct FidlCodedUnion test_union_ExplicitFlexibleUnionNullableRefTable = {
 static const struct FidlUnionField Fields22test_union_ExplicitFoo[] = {
     {.type = (const fidl_type_t*)&fidl_internal_kInt32Table},
     {.type = (const fidl_type_t*)&StringunboundednotnullableTable},
-    {.type = NULL},
 };
 const struct FidlCodedUnion test_union_ExplicitFooTable = {
     .tag = kFidlTypeUnion,
@@ -250,7 +249,7 @@ const struct FidlCodedUnion test_union_ExplicitFooTable = {
     .is_resource = kFidlIsResource_NotResource,
     .nullable = kFidlNullability_Nonnullable,
     .fields = Fields22test_union_ExplicitFoo,
-    .field_count = 3,
+    .field_count = 2,
 };
 const struct FidlCodedUnion test_union_ExplicitFooNullableRefTable = {
     .tag = kFidlTypeUnion,
@@ -259,7 +258,7 @@ const struct FidlCodedUnion test_union_ExplicitFooNullableRefTable = {
     .is_resource = kFidlIsResource_NotResource,
     .nullable = kFidlNullability_Nullable,
     .fields = Fields22test_union_ExplicitFoo,
-    .field_count = 3,
+    .field_count = 2,
 };
 
 static const struct FidlUnionField Fields31test_union_ExplicitPizzaOrPasta[] = {
@@ -474,17 +473,14 @@ const struct FidlCodedUnion test_union_OlderSimpleUnionNullableRefTable = {
     .field_count = 2,
 };
 
-static const struct FidlUnionField Fields36test_union_OnlyReservedFlexibleUnion[] = {
-    {.type = NULL},
-};
 const struct FidlCodedUnion test_union_OnlyReservedFlexibleUnionTable = {
     .tag = kFidlTypeUnion,
     .name = "test.union/OnlyReservedFlexibleUnion",
     .strictness = kFidlStrictness_Flexible,
     .is_resource = kFidlIsResource_NotResource,
     .nullable = kFidlNullability_Nonnullable,
-    .fields = Fields36test_union_OnlyReservedFlexibleUnion,
-    .field_count = 1,
+    .fields = NULL,
+    .field_count = 0,
 };
 const struct FidlCodedUnion test_union_OnlyReservedFlexibleUnionNullableRefTable = {
     .tag = kFidlTypeUnion,
@@ -492,8 +488,8 @@ const struct FidlCodedUnion test_union_OnlyReservedFlexibleUnionNullableRefTable
     .strictness = kFidlStrictness_Flexible,
     .is_resource = kFidlIsResource_NotResource,
     .nullable = kFidlNullability_Nullable,
-    .fields = Fields36test_union_OnlyReservedFlexibleUnion,
-    .field_count = 1,
+    .fields = NULL,
+    .field_count = 0,
 };
 
 static const struct FidlUnionField Fields23test_union_PizzaOrPasta[] = {
@@ -706,7 +702,6 @@ const struct FidlCodedUnion test_union_UnionContainingEmptyStructNullableRefTabl
 
 static const struct FidlUnionField Fields30test_union_UnionWithAttributes[] = {
     {.type = (const fidl_type_t*)&fidl_internal_kInt64Table},
-    {.type = NULL},
 };
 const struct FidlCodedUnion test_union_UnionWithAttributesTable = {
     .tag = kFidlTypeUnion,
@@ -715,7 +710,7 @@ const struct FidlCodedUnion test_union_UnionWithAttributesTable = {
     .is_resource = kFidlIsResource_NotResource,
     .nullable = kFidlNullability_Nonnullable,
     .fields = Fields30test_union_UnionWithAttributes,
-    .field_count = 2,
+    .field_count = 1,
 };
 const struct FidlCodedUnion test_union_UnionWithAttributesNullableRefTable = {
     .tag = kFidlTypeUnion,
@@ -724,7 +719,7 @@ const struct FidlCodedUnion test_union_UnionWithAttributesNullableRefTable = {
     .is_resource = kFidlIsResource_NotResource,
     .nullable = kFidlNullability_Nullable,
     .fields = Fields30test_union_UnionWithAttributes,
-    .field_count = 2,
+    .field_count = 1,
 };
 
 static const struct FidlCodedVector Vectorunboundednotnullable_19String16notnullableTable = {

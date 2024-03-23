@@ -77,12 +77,7 @@ fn can_derive_partialeq(
                 Declaration::Table => {
                     let decl = ir.get_table(type_id)?;
                     for field in &decl.members {
-                        if field.reserved {
-                            continue;
-                        }
-                        if let Type::Identifier { identifier: field_id, .. } =
-                            &field._type.as_ref().unwrap()
-                        {
+                        if let Type::Identifier { identifier: field_id, .. } = &field._type {
                             // Circular reference. Skip the check on this field to prevent stack
                             // overflow. It's still possible to derive PartialEq as long as other
                             // fields do not prevent the derive.
@@ -91,7 +86,7 @@ fn can_derive_partialeq(
                             }
                         }
                         parents.insert(type_id.clone());
-                        if !can_derive_partialeq(&field._type.as_ref().unwrap(), parents, ir)? {
+                        if !can_derive_partialeq(&field._type, parents, ir)? {
                             return Ok(false);
                         }
                         parents.remove(type_id);
@@ -219,10 +214,10 @@ fn field_to_rust_str(field: &StructMember, ir: &FidlIr) -> Result<String, Error>
 }
 
 fn table_field_to_rust_str(field: &TableMember, ir: &FidlIr) -> Result<String, Error> {
-    let c_name = &field.name.as_ref().expect("Missing name on table field").0;
+    let c_name = &field.name.0;
     let maybe_attributes = &field.maybe_attributes;
 
-    match field._type.as_ref().expect("Missing type on table field") {
+    match &field._type {
         Type::Array { .. }
         | Type::Str { .. }
         | Type::Primitive { .. }
@@ -230,7 +225,7 @@ fn table_field_to_rust_str(field: &TableMember, ir: &FidlIr) -> Result<String, E
         | Type::Handle { .. } => Ok(format!(
             "    pub {c_name}: {ty},",
             c_name = c_name,
-            ty = type_to_rust_str(&field._type.as_ref().unwrap(), maybe_attributes, ir)?
+            ty = type_to_rust_str(&field._type, maybe_attributes, ir)?
         )),
         Type::Vector { ref element_type, .. } => {
             let out_of_line = if maybe_attributes.has("OutOfLineContents") { "*mut " } else { "" };
@@ -441,13 +436,9 @@ impl<'a, W: io::Write> RustBackend<'a, W> {
                 let mut partial_eq = true;
                 let mut parents = HashSet::new();
                 for field in &data.members {
-                    if field.reserved {
-                        // Ignore reserved fields.
-                        continue;
-                    }
                     parents.clear();
                     parents.insert(data.name.clone());
-                    if !can_derive_partialeq(&field._type.as_ref().unwrap(), &mut parents, ir)? {
+                    if !can_derive_partialeq(&field._type, &mut parents, ir)? {
                         partial_eq = false;
                     }
                     field_str.push(table_field_to_rust_str(&field, ir)?);
@@ -482,22 +473,17 @@ impl<'a, W: io::Write> RustBackend<'a, W> {
                 let field_str = data
                     .members
                     .iter()
-                    .filter(|f| f._type != None)
                     .map(|field| {
                         let ty = if let Some(arg_type) = get_base_type_from_alias(
                             &field.experimental_maybe_from_alias.as_ref().map(|a| &a.name),
                         ) {
                             arg_type
                         } else {
-                            type_to_rust_str(
-                                &field._type.as_ref().unwrap(),
-                                &field.maybe_attributes,
-                                ir,
-                            )?
+                            type_to_rust_str(&field._type, &field.maybe_attributes, ir)?
                         };
                         Ok(format!(
                             "    pub {c_name}: {ty},",
-                            c_name = to_c_name(&field.name.as_ref().unwrap().0),
+                            c_name = to_c_name(&field.name.0),
                             ty = ty
                         ))
                     })

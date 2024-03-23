@@ -43,30 +43,6 @@
             </td>
             <td></td>
         </tr>
-        <tr id="NewerSimpleTable.">
-<td><h3 id="NewerSimpleTable." class="add-link hide-from-toc">2</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="NewerSimpleTable.">
-<td><h3 id="NewerSimpleTable." class="add-link hide-from-toc">3</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="NewerSimpleTable.">
-<td><h3 id="NewerSimpleTable." class="add-link hide-from-toc">4</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
         <tr id="NewerSimpleTable.y">
 <td><h3 id="NewerSimpleTable.y" class="add-link hide-from-toc">5</h3></td>
             <td><code>y</code></td>
@@ -80,14 +56,6 @@
             <td><code>z</code></td>
             <td>
                 <code>int64</code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="NewerSimpleTable.">
-<td><h3 id="NewerSimpleTable." class="add-link hide-from-toc">7</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
             </td>
             <td></td>
         </tr>
@@ -105,14 +73,6 @@
             <td><code>x</code></td>
             <td>
                 <code>int64</code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="OlderSimpleTable.">
-<td><h3 id="OlderSimpleTable." class="add-link hide-from-toc">2</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
             </td>
             <td></td>
         </tr>
@@ -163,30 +123,6 @@
             <td><code>x</code></td>
             <td>
                 <code>int64</code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="SimpleTable.">
-<td><h3 id="SimpleTable." class="add-link hide-from-toc">2</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="SimpleTable.">
-<td><h3 id="SimpleTable." class="add-link hide-from-toc">3</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="SimpleTable.">
-<td><h3 id="SimpleTable." class="add-link hide-from-toc">4</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
             </td>
             <td></td>
         </tr>
@@ -733,14 +669,6 @@
             <td><code>x</code></td>
             <td>
                 <code>int64</code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="TableWithAttributes.">
-<td><h3 id="TableWithAttributes." class="add-link hide-from-toc">2</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
             </td>
             <td></td>
         </tr>

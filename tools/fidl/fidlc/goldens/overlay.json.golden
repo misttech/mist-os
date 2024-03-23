@@ -204,7 +204,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "Primitive",
           "type": {
             "kind": "primitive",
@@ -228,7 +227,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "StringNeedsConstructor",
           "type": {
             "kind": "string",
@@ -252,7 +250,6 @@
         },
         {
           "ordinal": 3,
-          "reserved": false,
           "name": "VectorStringAlsoNeedsConstructor",
           "type": {
             "kind": "vector",
@@ -326,7 +323,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "x",
           "type": {
             "kind": "primitive",
@@ -362,7 +358,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "y",
           "type": {
             "kind": "primitive",
@@ -423,7 +418,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "pizza",
           "type": {
             "kind": "identifier",
@@ -448,7 +442,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "pasta",
           "type": {
             "kind": "identifier",
@@ -498,7 +491,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "first",
           "type": {
             "kind": "primitive",
@@ -522,7 +514,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "second",
           "type": {
             "kind": "primitive",

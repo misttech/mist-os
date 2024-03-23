@@ -1244,7 +1244,7 @@ func (c *compiler) compileParameterSingleton(name fidlgen.EncodedCompoundIdentif
 		Type:              c.compileType(typ),
 		nameVariants:      c.compileNameVariants(name),
 		OffsetV2:          0,
-		HandleInformation: c.fieldHandleInformation(&typ),
+		HandleInformation: c.fieldHandleInformation(typ),
 	}}
 }
 
@@ -1256,7 +1256,7 @@ func (c *compiler) compileParameterArray(val fidlgen.Struct) []Parameter {
 			Type:              c.compileType(v.Type),
 			nameVariants:      structMemberContext.transform(v.Name),
 			OffsetV2:          v.FieldShapeV2.Offset,
-			HandleInformation: c.fieldHandleInformation(&v.Type),
+			HandleInformation: c.fieldHandleInformation(v.Type),
 		})
 	}
 	return params

@@ -203,23 +203,14 @@ func (g *DeclDepGraph) addDecl(decl fidlgen.Decl) {
 		}
 	case *fidlgen.Table:
 		for _, m := range decl.Members {
-			if m.Reserved {
-				continue
-			}
-			g.addDepsFromType(node, *m.Type)
-			if m.MaybeDefaultValue != nil {
-				g.addDepsFromConstant(node, *m.MaybeDefaultValue)
-			}
+			g.addDepsFromType(node, m.Type)
 			if m.MaybeAlias != nil {
 				g.addDepsFromTypeCtor(node, *m.MaybeAlias)
 			}
 		}
 	case *fidlgen.Union:
 		for _, m := range decl.Members {
-			if m.Reserved {
-				continue
-			}
-			g.addDepsFromType(node, *m.Type)
+			g.addDepsFromType(node, m.Type)
 			if m.MaybeAlias != nil {
 				g.addDepsFromTypeCtor(node, *m.MaybeAlias)
 			}

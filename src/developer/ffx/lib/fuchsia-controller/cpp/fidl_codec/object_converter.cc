@@ -212,7 +212,7 @@ void ObjectConverter::VisitUnionType(const fidl_codec::UnionType* type) {
     return;
   }
   for (const auto& member : type->union_definition().members()) {
-    if (!member || member->reserved()) {
+    if (!member) {
       continue;
     }
     auto child_value = py::Object(GetAttr(obj_, NormalizeMemberName(member->name())));

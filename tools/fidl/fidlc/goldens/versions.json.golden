@@ -1073,7 +1073,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "primitive",
             "subtype": "uint32",
@@ -1142,69 +1141,6 @@
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
                 "line": 30,
-                "column": 5,
-                "length": 33
-              }
-            }
-          ]
-        },
-        {
-          "ordinal": 2,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-            "line": 32,
-            "column": 5,
-            "length": 49
-          },
-          "maybe_attributes": [
-            {
-              "name": "available",
-              "arguments": [
-                {
-                  "name": "added",
-                  "type": "uint64",
-                  "value": {
-                    "kind": "literal",
-                    "value": "2",
-                    "expression": "2",
-                    "literal": {
-                      "kind": "numeric",
-                      "value": "2",
-                      "expression": "2"
-                    }
-                  },
-                  "location": {
-                    "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 32,
-                    "column": 16,
-                    "length": 7
-                  }
-                },
-                {
-                  "name": "deprecated",
-                  "type": "uint64",
-                  "value": {
-                    "kind": "literal",
-                    "value": "3",
-                    "expression": "3",
-                    "literal": {
-                      "kind": "numeric",
-                      "value": "3",
-                      "expression": "3"
-                    }
-                  },
-                  "location": {
-                    "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 32,
-                    "column": 25,
-                    "length": 12
-                  }
-                }
-              ],
-              "location": {
-                "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 32,
                 "column": 5,
                 "length": 33
               }
@@ -1293,7 +1229,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "x",
           "type": {
             "kind": "primitive",
@@ -1362,69 +1297,6 @@
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
                 "line": 38,
-                "column": 5,
-                "length": 33
-              }
-            }
-          ]
-        },
-        {
-          "ordinal": 2,
-          "reserved": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-            "line": 40,
-            "column": 5,
-            "length": 49
-          },
-          "maybe_attributes": [
-            {
-              "name": "available",
-              "arguments": [
-                {
-                  "name": "added",
-                  "type": "uint64",
-                  "value": {
-                    "kind": "literal",
-                    "value": "2",
-                    "expression": "2",
-                    "literal": {
-                      "kind": "numeric",
-                      "value": "2",
-                      "expression": "2"
-                    }
-                  },
-                  "location": {
-                    "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 40,
-                    "column": 16,
-                    "length": 7
-                  }
-                },
-                {
-                  "name": "deprecated",
-                  "type": "uint64",
-                  "value": {
-                    "kind": "literal",
-                    "value": "3",
-                    "expression": "3",
-                    "literal": {
-                      "kind": "numeric",
-                      "value": "3",
-                      "expression": "3"
-                    }
-                  },
-                  "location": {
-                    "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 40,
-                    "column": 25,
-                    "length": 12
-                  }
-                }
-              ],
-              "location": {
-                "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 40,
                 "column": 5,
                 "length": 33
               }

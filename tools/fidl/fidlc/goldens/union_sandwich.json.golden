@@ -526,7 +526,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "variant",
           "type": {
             "kind": "array",
@@ -589,7 +588,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "variant",
           "type": {
             "kind": "identifier",
@@ -640,7 +638,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "variant",
           "type": {
             "kind": "array",
@@ -703,7 +700,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "variant",
           "type": {
             "kind": "primitive",

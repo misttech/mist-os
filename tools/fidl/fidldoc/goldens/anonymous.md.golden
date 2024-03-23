@@ -175,14 +175,6 @@ Type: <code>uint32</code>
             </td>
             <td></td>
         </tr>
-        <tr id="FunctionApplication.">
-<td><h3 id="FunctionApplication." class="add-link hide-from-toc">2</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
         <tr id="FunctionApplication.args">
 <td><h3 id="FunctionApplication.args" class="add-link hide-from-toc">3</h3></td>
             <td><code>args</code></td>
@@ -208,14 +200,6 @@ Type: <code>uint32</code>
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr id="TableMember.">
-<td><h3 id="TableMember." class="add-link hide-from-toc">1</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
         <tr id="TableMember.table_data">
 <td><h3 id="TableMember.table_data" class="add-link hide-from-toc">2</h3></td>
             <td><code>table_data</code></td>
@@ -285,14 +269,6 @@ Type: <code>uint32</code>
 *Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=27)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnionMember.">
-<td><h3 id="UnionMember." class="add-link hide-from-toc">1</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
         <tr id="UnionMember.union_data">
 <td><h3 id="UnionMember.union_data" class="add-link hide-from-toc">2</h3></td>
             <td><code>union_data</code></td>

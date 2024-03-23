@@ -87,15 +87,6 @@ Type: <code>uint32</code>
             <td><div class="fidl-version-div"><span class="fidl-attribute fidl-version">Deprecated: 3</span> <span class="fidl-attribute fidl-version">Added: 2</span></div>
 </td>
         </tr>
-        <tr id="Table.">
-<td><h3 id="Table." class="add-link hide-from-toc">2</h3></td>
-            <td><code>RESERVED</code></td>
-            <td>
-                <code></code>
-            </td>
-            <td><div class="fidl-version-div"><span class="fidl-attribute fidl-version">Deprecated: 3</span> <span class="fidl-attribute fidl-version">Added: 2</span></div>
-</td>
-        </tr>
 </table>
 
 
@@ -111,15 +102,6 @@ Type: <code>uint32</code>
             <td><code>x</code></td>
             <td>
                 <code>uint32</code>
-            </td>
-            <td><div class="fidl-version-div"><span class="fidl-attribute fidl-version">Deprecated: 3</span> <span class="fidl-attribute fidl-version">Added: 2</span></div>
-</td>
-        </tr>
-        <tr id="Union.">
-<td><h3 id="Union." class="add-link hide-from-toc">2</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
             </td>
             <td><div class="fidl-version-div"><span class="fidl-attribute fidl-version">Deprecated: 3</span> <span class="fidl-attribute fidl-version">Added: 2</span></div>
 </td>

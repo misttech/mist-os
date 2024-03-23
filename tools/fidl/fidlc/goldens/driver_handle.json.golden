@@ -479,7 +479,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "type": {
             "kind": "handle",
             "obj_type": 5,
@@ -507,7 +506,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "type": {
             "kind": "identifier",
             "identifier": "test.driverhandle/DriverProtocol",

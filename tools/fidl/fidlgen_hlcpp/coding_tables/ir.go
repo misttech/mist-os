@@ -261,7 +261,7 @@ func (c *compiler) fillStructNonPaddingMembers(v fidlgen.Struct, baseOffset int,
 		} else {
 			*members = append(*members, structMember{
 				Offset:       offset,
-				Type:         c.compilePointerToType(&m.Type),
+				Type:         c.compilePointerToType(m.Type),
 				Resourceness: compileResourceness(c.decls.LookupResourceness(m.Type)),
 			})
 		}
@@ -304,9 +304,6 @@ func (c *compiler) canCopyWithoutValidation(typ fidlgen.Type) bool {
 func (c *compiler) compileTable(v fidlgen.Table) table {
 	var members []tableMember
 	for _, m := range v.Members {
-		if m.Reserved {
-			continue
-		}
 		members = append(members, tableMember{
 			Ordinal: m.Ordinal,
 			Type:    c.compilePointerToType(m.Type),
@@ -329,6 +326,9 @@ func (c *compiler) compileUnion(v fidlgen.Union) union {
 	}
 	var members []unionMember
 	for _, m := range v.Members {
+		for len(members) < m.Ordinal-1 {
+			members = append(members, unionMember{Type: "NULL"})
+		}
 		members = append(members, unionMember{
 			Type: c.compilePointerToType(m.Type),
 		})
@@ -344,11 +344,8 @@ func (c *compiler) compileUnion(v fidlgen.Union) union {
 	}
 }
 
-func (c *compiler) compilePointerToType(typ *fidlgen.Type) string {
-	if typ == nil {
-		return "NULL"
-	}
-	return "(const fidl_type_t*)&" + c.compilePointerToTypeWithoutCast(*typ)
+func (c *compiler) compilePointerToType(typ fidlgen.Type) string {
+	return "(const fidl_type_t*)&" + c.compilePointerToTypeWithoutCast(typ)
 }
 
 func (c *compiler) compilePointerToTypeWithoutCast(typ fidlgen.Type) string {
@@ -403,7 +400,7 @@ func (c *compiler) compileType(name string, typ fidlgen.Type) {
 func (c *compiler) compileArray(name string, typ fidlgen.Type) array {
 	return array{
 		Name:        name,
-		ElementType: c.compilePointerToType(typ.ElementType),
+		ElementType: c.compilePointerToType(*typ.ElementType),
 		InlineSize:  typ.TypeShapeV2.InlineSize,
 		ElementSize: typ.ElementType.TypeShapeV2.InlineSize,
 	}
@@ -412,7 +409,7 @@ func (c *compiler) compileArray(name string, typ fidlgen.Type) array {
 func (c *compiler) compileVector(name string, typ fidlgen.Type) vector {
 	return vector{
 		Name:        name,
-		ElementType: c.compilePointerToType(typ.ElementType),
+		ElementType: c.compilePointerToType(*typ.ElementType),
 		MaxCount:    compileMaxCount(typ.ElementCount),
 		Nullability: compileNullability(typ.Nullable),
 		ElementSize: typ.ElementType.TypeShapeV2.InlineSize,
@@ -428,7 +425,7 @@ func (c *compiler) compileString(name string, typ fidlgen.Type) string_ {
 }
 
 func (c *compiler) compileHandle(name string, typ fidlgen.Type) handle {
-	info := cpp.FieldHandleInformation(&typ, c.decls)
+	info := cpp.FieldHandleInformation(typ, c.decls)
 	return handle{
 		Name:        name,
 		ObjectType:  info.ObjectType,

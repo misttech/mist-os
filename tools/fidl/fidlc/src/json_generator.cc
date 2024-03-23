@@ -619,13 +619,24 @@ void JSONGenerator::Generate(const Struct::Member& value) {
   });
 }
 
+template <typename Member>
+static std::vector<const Member*> NonReservedMembers(const std::vector<Member>& members) {
+  std::vector<const Member*> result;
+  result.reserve(members.size());
+  for (auto& member : members) {
+    if (member.maybe_used)
+      result.push_back(&member);
+  }
+  return result;
+}
+
 void JSONGenerator::Generate(const Table& value) {
   GenerateObject([&]() {
     GenerateDeclName(value.name);
     GenerateObjectMember("location", NameSpan(value.name));
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
-    GenerateObjectMember("members", value.members);
+    GenerateObjectMember("members", NonReservedMembers(value.members));
     GenerateObjectMember("strict", value.strictness);
     GenerateObjectMember("resource", value.resourceness == Resourceness::kResource);
     GenerateObjectMember("type_shape_v2", value.type_shape.value());
@@ -633,20 +644,12 @@ void JSONGenerator::Generate(const Table& value) {
 }
 
 void JSONGenerator::Generate(const Table::Member& value) {
+  ZX_ASSERT_MSG(value.maybe_used, "should only emit non-reserved members");
   GenerateObject([&]() {
     GenerateObjectMember("ordinal", *value.ordinal, Position::kFirst);
-    if (value.maybe_used) {
-      ZX_ASSERT(!value.span);
-      GenerateObjectMember("reserved", false);
-      GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
-      GenerateObjectMember("name", value.maybe_used->name);
-      GenerateObjectMember("location", NameSpan(value.maybe_used->name));
-    } else {
-      ZX_ASSERT(value.span);
-      GenerateObjectMember("reserved", true);
-      GenerateObjectMember("location", NameSpan(value.span.value()));
-    }
-
+    GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
+    GenerateObjectMember("name", value.maybe_used->name);
+    GenerateObjectMember("location", NameSpan(value.maybe_used->name));
     if (!value.attributes->Empty()) {
       GenerateObjectMember("maybe_attributes", value.attributes);
     }
@@ -678,7 +681,7 @@ void JSONGenerator::Generate(const Union& value) {
     GenerateObjectMember("location", NameSpan(value.name));
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
-    GenerateObjectMember("members", value.members);
+    GenerateObjectMember("members", NonReservedMembers(value.members));
     GenerateObjectMember("strict", value.strictness);
     GenerateObjectMember("resource", value.resourceness == Resourceness::kResource);
     auto anon = value.name.as_anonymous();
@@ -689,19 +692,12 @@ void JSONGenerator::Generate(const Union& value) {
 }
 
 void JSONGenerator::Generate(const Union::Member& value) {
+  ZX_ASSERT_MSG(value.maybe_used, "should only emit non-reserved members");
   GenerateObject([&]() {
     GenerateObjectMember("ordinal", value.ordinal, Position::kFirst);
-    if (value.maybe_used) {
-      ZX_ASSERT(!value.span);
-      GenerateObjectMember("reserved", false);
-      GenerateObjectMember("name", value.maybe_used->name);
-      GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
-      GenerateObjectMember("location", NameSpan(value.maybe_used->name));
-    } else {
-      GenerateObjectMember("reserved", true);
-      GenerateObjectMember("location", NameSpan(value.span.value()));
-    }
-
+    GenerateObjectMember("name", value.maybe_used->name);
+    GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
+    GenerateObjectMember("location", NameSpan(value.maybe_used->name));
     if (!value.attributes->Empty()) {
       GenerateObjectMember("maybe_attributes", value.attributes);
     }
@@ -714,7 +710,7 @@ void JSONGenerator::Generate(const Overlay& value) {
     GenerateObjectMember("location", NameSpan(value.name));
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
-    GenerateObjectMember("members", value.members);
+    GenerateObjectMember("members", NonReservedMembers(value.members));
     ZX_ASSERT(value.strictness == Strictness::kStrict);
     GenerateObjectMember("strict", value.strictness);
     ZX_ASSERT(value.resourceness == Resourceness::kValue);
@@ -724,15 +720,12 @@ void JSONGenerator::Generate(const Overlay& value) {
 }
 
 void JSONGenerator::Generate(const Overlay::Member& value) {
+  ZX_ASSERT_MSG(value.maybe_used, "should only emit non-reserved members");
   GenerateObject([&]() {
     GenerateObjectMember("ordinal", value.ordinal, Position::kFirst);
-    ZX_ASSERT(value.maybe_used);
-    ZX_ASSERT(!value.span);
-    GenerateObjectMember("reserved", false);
     GenerateObjectMember("name", value.maybe_used->name);
     GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
     GenerateObjectMember("location", NameSpan(value.maybe_used->name));
-
     if (!value.attributes->Empty()) {
       GenerateObjectMember("maybe_attributes", value.attributes);
     }

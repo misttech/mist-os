@@ -95,14 +95,8 @@ class ToStringVisitor : public TypeVisitor {
         type, "union", type->union_definition().members(),
         [this](const std::unique_ptr<UnionMember>& member) {
           *result_ += indent_ + "  " + std::to_string(member->ordinal()) + ": ";
-          if (member->reserved()) {
-            *result_ += "reserved";
-            return true;
-          }
-
           ToStringVisitor visitor(indent_ + "  ", NextExpandLevels(), result_);
           member->type()->Visit(&visitor);
-
           *result_ += " " + std::string(member->name());
           return true;
         });
@@ -141,10 +135,6 @@ class ToStringVisitor : public TypeVisitor {
           }
           *result_ += indent_ + "  ";
           *result_ += std::to_string(member->ordinal()) + ": ";
-          if (member->reserved()) {
-            *result_ += "reserved";
-            return true;
-          }
           ToStringVisitor visitor(indent_ + "  ", NextExpandLevels(), result_);
           member->type()->Visit(&visitor);
           *result_ += " " + std::string(member->name());
@@ -964,7 +954,7 @@ std::unique_ptr<Value> TableType::Decode(MessageDecoder* decoder, uint64_t offse
   auto result = std::make_unique<TableValue>(table_definition_);
   for (uint64_t i = 1; i <= member_count; ++i) {
     const TableMember* member = table_definition_.MemberFromOrdinal(i);
-    if ((member == nullptr) || member->reserved()) {
+    if (member == nullptr) {
       decoder->SkipEnvelope(nullable_offset);
     } else {
       std::unique_ptr<Value> value = decoder->DecodeEnvelope(nullable_offset, member->type());

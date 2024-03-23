@@ -435,7 +435,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "response",
           "type": {
             "kind": "identifier",
@@ -460,7 +459,6 @@
         },
         {
           "ordinal": 2,
-          "reserved": false,
           "name": "err",
           "type": {
             "kind": "primitive",

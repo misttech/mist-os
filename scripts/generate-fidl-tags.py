@@ -361,7 +361,7 @@ def extract_name_and_members(json):
      Tag(base_freq, garnet/lib/wlan/fidl/phy.fidl, 46, 12),
      Tag(channels, garnet/lib/wlan/fidl/phy.fidl, 47, 23)]
 
-    Tables declarations (note reserved: True members to be excluded):
+    Tables declarations:
 
     >>> extract_name_and_members([
     ... {
@@ -448,14 +448,6 @@ def extract_name_and_members(json):
     ...         "line": 80,
     ...         "column": 37
     ...     },
-    ...     },
-    ...     {
-    ...         "reserved": True,
-    ...         "location": {
-    ...             "column": 5,
-    ...             "line": 43,
-    ...             "filename": "../../sdk/fidl/fuchsia.feedback/data_provider.fidl"
-    ...         }
     ...     }
     ... ],
     ... },
@@ -838,8 +830,6 @@ def extract_name_and_members(json):
         tag = strip_library(x["name"])
         result.append(Tag(tag, *get_location_pieces(x["location"])))
         for member in x["members"]:
-            if member.get("reserved"):
-                continue
             result.append(
                 Tag(member["name"], *get_location_pieces(member["location"]))
             )

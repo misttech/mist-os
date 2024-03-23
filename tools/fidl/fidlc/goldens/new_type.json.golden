@@ -404,7 +404,6 @@
       "members": [
         {
           "ordinal": 1,
-          "reserved": false,
           "name": "b",
           "type": {
             "kind": "primitive",

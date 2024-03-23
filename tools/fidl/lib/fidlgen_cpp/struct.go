@@ -149,7 +149,7 @@ func (c *compiler) compileStructMember(val fidlgen.StructMember) StructMember {
 		Type:              t,
 		DefaultValue:      defaultValue,
 		OffsetV2:          val.FieldShapeV2.Offset,
-		HandleInformation: c.fieldHandleInformation(&val.Type),
+		HandleInformation: c.fieldHandleInformation(val.Type),
 		NaturalConstraint: t.NaturalFieldConstraint,
 		WireConstraint:    t.WireFieldConstraint,
 	}

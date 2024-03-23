@@ -1193,12 +1193,9 @@ type Union struct {
 // union.
 type UnionMember struct {
 	member
-	Reserved     bool                    `json:"reserved"`
-	Ordinal      int                     `json:"ordinal"`
-	Type         *Type                   `json:"type,omitempty"`
-	Offset       int                     `json:"offset"`
-	MaxOutOfLine int                     `json:"max_out_of_line"`
-	MaybeAlias   *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
+	Ordinal    int                     `json:"ordinal"`
+	Type       Type                    `json:"type"`
+	MaybeAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
 }
 
 // Table represents a declaration of a FIDL table.
@@ -1212,12 +1209,9 @@ type Table struct {
 // TableMember represents the declaration of a field in a FIDL table.
 type TableMember struct {
 	member
-	Reserved          bool                    `json:"reserved"`
-	Type              *Type                   `json:"type,omitempty"`
-	Ordinal           int                     `json:"ordinal"`
-	MaybeDefaultValue *Constant               `json:"maybe_default_value,omitempty"`
-	MaybeAlias        *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
-	MaxOutOfLine      int                     `json:"max_out_of_line"`
+	Type       Type                    `json:"type"`
+	Ordinal    int                     `json:"ordinal"`
+	MaybeAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
 }
 
 // Struct represents a declaration of a FIDL struct.
@@ -1274,7 +1268,6 @@ type Overlay struct {
 // OverlayMember represents the declaration of a member in a FIDL overlay.
 type OverlayMember struct {
 	member
-	Reserved   bool                    `json:"reserved"`
 	Ordinal    int                     `json:"ordinal"`
 	Type       Type                    `json:"type"`
 	MaybeAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
@@ -1935,15 +1928,6 @@ func (r *Root) filter(keep func(Element) bool) Root {
 			for _, m := range v.Members {
 				if keep(m) {
 					newV.Members = append(newV.Members, m)
-				} else {
-					newV.Members = append(newV.Members, TableMember{
-						member: member{
-							Attributes: m.Attributes,
-							Name:       m.Name,
-						},
-						Reserved: true,
-						Ordinal:  m.Ordinal,
-					})
 				}
 			}
 			res.Tables = append(res.Tables, newV)
@@ -1954,15 +1938,6 @@ func (r *Root) filter(keep func(Element) bool) Root {
 			for _, m := range v.Members {
 				if keep(m) {
 					newV.Members = append(newV.Members, m)
-				} else {
-					newV.Members = append(newV.Members, UnionMember{
-						member: member{
-							Attributes: m.Attributes,
-							Name:       m.Name,
-						},
-						Reserved: true,
-						Ordinal:  m.Ordinal,
-					})
 				}
 			}
 			res.Unions = append(res.Unions, newV)
