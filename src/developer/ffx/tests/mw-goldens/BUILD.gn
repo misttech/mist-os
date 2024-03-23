@@ -55,7 +55,7 @@ if (has_board) {
     script = "gen_schema.py"
     inputs = [
       "commandlist.txt",
-      "${root_build_dir}/host_x64/ffx",
+      "${root_build_dir}/host_${host_cpu}/ffx",
     ]
     outputs = [ _comparison_file ]
     _golden_filename_list = read_file("goldens/schemalist.txt", "list lines")
