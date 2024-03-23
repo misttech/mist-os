@@ -48,7 +48,7 @@ mod tests {
         let parent_token = zx::Event::create();
         let (parent_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (parent_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (parent_element_control, _) = topology
+        let parent_element_control = topology
             .add_element(ElementSchema {
                 element_name: Some("P".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
@@ -70,7 +70,8 @@ mod tests {
             parent_element_control.open_status_channel(server)?;
             client
         };
-        let (_, child_lessor) = topology
+        let (child_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
+        let _child_element_control = topology
             .add_element(ElementSchema {
                 element_name: Some("C".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
@@ -83,11 +84,11 @@ mod tests {
                         .expect("dup failed"),
                     requires_level: BinaryPowerLevel::On.into_primitive(),
                 }]),
+                lessor_channel: Some(lessor_server),
                 ..Default::default()
             })
             .await?
             .expect("add_element failed");
-        let child_lessor: fpb::LessorProxy = child_lessor.into_proxy()?;
 
         // Initial required level for P should be OFF.
         // Update P's current level to OFF with PowerBroker.
@@ -136,7 +137,7 @@ mod tests {
         assert_eq!(power_level, BinaryPowerLevel::Off.into_primitive());
 
         // Remove P's element. Status channel should be closed.
-        parent_element_control.remove_element().await?;
+        drop(parent_element_control);
         let status_after_remove = parent_status.watch_power_level().await;
         assert!(matches!(status_after_remove, Err(fidl::Error::ClientChannelClosed { .. })));
 
@@ -156,7 +157,7 @@ mod tests {
         let element_a_token = zx::Event::create();
         let (element_a_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (element_a_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_a_element_control, _) = executor.run_singlethreaded(async {
+        let element_a_element_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("A".into()),
@@ -184,7 +185,7 @@ mod tests {
         let element_b_token = zx::Event::create();
         let (element_b_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (element_b_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_b_element_control, _) = executor.run_singlethreaded(async {
+        let element_b_element_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("B".into()),
@@ -217,7 +218,8 @@ mod tests {
             element_b_element_control.open_status_channel(server)?;
             client.into_proxy()?
         };
-        let (_, element_c_lessor) = executor.run_singlethreaded(async {
+        let (element_c_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
+        let _element_c_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("C".into()),
@@ -231,16 +233,16 @@ mod tests {
                             .expect("dup failed"),
                         requires_level: BinaryPowerLevel::On.into_primitive(),
                     }]),
+                    lessor_channel: Some(lessor_server),
                     ..Default::default()
                 })
                 .await
                 .unwrap()
                 .expect("add_element failed")
         });
-        let element_c_lessor = element_c_lessor.into_proxy()?;
         let (element_d_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (element_d_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_d_element_control, _) = executor.run_singlethreaded(async {
+        let element_d_element_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("D".into()),
@@ -458,7 +460,7 @@ mod tests {
         let grandparent_token = zx::Event::create();
         let (grandparent_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (grandparent_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (_, _) = executor.run_singlethreaded(async {
+        let _grandparent_element_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("GP".into()),
@@ -480,7 +482,7 @@ mod tests {
         let parent_token = zx::Event::create();
         let (parent_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (parent_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (_, _) = executor.run_singlethreaded(async {
+        let _parent_element_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("P".into()),
@@ -517,7 +519,8 @@ mod tests {
                 .unwrap()
                 .expect("add_element failed")
         });
-        let (_, child1_lessor) = executor.run_singlethreaded(async {
+        let (child1_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
+        let _child1_element_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("C1".into()),
@@ -531,14 +534,15 @@ mod tests {
                             .expect("dup failed"),
                         requires_level: 50,
                     }]),
+                    lessor_channel: Some(lessor_server),
                     ..Default::default()
                 })
                 .await
                 .unwrap()
                 .expect("add_element failed")
         });
-        let child1_lessor = child1_lessor.into_proxy()?;
-        let (_, child2_lessor) = executor.run_singlethreaded(async {
+        let (child2_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
+        let _child2_element_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("C2".into()),
@@ -552,13 +556,13 @@ mod tests {
                             .expect("dup failed"),
                         requires_level: 30,
                     }]),
+                    lessor_channel: Some(lessor_server),
                     ..Default::default()
                 })
                 .await
                 .unwrap()
                 .expect("add_element failed")
         });
-        let child2_lessor = child2_lessor.into_proxy()?;
 
         // Initially, Grandparent should have a default required level of 10
         // and Parent should have a default required level of 0.
@@ -750,7 +754,7 @@ mod tests {
         let token_a = zx::Event::create();
         let (current_a, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (required_a, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (_, _) = executor.run_singlethreaded(async {
+        let _element_a_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("A".into()),
@@ -773,7 +777,7 @@ mod tests {
         let token_b_passive = zx::Event::create();
         let (current_b, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (required_b, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (_, _) = executor.run_singlethreaded(async {
+        let _element_b_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("B".into()),
@@ -801,7 +805,8 @@ mod tests {
                 .unwrap()
                 .expect("add_element failed")
         });
-        let (_, element_c_lessor) = executor.run_singlethreaded(async {
+        let (element_c_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
+        let _element_c_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("C".into()),
@@ -815,14 +820,15 @@ mod tests {
                             .unwrap(),
                         requires_level: BinaryPowerLevel::On.into_primitive(),
                     }]),
+                    lessor_channel: Some(lessor_server),
                     ..Default::default()
                 })
                 .await
                 .unwrap()
                 .expect("add_element failed")
         });
-        let element_c_lessor = element_c_lessor.into_proxy()?;
-        let (_, element_d_lessor) = executor.run_singlethreaded(async {
+        let (element_d_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
+        let _element_d_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("D".into()),
@@ -836,13 +842,13 @@ mod tests {
                             .unwrap(),
                         requires_level: BinaryPowerLevel::On.into_primitive(),
                     }]),
+                    lessor_channel: Some(lessor_server),
                     ..Default::default()
                 })
                 .await
                 .unwrap()
                 .expect("add_element failed")
         });
-        let element_d_lessor = element_d_lessor.into_proxy()?;
 
         // Initial required level for A and B should be OFF.
         // Set A and B's current level to OFF.
@@ -1002,7 +1008,7 @@ mod tests {
         // Create a four element topology.
         let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
         let earth_token = zx::Event::create();
-        let (earth_element_control, _) = topology
+        let earth_element_control = topology
             .add_element(ElementSchema {
                 element_name: Some("Earth".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
@@ -1016,7 +1022,7 @@ mod tests {
             .expect("add_element failed");
         let earth_element_control = earth_element_control.into_proxy()?;
         let water_token = zx::Event::create();
-        let (water_element_control, _) = topology
+        let water_element_control = topology
             .add_element(ElementSchema {
                 element_name: Some("Water".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
@@ -1038,7 +1044,7 @@ mod tests {
             .expect("add_element failed");
         let water_element_control = water_element_control.into_proxy()?;
         let fire_token = zx::Event::create();
-        let (fire_element_control, _) = topology
+        let fire_element_control = topology
             .add_element(ElementSchema {
                 element_name: Some("Fire".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
@@ -1052,7 +1058,7 @@ mod tests {
             .expect("add_element failed");
         let fire_element_control = fire_element_control.into_proxy()?;
         let air_token = zx::Event::create();
-        let (air_element_control, _) = topology
+        let air_element_control = topology
             .add_element(ElementSchema {
                 element_name: Some("Air".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
@@ -1096,10 +1102,17 @@ mod tests {
             .await?;
         assert!(matches!(extra_remove_dep_res, Err(fpb::ModifyDependencyError::NotFound { .. })));
 
-        fire_element_control.remove_element().await.expect("remove_element failed");
-        fire_element_control.on_closed().await?;
-        air_element_control.remove_element().await.expect("remove_element failed");
-        air_element_control.on_closed().await?;
+        drop(air_element_control);
+
+        // Confirm the element has been removed and Status channels have been
+        // closed.
+        let fire_status = {
+            let (client, server) = create_proxy::<StatusMarker>()?;
+            fire_element_control.open_status_channel(server)?;
+            client
+        };
+        drop(fire_element_control);
+        fire_status.as_channel().on_closed().await?;
 
         let add_dep_req_invalid = earth_element_control
             .add_dependency(

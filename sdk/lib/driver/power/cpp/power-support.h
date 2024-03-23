@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SDK_LIB_DRIVERS_POWER_CPP_FDF_POWER_
-#define SDK_LIB_DRIVERS_POWER_CPP_FDF_POWER_
+#ifndef LIB_DRIVER_POWER_CPP_POWER_SUPPORT_H_
+#define LIB_DRIVER_POWER_CPP_POWER_SUPPORT_H_
 
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
@@ -134,4 +134,4 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
         level_control);
 }  // namespace fdf_power
 
-#endif /* SDK_LIB_DRIVERS_POWER_CPP_FDF_POWER_ */
+#endif  // LIB_DRIVER_POWER_CPP_POWER_SUPPORT_H_

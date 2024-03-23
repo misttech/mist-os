@@ -77,7 +77,7 @@ where
                 .await
                 .context("while calling fuchsia.power.broker.Topology/AddElement")?;
             match result {
-                Ok((_element_control_ch, _lease_control_ch)) => {
+                Ok(_element_control_ch) => {
                     return Ok(loop_fn(current, required).await);
                 }
                 Err(e) => return Err(anyhow!("error while adding element: {:?}", e)),
@@ -297,9 +297,7 @@ mod tests {
             while let Some(request) = _t_stream.next().await {
                 match request {
                     Ok(fpb::TopologyRequest::AddElement { payload: _, responder }) => {
-                        responder
-                            .send(Ok((dummy_client_end(), dummy_client_end())))
-                            .expect("never fails");
+                        responder.send(Ok(dummy_client_end())).expect("never fails");
                     }
                     Ok(_) | Err(_) => unimplemented!(),
                 }

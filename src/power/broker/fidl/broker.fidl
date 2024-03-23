@@ -56,9 +56,11 @@ open protocol Topology {
     /// open control channels for that element.
     flexible AddElement(ElementSchema) -> (resource struct {
         /// ElementControl channel for this element.
+        /// When this channel is dropped, the element will be removed from the
+        /// topology. All channels associated with this element will be
+        /// closed and all tokens registered to this element will be
+        /// unregistered.
         element_control_channel client_end:ElementControl;
-        /// Lessor channel for this element.
-        lessor_channel client_end:Lessor;
     }) error AddElementError;
 };
 
@@ -87,6 +89,9 @@ type ElementSchema = resource table {
     /// Channels on which Power Broker will send required power levels and
     /// receive current level updates.
     7: level_control_channels LevelControlChannels;
+    /// Optional. If passed, this will be treated as a consumer element and
+    /// Leases for this element can be requested via this channel.
+    8: lessor_channel server_end:Lessor;
 };
 
 type LevelControlChannels = resource struct {
@@ -120,14 +125,6 @@ open protocol ElementControl {
     flexible OpenStatusChannel(resource struct {
         status_channel server_end:Status;
     });
-
-    /// Called by a Power Element owner to remove their Power Element.
-    /// Removing a Power Element also removes dependencies on other elements,
-    /// but dependencies on this element will remain permanently unsatisfied.
-    /// The level control channel and open status channels will be closed and
-    /// all tokens registered to this element will be unregistered.
-    /// TODO(b/314814975): Make the above actually true.
-    flexible RemoveElement() -> ();
 
     /// Adds an active or passive dependency of this element upon another
     /// element.

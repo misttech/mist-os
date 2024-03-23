@@ -7,8 +7,8 @@ use std::rc::Rc;
 use anyhow::{Error, Result};
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_power_broker::{
-    ElementControlMarker, LeaseControlMarker, LessorMarker, LessorRequest, LessorRequestStream,
-    TopologyRequest, TopologyRequestStream,
+    ElementControlMarker, LeaseControlMarker, LessorRequest, LessorRequestStream, TopologyRequest,
+    TopologyRequestStream,
 };
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
@@ -50,17 +50,16 @@ impl FakePowerBroker {
     async fn handle_topology_request(self: Rc<Self>, mut stream: TopologyRequestStream) {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                TopologyRequest::AddElement { responder, .. } => {
+                TopologyRequest::AddElement { payload, responder, .. } => {
                     let (element_control_client, _element_control_stream) =
                         create_request_stream::<ElementControlMarker>().expect("");
 
-                    let (lessor_client, lessor_stream) =
-                        create_request_stream::<LessorMarker>().expect("");
-                    fasync::Task::local(self.clone().handle_lessor(lessor_stream)).detach();
+                    if let Some(lessor) = payload.lessor_channel {
+                        let lessor_stream = lessor.into_stream().unwrap();
+                        fasync::Task::local(self.clone().handle_lessor(lessor_stream)).detach();
+                    }
 
-                    responder
-                        .send(Ok((element_control_client, lessor_client)))
-                        .expect("send should success")
+                    responder.send(Ok(element_control_client)).expect("send should success")
                 }
                 TopologyRequest::_UnknownMethod { .. } => todo!(),
             }

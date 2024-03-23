@@ -4,13 +4,13 @@
 
 use anyhow::{Context as _, Error};
 use async_utils::event::Event;
-use fidl::endpoints::{create_request_stream, ControlHandle, Responder, ServerEnd};
+use fidl::endpoints::{create_request_stream, ServerEnd};
 use fidl_fuchsia_power_broker::{
     self as fpb, CurrentLevelRequest, CurrentLevelRequestStream, ElementControlMarker,
     ElementControlRequest, ElementControlRequestStream, LeaseControlMarker, LeaseControlRequest,
-    LeaseControlRequestStream, LeaseStatus, LessorMarker, LessorRequest, LessorRequestStream,
-    PowerLevel, RequiredLevelRequest, RequiredLevelRequestStream, StatusRequest,
-    StatusRequestStream, TopologyRequest, TopologyRequestStream,
+    LeaseControlRequestStream, LeaseStatus, LessorRequest, LessorRequestStream, PowerLevel,
+    RequiredLevelRequest, RequiredLevelRequestStream, StatusRequest, StatusRequestStream,
+    TopologyRequest, TopologyRequestStream,
 };
 use fpb::ElementSchema;
 use fuchsia_async::Task;
@@ -36,20 +36,28 @@ enum IncomingRequest {
     Topology(TopologyRequestStream),
 }
 
+struct ElementHandlers {
+    current: Option<Rc<CurrentLevelHandler>>,
+    required: Option<RequiredLevelHandler>,
+    status: Vec<StatusChannelHandler>,
+}
+
+impl ElementHandlers {
+    fn new() -> Self {
+        Self { current: None, required: None, status: Vec::new() }
+    }
+}
+
 struct BrokerSvc {
     broker: Rc<RefCell<Broker>>,
-    required_level_handlers: Rc<RefCell<HashMap<ElementID, RequiredLevelHandler>>>,
-    current_level_handlers: Rc<RefCell<HashMap<ElementID, Rc<CurrentLevelHandler>>>>,
-    status_channel_handlers: Rc<RefCell<HashMap<ElementID, Vec<StatusChannelHandler>>>>,
+    element_handlers: Rc<RefCell<HashMap<ElementID, ElementHandlers>>>,
 }
 
 impl BrokerSvc {
     fn new() -> Self {
         Self {
             broker: Rc::new(RefCell::new(Broker::new())),
-            required_level_handlers: Rc::new(RefCell::new(HashMap::new())),
-            current_level_handlers: Rc::new(RefCell::new(HashMap::new())),
-            status_channel_handlers: Rc::new(RefCell::new(HashMap::new())),
+            element_handlers: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -161,128 +169,109 @@ impl BrokerSvc {
         element_id: ElementID,
         stream: ElementControlRequestStream,
     ) -> Result<(), Error> {
-        stream
+        let res = stream
             .map(|result| result.context("failed request"))
-            .try_for_each(|request| async {
-                match request {
-                    ElementControlRequest::OpenStatusChannel { status_channel, .. } => {
-                        tracing::debug!("OpenStatusChannel({:?})", &element_id);
-                        let svc = self.clone();
-                        svc.create_status_channel_handler(element_id.clone(), status_channel).await
-                    }
-                    ElementControlRequest::RemoveElement { responder } => {
-                        tracing::debug!("RemoveElement({:?})", &element_id);
-                        let mut broker = self.broker.borrow_mut();
-                        broker.remove_element(&element_id);
-
-                        // Clean up StatusChannelHandlers.
-                        self.required_level_handlers.borrow_mut().remove(&element_id);
-                        self.current_level_handlers.borrow_mut().remove(&element_id);
-                        self.status_channel_handlers.borrow_mut().remove(&element_id);
-
-                        // Close the ElementControl channel.
-                        let control_handle = responder.control_handle().clone();
-                        let res = responder.send().context("send failed");
-                        control_handle.shutdown();
-                        res
-                    }
-                    ElementControlRequest::AddDependency {
-                        dependency_type,
-                        dependent_level,
-                        requires_token,
-                        requires_level,
-                        responder,
-                    } => {
-                        tracing::debug!("AddDependency({:?},{:?},{:?},{:?},{:?})", &element_id, dependency_type, &dependent_level, &requires_token, &requires_level);
-                        let mut broker = self.broker.borrow_mut();
-                        let res = broker.add_dependency(
-                            &element_id,
-                            dependency_type,
-                            dependent_level,
-                            requires_token.into(),
-                            requires_level,
-                        );
-                        tracing::debug!("AddDependency add_dependency = ({:?})", &res);
-                        if let Err(err) = res {
-                            responder.send(Err(err.into())).context("send failed")
-                        } else {
-                            responder.send(Ok(())).context("send failed")
-                        }
-                    }
-                    ElementControlRequest::RemoveDependency {
-                        dependency_type,
-                        dependent_level,
-                        requires_token,
-                        requires_level,
-                        responder,
-                    } => {
-                        tracing::debug!("RemoveDependency({:?},{:?},{:?},{:?},{:?})", &element_id, dependency_type, &dependent_level, &requires_token, &requires_level);
-                        let mut broker = self.broker.borrow_mut();
-                        let res = broker.remove_dependency(
-                            &element_id,
-                            dependency_type,
-                            dependent_level,
-                            requires_token.into(),
-                            requires_level,
-                        );
-                        tracing::debug!("RemoveDependency remove_dependency = ({:?})", &res);
-                        if let Err(err) = res {
-                            responder.send(Err(err.into())).context("send failed")
-                        } else {
-                            responder.send(Ok(())).context("send failed")
-                        }
-                    }
-                    ElementControlRequest::RegisterDependencyToken {
-                        token,
-                        dependency_type,
-                        responder,
-                    } => {
-                        tracing::debug!(
-                            "RegisterDependencyToken({:?}, {:?})",
-                            &element_id,
-                            &token,
-                        );
-                        let mut broker = self.broker.borrow_mut();
-                        let res = broker.register_dependency_token(
-                            &element_id,
-                            token.into(),
-                            dependency_type,
-                        );
-                        tracing::debug!("RegisterDependencyToken register_credentials = ({:?})", &res);
-                        if let Err(err) = res {
-                            responder.send(Err(err.into())).context("send failed")
-                        } else {
-                            responder.send(Ok(())).context("send failed")
-                        }
-                    }
-                    ElementControlRequest::UnregisterDependencyToken {
-                        token,
-                        responder,
-                    } => {
-                        tracing::debug!(
-                            "UnregisterDependencyToken({:?}, {:?})",
-                            &element_id,
-                            &token,
-                        );
-                        let mut broker = self.broker.borrow_mut();
-                        let res = broker.unregister_dependency_token(
-                            &element_id,
-                            token.into(),
-                        );
-                        tracing::debug!("UnregisterDependencyToken unregister_credentials = ({:?})", &res);
-                        if let Err(err) = res {
-                            responder.send(Err(err.into())).context("send failed")
-                        } else {
-                            responder.send(Ok(())).context("send failed")
-                        }
-                    }
-                    ElementControlRequest::_UnknownMethod { ordinal, .. } => {
-                        tracing::warn!("Received unknown ElementControlRequest: {ordinal}");
-                        todo!()
-                    }
-                }
+            .try_for_each(|request| {
+                self.clone().handle_element_control_request(&element_id, request)
             })
-            .await
+            .await;
+        tracing::debug!("ElementControl stream is closed, removing element ({element_id:?})...");
+        let mut broker = self.broker.borrow_mut();
+        broker.remove_element(&element_id);
+
+        // Clean up ElementHandlers.
+        self.element_handlers.borrow_mut().remove(&element_id);
+        tracing::debug!("Element ({element_id:?}) removed.");
+        res
+    }
+
+    async fn handle_element_control_request(
+        self: Rc<Self>,
+        element_id: &ElementID,
+        request: ElementControlRequest,
+    ) -> Result<(), Error> {
+        match request {
+            ElementControlRequest::OpenStatusChannel { status_channel, .. } => {
+                tracing::debug!("OpenStatusChannel({:?})", element_id);
+                let svc = self.clone();
+                svc.create_status_channel_handler(element_id.clone(), status_channel).await
+            }
+            ElementControlRequest::AddDependency {
+                dependency_type,
+                dependent_level,
+                requires_token,
+                requires_level,
+                responder,
+            } => {
+                tracing::debug!(
+                    "AddDependency({:?},{:?},{:?},{:?},{:?})",
+                    element_id,
+                    dependency_type,
+                    &dependent_level,
+                    &requires_token,
+                    &requires_level
+                );
+                let mut broker = self.broker.borrow_mut();
+                let res = broker.add_dependency(
+                    element_id,
+                    dependency_type,
+                    dependent_level,
+                    requires_token.into(),
+                    requires_level,
+                );
+                tracing::debug!("AddDependency add_dependency = ({:?})", &res);
+                responder.send(res.map_err(Into::into)).context("send failed")
+            }
+            ElementControlRequest::RemoveDependency {
+                dependency_type,
+                dependent_level,
+                requires_token,
+                requires_level,
+                responder,
+            } => {
+                tracing::debug!(
+                    "RemoveDependency({:?},{:?},{:?},{:?},{:?})",
+                    element_id,
+                    dependency_type,
+                    &dependent_level,
+                    &requires_token,
+                    &requires_level
+                );
+                let mut broker = self.broker.borrow_mut();
+                let res = broker.remove_dependency(
+                    element_id,
+                    dependency_type,
+                    dependent_level,
+                    requires_token.into(),
+                    requires_level,
+                );
+                tracing::debug!("RemoveDependency remove_dependency = ({:?})", &res);
+                responder.send(res.map_err(Into::into)).context("send failed")
+            }
+            ElementControlRequest::RegisterDependencyToken {
+                token,
+                dependency_type,
+                responder,
+            } => {
+                tracing::debug!("RegisterDependencyToken({:?}, {:?})", element_id, &token);
+                let mut broker = self.broker.borrow_mut();
+                let res =
+                    broker.register_dependency_token(element_id, token.into(), dependency_type);
+                tracing::debug!("RegisterDependencyToken register_credentials = ({:?})", &res);
+                responder.send(res.map_err(Into::into)).context("send failed")
+            }
+            ElementControlRequest::UnregisterDependencyToken { token, responder } => {
+                tracing::debug!("UnregisterDependencyToken({:?}, {:?})", element_id, &token);
+                let mut broker = self.broker.borrow_mut();
+                let res = broker.unregister_dependency_token(element_id, token.into());
+                tracing::debug!("UnregisterDependencyToken unregister_credentials = ({:?})", &res);
+                responder.send(res.map_err(Into::into)).context("send failed")
+            }
+            ElementControlRequest::_UnknownMethod { ordinal, .. } => {
+                tracing::warn!("Received unknown ElementControlRequest: {ordinal}");
+                todo!()
+            }
+        }
     }
 
     fn validate_and_unpack_add_element_payload(
@@ -296,6 +285,7 @@ impl BrokerSvc {
             Vec<credentials::Token>,
             Vec<credentials::Token>,
             Option<fpb::LevelControlChannels>,
+            Option<ServerEnd<fpb::LessorMarker>>,
         ),
         fpb::AddElementError,
     > {
@@ -329,6 +319,7 @@ impl BrokerSvc {
             active_dependency_tokens,
             passive_dependency_tokens,
             payload.level_control_channels,
+            payload.lessor_channel,
         ))
     }
 
@@ -347,6 +338,7 @@ impl BrokerSvc {
                             active_dependency_tokens,
                             passive_dependency_tokens,
                             level_control_channels,
+                            lessor_channel,
                         )) = Self::validate_and_unpack_add_element_payload(payload)
                         else {
                             return responder
@@ -367,17 +359,29 @@ impl BrokerSvc {
                         tracing::debug!("AddElement add_element = {:?}", res);
                         match res {
                             Ok(element_id) => {
+                                self.element_handlers
+                                    .borrow_mut()
+                                    .insert(element_id.clone(), ElementHandlers::new());
                                 if let Some(level_control) = level_control_channels {
-                                    self.set_current_level_handler(
-                                        element_id.clone(),
-                                        level_control.current,
-                                    )
-                                    .await;
-                                    self.set_required_level_handler(
-                                        element_id.clone(),
-                                        level_control.required,
-                                    )
-                                    .await;
+                                    let current = self
+                                        .create_current_level_handler(
+                                            element_id.clone(),
+                                            level_control.current,
+                                        )
+                                        .await;
+                                    let required = self
+                                        .create_required_level_handler(
+                                            element_id.clone(),
+                                            level_control.required,
+                                        )
+                                        .await;
+                                    self.element_handlers
+                                        .borrow_mut()
+                                        .entry(element_id.clone())
+                                        .and_modify(|e| {
+                                            e.current = Some(current);
+                                            e.required = Some(required);
+                                        });
                                 }
                                 let (element_control_client, element_control_stream) =
                                     create_request_stream::<ElementControlMarker>()?;
@@ -398,28 +402,27 @@ impl BrokerSvc {
                                     }
                                 })
                                 .detach();
-                                tracing::debug!("Spawning lessor task for {:?}", &element_id);
-                                let (lessor_client, lessor_stream) =
-                                    create_request_stream::<LessorMarker>()?;
-                                Task::local({
-                                    let svc = self.clone();
-                                    let element_id = element_id.clone();
-                                    async move {
-                                        if let Err(err) =
-                                            svc.run_lessor(element_id, lessor_stream).await
-                                        {
-                                            tracing::debug!("run_lessor err: {:?}", err);
+                                if let Some(lessor_channel) = lessor_channel {
+                                    tracing::debug!("Spawning lessor task for {:?}", &element_id);
+                                    let lessor_stream = lessor_channel.into_stream().unwrap();
+                                    Task::local({
+                                        let svc = self.clone();
+                                        let element_id = element_id.clone();
+                                        async move {
+                                            if let Err(err) = svc
+                                                .run_lessor(element_id.clone(), lessor_stream)
+                                                .await
+                                            {
+                                                tracing::debug!(
+                                                    "run_lessor({element_id:?}) err: {:?}",
+                                                    err
+                                                );
+                                            }
                                         }
-                                    }
-                                })
-                                .detach();
-                                tracing::debug!(
-                                    "Create level control handler for {:?}",
-                                    &element_id
-                                );
-                                responder
-                                    .send(Ok((element_control_client, lessor_client)))
-                                    .context("send failed")
+                                    })
+                                    .detach();
+                                }
+                                responder.send(Ok(element_control_client)).context("send failed")
                             }
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
                         }
@@ -433,11 +436,11 @@ impl BrokerSvc {
             .await
     }
 
-    async fn set_required_level_handler(
+    async fn create_required_level_handler(
         &self,
         element_id: ElementID,
         server_end: ServerEnd<fpb::RequiredLevelMarker>,
-    ) {
+    ) -> RequiredLevelHandler {
         let receiver = {
             let mut broker = self.broker.borrow_mut();
             broker.watch_required_level(&element_id)
@@ -445,18 +448,18 @@ impl BrokerSvc {
         let mut handler = RequiredLevelHandler::new(element_id.clone());
         let stream = server_end.into_stream().unwrap();
         handler.start(stream, receiver);
-        self.required_level_handlers.borrow_mut().insert(element_id.clone(), handler);
+        handler
     }
 
-    async fn set_current_level_handler(
+    async fn create_current_level_handler(
         &self,
         element_id: ElementID,
         server_end: ServerEnd<fpb::CurrentLevelMarker>,
-    ) {
+    ) -> Rc<CurrentLevelHandler> {
         let handler = Rc::new(CurrentLevelHandler::new(self.broker.clone(), element_id.clone()));
         let stream = server_end.into_stream().unwrap();
         handler.clone().start(stream);
-        self.current_level_handlers.borrow_mut().insert(element_id.clone(), handler);
+        handler
     }
 
     async fn create_status_channel_handler(
@@ -471,11 +474,10 @@ impl BrokerSvc {
         let mut handler = StatusChannelHandler::new(element_id.clone());
         let stream = server_end.into_stream()?;
         handler.start(stream, receiver);
-        self.status_channel_handlers
+        self.element_handlers
             .borrow_mut()
             .entry(element_id.clone())
-            .or_insert(Vec::new())
-            .push(handler);
+            .and_modify(|e| e.status.push(handler));
         Ok(())
     }
 }
@@ -572,13 +574,7 @@ impl CurrentLevelHandler {
                         );
                         let mut broker = self.broker.borrow_mut();
                         let res = broker.update_current_level(&element_id, current_level);
-                        match res {
-                            Ok(_) => responder.send(Ok(())).context("send failed"),
-                            Err(err) => {
-                                tracing::debug!("CurrentLevel.Update Err: {:?}", &err);
-                                responder.send(Err(err.into())).context("send failed")
-                            }
-                        }
+                        responder.send(res.map_err(Into::into)).context("send failed")
                     }
                     CurrentLevelRequest::_UnknownMethod { ordinal, .. } => {
                         tracing::warn!("Received unknown CurrentLevelRequest: {ordinal}");

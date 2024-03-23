@@ -55,7 +55,7 @@ class PowerElement {
  public:
   explicit PowerElement(
       fidl::ServerEnd<fuchsia_power_broker::ElementControl> ec,
-      fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor,
+      std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor,
       std::optional<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>> current_level,
       std::optional<fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>> required_level)
       : element_control_(std::move(ec)),
@@ -65,7 +65,7 @@ class PowerElement {
 
  private:
   fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_;
-  fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor_;
+  std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>> current_level_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>> required_level_;
 };
@@ -90,23 +90,21 @@ class TopologyServer : public fidl::Server<fuchsia_power_broker::Topology> {
 
     // Make channels to return to client
     auto element_control = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
-    auto lessor = fidl::CreateEndpoints<fuchsia_power_broker::Lessor>();
 
     if (req.level_control_channels().has_value()) {
-      PowerElement element{std::move(element_control->server), std::move(lessor->server),
-                           std::move(std::move(req.level_control_channels().value().current())),
+      PowerElement element{std::move(element_control->server), std::move(req.lessor_channel()),
+                           std::move(req.level_control_channels().value().current()),
                            std::move(req.level_control_channels().value().required())};
 
       clients_.emplace_back(std::move(element));
     } else {
-      PowerElement element{std::move(element_control->server), std::move(lessor->server),
+      PowerElement element{std::move(element_control->server), std::move(req.lessor_channel()),
                            std::nullopt, std::nullopt};
 
       clients_.emplace_back(std::move(element));
     }
     fuchsia_power_broker::TopologyAddElementResponse result{
-        {.element_control_channel = std::move(element_control->client),
-         .lessor_channel = std::move(lessor->client)},
+        {.element_control_channel = std::move(element_control->client)},
     };
     fit::success<fuchsia_power_broker::TopologyAddElementResponse> success(std::move(result));
 

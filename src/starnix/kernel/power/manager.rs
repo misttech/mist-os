@@ -11,6 +11,7 @@ use std::{collections::HashSet, sync::Arc};
 
 use anyhow::{anyhow, Context};
 use async_utils::hanging_get::client::HangingGetStream;
+use fidl::endpoints::create_sync_proxy;
 use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system as fsystem;
@@ -96,7 +97,8 @@ impl SuspendResumeManager {
         {
             // TODO(b/316023943): also depends on execution_resume_latency after implemented.
             let power_levels: Vec<u8> = (0..=POWER_ON_LEVEL).collect();
-            let (_, lessor_client_end) = topology
+            let (lessor, lessor_server_end) = create_sync_proxy::<fbroker::LessorMarker>();
+            let _element = topology
                 .add_element(
                     fbroker::ElementSchema {
                         element_name: Some("starnix_power_mode".into()),
@@ -109,6 +111,7 @@ impl SuspendResumeManager {
                             requires_level: fsystem::ApplicationActivityLevel::Active
                                 .into_primitive(),
                         }]),
+                        lessor_channel: Some(lessor_server_end),
                         ..Default::default()
                     },
                     zx::Time::INFINITE,
@@ -116,7 +119,6 @@ impl SuspendResumeManager {
                 .map_err(|e| anyhow!("PowerBroker::AddElementError({e:?})"))?;
 
             // Power on by holding a lease.
-            let lessor = lessor_client_end.into_sync_proxy();
             let power_on_control = lessor
                 .lease(POWER_ON_LEVEL, zx::Time::INFINITE)?
                 .map_err(|e| anyhow!("PowerBroker::LeaseError({e:?})"))?
