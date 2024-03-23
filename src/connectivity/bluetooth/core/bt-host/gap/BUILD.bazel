@@ -2,6 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_test",
+    "fuchsia_unittest_package",
+)
+
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
@@ -58,4 +64,68 @@ cc_library(
         "@pigweed//pw_bluetooth",
         "@pigweed//third_party/fuchsia:fit",
     ],
+)
+
+cc_library(
+    name = "testing",
+    testonly = True,
+    srcs = [
+        "fake_adapter.cc",
+        "fake_pairing_delegate.cc",
+    ],
+    deps = [
+        ":gap",
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
+        "@pigweed//pw_unit_test",
+    ],
+)
+
+fuchsia_cc_test(
+    name = "gap_test",
+    testonly = True,
+    srcs = [
+        "adapter_test.cc",
+        "android_vendor_capabilities_test.cc",
+        "bredr_connection_manager_test.cc",
+        "bredr_connection_request_test.cc",
+        "bredr_discovery_manager_test.cc",
+        "bredr_interrogator_test.cc",
+        "discovery_filter_test.cc",
+        "fake_pairing_delegate_test.cc",
+        "identity_resolving_list_test.cc",
+        "low_energy_address_manager_test.cc",
+        "low_energy_advertising_manager_test.cc",
+        "low_energy_connection_manager_test.cc",
+        "low_energy_discovery_manager_test.cc",
+        "low_energy_interrogator_test.cc",
+        "pairing_state_test.cc",
+        "peer_cache_test.cc",
+        "peer_test.cc",
+        "types_test.cc",
+    ],
+    death_unittest = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":gap",
+        ":testing",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/core/bt-host/gatt:testing",
+        "//src/connectivity/bluetooth/core/bt-host/hci:testing",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
+        "//src/connectivity/bluetooth/core/bt-host/sm:testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "test_pkg",
+    package_name = "gap_tests",
+    testonly = True,
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        ":gap_test",
+    ],
+    visibility = ["//visibility:public"],
 )

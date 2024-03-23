@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_fuchsia_test_package.gni")
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_unit_test/test.gni")
 
@@ -183,4 +184,9 @@ source_set("fuzztest_driver") {
     "//src/connectivity/bluetooth/core/bt-host/common",
     "//third_party/pigweed/backends/pw_log:printf",
   ]
+}
+
+bazel_fuchsia_test_package("test_pkg") {
+  test_package_name = "testing_tests"
+  test_component_names = [ "testing_test_autogen_cml" ]
 }

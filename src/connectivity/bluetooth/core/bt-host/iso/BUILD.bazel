@@ -2,6 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_test",
+    "fuchsia_unittest_package",
+)
+
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
@@ -12,4 +18,29 @@ cc_library(
         "//src/connectivity/bluetooth/core/bt-host/common",
         "//src/connectivity/bluetooth/core/bt-host/transport",
     ],
+)
+
+fuchsia_cc_test(
+    name = "iso_test",
+    testonly = True,
+    srcs = [
+        "iso_stream_manager_test.cc",
+    ],
+    death_unittest = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host/testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "test_pkg",
+    package_name = "iso_tests",
+    testonly = True,
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        ":iso_test",
+    ],
+    visibility = ["//visibility:public"],
 )

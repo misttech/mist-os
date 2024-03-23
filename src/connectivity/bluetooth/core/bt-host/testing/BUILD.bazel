@@ -2,6 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_test",
+    "fuchsia_unittest_package",
+)
+
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
@@ -104,4 +110,36 @@ cc_library(
         "//src/connectivity/bluetooth/core/bt-host/common",
         "//third_party/pigweed/backends/pw_log:printf",
     ],
+)
+
+fuchsia_cc_test(
+    name = "testing_test",
+    testonly = True,
+    srcs = [
+        "fake_controller_test.cc",
+        "fake_dynamic_channel_test.cc",
+        "fake_l2cap_test.cc",
+        "fake_sdp_server_test.cc",
+        "fake_signaling_server_test.cc",
+        "inspect_util_test.cc",
+        "parse_args_test.cc",
+    ],
+    death_unittest = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":testing",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "test_pkg",
+    package_name = "testing_tests",
+    testonly = True,
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        ":testing_test",
+    ],
+    visibility = ["//visibility:public"],
 )

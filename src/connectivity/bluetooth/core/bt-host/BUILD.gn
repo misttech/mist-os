@@ -315,10 +315,18 @@ group("tests") {
 group("bazel_tests") {
   testonly = true
   deps = [
+    "att:test_pkg",
+    "common:test_pkg",
+    "gap:test_pkg",
+    "gatt:test_pkg",
     "hci:test_pkg",
     "hci-spec:test_pkg",
+    "iso:test_pkg",
     "l2cap:test_pkg",
     "sco:test_pkg",
+    "sdp:test_pkg",
+    "sm:test_pkg",
+    "testing:test_pkg",
     "transport:test_pkg",
   ]
 }
