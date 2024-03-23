@@ -114,6 +114,162 @@ pub async fn serve_state_request<'a, I: FidlRouteIpExt>(
     watcher_fut.await
 }
 
+/// Provides a stream of watcher events such that the stack appears to contain
+/// no routes and never installs any.
+pub fn empty_watch_event_stream<'a, I: FidlRouteIpExt>(
+) -> impl Stream<Item = Vec<I::WatchEvent>> + 'a {
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct Wrap<I: FidlRouteIpExt>(I::WatchEvent);
+
+    let Wrap(event) = I::map_ip(
+        (),
+        |()| Wrap(fnet_routes::EventV4::Idle(fnet_routes::Empty)),
+        |()| Wrap(fnet_routes::EventV6::Idle(fnet_routes::Empty)),
+    );
+    futures::stream::once(futures::future::ready(vec![event])).chain(futures::stream::pending())
+}
+
+/// Provides testutils for testing implementations of clients and servers of
+/// fuchsia.net.routes.admin.
+pub mod admin {
+    use fidl::endpoints::ProtocolMarker;
+    use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
+    use futures::{Stream, StreamExt as _};
+    use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
+
+    use crate::admin::{FidlRouteAdminIpExt, Responder, RouteSetRequest};
+
+    /// Provides a SetProvider implementation that provides one RouteSet and
+    /// then panics on subsequent invocations. Returns the request stream for
+    /// that RouteSet.
+    pub fn serve_one_route_set<I: FidlRouteAdminIpExt>(
+        server_end: fidl::endpoints::ServerEnd<I::SetProviderMarker>,
+    ) -> impl Stream<
+            Item = <
+                    <<I as FidlRouteAdminIpExt>::RouteSetMarker as ProtocolMarker>
+                        ::RequestStream as Stream
+                >::Item
+    >{
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct In<I: FidlRouteAdminIpExt>(
+            <<<I as FidlRouteAdminIpExt>::SetProviderMarker as ProtocolMarker>
+                ::RequestStream as Stream
+            >::Item,
+        );
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Out<I: FidlRouteAdminIpExt>(fidl::endpoints::ServerEnd<I::RouteSetMarker>);
+
+        let stream = server_end.into_stream().expect("into stream");
+        stream
+            .scan(false, |responded, item| {
+                let responded = std::mem::replace(responded, true);
+                if responded {
+                    panic!("received multiple SetProvider requests");
+                }
+
+                futures::future::ready(Some(item))
+            })
+            .map(|item| {
+                let Out(route_set_server_end) = I::map_ip(
+                    In(item),
+                    |In(item)| match item.expect("set provider FIDL error") {
+                        fnet_routes_admin::SetProviderV4Request::NewRouteSet {
+                            route_set,
+                            control_handle: _,
+                        } => Out(route_set),
+                    },
+                    |In(item)| match item.expect("set provider FIDL error") {
+                        fnet_routes_admin::SetProviderV6Request::NewRouteSet {
+                            route_set,
+                            control_handle: _,
+                        } => Out(route_set),
+                    },
+                );
+                route_set_server_end.into_stream().expect("into stream")
+            })
+            .flatten()
+    }
+
+    /// Provides a SetProvider implementation that serves no-op RouteSets.
+    pub async fn serve_noop_route_sets<I: FidlRouteAdminIpExt>(
+        server_end: fidl::endpoints::ServerEnd<I::SetProviderMarker>,
+    ) {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct In<I: FidlRouteAdminIpExt>(
+            <<<I as FidlRouteAdminIpExt>::SetProviderMarker as ProtocolMarker>
+                ::RequestStream as Stream
+            >::Item,
+        );
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Out<I: FidlRouteAdminIpExt>(fidl::endpoints::ServerEnd<I::RouteSetMarker>);
+
+        let stream = server_end.into_stream().expect("into stream");
+        stream
+            .for_each_concurrent(None, |item| async move {
+                let Out(route_set_server_end) = I::map_ip(
+                    In(item),
+                    |In(item)| match item.expect("set provider FIDL error") {
+                        fnet_routes_admin::SetProviderV4Request::NewRouteSet {
+                            route_set,
+                            control_handle: _,
+                        } => Out(route_set),
+                    },
+                    |In(item)| match item.expect("set provider FIDL error") {
+                        fnet_routes_admin::SetProviderV6Request::NewRouteSet {
+                            route_set,
+                            control_handle: _,
+                        } => Out(route_set),
+                    },
+                );
+                serve_noop_route_set::<I>(route_set_server_end).await;
+            })
+            .await;
+    }
+
+    /// Serves a RouteSet that returns OK for everything and does nothing.
+    async fn serve_noop_route_set<I: FidlRouteAdminIpExt>(
+        server_end: fidl::endpoints::ServerEnd<I::RouteSetMarker>,
+    ) {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Wrap<I: FidlRouteAdminIpExt>(
+            <<<I as FidlRouteAdminIpExt>::RouteSetMarker as ProtocolMarker>
+                ::RequestStream as Stream
+            >::Item,
+        );
+
+        let stream = server_end.into_stream().expect("into stream");
+        stream
+            .for_each(|item| async move {
+                let request: RouteSetRequest<I> = I::map_ip(
+                    Wrap(item),
+                    |Wrap(item)| RouteSetRequest::<Ipv4>::from(item.expect("route set FIDL error")),
+                    |Wrap(item)| RouteSetRequest::<Ipv6>::from(item.expect("route set FIDL error")),
+                );
+                match request {
+                    RouteSetRequest::AddRoute { route, responder } => {
+                        let _: crate::Route<I> = route.expect("AddRoute called with invalid route");
+                        responder.send(Ok(true)).expect("respond to AddRoute");
+                    }
+                    RouteSetRequest::RemoveRoute { route, responder } => {
+                        let _: crate::Route<I> =
+                            route.expect("RemoveRoute called with invalid route");
+                        responder.send(Ok(true)).expect("respond to RemoveRoute");
+                    }
+                    RouteSetRequest::AuthenticateForInterface { credential: _, responder } => {
+                        responder.send(Ok(())).expect("respond to AuthenticateForInterface");
+                    }
+                }
+            })
+            .await;
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod internal {
     use super::*;

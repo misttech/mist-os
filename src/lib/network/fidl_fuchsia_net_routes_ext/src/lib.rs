@@ -724,7 +724,8 @@ pub trait FidlRouteIpExt: Ip {
         + Clone
         + std::fmt::Debug
         + PartialEq
-        + Unpin;
+        + Unpin
+        + Send;
     /// The "route" FIDL type to use for this IP version.
     type Route: TryFrom<Route<Self>, Error = NetTypeConversionError>
         + TryInto<Route<Self>, Error = FidlConversionError<RoutePropertiesRequiredFields>>
