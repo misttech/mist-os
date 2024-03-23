@@ -236,7 +236,7 @@ impl From<Dict> for fsandbox::Capability {
 }
 
 impl CapabilityTrait for Dict {
-    fn try_into_directory(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         let dir = pfs::simple();
         for (key, value) in self.lock_entries().iter() {
             let remote: Arc<dyn DirectoryEntry> = match value {

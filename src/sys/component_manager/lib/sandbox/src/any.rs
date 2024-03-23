@@ -39,7 +39,9 @@ pub(crate) mod crate_local {
 
         fn try_into_open(self: Box<Self>) -> Result<Open, ConversionError>;
 
-        fn try_into_directory(self: Box<Self>) -> Result<Arc<dyn DirectoryEntry>, ConversionError>;
+        fn try_into_directory_entry(
+            self: Box<Self>,
+        ) -> Result<Arc<dyn DirectoryEntry>, ConversionError>;
     }
 
     impl<T: CapabilityTrait> ObjectSafeCapability for T {
@@ -51,8 +53,10 @@ pub(crate) mod crate_local {
             (*self).try_into_open()
         }
 
-        fn try_into_directory(self: Box<Self>) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
-            (*self).try_into_directory()
+        fn try_into_directory_entry(
+            self: Box<Self>,
+        ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+            (*self).try_into_directory_entry()
         }
     }
 }

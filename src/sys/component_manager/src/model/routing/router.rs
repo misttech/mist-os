@@ -209,12 +209,12 @@ impl Router {
                     };
                     // TODO: Should we convert the Open to a Directory here if the Router wraps a
                     // Dict?
-                    Capability::Open(router.into_open(
+                    Capability::Open(Open::new(router.into_directory_entry(
                         request,
                         fio::DirentType::Service,
                         routing_task_group.clone(),
                         |_| {},
-                    ))
+                    )))
                 }
                 other => other.clone(),
             };
@@ -224,23 +224,23 @@ impl Router {
         out
     }
 
-    /// Converts the [Router] capability into an [Open] capability such that open requests
+    /// Converts the [Router] capability into DirectoryEntry such that open requests
     /// will be fulfilled via the specified `request` on the router.
     ///
-    /// `entry_type` is the type of the entry when the `Open` is accessed through a `fuchsia.io`
+    /// `entry_type` is the type of the entry when the DirectoryEntry is accessed through a `fuchsia.io`
     /// connection.
     ///
     /// Routing tasks are run on the `routing_task_group`.
     ///
-    /// When routing failed while exercising the returned [Open] capability, errors will be
+    /// When routing failed while exercising the returned DirectoryEntry, errors will be
     /// sent to `errors_fn`.
-    pub fn into_open(
+    pub fn into_directory_entry(
         self,
         request: Request,
         entry_type: fio::DirentType,
         routing_task_group: TaskGroup,
         errors_fn: impl Fn(ErrorCapsule) + Send + Sync + 'static,
-    ) -> Open {
+    ) -> Arc<dyn DirectoryEntry> {
         struct RouterEntry<F> {
             router: Router,
             request: Request,
@@ -320,13 +320,13 @@ impl Router {
             }
         }
 
-        Open::new(Arc::new(RouterEntry {
+        Arc::new(RouterEntry {
             router: self.clone(),
             request,
             entry_type,
             routing_task_group,
             errors_fn,
-        }))
+        })
     }
 }
 

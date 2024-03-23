@@ -84,16 +84,16 @@ impl Capability {
         }
     }
 
-    pub fn try_into_directory(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+    pub fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         match self {
-            Capability::Sender(s) => s.try_into_directory(),
-            Capability::Open(s) => s.try_into_directory(),
-            Capability::Router(s) => s.try_into_directory(),
-            Capability::Dictionary(s) => s.try_into_directory(),
-            Capability::Data(s) => s.try_into_directory(),
-            Capability::Unit(s) => s.try_into_directory(),
-            Capability::Directory(s) => s.try_into_directory(),
-            Capability::OneShotHandle(s) => s.try_into_directory(),
+            Capability::Sender(s) => s.try_into_directory_entry(),
+            Capability::Open(s) => s.try_into_directory_entry(),
+            Capability::Router(s) => s.try_into_directory_entry(),
+            Capability::Dictionary(s) => s.try_into_directory_entry(),
+            Capability::Data(s) => s.try_into_directory_entry(),
+            Capability::Unit(s) => s.try_into_directory_entry(),
+            Capability::Directory(s) => s.try_into_directory_entry(),
+            Capability::OneShotHandle(s) => s.try_into_directory_entry(),
         }
     }
 }
@@ -190,19 +190,20 @@ pub trait CapabilityTrait:
 {
     /// Attempt to convert `self` to a capability of type [Open].
     ///
-    /// The default implementation forwards to `try_into_directory`.
+    /// The default implementation forwards to `try_into_directory_entry`.
     fn try_into_open(self) -> Result<Open, ConversionError> {
-        Ok(Open::new(self.try_into_directory()?))
+        Ok(Open::new(self.try_into_directory_entry()?))
     }
 
     fn into_fidl(self) -> fsandbox::Capability {
         self.into()
     }
 
-    /// Attempt to convert `self` to a fuchsia.io directory.
+    /// Attempt to convert `self` to a DirectoryEntry which can be served in a
+    /// VFS.
     ///
     /// The default implementation always returns an error.
-    fn try_into_directory(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Err(ConversionError::NotSupported)
     }
 }

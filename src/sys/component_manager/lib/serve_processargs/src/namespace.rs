@@ -110,15 +110,21 @@ impl NamespaceBuilder {
                 let directory = match cap {
                     Capability::Directory(d) => d,
                     cap => {
-                        let directory = cap.try_into_directory().map_err(|err| {
+                        let entry = cap.try_into_directory_entry().map_err(|err| {
                             BuildNamespaceError::Conversion {
                                 path: path.clone(),
                                 err: Arc::new(err),
                             }
                         })?;
+                        if entry.entry_info().type_() != fio::DirentType::Directory {
+                            return Err(BuildNamespaceError::Conversion {
+                                path: path.clone(),
+                                err: Arc::new(sandbox::ConversionError::NotSupported),
+                            });
+                        }
                         sandbox::Directory::new(
                             serve_directory(
-                                directory,
+                                entry,
                                 &self.scope,
                                 fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
                             )
@@ -401,5 +407,14 @@ mod tests {
         assert_eq!(not_found_receiver.next().await, Some("/svc/non_existent".to_string()));
 
         drop(ns);
+    }
+
+    #[fuchsia::test]
+    async fn test_not_directory() {
+        let (not_found_sender, _) = unbounded();
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), not_found_sender);
+        let (_, sender) = sandbox::Receiver::new();
+        namespace.add_entry(sender.into(), &ns_path("/a")).unwrap();
+        assert_matches!(namespace.serve(), Err(BuildNamespaceError::Conversion { .. }));
     }
 }

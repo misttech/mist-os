@@ -375,7 +375,12 @@ fn service_or_protocol_use(
                 });
             };
 
-            router.into_open(request, fio::DirentType::Service, blocking_task_group, errors_fn)
+            Open::new(router.into_directory_entry(
+                request,
+                fio::DirentType::Service,
+                blocking_task_group,
+                errors_fn,
+            ))
         }
 
         // Legacy routing.

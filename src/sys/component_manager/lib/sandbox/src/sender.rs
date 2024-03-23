@@ -6,9 +6,9 @@ use fidl::endpoints::{create_request_stream, ClientEnd, ControlHandle, RequestSt
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{channel::mpsc, TryStreamExt};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 use tracing::warn;
-use vfs::service::endpoint;
+use vfs::directory::entry::DirectoryEntry;
 
 #[derive(Debug)]
 pub struct Message {
@@ -111,15 +111,17 @@ impl Sender {
 
 impl From<Sender> for Open {
     fn from(sender: Sender) -> Self {
-        Self::new(endpoint(move |_scope, server_end| {
+        Self::new(vfs::service::endpoint(move |_scope, server_end| {
             let _ = sender.send_channel(server_end.into_zx_channel().into());
         }))
     }
 }
 
 impl CapabilityTrait for Sender {
-    fn try_into_open(self) -> Result<Open, ConversionError> {
-        Ok(self.into())
+    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+        Ok(vfs::service::endpoint(move |_scope, server_end| {
+            let _ = self.send_channel(server_end.into_zx_channel().into());
+        }))
     }
 }
 
