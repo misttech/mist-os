@@ -254,24 +254,11 @@ impl CapabilityRouteController {
 
         let mut capability_types = HashSet::<CapabilityTypeName>::new();
         for name in request.capability_types.split(" ") {
-            capability_types.insert(Self::parse_capability_type(&name)?);
+            capability_types.insert(name.parse()?);
         }
 
         let response_level = Self::parse_response_level(&request.response_level)?;
         Ok((capability_types, response_level))
-    }
-
-    fn parse_capability_type(name: &str) -> Result<CapabilityTypeName> {
-        match name {
-            "directory" => Ok(CapabilityTypeName::Directory),
-            "event_stream" => Ok(CapabilityTypeName::EventStream),
-            "protocol" => Ok(CapabilityTypeName::Protocol),
-            "resolver" => Ok(CapabilityTypeName::Resolver),
-            "runner" => Ok(CapabilityTypeName::Runner),
-            "service" => Ok(CapabilityTypeName::Service),
-            "storage" => Ok(CapabilityTypeName::Storage),
-            _ => Err(anyhow!("unrecognized capability type name {}", name)),
-        }
     }
 
     fn parse_response_level(level: &str) -> Result<ResponseLevel> {
