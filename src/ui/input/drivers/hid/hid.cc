@@ -385,7 +385,7 @@ hidbus_ifc_protocol_ops_t hid_ifc_ops = {
 
 zx_status_t HidDevice::SetReportDescriptor() {
   hid_report_desc_.resize(HID_MAX_DESC_LEN);
-  size_t actual;
+  size_t actual = 0;
   zx_status_t status = hidbus_.GetDescriptor(HID_DESCRIPTION_TYPE_REPORT, hid_report_desc_.data(),
                                              hid_report_desc_.size(), &actual);
   if (status != ZX_OK) {
