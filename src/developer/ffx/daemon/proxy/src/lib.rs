@@ -89,7 +89,7 @@ pub struct Injection {
     env_context: EnvironmentContext,
     daemon_check: DaemonVersionCheck,
     format: Option<Format>,
-    target: Option<String>,
+    target_spec: Option<String>,
     node: Arc<overnet_core::Router>,
     daemon_once: ProxyState<DaemonProxy>,
     remote_once: ProxyState<RemoteControlProxy>,
@@ -109,14 +109,14 @@ impl Injection {
         daemon_check: DaemonVersionCheck,
         node: Arc<overnet_core::Router>,
         format: Option<Format>,
-        target: Option<String>,
+        target_spec: Option<String>,
     ) -> Self {
         Self {
             env_context,
             daemon_check,
             node,
             format,
-            target,
+            target_spec,
             daemon_once: Default::default(),
             remote_once: Default::default(),
         }
@@ -133,13 +133,13 @@ impl Injection {
         let node = overnet_core::Router::new(router_interval)
             .bug_context("Failed to initialize overnet")?;
         tracing::debug!("Getting target");
-        let target = ffx_target::resolve_default_target(&env_context).await?;
+        let target_spec = ffx_target::get_target_specifier(&env_context).await?;
         tracing::debug!("Building Injection");
-        Ok(Injection::new(env_context, daemon_check, node, format, target))
+        Ok(Injection::new(env_context, daemon_check, node, format, target_spec))
     }
 
     fn is_default_target(&self) -> bool {
-        self.target.is_none()
+        self.target_spec.is_none()
     }
 
     #[tracing::instrument]
@@ -148,10 +148,10 @@ impl Injection {
         target_info: &mut Option<TargetInfo>,
     ) -> Result<RemoteControlProxy> {
         let daemon_proxy = self.daemon_factory().await?;
-        let target = self.target.clone();
+        let target_spec = self.target_spec.clone();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         get_remote_proxy(
-            target,
+            target_spec,
             self.is_default_target(),
             daemon_proxy,
             proxy_timeout,
@@ -163,10 +163,10 @@ impl Injection {
 
     #[tracing::instrument]
     async fn target_factory_inner(&self) -> Result<TargetProxy> {
-        let target = self.target.clone();
+        let target_spec = self.target_spec.clone();
         let daemon_proxy = self.daemon_factory().await?;
         let (target_proxy, target_proxy_fut) = open_target_with_fut(
-            target,
+            target_spec,
             self.is_default_target(),
             daemon_proxy.clone(),
             self.env_context.get_proxy_timeout().await?,
@@ -177,10 +177,9 @@ impl Injection {
     }
 
     fn daemon_timeout_error(&self) -> FfxError {
-        let target = self.target.as_ref().map(ToString::to_string);
         FfxError::DaemonError {
             err: DaemonError::Timeout,
-            target,
+            target: self.target_spec.clone(),
             is_default_target: self.is_default_target(),
         }
     }
@@ -231,7 +230,7 @@ impl Injector for Injection {
         let timeout_error = self.daemon_timeout_error();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         timeout(proxy_timeout, self.target_factory_inner()).await.map_err(|_| {
-            tracing::warn!("Timed out getting Target proxy for: {:?}", self.target);
+            tracing::warn!("Timed out getting Target proxy for: {:?}", self.target_spec);
             timeout_error
         })?
     }
@@ -250,7 +249,7 @@ impl Injector for Injection {
         })
         .await
         .map_err(|_| {
-            tracing::warn!("Timed out getting remote control proxy for: {:?}", self.target);
+            tracing::warn!("Timed out getting remote control proxy for: {:?}", self.target_spec);
             match target_info.lock().unwrap().take() {
                 Some(TargetInfo { nodename: Some(name), .. }) => FfxError::DaemonError {
                     err: DaemonError::Timeout,

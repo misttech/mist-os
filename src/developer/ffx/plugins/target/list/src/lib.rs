@@ -93,13 +93,13 @@ async fn show_targets(
             if writer.is_machine() {
                 let res = target_formatter::filter_targets_by_address_types(infos, address_types);
                 let mut formatter = JsonTargetFormatter::try_from(res)?;
-                let default: Option<String> = ffx_target::get_default_target(&context).await?;
+                let default: Option<String> = ffx_target::get_target_specifier(&context).await?;
                 JsonTargetFormatter::set_default_target(&mut formatter.targets, default.as_deref());
                 writer.machine(&formatter.targets)?;
             } else {
                 let formatter =
                     Box::<dyn TargetFormatter>::try_from((cmd.format, address_types, infos))?;
-                let default: Option<String> = ffx_target::get_default_target(&context).await?;
+                let default: Option<String> = ffx_target::get_target_specifier(&context).await?;
                 writer.line(formatter.lines(default.as_deref()).join("\n"))?;
             }
         }

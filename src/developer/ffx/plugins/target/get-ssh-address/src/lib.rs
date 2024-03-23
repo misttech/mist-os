@@ -47,19 +47,19 @@ async fn get_ssh_address_impl<W: Write>(
 ) -> Result<()> {
     let timeout_dur = Duration::from_secs_f64(cmd.timeout().await?);
     let (proxy, handle) = fidl::endpoints::create_proxy::<TargetMarker>()?;
-    let target: Option<String> = ffx_target::get_default_target(&context).await?;
+    let target_spec: Option<String> = ffx_target::get_target_specifier(&context).await?;
     let ffx: ffx_command::Ffx = argh::from_env();
     let is_default_target = ffx.target.is_none();
-    let t_clone = target.clone();
-    let t_clone_2 = target.clone();
+    let ts_clone = target_spec.clone();
+    let ts_clone_2 = target_spec.clone();
     let res = timeout(timeout_dur, async {
         collection_proxy
-            .open_target(&TargetQuery { string_matcher: target, ..Default::default() }, handle)
+            .open_target(&TargetQuery { string_matcher: target_spec, ..Default::default() }, handle)
             .await?
             .map_err(|err| {
                 anyhow::Error::from(FfxError::OpenTargetError {
                     err,
-                    target: t_clone_2,
+                    target: ts_clone_2,
                     is_default_target,
                 })
             })?;
@@ -68,7 +68,7 @@ async fn get_ssh_address_impl<W: Write>(
     .await
     .map_err(|_| FfxError::DaemonError {
         err: DaemonError::Timeout,
-        target: t_clone,
+        target: ts_clone,
         is_default_target,
     })??;
 

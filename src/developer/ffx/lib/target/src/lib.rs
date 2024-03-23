@@ -169,12 +169,6 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     Ok((target_proxy, fut))
 }
 
-/// Attempts to resolve the default target. Returning Some(_) if a target has been found, None
-/// otherwise.
-pub async fn resolve_default_target(env_context: &EnvironmentContext) -> Result<Option<String>> {
-    get_default_target(&env_context).await
-}
-
 pub(crate) fn target_addr_info_to_socket(ti: &TargetAddrInfo) -> SocketAddr {
     let (target_ip, port) = match ti {
         TargetAddrInfo::Ip(a) => (a.clone(), 0),
@@ -424,23 +418,24 @@ async fn knock_target_daemonless_with(
     }
 }
 
-/// Get the default target.  This uses the normal config mechanism which
+/// Get the target specifier.  This uses the normal config mechanism which
 /// supports flexible config values: it can be a string naming the target, or
 /// a list of strings, in which case the first valid entry is used. (The most
 /// common use of this functionality would be to specify an array of environment
-/// variables, e.g. ["$FUCHSIA_TARGET_ADDR", "FUCHSIA_NODENAME"])
-pub async fn get_default_target(context: &EnvironmentContext) -> Result<Option<String>> {
-    let target = context.get(TARGET_DEFAULT_KEY).await?;
-    // TODO: (b/320519654) this resolves the target to use? Is the message wrong, and this is
-    // called to check for a default, and resolution happens somewhere else, for example, handling
-    // the None case? In that case, should both these log messages be moved there?  If this is the
-    // resolution of which target to use and it resolves to None, this should be a warning at
-    // least, if not an error?
-    match target {
-        Some(ref target) => info!("Default target resolved to ['{target:?}']"),
-        None => debug!("No default target configured"),
+/// variables, e.g. ["$FUCHSIA_TARGET_ADDR", "FUCHSIA_NODENAME"]).
+/// The result is a string which can be turned into a `TargetInfoQuery` to match
+/// against the available targets (by name, address, etc). We don't return the query
+/// itself, because some callers assume the specifier is the name of the target,
+/// for the purposes of error messages, etc.  E.g. The repo server only works if
+/// an explicit _name_ is provided.  In other contexts, it is valid for the specifier
+/// to be a substring, a network address, etc.
+pub async fn get_target_specifier(context: &EnvironmentContext) -> Result<Option<String>> {
+    let target_spec = context.get(TARGET_DEFAULT_KEY).await?;
+    match target_spec {
+        Some(ref target) => info!("Target specifier: ['{target:?}']"),
+        None => debug!("No target specified"),
     }
-    Ok(target)
+    Ok(target_spec)
 }
 
 pub async fn add_manual_target(
@@ -538,8 +533,8 @@ mod test {
     #[fuchsia::test]
     async fn test_get_empty_default_target() {
         let env = test_init().await.unwrap();
-        let target = get_default_target(&env.context).await.unwrap();
-        assert_eq!(target, None);
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, None);
     }
 
     #[fuchsia::test]
@@ -552,8 +547,8 @@ mod test {
             .await
             .unwrap();
 
-        let target = get_default_target(&env.context).await.unwrap();
-        assert_eq!(target, Some("some_target".to_owned()));
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("some_target".to_owned()));
     }
 
     #[fuchsia::test]
@@ -567,8 +562,8 @@ mod test {
             .await
             .unwrap();
 
-        let target = get_default_target(&env.context).await.unwrap();
-        assert_eq!(target, Some("t1".to_owned()));
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("t1".to_owned()));
     }
 
     #[fuchsia::test]
@@ -583,8 +578,8 @@ mod test {
             .await
             .unwrap();
 
-        let target = get_default_target(&env.context).await.unwrap();
-        assert_eq!(target, Some("t2".to_owned()));
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("t2".to_owned()));
     }
 
     #[fuchsia::test]
@@ -600,8 +595,8 @@ mod test {
             .await
             .unwrap();
 
-        let target = get_default_target(&env.context).await.unwrap();
-        assert_eq!(target, Some("t1".to_owned()));
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("t1".to_owned()));
         std::env::remove_var("MY_LITTLE_TMPKEY");
     }
 

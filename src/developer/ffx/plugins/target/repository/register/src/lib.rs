@@ -37,9 +37,9 @@ pub async fn register_cmd(
     context: EnvironmentContext,
 ) -> Result<()> {
     register(
-        ffx_target::get_default_target(&context)
+        ffx_target::get_target_specifier(&context)
             .await
-            .user_message("getting default target from config")?,
+            .user_message("getting target specifier from config")?,
         cmd,
         repos,
     )

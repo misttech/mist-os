@@ -12,7 +12,7 @@ use ffx_config::{environment::EnvironmentContext, get, global_env_context, print
 use ffx_daemon::DaemonConfig;
 use ffx_doctor_args::DoctorCommand;
 use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
-use ffx_target::get_default_target;
+use ffx_target::get_target_specifier;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
@@ -316,8 +316,8 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
 
     let recorder = Arc::new(Mutex::new(DoctorRecorder::new()));
     let mut handler = DefaultDoctorStepHandler::new(recorder.clone(), Box::new(writer));
-    let default_target =
-        get_default_target(&context).await.map_err(|e| format!("{:?}", e).replace("\n", ""));
+    let target_spec =
+        get_target_specifier(&context).await.map_err(|e| format!("{:?}", e).replace("\n", ""));
 
     // create ledger
     let ledger_mode = match cmd.verbose {
@@ -339,7 +339,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
         delay,
         cmd.restart_daemon,
         version_info,
-        default_target,
+        target_spec,
         &global_env_context().context("No global environment configured")?,
         DoctorRecorderParameters {
             record,
@@ -423,7 +423,7 @@ async fn doctor<W: Write>(
     retry_delay: Duration,
     restart_daemon: bool,
     version_info: VersionInfo,
-    default_target: Result<Option<String>, String>,
+    target_spec: Result<Option<String>, String>,
     env_context: &EnvironmentContext,
     record_params: DoctorRecorderParameters,
 ) -> Result<()> {
@@ -437,7 +437,7 @@ async fn doctor<W: Write>(
         target_str,
         retry_delay,
         version_info,
-        default_target,
+        target_spec,
         env_context,
         ledger,
     )
@@ -784,7 +784,7 @@ async fn doctor_summary<W: Write>(
     target_str: &str,
     retry_delay: Duration,
     version_info: VersionInfo,
-    default_target: Result<Option<String>, String>,
+    target_spec: Result<Option<String>, String>,
     env_context: &EnvironmentContext,
     ledger: &mut DoctorLedger<W>,
 ) -> Result<()> {
@@ -1019,7 +1019,7 @@ async fn doctor_summary<W: Write>(
         }
     }
 
-    match default_target {
+    match target_spec {
         Ok(t) => {
             let default_target_display = {
                 if t.is_none() || t.as_ref().unwrap().is_empty() {

@@ -87,7 +87,7 @@ impl EnvContext {
         let cache_path = context.get_cache_path()?;
         std::fs::create_dir_all(&cache_path)?;
         let node = overnet_core::Router::new(None)?;
-        let target = ffx_target::resolve_default_target(&context).await?;
+        let target_spec = ffx_target::get_target_specifier(&context).await?;
         let injector = Box::new(Injection::new(
             context.clone(),
             DaemonVersionCheck::CheckApiLevel(
@@ -95,7 +95,7 @@ impl EnvContext {
             ),
             node,
             None,
-            target,
+            target_spec,
         ));
         Ok(Self { context, injector, lib_ctx })
     }
@@ -144,12 +144,12 @@ impl EnvContext {
     }
 
     pub async fn connect_remote_control_proxy(&self) -> Result<zx_types::zx_handle_t> {
-        let target = ffx_target::resolve_default_target(&self.context).await?;
-        let is_default_target = target.is_none();
+        let target_spec = ffx_target::get_target_specifier(&self.context).await?;
+        let is_default_target = target_spec.is_none();
         let daemon = self.injector.daemon_factory().await?;
         let timeout = self.context.get_proxy_timeout().await?;
         let proxy = ffx_target::get_remote_proxy(
-            target,
+            target_spec,
             is_default_target,
             daemon,
             timeout,

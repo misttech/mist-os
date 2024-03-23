@@ -24,9 +24,9 @@ fho::embedded_plugin!(ForwardTcpTool);
 impl FfxMain for ForwardTcpTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        let target = ffx_target::get_default_target(&self.context)
+        let target = ffx_target::get_target_specifier(&self.context)
             .await
-            .user_message("Failed to get default target from config")?;
+            .user_message("Failed to get target specifier from config")?;
         let target = if let Some(target) = target {
             target
         } else {

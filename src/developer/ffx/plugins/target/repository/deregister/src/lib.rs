@@ -27,9 +27,9 @@ impl FfxMain for DeregisterTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         deregister(
-            ffx_target::get_default_target(&self.context)
+            ffx_target::get_target_specifier(&self.context)
                 .await
-                .user_message("Failed to get default target from config")?,
+                .user_message("Failed to get target specifier from config")?,
             self.cmd,
             self.repos,
         )

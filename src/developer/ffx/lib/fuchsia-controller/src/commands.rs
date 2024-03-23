@@ -466,7 +466,9 @@ impl LibraryCommand {
                         return;
                     }
                 };
-                let default_target = match ffx_target::resolve_default_target(&env.context).await {
+                // This target spec is the same one used in the target proxy factory -- we re-grab it
+                // just for the error message.
+                let target_spec = match ffx_target::get_target_specifier(&env.context).await {
                     Ok(t) => t,
                     Err(e) => {
                         env.write_err(e);
@@ -494,11 +496,11 @@ impl LibraryCommand {
                     Err(e) => {
                         anyhow::anyhow!(
                             "timeout attempting to knock target {} {}: {:?}",
-                            default_target
+                            target_spec
                                 .as_ref()
                                 .map(ToString::to_string)
                                 .unwrap_or("unspecified".to_owned()),
-                            if default_target.is_none() { "(default)" } else { "" },
+                            if target_spec.is_none() { "(default)" } else { "" },
                             e
                         )
                     }

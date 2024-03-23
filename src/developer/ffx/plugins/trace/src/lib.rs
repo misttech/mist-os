@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Context, Result};
 use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
-use ffx_target::get_default_target;
+use ffx_target::get_target_specifier;
 use ffx_trace_args::{TraceCommand, TraceSubCommand};
 use fho::{daemon_protocol, deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
@@ -470,7 +470,7 @@ pub async fn trace(
     mut writer: Writer,
     cmd: TraceCommand,
 ) -> Result<()> {
-    let default_target: Option<String> = get_default_target(&context).await?;
+    let target_spec: Option<String> = get_target_specifier(&context).await?;
     match cmd.sub_cmd {
         TraceSubCommand::ListCategories(_) => {
             let controller = controller.await?;
@@ -515,7 +515,7 @@ pub async fn trace(
             }
         }
         TraceSubCommand::Start(opts) => {
-            let default = ffx::TargetQuery { string_matcher: default_target, ..Default::default() };
+            let default = ffx::TargetQuery { string_matcher: target_spec, ..Default::default() };
             let triggers = if opts.trigger.is_empty() { None } else { Some(opts.trigger) };
             if triggers.is_some() && !opts.background {
                 ffx_bail!(
@@ -571,7 +571,7 @@ pub async fn trace(
         TraceSubCommand::Stop(opts) => {
             let output = match opts.output {
                 Some(o) => canonical_path(o)?,
-                None => default_target.unwrap_or("".to_owned()),
+                None => target_spec.unwrap_or("".to_owned()),
             };
             stop_tracing(&context, &proxy, output, writer, opts.verbose).await?;
         }
@@ -703,7 +703,7 @@ async fn handle_recording_result(
     res: Result<ffx::TargetInfo, RecordingError>,
     output: &String,
 ) -> Result<ffx::TargetInfo> {
-    let default = get_default_target(context).await.unwrap_or(None);
+    let target_spec = get_target_specifier(context).await.unwrap_or(None);
     match res {
         Ok(t) => Ok(t),
         Err(e) => match e {
@@ -722,7 +722,10 @@ https://fuchsia.dev/fuchsia-src/development/sdk/ffx/record-traces"
             }
             RecordingError::RecordingAlreadyStarted => {
                 // TODO(85098): Also return file info (which output file is being written to).
-                ffx_bail!("Trace already started for target {}", default.unwrap_or("".to_owned()));
+                ffx_bail!(
+                    "Trace already started for target {}",
+                    target_spec.unwrap_or("".to_owned())
+                );
             }
             RecordingError::DuplicateTraceFile => {
                 // TODO(85098): Also return target info.
@@ -756,13 +759,13 @@ package is missing from the device's system image.",
             RecordingError::NoSuchTarget => {
                 ffx_bail!(
                     "The string '{}' didn't match a trace output file, or any valid targets.",
-                    default.as_deref().unwrap_or("")
+                    target_spec.as_deref().unwrap_or("")
                 );
             }
             RecordingError::DisconnectedTarget => {
                 ffx_bail!(
                     "The string '{}' didn't match a valid target connected to the ffx daemon.",
-                    default.as_deref().unwrap_or("")
+                    target_spec.as_deref().unwrap_or("")
                 );
             }
         },

@@ -9,7 +9,7 @@ use {
     errors::ffx_bail,
     ffx_config::EnvironmentContext,
     ffx_repository_serve_args::ServeCommand,
-    ffx_target::{get_default_target, knock_target_by_name},
+    ffx_target::{get_target_specifier, knock_target_by_name},
     fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter},
     fidl_fuchsia_developer_ffx::{
         RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetCollectionProxy,
@@ -244,18 +244,18 @@ impl FfxMain for ServeTool {
                 // Resolving the default target is typically fast
                 // or does not succeed, in which case we return from the
                 // function with an error.
-                tracing::info!("Resolving default target");
-                let target_identifier =
-                    timeout(Duration::from_secs(1), get_default_target(&self.context))
+                tracing::info!("Getting target specifier");
+                let target_spec =
+                    timeout(Duration::from_secs(1), get_target_specifier(&self.context))
                         .await
-                        .with_context(|| format!("getting target identifier for default target"))??
-                        .ok_or(anyhow!("no default target value"))?;
+                        .with_context(|| format!("getting target specifier for default target"))??
+                        .ok_or(anyhow!("no target specifier"))?;
 
                 // This blocks until the default target becomes available
                 // if a connection is possible.
-                tracing::info!("Attempting connection to default target: {target_identifier}");
+                tracing::info!("Attempting connection to default target: {target_spec}");
                 let connection = connect_to_target(
-                    target_identifier.clone(),
+                    target_spec.clone(),
                     Some(self.cmd.alias.clone()),
                     self.cmd.storage_type,
                     server.local_addr(),
@@ -268,16 +268,16 @@ impl FfxMain for ServeTool {
                 match connection {
                     Ok(()) => {
                         let s = format!(
-                            "Serving repository '{repo_path}' to target '{target_identifier}' over address '{}'.",
+                            "Serving repository '{repo_path}' to target '{target_spec}' over address '{}'.",
                             server.local_addr()
                         );
-                        writeln!(writer, "{}", s)
+                        writeln!(writer, "{}", s,)
                             .map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
                         tracing::info!("{}", s);
                         loop {
                             fuchsia_async::Timer::new(std::time::Duration::from_secs(10)).await;
                             if let Err(e) = knock_target_by_name(
-                                &Some(target_identifier.clone()),
+                                &Some(target_spec.clone()),
                                 &self.target_collection_proxy,
                                 SERVE_KNOCK_TIMEOUT,
                                 SERVE_KNOCK_TIMEOUT,

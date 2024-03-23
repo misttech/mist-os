@@ -150,8 +150,8 @@ async fn listener_listen(
     op: ListenOp,
     context: &EnvironmentContext,
 ) -> Result<AgisResult, anyhow::Error> {
-    let target_name = ffx_target::get_default_target(context).await?;
-    let target_query = TargetQuery { string_matcher: target_name, ..Default::default() };
+    let target_spec = ffx_target::get_target_specifier(context).await?;
+    let target_query = TargetQuery { string_matcher: target_spec, ..Default::default() };
     listener
         .listen(&target_query, op.global_id)
         .await?
