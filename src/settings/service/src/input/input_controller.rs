@@ -223,8 +223,6 @@ impl InputControllerInner {
     }
 
     /// Sets the hardware mic/cam state from the muted states in `media_buttons`.
-    // TODO(https://fxbug.dev/42145737): Send in name of device to set state for, instead
-    // of using the device type's to_string.
     async fn set_hw_media_buttons_state(
         &mut self,
         media_buttons: MediaButtons,
