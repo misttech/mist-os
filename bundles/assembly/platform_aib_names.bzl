@@ -13,7 +13,6 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "zircon",
     "bootstrap",
     "driver_framework",
-    "empty_live_usb",
     "emulator_support",
     "fshost_common",
     "fshost_fxfs",

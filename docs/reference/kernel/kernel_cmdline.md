@@ -190,12 +190,6 @@ This option (disabled by default) turns on dynamic linker trace output. The
 output is in a form that is consumable by clients like Intel Processor Trace
 support.
 
-## live_usb.is_system=\<bool>
-
-This option indicates to the `live_usb` component that the system is booting
-into a full system rather than a recovery environment. If this is not set to
-true, the `live_usb` component does nothing.
-
 ## zircon.autorun.boot=\<command>
 
 This option requests that *command* be run at boot.

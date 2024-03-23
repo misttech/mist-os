@@ -36,11 +36,6 @@
             url: "fuchsia-boot:///miscsvc#meta/miscsvc.cm",
         },
         {
-            name: "live_usb",
-            url: "fuchsia-boot:///live-usb#meta/live-usb.cm",
-            startup: "eager",
-        },
-        {
             name: "netsvc",
             url: "fuchsia-boot:///netsvc#meta/netsvc.cm",
             startup: "eager",
@@ -359,14 +354,6 @@
         {
             protocol: [
                 "fuchsia.boot.Arguments",
-                "fuchsia.pkg.rewrite.Engine",
-            ],
-            from: "parent",
-            to: "#live_usb",
-        },
-        {
-            protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.process.Launcher",
             ],
@@ -557,13 +544,6 @@
         {
             directory: "dev-class",
             from: "#devfs",
-            as: "dev-class-block",
-            to: "#live_usb",
-            subdir: "block",
-        },
-        {
-            directory: "dev-class",
-            from: "#devfs",
             as: "dev-class-suspend",
             to: "#system-activity-governor",
             subdir: "suspend",
@@ -724,11 +704,6 @@
             ],
         },
         {
-            protocol: [ "fuchsia.paver.Paver" ],
-            from: "#miscsvc",
-            to: "#live_usb",
-        },
-        {
             protocol: "fuchsia.logger.Log",
             from: "#archivist",
             to: [
@@ -749,7 +724,6 @@
                 "#cr50_agent",
                 "#device_name_provider",
                 "#fshost",
-                "#live_usb",
                 "#miscsvc",
                 "#netsvc",
                 "#power-broker",
@@ -801,11 +775,6 @@
             protocol: [ "fuchsia.fshost.BlockWatcher" ],
             from: "#fshost",
             to: "#miscsvc",
-        },
-        {
-            protocol: [ "fuchsia.fshost.BlockWatcher" ],
-            from: "#fshost",
-            to: "#live_usb",
         },
 
         // -- Archivist offers below here --

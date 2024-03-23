@@ -3046,12 +3046,18 @@ assembly_input_bundle("soundplayer") {
 
 assembly_input_bundle("live_usb") {
   bootfs_packages = [ "//src/sys/live_usb:package" ]
-
-  kernel_cmdline = [ "live_usb.is_system=true" ]
-}
-
-assembly_input_bundle("empty_live_usb") {
-  bootfs_packages = [ "//src/sys/live_usb:empty_package" ]
+  compiled_packages = [
+    {
+      name = "bootstrap"
+      component_shards = [
+        {
+          component_name = "bootstrap"
+          shards = rebase_path([ "//src/sys/live_usb/meta/live-usb.shard.cml" ],
+                               root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # Session manager support

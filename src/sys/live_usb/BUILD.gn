@@ -11,18 +11,6 @@ group("tests") {
   deps = [ ":live-usb-unittests" ]
 }
 
-# This is a hack, because component_manager doesn't currently support modifying root.cml on a
-# per-product basis. Assembly chooses the right package based on a live_usb.enabled product config.
-fuchsia_package("empty_package") {
-  package_name = "live-usb"
-  deps = [ ":empty_component" ]
-}
-
-fuchsia_component("empty_component") {
-  component_name = "live-usb"
-  manifest = "meta/empty.cml"
-}
-
 fuchsia_package("package") {
   package_name = "live-usb"
   deps = [ ":component" ]

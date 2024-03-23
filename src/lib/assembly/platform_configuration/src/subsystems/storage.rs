@@ -20,8 +20,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
     ) -> anyhow::Result<()> {
         if storage_config.live_usb_enabled {
             builder.platform_bundle("live_usb");
-        } else {
-            builder.platform_bundle("empty_live_usb");
         }
 
         // Build and add the component id index.

@@ -19,7 +19,6 @@ blobfs.cache-eviction-policy=NEVER_EVICT
 ?kernel.ppb.replace-on-unloan=true
 ?kernel.render-dlog-to-crashlog=true
 ?kernel.serial=none
-?live_usb.is_system=true
 ?netsvc.all-features=true
 ?netsvc.disable=false
 ?netsvc.disable=true

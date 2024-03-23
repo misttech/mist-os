@@ -1,0 +1,47 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "live_usb",
+            url: "fuchsia-boot:///live-usb#meta/live-usb.cm",
+            startup: "eager",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.pkg.rewrite.Engine",
+            ],
+            from: "parent",
+            to: "#live_usb",
+        },
+        {
+            directory: "dev-class",
+            from: "#devfs",
+            as: "dev-class-block",
+            to: "#live_usb",
+            subdir: "block",
+        },
+        {
+            protocol: [ "fuchsia.paver.Paver" ],
+            from: "#miscsvc",
+            to: "#live_usb",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#live_usb",
+        },
+        {
+            protocol: [ "fuchsia.fshost.BlockWatcher" ],
+            from: "#fshost",
+            to: "#live_usb",
+        },
+    ],
+}

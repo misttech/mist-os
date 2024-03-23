@@ -30,10 +30,7 @@ async fn is_live_usb_enabled() -> Result<bool, Error> {
     let proxy = fuchsia_component::client::connect_to_protocol::<ArgumentsMarker>()
         .context("Connecting to service")?;
 
-    let bools = &[
-        BoolPair { key: "boot.usb".to_owned(), defaultval: false },
-        BoolPair { key: "live_usb.is_system".to_owned(), defaultval: false },
-    ];
+    let bools = &[BoolPair { key: "boot.usb".to_owned(), defaultval: false }];
     let result: Vec<bool> = proxy.get_bools(bools).await.context("Getting boot.usb bool value")?;
 
     Ok(result.iter().all(|f| *f))
