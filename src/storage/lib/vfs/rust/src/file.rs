@@ -24,6 +24,9 @@ use fuchsia_zircon as zx;
 #[cfg(target_os = "fuchsia")]
 pub mod vmo;
 
+#[cfg(not(target_os = "fuchsia"))]
+pub mod simple;
+
 pub mod test_utils;
 
 mod common;
@@ -34,6 +37,42 @@ pub use connection::{FidlIoConnection, RawIoConnection};
 
 #[cfg(target_os = "fuchsia")]
 pub use connection::{GetVmo, StreamIoConnection};
+
+/// Creates a new read-only `SimpleFile` with the specified `content`.
+///
+/// ## Examples
+/// ```
+/// // Using static data:
+/// let from_str = read_only("str");
+/// let from_bytes = read_only(b"bytes");
+/// // Using owned data:
+/// let from_string = read_only(String::from("owned"));
+/// let from_vec = read_only(vec![0u8; 2]);
+/// ```
+#[cfg(not(target_os = "fuchsia"))]
+pub fn read_only(content: impl AsRef<[u8]>) -> Arc<simple::SimpleFile> {
+    simple::SimpleFile::read_only(content)
+}
+
+/// Creates a new read-write `SimpleFile` with the specified `content`.
+///
+/// ## Examples
+/// ```
+/// // Initially empty file:
+/// let empty = read_write("");
+/// // File created with contents:
+/// let sized = read_write("Hello world!");
+/// ```
+#[cfg(not(target_os = "fuchsia"))]
+pub fn read_write(content: impl AsRef<[u8]>) -> Arc<simple::SimpleFile> {
+    simple::SimpleFile::read_write(content)
+}
+
+#[cfg(target_os = "fuchsia")]
+pub use vmo::read_only;
+
+#[cfg(target_os = "fuchsia")]
+pub use vmo::read_write;
 
 /// FileOptions include options that are relevant after the file has been opened. Flags like
 /// `TRUNCATE`, which only applies during open time, are not included.

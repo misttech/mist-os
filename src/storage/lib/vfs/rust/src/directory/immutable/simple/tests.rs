@@ -24,9 +24,9 @@ use crate::{
         test_utils::{run_server_client, DirentsSameInodeBuilder},
     },
     execution_scope::ExecutionScope,
+    file,
     path::Path,
     test_utils::node::{open2_get_proxy, open_get_proxy},
-    test_utils::test_file::TestFile,
     test_utils::{build_flag_combinations, run_client},
 };
 
@@ -130,7 +130,7 @@ fn open_empty_directory_with_describe() {
 #[test]
 fn clone() {
     let root = pseudo_directory! {
-        "file" => TestFile::read_only(b"Content"),
+        "file" => file::read_only(b"Content"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |first_proxy| async move {
@@ -161,7 +161,7 @@ fn clone_inherit_access() {
     use fidl_fuchsia_io as fio;
 
     let root = pseudo_directory! {
-        "file" => TestFile::read_only(b"Content"),
+        "file" => file::read_only(b"Content"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |first_proxy| async move {
@@ -190,7 +190,7 @@ fn clone_inherit_access() {
 #[test]
 fn clone_cannot_increase_access() {
     let root = pseudo_directory! {
-        "file" => TestFile::read_only(b"Content"),
+        "file" => file::read_only(b"Content"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -221,7 +221,7 @@ fn clone_cannot_use_same_rights_flag_with_any_specific_right() {
     use fidl_fuchsia_io as fio;
 
     let root = pseudo_directory! {
-        "file" => TestFile::read_only(b"Content"),
+        "file" => file::read_only(b"Content"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -246,7 +246,7 @@ fn clone_cannot_use_same_rights_flag_with_any_specific_right() {
 #[test]
 fn one_file_open_existing() {
     let root = pseudo_directory! {
-        "file" => TestFile::read_only(b"Content"),
+        "file" => file::read_only(b"Content"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -263,7 +263,7 @@ fn one_file_open_existing() {
 #[test]
 fn one_file_open_missing_not_found_handler() {
     let root = pseudo_directory! {
-        "file" => TestFile::read_only("Content"),
+        "file" => file::read_only("Content"),
     };
 
     let last_handler_value = Arc::new(Mutex::new(None));
@@ -287,7 +287,7 @@ fn one_file_open_missing_not_found_handler() {
 #[test]
 fn one_file_open2_missing_not_found_handler() {
     let root = pseudo_directory! {
-        "foo" => TestFile::read_only("Content"),
+        "foo" => file::read_only("Content"),
     };
 
     let last_handler_value = Arc::new(Mutex::new(None));
@@ -324,7 +324,7 @@ fn one_file_open2_missing_not_found_handler() {
 #[test]
 fn one_file_open_missing() {
     let root = pseudo_directory! {
-        "file" => TestFile::read_only(b"Content"),
+        "file" => file::read_only(b"Content"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -339,12 +339,12 @@ fn one_file_open_missing() {
 fn small_tree_traversal() {
     let root = pseudo_directory! {
         "etc" => pseudo_directory! {
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
+            "fstab" => file::read_only(b"/dev/fs /"),
             "ssh" => pseudo_directory! {
-                "sshd_config" => TestFile::read_only(b"# Empty"),
+                "sshd_config" => file::read_only(b"# Empty"),
             },
         },
-        "uname" => TestFile::read_only(b"Fuchsia"),
+        "uname" => file::read_only(b"Fuchsia"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -381,7 +381,7 @@ fn open_writable_in_subdir() {
         pseudo_directory! {
             "etc" => pseudo_directory! {
                 "ssh" => pseudo_directory! {
-                    "sshd_config" => TestFile::read_write(b"# Empty"),
+                    "sshd_config" => file::read_write(b"# Empty"),
                 }
             }
         }
@@ -528,9 +528,9 @@ fn open_subdir_with_posix_flag_rights_expansion() {
 fn open_non_existing_path() {
     let root = pseudo_directory! {
         "dir" => pseudo_directory! {
-            "file1" => TestFile::read_only(b"Content 1"),
+            "file1" => file::read_only(b"Content 1"),
         },
-        "file2" => TestFile::read_only(b"Content 2"),
+        "file2" => file::read_only(b"Content 2"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -547,7 +547,7 @@ fn open_non_existing_path() {
 #[test]
 fn open_empty_path() {
     let root = pseudo_directory! {
-        "file_foo" => TestFile::read_only(b"Content"),
+        "file_foo" => file::read_only(b"Content"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -562,9 +562,9 @@ fn open_empty_path() {
 fn open_path_within_a_file() {
     let root = pseudo_directory! {
         "dir" => pseudo_directory! {
-            "file1" => TestFile::read_only(b"Content 1"),
+            "file1" => file::read_only(b"Content 1"),
         },
-        "file2" => TestFile::read_only(b"Content 2"),
+        "file2" => file::read_only(b"Content 2"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -580,9 +580,9 @@ fn open_path_within_a_file() {
 fn open_file_as_directory() {
     let root = pseudo_directory! {
         "dir" => pseudo_directory! {
-            "file1" => TestFile::read_only(b"Content 1"),
+            "file1" => file::read_only(b"Content 1"),
         },
-        "file2" => TestFile::read_only(b"Content 2"),
+        "file2" => file::read_only(b"Content 2"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -641,7 +641,7 @@ fn open_directory_as_file() {
 #[test]
 fn trailing_slash_means_directory() {
     let root = pseudo_directory! {
-        "file" => TestFile::read_only(b"Content"),
+        "file" => file::read_only(b"Content"),
         "dir" => pseudo_directory! {},
     };
 
@@ -668,7 +668,7 @@ fn trailing_slash_means_directory() {
 #[test]
 fn no_dots_in_open() {
     let root = pseudo_directory! {
-        "file" => TestFile::read_only(b"Content"),
+        "file" => file::read_only(b"Content"),
         "dir" => pseudo_directory! {
             "dir2" => pseudo_directory! {},
         },
@@ -709,7 +709,7 @@ fn no_consequtive_slashes_in_open() {
 fn directories_restrict_nested_read_permissions() {
     let root = pseudo_directory! {
         "dir" => pseudo_directory! {
-            "file" => TestFile::read_only(b"Content"),
+            "file" => file::read_only(b"Content"),
         },
     };
 
@@ -729,7 +729,7 @@ fn directories_restrict_nested_read_permissions() {
 fn directories_restrict_nested_write_permissions() {
     let root = pseudo_directory! {
         "dir" => pseudo_directory! {
-            "file" => TestFile::read_write("content"),
+            "file" => file::read_write("content"),
         },
     };
 
@@ -767,7 +767,7 @@ fn flag_posix_means_writable() {
     let root = {
         pseudo_directory! {
         "nested" => pseudo_directory! {
-            "file" => TestFile::read_write(b"Content"),
+            "file" => file::read_write(b"Content"),
             }
         }
     };
@@ -814,7 +814,7 @@ fn flag_posix_means_writable() {
 fn flag_posix_does_not_add_writable_to_read_only() {
     let root = pseudo_directory! {
         "nested" => pseudo_directory! {
-            "file" => TestFile::read_write(b"Content"),
+            "file" => file::read_write(b"Content"),
         },
     };
 
@@ -859,16 +859,16 @@ fn flag_posix_does_not_add_writable_to_read_only() {
 fn read_dirents_large_buffer() {
     let root = pseudo_directory! {
         "etc" => pseudo_directory! {
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
-            "passwd" => TestFile::read_only(b"[redacted]"),
-            "shells" => TestFile::read_only(b"/bin/bash"),
+            "fstab" => file::read_only(b"/dev/fs /"),
+            "passwd" => file::read_only(b"[redacted]"),
+            "shells" => file::read_only(b"/bin/bash"),
             "ssh" => pseudo_directory! {
-                "sshd_config" => TestFile::read_only(b"# Empty"),
+                "sshd_config" => file::read_only(b"# Empty"),
             },
         },
-        "files" => TestFile::read_only(b"Content"),
-        "more" => TestFile::read_only(b"Content"),
-        "uname" => TestFile::read_only(b"Fuchsia"),
+        "files" => file::read_only(b"Content"),
+        "more" => file::read_only(b"Content"),
+        "uname" => file::read_only(b"Fuchsia"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -921,9 +921,9 @@ fn read_dirents_large_buffer() {
 fn read_dirents_small_buffer() {
     let root = pseudo_directory! {
         "etc" => pseudo_directory! { },
-        "files" => TestFile::read_only(b"Content"),
-        "more" => TestFile::read_only(b"Content"),
-        "uname" => TestFile::read_only(b"Fuchsia"),
+        "files" => file::read_only(b"Content"),
+        "more" => file::read_only(b"Content"),
+        "uname" => file::read_only(b"Fuchsia"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| {
@@ -961,7 +961,7 @@ fn read_dirents_small_buffer() {
 #[test]
 fn read_dirents_very_small_buffer() {
     let root = pseudo_directory! {
-        "file" => TestFile::read_only(b"Content"),
+        "file" => file::read_only(b"Content"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| {
@@ -977,9 +977,9 @@ fn read_dirents_very_small_buffer() {
 fn read_dirents_rewind() {
     let root = pseudo_directory! {
         "etc" => pseudo_directory! { },
-        "files" => TestFile::read_only(b"Content"),
-        "more" => TestFile::read_only(b"Content"),
-        "uname" => TestFile::read_only(b"Fuchsia"),
+        "files" => file::read_only(b"Content"),
+        "more" => file::read_only(b"Content"),
+        "uname" => file::read_only(b"Fuchsia"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| {
@@ -1051,7 +1051,7 @@ fn add_entry_too_long_error() {
     };
     let name_len = name.len();
 
-    match root.clone().add_entry(name, TestFile::read_only(b"Should never be used")) {
+    match root.clone().add_entry(name, file::read_only(b"Should never be used")) {
         Ok(()) => panic!(
             "`add_entry()` succeeded for a name of {} bytes, when MAX_FILENAME is {}",
             name_len, max_filename
@@ -1080,7 +1080,7 @@ fn simple_add_file() {
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root.clone(), |proxy| async move {
         {
-            let file = TestFile::read_only(b"Content");
+            let file = file::read_only(b"Content");
             root.add_entry("file", file).unwrap();
         }
 
@@ -1105,7 +1105,7 @@ fn add_file_to_empty() {
         open_as_file_assert_err!(&proxy, flags, "etc/fstab", Status::NOT_FOUND);
 
         {
-            let fstab = TestFile::read_only(b"/dev/fs /");
+            let fstab = file::read_only(b"/dev/fs /");
             etc.add_entry("fstab", fstab).unwrap();
         }
 
@@ -1121,7 +1121,7 @@ fn in_tree_open() {
         "etc" => pseudo_directory! {
             "ssh" => pseudo_directory! {
                 ssh ->
-                "sshd_config" => TestFile::read_only(b"# Empty"),
+                "sshd_config" => file::read_only(b"# Empty"),
             },
         },
     };
@@ -1149,7 +1149,7 @@ fn in_tree_open_path_one_component() {
         "etc" => pseudo_directory! {
             etc ->
             "ssh" => pseudo_directory! {
-                "sshd_config" => TestFile::read_only(b"# Empty"),
+                "sshd_config" => file::read_only(b"# Empty"),
             },
         },
     };
@@ -1178,7 +1178,7 @@ fn in_tree_open_path_two_components() {
         "etc" => pseudo_directory! {
             etc ->
             "ssh" => pseudo_directory! {
-                "sshd_config" => TestFile::read_only(b"# Empty"),
+                "sshd_config" => file::read_only(b"# Empty"),
             },
         },
     };
@@ -1206,9 +1206,9 @@ fn in_tree_add_file() {
         "etc" => pseudo_directory! {
             etc ->
             "ssh" => pseudo_directory! {
-                "sshd_config" => TestFile::read_only(b"# Empty"),
+                "sshd_config" => file::read_only(b"# Empty"),
             },
-            "passwd" => TestFile::read_only(b"[redacted]"),
+            "passwd" => file::read_only(b"[redacted]"),
         },
     };
 
@@ -1219,7 +1219,7 @@ fn in_tree_add_file() {
         open_as_vmo_file_assert_content!(&root, flags, "etc/passwd", "[redacted]");
 
         {
-            let fstab = TestFile::read_only(b"/dev/fs /");
+            let fstab = file::read_only(b"/dev/fs /");
             etc.add_entry("fstab", fstab).unwrap();
         }
 
@@ -1236,8 +1236,8 @@ fn in_tree_remove_file() {
     let root = pseudo_directory! {
         "etc" => pseudo_directory! {
             etc ->
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
-            "passwd" => TestFile::read_only(b"[redacted]"),
+            "fstab" => file::read_only(b"/dev/fs /"),
+            "passwd" => file::read_only(b"[redacted]"),
         },
     };
 
@@ -1269,7 +1269,7 @@ fn in_tree_move_file() {
     let root = pseudo_directory! {
         "etc" => pseudo_directory! {
             etc ->
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
+            "fstab" => file::read_only(b"/dev/fs /"),
         },
     };
 
@@ -1315,12 +1315,12 @@ fn watch_empty() {
 fn watch_non_empty() {
     let root = pseudo_directory! {
         "etc" => pseudo_directory! {
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
+            "fstab" => file::read_only(b"/dev/fs /"),
             "ssh" => pseudo_directory! {
-                "sshd_config" => TestFile::read_only(b"# Empty"),
+                "sshd_config" => file::read_only(b"# Empty"),
             },
         },
-        "files" => TestFile::read_only(b"Content"),
+        "files" => file::read_only(b"Content"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -1347,12 +1347,12 @@ fn watch_non_empty() {
 fn watch_two_watchers() {
     let root = pseudo_directory! {
         "etc" => pseudo_directory! {
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
+            "fstab" => file::read_only(b"/dev/fs /"),
             "ssh" => pseudo_directory! {
-                "sshd_config" => TestFile::read_only(b"# Empty"),
+                "sshd_config" => file::read_only(b"# Empty"),
             },
         },
-        "files" => TestFile::read_only(b"Content"),
+        "files" => file::read_only(b"Content"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -1393,9 +1393,9 @@ fn watch_addition() {
         "etc" => pseudo_directory! {
             etc ->
             "ssh" => pseudo_directory! {
-                "sshd_config" => TestFile::read_only(b"# Empty"),
+                "sshd_config" => file::read_only(b"# Empty"),
             },
-            "passwd" => TestFile::read_only(b"[redacted]"),
+            "passwd" => file::read_only(b"[redacted]"),
         },
     };
 
@@ -1422,7 +1422,7 @@ fn watch_addition() {
         assert_watcher_one_message_watched_events!(watcher, { IDLE, vec![] });
 
         {
-            let fstab = TestFile::read_only(b"/dev/fs /");
+            let fstab = file::read_only(b"/dev/fs /");
             etc.add_entry("fstab", fstab).unwrap();
         }
 
@@ -1442,8 +1442,8 @@ fn watch_removal() {
     let root = pseudo_directory! {
         "etc" => pseudo_directory! {
             etc ->
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
-            "passwd" => TestFile::read_only(b"[redacted]"),
+            "fstab" => file::read_only(b"/dev/fs /"),
+            "passwd" => file::read_only(b"[redacted]"),
         },
     };
 
@@ -1492,12 +1492,12 @@ fn watch_removal() {
 fn watch_with_mask() {
     let root = pseudo_directory! {
         "etc" => pseudo_directory! {
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
+            "fstab" => file::read_only(b"/dev/fs /"),
             "ssh" => pseudo_directory! {
-                "sshd_config" => TestFile::read_only(b"# Empty"),
+                "sshd_config" => file::read_only(b"# Empty"),
             },
         },
-        "files" => TestFile::read_only(b"Content"),
+        "files" => file::read_only(b"Content"),
     };
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
@@ -1517,7 +1517,7 @@ fn watch_addition_with_two_scopes() {
     let root = pseudo_directory! {
         "etc" => pseudo_directory! {
             etc ->
-            "passwd" => TestFile::read_only(b"[redacted]"),
+            "passwd" => file::read_only(b"[redacted]"),
         },
     };
 
@@ -1559,7 +1559,7 @@ fn watch_addition_with_two_scopes() {
             let watcher2_client = assert_watch!(etc2_proxy, mask);
 
             {
-                let fstab = TestFile::read_only(b"/dev/fs /");
+                let fstab = file::read_only(b"/dev/fs /");
                 etc.clone().add_entry("fstab", fstab).unwrap();
             }
 
@@ -1577,7 +1577,7 @@ fn watch_addition_with_two_scopes() {
             assert_channel_closed!(etc2_proxy.into_channel().unwrap());
 
             {
-                let shells = TestFile::read_only(b"/bin/bash");
+                let shells = file::read_only(b"/bin/bash");
                 etc.add_entry("shells", shells).unwrap();
             }
 

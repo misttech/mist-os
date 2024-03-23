@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    attributes,
     directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
     execution_scope::ExecutionScope,
     file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode},
@@ -18,29 +17,32 @@ use {
     std::sync::{Arc, Mutex},
 };
 
+#[cfg(test)]
+mod tests;
+
 // Redefine these constants as a u32 as in macos they are u16
 const S_IRUSR: u32 = libc::S_IRUSR as u32;
-// const S_IXUSR: u32 = libc::S_IXUSR as u32;
+const S_IWUSR: u32 = libc::S_IWUSR as u32;
 
 /// A file with a byte array for content, useful for testing.
-pub struct TestFile {
+pub struct SimpleFile {
     data: Mutex<Vec<u8>>,
     writable: bool,
 }
 
-impl TestFile {
+impl SimpleFile {
     /// Create a new read-only test file with the provided content.
     pub fn read_only(content: impl AsRef<[u8]>) -> Arc<Self> {
-        Arc::new(TestFile { data: Mutex::new(content.as_ref().to_vec()), writable: false })
+        Arc::new(SimpleFile { data: Mutex::new(content.as_ref().to_vec()), writable: false })
     }
 
     /// Create a new writable test file with the provided content.
     pub fn read_write(content: impl AsRef<[u8]>) -> Arc<Self> {
-        Arc::new(TestFile { data: Mutex::new(content.as_ref().to_vec()), writable: true })
+        Arc::new(SimpleFile { data: Mutex::new(content.as_ref().to_vec()), writable: true })
     }
 }
 
-impl DirectoryEntry for TestFile {
+impl DirectoryEntry for SimpleFile {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
     }
@@ -51,11 +53,11 @@ impl DirectoryEntry for TestFile {
 }
 
 #[async_trait]
-impl Node for TestFile {
+impl Node for SimpleFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let content_size = self.data.lock().unwrap().len().try_into().unwrap();
         Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE | S_IRUSR,
+            mode: fio::MODE_TYPE_FILE | S_IRUSR | if self.writable { S_IWUSR } else { 0 },
             id: fio::INO_UNKNOWN,
             content_size,
             storage_size: content_size,
@@ -78,7 +80,11 @@ impl Node for TestFile {
                 abilities: fio::Operations::GET_ATTRIBUTES
                     | fio::Operations::UPDATE_ATTRIBUTES
                     | fio::Operations::READ_BYTES
-                    | fio::Operations::WRITE_BYTES,
+                    | if self.writable {
+                        fio::Operations::WRITE_BYTES
+                    } else {
+                        fio::Operations::empty()
+                    },
                 content_size: content_size,
                 storage_size: content_size,
                 link_count: 1,
@@ -88,7 +94,7 @@ impl Node for TestFile {
     }
 }
 
-impl FileIo for TestFile {
+impl FileIo for SimpleFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
         let content_size = self.data.lock().unwrap().len().try_into().unwrap();
         if offset >= content_size {
@@ -115,12 +121,18 @@ impl FileIo for TestFile {
         Ok(content.len().try_into().unwrap())
     }
 
-    async fn append(&self, _content: &[u8]) -> Result<(u64, u64), Status> {
-        Err(Status::NOT_SUPPORTED)
+    async fn append(&self, content: &[u8]) -> Result<(u64, u64), Status> {
+        if !self.writable {
+            return Err(Status::ACCESS_DENIED);
+        }
+
+        let mut data = self.data.lock().unwrap();
+        data.extend_from_slice(content);
+        Ok((content.len().try_into().unwrap(), data.len().try_into().unwrap()))
     }
 }
 
-impl File for TestFile {
+impl File for SimpleFile {
     fn readable(&self) -> bool {
         true
     }
@@ -137,8 +149,13 @@ impl File for TestFile {
         Ok(())
     }
 
-    async fn truncate(&self, _length: u64) -> Result<(), Status> {
-        Err(Status::ACCESS_DENIED)
+    async fn truncate(&self, length: u64) -> Result<(), Status> {
+        if self.writable {
+            self.data.lock().unwrap().resize(length as usize, 0);
+            Ok(())
+        } else {
+            Err(Status::ACCESS_DENIED)
+        }
     }
 
     async fn get_size(&self) -> Result<u64, Status> {
@@ -170,16 +187,13 @@ impl File for TestFile {
     }
 }
 
-impl FileLike for TestFile {
+impl FileLike for SimpleFile {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         options: FileOptions,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        if options.is_append {
-            return Err(Status::NOT_SUPPORTED);
-        }
         FidlIoConnection::spawn(scope, self, options, object_request)
     }
 }

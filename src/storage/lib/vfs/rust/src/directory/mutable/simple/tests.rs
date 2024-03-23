@@ -23,7 +23,8 @@ use crate::{
         mutable::simple::tree_constructor,
         test_utils::{run_server_client, test_server_client, DirentsSameInodeBuilder},
     },
-    test_utils::{node::open2_get_proxy, test_file::TestFile},
+    file,
+    test_utils::node::open2_get_proxy,
 };
 
 use {
@@ -49,8 +50,8 @@ fn empty_directory() {
 #[test]
 fn unlink_entry() {
     let root = mut_pseudo_directory! {
-        "fstab" => TestFile::read_only(b"/dev/fs /"),
-        "passwd" => TestFile::read_only(b"[redacted]"),
+        "fstab" => file::read_only(b"/dev/fs /"),
+        "passwd" => file::read_only(b"[redacted]"),
     };
 
     run_server_client(
@@ -75,7 +76,7 @@ fn unlink_entry() {
 #[test]
 fn unlink_absent_entry() {
     let root = mut_pseudo_directory! {
-        "fstab" => TestFile::read_only(b"/dev/fs /"),
+        "fstab" => file::read_only(b"/dev/fs /"),
     };
 
     run_server_client(
@@ -99,7 +100,7 @@ fn unlink_absent_entry() {
 fn unlink_does_not_traverse() {
     let root = mut_pseudo_directory! {
         "etc" => mut_pseudo_directory! {
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
+            "fstab" => file::read_only(b"/dev/fs /"),
         },
     };
 
@@ -124,7 +125,7 @@ fn unlink_does_not_traverse() {
 fn unlink_fails_for_read_only_source() {
     let root = mut_pseudo_directory! {
         "etc" => mut_pseudo_directory! {
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
+            "fstab" => file::read_only(b"/dev/fs /"),
         },
     };
 
@@ -149,7 +150,7 @@ fn unlink_fails_for_read_only_source() {
 #[test]
 fn rename_within_directory() {
     let root = mut_pseudo_directory! {
-        "passwd" => TestFile::read_only(b"/dev/fs /"),
+        "passwd" => file::read_only(b"/dev/fs /"),
     };
 
     test_server_client(
@@ -187,7 +188,7 @@ fn rename_within_directory() {
 fn rename_across_directories() {
     let root = mut_pseudo_directory! {
         "tmp" => mut_pseudo_directory! {
-            "fstab.new" => TestFile::read_only(b"/dev/fs /"),
+            "fstab.new" => file::read_only(b"/dev/fs /"),
         },
         "etc" => mut_pseudo_directory! {},
     };
@@ -233,7 +234,7 @@ fn rename_across_directories() {
 fn rename_across_directories_twice() {
     let root = mut_pseudo_directory! {
         "etc" => mut_pseudo_directory! {
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
+            "fstab" => file::read_only(b"/dev/fs /"),
         },
         "tmp" => mut_pseudo_directory! {},
     };
@@ -280,7 +281,7 @@ fn rename_across_directories_twice() {
 #[test]
 fn rename_within_directory_with_watchers() {
     let root = mut_pseudo_directory! {
-        "passwd" => TestFile::read_only(b"/dev/fs /"),
+        "passwd" => file::read_only(b"/dev/fs /"),
     };
 
     test_server_client(
@@ -340,7 +341,7 @@ fn rename_within_directory_with_watchers() {
 fn rename_across_directories_with_watchers() {
     let root = mut_pseudo_directory! {
         "tmp" => mut_pseudo_directory! {
-            "fstab.new" => TestFile::read_only(b"/dev/fs /"),
+            "fstab.new" => file::read_only(b"/dev/fs /"),
         },
         "etc" => mut_pseudo_directory! {},
     };
@@ -408,7 +409,7 @@ fn rename_across_directories_with_watchers() {
 fn rename_across_directories_twice_with_watchers() {
     let root = mut_pseudo_directory! {
         "etc" => mut_pseudo_directory! {
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
+            "fstab" => file::read_only(b"/dev/fs /"),
         },
         "tmp" => mut_pseudo_directory! {},
     };
@@ -481,7 +482,7 @@ fn rename_across_directories_twice_with_watchers() {
 #[test]
 fn rename_into_self_with_watchers() {
     let root = mut_pseudo_directory! {
-        "passwd" => TestFile::read_only(b"[redacted]"),
+        "passwd" => file::read_only(b"[redacted]"),
     };
 
     test_server_client(
@@ -525,7 +526,7 @@ fn rename_into_self_with_watchers() {
 fn get_token_fails_for_read_only_target() {
     let root = mut_pseudo_directory! {
         "etc" => mut_pseudo_directory! {
-            "passwd" => TestFile::read_only(b"[redacted]"),
+            "passwd" => file::read_only(b"[redacted]"),
         },
     };
 
@@ -549,7 +550,7 @@ fn get_token_fails_for_read_only_target() {
 fn rename_fails_for_read_only_source() {
     let root = mut_pseudo_directory! {
         "etc" => mut_pseudo_directory! {
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
+            "fstab" => file::read_only(b"/dev/fs /"),
         },
         "tmp" => mut_pseudo_directory! {},
     };
@@ -581,7 +582,7 @@ fn rename_fails_for_read_only_source() {
 #[test]
 fn hardlink_not_supported() {
     let root = mut_pseudo_directory! {
-        "test" => TestFile::read_only(b"hello"),
+        "test" => file::read_only(b"hello"),
         "tmp" => mut_pseudo_directory! {},
     };
 
@@ -612,7 +613,7 @@ fn create_file() {
     let constructor = tree_constructor(move |_parent, name| {
         let index = count.fetch_add(1, Ordering::Relaxed);
         let content = format!("{} - {}", name, index);
-        Ok(TestFile::read_only(content))
+        Ok(file::read_only(content))
     });
 
     let root = mut_pseudo_directory! {
@@ -687,7 +688,7 @@ fn create_two_levels_deep() {
     let constructor = tree_constructor(move |_parent, name| {
         let index = count.fetch_add(1, Ordering::Relaxed);
         let content = format!("{} - {}", name, index);
-        Ok(TestFile::read_only(content))
+        Ok(file::read_only(content))
     });
 
     let root = mut_pseudo_directory! {
@@ -769,10 +770,10 @@ fn can_not_create_nested() {
 
 #[test]
 fn open_existing_file() {
-    let constructor = tree_constructor(move |_, _| Ok(TestFile::read_write(b"")));
+    let constructor = tree_constructor(move |_, _| Ok(file::read_write(b"")));
 
     let root = mut_pseudo_directory! {
-        "foo" => TestFile::read_write(b"abc"),
+        "foo" => file::read_write(b"abc"),
     };
 
     test_server_client(

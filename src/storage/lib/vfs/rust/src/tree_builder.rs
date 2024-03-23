@@ -147,7 +147,7 @@ impl TreeBuilder {
     ///
     /// let mut tree = TreeBuilder::empty_dir();
     /// tree.add_entry(&["dir1"], simple());
-    /// tree.add_entry(&["dir1", "nested"], TestFile::new(b"A file"));
+    /// tree.add_entry(&["dir1", "nested"], file::new(b"A file"));
     /// ```
     ///
     /// The problem is that the builder does not see "dir1" as a directory, but as a leaf node that
@@ -163,7 +163,7 @@ impl TreeBuilder {
     ///
     /// let mut tree = TreeBuilder::empty_dir();
     /// tree.add_empty_dir(&["dir1"]);
-    /// tree.add_entry(&["dir1", "nested"], TestFile::new(b"A file"));
+    /// tree.add_entry(&["dir1", "nested"], file::new(b"A file"));
     /// ```
     pub fn add_empty_dir<'components, P: 'components, PathImpl>(
         &mut self,
@@ -378,7 +378,7 @@ mod tests {
 
     use crate::{
         directory::{immutable::simple, test_utils::run_server_client},
-        test_utils::test_file::TestFile,
+        file,
     };
 
     use {fidl_fuchsia_io as fio, vfs_macros::pseudo_directory};
@@ -386,8 +386,8 @@ mod tests {
     #[test]
     fn vfs_with_custom_inodes() {
         let mut tree = TreeBuilder::empty_dir();
-        tree.add_entry(&["a", "b", "file"], TestFile::read_only(b"A content")).unwrap();
-        tree.add_entry(&["a", "c", "file"], TestFile::read_only(b"B content")).unwrap();
+        tree.add_entry(&["a", "b", "file"], file::read_only(b"A content")).unwrap();
+        tree.add_entry(&["a", "c", "file"], file::read_only(b"B content")).unwrap();
 
         let mut get_inode = |name: String| -> u64 {
             match &name[..] {
@@ -457,8 +457,8 @@ mod tests {
     #[test]
     fn two_files() {
         let mut tree = TreeBuilder::empty_dir();
-        tree.add_entry("a", TestFile::read_only(b"A content")).unwrap();
-        tree.add_entry("b", TestFile::read_only(b"B content")).unwrap();
+        tree.add_entry("a", file::read_only(b"A content")).unwrap();
+        tree.add_entry("b", file::read_only(b"B content")).unwrap();
 
         let root = tree.build();
 
@@ -489,9 +489,9 @@ mod tests {
     #[test]
     fn overlapping_paths() {
         let mut tree = TreeBuilder::empty_dir();
-        tree.add_entry(&["one", "two"], TestFile::read_only(b"A")).unwrap();
-        tree.add_entry(&["one", "three"], TestFile::read_only(b"B")).unwrap();
-        tree.add_entry("four", TestFile::read_only(b"C")).unwrap();
+        tree.add_entry(&["one", "two"], file::read_only(b"A")).unwrap();
+        tree.add_entry(&["one", "three"], file::read_only(b"B")).unwrap();
+        tree.add_entry("four", file::read_only(b"C")).unwrap();
 
         let root = tree.build();
 
@@ -535,15 +535,15 @@ mod tests {
     #[test]
     fn directory_leaf() {
         let etc = pseudo_directory! {
-            "fstab" => TestFile::read_only(b"/dev/fs /"),
+            "fstab" => file::read_only(b"/dev/fs /"),
             "ssh" => pseudo_directory! {
-                "sshd_config" => TestFile::read_only(b"# Empty"),
+                "sshd_config" => file::read_only(b"# Empty"),
             },
         };
 
         let mut tree = TreeBuilder::empty_dir();
         tree.add_entry("etc", etc).unwrap();
-        tree.add_entry("uname", TestFile::read_only(b"Fuchsia")).unwrap();
+        tree.add_entry("uname", file::read_only(b"Fuchsia")).unwrap();
 
         let root = tree.build();
 
@@ -593,7 +593,7 @@ mod tests {
     fn add_empty_dir_populate_later() {
         let mut tree = TreeBuilder::empty_dir();
         tree.add_empty_dir(&["one", "two"]).unwrap();
-        tree.add_entry(&["one", "two", "three"], TestFile::read_only(b"B")).unwrap();
+        tree.add_entry(&["one", "two", "three"], file::read_only(b"B")).unwrap();
 
         let root = tree.build();
 
@@ -628,7 +628,7 @@ mod tests {
     #[test]
     fn add_empty_dir_already_exists() {
         let mut tree = TreeBuilder::empty_dir();
-        tree.add_entry(&["one", "two", "three"], TestFile::read_only(b"B")).unwrap();
+        tree.add_entry(&["one", "two", "three"], file::read_only(b"B")).unwrap();
         tree.add_empty_dir(&["one", "two"]).unwrap();
 
         let root = tree.build();
@@ -713,7 +713,7 @@ mod tests {
     fn error_empty_path_in_add_entry() {
         let mut tree = TreeBuilder::empty_dir();
         let err = tree
-            .add_entry(vec![], TestFile::read_only(b"Invalid"))
+            .add_entry(vec![], file::read_only(b"Invalid"))
             .expect_err("Empty paths are not allowed.");
         assert_eq!(err, Error::EmptyPath);
     }
@@ -722,7 +722,7 @@ mod tests {
     fn error_slash_in_component() {
         let mut tree = TreeBuilder::empty_dir();
         let err = tree
-            .add_entry("a/b", TestFile::read_only(b"Invalid"))
+            .add_entry("a/b", file::read_only(b"Invalid"))
             .expect_err("Slash in path component name.");
         assert_eq!(
             err,
@@ -734,7 +734,7 @@ mod tests {
     fn error_slash_in_second_component() {
         let mut tree = TreeBuilder::empty_dir();
         let err = tree
-            .add_entry(&["a", "b/c"], TestFile::read_only(b"Invalid"))
+            .add_entry(&["a", "b/c"], file::read_only(b"Invalid"))
             .expect_err("Slash in path component name.");
         assert_eq!(
             err,
@@ -750,7 +750,7 @@ mod tests {
 
         let path: &[&str] = &["a", &long_component, "b"];
         let err = tree
-            .add_entry(path, TestFile::read_only(b"Invalid"))
+            .add_entry(path, file::read_only(b"Invalid"))
             .expect_err("Individual component names may not exceed MAX_FILENAME bytes.");
         assert_eq!(
             err,
@@ -767,9 +767,9 @@ mod tests {
     fn error_leaf_over_directory() {
         let mut tree = TreeBuilder::empty_dir();
 
-        tree.add_entry(&["top", "nested", "file"], TestFile::read_only(b"Content")).unwrap();
+        tree.add_entry(&["top", "nested", "file"], file::read_only(b"Content")).unwrap();
         let err = tree
-            .add_entry(&["top", "nested"], TestFile::read_only(b"Invalid"))
+            .add_entry(&["top", "nested"], file::read_only(b"Invalid"))
             .expect_err("A leaf may not be constructed over a directory.");
         assert_eq!(err, Error::LeafOverDirectory { path: "top/nested".to_string() });
     }
@@ -778,9 +778,9 @@ mod tests {
     fn error_leaf_over_leaf() {
         let mut tree = TreeBuilder::empty_dir();
 
-        tree.add_entry(&["top", "nested", "file"], TestFile::read_only(b"Content")).unwrap();
+        tree.add_entry(&["top", "nested", "file"], file::read_only(b"Content")).unwrap();
         let err = tree
-            .add_entry(&["top", "nested", "file"], TestFile::read_only(b"Invalid"))
+            .add_entry(&["top", "nested", "file"], file::read_only(b"Invalid"))
             .expect_err("A leaf may not be constructed over another leaf.");
         assert_eq!(err, Error::LeafOverLeaf { path: "top/nested/file".to_string() });
     }
@@ -789,9 +789,9 @@ mod tests {
     fn error_entry_inside_leaf() {
         let mut tree = TreeBuilder::empty_dir();
 
-        tree.add_entry(&["top", "file"], TestFile::read_only(b"Content")).unwrap();
+        tree.add_entry(&["top", "file"], file::read_only(b"Content")).unwrap();
         let err = tree
-            .add_entry(&["top", "file", "nested"], TestFile::read_only(b"Invalid"))
+            .add_entry(&["top", "file", "nested"], file::read_only(b"Invalid"))
             .expect_err("A leaf may not be constructed over another leaf.");
         assert_eq!(
             err,
@@ -809,7 +809,7 @@ mod tests {
         // Even when a leaf is itself a directory the tree builder cannot insert a nested entry.
         tree.add_entry(&["top", "file"], simple()).unwrap();
         let err = tree
-            .add_entry(&["top", "file", "nested"], TestFile::read_only(b"Invalid"))
+            .add_entry(&["top", "file", "nested"], file::read_only(b"Invalid"))
             .expect_err("A leaf may not be constructed over another leaf.");
         assert_eq!(
             err,

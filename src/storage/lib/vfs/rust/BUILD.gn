@@ -84,6 +84,8 @@ rustc_library("vfs") {
     "src/file.rs",
     "src/file/common.rs",
     "src/file/connection.rs",
+    "src/file/simple.rs",
+    "src/file/simple/tests.rs",
     "src/file/test_utils.rs",
     "src/file/vmo.rs",
     "src/file/vmo/tests.rs",
@@ -105,7 +107,6 @@ rustc_library("vfs") {
     "src/test_utils/assertions.rs",
     "src/test_utils/node.rs",
     "src/test_utils/run.rs",
-    "src/test_utils/test_file.rs",
     "src/token_registry.rs",
     "src/tree_builder.rs",
   ]

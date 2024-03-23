@@ -642,14 +642,14 @@ fn create_entry(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assert_event, test_utils::test_file::TestFile};
+    use crate::{assert_event, file};
     use fidl::endpoints::create_proxy;
 
     #[test]
     fn add_entry_success() {
         let dir = crate::directory::mutable::simple();
         assert_eq!(
-            dir.add_entry("path_without_separators", TestFile::read_only(b"test")),
+            dir.add_entry("path_without_separators", file::read_only(b"test")),
             Ok(()),
             "add entry with valid filename should succeed"
         );
@@ -659,7 +659,7 @@ mod tests {
     fn add_entry_error_name_with_path_separator() {
         let dir = crate::directory::mutable::simple();
         let status = dir
-            .add_entry("path/with/separators", TestFile::read_only(b"test"))
+            .add_entry("path/with/separators", file::read_only(b"test"))
             .expect_err("add entry with path separator should fail");
         assert_eq!(status, Status::INVALID_ARGS);
     }
@@ -668,7 +668,7 @@ mod tests {
     fn add_entry_error_name_too_long() {
         let dir = crate::directory::mutable::simple();
         let status = dir
-            .add_entry("a".repeat(10000), TestFile::read_only(b"test"))
+            .add_entry("a".repeat(10000), file::read_only(b"test"))
             .expect_err("add entry whose name is too long should fail");
         assert_eq!(status, Status::BAD_PATH);
     }
@@ -689,7 +689,7 @@ mod tests {
         }));
         dir.add_entry("dir", sub_dir).expect("add entry with valid filename should succeed");
 
-        dir.add_entry("file", TestFile::read_only(b"test"))
+        dir.add_entry("file", file::read_only(b"test"))
             .expect("add entry with valid filename should succeed");
 
         let scope = ExecutionScope::new();

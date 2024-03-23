@@ -7,7 +7,6 @@
 pub mod assertions;
 pub mod node;
 pub mod run;
-pub mod test_file;
 
 pub use run::{run_client, run_server_client, test_client, test_server_client, TestController};
 
