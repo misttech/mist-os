@@ -121,7 +121,7 @@ class CounterEvent(Event):
         id: Optional[int] = None
         if id_key in event_dict:
             try:
-                id = int(event_dict[id_key])
+                id = int(event_dict[id_key], 0)
             except (TypeError, ValueError) as t:
                 raise TypeError(
                     f"Expected '{id_key}' field to be an int or a string that "
