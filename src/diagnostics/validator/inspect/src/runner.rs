@@ -40,19 +40,7 @@ pub async fn run_all_trials() -> results::Results {
                 } else {
                     results.log(format!("Trial {} succeeds", trial.name));
                 }
-                if puppet.config.test_archive {
-                    match puppet.unpublish().await {
-                        Ok(validate::TestResult::Ok) => {}
-                        Ok(result) => {
-                            results.error(format!("Unpublish reported {result:?}"));
-                            return results;
-                        }
-                        Err(e) => {
-                            results.error(format!("Unpublish error: {e:?}"));
-                            return results;
-                        }
-                    }
-                }
+
                 // The puppet has to be shut down (it will restart) so the VMO fetch will succeed
                 // on the next trial. This also makes sure the puppet is in a clean state for
                 // each trial.
@@ -260,10 +248,6 @@ async fn try_compare<ActionType: std::fmt::Debug>(
         if puppet.config.test_archive {
             let archive_data = match ArchiveReader::new()
                 .add_selector(ComponentSelector::new(vec![PUPPET_MONIKER.to_string()]))
-                .add_selector(
-                    ComponentSelector::new(vec![puppet.printable_name().to_string()])
-                        .with_tree_selector("root:DUMMY"),
-                )
                 .snapshot::<Inspect>()
                 .await
             {

@@ -36,7 +36,6 @@ inspect_service_hlcpp_allowlist = [
   "//sdk/lib/inspect/service/cpp/tests:*",
   "//sdk/lib/sys/inspect/cpp:*",
   "//sdk/lib/sys/inspect/cpp/tests:*",
-  "//src/diagnostics/validator/inspect/lib/cpp:*",
 ]
 
 sdk_source_set("cpp") {

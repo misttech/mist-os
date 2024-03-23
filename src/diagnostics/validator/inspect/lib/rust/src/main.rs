@@ -11,29 +11,18 @@
 use fuchsia_inspect::Property as UsablePropertyTrait;
 use {
     anyhow::{format_err, Context as _, Error},
-    fidl::endpoints::{create_request_stream, DiscoverableProtocolMarker},
+    fidl::endpoints::create_request_stream,
     fidl_diagnostics_validate::*,
     fidl_fuchsia_inspect::TreeMarker,
-    fidl_fuchsia_io as fio,
-    fuchsia_component::server::{ServiceFs, ServiceObjTrait},
+    fuchsia_async as fasync,
+    fuchsia_component::server::ServiceFs,
     fuchsia_inspect::hierarchy::*,
     fuchsia_inspect::*,
     fuchsia_zircon::HandleBased,
     futures::prelude::*,
     inspect_runtime::{service, TreeServerSendPreference},
     std::collections::HashMap,
-    std::sync::Arc,
     tracing::{error, info, warn},
-    vfs::{
-        directory::{
-            entry_container::Directory,
-            helper::DirectlyMutable,
-            mutable::simple::{simple, Simple},
-        },
-        execution_scope::ExecutionScope,
-        path::Path,
-        service::host,
-    },
 };
 
 #[derive(Debug)]
@@ -71,49 +60,18 @@ struct Actor {
 /// Handles publishing and unpublishing an inspect tree.
 struct Publisher {
     inspector: Option<Inspector>,
-    dir: Arc<Simple>,
+    publish_task: Option<fasync::Task<()>>,
 }
 
 impl Publisher {
-    fn new(dir: Arc<Simple>) -> Self {
-        Self { inspector: None, dir }
+    fn new() -> Self {
+        Self { inspector: None, publish_task: None }
     }
 
     fn publish(&mut self, inspector: Inspector) {
         self.inspector = Some(inspector.clone());
-
-        self.dir
-            .clone()
-            .add_entry(
-                TreeMarker::PROTOCOL_NAME,
-                host(move |stream| {
-                    let inspector_clone = inspector.clone();
-                    async move {
-                        service::handle_request_stream(
-                            inspector_clone,
-                            TreeServerSendPreference::default(),
-                            stream,
-                        )
-                        .await
-                        .expect("failed to run server");
-                    }
-                    .boxed()
-                }),
-            )
-            .expect("add entry");
-    }
-
-    fn unpublish(&mut self) {
-        if self.inspector.is_some() {
-            self.dir.clone().remove_entry(TreeMarker::PROTOCOL_NAME, false).expect("remove entry");
-        }
-        self.inspector = None;
-    }
-}
-
-impl Drop for Publisher {
-    fn drop(&mut self) {
-        self.unpublish();
+        self.publish_task =
+            inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
     }
 }
 
@@ -587,8 +545,8 @@ async fn run_driver_service(
                     responder.send(TestResult::Illegal)?;
                 }
             },
+            // Unneeded by puppets that use InspectSink; they unpublish by shutting down
             InspectPuppetRequest::Unpublish { responder } => {
-                publisher.unpublish();
                 responder.send(TestResult::Ok)?;
             }
         }
@@ -601,23 +559,6 @@ enum IncomingService {
     // ... more services here
 }
 
-fn make_diagnostics_dir<T: ServiceObjTrait>(fs: &mut ServiceFs<T>) -> Arc<Simple> {
-    let (proxy, server) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().expect("create directory marker");
-    let dir = simple();
-    let server_end = server.into_channel().into();
-    let scope = ExecutionScope::new();
-    dir.clone().open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
-        Path::dot(),
-        server_end,
-    );
-    fs.add_remote("diagnostics", proxy);
-
-    dir
-}
-
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     info!("Puppet starting");
@@ -625,15 +566,13 @@ async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(IncomingService::InspectPuppet);
 
-    let dir = make_diagnostics_dir(&mut fs);
-
     fs.take_and_serve_directory_handle()?;
 
     // Set concurrent > 1, otherwise additional requests hang on the completion of the InspectPuppet
     // service.
     const MAX_CONCURRENT: usize = 4;
     let fut = fs.for_each_concurrent(MAX_CONCURRENT, |IncomingService::InspectPuppet(stream)| {
-        run_driver_service(stream, Publisher::new(dir.clone()))
+        run_driver_service(stream, Publisher::new())
             .unwrap_or_else(|e| error!("ERROR in puppet's main: {:?}", e))
     });
 

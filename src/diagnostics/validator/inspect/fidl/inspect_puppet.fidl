@@ -289,7 +289,7 @@ closed protocol InspectPuppet {
         result TestResult;
     });
 
-    /// Instruct the puppet to expose its current data in its out/diagnostics directory.
+    /// Instruct the puppet to publish its current data over InspectSink.
     ///
     /// Note: It is an error for more than one Validate connection to
     /// Publish at once. Unpublish must be called to cleanup.
@@ -297,7 +297,7 @@ closed protocol InspectPuppet {
         result TestResult;
     });
 
-    /// Instruct the puppet to unpublish any data it currently has present in out/diagnostics.
+    /// Does nothing in any of the current puppets.
     strict Unpublish() -> (struct {
         result TestResult;
     });

@@ -7,8 +7,9 @@
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fpromise/single_threaded_executor.h>
+#include <lib/inspect/component/cpp/component.h>
+#include <lib/inspect/component/cpp/service.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/inspect/service/cpp/service.h>
 #include <lib/stdcompat/variant.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
@@ -599,9 +600,9 @@ class Actor {
 
 class Puppet : public diagnostics::validate::InspectPuppet {
  public:
-  explicit Puppet(std::unique_ptr<sys::ComponentContext> context) : context_(std::move(context)) {
+  explicit Puppet(async_dispatcher_t* dispatcher, std::unique_ptr<sys::ComponentContext> context)
+      : dispatcher_(dispatcher), context_(std::move(context)) {
     context_->outgoing()->AddPublicService(bindings_.GetHandler(this));
-    diagnostics_directory_ = context_->outgoing()->GetOrCreateDirectory("diagnostics");
   }
 
   void Initialize(InitializationParams params, InitializeCallback callback) override {
@@ -625,9 +626,11 @@ class Puppet : public diagnostics::validate::InspectPuppet {
     }
     actor_ = std::make_unique<Actor>(inspect::InspectSettings{.maximum_size = params.vmoSize()});
 
-    tree_handler_ = inspect::MakeTreeHandler(&actor_->inspector());
+    auto endpoints = fidl::CreateEndpoints<fuchsia_inspect::Tree>();
+    inspect::TreeServer::StartSelfManagedServer(actor_->inspector(), {}, dispatcher_,
+                                                std::move(endpoints->server));
     fuchsia::inspect::TreePtr tree_ptr;
-    tree_handler_(tree_ptr.NewRequest());
+    tree_ptr.Bind(endpoints->client.TakeChannel(), dispatcher_);
     callback(std::move(tree_ptr), TestResult::OK);
   }
 
@@ -639,16 +642,13 @@ class Puppet : public diagnostics::validate::InspectPuppet {
       return;
     }
 
-    diagnostics_directory_->AddEntry(
-        fuchsia::inspect::Tree::Name_,
-        std::make_unique<vfs::Service>(inspect::MakeTreeHandler(&actor_->inspector())));
+    component_inspector_ =
+        inspect::ComponentInspector(dispatcher_, {.inspector = actor_->inspector()});
     callback(TestResult::OK);
   }
 
-  void Unpublish(PublishCallback callback) override {
-    diagnostics_directory_->RemoveEntry(fuchsia::inspect::Tree::Name_);
-    callback(TestResult::OK);
-  }
+  // Unneeded by puppets that use InspectSink; they unpublish by shutting down
+  void Unpublish(UnpublishCallback callback) override { callback(TestResult::OK); }
 
   void Act(Action action, ActCallback callback) override {
     if (actor_ == nullptr) {
@@ -667,10 +667,10 @@ class Puppet : public diagnostics::validate::InspectPuppet {
   }
 
  private:
+  async_dispatcher_t* dispatcher_;
   std::unique_ptr<sys::ComponentContext> context_;
-  vfs::PseudoDir* diagnostics_directory_;
+  std::optional<inspect::ComponentInspector> component_inspector_ = std::nullopt;
   fidl::BindingSet<diagnostics::validate::InspectPuppet> bindings_;
-  fidl::InterfaceRequestHandler<fuchsia::inspect::Tree> tree_handler_;
   std::unique_ptr<Actor> actor_;
 };
 
@@ -678,7 +678,7 @@ int main(int argc, const char** argv) {
   // must be first thing
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  Puppet puppet(sys::ComponentContext::CreateAndServeOutgoingDirectory());
+  Puppet puppet(loop.dispatcher(), sys::ComponentContext::CreateAndServeOutgoingDirectory());
 
   loop.Run();
   return 0;

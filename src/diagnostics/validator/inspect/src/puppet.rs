@@ -76,10 +76,6 @@ impl Puppet {
         Ok(self.connection.fidl.publish().await?)
     }
 
-    pub async fn unpublish(&mut self) -> Result<validate::TestResult, Error> {
-        Ok(self.connection.fidl.unpublish().await?)
-    }
-
     pub async fn connect() -> Result<Self, Error> {
         Puppet::initialize_with_connection(Connection::connect().await?).await
     }
