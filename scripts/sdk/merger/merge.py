@@ -230,6 +230,8 @@ class ElementMeta(object):
             common_files.update(self._meta["sources"])
         elif type == "dart_library":
             common_files.update(self._meta["sources"])
+        elif type == "experimental_python_e2e_test":
+            common_files.update(self._meta["files"])
         elif type == "ffx_tool":
             if "files" in self._meta:
                 for name, collection in self._meta["files"].items():
@@ -357,6 +359,7 @@ class ElementMeta(object):
             "component_manifest",
             "bind_library",
             "version_history",
+            "experimental_python_e2e_test",
         ):
             # These elements are arch-independent, the metadata does not need any
             # update.

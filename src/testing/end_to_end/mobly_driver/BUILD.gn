@@ -17,7 +17,7 @@ if (is_host) {
     sources = [ "api_mobly.py" ]
     library_deps = [
       ":api_infra",
-      "//third_party/mobly",
+      "//third_party/mobly:mobly_no_testonly",
     ]
   }
 
