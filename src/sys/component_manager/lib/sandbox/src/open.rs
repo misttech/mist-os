@@ -119,7 +119,7 @@ impl Open {
     ///
     /// `into_remote` avoids a round trip through FIDL and channels, and is used as an
     /// internal performance optimization by `Dict` when building a directory tree.
-    pub(crate) fn into_remote(self) -> Arc<dyn DirectoryEntry> {
+    pub fn into_remote(self) -> Arc<dyn DirectoryEntry> {
         self.entry.clone()
     }
 
@@ -149,8 +149,8 @@ impl fmt::Debug for Open {
 }
 
 impl CapabilityTrait for Open {
-    fn try_into_open(self) -> Result<Open, ConversionError> {
-        Ok(self)
+    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+        Ok(self.entry)
     }
 }
 
@@ -301,9 +301,12 @@ mod tests {
 
         // Verify that the connection has a directory named `foo`.
         let scope = ExecutionScope::new();
-        let directory =
-            serve_directory(open.clone().into_remote(), &scope, fio::OpenFlags::RIGHT_READABLE)
-                .unwrap();
+        let directory = serve_directory(
+            open.clone().try_into_directory_entry().unwrap(),
+            &scope,
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .unwrap();
         let entries = get_entries(directory).await.unwrap();
         assert_eq!(entries, vec!["foo".to_owned()]);
 
@@ -315,9 +318,12 @@ mod tests {
                 fio::DirentType::Directory,
             )
             .unwrap();
-        let directory =
-            serve_directory(open.clone().into_remote(), &scope, fio::OpenFlags::RIGHT_READABLE)
-                .unwrap();
+        let directory = serve_directory(
+            open.clone().try_into_directory_entry().unwrap(),
+            &scope,
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .unwrap();
 
         // Verify that the connection does not have anymore children, since `foo` has no children.
         let entries = get_entries(directory).await.unwrap();
@@ -353,7 +359,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_sender_into_open() {
         let (receiver, sender) = Receiver::new();
-        let open: Open = sender.try_into_open().unwrap();
+        let open = Open::new(sender.try_into_directory_entry().unwrap());
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), ".".to_owned(), server_end);
@@ -369,7 +375,7 @@ mod tests {
         let mut ex = fasync::TestExecutor::new();
 
         let (receiver, sender) = Receiver::new();
-        let open: Open = sender.try_into_open().unwrap();
+        let open = Open::new(sender.try_into_directory_entry().unwrap());
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), "foo".to_owned(), server_end);
@@ -393,7 +399,7 @@ mod tests {
         let (receiver, sender) = Receiver::new();
         dict.lock_entries().insert("echo".to_owned(), Capability::Sender(sender));
 
-        let open: Open = dict.try_into_open().unwrap();
+        let open = Open::new(dict.try_into_directory_entry().unwrap());
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), "echo".to_owned(), server_end);
@@ -413,7 +419,7 @@ mod tests {
         let (receiver, sender) = Receiver::new();
         dict.lock_entries().insert("echo".to_owned(), Capability::Sender(sender));
 
-        let open: Open = dict.try_into_open().unwrap();
+        let open = Open::new(dict.try_into_directory_entry().unwrap());
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), "echo/foo".to_owned(), server_end);

@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{AnyCapability, AnyCast, Open};
+use crate::{AnyCapability, AnyCast};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use from_enum::FromEnum;
 use fuchsia_zircon::{AsHandleRef, HandleRef};
@@ -55,19 +55,6 @@ impl Capability {
         match self {
             Capability::Dictionary(d) => Some(d),
             _ => None,
-        }
-    }
-
-    pub fn try_into_open(self) -> Result<Open, ConversionError> {
-        match self {
-            Capability::Sender(s) => s.try_into_open(),
-            Capability::Open(s) => s.try_into_open(),
-            Capability::Router(s) => s.try_into_open(),
-            Capability::Dictionary(s) => s.try_into_open(),
-            Capability::Data(s) => s.try_into_open(),
-            Capability::Unit(s) => s.try_into_open(),
-            Capability::Directory(s) => s.try_into_open(),
-            Capability::OneShotHandle(s) => s.try_into_open(),
         }
     }
 
@@ -188,13 +175,6 @@ impl TryFrom<fsandbox::Capability> for Capability {
 pub trait CapabilityTrait:
     AnyCast + Into<fsandbox::Capability> + Clone + Debug + Send + Sync
 {
-    /// Attempt to convert `self` to a capability of type [Open].
-    ///
-    /// The default implementation forwards to `try_into_directory_entry`.
-    fn try_into_open(self) -> Result<Open, ConversionError> {
-        Ok(Open::new(self.try_into_directory_entry()?))
-    }
-
     fn into_fidl(self) -> fsandbox::Capability {
         self.into()
     }

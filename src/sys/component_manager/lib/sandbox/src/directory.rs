@@ -191,7 +191,7 @@ mod tests {
         let open = Open::new(Arc::new(MockDir(open_tx)));
 
         let fs = pseudo_directory! {
-            "foo" => open.into_remote(),
+            "foo" => open.try_into_directory_entry().unwrap(),
         };
 
         // Create a Directory capability, and a clone.

@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{CapabilityTrait, ConversionError, Open};
+use crate::{CapabilityTrait, ConversionError};
 use crate_local::ObjectSafeCapability;
 use dyn_clone::{clone_trait_object, DynClone};
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -37,8 +37,6 @@ pub(crate) mod crate_local {
     pub trait ObjectSafeCapability {
         fn into_fidl(self: Box<Self>) -> fsandbox::Capability;
 
-        fn try_into_open(self: Box<Self>) -> Result<Open, ConversionError>;
-
         fn try_into_directory_entry(
             self: Box<Self>,
         ) -> Result<Arc<dyn DirectoryEntry>, ConversionError>;
@@ -47,10 +45,6 @@ pub(crate) mod crate_local {
     impl<T: CapabilityTrait> ObjectSafeCapability for T {
         fn into_fidl(self: Box<Self>) -> fsandbox::Capability {
             (*self).into()
-        }
-
-        fn try_into_open(self: Box<Self>) -> Result<Open, ConversionError> {
-            (*self).try_into_open()
         }
 
         fn try_into_directory_entry(
@@ -89,7 +83,7 @@ impl<T: Any> AnyCast for T {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Capability, Data, Unit};
+    use crate::{Capability, Data, Open, Unit};
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;
@@ -121,7 +115,7 @@ mod tests {
         let any: AnyCapability = Box::new(open);
 
         // Convert the Any back to Open.
-        let open = any.try_into_open().unwrap();
+        let open = Open::new(any.try_into_directory_entry().unwrap());
         let (ch1, _ch2) = zx::Channel::create();
         open.open(ExecutionScope::new(), fio::OpenFlags::empty(), vfs::path::Path::dot(), ch1);
         rx.recv().unwrap();

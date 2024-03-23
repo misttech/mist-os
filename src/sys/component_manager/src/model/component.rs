@@ -1945,9 +1945,11 @@ impl ResolvedInstanceState {
     async fn get_exposed_dir(&self) -> &Open {
         let create_exposed_dir = async {
             let exposed_dict = self.make_exposed_dict().await;
-            exposed_dict
-                .try_into_open()
-                .expect("converting exposed dict to open should always succeed")
+            Open::new(
+                exposed_dict
+                    .try_into_directory_entry()
+                    .expect("converting exposed dict to open should always succeed"),
+            )
         };
         self.exposed_dir.get_or_init(create_exposed_dir).await
     }

@@ -3506,7 +3506,7 @@ async fn route_from_while_component_is_stopping() {
     let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
     let route_and_open_fut = async {
         // Route the capability.
-        let open: Open = output
+        let entry = output
             .get_capability(iter::once("foo"))
             .unwrap()
             .route(crate::model::routing::router::Request {
@@ -3515,11 +3515,11 @@ async fn route_from_while_component_is_stopping() {
             })
             .await
             .unwrap()
-            .try_into_open()
+            .try_into_directory_entry()
             .unwrap();
 
         // Connect to the capability.
-        open.open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
+        Open::new(entry).open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
     };
 
     // Both should complete after the response delay has passed.

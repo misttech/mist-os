@@ -21,7 +21,7 @@ use vfs::{
     name::Name,
 };
 
-use crate::{registry, Capability, CapabilityTrait, ConversionError, Open};
+use crate::{registry, Capability, CapabilityTrait, ConversionError};
 
 pub type Key = String;
 
@@ -241,12 +241,9 @@ impl CapabilityTrait for Dict {
         for (key, value) in self.lock_entries().iter() {
             let remote: Arc<dyn DirectoryEntry> = match value {
                 Capability::Directory(d) => d.clone().into_remote(),
-                value => {
-                    let open: Open = value.clone().try_into_open().map_err(|err| {
-                        ConversionError::Nested { key: key.clone(), err: Box::new(err) }
-                    })?;
-                    open.into_remote()
-                }
+                value => value.clone().try_into_directory_entry().map_err(|err| {
+                    ConversionError::Nested { key: key.clone(), err: Box::new(err) }
+                })?,
             };
             let key: Name = key.clone().try_into()?;
             match dir.add_entry_impl(key, remote, false) {
@@ -303,7 +300,7 @@ async fn serve_dict_iterator(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Data, Directory, Unit};
+    use crate::{Data, Directory, Open, Unit};
     use anyhow::{Error, Result};
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream, Proxy};
@@ -669,7 +666,10 @@ mod tests {
     async fn try_into_open_error_not_supported() {
         let dict = Dict::new();
         dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Unit(Unit::default()));
-        assert_matches!(dict.try_into_open(), Err(ConversionError::Nested { .. }));
+        assert_matches!(
+            dict.try_into_directory_entry().err(),
+            Some(ConversionError::Nested { .. })
+        );
     }
 
     #[fuchsia::test]
@@ -680,7 +680,7 @@ mod tests {
         // This string is too long to be a valid fuchsia.io name.
         let bad_name = "a".repeat(10000);
         dict.lock_entries().insert(bad_name, Capability::Open(placeholder_open));
-        assert_matches!(dict.try_into_open(), Err(ConversionError::ParseName(_)));
+        assert_matches!(dict.try_into_directory_entry().err(), Some(ConversionError::ParseName(_)));
     }
 
     struct MockDir(Counter);
@@ -713,9 +713,7 @@ mod tests {
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
         dict.lock_entries()
             .insert(CAP_KEY.to_string(), Capability::Open(Open::new(mock_dir.clone())));
-        let dict_open = dict.try_into_open().expect("convert dict into Open capability");
-
-        let remote = dict_open.into_remote();
+        let remote = dict.try_into_directory_entry().expect("convert dict into Open capability");
         let scope = ExecutionScope::new();
 
         let dir_client_end =
@@ -740,9 +738,7 @@ mod tests {
         let dict = Dict::new();
         dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Dictionary(inner_dict));
 
-        let dict_open = dict.try_into_open().expect("convert dict into Open capability");
-
-        let remote = dict_open.into_remote();
+        let remote = dict.try_into_directory_entry().expect("convert dict into Open capability");
         let scope = ExecutionScope::new();
 
         let dir_client_end =
@@ -788,8 +784,7 @@ mod tests {
         let dict = Dict::new();
         dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Directory(directory));
 
-        let dict_open = dict.try_into_open().unwrap();
-        let remote = dict_open.into_remote();
+        let remote = dict.try_into_directory_entry().unwrap();
 
         // List the inner directory and verify its contents.
         let scope = ExecutionScope::new();

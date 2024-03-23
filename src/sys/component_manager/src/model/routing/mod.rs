@@ -58,9 +58,10 @@ fn check_source_for_void(source: &CapabilitySource) -> Result<(), RoutingError> 
 pub(super) fn capability_into_open(capability: Capability) -> Result<Open, BedrockError> {
     match capability {
         Capability::Unit(_) => Err(RoutingError::SourceCapabilityIsVoid.into()),
-        cap => {
-            Ok(cap.try_into_open().map_err(crate::model::error::OpenError::DoesNotSupportOpen)?)
-        }
+        cap => Ok(Open::new(
+            cap.try_into_directory_entry()
+                .map_err(crate::model::error::OpenError::DoesNotSupportOpen)?,
+        )),
     }
 }
 
