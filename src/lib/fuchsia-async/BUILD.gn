@@ -47,7 +47,6 @@ rustc_library("fuchsia-async") {
       "//src/lib/zircon/rust:fuchsia-zircon",
       "//third_party/rust_crates:crossbeam",
       "//third_party/rust_crates:libc",
-      "//third_party/rust_crates:pin-project",
       "//third_party/rust_crates:rustc-hash",
       "//third_party/rust_crates:socket2",
       "//third_party/rust_crates:thiserror",

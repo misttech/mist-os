@@ -14,7 +14,6 @@ use std::task::Poll;
 use crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::task::{AtomicWaker, Context};
-use pin_project::{pin_project, pinned_drop};
 
 struct OnSignalsReceiver {
     maybe_signals: AtomicUsize,
@@ -58,7 +57,6 @@ impl PacketReceiver for OnSignalsReceiver {
 
 /// A future that completes when some set of signals become available on a Handle.
 #[must_use = "futures do nothing unless polled"]
-#[pin_project(PinnedDrop)]
 pub struct OnSignals<'a, H: AsHandleRef> {
     handle: H,
     signals: zx::Signals,
@@ -88,11 +86,11 @@ impl<'a, H: AsHandleRef + 'a> OnSignals<'a, H> {
     }
 
     /// Takes the handle.
-    pub fn take_handle(mut self: Pin<&mut Self>) -> H
+    pub fn take_handle(mut self) -> H
     where
         H: zx::HandleBased,
     {
-        self.as_mut().unregister();
+        self.unregister();
         std::mem::replace(&mut self.handle, zx::Handle::invalid().into())
     }
 
@@ -146,7 +144,7 @@ impl<'a, H: AsHandleRef + 'a> OnSignals<'a, H> {
         Ok(registration)
     }
 
-    fn unregister(mut self: Pin<&mut Self>) {
+    fn unregister(&mut self) {
         if let Some(registration) = self.registration.take() {
             if registration.receiver().maybe_signals.load(Ordering::SeqCst) == 0 {
                 // Ignore the error from zx_port_cancel, because it might just be a race condition.
@@ -158,15 +156,15 @@ impl<'a, H: AsHandleRef + 'a> OnSignals<'a, H> {
     }
 }
 
-impl<H: AsHandleRef> Future for OnSignals<'_, H> {
+impl<H: AsHandleRef + Unpin> Future for OnSignals<'_, H> {
     type Output = Result<zx::Signals, zx::Status>;
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match &self.registration {
             None => match self.handle.wait_handle(self.signals, zx::Time::INFINITE_PAST) {
                 Ok(signals) => Poll::Ready(Ok(signals)),
                 Err(zx::Status::TIMED_OUT) => {
                     let registration = self.register(Some(cx))?;
-                    self.registration = Some(registration);
+                    self.get_mut().registration = Some(registration);
                     Poll::Pending
                 }
                 Err(e) => Poll::Ready(Err(e)),
@@ -199,9 +197,8 @@ impl<H: AsHandleRef> fmt::Debug for OnSignals<'_, H> {
     }
 }
 
-#[pinned_drop]
-impl<H: AsHandleRef> PinnedDrop for OnSignals<'_, H> {
-    fn drop(self: Pin<&mut Self>) {
+impl<H: AsHandleRef> Drop for OnSignals<'_, H> {
+    fn drop(&mut self) {
         self.unregister();
     }
 }
@@ -322,7 +319,7 @@ mod test {
 
         let (rx, tx) = zx::Channel::create();
 
-        let mut fut = pin!(OnSignals::new(rx, zx::Signals::CHANNEL_READABLE));
+        let mut fut = OnSignals::new(rx, zx::Signals::CHANNEL_READABLE);
 
         assert_eq!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
