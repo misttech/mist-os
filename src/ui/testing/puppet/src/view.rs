@@ -163,6 +163,7 @@ impl View {
             )
             .expect("failed to create view");
         flatland.set_root_transform(&root_transform_id).expect("failed to set root transform");
+        info!("[b/328261162] Wait for request_present()");
         request_present(&presentation_sender).await;
 
         let this = Rc::new(RefCell::new(Self {
@@ -223,10 +224,10 @@ impl View {
             .set(keyboard_task)
             .expect("set keyboard watcher task more than once");
 
-        // Wait for view to be initialized.
+        info!("[b/328261162] Wait for view to be initialized.");
         _ = view_initialized.wait().await;
 
-        // Wait for keyboard listener ready.
+        info!("[b/328261162] Wait for keyboard listener ready.");
         _ = keyboard_ready.wait().await;
 
         (this, view_ref_clone)
