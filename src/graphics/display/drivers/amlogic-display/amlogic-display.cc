@@ -588,7 +588,7 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
   }
 }
 
-void AmlogicDisplay::DdkRelease() {
+void AmlogicDisplay::Deinitialize() {
   vsync_receiver_.reset();
 
   // TODO(https://fxbug.dev/42082206): Power off should occur after all threads are
@@ -601,19 +601,6 @@ void AmlogicDisplay::DdkRelease() {
 
   capture_.reset();
   hot_plug_detection_.reset();
-  delete this;
-}
-
-zx_status_t AmlogicDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
-  auto* proto = static_cast<ddk::AnyProtocol*>(out_protocol);
-  proto->ctx = this;
-  switch (proto_id) {
-    case ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL:
-      proto->ops = &display_controller_impl_protocol_ops_;
-      return ZX_OK;
-    default:
-      return ZX_ERR_NOT_SUPPORTED;
-  }
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
@@ -621,7 +608,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplGetSysmemConnection(zx::channel
   // we only have the server_end here.
   using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
   zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent_, "sysmem", ServiceMember::ServiceName, ServiceMember::Name, connection.release());
+      bus_device_, "sysmem", ServiceMember::ServiceName, ServiceMember::Name, connection.release());
   if (status != ZX_OK) {
     return status;
   }
@@ -1037,7 +1024,7 @@ zx_status_t AmlogicDisplay::SetupHotplugDisplayDetection() {
   ZX_DEBUG_ASSERT_MSG(!hot_plug_detection_, "HPD already set up");
 
   zx::result<std::unique_ptr<HotPlugDetection>> hot_plug_detection_result =
-      HotPlugDetection::Create(parent_,
+      HotPlugDetection::Create(bus_device_,
                                fit::bind_member<&AmlogicDisplay::OnHotPlugStateChange>(this));
 
   if (hot_plug_detection_result.is_error()) {
@@ -1052,7 +1039,7 @@ zx_status_t AmlogicDisplay::InitializeHdmiVout() {
   ZX_DEBUG_ASSERT(vout_ == nullptr);
 
   zx::result<std::unique_ptr<Vout>> create_hdmi_vout_result =
-      Vout::CreateHdmiVout(parent_, root_node_.CreateChild("vout"));
+      Vout::CreateHdmiVout(bus_device_, root_node_.CreateChild("vout"));
   if (!create_hdmi_vout_result.is_ok()) {
     zxlogf(ERROR, "Failed to initialize HDMI Vout device: %s",
            create_hdmi_vout_result.status_string());
@@ -1071,7 +1058,7 @@ zx_status_t AmlogicDisplay::InitializeMipiDsiVout(display_panel_t panel_info) {
   {
     fbl::AutoLock lock(&display_mutex_);
     zx::result<std::unique_ptr<Vout>> create_dsi_vout_result =
-        Vout::CreateDsiVout(parent_, panel_info.panel_type, panel_info.width, panel_info.height,
+        Vout::CreateDsiVout(bus_device_, panel_info.panel_type, panel_info.width, panel_info.height,
                             root_node_.CreateChild("vout"));
     if (!create_dsi_vout_result.is_ok()) {
       zxlogf(ERROR, "Failed to initialize DSI Vout device: %s",
@@ -1096,7 +1083,7 @@ zx_status_t AmlogicDisplay::InitializeVout() {
   // store metadata of `display_config_t` type rather than `display_panel_t`
   // type, though currently all the board drivers use display_panel_t instead,
   // which is defined on a side channel apart from the //src/lib/ddk library.
-  zx_status_t status = device_get_metadata(parent_, DEVICE_METADATA_DISPLAY_CONFIG, &panel_info,
+  zx_status_t status = device_get_metadata(bus_device_, DEVICE_METADATA_DISPLAY_CONFIG, &panel_info,
                                            sizeof(display_panel_t), &actual_bytes);
   if (status == ZX_ERR_NOT_FOUND) {
     return InitializeHdmiVout();
@@ -1124,7 +1111,7 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
   static constexpr char kPdevFragmentName[] = "pdev";
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-          fuchsia_hardware_platform_device::Service::Device>(parent_, kPdevFragmentName);
+          fuchsia_hardware_platform_device::Service::Device>(bus_device_, kPdevFragmentName);
   if (pdev_result.is_error()) {
     zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
     return pdev_result.status_value();
@@ -1138,7 +1125,7 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
 
   zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> sysmem_client_result =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-          fuchsia_hardware_sysmem::Service::AllocatorV1>(parent_, "sysmem");
+          fuchsia_hardware_sysmem::Service::AllocatorV1>(bus_device_, "sysmem");
   if (sysmem_client_result.is_error()) {
     zxlogf(ERROR, "Failed to get sysmem protocol: %s", sysmem_client_result.status_string());
     return sysmem_client_result.status_value();
@@ -1146,8 +1133,8 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
   sysmem_.Bind(std::move(sysmem_client_result.value()));
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_amlogiccanvas::Device>> canvas_client_result =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_amlogiccanvas::Service::Device>(parent_,
-                                                                                      "canvas");
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+          fuchsia_hardware_amlogiccanvas::Service::Device>(bus_device_, "canvas");
   if (canvas_client_result.is_error()) {
     zxlogf(ERROR, "Failed to get Amlogic canvas protocol: %s",
            canvas_client_result.status_string());
@@ -1185,8 +1172,7 @@ zx_status_t AmlogicDisplay::InitializeSysmemAllocator() {
   return ZX_OK;
 }
 
-// TODO(payamm): make sure unbind/release are called if we return error
-zx_status_t AmlogicDisplay::Bind() {
+zx_status_t AmlogicDisplay::Initialize() {
   SetFormatSupportCheck(
       [](fuchsia_images2::wire::PixelFormat format) { return IsFormatSupported(format); });
 
@@ -1256,7 +1242,7 @@ zx_status_t AmlogicDisplay::Bind() {
 
   {
     zx::result<std::unique_ptr<VsyncReceiver>> vsync_receiver_result = VsyncReceiver::Create(
-        parent(), pdev_.client_end(), fit::bind_member<&AmlogicDisplay::OnVsync>(this));
+        bus_device_, pdev_.client_end(), fit::bind_member<&AmlogicDisplay::OnVsync>(this));
     if (vsync_receiver_result.is_error()) {
       // Create() already logged the error.
       return vsync_receiver_result.error_value();
@@ -1281,51 +1267,28 @@ zx_status_t AmlogicDisplay::Bind() {
     }
   }
 
-  auto cleanup = fit::defer([&]() { DdkRelease(); });
-
-  if (zx_status_t status = DdkAdd(ddk::DeviceAddArgs("amlogic-display")
-                                      .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
-                                      .set_inspect_vmo(inspector_.DuplicateVmo()));
-      status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  cleanup.cancel();
-
   set_fully_initialized();
   return ZX_OK;
 }
 
-AmlogicDisplay::AmlogicDisplay(zx_device_t* parent) : DeviceType(parent) {}
-AmlogicDisplay::~AmlogicDisplay() = default;
+AmlogicDisplay::AmlogicDisplay(zx_device_t* bus_device) : bus_device_(bus_device) {}
+AmlogicDisplay::~AmlogicDisplay() {}
 
 // static
-zx_status_t AmlogicDisplay::Create(zx_device_t* parent) {
+zx::result<std::unique_ptr<AmlogicDisplay>> AmlogicDisplay::Create(zx_device_t* parent) {
   fbl::AllocChecker alloc_checker;
-  auto dev = fbl::make_unique_checked<AmlogicDisplay>(&alloc_checker, parent);
+  auto amlogic_display = fbl::make_unique_checked<AmlogicDisplay>(&alloc_checker, parent);
   if (!alloc_checker.check()) {
-    return ZX_ERR_NO_MEMORY;
+    zxlogf(ERROR, "Failed to allocate memory for AmlogicDisplay");
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  const zx_status_t status = dev->Bind();
-  if (status == ZX_OK) {
-    // devmgr now owns the memory for `dev`
-    [[maybe_unused]] auto ptr = dev.release();
+  const zx_status_t status = amlogic_display->Initialize();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to initialize AmlogicDisplay instance: %s", zx_status_get_string(status));
+    return zx::error(status);
   }
-  return status;
+  return zx::ok(std::move(amlogic_display));
 }
 
-namespace {
-
-constexpr zx_driver_ops_t kDriverOps = {
-    .version = DRIVER_OPS_VERSION,
-    .bind = [](void* ctx, zx_device_t* parent) { return AmlogicDisplay::Create(parent); },
-};
-
-}  // namespace
-
 }  // namespace amlogic_display
-
-// clang-format off
-ZIRCON_DRIVER(amlogic_display, amlogic_display::kDriverOps, "zircon", "0.1");

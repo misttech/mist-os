@@ -11,9 +11,6 @@
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -71,18 +68,18 @@ struct ImageInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ImageInfo>> 
   zx_paddr_t paddr;
 };
 
-class AmlogicDisplay;
-
-// AmlogicDisplay will implement only a few subset of Device.
-using DeviceType = ddk::Device<AmlogicDisplay, ddk::GetProtocolable>;
 class AmlogicDisplay
-    : public DeviceType,
-      public ddk::DisplayControllerImplProtocol<AmlogicDisplay, ddk::base_protocol> {
+    : public ddk::DisplayControllerImplProtocol<AmlogicDisplay, ddk::base_protocol> {
  public:
-  // Factory method used by the device manager glue code.
-  static zx_status_t Create(zx_device_t* parent);
+  // Factory method for production use.
+  //
+  // `bus_device` must be valid.
+  static zx::result<std::unique_ptr<AmlogicDisplay>> Create(zx_device_t* bus_device);
 
-  explicit AmlogicDisplay(zx_device_t* parent);
+  // Creates an uninitialized `AmlogicDisplay` instance.
+  //
+  // Production code should use `AmlogicDisplay::Create()` instead.
+  explicit AmlogicDisplay(zx_device_t* bus_device);
 
   AmlogicDisplay(const AmlogicDisplay&) = delete;
   AmlogicDisplay(AmlogicDisplay&&) = delete;
@@ -91,14 +88,26 @@ class AmlogicDisplay
 
   ~AmlogicDisplay();
 
-  // Acquires parent resources, sets up display submodules, and binds itself to
-  // the device node.
+  // Acquires parent resources and sets up display submodules.
   //
-  // Must be called once and only once by the device manager (via the Create()
-  // factory method) during the driver lifetime.
-  zx_status_t Bind();
+  // Must be called exactly once via the `Create()` factory method during
+  // the AmlogicDisplay lifetime in production code.
+  //
+  // TODO(https://fxbug.dev/42082357): Replace the two-step initialization with
+  // a factory method and a constructor.
+  zx_status_t Initialize();
 
-  // Required functions needed to implement Display Controller Protocol
+  // Tears down display submodules and turns off the hardware.
+  //
+  // Must be called exactly once before the AmlogicDisplay instance is
+  // destroyed in production code.
+  //
+  // TODO(https://fxbug.dev/42082357): Move the Deinitialize behavior to the
+  // destructor.
+  void Deinitialize();
+
+  // Implements the `fuchsia.hardware.display.controller/DisplayControllerImpl`
+  // banjo protocol.
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
   void DisplayControllerImplResetDisplayControllerInterface();
@@ -132,11 +141,13 @@ class AmlogicDisplay
   zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle);
   bool DisplayControllerImplIsCaptureCompleted() __TA_EXCLUDES(capture_mutex_);
 
+  const display_controller_impl_protocol_ops_t* display_controller_impl_protocol_ops() const {
+    return &display_controller_impl_protocol_ops_;
+  }
+
   zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb);
 
-  // Required functions for DeviceType
-  void DdkRelease();
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
+  const inspect::Inspector& inspector() const { return inspector_; }
 
   void Dump() { vout_->Dump(); }
 
@@ -238,6 +249,8 @@ class AmlogicDisplay
   // Whether `timing` is a new display timing different from the timing
   // currently applied to the display.
   bool IsNewDisplayTiming(const display::DisplayTiming& timing) TA_REQ(display_mutex_);
+
+  zx_device_t* const bus_device_;
 
   // Zircon handles
   zx::bti bti_;

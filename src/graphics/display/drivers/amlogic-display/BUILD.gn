@@ -39,6 +39,8 @@ source_set("common_srcs") {
     "clock.cc",
     "clock.h",
     "common.h",
+    "display-device-driver.cc",
+    "display-device-driver.h",
     "dsi-host.cc",
     "dsi-host.h",
     "dsi.h",
