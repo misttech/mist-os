@@ -58,6 +58,10 @@ if (is_host) {
   # Main executable target.
   python_binary("fxtest-rewrite") {
     enable_mypy = true
+
+    # Unbuffer so output can be piped to other programs nicely.
+    unbuffered_output = true
+
     main_source = "main.py"
     output_name = "fxtest_rewrite.pyz"
     sources = binary_sources
