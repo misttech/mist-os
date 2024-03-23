@@ -133,6 +133,9 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         builder.set_package_config(package, config)?;
     }
 
+    // Add the kernel cmdline arguments
+    builder.add_kernel_args(configuration.kernel_args)?;
+
     // Add the domain config packages.
     for (package, config) in configuration.domain_configs {
         builder.add_domain_config(package, config)?;

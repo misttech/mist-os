@@ -355,6 +355,14 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
+    /// Add kernel args to the builder
+    pub fn add_kernel_args(&mut self, args: impl IntoIterator<Item = String>) -> Result<()> {
+        self.kernel_args
+            .try_insert_all_unique(args)
+            .map_err(|arg| anyhow!("duplicate boot_arg found: {}", arg))?;
+        Ok(())
+    }
+
     fn add_bootfs_files_from_path(
         &mut self,
         bundle_path: impl AsRef<Utf8Path>,

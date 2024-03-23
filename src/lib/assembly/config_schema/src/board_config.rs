@@ -69,8 +69,13 @@ pub struct BoardInformation {
     pub configuration: BoardProvidedConfig,
 
     /// Configure kernel cmdline args
+    /// TODO: Move this into platform section below
     #[serde(default)]
-    pub kernel: KernelConfig,
+    pub kernel: BoardKernelConfig,
+
+    /// Configure platform related feature
+    #[serde(default)]
+    pub platform: PlatformConfig,
 }
 
 /// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl
@@ -143,10 +148,38 @@ pub struct BoardProvidedConfig {
 /// This struct defines supported kernel features.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
-pub struct KernelConfig {
+pub struct BoardKernelConfig {
     /// Enable the use of 'contiguous physical pages'. This should be enabled
     /// when a significant contiguous memory size is required.
     pub contiguous_physical_pages: bool,
+}
+
+/// This struct defines platform configurations specified by board.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PlatformConfig {
+    /// Configure connectivity related features
+    pub connectivity: ConnectivityConfig,
+}
+
+/// This struct defines connectivity configurations.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ConnectivityConfig {
+    /// Configure network related features
+    pub network: NetworkConfig,
+}
+
+/// This struct defines network configurations.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct NetworkConfig {
+    /// This option instructs netsvc to use only the device whose topological
+    /// path ends with the option's value. All other devices are ignored by
+    /// netsvc. The topological path for a device can be determined from the
+    /// shell by running the `lsdev` command on the device
+    /// (e.g. `/dev/class/network/000` or `/dev/class/ethernet/000`).
+    pub netsvc_interface: Option<String>,
 }
 
 #[cfg(test)]
@@ -210,7 +243,8 @@ mod test {
                 FileRelativePathBuf::Resolved("some/path/to/board/bundle_b".into()),
             ],
             devicetree: Some(FileRelativePathBuf::Resolved("some/path/to/board/test.dtb".into())),
-            kernel: KernelConfig { contiguous_physical_pages: true },
+            kernel: BoardKernelConfig { contiguous_physical_pages: true },
+            platform: PlatformConfig::default(),
             ..Default::default()
         };
 

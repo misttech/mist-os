@@ -62,6 +62,18 @@ _base = {
   kernel = {
     contiguous_physical_pages = true
   }
+
+  platform = {
+    connectivity = {
+      network = {
+        # Prefer using the built-in NIC to the CDC-ether interface.
+        # TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
+        # netdevice migration.
+        netsvc_interface =
+            "/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device"
+      }
+    }
+  }
 }
 
 board_configuration("vim3") {

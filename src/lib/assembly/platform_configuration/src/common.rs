@@ -166,6 +166,11 @@ pub(crate) trait ConfigurationBuilder {
         name: &str,
         config: assembly_config_capabilities::Config,
     ) -> Result<()>;
+
+    /// Add a kernel command line arg that should be included in the
+    /// assembled platform.
+    #[allow(dead_code)]
+    fn kernel_arg(&mut self, arg: String);
 }
 
 /// The interface for specifying the configuration to provide for bootfs.
@@ -276,6 +281,9 @@ pub(crate) struct ConfigurationBuilderImpl {
 
     /// The configuration capabilities to add.
     configuration_capabilities: CapabilityNamedMap,
+
+    /// The Kernel Commandline Arguments to add.
+    kernel_args: BTreeSet<String>,
 }
 
 #[cfg(test)]
@@ -298,6 +306,7 @@ impl ConfigurationBuilderImpl {
             icu_config,
             core_shards: Vec::new(),
             configuration_capabilities: CapabilityNamedMap::new("config capabilties"),
+            kernel_args: BTreeSet::default(),
         }
     }
 
@@ -312,6 +321,7 @@ impl ConfigurationBuilderImpl {
             icu_config: _,
             core_shards,
             configuration_capabilities,
+            kernel_args,
         } = self;
         CompletedConfiguration {
             bundles,
@@ -320,6 +330,7 @@ impl ConfigurationBuilderImpl {
             domain_configs,
             core_shards,
             configuration_capabilities,
+            kernel_args,
         }
     }
 }
@@ -349,6 +360,9 @@ pub struct CompletedConfiguration {
 
     // The configuration capabilities to add.
     pub configuration_capabilities: CapabilityNamedMap,
+
+    /// The Kernel Commandline Arguments to add.
+    pub kernel_args: BTreeSet<String>,
 }
 
 /// A map from package names to the configuration to apply to them.
@@ -504,6 +518,10 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
         config: assembly_config_capabilities::Config,
     ) -> Result<()> {
         self.configuration_capabilities.try_insert_unique(name.to_string(), config)
+    }
+
+    fn kernel_arg(&mut self, arg: String) {
+        self.kernel_args.insert(arg);
     }
 }
 
