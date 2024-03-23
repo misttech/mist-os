@@ -181,7 +181,7 @@ closed protocol Peripheral {
     ///
     /// + request `peer` Information about the central that initiated the connection.
     /// + request `connection` Represents the connection.
-    @deprecated
+    @deprecated("Use AdvertisedPeripheral.OnConnected instead")
     strict -> OnPeerConnected(resource struct {
         peer Peer;
         connection client_end:Connection;
