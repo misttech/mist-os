@@ -36,6 +36,9 @@ void SceneProvider::AttachClientView(
       << "Failed to set root view: " << set_root_view_result.err();
   client_view_ref = std::move(set_root_view_result.response().view_ref);
 
+  pending_presented_view_count_++;
+  NotifyViewPresentationWatcher();
+
   callback(fsl::GetKoid(client_view_ref.reference.get()));
 }
 
@@ -48,6 +51,9 @@ void SceneProvider::PresentClientView(
                                   &present_root_view_result);
 
   FX_LOGS(INFO) << "Requested to present client view";
+
+  pending_presented_view_count_++;
+  NotifyViewPresentationWatcher();
 }
 
 void SceneProvider::RegisterViewTreeWatcher(
@@ -60,6 +66,27 @@ void SceneProvider::RegisterViewTreeWatcher(
   observer_registry->RegisterGlobalViewTreeWatcher(std::move(view_tree_watcher));
 
   callback();
+}
+
+void SceneProvider::WatchViewPresentation(WatchViewPresentationCallback callback) {
+  if (view_presentation_callback_ != nullptr) {
+    FX_LOGS(ERROR)
+        << "Received a WatchViewPresentation request while a prior one was still pending. Ignoring the request.";
+    return;
+  }
+
+  view_presentation_callback_ = std::move(callback);
+  NotifyViewPresentationWatcher();
+}
+
+void SceneProvider::NotifyViewPresentationWatcher() {
+  if (pending_presented_view_count_ == 0 || !view_presentation_callback_) {
+    return;
+  }
+
+  view_presentation_callback_();
+  view_presentation_callback_ = nullptr;
+  pending_presented_view_count_--;
 }
 
 // TODO(https://fxbug.dev/42064159): Refactor to accommodate Flatland + Geometry
@@ -96,6 +123,9 @@ void SceneProvider::PresentView(
     FX_LOGS(FATAL) << "Invalid view spec";
   }
 
+  pending_presented_view_count_++;
+  NotifyViewPresentationWatcher();
+
   fuchsia::element::GraphicalPresenter_PresentView_Result result;
   result.set_response({});
   callback(std::move(result));
@@ -112,7 +142,8 @@ SceneProvider::GetGraphicalPresenterHandler() {
 }
 
 void SceneProvider::DismissView() {
-  FX_LOGS(FATAL) << "Dismissing views on flatland is not yet supported (https://fxbug.dev/42065735)";
+  FX_LOGS(FATAL)
+      << "Dismissing views on flatland is not yet supported (https://fxbug.dev/42065735)";
 }
 
 }  // namespace ui_testing

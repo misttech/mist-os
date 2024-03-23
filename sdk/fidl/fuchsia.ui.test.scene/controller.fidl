@@ -65,4 +65,26 @@ closed protocol Controller {
     strict RegisterViewTreeWatcher(resource struct {
         watcher server_end:fuchsia.ui.observation.geometry.ViewTreeWatcher;
     }) -> ();
+
+    /// A hanging get to watch for updates to view presentation.
+    ///
+    /// Callers can use this method to wait until a `ClientView` has
+    /// `Present()`-ed through any of the following view presentation methods:
+    ///   * `fuchsia.ui.test.scene.Controller/AttachClientView()`
+    ///   * `fuchsia.ui.test.scene.Controller/PresentClientView()`
+    ///   * `fuchsia.element.GraphicalPresenter/PresentView()`
+    ///
+    /// Callers should expect to call this method once for each view they
+    /// expect to wait for.
+    ///
+    /// Note that callers must take care when interleaving calls, since
+    /// this method has no way to
+    ///   a) associate a `Present()` with a specific `ClientView`, or
+    ///   b) associate a `Present()` with an `AttachClientView()` call, rather
+    ///    than a `PresentClientView()` or `PresentView` call.
+    ///
+    /// It is invalid to call `WatchViewPresentation` while a previous call is
+    /// still pending; subsequent requests will be ignored.
+    @available(added=19)
+    strict WatchViewPresentation() -> ();
 };

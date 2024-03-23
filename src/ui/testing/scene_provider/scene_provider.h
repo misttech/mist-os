@@ -53,6 +53,9 @@ class SceneProvider : public fuchsia::ui::test::scene::Controller,
       fidl::InterfaceRequest<fuchsia::ui::observation::geometry::ViewTreeWatcher> view_tree_watcher,
       RegisterViewTreeWatcherCallback callback) override;
 
+  // |fuchsia::ui::test::scene::Controller|
+  void WatchViewPresentation(WatchViewPresentationCallback callback) override;
+
   // |fuchsia::element::GraphicalPresenter|
   void PresentView(
       fuchsia::element::ViewSpec view_spec,
@@ -72,12 +75,37 @@ class SceneProvider : public fuchsia::ui::test::scene::Controller,
   void DismissView();
 
  private:
+  // Calls a registered view presentation watcher if there was at least one
+  // View `Present()`-ed, as counted by way of any of the following presentation
+  // methods:
+  //   * `fuchsia.ui.test.scene.Controller/AttachClientView()`
+  //   * `fuchsia.ui.test.scene.Controller/PresentClientView()`
+  //   * `fuchsia.element.GraphicalPresenter/PresentView()`
+  void NotifyViewPresentationWatcher();
+
   fidl::BindingSet<fuchsia::ui::test::scene::Controller> scene_controller_bindings_;
   fidl::BindingSet<fuchsia::element::GraphicalPresenter> graphical_presenter_bindings_;
   fuchsia::session::scene::ManagerSyncPtr scene_manager_;
   std::optional<FakeViewController> fake_view_controller_;
   fuchsia::element::AnnotationControllerPtr annotation_controller_;
   sys::ComponentContext* context_ = nullptr;
+
+  // A registered view presentation watcher, if any, as registered through
+  // `fuchsia.ui.test.scene.Controller/WatchViewPresentation()`.
+  WatchViewPresentationCallback view_presentation_callback_;
+
+  // The number of views that have been `Present()`-ed but not yet communicated
+  // to any registered view presentation watcher view the
+  // `view_presentation_callback_`.
+  //
+  // This count is incremented once any of the following presentation methods
+  // completes:
+  //   * `fuchsia.ui.test.scene.Controller/AttachClientView()`
+  //   * `fuchsia.ui.test.scene.Controller/PresentClientView()`
+  //   * `fuchsia.element.GraphicalPresenter/PresentView()`
+  //
+  // This count is decremented any time `view_presentation_callback_` is called.
+  uint32_t pending_presented_view_count_ = 0;
 };
 
 }  // namespace ui_testing

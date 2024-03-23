@@ -42,6 +42,9 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   // both to render.
   void LaunchClientWithEmbeddedView();
 
+  // Returns when a view has fully connected to the scene.
+  void WaitForViewPresentation();
+
   // Returns true when the specified view is fully connected to the scene AND
   // has presented at least one frame of content.
   bool HasViewConnected(zx_koid_t view_ref_koid);
@@ -124,6 +127,9 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
 
   // Returns the test-ui-stack component url to use in this test.
   virtual std::string GetTestUIStackUrl() = 0;
+
+  // Helper method to set up the scene provider.
+  void SetUpSceneProvider();
 
   // Helper method to watch watch for view geometry updates.
   void WatchViewGeometry();

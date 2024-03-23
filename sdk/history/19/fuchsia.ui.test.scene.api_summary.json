@@ -25,6 +25,13 @@
         "request": "fuchsia.ui.test.scene/ControllerRegisterViewTreeWatcherRequest"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.test.scene/Controller.WatchViewPresentation",
+        "strictness": "strict",
+        "ordinal": "1532230432176132637",
+        "direction": "two_way"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.ui.test.scene/Controller",
         "openness": "closed",

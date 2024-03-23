@@ -115,6 +115,14 @@ void PortableUITest::ProcessViewGeometryResponse(
   }
 }
 
+void PortableUITest::SetUpSceneProvider() {
+  ASSERT_TRUE(realm_.has_value());
+  scene_provider_ = realm_->component().Connect<fuchsia::ui::test::scene::Controller>();
+  scene_provider_.set_error_handler([](zx_status_t status) {
+    FX_LOGS(ERROR) << "Error from test scene provider: " << zx_status_get_string(status);
+  });
+}
+
 void PortableUITest::WatchViewGeometry() {
   FX_CHECK(view_tree_watcher_) << "View Tree watcher must be registered before calling Watch()";
 
@@ -124,17 +132,20 @@ void PortableUITest::WatchViewGeometry() {
   });
 }
 
+void PortableUITest::WaitForViewPresentation() {
+  SetUpSceneProvider();
+  bool view_presented = false;
+  scene_provider_->WatchViewPresentation([&]() { view_presented = true; });
+  RunLoopUntil([&]() { return view_presented; });
+}
+
 bool PortableUITest::HasViewConnected(zx_koid_t view_ref_koid) {
   return last_view_tree_snapshot_.has_value() &&
          CheckViewExistsInSnapshot(*last_view_tree_snapshot_, view_ref_koid);
 }
 
 void PortableUITest::LaunchClient() {
-  ASSERT_TRUE(realm_.has_value());
-  scene_provider_ = realm_->component().Connect<fuchsia::ui::test::scene::Controller>();
-  scene_provider_.set_error_handler([](zx_status_t status) {
-    FX_LOGS(ERROR) << "Error from test scene provider: " << zx_status_get_string(status);
-  });
+  SetUpSceneProvider();
   fuchsia::ui::test::scene::ControllerAttachClientViewRequest request;
   request.set_view_provider(realm_->component().Connect<fuchsia::ui::app::ViewProvider>());
   scene_provider_->RegisterViewTreeWatcher(view_tree_watcher_.NewRequest(), []() {});
