@@ -142,14 +142,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.AddInotifyFilter",
-        "strictness": "strict",
-        "ordinal": "2291733984692638506",
-        "direction": "two_way",
-        "request": "fuchsia.io/Directory2AddInotifyFilterRequest"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.io/Directory.AdvisoryLock",
         "strictness": "strict",
         "ordinal": "7992130864415541162",
@@ -615,14 +607,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Directory2.AddInotifyFilter",
-        "strictness": "strict",
-        "ordinal": "2291733984692638506",
-        "direction": "two_way",
-        "request": "fuchsia.io/Directory2AddInotifyFilterRequest"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.io/Directory2.AdvisoryLock",
         "strictness": "strict",
         "ordinal": "7992130864415541162",
@@ -742,35 +726,6 @@
         "name": "fuchsia.io/Directory2",
         "openness": "closed",
         "transport": "channel"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/Directory2AddInotifyFilterRequest.filter",
-        "ordinal": "2",
-        "type": "fuchsia.io/InotifyWatchMask"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/Directory2AddInotifyFilterRequest.path",
-        "ordinal": "1",
-        "type": "string:4095"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/Directory2AddInotifyFilterRequest.socket",
-        "ordinal": "4",
-        "type": "zx/Handle:SOCKET"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/Directory2AddInotifyFilterRequest.watch_descriptor",
-        "ordinal": "3",
-        "type": "uint32"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/Directory2AddInotifyFilterRequest",
-        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

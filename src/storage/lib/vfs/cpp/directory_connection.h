@@ -57,12 +57,6 @@ class DirectoryConnection final : public Connection,
               ReopenCompleter::Sync& completer) final {
     request->object_request.Close(ZX_ERR_NOT_SUPPORTED);
   }
-#if __Fuchsia_API_level__ < 13
-  void AddInotifyFilter(AddInotifyFilterRequestView request,
-                        AddInotifyFilterCompleter::Sync& completer) final {
-    ZX_PANIC("Not Implemented");
-  }
-#endif
 #if __Fuchsia_API_level__ >= 18
   void ListExtendedAttributes(ListExtendedAttributesRequestView request,
                               ListExtendedAttributesCompleter::Sync& completer) final {

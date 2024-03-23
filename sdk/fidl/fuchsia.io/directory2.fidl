@@ -229,34 +229,6 @@ closed protocol Directory2 {
         object_request zx.Handle:CHANNEL;
     });
 
-    /// Adds a new inotify filter for an object relative to this directory object.
-    ///
-    /// + 'filter` is a mask of different inotify events that need to be watched by the server
-    ///   for a specific file/directory.
-    ///
-    /// + `path` may contain multiple segments, separated by "/" characters,
-    ///   and should never be empty; i.e., "" is an invalid path. Paths should not contain
-    ///   a leading "/".
-    ///
-    /// +`watch_descriptor` is client assigned value to identify a filter.
-    ///   Server shouldn't trust the client-assigned watch_descriptor. They should just send it
-    ///   back to the client in the socket.
-    ///   This value is not used by server, but it is returned back as part of InotifyEvent,
-    ///   to help the client correlate filter with events on this filter.
-    ///
-    /// + `socket` is shared between different filter objects i.e every new filter will
-    ///   have a different server end of the socket and there will be a single client end per
-    ///   inotify instance on inotify init.
-    ///
-    @available(deprecated=12, removed=13, note="Never fully implemented")
-    @selector("fuchsia.io/Directory.AddInotifyFilter")
-    strict AddInotifyFilter(resource struct {
-        path Path;
-        filter InotifyWatchMask;
-        watch_descriptor uint32;
-        socket zx.Handle:SOCKET;
-    }) -> ();
-
     /// Removes a child node from the this directory's list of entries.
     ///
     /// Note: this does not guarantee that the underlying object is destroyed.
