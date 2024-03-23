@@ -258,25 +258,27 @@ pub struct RealSymbolizerProcess {
 }
 
 impl RealSymbolizerProcess {
-    /// Constructs a new symbolizer with prettification enabled.
-    pub async fn new() -> anyhow::Result<Self> {
+    /// Constructs a new symbolizer.
+    pub async fn new(enable_prettification: bool) -> anyhow::Result<Self> {
         let sdk =
             global_env_context().context("Loading global environment context")?.get_sdk().await?;
         if let Err(e) = ensure_symbol_index_registered(&sdk).await {
             tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
-
+        let mut args = vec![
+            "--symbol-server",
+            "gs://fuchsia-artifacts/debug",
+            "--symbol-server",
+            "gs://fuchsia-artifacts-internal/debug",
+            "--symbol-server",
+            "gs://fuchsia-artifacts-release/debug",
+        ];
+        if enable_prettification {
+            args.push("--prettify-backtrace");
+        }
         let path = sdk.get_host_tool("symbolizer").context("getting symbolizer binary path")?;
         let c = Command::new(path)
-            .args(vec![
-                "--symbol-server",
-                "gs://fuchsia-artifacts/debug",
-                "--symbol-server",
-                "gs://fuchsia-artifacts-internal/debug",
-                "--symbol-server",
-                "gs://fuchsia-artifacts-release/debug",
-                "--prettify-backtrace",
-            ])
+            .args(args)
             .stdout(Stdio::piped())
             .stdin(Stdio::piped())
             .stderr(Stdio::inherit())

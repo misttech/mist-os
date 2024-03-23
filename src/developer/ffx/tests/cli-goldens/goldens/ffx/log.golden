@@ -212,6 +212,18 @@
     {
       "kind": {
         "Option": {
+          "arg_name": "symbolize"
+        }
+      },
+      "optionality": "optional",
+      "long": "--symbolize",
+      "short": null,
+      "description": "configure symbolization options, defaults to pretty.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
           "arg_name": "select"
         }
       },

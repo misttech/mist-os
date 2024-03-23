@@ -15,7 +15,7 @@ use log_command::{
         dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
         Symbolize, WriterContainer,
     },
-    InstanceGetter, LogSubCommand, WatchCommand,
+    InstanceGetter, LogSubCommand, SymbolizeMode, WatchCommand,
 };
 use log_symbolizer::LogSymbolizer;
 use std::{fmt::Debug, io::Write};
@@ -77,7 +77,26 @@ pub async fn log_impl(
 ) -> Result<(), LogError> {
     let enable_transactional_symbolizer =
         ffx_config::get("log_cmd.pretty_backtraces").await.unwrap_or(false);
-    let no_symbolize = cmd.no_symbolize;
+    let mut disable_prettification = false;
+    let mut no_symbolize = cmd.no_symbolize;
+    // TODO(b/299980894): Clean this up once no longer needed.
+    if cmd.no_symbolize || cmd.raw {
+        eprintln!(concat!(
+            "WARNING: --no-symbolize and --raw have been deprecated",
+            " and replaced with --symbolize."
+        ));
+        eprintln!("These legacy options will eventually be removed.");
+    } else {
+        match cmd.symbolize {
+            SymbolizeMode::Off => {
+                no_symbolize = true;
+            }
+            SymbolizeMode::Pretty => {}
+            SymbolizeMode::Classic => {
+                disable_prettification = true;
+            }
+        }
+    }
     let instance_getter = rcs::root_realm_query(&rcs_proxy, TIMEOUT).await?;
     log_main(
         writer,
@@ -89,7 +108,7 @@ pub async fn log_impl(
         } else {
             if enable_transactional_symbolizer {
                 Some(EitherSymbolizer::Left(TransactionalSymbolizer::new(
-                    RealSymbolizerProcess::new().await?,
+                    RealSymbolizerProcess::new(!disable_prettification).await?,
                 )?))
             } else {
                 Some(EitherSymbolizer::Right(LogSymbolizer::new()))

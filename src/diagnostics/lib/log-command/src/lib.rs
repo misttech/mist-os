@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::format_err;
 use argh::{ArgsInfo, FromArgs, TopLevelCommand};
 use chrono::{DateTime, Local};
 use chrono_english::{parse_date_string, Dialect};
@@ -12,7 +13,9 @@ use fidl_fuchsia_diagnostics::{LogInterestSelector, LogSettingsProxy};
 use fidl_fuchsia_sys2::RealmQueryProxy;
 use moniker::Moniker;
 use selectors::{sanitize_moniker_for_selectors, SelectorExt};
-use std::{borrow::Cow, io::Write, ops::Deref, string::FromUtf8Error, time::Duration};
+use std::{
+    borrow::Cow, io::Write, ops::Deref, str::FromStr, string::FromUtf8Error, time::Duration,
+};
 use thiserror::Error;
 pub mod filter;
 pub mod log_formatter;
@@ -99,6 +102,16 @@ impl Deref for DetailedDateTime {
     fn deref(&self) -> &Self::Target {
         &self.time
     }
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum SymbolizeMode {
+    /// Disable all symbolization
+    Off,
+    /// Use prettified symbolization
+    Pretty,
+    /// Use classic (non-prettified) symbolization
+    Classic,
 }
 
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
@@ -241,6 +254,11 @@ pub struct LogCommand {
     #[argh(switch)]
     pub no_symbolize: bool,
 
+    /// configure symbolization options, defaults to pretty.
+    #[cfg(not(target_os = "fuchsia"))]
+    #[argh(option, default = "SymbolizeMode::Pretty")]
+    pub symbolize: SymbolizeMode,
+
     /// configure the log settings on the target device for components matching
     /// the given selector. This modifies the minimum log severity level emitted
     /// by components during the logging session.
@@ -296,6 +314,22 @@ impl Default for LogCommand {
             json: false,
             #[cfg(not(target_os = "fuchsia"))]
             no_symbolize: false,
+            #[cfg(not(target_os = "fuchsia"))]
+            symbolize: SymbolizeMode::Pretty,
+        }
+    }
+}
+
+impl FromStr for SymbolizeMode {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.to_lowercase();
+        match s.as_str() {
+            "off" => Ok(SymbolizeMode::Off),
+            "pretty" => Ok(SymbolizeMode::Pretty),
+            "classic" => Ok(SymbolizeMode::Classic),
+            other => Err(format_err!("invalid symbolize flag: {}", other)),
         }
     }
 }
@@ -477,6 +511,19 @@ mod test {
             }
             Ok(self.output.clone())
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_symbolize_mode_from_str() {
+        assert_matches!(SymbolizeMode::from_str("off"), Ok(value) if value == SymbolizeMode::Off);
+        assert_matches!(
+            SymbolizeMode::from_str("pretty"),
+            Ok(value) if value == SymbolizeMode::Pretty
+        );
+        assert_matches!(
+            SymbolizeMode::from_str("classic"),
+            Ok(value) if value == SymbolizeMode::Classic
+        );
     }
 
     #[fuchsia::test]
