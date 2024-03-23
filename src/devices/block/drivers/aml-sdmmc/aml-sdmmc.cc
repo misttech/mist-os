@@ -665,7 +665,20 @@ void AmlSdmmc::ConfigureDefaultRegs() {
 }
 
 void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
-  zx_status_t status = SdmmcHwReset();
+  fbl::AutoLock lock(&lock_);
+
+  // TODO(b/309152727): Explore allowing HwReset while power is suspended.
+  if (power_suspended_) {
+    FDF_LOGL(ERROR, logger(), "Rejecting HwReset (FIDL) while power is suspended.");
+    completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  HwResetAndComplete(arena, completer);
+}
+
+void AmlSdmmc::HwResetAndComplete(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
+  zx_status_t status = SdmmcHwResetLocked();
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -678,10 +691,14 @@ zx_status_t AmlSdmmc::SdmmcHwReset() {
 
   // TODO(b/309152727): Explore allowing HwReset while power is suspended.
   if (power_suspended_) {
-    FDF_LOGL(ERROR, logger(), "Rejecting HwReset while power is suspended.");
+    FDF_LOGL(ERROR, logger(), "Rejecting SdmmcHwReset (Banjo) while power is suspended.");
     return ZX_ERR_BAD_STATE;
   }
 
+  return SdmmcHwResetLocked();
+}
+
+zx_status_t AmlSdmmc::SdmmcHwResetLocked() {
   if (reset_gpio_.is_valid()) {
     fidl::WireResult result1 = reset_gpio_->ConfigOut(0);
     if (!result1.ok()) {
@@ -1438,6 +1455,17 @@ void AmlSdmmc::Request(RequestRequestView request, fdf::Arena& arena,
                        RequestCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
 
+  if (power_suspended_) {
+    FDF_LOGL(ERROR, logger(), "Rejecting Request (FIDL) while power is suspended.");
+    completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  RequestAndComplete(request, arena, completer);
+}
+
+void AmlSdmmc::RequestAndComplete(RequestRequestView request, fdf::Arena& arena,
+                                  RequestCompleter::Sync& completer) {
   fidl::Array<uint32_t, 4> response;
   for (const auto& req : request->reqs) {
     std::vector<sdmmc_buffer_region_t> buffer_regions;
@@ -1496,17 +1524,16 @@ zx_status_t AmlSdmmc::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response
   }
 
   fbl::AutoLock lock(&lock_);
+  if (power_suspended_) {
+    FDF_LOGL(ERROR, logger(), "Rejecting SdmmcRequest (Banjo) while power is suspended.");
+    return ZX_ERR_BAD_STATE;
+  }
   return SdmmcRequestLocked(req, out_response);
 }
 
 zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_response[4]) {
   if (shutdown_) {
     return ZX_ERR_CANCELED;
-  }
-
-  if (power_suspended_) {
-    FDF_LOGL(ERROR, logger(), "Rejecting SdmmcRequestLocked while power is suspended.");
-    return ZX_ERR_BAD_STATE;
   }
 
   // Wait for the bus to become idle before issuing the next request. This could be necessary if the

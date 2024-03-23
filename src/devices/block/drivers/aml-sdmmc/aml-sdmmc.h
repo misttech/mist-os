@@ -212,7 +212,12 @@ class AmlSdmmc : public fdf::DriverBase,
     return static_cast<aml_sdmmc_desc_t*>(descs_buffer_->virt());
   }
 
+  zx_status_t SdmmcHwResetLocked() TA_REQ(lock_);
   zx_status_t SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_response[4]) TA_REQ(lock_);
+
+  void HwResetAndComplete(fdf::Arena& arena, HwResetCompleter::Sync& completer) TA_REQ(lock_);
+  void RequestAndComplete(RequestRequestView request, fdf::Arena& arena,
+                          RequestCompleter::Sync& completer) TA_REQ(lock_);
 
   uint32_t DistanceToFailingPoint(TuneSettings point,
                                   cpp20::span<const TuneResults> adj_delay_results);
