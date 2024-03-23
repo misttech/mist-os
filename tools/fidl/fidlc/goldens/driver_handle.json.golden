@@ -87,6 +87,7 @@
         "column": 17,
         "length": 14
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "transport",
@@ -132,6 +133,7 @@
         "column": 17,
         "length": 17
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "transport",
@@ -209,6 +211,7 @@
             "column": 12,
             "length": 11
           },
+          "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
@@ -244,6 +247,7 @@
         "column": 6,
         "length": 16
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "bindings_denylist",
@@ -301,6 +305,7 @@
             "column": 5,
             "length": 5
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -332,6 +337,7 @@
         "column": 24,
         "length": 160
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -355,6 +361,7 @@
             "column": 9,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -384,6 +391,7 @@
         "column": 6,
         "length": 16
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "bindings_denylist",
@@ -441,6 +449,7 @@
             "column": 5,
             "length": 5
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -476,6 +485,7 @@
         "column": 11,
         "length": 125
       },
+      "deprecated": false,
       "members": [
         {
           "ordinal": 1,
@@ -502,7 +512,8 @@
             "line": 27,
             "column": 16,
             "length": 13
-          }
+          },
+          "deprecated": false
         },
         {
           "ordinal": 2,
@@ -527,7 +538,8 @@
             "line": 28,
             "column": 16,
             "length": 10
-          }
+          },
+          "deprecated": false
         }
       ],
       "strict": false,

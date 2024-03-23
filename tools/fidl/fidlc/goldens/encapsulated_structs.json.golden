@@ -92,6 +92,7 @@
         "column": 6,
         "length": 14
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -128,6 +129,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -157,6 +159,7 @@
         "column": 6,
         "length": 9
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -179,6 +182,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -205,6 +209,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 2,
             "padding": 1
@@ -234,6 +239,7 @@
         "column": 6,
         "length": 9
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -256,6 +262,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 3
@@ -282,6 +289,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 4,
             "padding": 0
@@ -311,6 +319,7 @@
         "column": 6,
         "length": 25
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -334,6 +343,7 @@
             "column": 5,
             "length": 7
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -364,6 +374,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 8,
             "padding": 4
@@ -393,6 +404,7 @@
         "column": 6,
         "length": 23
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -416,6 +428,7 @@
             "column": 5,
             "length": 8
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -443,6 +456,7 @@
             "column": 5,
             "length": 5
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 4,
             "padding": 0
@@ -470,6 +484,7 @@
             "column": 5,
             "length": 5
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 12,
             "padding": 0
@@ -499,6 +514,7 @@
         "column": 6,
         "length": 14
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -522,6 +538,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -549,6 +566,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 24,
             "padding": 0

@@ -20,6 +20,7 @@
         "column": 6,
         "length": 9
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint32",
@@ -48,6 +49,7 @@
         "column": 6,
         "length": 12
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint64",
@@ -71,6 +73,7 @@
             "column": 5,
             "length": 8
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -90,6 +93,7 @@
             "column": 5,
             "length": 7
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "9223372036854775808",
@@ -115,6 +119,7 @@
         "column": 6,
         "length": 6
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint32",
@@ -138,6 +143,7 @@
             "column": 5,
             "length": 12
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -157,6 +163,7 @@
             "column": 5,
             "length": 12
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "2",
@@ -176,6 +183,7 @@
             "column": 5,
             "length": 4
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "4",
@@ -201,6 +209,7 @@
         "column": 6,
         "length": 10
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint64",
@@ -224,6 +233,7 @@
             "column": 5,
             "length": 8
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -243,6 +253,7 @@
             "column": 5,
             "length": 7
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "9223372036854775808",

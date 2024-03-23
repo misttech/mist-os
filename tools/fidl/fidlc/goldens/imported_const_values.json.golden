@@ -78,6 +78,7 @@
         "column": 7,
         "length": 11
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "test.dependent/MyBits",
@@ -107,6 +108,7 @@
         "column": 7,
         "length": 21
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "bindings_denylist",
@@ -168,6 +170,7 @@
         "column": 7,
         "length": 11
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "test.dependent/MyEnum",
@@ -197,6 +200,7 @@
         "column": 7,
         "length": 21
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "bindings_denylist",
@@ -267,6 +271,7 @@
         "column": 6,
         "length": 8
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "attr1",

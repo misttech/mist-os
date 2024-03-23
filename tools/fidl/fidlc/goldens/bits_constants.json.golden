@@ -20,6 +20,7 @@
         "column": 6,
         "length": 8
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint32",
@@ -43,6 +44,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -62,6 +64,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "128",
@@ -81,6 +84,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "2",
@@ -105,6 +109,7 @@
         "column": 7,
         "length": 6
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "test.bitsconstants/BitsType",
@@ -138,6 +143,7 @@
         "column": 7,
         "length": 6
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "test.bitsconstants/BitsType",
@@ -167,6 +173,7 @@
         "column": 7,
         "length": 6
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "test.bitsconstants/BitsType",
@@ -195,6 +202,7 @@
         "column": 7,
         "length": 6
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "test.bitsconstants/BitsType",

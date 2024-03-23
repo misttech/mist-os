@@ -35,6 +35,7 @@
         "column": 6,
         "length": 3
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -58,6 +59,7 @@
             "column": 5,
             "length": 5
           },
+          "deprecated": false,
           "maybe_attributes": [
             {
               "name": "allow_deprecated_struct_defaults",

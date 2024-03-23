@@ -22,6 +22,7 @@
         "column": 6,
         "length": 8
       },
+      "deprecated": false,
       "type": "uint32",
       "members": [
         {
@@ -32,6 +33,7 @@
             "column": 5,
             "length": 4
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "0",
@@ -51,6 +53,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "3",
@@ -75,6 +78,7 @@
         "column": 21,
         "length": 6
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint32",
@@ -97,6 +101,7 @@
             "column": 9,
             "length": 7
           },
+          "deprecated": false,
           "type": {
             "kind": "identifier",
             "identifier": "test.handlesintypes/obj_type",
@@ -129,6 +134,7 @@
         "column": 6,
         "length": 19
       },
+      "deprecated": false,
       "members": [],
       "resource": true,
       "is_empty_success_struct": false,
@@ -153,6 +159,7 @@
         "column": 6,
         "length": 14
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -179,6 +186,7 @@
             "column": 5,
             "length": 13
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 4
@@ -222,6 +230,7 @@
             "column": 5,
             "length": 13
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 8,
             "padding": 0
@@ -265,6 +274,7 @@
             "column": 5,
             "length": 15
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 24,
             "padding": 4
@@ -321,6 +331,7 @@
             "column": 5,
             "length": 25
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 48,
             "padding": 0
@@ -348,6 +359,7 @@
             "column": 5,
             "length": 17
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 64,
             "padding": 0
@@ -375,6 +387,7 @@
             "column": 5,
             "length": 17
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 80,
             "padding": 0
@@ -407,6 +420,7 @@
         "column": 6,
         "length": 18
       },
+      "deprecated": false,
       "members": [],
       "strict": false,
       "resource": true,
@@ -431,6 +445,7 @@
         "column": 6,
         "length": 15
       },
+      "deprecated": false,
       "members": [
         {
           "ordinal": 1,
@@ -457,7 +472,8 @@
             "line": 18,
             "column": 8,
             "length": 1
-          }
+          },
+          "deprecated": false
         }
       ],
       "strict": false,
@@ -485,6 +501,7 @@
         "column": 6,
         "length": 18
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "bindings_denylist",
@@ -543,6 +560,7 @@
         "column": 6,
         "length": 15
       },
+      "deprecated": false,
       "members": [
         {
           "ordinal": 1,
@@ -569,7 +587,8 @@
             "line": 22,
             "column": 8,
             "length": 1
-          }
+          },
+          "deprecated": false
         }
       ],
       "strict": false,

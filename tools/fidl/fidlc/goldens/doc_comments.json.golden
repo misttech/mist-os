@@ -53,6 +53,7 @@
         "column": 6,
         "length": 14
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "doc",
@@ -109,6 +110,7 @@
             "column": 5,
             "length": 12
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -161,6 +163,7 @@
             "column": 5,
             "length": 12
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "2",
@@ -219,6 +222,7 @@
         "column": 6,
         "length": 12
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "doc",
@@ -275,6 +279,7 @@
             "column": 5,
             "length": 12
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -327,6 +332,7 @@
             "column": 5,
             "length": 12
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "2",
@@ -384,6 +390,7 @@
         "column": 7,
         "length": 1
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "doc",
@@ -454,6 +461,7 @@
         "column": 6,
         "length": 14
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "doc",
@@ -497,6 +505,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -549,6 +558,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "2",
@@ -608,6 +618,7 @@
         "column": 6,
         "length": 12
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "doc",
@@ -651,6 +662,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -703,6 +715,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "2",
@@ -761,6 +774,7 @@
         "column": 17,
         "length": 9
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "doc",
@@ -807,6 +821,7 @@
             "column": 12,
             "length": 6
           },
+          "deprecated": false,
           "has_request": true,
           "maybe_attributes": [
             {
@@ -855,6 +870,7 @@
             "column": 15,
             "length": 7
           },
+          "deprecated": false,
           "has_request": false,
           "maybe_attributes": [
             {
@@ -905,6 +921,7 @@
         "column": 9,
         "length": 7
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "doc",
@@ -962,6 +979,7 @@
             "column": 5,
             "length": 9
           },
+          "deprecated": false,
           "maybe_attributes": [
             {
               "name": "doc",
@@ -1011,6 +1029,7 @@
         "column": 6,
         "length": 6
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "doc",
@@ -1066,6 +1085,7 @@
             "column": 5,
             "length": 5
           },
+          "deprecated": false,
           "maybe_attributes": [
             {
               "name": "doc",
@@ -1131,6 +1151,7 @@
         "column": 6,
         "length": 5
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "doc",
@@ -1187,6 +1208,7 @@
             "column": 8,
             "length": 5
           },
+          "deprecated": false,
           "maybe_attributes": [
             {
               "name": "doc",
@@ -1247,6 +1269,7 @@
         "column": 6,
         "length": 13
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "doc",
@@ -1303,6 +1326,7 @@
             "column": 8,
             "length": 5
           },
+          "deprecated": false,
           "maybe_attributes": [
             {
               "name": "doc",
@@ -1362,6 +1386,7 @@
         "column": 6,
         "length": 11
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "doc",
@@ -1418,6 +1443,7 @@
             "column": 8,
             "length": 5
           },
+          "deprecated": false,
           "maybe_attributes": [
             {
               "name": "doc",

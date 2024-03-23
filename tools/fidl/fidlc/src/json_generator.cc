@@ -304,6 +304,7 @@ void JSONGenerator::Generate(const Bits& value) {
   GenerateObject([&]() {
     GenerateDeclName(value.name);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateTypeAndFromAlias(value.subtype_ctor.get());
@@ -321,6 +322,7 @@ void JSONGenerator::Generate(const Bits::Member& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.name, Position::kFirst);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     GenerateObjectMember("value", value.value);
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
@@ -331,6 +333,7 @@ void JSONGenerator::Generate(const Const& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.name, Position::kFirst);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateTypeAndFromAlias(value.type_ctor.get());
@@ -342,6 +345,7 @@ void JSONGenerator::Generate(const Enum& value) {
   GenerateObject([&]() {
     GenerateDeclName(value.name);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     // TODO(https://fxbug.dev/42156522): Due to legacy reasons, the 'type' of enums is actually
@@ -365,6 +369,7 @@ void JSONGenerator::Generate(const Enum::Member& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.name, Position::kFirst);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     GenerateObjectMember("value", value.value);
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
@@ -375,6 +380,7 @@ void JSONGenerator::Generate(const Protocol& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.name, Position::kFirst);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("openness", value.openness);
@@ -389,6 +395,7 @@ void JSONGenerator::Generate(const Protocol::ComposedProtocol& value) {
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("location", NameSpan(value.reference.span()));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
   });
 }
 
@@ -400,6 +407,7 @@ void JSONGenerator::Generate(const Protocol::MethodWithInfo& method_with_info) {
     GenerateObjectMember("name", value.name);
     GenerateObjectMember("strict", value.strictness);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     GenerateObjectMember("has_request", value.has_request);
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
@@ -553,6 +561,7 @@ void JSONGenerator::Generate(const Resource::Property& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.name, Position::kFirst);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     GenerateTypeAndFromAlias(value.type_ctor.get());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
@@ -563,6 +572,7 @@ void JSONGenerator::Generate(const Resource& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.name, Position::kFirst);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateTypeAndFromAlias(value.subtype_ctor.get());
@@ -574,6 +584,7 @@ void JSONGenerator::Generate(const Service& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.name, Position::kFirst);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("members", value.members);
@@ -585,6 +596,7 @@ void JSONGenerator::Generate(const Service::Member& value) {
     GenerateTypeAndFromAlias(value.type_ctor.get(), Position::kFirst);
     GenerateObjectMember("name", value.name);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
   });
@@ -594,6 +606,7 @@ void JSONGenerator::Generate(const Struct& value) {
   GenerateObject([&]() {
     GenerateDeclName(value.name);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("members", value.members);
@@ -611,6 +624,7 @@ void JSONGenerator::Generate(const Struct::Member& value) {
     GenerateTypeAndFromAlias(value.type_ctor.get(), Position::kFirst);
     GenerateObjectMember("name", value.name);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     if (value.maybe_default_value)
@@ -634,6 +648,7 @@ void JSONGenerator::Generate(const Table& value) {
   GenerateObject([&]() {
     GenerateDeclName(value.name);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("members", NonReservedMembers(value.members));
@@ -650,6 +665,7 @@ void JSONGenerator::Generate(const Table::Member& value) {
     GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
     GenerateObjectMember("name", value.maybe_used->name);
     GenerateObjectMember("location", NameSpan(value.maybe_used->name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty()) {
       GenerateObjectMember("maybe_attributes", value.attributes);
     }
@@ -679,6 +695,7 @@ void JSONGenerator::Generate(const Union& value) {
   GenerateObject([&]() {
     GenerateDeclName(value.name);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("members", NonReservedMembers(value.members));
@@ -698,6 +715,7 @@ void JSONGenerator::Generate(const Union::Member& value) {
     GenerateObjectMember("name", value.maybe_used->name);
     GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
     GenerateObjectMember("location", NameSpan(value.maybe_used->name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty()) {
       GenerateObjectMember("maybe_attributes", value.attributes);
     }
@@ -708,6 +726,7 @@ void JSONGenerator::Generate(const Overlay& value) {
   GenerateObject([&]() {
     GenerateDeclName(value.name);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("members", NonReservedMembers(value.members));
@@ -726,6 +745,7 @@ void JSONGenerator::Generate(const Overlay::Member& value) {
     GenerateObjectMember("name", value.maybe_used->name);
     GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
     GenerateObjectMember("location", NameSpan(value.maybe_used->name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty()) {
       GenerateObjectMember("maybe_attributes", value.attributes);
     }
@@ -840,6 +860,7 @@ void JSONGenerator::Generate(const Alias& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.name, Position::kFirst);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     // TODO(https://fxbug.dev/42158155): Remove "partial_type_ctor".
@@ -852,6 +873,7 @@ void JSONGenerator::Generate(const NewType& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.name, Position::kFirst);
     GenerateObjectMember("location", NameSpan(value.name));
+    GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateTypeAndFromAlias(value.type_ctor.get());

@@ -46,6 +46,7 @@
         "column": 17,
         "length": 3
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "bindings_denylist",
@@ -88,7 +89,8 @@
             "line": 9,
             "column": 13,
             "length": 18
-          }
+          },
+          "deprecated": false
         }
       ],
       "methods": [
@@ -102,6 +104,7 @@
             "column": 12,
             "length": 6
           },
+          "deprecated": false,
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
@@ -140,6 +143,7 @@
         "column": 39,
         "length": 31
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "bindings_denylist",
@@ -196,6 +200,7 @@
             "column": 9,
             "length": 3
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0

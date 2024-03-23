@@ -27,6 +27,7 @@
         "column": 6,
         "length": 16
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -49,6 +50,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -78,6 +80,7 @@
         "column": 6,
         "length": 16
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -100,6 +103,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -132,6 +136,7 @@
         "column": 6,
         "length": 15
       },
+      "deprecated": false,
       "members": [
         {
           "ordinal": 1,
@@ -154,7 +159,8 @@
             "line": 16,
             "column": 8,
             "length": 1
-          }
+          },
+          "deprecated": false
         }
       ],
       "strict": false,
@@ -180,6 +186,7 @@
         "column": 6,
         "length": 15
       },
+      "deprecated": false,
       "members": [
         {
           "ordinal": 1,
@@ -202,7 +209,8 @@
             "line": 12,
             "column": 8,
             "length": 1
-          }
+          },
+          "deprecated": false
         }
       ],
       "strict": false,
@@ -230,6 +238,7 @@
         "column": 6,
         "length": 15
       },
+      "deprecated": false,
       "members": [
         {
           "ordinal": 1,
@@ -252,7 +261,8 @@
             "line": 24,
             "column": 8,
             "length": 1
-          }
+          },
+          "deprecated": false
         }
       ],
       "strict": true,
@@ -279,6 +289,7 @@
         "column": 6,
         "length": 15
       },
+      "deprecated": false,
       "members": [
         {
           "ordinal": 1,
@@ -301,7 +312,8 @@
             "line": 20,
             "column": 8,
             "length": 1
-          }
+          },
+          "deprecated": false
         }
       ],
       "strict": true,

@@ -21,6 +21,7 @@
         "column": 17,
         "length": 18
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "transport",
@@ -68,6 +69,7 @@
         "column": 9,
         "length": 17
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -91,7 +93,8 @@
             "line": 10,
             "column": 5,
             "length": 6
-          }
+          },
+          "deprecated": false
         }
       ]
     }

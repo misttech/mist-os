@@ -32,6 +32,7 @@
         "column": 6,
         "length": 8
       },
+      "deprecated": false,
       "type": "uint32",
       "members": [
         {
@@ -42,6 +43,7 @@
             "column": 5,
             "length": 4
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "0",
@@ -61,6 +63,7 @@
             "column": 5,
             "length": 7
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "4",
@@ -85,6 +88,7 @@
         "column": 21,
         "length": 6
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint32",
@@ -107,6 +111,7 @@
             "column": 9,
             "length": 7
           },
+          "deprecated": false,
           "type": {
             "kind": "identifier",
             "identifier": "test.aliases/obj_type",
@@ -139,6 +144,7 @@
         "column": 6,
         "length": 21
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -166,6 +172,7 @@
             "column": 5,
             "length": 12
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 4
@@ -210,6 +217,7 @@
             "column": 5,
             "length": 23
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 8,
             "padding": 0
@@ -265,6 +273,7 @@
             "column": 5,
             "length": 36
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 24,
             "padding": 0
@@ -310,6 +319,7 @@
             "column": 5,
             "length": 33
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 40,
             "padding": 0
@@ -356,6 +366,7 @@
             "column": 5,
             "length": 32
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 56,
             "padding": 0
@@ -391,6 +402,7 @@
             "column": 5,
             "length": 16
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 72,
             "padding": 0
@@ -426,6 +438,7 @@
             "column": 5,
             "length": 19
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 76,
             "padding": 0
@@ -461,6 +474,7 @@
             "column": 5,
             "length": 28
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 80,
             "padding": 4
@@ -492,6 +506,7 @@
         "column": 7,
         "length": 11
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "test.someotherlibrary/ReferenceMe",
         "args": [],
@@ -520,6 +535,7 @@
         "column": 7,
         "length": 16
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "test.aliases/handle",
         "args": [],
@@ -556,6 +572,7 @@
         "column": 7,
         "length": 7
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "test.aliases/handle",
         "args": [],
@@ -587,6 +604,7 @@
         "column": 7,
         "length": 3
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "uint32",
         "args": [],
@@ -614,6 +632,7 @@
         "column": 7,
         "length": 14
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "vector",
         "args": [
@@ -660,6 +679,7 @@
         "column": 7,
         "length": 24
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "vector",
         "args": [

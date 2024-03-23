@@ -21,6 +21,7 @@
         "column": 17,
         "length": 13
       },
+      "deprecated": false,
       "openness": "closed",
       "composed_protocols": [],
       "methods": [
@@ -34,6 +35,7 @@
             "column": 12,
             "length": 13
           },
+          "deprecated": false,
           "has_request": true,
           "has_response": false,
           "is_composed": false,
@@ -49,6 +51,7 @@
         "column": 17,
         "length": 14
       },
+      "deprecated": false,
       "openness": "closed",
       "composed_protocols": [],
       "methods": [
@@ -62,6 +65,7 @@
             "column": 12,
             "length": 14
           },
+          "deprecated": false,
           "has_request": true,
           "has_response": false,
           "is_composed": false,
@@ -79,6 +83,7 @@
         "column": 9,
         "length": 12
       },
+      "deprecated": false,
       "members": []
     },
     {
@@ -89,6 +94,7 @@
         "column": 9,
         "length": 31
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -112,7 +118,8 @@
             "line": 21,
             "column": 5,
             "length": 12
-          }
+          },
+          "deprecated": false
         },
         {
           "type": {
@@ -136,7 +143,8 @@
             "line": 22,
             "column": 5,
             "length": 13
-          }
+          },
+          "deprecated": false
         }
       ]
     },
@@ -148,6 +156,7 @@
         "column": 9,
         "length": 29
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -171,7 +180,8 @@
             "line": 26,
             "column": 5,
             "length": 12
-          }
+          },
+          "deprecated": false
         },
         {
           "type": {
@@ -195,7 +205,8 @@
             "line": 27,
             "column": 5,
             "length": 13
-          }
+          },
+          "deprecated": false
         }
       ]
     },
@@ -207,6 +218,7 @@
         "column": 9,
         "length": 19
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -230,7 +242,8 @@
             "line": 13,
             "column": 5,
             "length": 13
-          }
+          },
+          "deprecated": false
         }
       ]
     }

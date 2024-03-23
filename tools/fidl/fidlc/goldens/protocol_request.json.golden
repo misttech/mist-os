@@ -21,6 +21,7 @@
         "column": 17,
         "length": 5
       },
+      "deprecated": false,
       "openness": "closed",
       "composed_protocols": [],
       "methods": []
@@ -33,6 +34,7 @@
         "column": 17,
         "length": 6
       },
+      "deprecated": false,
       "openness": "closed",
       "composed_protocols": [],
       "methods": [
@@ -46,6 +48,7 @@
             "column": 12,
             "length": 8
           },
+          "deprecated": false,
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
@@ -75,6 +78,7 @@
             "column": 12,
             "length": 15
           },
+          "deprecated": false,
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
@@ -104,6 +108,7 @@
             "column": 12,
             "length": 9
           },
+          "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
@@ -133,6 +138,7 @@
             "column": 12,
             "length": 16
           },
+          "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
@@ -170,6 +176,7 @@
         "column": 34,
         "length": 51
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -194,6 +201,7 @@
             "column": 9,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -225,6 +233,7 @@
         "column": 27,
         "length": 51
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -249,6 +258,7 @@
             "column": 9,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -280,6 +290,7 @@
         "column": 22,
         "length": 51
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -304,6 +315,7 @@
             "column": 9,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -335,6 +347,7 @@
         "column": 29,
         "length": 51
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -359,6 +372,7 @@
             "column": 9,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0

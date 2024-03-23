@@ -21,6 +21,7 @@
         "column": 17,
         "length": 5
       },
+      "deprecated": false,
       "openness": "closed",
       "composed_protocols": [
         {
@@ -30,7 +31,8 @@
             "line": 10,
             "column": 13,
             "length": 6
-          }
+          },
+          "deprecated": false
         }
       ],
       "methods": [
@@ -44,6 +46,7 @@
             "column": 12,
             "length": 5
           },
+          "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
@@ -73,6 +76,7 @@
             "column": 12,
             "length": 6
           },
+          "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
@@ -102,6 +106,7 @@
         "column": 17,
         "length": 6
       },
+      "deprecated": false,
       "openness": "closed",
       "composed_protocols": [],
       "methods": [
@@ -115,6 +120,7 @@
             "column": 12,
             "length": 5
           },
+          "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
@@ -152,6 +158,7 @@
         "column": 19,
         "length": 58
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -176,6 +183,7 @@
             "column": 9,
             "length": 7
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -207,6 +215,7 @@
         "column": 18,
         "length": 58
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -231,6 +240,7 @@
             "column": 9,
             "length": 7
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0

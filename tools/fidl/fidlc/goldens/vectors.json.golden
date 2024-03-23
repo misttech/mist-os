@@ -26,6 +26,7 @@
         "column": 6,
         "length": 19
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -61,6 +62,7 @@
             "column": 5,
             "length": 15
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -113,6 +115,7 @@
             "column": 5,
             "length": 24
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 16,
             "padding": 0

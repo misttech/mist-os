@@ -54,6 +54,7 @@
         "column": 6,
         "length": 4
       },
+      "deprecated": true,
       "maybe_attributes": [
         {
           "name": "available",
@@ -130,6 +131,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": true,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -207,6 +209,7 @@
         "column": 7,
         "length": 13
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "available",
@@ -268,6 +271,7 @@
         "column": 7,
         "length": 5
       },
+      "deprecated": true,
       "maybe_attributes": [
         {
           "name": "available",
@@ -358,6 +362,7 @@
         "column": 6,
         "length": 4
       },
+      "deprecated": true,
       "maybe_attributes": [
         {
           "name": "available",
@@ -421,6 +426,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": true,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -500,6 +506,7 @@
         "column": 17,
         "length": 13
       },
+      "deprecated": false,
       "openness": "closed",
       "composed_protocols": [],
       "methods": []
@@ -512,6 +519,7 @@
         "column": 17,
         "length": 8
       },
+      "deprecated": true,
       "maybe_attributes": [
         {
           "name": "available",
@@ -627,7 +635,8 @@
             "line": 49,
             "column": 13,
             "length": 13
-          }
+          },
+          "deprecated": true
         }
       ],
       "methods": [
@@ -641,6 +650,7 @@
             "column": 12,
             "length": 3
           },
+          "deprecated": true,
           "has_request": true,
           "maybe_attributes": [
             {
@@ -711,6 +721,7 @@
         "column": 9,
         "length": 7
       },
+      "deprecated": true,
       "maybe_attributes": [
         {
           "name": "available",
@@ -788,6 +799,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": true,
           "maybe_attributes": [
             {
               "name": "available",
@@ -857,6 +869,7 @@
         "column": 6,
         "length": 6
       },
+      "deprecated": true,
       "maybe_attributes": [
         {
           "name": "available",
@@ -932,6 +945,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": true,
           "maybe_attributes": [
             {
               "name": "available",
@@ -1017,6 +1031,7 @@
         "column": 6,
         "length": 5
       },
+      "deprecated": true,
       "maybe_attributes": [
         {
           "name": "available",
@@ -1093,6 +1108,7 @@
             "column": 8,
             "length": 1
           },
+          "deprecated": true,
           "maybe_attributes": [
             {
               "name": "available",
@@ -1173,6 +1189,7 @@
         "column": 6,
         "length": 5
       },
+      "deprecated": true,
       "maybe_attributes": [
         {
           "name": "available",
@@ -1249,6 +1266,7 @@
             "column": 8,
             "length": 1
           },
+          "deprecated": true,
           "maybe_attributes": [
             {
               "name": "available",
@@ -1327,6 +1345,7 @@
         "column": 7,
         "length": 5
       },
+      "deprecated": true,
       "maybe_attributes": [
         {
           "name": "available",

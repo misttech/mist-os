@@ -86,6 +86,7 @@
         "column": 6,
         "length": 8
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint32",
@@ -109,6 +110,7 @@
             "column": 5,
             "length": 5
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -128,6 +130,7 @@
             "column": 5,
             "length": 4
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "2",
@@ -152,6 +155,7 @@
         "column": 7,
         "length": 6
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint16",
@@ -184,6 +188,7 @@
         "column": 7,
         "length": 16
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint16",
@@ -216,6 +221,7 @@
         "column": 7,
         "length": 15
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint8",
@@ -244,6 +250,7 @@
         "column": 7,
         "length": 17
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "float64",
@@ -276,6 +283,7 @@
         "column": 7,
         "length": 7
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint64",
@@ -308,6 +316,7 @@
         "column": 7,
         "length": 12
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "bool",
@@ -340,6 +349,7 @@
         "column": 7,
         "length": 7
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint64",
@@ -372,6 +382,7 @@
         "column": 7,
         "length": 8
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "float32",
@@ -404,6 +415,7 @@
         "column": 7,
         "length": 6
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "int8",
@@ -436,6 +448,7 @@
         "column": 7,
         "length": 19
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint32",
@@ -468,6 +481,7 @@
         "column": 7,
         "length": 8
       },
+      "deprecated": false,
       "type": {
         "kind": "string",
         "nullable": false,
@@ -500,6 +514,7 @@
         "column": 7,
         "length": 8
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint64",
@@ -528,6 +543,7 @@
         "column": 7,
         "length": 10
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "zx/ObjType",
@@ -557,6 +573,7 @@
         "column": 7,
         "length": 13
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "zx/Rights",
@@ -586,6 +603,7 @@
         "column": 7,
         "length": 17
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint32",
@@ -614,6 +632,7 @@
         "column": 7,
         "length": 16
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint32",
@@ -642,6 +661,7 @@
         "column": 7,
         "length": 24
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "uint8",
@@ -670,6 +690,7 @@
         "column": 7,
         "length": 8
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "test.consts/BitsType",
@@ -699,6 +720,7 @@
         "column": 7,
         "length": 7
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "test.consts/BitsType",
@@ -728,6 +750,7 @@
         "column": 7,
         "length": 17
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "int32",
@@ -756,6 +779,7 @@
         "column": 7,
         "length": 16
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "int32",
@@ -784,6 +808,7 @@
         "column": 7,
         "length": 24
       },
+      "deprecated": false,
       "type": {
         "kind": "primitive",
         "subtype": "int8",
@@ -812,6 +837,7 @@
         "column": 7,
         "length": 8
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "test.consts/EnumType",
@@ -841,6 +867,7 @@
         "column": 7,
         "length": 7
       },
+      "deprecated": false,
       "type": {
         "kind": "identifier",
         "identifier": "test.consts/EnumType",
@@ -875,6 +902,7 @@
         "column": 6,
         "length": 8
       },
+      "deprecated": false,
       "type": "int32",
       "members": [
         {
@@ -885,6 +913,7 @@
             "column": 5,
             "length": 5
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -904,6 +933,7 @@
             "column": 5,
             "length": 4
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "2",

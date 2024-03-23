@@ -21,6 +21,7 @@
         "column": 17,
         "length": 10
       },
+      "deprecated": false,
       "openness": "closed",
       "composed_protocols": [],
       "methods": []
@@ -39,6 +40,7 @@
         "column": 6,
         "length": 7
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -66,6 +68,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -111,6 +114,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 8,
             "padding": 0
@@ -155,6 +159,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 24,
             "padding": 0
@@ -213,6 +218,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 32,
             "padding": 0
@@ -270,6 +276,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 48,
             "padding": 0
@@ -328,6 +335,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 64,
             "padding": 0
@@ -385,6 +393,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 128,
             "padding": 0
@@ -429,6 +438,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 160,
             "padding": 0
@@ -486,6 +496,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 176,
             "padding": 0
@@ -543,6 +554,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 192,
             "padding": 0
@@ -587,6 +599,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 256,
             "padding": 0
@@ -644,6 +657,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 264,
             "padding": 0
@@ -701,6 +715,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 280,
             "padding": 0
@@ -734,6 +749,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 312,
             "padding": 4
@@ -780,6 +796,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 320,
             "padding": 0
@@ -826,6 +843,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 336,
             "padding": 0
@@ -870,6 +888,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 352,
             "padding": 0
@@ -927,6 +946,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 368,
             "padding": 0
@@ -984,6 +1004,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 384,
             "padding": 0
@@ -1015,6 +1036,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 448,
             "padding": 0
@@ -1059,6 +1081,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 464,
             "padding": 0
@@ -1103,6 +1126,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 480,
             "padding": 0
@@ -1153,6 +1177,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 544,
             "padding": 0
@@ -1217,6 +1242,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 560,
             "padding": 0
@@ -1280,6 +1306,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 576,
             "padding": 0
@@ -1329,6 +1356,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 624,
             "padding": 0
@@ -1392,6 +1420,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 640,
             "padding": 0
@@ -1454,6 +1483,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 656,
             "padding": 0
@@ -1485,6 +1515,7 @@
         "column": 7,
         "length": 12
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "array",
         "args": [
@@ -1541,6 +1572,7 @@
         "column": 7,
         "length": 34
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "array",
         "args": [
@@ -1602,6 +1634,7 @@
         "column": 7,
         "length": 12
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "vector",
         "args": [
@@ -1648,6 +1681,7 @@
         "column": 7,
         "length": 14
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "request",
         "args": [
@@ -1683,6 +1717,7 @@
         "column": 7,
         "length": 13
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "string",
         "args": [],
@@ -1710,6 +1745,7 @@
         "column": 7,
         "length": 36
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "vector",
         "args": [
@@ -1772,6 +1808,7 @@
         "column": 7,
         "length": 3
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "uint64",
         "args": [],
@@ -1799,6 +1836,7 @@
         "column": 7,
         "length": 6
       },
+      "deprecated": false,
       "partial_type_ctor": {
         "name": "vector",
         "args": [

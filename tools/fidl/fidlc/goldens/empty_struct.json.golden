@@ -21,6 +21,7 @@
         "column": 17,
         "length": 13
       },
+      "deprecated": false,
       "openness": "closed",
       "composed_protocols": [],
       "methods": [
@@ -34,6 +35,7 @@
             "column": 12,
             "length": 4
           },
+          "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
@@ -63,6 +65,7 @@
             "column": 15,
             "length": 7
           },
+          "deprecated": false,
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
@@ -92,6 +95,7 @@
             "column": 12,
             "length": 14
           },
+          "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
@@ -141,6 +145,7 @@
         "column": 6,
         "length": 5
       },
+      "deprecated": false,
       "members": [],
       "resource": false,
       "is_empty_success_struct": false,
@@ -167,6 +172,7 @@
         "column": 23,
         "length": 31
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -190,6 +196,7 @@
             "column": 9,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -221,6 +228,7 @@
         "column": 27,
         "length": 31
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -244,6 +252,7 @@
             "column": 9,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -275,6 +284,7 @@
         "column": 12,
         "length": 31
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -298,6 +308,7 @@
             "column": 9,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -329,6 +340,7 @@
         "column": 17,
         "length": 31
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -352,6 +364,7 @@
             "column": 9,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0

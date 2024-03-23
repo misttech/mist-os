@@ -21,6 +21,7 @@
         "column": 17,
         "length": 6
       },
+      "deprecated": false,
       "maybe_attributes": [
         {
           "name": "transport",
@@ -67,6 +68,7 @@
             "column": 12,
             "length": 4
           },
+          "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
@@ -104,6 +106,7 @@
         "column": 17,
         "length": 39
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -127,6 +130,7 @@
             "column": 9,
             "length": 7
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -156,6 +160,7 @@
         "column": 6,
         "length": 7
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -178,6 +183,7 @@
             "column": 5,
             "length": 5
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0

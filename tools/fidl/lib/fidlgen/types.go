@@ -948,6 +948,7 @@ type FieldShape struct {
 type Element interface {
 	GetAttributes() Attributes
 	GetLocation() Location
+	IsDeprecated() bool
 }
 
 var _ = []Element{
@@ -996,8 +997,9 @@ var _ = []Decl{
 
 type decl struct {
 	Attributes
-	Location `json:"location"`
-	Name     EncodedCompoundIdentifier `json:"name"`
+	Location   `json:"location"`
+	Deprecated bool                      `json:"deprecated"`
+	Name       EncodedCompoundIdentifier `json:"name"`
 }
 
 func (d decl) GetAttributes() Attributes {
@@ -1006,6 +1008,10 @@ func (d decl) GetAttributes() Attributes {
 
 func (d decl) GetLocation() Location {
 	return d.Location
+}
+
+func (d decl) IsDeprecated() bool {
+	return d.Deprecated
 }
 
 func (d decl) GetName() EncodedCompoundIdentifier {
@@ -1030,8 +1036,9 @@ var _ = []Member{
 
 type member struct {
 	Attributes
-	Location `json:"location"`
-	Name     Identifier `json:"name,omitempty"`
+	Location   `json:"location"`
+	Deprecated bool       `json:"deprecated"`
+	Name       Identifier `json:"name,omitempty"`
 }
 
 func (m member) GetAttributes() Attributes {
@@ -1040,6 +1047,10 @@ func (m member) GetAttributes() Attributes {
 
 func (m member) GetLocation() Location {
 	return m.Location
+}
+
+func (m member) IsDeprecated() bool {
+	return m.Deprecated
 }
 
 func (m member) GetName() Identifier {

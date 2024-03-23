@@ -26,6 +26,7 @@
         "column": 6,
         "length": 11
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -48,6 +49,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 4
@@ -74,6 +76,7 @@
             "column": 5,
             "length": 1
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 8,
             "padding": 0
@@ -103,6 +106,7 @@
         "column": 6,
         "length": 6
       },
+      "deprecated": false,
       "members": [
         {
           "type": {
@@ -125,6 +129,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -151,6 +156,7 @@
             "column": 5,
             "length": 2
           },
+          "deprecated": false,
           "field_shape_v2": {
             "offset": 1,
             "padding": 0

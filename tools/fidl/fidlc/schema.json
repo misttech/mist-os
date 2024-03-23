@@ -199,6 +199,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -236,6 +240,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "mask",
                 "members",
@@ -252,6 +257,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -270,6 +279,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "name",
                 "value"
@@ -283,6 +293,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the compose declaration"
@@ -297,6 +311,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "name"
             ],
@@ -314,6 +329,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -336,6 +355,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "name",
                 "type",
@@ -397,6 +417,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -434,6 +458,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "members",
                 "name",
@@ -449,6 +474,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -467,6 +496,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "name",
                 "value"
@@ -780,6 +810,10 @@
                     },
                     "type": "array"
                 },
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -810,6 +844,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "methods",
                 "name"
@@ -823,6 +858,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "has_request": {
                     "description": "Flag indicating that protocol method has a request component. If has_request is true, the method is client-initiated. It may or may not have a payload, which is provided separately in `maybe_request_payload`. For example, `Foo()` is a method where has_request would be true but `maybe_request_payload` would be absent.",
                     "type": "boolean"
@@ -877,6 +916,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "has_request",
                 "has_response",
                 "is_composed",
@@ -1251,6 +1291,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -1276,6 +1320,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "name",
                 "type"
@@ -1289,6 +1334,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -1303,6 +1352,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "name",
                 "type"
@@ -1316,6 +1366,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -1337,6 +1391,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "members",
                 "name"
@@ -1350,6 +1405,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -1368,6 +1427,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "name",
                 "type"
@@ -1415,6 +1475,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "is_empty_success_struct": {
                     "description": "True if this is an empty success struct generated by the compiler, i.e. the `maybe_response_success_type` for a method like `strict Foo() -> () error uint32` or `flexible Foo() -> ()`",
                     "type": "boolean"
@@ -1456,6 +1520,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "is_empty_success_struct",
                 "location",
                 "members",
@@ -1472,6 +1537,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "field_shape_v2": {
                     "$ref": "#/definitions/fieldshape",
                     "description": "Field shape"
@@ -1498,6 +1567,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "field_shape_v2",
                 "location",
                 "name",
@@ -1512,6 +1582,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -1553,6 +1627,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "members",
                 "name",
@@ -1569,6 +1644,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -1591,6 +1670,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "ordinal",
                 "type"
@@ -1649,6 +1729,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "experimental_maybe_from_alias": {
                     "$ref": "#/definitions/partial-type-ctor",
                     "description": "If provided, an alias for the corresponding type used in the definition"
@@ -1675,6 +1759,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "name",
                 "partial_type_ctor",
@@ -1689,6 +1774,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "experimental_maybe_from_alias": {
                     "$ref": "#/definitions/partial-type-ctor",
                     "description": "If provided, an alias for the corresponding type used in the definition"
@@ -1711,6 +1800,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "name",
                 "type"
@@ -1771,6 +1861,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "is_result": {
                     "description": "True if this is a result union, i.e. the response type generated for a method that is flexible or uses error syntax",
                     "type": "boolean"
@@ -1816,6 +1910,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "is_result",
                 "location",
                 "members",
@@ -1833,6 +1928,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -1855,6 +1954,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "ordinal",
                 "type"
@@ -1868,6 +1968,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -1909,6 +2013,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "members",
                 "name",
@@ -1925,6 +2030,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "deprecated": {
+                    "description": "True if the element is deprecated in the target version",
+                    "type": "boolean"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -1947,6 +2056,7 @@
                 }
             },
             "required": [
+                "deprecated",
                 "location",
                 "ordinal",
                 "type"

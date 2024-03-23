@@ -22,6 +22,7 @@
         "column": 6,
         "length": 19
       },
+      "deprecated": false,
       "type": "uint32",
       "members": [],
       "strict": false,
@@ -38,6 +39,7 @@
         "column": 6,
         "length": 14
       },
+      "deprecated": false,
       "type": "uint32",
       "members": [
         {
@@ -48,6 +50,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -67,6 +70,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "2",
@@ -93,6 +97,7 @@
         "column": 6,
         "length": 31
       },
+      "deprecated": false,
       "type": "uint32",
       "members": [
         {
@@ -103,6 +108,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -122,6 +128,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "2",
@@ -141,6 +148,7 @@
             "column": 5,
             "length": 14
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "3",
@@ -179,6 +187,7 @@
         "column": 6,
         "length": 12
       },
+      "deprecated": false,
       "type": "uint32",
       "members": [
         {
@@ -189,6 +198,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "1",
@@ -208,6 +218,7 @@
             "column": 5,
             "length": 3
           },
+          "deprecated": false,
           "value": {
             "kind": "literal",
             "value": "2",
