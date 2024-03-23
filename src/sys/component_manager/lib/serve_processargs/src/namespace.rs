@@ -7,7 +7,6 @@ use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use namespace::{Entry as NamespaceEntry, Namespace, NamespaceError, Path as NamespacePath, Tree};
 use sandbox::{Capability, Dict};
-use std::sync::Arc;
 use thiserror::Error;
 use vfs::{directory::entry::serve_directory, execution_scope::ExecutionScope};
 
@@ -37,7 +36,7 @@ pub enum BuildNamespaceError {
     Conversion {
         path: NamespacePath,
         #[source]
-        err: Arc<sandbox::ConversionError>,
+        err: sandbox::ConversionError,
     },
 
     #[error("unable to serve `{path}` after converting to directory: {err}")]
@@ -111,15 +110,12 @@ impl NamespaceBuilder {
                     Capability::Directory(d) => d,
                     cap => {
                         let entry = cap.try_into_directory_entry().map_err(|err| {
-                            BuildNamespaceError::Conversion {
-                                path: path.clone(),
-                                err: Arc::new(err),
-                            }
+                            BuildNamespaceError::Conversion { path: path.clone(), err }
                         })?;
                         if entry.entry_info().type_() != fio::DirentType::Directory {
                             return Err(BuildNamespaceError::Conversion {
                                 path: path.clone(),
-                                err: Arc::new(sandbox::ConversionError::NotSupported),
+                                err: sandbox::ConversionError::NotSupported,
                             });
                         }
                         sandbox::Directory::new(
