@@ -4,12 +4,11 @@
 #ifndef SRC_UI_SCENIC_LIB_UTILS_PIXEL_H_
 #define SRC_UI_SCENIC_LIB_UTILS_PIXEL_H_
 
+#include <fuchsia/sysmem/cpp/fidl.h>
 #include <math.h>
 
 #include <cstdint>
 #include <ostream>
-
-#include "fuchsia/sysmem/cpp/fidl.h"
 
 namespace utils {
 

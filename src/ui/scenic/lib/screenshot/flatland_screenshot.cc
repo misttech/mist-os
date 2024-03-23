@@ -160,7 +160,6 @@ FlatlandScreenshot::~FlatlandScreenshot() {}
 
 void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest params,
                               TakeCallback callback) {
-  FX_LOGS(ERROR) << "Take() started\n";
   // Check if there is already a Take() call pending. Either the setup is done (|init_wait_| is
   // signaled) or the setup is still in progress.
   //
@@ -383,8 +382,11 @@ void FlatlandScreenshot::TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRe
         if (params.format() == ScreenshotFormat::PNG) {
           zx::vmo response_vmo;
           zx::vmo response_vmo_copy;
+          // Make |resonpnse_vmo| large enough to hold any potential PNG encoding of |raw_vmo|.
+          // Once compression is complete |resonpnse_vmo| gets resized back down.
           const auto response_vmo_size =
-              display_size_.width * display_size_.height * kBytesPerPixel;
+              display_size_.width * display_size_.height * kBytesPerPixel +
+              zx_system_get_page_size();
           FX_CHECK(zx::vmo::create(response_vmo_size, 0, &response_vmo) == ZX_OK);
           FX_CHECK(response_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &response_vmo_copy) == ZX_OK);
 

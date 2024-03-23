@@ -192,14 +192,14 @@ void PortableUITest::LaunchClientWithEmbeddedView() {
   FX_LOGS(INFO) << "Embedded view has rendered";
 }
 
-Screenshot PortableUITest::TakeScreenshot() {
+Screenshot PortableUITest::TakeScreenshot(ScreenshotFormat format) {
   if (!screenshotter_.has_value()) {
     screenshotter_ = realm_root()->component().Connect<fuchsia::ui::composition::Screenshot>();
   }
   FX_LOGS(INFO) << "Taking screenshot... ";
 
   fuchsia::ui::composition::ScreenshotTakeRequest request;
-  request.set_format(fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW);
+  request.set_format(format);
 
   std::optional<fuchsia::ui::composition::ScreenshotTakeResponse> response;
   screenshotter_.value()->Take(std::move(request), [this, &response](auto screenshot) {
@@ -211,15 +211,20 @@ Screenshot PortableUITest::TakeScreenshot() {
 
   EXPECT_FALSE(RunLoopWithTimeout(kScreenshotTimeout)) << "Timed out waiting for screenshot.";
 
-  return ui_testing::Screenshot(response->vmo(), display_size().width, display_size().height,
-                                display_rotation());
+  if (format == ScreenshotFormat::PNG) {
+    return Screenshot(response->vmo());
+  }
+  return Screenshot(response->vmo(), display_size().width, display_size().height,
+                    display_rotation());
 }
 
 bool PortableUITest::TakeScreenshotUntil(
-    fit::function<bool(const ui_testing::Screenshot&)> screenshot_predicate,
-    zx::duration predicate_timeout, zx::duration step) {
+    fit::function<bool(const Screenshot&)> screenshot_predicate, zx::duration predicate_timeout,
+    zx::duration step, ScreenshotFormat format) {
   return RunLoopWithTimeoutOrUntil(
-      [this, &screenshot_predicate] { return screenshot_predicate(TakeScreenshot()); },
+      [this, &screenshot_predicate, &format] {
+        return screenshot_predicate(TakeScreenshot(format));
+      },
       predicate_timeout, step);
 }
 

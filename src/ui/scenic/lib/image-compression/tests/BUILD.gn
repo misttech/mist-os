@@ -19,6 +19,7 @@ executable("unittests") {
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/ui/scenic/lib/image-compression:lib",
+    "//src/ui/testing/util:screenshot_helper",
     "//third_party/googletest:gtest",
     "//third_party/libpng",
     "//zircon/system/ulib/async-default",

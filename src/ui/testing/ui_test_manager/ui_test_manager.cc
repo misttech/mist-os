@@ -108,15 +108,18 @@ std::pair<uint64_t, uint64_t> UITestManager::GetDisplayDimensions() const {
   return std::make_pair(display_width_, display_height_);
 }
 
-Screenshot UITestManager::TakeScreenshot() const {
+Screenshot UITestManager::TakeScreenshot(ScreenshotFormat format) const {
   fuchsia::ui::composition::ScreenshotTakeRequest request;
-  request.set_format(fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW);
+  request.set_format(format);
 
   fuchsia::ui::composition::ScreenshotTakeResponse response;
   auto status = screenshotter_->Take(std::move(request), &response);
 
   FX_DCHECK(status == ZX_OK);
 
+  if (format == ScreenshotFormat::PNG) {
+    return Screenshot(response.vmo());
+  }
   return Screenshot(response.vmo(), display_width_, display_height_, display_rotation_);
 }
 

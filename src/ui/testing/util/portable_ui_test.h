@@ -21,6 +21,8 @@
 
 namespace ui_testing {
 
+using fuchsia::ui::composition::ScreenshotFormat;
+
 class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
  public:
   static constexpr auto kTestUIStack = "ui";
@@ -45,12 +47,13 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   bool HasViewConnected(zx_koid_t view_ref_koid);
 
   // Helper method to take a screenshot.
-  Screenshot TakeScreenshot();
+  Screenshot TakeScreenshot(ScreenshotFormat format = ScreenshotFormat::BGRA_RAW);
 
   // Helper method to take a screenshot until predicate is true. Returns false if
   // |predicate_timeout| is reached.
   bool TakeScreenshotUntil(fit::function<bool(const ui_testing::Screenshot&)> predicate,
-                           zx::duration predicate_timeout, zx::duration step = zx::msec(10));
+                           zx::duration predicate_timeout, zx::duration step = zx::msec(10),
+                           ScreenshotFormat format = ScreenshotFormat::BGRA_RAW);
 
   // Return display size by connecting to |fuchsia::ui::display::singleton::Info| protocol.
   fuchsia::math::SizeU display_size();

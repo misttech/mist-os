@@ -4,21 +4,33 @@
 
 #include "screenshot_helper.h"
 
+#include <fuchsia/io/cpp/fidl.h>
 #include <lib/zx/vmar.h>
 #include <png.h>
 #include <zircon/status.h>
 
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <memory>
 #include <unordered_map>
+#include <vector>
+
+#include "src/ui/scenic/lib/utils/pixel.h"
 
 namespace ui_testing {
 namespace {
 
 constexpr uint64_t kBytesPerPixel = 4;
+constexpr uint8_t kPNGHeaderBytes = 8;
+
+// Needed for |png_set_read_fn| so that libpng can read from a zx::vmo in a stream-like fashion.
+struct libpng_vmo {
+  zx::vmo* vmo;
+  size_t offset;
+};
 
 }  // namespace
 
@@ -50,6 +62,12 @@ Screenshot::Screenshot(const zx::vmo& screenshot_vmo, uint64_t width, uint64_t h
 }
 
 Screenshot::Screenshot() : width_(0), height_(0) {}
+
+Screenshot::Screenshot(const zx::vmo& png_vmo) {
+  zx::vmo vmo_copy;
+  FX_CHECK(png_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_copy) == ZX_OK);
+  ExtractScreenshotFromPngVMO(vmo_copy);
+}
 
 Pixel Screenshot::GetPixelAt(uint64_t x, uint64_t y) const {
   FX_CHECK(x >= 0 && x < width_ && y >= 0 && y < height_) << "Index out of bounds";
@@ -281,6 +299,65 @@ std::vector<Pixel> Screenshot::GetPixelsInRow(uint8_t* screenshot_vmo, size_t ro
   }
 
   return row;
+}
+
+// Decode PNG-encoded VMO back to raw format and populate screenshot_ with raw pixels.
+// Done this way for testing purposes so we can compare accuracy of screenshots taken in PNG format.
+void Screenshot::ExtractScreenshotFromPngVMO(zx::vmo& png_vmo) {
+  png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+  FX_DCHECK(png) << "png_create_read_struct failed";
+
+  png_infop info = png_create_info_struct(png);
+  FX_DCHECK(info) << "png_create_info_struct failed";
+
+  // Tell libpng how to read from a zx::vmo in a stream-like fashion.
+  libpng_vmo read_fn_vmo = {.vmo = &png_vmo, .offset = 0u};
+  png_set_read_fn(png, &read_fn_vmo,
+                  [](png_structp png_ptr, png_bytep out_bytes, size_t length) -> void {
+                    // Read |length| bytes into |out_bytes| from the VMO.
+                    libpng_vmo* vmo = reinterpret_cast<libpng_vmo*>(png_get_io_ptr(png_ptr));
+                    FX_CHECK(vmo->vmo->read(out_bytes, vmo->offset, length) == ZX_OK);
+                    vmo->offset += length;
+                  });
+
+  png_read_info(png, info);
+
+  width_ = png_get_image_width(png, info);
+  height_ = png_get_image_height(png, info);
+
+  uint32_t color_type = png_get_color_type(png, info);
+  uint32_t bit_depth = png_get_bit_depth(png, info);
+
+  // Only works with 4 bytes (32-bits) per pixel.
+  FX_CHECK(color_type == PNG_COLOR_TYPE_RGBA) << "currently only supports RGBA";
+  FX_CHECK(bit_depth == 8) << "currently only supports 8-bit channel";
+
+  int64_t row_bytes = png_get_rowbytes(png, info);
+  int64_t expected_row_bytes = kBytesPerPixel * width_;  // We assume each pixel is 4 bytes.
+  FX_DCHECK(row_bytes == expected_row_bytes)
+      << "unexpected row_bytes: " << row_bytes << " expect: 4 * " << width_;
+
+  const uint64_t bytesPerRow = png_get_rowbytes(png, info);
+  std::vector<uint8_t> rowData(bytesPerRow);
+
+  // Read one row at a time. For some reason, this is necessary instead of |png_read_image()|. Maybe
+  // because we're reading from memory instead of a file?
+  for (uint32_t rowIdx = 0; rowIdx < height_; ++rowIdx) {
+    png_read_row(png, static_cast<png_bytep>(rowData.data()), nullptr);
+
+    uint32_t byteIndex = 0;
+    std::vector<Pixel> row;
+    for (uint32_t colIdx = 0; colIdx < width_; ++colIdx) {
+      const uint8_t red = rowData[byteIndex++];
+      const uint8_t green = rowData[byteIndex++];
+      const uint8_t blue = rowData[byteIndex++];
+      const uint8_t alpha = rowData[byteIndex++];
+
+      row.emplace_back(blue, green, red, alpha);
+    }
+    screenshot_.push_back(row);
+  }
+  png_destroy_read_struct(&png, &info, nullptr);
 }
 
 }  // namespace ui_testing

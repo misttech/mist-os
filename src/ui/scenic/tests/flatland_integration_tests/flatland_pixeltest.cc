@@ -167,6 +167,41 @@ class FlatlandPixelTestBase : public LoggingEventLoop, public zxtest::Test {
     return constraints;
   }
 
+  // Draws the following coordinate test pattern without views:
+  // ___________________________________
+  // |                |                |
+  // |     BLACK      |        RED     |
+  // |           _____|_____           |
+  // |___________|  GREEN  |___________|
+  // |           |_________|           |
+  // |                |                |
+  // |      BLUE      |     MAGENTA    |
+  // |________________|________________|
+  //
+  void Draw4RectanglesToDisplay() {
+    const uint32_t view_width = display_width_;
+    const uint32_t view_height = display_height_;
+
+    const uint32_t pane_width =
+        static_cast<uint32_t>(std::ceil(static_cast<float>(view_width) / 2.f));
+
+    const uint32_t pane_height =
+        static_cast<uint32_t>(std::ceil(static_cast<float>(view_height) / 2.f));
+
+    // Draw the rectangles in the quadrants.
+    for (uint32_t i = 0; i < 2; i++) {
+      for (uint32_t j = 0; j < 2; j++) {
+        utils::Pixel color(static_cast<uint8_t>(j * 255), 0, static_cast<uint8_t>(i * 255), 255);
+        DrawRectangle(root_flatland_, pane_width, pane_height, i * pane_width, j * pane_height,
+                      color);
+      }
+    }
+
+    // Draw the rectangle in the center.
+    DrawRectangle(root_flatland_, view_width / 4, view_height / 4, 3 * view_width / 8,
+                  3 * view_height / 8, utils::kGreen);
+  }
+
  protected:
   fuchsia::sysmem::BufferCollectionInfo_2 SetConstraintsAndAllocateBuffer(
       fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
@@ -667,39 +702,8 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
             expected_colors->second.bottom_right);
 }
 
-// Draws and tests the following coordinate test pattern without views:
-// ___________________________________
-// |                |                |
-// |     BLACK      |        RED     |
-// |           _____|_____           |
-// |___________|  GREEN  |___________|
-// |           |_________|           |
-// |                |                |
-// |      BLUE      |     MAGENTA    |
-// |________________|________________|
-//
 TEST_F(FlatlandPixelTestBase, CoordinateViewTest) {
-  const uint32_t view_width = display_width_;
-  const uint32_t view_height = display_height_;
-
-  const uint32_t pane_width =
-      static_cast<uint32_t>(std::ceil(static_cast<float>(view_width) / 2.f));
-
-  const uint32_t pane_height =
-      static_cast<uint32_t>(std::ceil(static_cast<float>(view_height) / 2.f));
-
-  // Draw the rectangles in the quadrants.
-  for (uint32_t i = 0; i < 2; i++) {
-    for (uint32_t j = 0; j < 2; j++) {
-      utils::Pixel color(static_cast<uint8_t>(j * 255), 0, static_cast<uint8_t>(i * 255), 255);
-      DrawRectangle(root_flatland_, pane_width, pane_height, i * pane_width, j * pane_height,
-                    color);
-    }
-  }
-
-  // Draw the rectangle in the center.
-  DrawRectangle(root_flatland_, view_width / 4, view_height / 4, 3 * view_width / 8,
-                3 * view_height / 8, utils::kGreen);
+  Draw4RectanglesToDisplay();
 
   BlockingPresent(this, root_flatland_);
 
@@ -725,6 +729,30 @@ TEST_F(FlatlandPixelTestBase, CoordinateViewTest) {
             utils::kMagenta);  // Bottom right
   EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() / 2, screenshot.height() / 2),
             utils::kGreen);  // Center
+}
+
+TEST_F(FlatlandPixelTestBase, TakeScreenshotCompressionTest) {
+  Draw4RectanglesToDisplay();
+
+  BlockingPresent(this, root_flatland_);
+
+  auto raw_screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
+  auto png_screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_,
+                                       fuchsia::ui::composition::ScreenshotFormat::PNG);
+
+  EXPECT_GE(png_screenshot.ComputeSimilarity(raw_screenshot), 100.f);
+}
+
+TEST_F(FlatlandPixelTestBase, TakeFileScreenshotCompressionTest) {
+  Draw4RectanglesToDisplay();
+
+  BlockingPresent(this, root_flatland_);
+
+  auto raw_screenshot = TakeFileScreenshot(screenshotter_, display_width_, display_height_);
+  auto png_screenshot = TakeFileScreenshot(screenshotter_, display_width_, display_height_,
+                                           fuchsia::ui::composition::ScreenshotFormat::PNG);
+
+  EXPECT_GE(png_screenshot.ComputeSimilarity(raw_screenshot), 100.f);
 }
 
 struct OpacityTestParams {

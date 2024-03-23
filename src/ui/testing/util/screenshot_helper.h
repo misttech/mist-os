@@ -32,6 +32,9 @@ class Screenshot {
   //              is seen by the user.
   Screenshot(const zx::vmo& screenshot_vmo, uint64_t width, uint64_t height, int rotation);
 
+  // Use this specifically to create a |Screenshot| object from a PNG encoded vmo.
+  explicit Screenshot(const zx::vmo& png_vmo);
+
   // An empty screenshot.
   Screenshot();
 
@@ -92,6 +95,8 @@ class Screenshot {
   // Returns the top pixels in the histogram and prints logs.
   std::vector<std::pair<uint32_t, utils::Pixel>> LogHistogramTopPixels(
       int num_top_pixels = 10) const;
+
+  void ExtractScreenshotFromPngVMO(zx::vmo& png_vmo);
 
  private:
   // Populates |screenshot_| by converting the linear array of bytes in |screenshot_vmo| of size |4

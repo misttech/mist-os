@@ -24,6 +24,8 @@
 
 namespace ui_testing {
 
+using fuchsia::ui::composition::ScreenshotFormat;
+
 // Library class to manage test realm and scene setup on behalf of UI
 // integration test clients.
 class UITestManager : public fuchsia::ui::focus::FocusChainListener {
@@ -105,7 +107,7 @@ class UITestManager : public fuchsia::ui::focus::FocusChainListener {
   // Takes a screenshot using the |fuchsia.ui.composition.Screenshot| protocol, converts it into
   // |ui_testing::Screenshot| and returns it. Note that this is a blocking call i.e the client has
   // to wait until |fuchsia.ui.composition.Screenshot.Take| finishes execution.
-  Screenshot TakeScreenshot() const;
+  Screenshot TakeScreenshot(ScreenshotFormat format = ScreenshotFormat::BGRA_RAW) const;
 
  private:
   // Helper method to monitor the state of the view tree continuously.

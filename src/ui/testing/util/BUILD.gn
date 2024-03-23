@@ -65,6 +65,7 @@ source_set("screenshot_helper") {
   deps = [ "//src/ui/scenic/lib/utils" ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/lib/syslog/cpp",
     "//third_party/libpng",
     "//zircon/system/ulib/zx",
