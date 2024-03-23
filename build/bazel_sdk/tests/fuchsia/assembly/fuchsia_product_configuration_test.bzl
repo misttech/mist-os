@@ -45,7 +45,7 @@ def _fuchsia_product_ota_config_test_impl(ctx):
         ctx,
         file_to_test,
         golden_file,
-        ctx.runfiles(files = ctx.files.product_config),
+        runfiles = ctx.runfiles(files = ctx.files.product_config),
     )]
 
 fuchsia_product_ota_config_test = rule(

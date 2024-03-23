@@ -19,7 +19,12 @@ CREATE_VALIDATION_SCRIPT_ATTRS = {
     ),
 } | PY_TOOLCHAIN_DEPS
 
-def create_validation_script_provider(ctx, generated, golden_file, runfiles = None):
+def create_validation_script_provider(
+        ctx,
+        generated,
+        golden_file,
+        relative_path = None,
+        runfiles = None):
     """Create a validation script and its related runfiles object.
 
     Create a validation script that invokes json_comparator.py to
@@ -36,6 +41,8 @@ def create_validation_script_provider(ctx, generated, golden_file, runfiles = No
       golden_file: a File object pointing to the golden file used
          for verification.
 
+      relative_path: A path relative to generated directory.
+
       runfiles: an optional runfiles value for extra runtime requirements.
 
     Returns:
@@ -44,6 +51,9 @@ def create_validation_script_provider(ctx, generated, golden_file, runfiles = No
     validator_path = ctx.executable._json_comparator.short_path
 
     generated_path = generated.short_path
+    if relative_path:
+        generated_path = generated_path + "/" + relative_path
+
     validator_args = [
         "--generated={}".format(generated_path),
         "--golden={}".format(golden_file.short_path),

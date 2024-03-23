@@ -4,6 +4,7 @@
 
 """Rules for defining assembly board configuration."""
 
+load("@bazel_skylib//lib:paths.bzl", "paths")
 load(
     ":providers.bzl",
     "FuchsiaBoardConfigDirectoryInfo",
@@ -68,8 +69,11 @@ def _fuchsia_board_configuration_impl(ctx):
     # prefix "../"s to make them relative to the output board config.
     board_config_relative_to_root = "../" * board_config_file.path.count("/")
     for bib in ctx.attr.board_input_bundles:
+        path = bib[FuchsiaBoardInputBundleInfo].config.path
+        if paths.basename(path) == "board_input_bundle.json":
+            path = paths.dirname(path)
         board_config["input_bundles"] = board_config.get("input_bundles", []) + [
-            board_config_relative_to_root + bib[FuchsiaBoardInputBundleInfo].config.dirname,
+            board_config_relative_to_root + path,
         ]
         deps.extend(bib[FuchsiaBoardInputBundleInfo].files)
 

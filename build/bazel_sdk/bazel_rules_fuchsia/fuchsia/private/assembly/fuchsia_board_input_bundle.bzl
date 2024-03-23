@@ -83,7 +83,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
 
     # Create Board Input Bundle
     ffx_tool = fuchsia_toolchain.ffx
-    board_input_bundle_json = ctx.actions.declare_file(ctx.label.name + "_out/board_input_bundle.json")
+    board_input_bundle_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
     ffx_invocation = [
         ffx_tool.path,
@@ -92,7 +92,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
         "assembly",
         "board-input-bundle",
         "--outdir",
-        board_input_bundle_json.dirname,
+        board_input_bundle_dir.path,
     ] + creation_args
 
     script_lines = [
@@ -103,12 +103,12 @@ def _fuchsia_board_input_bundle_impl(ctx):
     script = "\n".join(script_lines)
     ctx.actions.run_shell(
         inputs = creation_inputs + get_ffx_assembly_inputs(fuchsia_toolchain),
-        outputs = [board_input_bundle_json, ffx_isolate_dir],
+        outputs = [board_input_bundle_dir, ffx_isolate_dir],
         command = script,
         progress_message = "Creating board input bundle for %s" % ctx.label.name,
     )
 
-    deps = [board_input_bundle_json] + creation_inputs
+    deps = [board_input_bundle_dir] + creation_inputs
 
     return [
         DefaultInfo(
@@ -117,7 +117,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
             ),
         ),
         FuchsiaBoardInputBundleInfo(
-            config = board_input_bundle_json,
+            config = board_input_bundle_dir,
             files = deps,
         ),
     ]
