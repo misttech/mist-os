@@ -68,30 +68,29 @@ struct ImageInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ImageInfo>> 
   zx_paddr_t paddr;
 };
 
-class AmlogicDisplay
-    : public ddk::DisplayControllerImplProtocol<AmlogicDisplay, ddk::base_protocol> {
+class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, ddk::base_protocol> {
  public:
   // Factory method for production use.
   //
   // `bus_device` must be valid.
-  static zx::result<std::unique_ptr<AmlogicDisplay>> Create(zx_device_t* bus_device);
+  static zx::result<std::unique_ptr<DisplayEngine>> Create(zx_device_t* bus_device);
 
-  // Creates an uninitialized `AmlogicDisplay` instance.
+  // Creates an uninitialized `DisplayEngine` instance.
   //
-  // Production code should use `AmlogicDisplay::Create()` instead.
-  explicit AmlogicDisplay(zx_device_t* bus_device);
+  // Production code should use `DisplayEngine::Create()` instead.
+  explicit DisplayEngine(zx_device_t* bus_device);
 
-  AmlogicDisplay(const AmlogicDisplay&) = delete;
-  AmlogicDisplay(AmlogicDisplay&&) = delete;
-  AmlogicDisplay& operator=(const AmlogicDisplay&) = delete;
-  AmlogicDisplay& operator=(AmlogicDisplay&&) = delete;
+  DisplayEngine(const DisplayEngine&) = delete;
+  DisplayEngine(DisplayEngine&&) = delete;
+  DisplayEngine& operator=(const DisplayEngine&) = delete;
+  DisplayEngine& operator=(DisplayEngine&&) = delete;
 
-  ~AmlogicDisplay();
+  ~DisplayEngine();
 
   // Acquires parent resources and sets up display submodules.
   //
   // Must be called exactly once via the `Create()` factory method during
-  // the AmlogicDisplay lifetime in production code.
+  // the DisplayEngine lifetime in production code.
   //
   // TODO(https://fxbug.dev/42082357): Replace the two-step initialization with
   // a factory method and a constructor.
@@ -99,7 +98,7 @@ class AmlogicDisplay
 
   // Tears down display submodules and turns off the hardware.
   //
-  // Must be called exactly once before the AmlogicDisplay instance is
+  // Must be called exactly once before the DisplayEngine instance is
   // destroyed in production code.
   //
   // TODO(https://fxbug.dev/42082357): Move the Deinitialize behavior to the
@@ -177,7 +176,7 @@ class AmlogicDisplay
   void OnVsync(zx::time timestamp);
   void OnCaptureComplete();
 
-  // TODO(https://fxbug.dev/42082357): Currently, AmlogicDisplay has a multi-step
+  // TODO(https://fxbug.dev/42082357): Currently, DisplayEngine has a multi-step
   // initialization procedure when the device manager binds the driver to the
   // device node. This makes the initialization stateful and hard to maintain
   // (submodules may have dependencies on initialization). Instead, it's
@@ -231,7 +230,7 @@ class AmlogicDisplay
   // the video output module. This will cause all the previous display hardware
   // state to be lost.
   //
-  // Must only be called during `AmlogicDisplay` initialization, after `vpu_`
+  // Must only be called during `DisplayEngine` initialization, after `vpu_`
   // and `vout_` are initialized, but before any IRQ handler thread starts
   // running, as access to display resources (registers, IRQs) after powering
   // off the display engine will cause the system to crash.

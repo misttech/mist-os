@@ -31,8 +31,7 @@ class DisplayDeviceDriver final : public DeviceType {
 
   // Exposed for testing. Production code should use the `Create()` factory
   // method instead.
-  explicit DisplayDeviceDriver(zx_device_t* parent,
-                               std::unique_ptr<AmlogicDisplay> amlogic_display);
+  explicit DisplayDeviceDriver(zx_device_t* parent, std::unique_ptr<DisplayEngine> display_engine);
 
   DisplayDeviceDriver(const DisplayDeviceDriver&) = delete;
   DisplayDeviceDriver(DisplayDeviceDriver&&) = delete;
@@ -51,7 +50,7 @@ class DisplayDeviceDriver final : public DeviceType {
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
 
  private:
-  std::unique_ptr<AmlogicDisplay> amlogic_display_;
+  std::unique_ptr<DisplayEngine> display_engine_;
 };
 
 }  // namespace amlogic_display

@@ -374,7 +374,7 @@ void VideoInputUnit::FlipOnVsync(const display_config_t* config,
   osd_ctrl_stat2_val.set_replaced_alpha_en(1).set_replaced_alpha(kMaximumAlpha);
   osd_ctrl_stat_val.set_global_alpha(kMaximumAlpha);
 
-  // This is guaranteed by AmlogicDisplay::CheckConfiguration().
+  // This is guaranteed by DisplayEngine::CheckConfiguration().
   ZX_DEBUG_ASSERT(config->layer_count > 0);
   ZX_DEBUG_ASSERT(config->layer_list[0]->type == LAYER_TYPE_PRIMARY);
   const primary_layer_t& primary_layer = config->layer_list[0]->cfg.primary;
@@ -646,7 +646,7 @@ void VideoInputUnit::SetMinimumRgb(uint8_t minimum_rgb) {
 
 void VideoInputUnit::ConfigAfbcDecoder(PixelGridSize2D layer_image_size) {
   // The format specifier must match the sysmem format modifier flags specified
-  // in AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints().
+  // in DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints().
   //
   // Note RGBA8888 works for both RGBA and BGRA formats. The color channels can
   // be reordered by setting MALI_UNPACK_CTRL register.
