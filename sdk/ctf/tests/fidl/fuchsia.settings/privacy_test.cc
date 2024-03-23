@@ -21,6 +21,8 @@
 
 namespace {
 
+// TODO(https://fxbug.dev/330610053): Once a C++ realm_proxy library is available, use
+// that instead of this custom boilerplate
 class InstalledNamespace {
  public:
   InstalledNamespace(std::string prefix, zx::channel realm_factory)
@@ -85,6 +87,8 @@ class PrivacyTest : public zxtest::Test {
   fuchsia::settings::PrivacySyncPtr privacy;
 
  private:
+  // TODO(https://fxbug.dev/330610053): Once a C++ realm_proxy library is available, use
+  // that instead of this custom boilerplate
   template <typename Interface>
   InstalledNamespace ExtendNamespace(
       fidl::InterfaceHandle<Interface> realm_factory,
