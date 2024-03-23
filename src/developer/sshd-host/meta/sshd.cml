@@ -166,7 +166,6 @@
                 "fuchsia.power.systemmode.Requester",
                 "fuchsia.process.Launcher",
                 "fuchsia.process.Resolver",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.session.Launcher",
                 "fuchsia.space.Manager",

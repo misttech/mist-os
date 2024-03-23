@@ -116,7 +116,6 @@
                 "fuchsia.power.systemmode.ClientConfigurator",
                 "fuchsia.power.systemmode.Requester",
                 "fuchsia.process.Launcher",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.space.Manager",
                 "fuchsia.sys2.CrashIntrospect",
