@@ -13,7 +13,7 @@ use {
     serde::{Deserialize, Serialize},
     std::{convert::TryInto as _, str::FromStr},
     tracing::{error, info, warn},
-    update_package::{ImagePackagesSlots, SystemVersion, UpdatePackage},
+    update_package::{SystemVersion, UpdatePackage},
 };
 
 /// The version of the OS.
@@ -84,10 +84,9 @@ impl Version {
                 "".to_string()
             });
 
-        let (vbmeta_hash, zbi_hash) = match update_package.image_packages().await {
-            Ok(image_package_manifest) => {
-                let manifest: ImagePackagesSlots = image_package_manifest.into();
-                if let Some(fuchsia) = manifest.fuchsia() {
+        let (vbmeta_hash, zbi_hash) = match update_package.images_metadata().await {
+            Ok(metadata) => {
+                if let Some(fuchsia) = metadata.fuchsia() {
                     (
                         fuchsia.vbmeta().map(|v| v.hash().to_string()).unwrap_or_else(|| "".into()),
                         fuchsia.zbi().hash().to_string(),

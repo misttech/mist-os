@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_paver::Configuration;
+use fidl_fuchsia_paver as fpaver;
 
 /// The [`fidl_fuchsia_paver::Configuration`]s to which an image should be written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetConfiguration {
     /// The image has a well defined configuration to which it should be written. For example,
     /// Recovery, or, for devices that support ABR, the "inactive" configuration.
-    Single(Configuration),
+    Single(fpaver::Configuration),
 
     /// The image would target the A or B configuration, but ABR is not supported on this platform,
     /// so write to A and try to write to B (if a B partition exists).
@@ -33,10 +33,10 @@ pub enum NonCurrentConfiguration {
 impl NonCurrentConfiguration {
     /// Converts this [`NonCurrentConfiguration`] into a specific configuration, or none if ABR is
     /// not supported.
-    pub fn to_configuration(self) -> Option<Configuration> {
+    pub fn to_configuration(self) -> Option<fpaver::Configuration> {
         match self {
-            NonCurrentConfiguration::A => Some(Configuration::A),
-            NonCurrentConfiguration::B => Some(Configuration::B),
+            NonCurrentConfiguration::A => Some(fpaver::Configuration::A),
+            NonCurrentConfiguration::B => Some(fpaver::Configuration::B),
             NonCurrentConfiguration::NotSupported => None,
         }
     }
@@ -45,8 +45,8 @@ impl NonCurrentConfiguration {
     /// configurations to target.
     pub fn to_target_configuration(self) -> TargetConfiguration {
         match self {
-            NonCurrentConfiguration::A => TargetConfiguration::Single(Configuration::A),
-            NonCurrentConfiguration::B => TargetConfiguration::Single(Configuration::B),
+            NonCurrentConfiguration::A => TargetConfiguration::Single(fpaver::Configuration::A),
+            NonCurrentConfiguration::B => TargetConfiguration::Single(fpaver::Configuration::B),
             NonCurrentConfiguration::NotSupported => TargetConfiguration::AB,
         }
     }
@@ -65,11 +65,11 @@ pub enum CurrentConfiguration {
 impl CurrentConfiguration {
     /// Converts this [`CurrentConfiguration`] into a specific configuration, or none if ABR is
     /// not supported.
-    pub fn to_configuration(self) -> Option<Configuration> {
+    pub fn to_configuration(self) -> Option<fpaver::Configuration> {
         match self {
-            CurrentConfiguration::A => Some(Configuration::A),
-            CurrentConfiguration::B => Some(Configuration::B),
-            CurrentConfiguration::Recovery => Some(Configuration::Recovery),
+            CurrentConfiguration::A => Some(fpaver::Configuration::A),
+            CurrentConfiguration::B => Some(fpaver::Configuration::B),
+            CurrentConfiguration::Recovery => Some(fpaver::Configuration::Recovery),
             CurrentConfiguration::NotSupported => None,
         }
     }
@@ -108,11 +108,11 @@ mod tests {
     fn current_a_targets_b() {
         assert_eq!(
             CurrentConfiguration::A.to_non_current_configuration().to_target_configuration(),
-            TargetConfiguration::Single(Configuration::B),
+            TargetConfiguration::Single(fpaver::Configuration::B),
         );
         assert_eq!(
             CurrentConfiguration::A.to_non_current_configuration().to_configuration(),
-            Some(Configuration::B),
+            Some(fpaver::Configuration::B),
         );
     }
 
@@ -120,11 +120,11 @@ mod tests {
     fn current_b_targets_a() {
         assert_eq!(
             CurrentConfiguration::B.to_non_current_configuration().to_target_configuration(),
-            TargetConfiguration::Single(Configuration::A),
+            TargetConfiguration::Single(fpaver::Configuration::A),
         );
         assert_eq!(
             CurrentConfiguration::B.to_non_current_configuration().to_configuration(),
-            Some(Configuration::A),
+            Some(fpaver::Configuration::A),
         );
     }
 
@@ -132,11 +132,11 @@ mod tests {
     fn current_r_targets_a() {
         assert_eq!(
             CurrentConfiguration::Recovery.to_non_current_configuration().to_target_configuration(),
-            TargetConfiguration::Single(Configuration::A),
+            TargetConfiguration::Single(fpaver::Configuration::A),
         );
         assert_eq!(
             CurrentConfiguration::Recovery.to_non_current_configuration().to_configuration(),
-            Some(Configuration::A),
+            Some(fpaver::Configuration::A),
         );
     }
 }

@@ -785,13 +785,12 @@ impl<'a> Attempt<'a> {
 
         let () = validate_epoch(SOURCE_EPOCH_RAW, &update_pkg).await?;
 
-        let manifest = update_package::ImagePackagesSlots::from(
-            update_pkg.image_packages().await.map_err(PrepareError::ParseImages)?,
-        );
-        let () = manifest.verify(mode).map_err(PrepareError::VerifyImages)?;
+        let images_metadata =
+            update_pkg.images_metadata().await.map_err(PrepareError::ParseImages)?;
+        let () = images_metadata.verify(mode).map_err(PrepareError::VerifyImages)?;
         let mut images_to_write = ImagesToWrite::new();
 
-        if let Some(fuchsia) = manifest.fuchsia() {
+        if let Some(fuchsia) = images_metadata.fuchsia() {
             target_version.zbi_hash = fuchsia.zbi().hash().to_string();
 
             // Determine if the fuchsia zbi has changed in this update. If an error is raised, do
@@ -846,7 +845,7 @@ impl<'a> Attempt<'a> {
 
         // Only check these images if we have to.
         if self.config.should_write_recovery {
-            if let Some(recovery) = manifest.recovery() {
+            if let Some(recovery) = images_metadata.recovery() {
                 match recovery_to_write(recovery.zbi(), &self.env.data_sink, fpaver::Asset::Kernel)
                     .await
                 {
@@ -887,17 +886,17 @@ impl<'a> Attempt<'a> {
             }
         }
 
-        for (filename, imagemetadata) in manifest.firmware() {
+        for (type_, metadata) in images_metadata.firmware() {
             match firmware_to_write(
-                filename,
-                imagemetadata,
+                type_,
+                metadata,
                 current_config,
                 &self.env.data_sink,
-                &update_package::Image::Firmware { type_: filename.into() },
+                &update_package::Image::Firmware { type_: type_.clone() },
             )
             .await
             {
-                Ok(Some(url)) => images_to_write.firmware.push((filename.to_string(), url)),
+                Ok(Some(url)) => images_to_write.firmware.push((type_.clone(), url)),
                 Ok(None) => (),
                 Err(e) => {
                     // If an error is raised, do not fail the update.
@@ -905,7 +904,7 @@ impl<'a> Attempt<'a> {
                         "Error while determining firmware to write, assume update is needed: {:#}",
                         anyhow!(e)
                     );
-                    images_to_write.firmware.push((filename.clone(), imagemetadata.url().clone()))
+                    images_to_write.firmware.push((type_.clone(), metadata.url().clone()))
                 }
             }
         }
@@ -1096,7 +1095,7 @@ async fn write_image(
 ///
 /// Ok(Some(url)) indicates that the firmware image in the update differs from the device's.
 async fn firmware_to_write(
-    filename: &str,
+    type_: &str,
     image_metadata: &update_package::ImageMetadata,
     current_config: paver::CurrentConfiguration,
     data_sink: &fpaver::DataSinkProxy,
@@ -1107,7 +1106,7 @@ async fn firmware_to_write(
         if get_firmware_buffer_if_hash_and_size_match(
             data_sink,
             non_current_config,
-            filename,
+            type_,
             image_metadata,
         )
         .await
@@ -1120,7 +1119,7 @@ async fn firmware_to_write(
             if let Some(buffer) = get_firmware_buffer_if_hash_and_size_match(
                 data_sink,
                 current_config,
-                filename,
+                type_,
                 image_metadata,
             )
             .await
@@ -1207,15 +1206,15 @@ async fn recovery_to_write(
 async fn get_firmware_buffer_if_hash_and_size_match(
     data_sink: &fpaver::DataSinkProxy,
     configuration: fpaver::Configuration,
-    subtype: &str,
+    type_: &str,
     image: &update_package::ImageMetadata,
 ) -> Option<fmem::Buffer> {
     let fmem::Buffer { vmo, size } =
-        match paver::paver_read_firmware(data_sink, configuration, subtype).await {
+        match paver::paver_read_firmware(data_sink, configuration, type_).await {
             Ok(buffer) => buffer,
             Err(e) => {
                 warn!(
-                    ?configuration, ?image, %subtype,
+                    ?configuration, ?image, %type_,
                     "Error reading firmware so it will not be used to avoid a download: {:#}",
                     anyhow!(e)
                 );
@@ -1233,7 +1232,7 @@ async fn get_firmware_buffer_if_hash_and_size_match(
         Ok(hash) => hash,
         Err(e) => {
             warn!(
-                ?configuration, ?image, %subtype,
+                ?configuration, ?image, %type_,
                 "Error hashing firmware so it will not be used to avoid a download: {:#}",
                 anyhow!(e)
             );

@@ -22,9 +22,9 @@ pub use crate::{
     hash::HashError,
     image::{Image, OpenImageError},
     images::{
-        parse_image_packages_json, BootSlot, ImageMetadata, ImageMetadataError, ImagePackagesError,
-        ImagePackagesManifest, ImagePackagesManifestBuilder, ImagePackagesSlots,
-        VersionedImagePackagesManifest,
+        parse_image_packages_json, ImageMetadata, ImageMetadataError, ImagePackagesError,
+        ImagePackagesManifest, ImagePackagesManifestBuilder, ImagesMetadata,
+        VersionedImagePackagesManifest, ZbiAndOptionalVbmetaMetadata,
     },
     images::{ResolveImagesError, VerifyError},
     name::VerifyNameError,
@@ -74,8 +74,8 @@ impl UpdatePackage {
     }
 
     /// Loads the image packages manifest, or determines that it is not present.
-    pub async fn image_packages(&self) -> Result<ImagePackagesManifest, ImagePackagesError> {
-        images::image_packages(&self.proxy).await
+    pub async fn images_metadata(&self) -> Result<ImagesMetadata, ImagePackagesError> {
+        images::images_metadata(&self.proxy).await
     }
 
     /// Verifies the board file has the given `contents`.

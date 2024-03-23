@@ -105,12 +105,10 @@ async fn check_for_system_update_impl(
         return update_available;
     }
 
-    let images = update_package::ImagePackagesSlots::from(
-        update_pkg
-            .image_packages()
-            .await
-            .map_err(errors::UpdatePackage::ExtractImagePackagesManifest)?,
-    );
+    let images = update_pkg
+        .images_metadata()
+        .await
+        .map_err(errors::UpdatePackage::ExtractImagePackagesManifest)?;
     let images = images.fuchsia().ok_or(errors::UpdatePackage::MissingFuchsiaImages)?;
 
     let (asset_reader, current_config) =

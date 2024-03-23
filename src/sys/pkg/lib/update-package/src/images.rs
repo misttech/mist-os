@@ -66,7 +66,7 @@ pub enum ImagePackagesError {
 /// A builder of [`ImagePackagesManifest`].
 #[derive(Debug, Clone)]
 pub struct ImagePackagesManifestBuilder {
-    slots: ImagePackagesSlots,
+    slots: ImagesMetadata,
 }
 
 /// A versioned [`ImagePackagesManifest`].
@@ -82,14 +82,15 @@ pub enum VersionedImagePackagesManifest {
 /// written during a system update, as well as metadata about those images and where to find them.
 #[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct ImagePackagesManifest {
-    partitions: Vec<AssemblyImageFormat>,
-    firmware: Vec<FirmwareImageFormat>,
+    #[serde(rename = "partitions")]
+    assets: Vec<AssetMetadata>,
+    firmware: Vec<FirmwareMetadata>,
 }
 
 /// Metadata describing a firmware image.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct FirmwareImageFormat {
+pub struct FirmwareMetadata {
     r#type: String,
     size: u64,
     hash: Hash,
@@ -100,30 +101,30 @@ pub struct FirmwareImageFormat {
 /// resolve it from.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct AssemblyImageFormat {
+pub struct AssetMetadata {
     slot: Slot,
-    r#type: SlotImage,
+    r#type: AssetType,
     size: u64,
     hash: Hash,
     url: AbsoluteComponentUrl,
 }
 
-/// Location for where an image should be written.
+/// Whether an asset should be written to recovery or the non-current partition.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum Slot {
-    /// The primary Fuchsia boot slot or slots, typically A or B, depending on which is currently
-    /// in use.
+    /// Write the asset to the non-current partition (if ABR is supported, otherwise overwrite
+    /// the current partition).
     Fuchsia,
 
-    /// The recovery boot slot.
+    /// Write the asset to the recovery partition.
     Recovery,
 }
 
 /// Image asset type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[serde(rename_all = "lowercase")]
-pub enum SlotImage {
+pub enum AssetType {
     /// A Zircon Boot Image.
     Zbi,
 
@@ -131,9 +132,9 @@ pub enum SlotImage {
     Vbmeta,
 }
 
-impl From<ImagePackagesManifest> for ImagePackagesSlots {
+impl From<ImagePackagesManifest> for ImagesMetadata {
     fn from(manifest: ImagePackagesManifest) -> Self {
-        ImagePackagesSlots {
+        ImagesMetadata {
             fuchsia: manifest.fuchsia(),
             recovery: manifest.recovery(),
             firmware: manifest.firmware(),
@@ -141,18 +142,18 @@ impl From<ImagePackagesManifest> for ImagePackagesSlots {
     }
 }
 
-/// A manifest describing the various image packages, all of which are optional, and each contains
-/// a fuchsia-pkg URI for that package and a description of the assets it contains.
+/// The metadata for all the images of the OTA, arranged by how the system-updater would write them
+/// to the paver.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ImagePackagesSlots {
-    fuchsia: Option<BootSlot>,
-    recovery: Option<BootSlot>,
+pub struct ImagesMetadata {
+    fuchsia: Option<ZbiAndOptionalVbmetaMetadata>,
+    recovery: Option<ZbiAndOptionalVbmetaMetadata>,
     firmware: BTreeMap<String, ImageMetadata>,
 }
 
 /// Metadata for artifacts unique to an A/B/R boot slot.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct BootSlot {
+pub struct ZbiAndOptionalVbmetaMetadata {
     /// The zircon boot image.
     zbi: ImageMetadata,
 
@@ -160,7 +161,7 @@ pub struct BootSlot {
     vbmeta: Option<ImageMetadata>,
 }
 
-impl BootSlot {
+impl ZbiAndOptionalVbmetaMetadata {
     /// Returns an immutable borrow to the ZBI designated in this boot slot.
     pub fn zbi(&self) -> &ImageMetadata {
         &self.zbi
@@ -187,10 +188,10 @@ pub struct ImageMetadata {
     url: AbsoluteComponentUrl,
 }
 
-impl FirmwareImageFormat {
-    /// Creates a new [`FirmwareImageFormat`] from the given image metadata and target subtype.
-    pub fn new_from_metadata(subtype: impl Into<String>, metadata: ImageMetadata) -> Self {
-        Self { r#type: subtype.into(), size: metadata.size, hash: metadata.hash, url: metadata.url }
+impl FirmwareMetadata {
+    /// Creates a new [`FirmwareMetadata`] from the given image metadata and firmware type.
+    pub fn new_from_metadata(type_: impl Into<String>, metadata: ImageMetadata) -> Self {
+        Self { r#type: type_.into(), size: metadata.size, hash: metadata.hash, url: metadata.url }
     }
 
     fn key(&self) -> &str {
@@ -203,13 +204,13 @@ impl FirmwareImageFormat {
     }
 }
 
-impl AssemblyImageFormat {
-    /// Creates a new [`AssemblyImageFormat`] from the given image metadata and target slot/type.
-    pub fn new_from_metadata(slot: Slot, kind: SlotImage, metadata: ImageMetadata) -> Self {
+impl AssetMetadata {
+    /// Creates a new [`AssetMetadata`] from the given image metadata and target slot/type.
+    pub fn new_from_metadata(slot: Slot, kind: AssetType, metadata: ImageMetadata) -> Self {
         Self { slot, r#type: kind, size: metadata.size, hash: metadata.hash, url: metadata.url }
     }
 
-    fn key(&self) -> (Slot, SlotImage) {
+    fn key(&self) -> (Slot, AssetType) {
         (self.slot, self.r#type)
     }
 
@@ -223,36 +224,32 @@ impl ImagePackagesManifest {
     /// Returns a [`ImagePackagesManifestBuilder`] with no configured images.
     pub fn builder() -> ImagePackagesManifestBuilder {
         ImagePackagesManifestBuilder {
-            slots: ImagePackagesSlots {
-                fuchsia: None,
-                recovery: None,
-                firmware: Default::default(),
-            },
+            slots: ImagesMetadata { fuchsia: None, recovery: None, firmware: Default::default() },
         }
     }
 
-    fn image(&self, slot: Slot, kind: SlotImage) -> Option<&AssemblyImageFormat> {
-        self.partitions.iter().find(|image| image.slot == slot && image.r#type == kind)
+    fn image(&self, slot: Slot, kind: AssetType) -> Option<&AssetMetadata> {
+        self.assets.iter().find(|image| image.slot == slot && image.r#type == kind)
     }
 
-    fn image_metadata(&self, slot: Slot, kind: SlotImage) -> Option<ImageMetadata> {
+    fn image_metadata(&self, slot: Slot, kind: AssetType) -> Option<ImageMetadata> {
         self.image(slot, kind).map(|image| image.metadata())
     }
 
-    fn slot_metadata(&self, slot: Slot) -> Option<BootSlot> {
-        let zbi = self.image_metadata(slot, SlotImage::Zbi);
-        let vbmeta = self.image_metadata(slot, SlotImage::Vbmeta);
+    fn slot_metadata(&self, slot: Slot) -> Option<ZbiAndOptionalVbmetaMetadata> {
+        let zbi = self.image_metadata(slot, AssetType::Zbi);
+        let vbmeta = self.image_metadata(slot, AssetType::Vbmeta);
 
-        zbi.map(|zbi| BootSlot { zbi, vbmeta })
+        zbi.map(|zbi| ZbiAndOptionalVbmetaMetadata { zbi, vbmeta })
     }
 
     /// Returns metadata for the fuchsia boot slot, if present.
-    pub fn fuchsia(&self) -> Option<BootSlot> {
+    pub fn fuchsia(&self) -> Option<ZbiAndOptionalVbmetaMetadata> {
         self.slot_metadata(Slot::Fuchsia)
     }
 
     /// Returns metadata for the recovery boot slot, if present.
-    pub fn recovery(&self) -> Option<BootSlot> {
+    pub fn recovery(&self) -> Option<ZbiAndOptionalVbmetaMetadata> {
         self.slot_metadata(Slot::Recovery)
     }
 
@@ -313,7 +310,7 @@ impl ImagePackagesManifestBuilder {
         zbi: ImageMetadata,
         vbmeta: Option<ImageMetadata>,
     ) -> &mut Self {
-        self.slots.fuchsia = Some(BootSlot { zbi, vbmeta });
+        self.slots.fuchsia = Some(ZbiAndOptionalVbmetaMetadata { zbi, vbmeta });
         self
     }
 
@@ -324,7 +321,7 @@ impl ImagePackagesManifestBuilder {
         zbi: ImageMetadata,
         vbmeta: Option<ImageMetadata>,
     ) -> &mut Self {
-        self.slots.recovery = Some(BootSlot { zbi, vbmeta });
+        self.slots.recovery = Some(ZbiAndOptionalVbmetaMetadata { zbi, vbmeta });
         self
     }
 
@@ -336,48 +333,40 @@ impl ImagePackagesManifestBuilder {
 
     /// Returns the constructed manifest.
     pub fn build(self) -> VersionedImagePackagesManifest {
-        let mut partitions = vec![];
+        let mut assets = vec![];
         let mut firmware = vec![];
 
         if let Some(slot) = self.slots.fuchsia {
-            partitions.push(AssemblyImageFormat::new_from_metadata(
-                Slot::Fuchsia,
-                SlotImage::Zbi,
-                slot.zbi,
-            ));
+            assets.push(AssetMetadata::new_from_metadata(Slot::Fuchsia, AssetType::Zbi, slot.zbi));
             if let Some(vbmeta) = slot.vbmeta {
-                partitions.push(AssemblyImageFormat::new_from_metadata(
+                assets.push(AssetMetadata::new_from_metadata(
                     Slot::Fuchsia,
-                    SlotImage::Vbmeta,
+                    AssetType::Vbmeta,
                     vbmeta,
                 ));
             }
         }
 
         if let Some(slot) = self.slots.recovery {
-            partitions.push(AssemblyImageFormat::new_from_metadata(
-                Slot::Recovery,
-                SlotImage::Zbi,
-                slot.zbi,
-            ));
+            assets.push(AssetMetadata::new_from_metadata(Slot::Recovery, AssetType::Zbi, slot.zbi));
             if let Some(vbmeta) = slot.vbmeta {
-                partitions.push(AssemblyImageFormat::new_from_metadata(
+                assets.push(AssetMetadata::new_from_metadata(
                     Slot::Recovery,
-                    SlotImage::Vbmeta,
+                    AssetType::Vbmeta,
                     vbmeta,
                 ));
             }
         }
 
-        for (subtype, metadata) in self.slots.firmware {
-            firmware.push(FirmwareImageFormat::new_from_metadata(subtype, metadata));
+        for (type_, metadata) in self.slots.firmware {
+            firmware.push(FirmwareMetadata::new_from_metadata(type_, metadata));
         }
 
-        VersionedImagePackagesManifest::Version1(ImagePackagesManifest { partitions, firmware })
+        VersionedImagePackagesManifest::Version1(ImagePackagesManifest { assets, firmware })
     }
 }
 
-impl ImagePackagesSlots {
+impl ImagesMetadata {
     /// Verify that this image package manifest is appropriate for the given update mode.
     ///
     /// * `UpdateMode::Normal` - a non-recovery kernel image is required.
@@ -393,13 +382,13 @@ impl ImagePackagesSlots {
 
     /// Returns an immutable borrow to the boot slot image package designated as "fuchsia" in this
     /// image packages manifest.
-    pub fn fuchsia(&self) -> Option<&BootSlot> {
+    pub fn fuchsia(&self) -> Option<&ZbiAndOptionalVbmetaMetadata> {
         self.fuchsia.as_ref()
     }
 
     /// Returns an immutable borrow to the boot slot image package designated as "recovery" in this
     /// image packages manifest.
-    pub fn recovery(&self) -> Option<&BootSlot> {
+    pub fn recovery(&self) -> Option<&ZbiAndOptionalVbmetaMetadata> {
         self.recovery.as_ref()
     }
 
@@ -419,8 +408,8 @@ impl<'de> Deserialize<'de> for ImagePackagesManifest {
 
         #[derive(Debug, Deserialize)]
         pub struct DeImagePackagesManifest {
-            partitions: Vec<AssemblyImageFormat>,
-            firmware: Vec<FirmwareImageFormat>,
+            partitions: Vec<AssetMetadata>,
+            firmware: Vec<FirmwareMetadata>,
         }
 
         let parsed = DeImagePackagesManifest::deserialize(deserializer)?;
@@ -446,8 +435,8 @@ impl<'de> Deserialize<'de> for ImagePackagesManifest {
             }
 
             for slot in [Slot::Fuchsia, Slot::Recovery] {
-                if keys.contains(&(slot, SlotImage::Vbmeta))
-                    && !keys.contains(&(slot, SlotImage::Zbi))
+                if keys.contains(&(slot, AssetType::Vbmeta))
+                    && !keys.contains(&(slot, AssetType::Zbi))
                 {
                     return Err(D::Error::custom(format!(
                         "vbmeta without zbi entry in partition {slot:?}"
@@ -476,7 +465,7 @@ impl<'de> Deserialize<'de> for ImagePackagesManifest {
             }
         }
 
-        Ok(ImagePackagesManifest { partitions: parsed.partitions, firmware: parsed.firmware })
+        Ok(ImagePackagesManifest { assets: parsed.partitions, firmware: parsed.firmware })
     }
 }
 
@@ -490,7 +479,13 @@ pub fn parse_image_packages_json(
     Ok(manifest)
 }
 
-pub(crate) async fn image_packages(
+pub(crate) async fn images_metadata(
+    proxy: &fio::DirectoryProxy,
+) -> Result<ImagesMetadata, ImagePackagesError> {
+    image_packages(proxy).await.map(Into::into)
+}
+
+async fn image_packages(
     proxy: &fio::DirectoryProxy,
 ) -> Result<ImagePackagesManifest, ImagePackagesError> {
     let file =
@@ -593,7 +588,7 @@ mod tests {
         .to_string();
 
         let actual = parse_image_packages_json(raw_json.as_bytes()).unwrap();
-        assert_eq!(actual, ImagePackagesManifest { partitions: vec![], firmware: vec![] });
+        assert_eq!(actual, ImagePackagesManifest { assets: vec![], firmware: vec![] });
     }
 
     #[test]
@@ -601,7 +596,7 @@ mod tests {
         assert_eq!(
             ImagePackagesManifest::builder().build(),
             VersionedImagePackagesManifest::Version1(ImagePackagesManifest {
-                partitions: vec![],
+                assets: vec![],
                 firmware: vec![],
             }),
         );
@@ -631,37 +626,37 @@ mod tests {
         assert_eq!(
             actual,
             VersionedImagePackagesManifest::Version1(ImagePackagesManifest {
-                partitions: vec![
-                    AssemblyImageFormat {
+                assets: vec![
+                    AssetMetadata {
                         slot: Slot::Fuchsia,
-                        r#type: SlotImage::Zbi,
+                        r#type: AssetType::Zbi,
                         size: 1,
                         hash: hash(1),
                         url: image_package_resource_url("update-images-fuchsia", 9, "zbi"),
                     },
-                    AssemblyImageFormat {
+                    AssetMetadata {
                         slot: Slot::Fuchsia,
-                        r#type: SlotImage::Vbmeta,
+                        r#type: AssetType::Vbmeta,
                         size: 2,
                         hash: hash(2),
                         url: image_package_resource_url("update-images-fuchsia", 8, "vbmeta"),
                     },
-                    AssemblyImageFormat {
+                    AssetMetadata {
                         slot: Slot::Recovery,
-                        r#type: SlotImage::Zbi,
+                        r#type: AssetType::Zbi,
                         size: 3,
                         hash: hash(3),
                         url: image_package_resource_url("update-images-recovery", 7, "zbi"),
                     },
                 ],
                 firmware: vec![
-                    FirmwareImageFormat {
+                    FirmwareMetadata {
                         r#type: "".to_owned(),
                         size: 5,
                         hash: hash(5),
                         url: image_package_resource_url("update-images-firmware", 6, "a"),
                     },
-                    FirmwareImageFormat {
+                    FirmwareMetadata {
                         r#type: "bl2".to_owned(),
                         size: 6,
                         hash: hash(6),
@@ -727,9 +722,9 @@ mod tests {
 
         let actual = parse_image_packages_json(raw_json.as_bytes()).unwrap();
         assert_eq!(
-            ImagePackagesSlots::from(actual),
-            ImagePackagesSlots {
-                fuchsia: Some(BootSlot {
+            ImagesMetadata::from(actual),
+            ImagesMetadata {
+                fuchsia: Some(ZbiAndOptionalVbmetaMetadata {
                     zbi: ImageMetadata::new(
                         1,
                         hash(1),
@@ -741,7 +736,7 @@ mod tests {
                         image_package_resource_url("package", 1, "vbmeta")
                     )),
                 },),
-                recovery: Some(BootSlot {
+                recovery: Some(ZbiAndOptionalVbmetaMetadata {
                     zbi: ImageMetadata::new(
                         3,
                         hash(3),
@@ -785,7 +780,11 @@ mod tests {
         })
         .to_string();
 
-        assert_matches!(parse_image_packages_json(raw_json.as_bytes()), Err(_));
+        assert_matches!(
+            parse_image_packages_json(raw_json.as_bytes()),
+            Err(ImagePackagesError::Parse(e))
+                if e.to_string().contains("duplicate image entry: (Fuchsia, Zbi)")
+        );
     }
 
     #[test]
@@ -811,7 +810,11 @@ mod tests {
         })
         .to_string();
 
-        assert_matches!(parse_image_packages_json(raw_json.as_bytes()), Err(_));
+        assert_matches!(
+            parse_image_packages_json(raw_json.as_bytes()),
+            Err(ImagePackagesError::Parse(e))
+                if e.to_string().contains(r#"duplicate firmware entry: """#)
+        );
     }
 
     #[test]
@@ -831,11 +834,15 @@ mod tests {
         })
         .to_string();
 
-        assert_matches!(parse_image_packages_json(raw_json.as_bytes()), Err(_));
+        assert_matches!(
+            parse_image_packages_json(raw_json.as_bytes()),
+            Err(ImagePackagesError::Parse(e))
+                if e.to_string().contains("vbmeta without zbi entry in partition Fuchsia")
+        );
     }
 
     #[test]
-    fn rejects_urls_without_hash_paritions() {
+    fn rejects_urls_without_hash_partitions() {
         let raw_json = json!({
             "version": "1",
             "contents":  {
@@ -851,7 +858,10 @@ mod tests {
         })
         .to_string();
 
-        assert_matches!(parse_image_packages_json(raw_json.as_bytes()), Err(_));
+        assert_matches!(
+            parse_image_packages_json(raw_json.as_bytes()),
+            Err(ImagePackagesError::Parse(e)) if e.to_string().contains("does not contain hash")
+        );
     }
 
     #[test]
@@ -870,13 +880,16 @@ mod tests {
         })
         .to_string();
 
-        assert_matches!(parse_image_packages_json(raw_json.as_bytes()), Err(_));
+        assert_matches!(
+            parse_image_packages_json(raw_json.as_bytes()),
+            Err(ImagePackagesError::Parse(e)) if e.to_string().contains("does not contain hash")
+        );
     }
 
     #[test]
     fn verify_mode_normal_requires_zbi() {
-        let with_zbi = ImagePackagesSlots {
-            fuchsia: Some(BootSlot {
+        let with_zbi = ImagesMetadata {
+            fuchsia: Some(ZbiAndOptionalVbmetaMetadata {
                 zbi: ImageMetadata::new(1, hash(1), test_url("zbi")),
                 vbmeta: None,
             }),
@@ -886,16 +899,15 @@ mod tests {
 
         assert_eq!(with_zbi.verify(UpdateMode::Normal), Ok(()));
 
-        let without_zbi =
-            ImagePackagesSlots { fuchsia: None, recovery: None, firmware: btreemap! {} };
+        let without_zbi = ImagesMetadata { fuchsia: None, recovery: None, firmware: btreemap! {} };
 
         assert_eq!(without_zbi.verify(UpdateMode::Normal), Err(VerifyError::MissingZbi));
     }
 
     #[test]
     fn verify_mode_force_recovery_requires_no_zbi() {
-        let with_zbi = ImagePackagesSlots {
-            fuchsia: Some(BootSlot {
+        let with_zbi = ImagesMetadata {
+            fuchsia: Some(ZbiAndOptionalVbmetaMetadata {
                 zbi: ImageMetadata::new(1, hash(1), test_url("zbi")),
                 vbmeta: None,
             }),
@@ -905,8 +917,7 @@ mod tests {
 
         assert_eq!(with_zbi.verify(UpdateMode::ForceRecovery), Err(VerifyError::UnexpectedZbi));
 
-        let without_zbi =
-            ImagePackagesSlots { fuchsia: None, recovery: None, firmware: btreemap! {} };
+        let without_zbi = ImagesMetadata { fuchsia: None, recovery: None, firmware: btreemap! {} };
 
         assert_eq!(without_zbi.verify(UpdateMode::ForceRecovery), Ok(()));
     }
@@ -938,13 +949,13 @@ mod tests {
 
         assert_eq!(
             image_packages(&proxy).await.unwrap(),
-            ImagePackagesManifest { partitions: vec![], firmware: vec![] }
+            ImagePackagesManifest { assets: vec![], firmware: vec![] }
         );
     }
 
     #[fuchsia::test]
     fn boot_slot_accessors() {
-        let slot = BootSlot {
+        let slot = ZbiAndOptionalVbmetaMetadata {
             zbi: ImageMetadata::new(1, hash(1), test_url("zbi")),
             vbmeta: Some(ImageMetadata::new(2, hash(2), test_url("vbmeta"))),
         };
@@ -952,13 +963,16 @@ mod tests {
         assert_eq!(slot.zbi(), &ImageMetadata::new(1, hash(1), test_url("zbi")));
         assert_eq!(slot.vbmeta(), Some(&ImageMetadata::new(2, hash(2), test_url("vbmeta"))));
 
-        let slot = BootSlot { zbi: ImageMetadata::new(1, hash(1), test_url("zbi")), vbmeta: None };
+        let slot = ZbiAndOptionalVbmetaMetadata {
+            zbi: ImageMetadata::new(1, hash(1), test_url("zbi")),
+            vbmeta: None,
+        };
         assert_eq!(slot.vbmeta(), None);
     }
 
     #[fuchsia::test]
     fn image_packages_manifest_accessors() {
-        let slot = BootSlot {
+        let slot = ZbiAndOptionalVbmetaMetadata {
             zbi: ImageMetadata::new(1, hash(1), test_url("zbi")),
             vbmeta: Some(ImageMetadata::new(2, hash(2), test_url("vbmeta"))),
         };
@@ -1000,7 +1014,7 @@ mod tests {
 
     #[fuchsia::test]
     fn firmware_image_format_to_image_metadata() {
-        let assembly_firmware = FirmwareImageFormat {
+        let assembly_firmware = FirmwareMetadata {
             r#type: "".to_string(),
             size: 1,
             hash: hash(1),
@@ -1020,9 +1034,9 @@ mod tests {
 
     #[fuchsia::test]
     fn assembly_image_format_to_image_metadata() {
-        let assembly_image = AssemblyImageFormat {
+        let assembly_image = AssetMetadata {
             slot: Slot::Fuchsia,
-            r#type: SlotImage::Zbi,
+            r#type: AssetType::Zbi,
             size: 1,
             hash: hash(1),
             url: image_package_resource_url("package", 1, "image"),
@@ -1041,55 +1055,55 @@ mod tests {
 
     #[fuchsia::test]
     fn manifest_conversion_minimal() {
-        let manifest = ImagePackagesManifest { partitions: vec![], firmware: vec![] };
+        let manifest = ImagePackagesManifest { assets: vec![], firmware: vec![] };
 
-        let slots = ImagePackagesSlots { fuchsia: None, recovery: None, firmware: btreemap! {} };
+        let slots = ImagesMetadata { fuchsia: None, recovery: None, firmware: btreemap! {} };
 
-        let translated_manifest: ImagePackagesSlots = manifest.into();
+        let translated_manifest: ImagesMetadata = manifest.into();
         assert_eq!(translated_manifest, slots);
     }
 
     #[fuchsia::test]
     fn manifest_conversion_maximal() {
         let manifest = ImagePackagesManifest {
-            partitions: vec![
-                AssemblyImageFormat {
+            assets: vec![
+                AssetMetadata {
                     slot: Slot::Fuchsia,
-                    r#type: SlotImage::Zbi,
+                    r#type: AssetType::Zbi,
                     size: 1,
                     hash: hash(1),
                     url: test_url("1"),
                 },
-                AssemblyImageFormat {
+                AssetMetadata {
                     slot: Slot::Fuchsia,
-                    r#type: SlotImage::Vbmeta,
+                    r#type: AssetType::Vbmeta,
                     size: 2,
                     hash: hash(2),
                     url: test_url("2"),
                 },
-                AssemblyImageFormat {
+                AssetMetadata {
                     slot: Slot::Recovery,
-                    r#type: SlotImage::Zbi,
+                    r#type: AssetType::Zbi,
                     size: 3,
                     hash: hash(3),
                     url: test_url("3"),
                 },
-                AssemblyImageFormat {
+                AssetMetadata {
                     slot: Slot::Recovery,
-                    r#type: SlotImage::Vbmeta,
+                    r#type: AssetType::Vbmeta,
                     size: 4,
                     hash: hash(4),
                     url: test_url("4"),
                 },
             ],
             firmware: vec![
-                FirmwareImageFormat {
+                FirmwareMetadata {
                     r#type: "".to_string(),
                     size: 5,
                     hash: hash(5),
                     url: test_url("5"),
                 },
-                FirmwareImageFormat {
+                FirmwareMetadata {
                     r#type: "bl2".to_string(),
                     size: 6,
                     hash: hash(6),
@@ -1098,12 +1112,12 @@ mod tests {
             ],
         };
 
-        let slots = ImagePackagesSlots {
-            fuchsia: Some(BootSlot {
+        let slots = ImagesMetadata {
+            fuchsia: Some(ZbiAndOptionalVbmetaMetadata {
                 zbi: ImageMetadata::new(1, hash(1), test_url("1")),
                 vbmeta: Some(ImageMetadata::new(2, hash(2), test_url("2"))),
             }),
-            recovery: Some(BootSlot {
+            recovery: Some(ZbiAndOptionalVbmetaMetadata {
                 zbi: ImageMetadata::new(3, hash(3), test_url("3")),
                 vbmeta: Some(ImageMetadata::new(4, hash(4), test_url("4"))),
             }),
@@ -1113,7 +1127,7 @@ mod tests {
             },
         };
 
-        let translated_manifest: ImagePackagesSlots = manifest.into();
+        let translated_manifest: ImagesMetadata = manifest.into();
         assert_eq!(translated_manifest, slots);
     }
 }

@@ -5,7 +5,7 @@
 use {fuchsia_zircon_status::Status, thiserror::Error};
 
 #[cfg(target_os = "fuchsia")]
-use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_zircon::VmoChildOptions};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_zircon as zx};
 
 /// An error encountered while opening an image.
 #[derive(Debug, Error)]
@@ -92,7 +92,7 @@ pub(crate) async fn open_from_path(
     // VMOs. Fortunately, a copy-on-write child clone of the vmo can be made resizable.
     let vmo = vmo
         .create_child(
-            VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | VmoChildOptions::RESIZABLE,
+            zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | zx::VmoChildOptions::RESIZABLE,
             0,
             size,
         )
