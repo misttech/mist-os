@@ -42,6 +42,16 @@ if (is_host) {
       "//src/performance/lib/perf_publish",
     ]
   }
+
+  python_library("test_case_revive") {
+    testonly = true
+    library_name = "test_case_revive"
+    sources = [
+      "__init__.py",
+      "test_case_revive.py",
+    ]
+    library_deps = [ ":fuchsia_base_test" ]
+  }
 }
 
 group("fuchsia_power_base_test_packages") {

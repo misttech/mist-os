@@ -13,6 +13,7 @@ if (is_host) {
   group("tests") {
     testonly = true
     public_deps = [
+      "test_case_revive_example:tests",
       "test_data_resource_access:tests",
       "test_hello_world:tests",
       "test_multi_device:tests",

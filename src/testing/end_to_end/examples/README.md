@@ -33,6 +33,20 @@ $ fx set core.x64 --with //src/testing/end_to_end/examples
 $ fx test //src/testing/end_to_end/examples/test_data_resource_access:data_resource_access_test_fc --e2e --output
 ```
 
+### Example Revive Test Case
+```shell
+$ fx set workbench_eng.x64 --with //src/testing/end_to_end/examples
+
+# To run the test class without reviving any test cases
+$ fx test //src/testing/end_to_end/examples/test_case_revive_example:run_wo_test_case_revive_fc --e2e --output
+
+# To run the test class by reviving test cases with Idle-Suspend-Auto-Resume operation
+$ fx test //src/testing/end_to_end/examples/test_case_revive_example:test_case_revive_with_with_idle_suspend_auto_resume_fc --e2e --output
+
+# To run the test class by reviving test cases with Soft-Reboot operation
+$ fx test //src/testing/end_to_end/examples/test_case_revive_example:test_case_revive_with_with_soft_reboot_fc --e2e --output
+```
+
 ### Soft Reboot Test
 ```shell
 # start the emulator with networking enabled
