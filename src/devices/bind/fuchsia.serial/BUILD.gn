@@ -7,4 +7,5 @@ import("//build/bind/bind.gni")
 bind_library("fuchsia.serial") {
   sdk_category = "partner"
   source = "fuchsia.serial.bind"
+  sdk_area = "Driver SDK"
 }

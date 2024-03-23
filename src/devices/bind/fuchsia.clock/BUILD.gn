@@ -7,4 +7,5 @@ import("//build/bind/bind.gni")
 bind_library("fuchsia.clock") {
   sdk_category = "partner"
   source = "fuchsia.clock.bind"
+  sdk_area = "Driver SDK"
 }

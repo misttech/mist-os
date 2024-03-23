@@ -7,4 +7,5 @@ import("//build/bind/bind.gni")
 bind_library("fuchsia.usb.phy") {
   sdk_category = "partner"
   source = "fuchsia.usb.phy.bind"
+  sdk_area = "Driver SDK"
 }

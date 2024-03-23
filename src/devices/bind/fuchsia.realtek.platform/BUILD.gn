@@ -7,4 +7,5 @@ import("//build/bind/bind.gni")
 bind_library("fuchsia.realtek.platform") {
   source = "fuchsia.realtek.platform.bind"
   sdk_category = "partner"
+  sdk_area = "Driver SDK"
 }

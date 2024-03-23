@@ -462,17 +462,39 @@ sdk_molecule("host_tools") {
 sdk_molecule("core_bindlib") {
   deps = [
     "//src/devices/bind/fuchsia:fuchsia_sdk",
+    "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_sdk",
+    "//src/devices/bind/fuchsia.adc:fuchsia.adc_sdk",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_sdk",
+    "//src/devices/bind/fuchsia.amlogic.platform.a311d:fuchsia.amlogic.platform.a311d_sdk",
+    "//src/devices/bind/fuchsia.amlogic.platform.meson:fuchsia.amlogic.platform.meson_sdk",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_sdk",
+    "//src/devices/bind/fuchsia.block:fuchsia.block_sdk",
+    "//src/devices/bind/fuchsia.broadcom.platform:fuchsia.broadcom.platform_sdk",
+    "//src/devices/bind/fuchsia.broadcom.platform.sdio:fuchsia.broadcom.platform.sdio_sdk",
+    "//src/devices/bind/fuchsia.clock:fuchsia.clock_sdk",
+    "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_sdk",
     "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_sdk",
+    "//src/devices/bind/fuchsia.ethernet:fuchsia.ethernet_sdk",
+    "//src/devices/bind/fuchsia.focaltech.platform:fuchsia.focaltech.platform_sdk",
     "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_sdk",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_sdk",
+    "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_sdk",
     "//src/devices/bind/fuchsia.khadas.platform:fuchsia.khadas.platform_sdk",
     "//src/devices/bind/fuchsia.nxp.platform:fuchsia.nxp.platform_sdk",
+    "//src/devices/bind/fuchsia.pci:fuchsia.pci_sdk",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_sdk",
+    "//src/devices/bind/fuchsia.power:fuchsia.power_sdk",
+    "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_sdk",
+    "//src/devices/bind/fuchsia.realtek.platform:fuchsia.realtek.platform_sdk",
+    "//src/devices/bind/fuchsia.register:fuchsia.register_sdk",
+    "//src/devices/bind/fuchsia.sdio:fuchsia.sdio_sdk",
+    "//src/devices/bind/fuchsia.serial:fuchsia.serial_sdk",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_sdk",
     "//src/devices/bind/fuchsia.test:fuchsia.test_sdk",
     "//src/devices/bind/fuchsia.test.platform:fuchsia.test.platform_sdk",
+    "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_sdk",
+    "//src/devices/bind/fuchsia.usb.phy:fuchsia.usb.phy_sdk",
+    "//src/devices/bind/fuchsia.verisilicon.platform:fuchsia.verisilicon.platform_sdk",
   ]
 }
 
@@ -866,10 +888,7 @@ sdk_molecule("driver_host_tools") {
 # DO NOT ADD anything here!
 sdk_molecule("bind") {
   deps = [
-    "//src/devices/bind/fuchsia:fuchsia_sdk",
     "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_sdk",
-    "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_sdk",
-    "//src/devices/bind/fuchsia.pci:fuchsia.pci_sdk",
     "//src/devices/bind/fuchsia.test:fuchsia.test_sdk",
     "//src/devices/bind/fuchsia.usb:fuchsia.usb_sdk",
   ]

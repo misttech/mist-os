@@ -7,4 +7,5 @@ import("//build/bind/bind.gni")
 bind_library("fuchsia.power") {
   sdk_category = "partner"
   source = "fuchsia.power.bind"
+  sdk_area = "Driver SDK"
 }

@@ -7,4 +7,5 @@ import("//build/bind/bind.gni")
 bind_library("fuchsia.focaltech.platform") {
   source = "fuchsia.focaltech.platform.bind"
   sdk_category = "partner"
+  sdk_area = "Driver SDK"
 }

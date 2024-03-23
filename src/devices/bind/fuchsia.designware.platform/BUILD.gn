@@ -7,4 +7,5 @@ import("//build/bind/bind.gni")
 bind_library("fuchsia.designware.platform") {
   source = "fuchsia.designware.platform.bind"
   sdk_category = "partner"
+  sdk_area = "Driver SDK"
 }
