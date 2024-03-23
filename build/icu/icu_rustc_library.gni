@@ -43,7 +43,8 @@ template("icu_rustc_library") {
 
       # Since the library names are also crate names, we must place each flavored
       # library in a separate directory, but with the same base name.
-      output_dir = "${target_out_dir}/out.${_icu_target_name}"
+      output_dir =
+          "${target_out_dir}/icu_rustc_library_flavored.${_icu_target_name}"
 
       forward_variables_from(invoker,
                              "*",
@@ -98,10 +99,14 @@ template("icu_rustc_library") {
           public_deps = []
         }
 
+        public_deps_to_remove = invoker.icu_public_deps
         foreach(icu_dep, invoker.icu_public_deps) {
           _relabel = get_label_info(icu_dep, "label_no_toolchain")
+          public_deps_to_remove += [ _relabel ]
           public_deps += [ "${_relabel}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
         }
+        public_deps += public_deps_to_remove
+        public_deps -= public_deps_to_remove
       }
 
       if (defined(invoker.icu_test_deps)) {
@@ -120,10 +125,14 @@ template("icu_rustc_library") {
           data_deps = []
         }
 
+        data_deps_to_remove = invoker.icu_data_deps
         foreach(icu_dep, invoker.icu_data_deps) {
           _relabel = get_label_info(icu_dep, "label_no_toolchain")
+          data_deps += [ _relabel ]
           data_deps += [ "${_relabel}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
         }
+        data_deps += data_deps_to_remove
+        data_deps -= data_deps_to_remove
       }
 
       if (defined(configs)) {
@@ -141,10 +150,14 @@ template("icu_rustc_library") {
       non_rust_deps -= icu_fixup_deps
 
       if (defined(invoker.icu_non_rust_deps)) {
+        non_rust_deps_to_remove = invoker.icu_non_rust_deps
         foreach(icu_dep, invoker.icu_non_rust_deps) {
           _relabel = get_label_info(icu_dep, "label_no_toolchain")
+          non_rust_deps_to_remove += [ _relabel ]
           non_rust_deps += [ "${_relabel}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
         }
+        non_rust_deps += non_rust_deps_to_remove
+        non_rust_deps -= non_rust_deps_to_remove
       }
     }
   }
@@ -172,6 +185,8 @@ template("icu_rustc_library") {
                              "visibility",
                              "testonly",
                            ])
+
+    output_dir = "${target_out_dir}/icu_rust_library_unflavored"
 
     # See icu_rustc_binary.gni for detailed comments.
     if (defined(invoker.icu_deps)) {

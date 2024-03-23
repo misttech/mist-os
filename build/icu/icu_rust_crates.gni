@@ -35,6 +35,8 @@ template("icu_group") {
         public_deps +=
             [ "${public_dep}.icu_${icu_flavor.name}_${icu_flavor.commit_id}" ]
       }
+      public_deps += invoker.public_deps
+      public_deps -= invoker.public_deps
     }
   }
 
@@ -90,6 +92,12 @@ template("icu_rust_library") {
             "${target_name}_icu_${icu_flavor.name}_${icu_flavor.commit_id}"
       }
 
+      # Ensure that each ICU-flavored rust artifact gets placed in a directory
+      # with like rust artifacts. This ensures no crates from other flavors get
+      # mixed in at link time.
+      output_dir = "${target_out_dir}/icu_rust_crates_flavored_outdir." +
+                   "${icu_flavor.name}_${icu_flavor.commit_id}"
+
       # Add the appropriate ICU rust configuration.
       configs += [ "//src/lib/icu:version" ]
       configs -= [ "//src/lib/icu:version" ]
@@ -124,5 +132,8 @@ template("icu_rust_library") {
                              "testonly",
                            ])
     output_name = invoker.output_name
+
+    # See the comment on `output_dir` above.
+    output_dir = "${target_out_dir}/icu_rust_crates_unflavored_outdir"
   }
 }
