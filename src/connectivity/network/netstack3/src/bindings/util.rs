@@ -287,7 +287,7 @@ pub(crate) async fn wait_for_resource_removal<T: 'static>(
 ) -> T {
     let mut receiver = match result {
         RemoveResourceResult::Removed(r) => {
-            tracing::debug!("{resource_name} {resource_id:?} removal completed synchronously");
+            tracing::trace!("{resource_name} {resource_id:?} removal completed synchronously");
             return r;
         }
         RemoveResourceResult::Deferred(receiver) => receiver,
