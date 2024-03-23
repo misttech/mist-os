@@ -110,8 +110,6 @@ assembly_input_bundle("bootstrap") {
     "//src/bringup/bin/ptysvc:package",
     "//src/bringup/bin/pwrbtn-monitor:package",
     "//src/bringup/bin/sysinfo:package",
-    "//src/devices/bin/devfs:package",
-    "//src/devices/bin/driver-index:package",
     "//src/diagnostics/archivist:package",
     "//src/power/power-manager:package",
     "//src/power/cpu-manager:package",
@@ -1951,8 +1949,10 @@ assembly_input_bundle("diagnostics_triage_detect_mali") {
 #
 assembly_input_bundle("driver_framework") {
   bootfs_packages = [
+    "//src/devices/bin/devfs:package",
     "//src/devices/bin/driver_host:package",
     "//src/devices/bin/driver_manager:package",
+    "//src/devices/bin/driver-index:package",
   ]
   compiled_packages = [
     {

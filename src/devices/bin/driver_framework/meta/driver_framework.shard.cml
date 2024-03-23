@@ -390,6 +390,15 @@
             // Weak to resolve dependency cycles.
             dependency: "weak",
         },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+            to: [
+                "#boot-drivers",
+                "#full-pkg-drivers",
+                "#pkg-drivers",
+            ],
+        },
     ],
     expose: [
         {
@@ -407,6 +416,14 @@
                 "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
+        },
+        {
+            directory: [
+                "dev-builtin",
+                "dev-class",
+                "dev-topological",
+            ],
+            from: "#devfs-with-pkg",
         },
     ],
     environments: [

@@ -290,14 +290,6 @@
         {
             directory: "boot",
             from: "parent",
-            as: "config",
-            to: "#driver_index",
-            rights: [ "r*" ],
-            subdir: "config/driver_index",
-        },
-        {
-            directory: "boot",
-            from: "parent",
             as: "config-profiles",
             to: "#svchost",
             rights: [ "r*" ],
@@ -918,12 +910,7 @@
         {
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
-            to: [
-                "#boot-drivers",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
-                "#system-activity-governor",
-            ],
+            to: "#system-activity-governor",
         },
 
         // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
@@ -949,14 +936,6 @@
             directory: "shell-commands-bin",
             from: "#pkg-cache",
             as: "bin",
-        },
-        {
-            directory: [
-                "dev-builtin",
-                "dev-class",
-                "dev-topological",
-            ],
-            from: "#devfs-with-pkg",
         },
         {
             directory: [
