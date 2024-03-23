@@ -63,6 +63,11 @@ def main() -> int:
         action="store_true",
         help="Name of the build target",
     )
+    parser.add_argument(
+        "--unbuffered",
+        action="store_true",
+        help="If set, pass argument to Python interpreter to not buffer output",
+    )
     args = parser.parse_args()
 
     infos = json.load(args.library_infos)
@@ -127,10 +132,15 @@ sys.exit({args.main_callable}())
 """
         )
 
+    if args.unbuffered:
+        interpreter = "/usr/bin/env -S fuchsia-vendored-python -u"
+    else:
+        interpreter = "/usr/bin/env fuchsia-vendored-python"
+
     zipapp.create_archive(
         app_dir,
         target=args.output,
-        interpreter="/usr/bin/env fuchsia-vendored-python",
+        interpreter=interpreter,
         compressed=True,
     )
 

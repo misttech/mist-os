@@ -47,6 +47,13 @@
 #     Type: boolean
 #     Default: False
 #
+#   unbuffered_output (optional)
+#     If true, run the Python interpreter in unbuffered mode (-u) by default.
+#     WARNING: This only affects running the output as a binary without
+#     specifying an interpreter (./foo.pyz, not python3 foo.pyz).
+#     Type: boolean
+#     Default: False
+#
 #   sources
 #   deps
 #   visibility
@@ -132,6 +139,9 @@ template("python_binary") {
            ]
     if (defined(invoker.enable_mypy) && invoker.enable_mypy) {
       args += [ "--enable_mypy" ]
+    }
+    if (defined(invoker.unbuffered_output) && invoker.unbuffered_output) {
+      args += [ "--unbuffered" ]
     }
   }
 }
