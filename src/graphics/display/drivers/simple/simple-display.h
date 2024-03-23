@@ -58,6 +58,7 @@ class SimpleDisplay : public DeviceType,
 
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
+  void DisplayControllerImplResetDisplayControllerInterface();
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(

@@ -36,7 +36,7 @@
 namespace fake_display {
 
 class FakeDisplay;
-using DeviceType = ddk::Device<FakeDisplay, ddk::GetProtocolable, ddk::ChildPreReleaseable>;
+using DeviceType = ddk::Device<FakeDisplay, ddk::GetProtocolable>;
 
 struct FakeDisplayDeviceConfig {
   // If enabled, the fake display device will not automatically emit Vsync
@@ -75,6 +75,7 @@ class FakeDisplay : public DeviceType,
   // DisplayControllerImplProtocol implementation:
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
+  void DisplayControllerImplResetDisplayControllerInterface();
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
@@ -112,10 +113,6 @@ class FakeDisplay : public DeviceType,
   // Required functions for DeviceType
   void DdkRelease();
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
-  void DdkChildPreRelease(void* child_ctx) {
-    fbl::AutoLock lock(&interface_mutex_);
-    controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient();
-  }
 
   const display_controller_impl_protocol_t* display_controller_impl_banjo_protocol() const {
     return &display_controller_impl_banjo_protocol_;

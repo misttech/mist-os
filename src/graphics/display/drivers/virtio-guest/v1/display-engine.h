@@ -71,6 +71,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
 
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
+  void DisplayControllerImplResetDisplayControllerInterface();
 
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);

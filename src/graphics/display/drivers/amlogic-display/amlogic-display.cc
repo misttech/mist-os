@@ -223,6 +223,11 @@ void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
   }
 }
 
+void AmlogicDisplay::DisplayControllerImplResetDisplayControllerInterface() {
+  fbl::AutoLock lock(&display_mutex_);
+  dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
+}
+
 zx_status_t AmlogicDisplay::DisplayControllerImplImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =

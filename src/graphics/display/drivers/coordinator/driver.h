@@ -49,7 +49,10 @@ class Driver : public ddk::Device<Driver> {
 
   void SetEld(DisplayId display_id, const uint8_t* raw_eld_list, size_t raw_eld_count);
 
+  // TODO(https://fxbug.dev/314126494): These methods are only used in the
+  // banjo transport. Remove when all drivers are migrated to FIDL transport.
   void SetDisplayControllerInterface(display_controller_interface_protocol_ops_t* ops);
+  void ResetDisplayControllerInterface();
 
   zx_status_t ImportImage(image_t* image, DriverBufferCollectionId collection_id, uint32_t index);
   zx_status_t ImportImageForCapture(DriverBufferCollectionId collection_id, uint32_t index,

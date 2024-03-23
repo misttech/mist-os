@@ -357,6 +357,10 @@ closed protocol DisplayControllerImpl {
         intf client_end:DisplayControllerInterface;
     }) -> ();
 
+    /// Resets the DisplayControllerInterface client (if set) and will not call
+    /// DisplayControllerInterface callback methods anymore.
+    strict ResetDisplayControllerInterface() -> ();
+
     /// Import a sysmem buffer collection token.
     ///
     /// Returns ZX_ERR_ALREADY_EXISTS if `collection_id` is in use.

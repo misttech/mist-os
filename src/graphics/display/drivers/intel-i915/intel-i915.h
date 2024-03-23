@@ -52,8 +52,8 @@ typedef struct buffer_allocation {
 } buffer_allocation_t;
 
 class Controller;
-using DeviceType = ddk::Device<Controller, ddk::Initializable, ddk::Unbindable, ddk::Suspendable,
-                               ddk::Resumable, ddk::ChildPreReleaseable>;
+using DeviceType =
+    ddk::Device<Controller, ddk::Initializable, ddk::Unbindable, ddk::Suspendable, ddk::Resumable>;
 
 class Controller : public DeviceType,
                    public ddk::DisplayControllerImplProtocol<Controller, ddk::base_protocol>,
@@ -75,20 +75,11 @@ class Controller : public DeviceType,
   void DdkRelease();
   void DdkSuspend(ddk::SuspendTxn txn);
   void DdkResume(ddk::ResumeTxn txn);
-  void DdkChildPreRelease(void* child_ctx) {
-    fbl::AutoLock lock(&display_lock_);
-    if (dc_intf_.is_valid()) {
-      display_controller_interface_protocol_t proto;
-      dc_intf_.GetProto(&proto);
-      if (proto.ctx == child_ctx) {
-        dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
-      }
-    }
-  }
 
   // display controller protocol ops
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol* intf);
+  void DisplayControllerImplResetDisplayControllerInterface();
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(

@@ -38,7 +38,7 @@
 namespace goldfish {
 
 class Display;
-using DisplayType = ddk::Device<Display, ddk::ChildPreReleaseable>;
+using DisplayType = ddk::Device<Display>;
 
 class Display : public DisplayType,
                 public ddk::DisplayControllerImplProtocol<Display, ddk::base_protocol> {
@@ -53,14 +53,11 @@ class Display : public DisplayType,
 
   // Device protocol implementation.
   void DdkRelease();
-  void DdkChildPreRelease(void* child_ctx) {
-    fbl::AutoLock lock(&flush_lock_);
-    dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
-  }
 
   // Display controller protocol implementation.
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* interface);
+  void DisplayControllerImplResetDisplayControllerInterface();
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(

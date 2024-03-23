@@ -833,6 +833,11 @@ void Controller::DisplayControllerImplSetDisplayControllerInterface(
   }
 }
 
+void Controller::DisplayControllerImplResetDisplayControllerInterface() {
+  fbl::AutoLock lock(&display_lock_);
+  dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
+}
+
 static bool ConvertPixelFormatToTilingType(fuchsia_sysmem::wire::PixelFormat format,
                                            uint32_t* image_tiling_type_out) {
   if (format.type != fuchsia_sysmem::wire::PixelFormatType::kBgra32 &&

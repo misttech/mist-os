@@ -74,7 +74,7 @@ struct ImageInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ImageInfo>> 
 class AmlogicDisplay;
 
 // AmlogicDisplay will implement only a few subset of Device.
-using DeviceType = ddk::Device<AmlogicDisplay, ddk::GetProtocolable, ddk::ChildPreReleaseable>;
+using DeviceType = ddk::Device<AmlogicDisplay, ddk::GetProtocolable>;
 class AmlogicDisplay
     : public DeviceType,
       public ddk::DisplayControllerImplProtocol<AmlogicDisplay, ddk::base_protocol> {
@@ -101,6 +101,7 @@ class AmlogicDisplay
   // Required functions needed to implement Display Controller Protocol
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
+  void DisplayControllerImplResetDisplayControllerInterface();
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
@@ -136,10 +137,6 @@ class AmlogicDisplay
   // Required functions for DeviceType
   void DdkRelease();
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
-  void DdkChildPreRelease(void* child_ctx) {
-    fbl::AutoLock lock(&display_mutex_);
-    dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
-  }
 
   void Dump() { vout_->Dump(); }
 

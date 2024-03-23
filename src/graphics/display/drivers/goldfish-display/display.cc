@@ -68,6 +68,13 @@ constexpr uint32_t FB_FPS = 5;
 constexpr uint32_t GL_RGBA = 0x1908;
 constexpr uint32_t GL_BGRA_EXT = 0x80E1;
 
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+}
+
 }  // namespace
 
 // static
@@ -289,11 +296,9 @@ void Display::DisplayControllerImplSetDisplayControllerInterface(
   }
 }
 
-zx_koid_t GetKoid(zx_handle_t handle) {
-  zx_info_handle_basic_t info;
-  zx_status_t status =
-      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+void Display::DisplayControllerImplResetDisplayControllerInterface() {
+  fbl::AutoLock lock(&flush_lock_);
+  dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
 }
 
 zx_status_t Display::InitSysmemAllocatorClientLocked() {

@@ -964,6 +964,7 @@ void Controller::DdkRelease() {
     const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
     driver_.ApplyConfiguration(&configs, 0, &banjo_config_stamp);
   }
+  driver_.ResetDisplayControllerInterface();
   delete this;
 }
 

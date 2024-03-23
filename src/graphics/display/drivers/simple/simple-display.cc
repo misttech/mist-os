@@ -128,6 +128,10 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
   intf_.OnDisplaysChanged(&args, 1, nullptr, 0);
 }
 
+void SimpleDisplay::DisplayControllerImplResetDisplayControllerInterface() {
+  intf_ = ddk::DisplayControllerInterfaceProtocolClient();
+}
+
 zx_status_t SimpleDisplay::DisplayControllerImplImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =

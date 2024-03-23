@@ -125,6 +125,15 @@ void Driver::SetDisplayControllerInterface(display_controller_interface_protocol
   dc_.SetDisplayControllerInterface(controller_, ops);
 }
 
+void Driver::ResetDisplayControllerInterface() {
+  if (use_engine_) {
+    return;
+  }
+
+  ZX_DEBUG_ASSERT(dc_.is_valid());
+  dc_.ResetDisplayControllerInterface();
+}
+
 zx_status_t Driver::ImportImage(image_t* image, DriverBufferCollectionId collection_id,
                                 uint32_t index) {
   if (use_engine_) {

@@ -116,6 +116,14 @@ void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
   display_controller_interface_on_displays_changed(intf, &args, 1, nullptr, 0);
 }
 
+void DisplayEngine::DisplayControllerImplResetDisplayControllerInterface() {
+  fbl::AutoLock al(&flush_lock_);
+  dc_intf_ = display_controller_interface_protocol_t{
+      .ops = nullptr,
+      .ctx = nullptr,
+  };
+}
+
 zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForImage(
     display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index,
     const image_metadata_t& image_metadata) const {

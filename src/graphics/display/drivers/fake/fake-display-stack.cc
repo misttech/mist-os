@@ -175,7 +175,6 @@ void FakeDisplayStack::SyncShutdown() {
   display_loop_.JoinThreads();
   sysmem_loop_.JoinThreads();
 
-  display_->DdkChildPreRelease(coordinator_controller_);
   coordinator_controller_->DdkAsyncRemove();
   display_->DdkAsyncRemove();
   device_async_remove(sysmem_device_);

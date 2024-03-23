@@ -152,6 +152,11 @@ void FakeDisplay::DisplayControllerImplSetDisplayControllerInterface(
   controller_interface_client_.OnDisplaysChanged(&args, 1, nullptr, 0);
 }
 
+void FakeDisplay::DisplayControllerImplResetDisplayControllerInterface() {
+  fbl::AutoLock interface_lock(&interface_mutex_);
+  controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient();
+}
+
 zx_status_t FakeDisplay::ImportVmoImageForTesting(image_t* image, zx::vmo vmo, size_t offset) {
   zx_status_t status = ZX_OK;
 
