@@ -7,7 +7,12 @@
 import abc
 from collections.abc import Callable
 
-from honeydew.interfaces.affordances import rtc, session, tracing
+from honeydew.interfaces.affordances import (
+    rtc,
+    session,
+    system_power_state_controller,
+    tracing,
+)
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_avrcp,
     bluetooth_gap,
@@ -221,6 +226,20 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             session.Session object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def system_power_state_controller(
+        self,
+    ) -> system_power_state_controller.SystemPowerStateController:
+        """Returns a SystemPowerStateController affordance object.
+
+        Returns:
+            system_power_state_controller.SystemPowerStateController object
+
+        Raises:
+            errors.NotSupportedError: If Fuchsia device does not support Starnix
         """
 
     @properties.Affordance

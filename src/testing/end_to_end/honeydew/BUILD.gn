@@ -33,6 +33,8 @@ python_library("honeydew") {
     "affordances/sl4f/wlan/__init__.py",
     "affordances/sl4f/wlan/wlan.py",
     "affordances/sl4f/wlan/wlan_policy.py",
+    "affordances/starnix/__init__.py",
+    "affordances/starnix/system_power_state_controller.py",
     "auxiliary_devices/__init__.py",
     "auxiliary_devices/power_switch_dmc.py",
     "errors.py",
@@ -51,6 +53,7 @@ python_library("honeydew") {
     "interfaces/affordances/bluetooth/profiles/bluetooth_gap.py",
     "interfaces/affordances/rtc.py",
     "interfaces/affordances/session.py",
+    "interfaces/affordances/system_power_state_controller.py",
     "interfaces/affordances/tracing.py",
     "interfaces/affordances/ui/__init__.py",
     "interfaces/affordances/ui/screenshot.py",
@@ -89,6 +92,9 @@ python_library("honeydew") {
   library_deps = [
     ":honeydew_fidl_ir_and_deps",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+
+    # For "ffx starnix adb" command
+    "//src/developer/ffx/tools/starnix:ffx_starnix_test_data",
     "//third_party/pypng",
   ]
 

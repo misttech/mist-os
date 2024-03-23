@@ -273,6 +273,29 @@ if (is_host) {
       ":workbench_nuc_unstable_tests",
     ]
   }
+
+  # starnix.vim3
+  # Note: This will be run on internal builder, hence using `starnix` here
+  # instead of internal `<PRODUCT>` name.
+  group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
+    testonly = true
+    public_deps =
+        [ "honeydew/tests/functional_tests:starnix_vim3_stable_tests" ]
+  }
+
+  group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
+    testonly = true
+    public_deps =
+        [ "honeydew/tests/functional_tests:starnix_vim3_unstable_tests" ]
+  }
+
+  group("starnix_vim3_staging_tests") {
+    testonly = true
+    public_deps = [
+      ":starnix_vim3_stable_tests",
+      ":starnix_vim3_unstable_tests",
+    ]
+  }
 }
 
 ############################## Test groups - End ###############################
@@ -473,6 +496,29 @@ group("workbench_nuc_staging_packages") {
   public_deps = [
     ":workbench_nuc_stable_packages",
     ":workbench_nuc_unstable_packages",
+  ]
+}
+
+# starnix.vim3
+# Note: This will be run on internal builder, hence using `starnix` here instead
+# of internal `<PRODUCT>` name.
+group_with_no_dir_target_deps("starnix_vim3_stable_packages") {
+  testonly = true
+  public_deps =
+      [ "honeydew/tests/functional_tests:starnix_vim3_stable_packages" ]
+}
+
+group_with_no_dir_target_deps("starnix_vim3_unstable_packages") {
+  testonly = true
+  public_deps =
+      [ "honeydew/tests/functional_tests:starnix_vim3_unstable_packages" ]
+}
+
+group("starnix_vim3_staging_packages") {
+  testonly = true
+  public_deps = [
+    ":starnix_vim3_stable_packages",
+    ":starnix_vim3_unstable_packages",
   ]
 }
 ############################ Package groups - End ##############################

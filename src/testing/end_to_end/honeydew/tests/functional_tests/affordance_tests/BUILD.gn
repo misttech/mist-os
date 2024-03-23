@@ -10,6 +10,7 @@ if (is_host) {
       "test_bluetooth:tests",
       "test_rtc:tests",
       "test_session:tests",
+      "test_system_power_state_controller:tests",
       "test_tracing:tests",
       "test_ui:tests",
       "test_wlan:tests",

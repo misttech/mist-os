@@ -105,3 +105,16 @@ class SessionError(HoneydewError):
 
 class DeviceNotConnectedError(HoneydewError):
     """Exception to be raised when device is not connected to host."""
+
+
+class SystemPowerStateControllerError(HoneydewError):
+    """Exception to be raised by SystemPowerStateController affordance."""
+
+
+class NotSupportedError(HoneydewError):
+    """Exception to be raised if an operation is not yet supported by
+    underlying Fuchsia platform."""
+
+
+class StarnixError(HoneydewError):
+    """Exception to be raised if a starnix operation fails."""

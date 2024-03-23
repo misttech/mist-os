@@ -1,0 +1,41 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be found
+# in the LICENSE file.
+
+import("//build/python/python_mobly_test.gni")
+import("//build/testing/environments.gni")
+
+if (is_host) {
+  python_mobly_test("system_power_state_controller_test_on_starnix_fc") {
+    enable_mypy = true
+    main_source = "test_system_power_state_controller.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+    transport = "fuchsia-controller"
+    params_source = "params_starnix.yaml"
+    environments = [ vim3_env ]
+  }
+
+  python_mobly_test("system_power_state_controller_test_on_non_starnix_fc") {
+    enable_mypy = true
+    main_source = "test_system_power_state_controller.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+    transport = "fuchsia-controller"
+    params_source = "params_non_starnix.yaml"
+    environments = [ vim3_env ]
+  }
+}
+
+# Group containing all of the SystemPowerStateController affordance functional test cases.
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":system_power_state_controller_test_on_non_starnix_fc($host_toolchain)",
+    ":system_power_state_controller_test_on_starnix_fc($host_toolchain)",
+  ]
+}

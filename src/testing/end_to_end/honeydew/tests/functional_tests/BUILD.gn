@@ -126,7 +126,10 @@ if (is_host) {
 
   group_with_no_dir_target_deps("core_vim3_unstable_tests") {
     testonly = true
-    public_deps = [ "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)" ]
+    public_deps = [
+      "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix_fc($host_toolchain)",
+      "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
+    ]
   }
 
   # workbench_eng.vim3
@@ -140,7 +143,10 @@ if (is_host) {
 
   group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
     testonly = true
-    public_deps = [ "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)" ]
+    public_deps = [
+      "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix_fc($host_toolchain)",
+      "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
+    ]
   }
 
   # core.nuc
@@ -177,6 +183,18 @@ if (is_host) {
   group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
     testonly = true
     public_deps = []
+  }
+
+  # starnix.vim3
+  # Note: This will be run on internal builder, hence using `starnix` here instead of internal `<PRODUCT>` name.
+  group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
+    testonly = true
+    public_deps = [ "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix_fc($host_toolchain)" ]
   }
 }
 
@@ -284,6 +302,18 @@ group_with_no_dir_target_deps("workbench_nuc_stable_packages") {
 }
 
 group_with_no_dir_target_deps("workbench_nuc_unstable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+# starnix.vim3
+# Note: This will be run on internal builder, hence using `starnix` here instead of internal `<PRODUCT>` name.
+group_with_no_dir_target_deps("starnix_vim3_stable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group_with_no_dir_target_deps("starnix_vim3_unstable_packages") {
   testonly = true
   public_deps = []
 }

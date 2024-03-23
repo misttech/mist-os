@@ -8,5 +8,6 @@ group("tests") {
     "ffx:tests",
     "fuchsia_controller:tests",
     "sl4f:tests",
+    "starnix:tests",
   ]
 }

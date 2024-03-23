@@ -15,7 +15,13 @@ from typing import Any
 from honeydew import errors
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
-from honeydew.interfaces.affordances import session
+from honeydew.affordances.starnix import (
+    system_power_state_controller as system_power_state_controller_starnix,
+)
+from honeydew.interfaces.affordances import (
+    session,
+    system_power_state_controller,
+)
 from honeydew.interfaces.affordances.ui import screenshot
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
@@ -274,6 +280,22 @@ class BaseFuchsiaDevice(
             screenshot.Screenshot object
         """
         return screenshot_ffx.Screenshot(self.ffx)
+
+    @properties.Affordance
+    def system_power_state_controller(
+        self,
+    ) -> system_power_state_controller.SystemPowerStateController:
+        """Returns a SystemPowerStateController affordance object.
+
+        Returns:
+            system_power_state_controller.SystemPowerStateController object
+
+        Raises:
+            errors.NotSupportedError: If Fuchsia device does not support Starnix
+        """
+        return system_power_state_controller_starnix.SystemPowerStateController(
+            device_name=self.device_name, ffx=self.ffx
+        )
 
     # List all the public methods
     def health_check(self) -> None:
