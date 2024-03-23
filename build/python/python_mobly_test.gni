@@ -14,11 +14,6 @@ import("//build/testing/host_test_data.gni")
 # that specializes at E2E tests with complex testbeds
 # such as multi-device testing.
 #
-# Subtargets:
-#  * $target_name.binary_and_config
-#    - The associated group target that contains metadata information on the
-#      test binary and test config.
-#
 # Example
 # ```
 # python_mobly_test("hello_world_test") {
@@ -148,12 +143,6 @@ import("//build/testing/host_test_data.gni")
 #
 #  deps
 #  visibility
-#
-# Metadata
-#
-#   pye2e_test_sources ($target_name.binary_and_config targets only)
-#     List of scopes for each test-specific file including the name and path of
-#     the source (relative to root).
 
 template("python_mobly_test") {
   assert(defined(invoker.main_source), "main_source is required")
@@ -185,6 +174,7 @@ template("python_mobly_test") {
                              "sources",
                              "enable_mypy",
                            ])
+
     testonly = _testonly
     visibility = [ ":*" ]
 
@@ -193,13 +183,7 @@ template("python_mobly_test") {
     # Mobly-specific entry point.
     main_callable = "test_runner.main"
 
-    deps = []
-    if (_testonly) {
-      deps += [ "//third_party/mobly" ]
-    } else {
-      deps += [ "//third_party/mobly:mobly_no_testonly" ]
-    }
-
+    deps = [ "//third_party/mobly" ]
     if (defined(invoker.libraries)) {
       deps += invoker.libraries
     }
@@ -307,33 +291,6 @@ template("python_mobly_test") {
     ]
 
     _additional_deps += [ ":${_param_yaml_data_target}" ]
-  }
-
-  group("${target_name}.binary_and_config") {
-    testonly = _testonly
-    deps = [ ":${_test_binary_target}" ]
-
-    metadata = {
-      pye2e_test_sources = [
-        {
-          # Add PYZ as a test source.
-          name = _test_binary_name
-          path = rebase_path(
-                  get_label_info(":${_test_binary_target}", "target_out_dir") +
-                      "/${_test_binary_name}",
-                  root_build_dir)
-        },
-      ]
-    }
-
-    if (defined(_params_source)) {
-      metadata.pye2e_test_sources += [
-        {
-          name = "params.yaml"
-          path = rebase_path(_params_source, root_build_dir)
-        },
-      ]
-    }
   }
 
   # If specified, define test config data target and add data path to host args.

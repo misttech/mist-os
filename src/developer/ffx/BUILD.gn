@@ -116,11 +116,6 @@ if (is_host) {
   }
 
   host_test_data("test_data") {
-    # Needed for SDK inclusion
-    #
-    # TODO(b/330934833): Remove when IDK allows for `testonly` targets in dep
-    # tree or when we can separate the concept of data_dep from host_test_data.
-    testonly = false
     deps = [ ":host" ]
     sources = [ "${host_tools_dir}/ffx" ]
   }

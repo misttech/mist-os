@@ -132,7 +132,6 @@ _AREA_OPTIONAL_TYPES = [
     "dart_library",
     "data",
     "documentation",
-    "experimental_python_e2e_test",
     "ffx_tool",
     "host_tool",
     "loadable_module",

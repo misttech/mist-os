@@ -137,11 +137,6 @@ import("//build/testing/host_test_data.gni")
 #   testonly
 #   visibility
 #
-# Metadata
-#
-#   fidl_ir_info (`${target_name}_host_test_data` only)
-#     Exactly one scope including the name of the library and the source IR JSON
-#     path (relative to root_build_dir).
 template("fidl") {
   assert(defined(invoker.sources), "A FIDL library requires some sources.")
   assert(!defined(invoker.deps),
@@ -277,15 +272,6 @@ template("fidl") {
         fidl_ir_root_outfile,
       ]
 
-      # Explicitly set `testonly` to false for SDK inclusion.
-      # host_test_data()'s default for `testonly` is true so we can't simply
-      # forward `invoker.testonly` as that's most likely unset for fidl()
-      # targets.
-      testonly = false
-      if (defined(invoker.testonly)) {
-        testonly = invoker.testonly
-      }
-
       # It's only necessary to depend on fidl_ir_target got get the FIDL IR json
       # file, but without depending on fidl_target, there is no entry in
       # all_fidl_json.txt, which at the moment is the main source for finding
@@ -312,22 +298,13 @@ template("fidl") {
     }
 
     group("${target_name}_host_test_data") {
-      forward_variables_from(invoker, [ "testonly" ])
+      testonly = true
       deps = [ ":_${target_name}" ]
       if (defined(invoker.public_deps)) {
         foreach(pdep, invoker.public_deps) {
           label = get_label_info(pdep, "label_no_toolchain")
           deps += [ "${label}_host_test_data" ]
         }
-      }
-
-      metadata = {
-        fidl_ir_info = [
-          {
-            library_name = fidl_library_name
-            source = rebase_path(fidl_ir_root_outfile, root_build_dir)
-          },
-        ]
       }
     }
   }

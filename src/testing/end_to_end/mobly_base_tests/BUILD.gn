@@ -5,33 +5,17 @@
 import("//build/python/python_library.gni")
 
 if (is_host) {
-  group("fuchsia_base_test") {
-    testonly = true
-
-    deps = [ ":fuchsia_base_test_no_testonly" ]
-  }
-
-  python_library("fuchsia_base_test_no_testonly") {
-    # In-tree-only tests should prefer ":fuchsia_base_test" because that
-    # enforces that only testonly code uses regular base test. This target
-    # should be used for tests or dependencies of tests that are packaged into
-    # the SDK, since they cannot be testonly.
-    visibility = [
-      ":*",
-
-      # SDK-based test targets listed below.
-      "//src/tests/end_to_end/rtc:*",
-    ]
-
+  python_library("fuchsia_base_test") {
     enable_mypy = true
+    testonly = true
     library_name = "fuchsia_base_test"
     sources = [
       "__init__.py",
       "fuchsia_base_test.py",
     ]
     library_deps = [
-      "//src/testing/end_to_end/mobly_controller:mobly_controller_no_testonly",
-      "//third_party/mobly:mobly_no_testonly",
+      "//src/testing/end_to_end/mobly_controller",
+      "//third_party/mobly",
     ]
   }
 

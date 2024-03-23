@@ -130,7 +130,6 @@ documentation://docs/open_source.json
 documentation://docs/ref_docs.json
 documentation://docs/sdk_notice.json
 documentation://docs/vulkan_license.json
-experimental_python_e2e_test://python/rtc_conformance_test
 ffx_tool://tools/arm64/ffx_tools/ffx-agis
 ffx_tool://tools/arm64/ffx_tools/ffx-assembly
 ffx_tool://tools/arm64/ffx_tools/ffx-audio
