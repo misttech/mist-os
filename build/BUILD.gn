@@ -261,7 +261,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//src/devices/testing/fake-msi:*",
     "//src/devices/testing/fake-object:*",
     "//src/devices/testing/fake-resource:*",
-    "//src/devices/testing/mock-mmio-reg:*",
     "//src/firmware/lib/abr:*",
     "//src/firmware/lib/zbi:*",
     "//src/firmware/lib/zircon_boot:*",
