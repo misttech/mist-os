@@ -135,7 +135,8 @@ class UsbAdbDevice : public UsbAdb,
       __TA_GUARDED(adb_mutex_);
 
   // Set once the interface is configured.
-  fuchsia_hardware_adb::StatusFlags status_ __TA_GUARDED(lock_);
+  fuchsia_hardware_adb::StatusFlags status_ __TA_GUARDED(lock_) =
+      fuchsia_hardware_adb::StatusFlags(0);
 
   // Holds suspend/unbind DDK callback to be invoked once shutdown is complete.
   fit::callback<void()> shutdown_callback_ __TA_GUARDED(lock_);

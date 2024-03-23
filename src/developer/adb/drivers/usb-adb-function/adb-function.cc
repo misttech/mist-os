@@ -33,12 +33,13 @@ void CompleteTxn(CompleterType& completer, zx_status_t status) {
 }  // namespace
 
 void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& completer) {
-  zx_status_t status = ZX_OK;
+  zx_status_t ret_status = ZX_OK;
   bool enable_ep = false;
   {
     fbl::AutoLock _(&adb_mutex_);
     if (adb_binding_.has_value()) {
-      status = ZX_ERR_ALREADY_BOUND;
+      zxlogf(ERROR, "Device is already bound");
+      ret_status = ZX_ERR_ALREADY_BOUND;
     } else {
       adb_binding_ = fidl::BindServer<fuchsia_hardware_adb::UsbAdbImpl>(
           dispatcher_, std::move(request->interface), this,
@@ -51,13 +52,19 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
       auto result = fidl::WireSendEvent(adb_binding_.value())->OnStatusChanged(status_);
       if (!result.ok()) {
         zxlogf(ERROR, "Could not call AdbInterface Status %s", result.error().status_string());
-        status = ZX_ERR_IO;
+        ret_status = ZX_ERR_IO;
       }
     }
   }
   // Configure endpoints as adb binding is set now.
-  status = ConfigureEndpoints(enable_ep);
-  CompleteTxn(completer, status);
+  {
+    auto status = ConfigureEndpoints(enable_ep);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "ConfigureEndpoints failed %d", status);
+    }
+    ret_status = ret_status == ZX_OK ? status : ret_status;
+  }
+  CompleteTxn(completer, ret_status);
 }
 
 void UsbAdbDevice::Stop() {
@@ -405,7 +412,7 @@ zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetInterface(uint8_t interface, ui
     }
   }
 
-  fuchsia_hardware_adb::StatusFlags online;
+  auto online = fuchsia_hardware_adb::StatusFlags(0);
   if (alt_setting && status == ZX_OK) {
     online = fuchsia_hardware_adb::StatusFlags::kOnline;
 
