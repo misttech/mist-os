@@ -450,7 +450,11 @@ mod tests {
                 name: Some("firmware_tpl".into()),
                 image: fake_bootloader.to_path_buf(),
             }],
-            partitions: vec![Partition::ZBI { name: "zircon_a".into(), slot: PartitionSlot::A }],
+            partitions: vec![Partition::ZBI {
+                name: "zircon_a".into(),
+                slot: PartitionSlot::A,
+                size: None,
+            }],
             hardware_revision: "hw".into(),
         };
         let epoch = EpochFile::Version1 { epoch: 0 };
@@ -599,7 +603,11 @@ mod tests {
                 name: Some("firmware_tpl".into()),
                 image: fake_bootloader.to_path_buf(),
             }],
-            partitions: vec![Partition::ZBI { name: "zircon_a".into(), slot: PartitionSlot::A }],
+            partitions: vec![Partition::ZBI {
+                name: "zircon_a".into(),
+                slot: PartitionSlot::A,
+                size: None,
+            }],
             hardware_revision: "hw".into(),
         };
         let epoch = EpochFile::Version1 { epoch: 0 };

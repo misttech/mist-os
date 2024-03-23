@@ -300,7 +300,7 @@ fn get_zbi_partition_name(
     };
 
     for partition in &partitions.partitions {
-        if let Partition::ZBI { name, slot } = &partition {
+        if let Partition::ZBI { name, slot, .. } = &partition {
             if slot == &partition_slot {
                 return Ok(name);
             }
@@ -323,7 +323,7 @@ fn get_vbmeta_partition_name(
     };
 
     for partition in &partitions.partitions {
-        if let Partition::VBMeta { name, slot } = &partition {
+        if let Partition::VBMeta { name, slot, .. } = &partition {
             if slot == &partition_slot {
                 return Ok(name);
             }

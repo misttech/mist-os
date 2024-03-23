@@ -855,7 +855,7 @@ mod test {
         let partitions_file = File::create(&partitions_path).unwrap();
         let partitions_config = {
             let mut config = PartitionsConfig::default();
-            config.partitions = vec![Partition::Fxfs { name: String::from("fxblob") }];
+            config.partitions = vec![Partition::Fxfs { name: String::from("fxblob"), size: None }];
             config
         };
         serde_json::to_writer(&partitions_file, &partitions_config).unwrap();

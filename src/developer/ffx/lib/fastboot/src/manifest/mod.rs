@@ -282,14 +282,14 @@ fn get_mapped_partitions(
     // images for all slots.
     for p in partitions {
         let (partition_name, image_type, slot) = match p {
-            Partition::ZBI { name, slot } => (name, ImageType::ZBI, slot),
-            Partition::VBMeta { name, slot } => (name, ImageType::VBMeta, slot),
+            Partition::ZBI { name, slot, .. } => (name, ImageType::ZBI, slot),
+            Partition::VBMeta { name, slot, .. } => (name, ImageType::VBMeta, slot),
 
             // Arbitrarily, take the fvm from the slot A system.
-            Partition::FVM { name } => (name, ImageType::FVM, &Slot::A),
+            Partition::FVM { name, .. } => (name, ImageType::FVM, &Slot::A),
 
             // Arbitrarily, take Fxfs from the slot A system.
-            Partition::Fxfs { name } => (name, ImageType::Fxfs, &Slot::A),
+            Partition::Fxfs { name, .. } => (name, ImageType::Fxfs, &Slot::A),
         };
 
         if let Some(slot) = match is_recovery {
@@ -674,9 +674,9 @@ mod test {
     #[test]
     fn test_get_mapped_partitions_slot_a_only() {
         let partitions = vec![
-            Partition::ZBI { name: "part1".into(), slot: Slot::A },
-            Partition::VBMeta { name: "part2".into(), slot: Slot::A },
-            Partition::FVM { name: "part3".into() },
+            Partition::ZBI { name: "part1".into(), slot: Slot::A, size: None },
+            Partition::VBMeta { name: "part2".into(), slot: Slot::A, size: None },
+            Partition::FVM { name: "part3".into(), size: None },
         ];
         let image_map: ImageMap = btreemap! {
             Slot::A => btreemap!{
@@ -708,10 +708,10 @@ mod test {
     #[test]
     fn test_get_mapped_partitions_fvm_and_fxfs() {
         let partitions = vec![
-            Partition::ZBI { name: "part1".into(), slot: Slot::A },
-            Partition::VBMeta { name: "part2".into(), slot: Slot::A },
-            Partition::FVM { name: "part3".into() },
-            Partition::Fxfs { name: "part4".into() },
+            Partition::ZBI { name: "part1".into(), slot: Slot::A, size: None },
+            Partition::VBMeta { name: "part2".into(), slot: Slot::A, size: None },
+            Partition::FVM { name: "part3".into(), size: None },
+            Partition::Fxfs { name: "part4".into(), size: None },
         ];
         let image_map_fvm: ImageMap = btreemap! {
             Slot::A => btreemap!{
@@ -770,13 +770,13 @@ mod test {
     #[test]
     fn test_get_mapped_partitions_all_slots() {
         let partitions = vec![
-            Partition::ZBI { name: "part1".into(), slot: Slot::A },
-            Partition::VBMeta { name: "part2".into(), slot: Slot::A },
-            Partition::ZBI { name: "part3".into(), slot: Slot::B },
-            Partition::VBMeta { name: "part4".into(), slot: Slot::B },
-            Partition::ZBI { name: "part5".into(), slot: Slot::R },
-            Partition::VBMeta { name: "part6".into(), slot: Slot::R },
-            Partition::FVM { name: "part7".into() },
+            Partition::ZBI { name: "part1".into(), slot: Slot::A, size: None },
+            Partition::VBMeta { name: "part2".into(), slot: Slot::A, size: None },
+            Partition::ZBI { name: "part3".into(), slot: Slot::B, size: None },
+            Partition::VBMeta { name: "part4".into(), slot: Slot::B, size: None },
+            Partition::ZBI { name: "part5".into(), slot: Slot::R, size: None },
+            Partition::VBMeta { name: "part6".into(), slot: Slot::R, size: None },
+            Partition::FVM { name: "part7".into(), size: None },
         ];
         let image_map: ImageMap = btreemap! {
             Slot::A => btreemap!{
@@ -813,13 +813,13 @@ mod test {
     #[test]
     fn test_get_mapped_partitions_missing_slot() {
         let partitions = vec![
-            Partition::ZBI { name: "part1".into(), slot: Slot::A },
-            Partition::VBMeta { name: "part2".into(), slot: Slot::A },
-            Partition::ZBI { name: "part3".into(), slot: Slot::B },
-            Partition::VBMeta { name: "part4".into(), slot: Slot::B },
-            Partition::ZBI { name: "part5".into(), slot: Slot::R },
-            Partition::VBMeta { name: "part6".into(), slot: Slot::R },
-            Partition::FVM { name: "part7".into() },
+            Partition::ZBI { name: "part1".into(), slot: Slot::A, size: None },
+            Partition::VBMeta { name: "part2".into(), slot: Slot::A, size: None },
+            Partition::ZBI { name: "part3".into(), slot: Slot::B, size: None },
+            Partition::VBMeta { name: "part4".into(), slot: Slot::B, size: None },
+            Partition::ZBI { name: "part5".into(), slot: Slot::R, size: None },
+            Partition::VBMeta { name: "part6".into(), slot: Slot::R, size: None },
+            Partition::FVM { name: "part7".into(), size: None },
         ];
         let image_map: ImageMap = btreemap! {
             Slot::A => btreemap!{
@@ -848,13 +848,13 @@ mod test {
     #[test]
     fn test_get_mapped_partitions_recovery() {
         let partitions = vec![
-            Partition::ZBI { name: "part1".into(), slot: Slot::A },
-            Partition::VBMeta { name: "part2".into(), slot: Slot::A },
-            Partition::ZBI { name: "part3".into(), slot: Slot::B },
-            Partition::VBMeta { name: "part4".into(), slot: Slot::B },
-            Partition::ZBI { name: "part5".into(), slot: Slot::R },
-            Partition::VBMeta { name: "part6".into(), slot: Slot::R },
-            Partition::FVM { name: "part7".into() },
+            Partition::ZBI { name: "part1".into(), slot: Slot::A, size: None },
+            Partition::VBMeta { name: "part2".into(), slot: Slot::A, size: None },
+            Partition::ZBI { name: "part3".into(), slot: Slot::B, size: None },
+            Partition::VBMeta { name: "part4".into(), slot: Slot::B, size: None },
+            Partition::ZBI { name: "part5".into(), slot: Slot::R, size: None },
+            Partition::VBMeta { name: "part6".into(), slot: Slot::R, size: None },
+            Partition::FVM { name: "part7".into(), size: None },
         ];
         let image_map: ImageMap = btreemap! {
             Slot::A => btreemap!{

@@ -166,7 +166,11 @@ pub mod test {
                 name: Some("firmware_tpl".into()),
                 image: bootloader_path.to_path_buf(),
             }],
-            partitions: vec![Partition::ZBI { name: "zircon_a".into(), slot: PartitionSlot::A }],
+            partitions: vec![Partition::ZBI {
+                name: "zircon_a".into(),
+                slot: PartitionSlot::A,
+                size: None,
+            }],
             hardware_revision: "hw".into(),
         };
 

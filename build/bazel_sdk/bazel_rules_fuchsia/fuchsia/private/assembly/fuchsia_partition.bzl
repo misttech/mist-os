@@ -29,6 +29,8 @@ def _fuchsia_partition_impl(ctx):
     }
     if ctx.attr.slot != "":
         partition["slot"] = ctx.attr.slot
+    if ctx.attr.size_kib:
+        partition["size"] = ctx.attr.size_kib * 1024
 
     return [
         FuchsiaPartitionInfo(
@@ -48,6 +50,9 @@ fuchsia_partition = rule(
         "slot": attr.string(
             doc = "The slot of the partition",
             values = [SLOT.A, SLOT.B, SLOT.R],
+        ),
+        "size_kib": attr.int(
+            doc = "The size of the partition in kibibytes",
         ),
         "type": attr.string(
             doc = "Type of this partition",

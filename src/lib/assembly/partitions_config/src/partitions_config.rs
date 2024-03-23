@@ -87,7 +87,7 @@ pub struct BootloaderPartition {
 }
 
 /// A non-bootloader partition which
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialOrd, Ord, Eq, PartialEq, Hash, Serialize)]
 #[serde(tag = "type")]
 pub enum Partition {
     /// A partition prepared for the Zircon Boot Image (ZBI).
@@ -96,6 +96,8 @@ pub enum Partition {
         name: String,
         /// The slot of the partition.
         slot: Slot,
+        /// An optional size constraint in bytes for the partition.
+        size: Option<u64>,
     },
 
     /// A partition prepared for the Verified Boot Metadata (VBMeta).
@@ -104,19 +106,57 @@ pub enum Partition {
         name: String,
         /// The slot of the partition.
         slot: Slot,
+        /// An optional size constraint for the partition.
+        size: Option<u64>,
     },
 
     /// A partition prepared for the Fuchsia Volume Manager (FVM).
     FVM {
         /// The partition name.
         name: String,
+        /// An optional size constraint for the partition.
+        size: Option<u64>,
     },
 
     /// A partition prepared for Fxfs.
     Fxfs {
         /// The partition name.
         name: String,
+        /// An optional size constraint for the partition.
+        size: Option<u64>,
     },
+}
+
+impl Partition {
+    /// The name of the partition.
+    pub fn name(&self) -> &String {
+        match &self {
+            Self::ZBI { name, .. } => name,
+            Self::VBMeta { name, .. } => name,
+            Self::FVM { name, .. } => name,
+            Self::Fxfs { name, .. } => name,
+        }
+    }
+
+    /// The slot of the partition, if applicable.
+    pub fn slot(&self) -> Option<&Slot> {
+        match &self {
+            Self::ZBI { slot, .. } => Some(slot),
+            Self::VBMeta { slot, .. } => Some(slot),
+            Self::FVM { .. } => None,
+            Self::Fxfs { .. } => None,
+        }
+    }
+
+    /// The size budget of the partition, if supplied.
+    pub fn size(&self) -> Option<&u64> {
+        match &self {
+            Self::ZBI { size, .. } => size.as_ref(),
+            Self::VBMeta { size, .. } => size.as_ref(),
+            Self::FVM { size, .. } => size.as_ref(),
+            Self::Fxfs { size, .. } => size.as_ref(),
+        }
+    }
 }
 
 /// The slots available for flashing or OTAing.
