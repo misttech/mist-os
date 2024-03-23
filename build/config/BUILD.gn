@@ -656,6 +656,11 @@ config("default_warnings") {
     # TODO(https://fxbug.dev/324268041): Disable "-Wextra-qualification" which
     # warns when an extra qualifier appears on a member.
     "-Wno-extra-qualification",
+
+    # TODO(https://fxbug.dev/330769701): Disable "-Wcast-fuction-type-strict"
+    # which enforce an exact type match between a function pointer and the
+    # target function.
+    "-Wno-cast-function-type-strict",
   ]
 
   cflags_cc = []
