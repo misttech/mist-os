@@ -28,7 +28,7 @@ config("dfv1") {
 }
 
 fuchsia_driver("aml-cpu-driver") {
-  output_name = "aml-cpu"
+  output_name = "aml-cpu-v1"
   configs += [
     ":dfv1",
     "//build/config:all_source",
@@ -59,16 +59,16 @@ fuchsia_driver("aml-cpu-driver") {
   ]
 }
 
-fuchsia_driver_component("component") {
-  component_name = "aml-cpu"
+fuchsia_driver_component("component-v1") {
+  component_name = "aml-cpu-v1"
   deps = [ ":aml-cpu-driver" ]
   manifest = "meta/aml-cpu.cml"
   info = "aml-cpu-info.json"
 }
 
-fuchsia_driver_package("package") {
-  package_name = "aml-cpu"
-  driver_components = [ ":component" ]
+fuchsia_driver_package("package-v1") {
+  package_name = "aml-cpu-v1"
+  driver_components = [ ":component-v1" ]
 }
 
 test("aml-cpu-test-bin") {
@@ -116,7 +116,7 @@ fuchsia_unittest_package("aml-cpu-test") {
 }
 
 fuchsia_driver("aml-cpu-v2-driver") {
-  output_name = "aml-cpu-v2"
+  output_name = "aml-cpu"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -136,8 +136,8 @@ fuchsia_driver("aml-cpu-v2-driver") {
   ]
 }
 
-fuchsia_driver_component("component-v2") {
-  component_name = "aml-cpu-v2"
+fuchsia_driver_component("component") {
+  component_name = "aml-cpu"
   deps = [
     ":aml-cpu-bind",
     ":aml-cpu-v2-driver",
@@ -146,9 +146,9 @@ fuchsia_driver_component("component-v2") {
   info = "aml-cpu-info.json"
 }
 
-fuchsia_driver_package("package-v2") {
-  package_name = "aml-cpu-v2"
-  driver_components = [ ":component-v2" ]
+fuchsia_driver_package("package") {
+  package_name = "aml-cpu"
+  driver_components = [ ":component" ]
 }
 
 test("aml-cpu-v2-test-bin") {
@@ -196,6 +196,6 @@ group("aml-cpu") {
   testonly = true
   deps = [
     ":component",
-    ":component-v2",
+    ":component-v1",
   ]
 }

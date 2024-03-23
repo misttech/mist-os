@@ -11,7 +11,7 @@
         runner: "driver",
         bind: "meta/bind/aml-cpu.bindbc",
         colocate: "true",
-        compat: "driver/aml-cpu.so",
+        compat: "driver/aml-cpu-v1.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },

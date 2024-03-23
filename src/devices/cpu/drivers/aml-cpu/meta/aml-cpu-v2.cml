@@ -9,7 +9,7 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/aml-cpu-v2.so",
+        binary: "driver/aml-cpu.so",
         bind: "meta/bind/aml-cpu.bindbc",
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
