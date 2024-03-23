@@ -4,13 +4,12 @@
 
 use anyhow::{Context, Result};
 
-use std::{
-    io::Write,
-    path::PathBuf,
-    process::{Command, Stdio},
-};
+use std::{path::PathBuf, process::Command};
 
-use crate::api::{Api, Component, ComponentId, CreateIssue, IssueId, UpdateIssue};
+use crate::{
+    api::{Api, Component, ComponentId, CreateIssue, IssueId, UpdateIssue},
+    command_ext::CommandExt as _,
+};
 
 pub struct Bugspec {
     path: PathBuf,
@@ -29,24 +28,12 @@ impl Api for Bugspec {
             println!("[bugspec] Creating new issue");
         }
 
-        let mut child = Command::new(&self.path)
-            .arg("create")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()?;
-
-        let mut stdin = child.stdin.take().unwrap();
-        stdin.write_all(request.to_bugspec().as_bytes())?;
-        drop(stdin);
-
-        let output = child.wait_with_output()?;
+        let response = Command::new(&self.path).arg("create").run_with(&request.to_bugspec())?;
 
         if self.log_api {
             println!("[bugspec] Successfully created issue");
         }
 
-        let response = core::str::from_utf8(&output.stdout)?;
         let id = response
             .strip_prefix("Created issue http://b/")
             .and_then(|r| r.strip_suffix('\n'))
@@ -56,30 +43,18 @@ impl Api for Bugspec {
     }
 
     fn update_issue(&mut self, request: UpdateIssue) -> Result<()> {
-        let mut child = Command::new(&self.path)
+        Command::new(&self.path)
             .arg("edit")
             .arg(&format!("{}", request.id))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()?;
-
-        let mut stdin = child.stdin.take().unwrap();
-        stdin.write_all(request.to_bugspec().as_bytes())?;
-        drop(stdin);
-
-        child.wait()?;
-
+            .run_with(&request.to_bugspec())?;
         Ok(())
     }
 
     fn list_components(&mut self) -> Result<Vec<Component>> {
         const FUCHSIA_COMPONENT_ID: &str = "1360843";
 
-        let output =
-            Command::new(&self.path).args(&["list-components", FUCHSIA_COMPONENT_ID]).output()?;
-
-        let text = String::from_utf8(output.stdout)?;
+        let text =
+            Command::new(&self.path).args(&["list-components", FUCHSIA_COMPONENT_ID]).run()?;
 
         let mut results = Vec::new();
         for line in text.lines() {

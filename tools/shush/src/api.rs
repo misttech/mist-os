@@ -123,7 +123,7 @@ impl UpdateIssue {
             writeln!(&mut result, "STATUS={}", status).unwrap();
         }
         if let Some(owner) = &self.owner {
-            writeln!(&mut result, "OWNER={}", owner).unwrap();
+            writeln!(&mut result, "ASSIGNEE={}", owner).unwrap();
         }
         if let Some(cc_users) = &self.cc_users {
             if !cc_users.is_empty() {

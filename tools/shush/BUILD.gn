@@ -22,6 +22,7 @@ if (is_host) {
     "src/allow.rs",
     "src/api.rs",
     "src/bugspec.rs",
+    "src/command_ext.rs",
     "src/fix.rs",
     "src/issues.rs",
     "src/lint.rs",

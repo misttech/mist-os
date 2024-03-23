@@ -216,7 +216,7 @@ impl Issue {
         let issues_len = issues.len();
         for (i, issue) in issues.drain(..).enumerate() {
             if verbose {
-                println!("[{i}/{issues_len}] Rolling out https://fxbug.dev/{}", issue.id);
+                println!("[{}/{issues_len}] Rolling out https://fxbug.dev/{}", i + 1, issue.id);
             }
 
             api.update_issue(UpdateIssue {
