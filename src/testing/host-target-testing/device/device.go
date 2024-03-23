@@ -721,17 +721,22 @@ func (c *Client) Flash(
 		return fmt.Errorf("failed to wait for device to reboot into bootloader: %w", err)
 	}
 
-	// FIXME(https://fxbug.dev/326658880): We can remove this sleep after the next stepping stone.
-	logger.Infof(ctx, "Sleeping 15s in case https://fxbug.dev/326658880 can't flash the device right after rebooting to the bootloader")
-	time.Sleep(15 * time.Second)
-
 	flasher := ffx.Flasher()
 	flasher.SetSSHPublicKey(publicKey)
 	flasher.SetManifest(manifest)
 	flasher.SetTarget(c.Name())
 
-	if _, err = flasher.Flash(ctx); err != nil {
-		return fmt.Errorf("device failed to flash: %w", err)
+	// FIXME(https://fxbug.dev/326658880): We can remove this retry logic after the next stepping stone.
+	for i := 0; i < 3; i++ {
+		logger.Infof(ctx, "sleeping for 12s before flashing device on attempt %d", i+1)
+		time.Sleep(12 * time.Second)
+		if _, err = flasher.Flash(ctx); err == nil {
+			break
+		}
+		logger.Infof(ctx, "failed to flash device: %v", err)
+	}
+	if err != nil {
+		return fmt.Errorf("device failed to flash after 3 attempts: %w", err)
 	}
 
 	logger.Infof(ctx, "flasher completed, waiting for device to boot")
