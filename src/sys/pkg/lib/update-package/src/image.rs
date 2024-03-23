@@ -32,41 +32,6 @@ pub enum OpenImageError {
     CloneBuffer { path: String, status: Status },
 }
 
-/// An identifier for an image that can be paved.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Image {
-    /// Kernel image.
-    Zbi,
-
-    /// Metadata for the kernel image.
-    FuchsiaVbmeta,
-
-    /// Recovery image.
-    Recovery,
-
-    /// Metadata for recovery image.
-    RecoveryVbmeta,
-
-    /// Firmware
-    Firmware {
-        /// A device-specific string given to the paver when writing the image.
-        /// Frequently the empty string on devices that only support a single firmware image type
-        /// (the bootloader).
-        /// https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.paver/paver.fidl;l=173-175;drc=4902eb163d5036cd2d2889b6cb22cb42a1cdd6b5
-        type_: String,
-    },
-}
-
-impl Image {
-    /// Determines if this image would target a recovery partition.
-    pub fn targets_recovery(self) -> bool {
-        match self {
-            Self::Recovery | Self::RecoveryVbmeta => true,
-            Self::Zbi | Self::FuchsiaVbmeta | Self::Firmware { .. } => false,
-        }
-    }
-}
-
 #[cfg(target_os = "fuchsia")]
 /// Opens the given `path` as a resizable VMO buffer and returns the buffer on success.
 pub(crate) async fn open_from_path(
@@ -99,31 +64,4 @@ pub(crate) async fn open_from_path(
         .map_err(|status| OpenImageError::CloneBuffer { path: path.to_string(), status })?;
 
     Ok(fmem::Buffer { vmo, size })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn recovery_images_target_recovery() {
-        assert!(Image::Recovery.targets_recovery(), "image recovery should target recovery",);
-        assert!(
-            Image::RecoveryVbmeta.targets_recovery(),
-            "image recovery.vbmeta should target recovery",
-        );
-    }
-
-    #[test]
-    fn non_recovery_images_do_not_target_recovery() {
-        assert!(!Image::Zbi.targets_recovery(), "image zbi should not target recovery",);
-        assert!(
-            !Image::FuchsiaVbmeta.targets_recovery(),
-            "image fuchsia.vbmeta should not target recovery",
-        );
-        assert!(
-            !Image::Firmware { type_: "".into() }.targets_recovery(),
-            "image firmware should not target recovery",
-        );
-    }
 }

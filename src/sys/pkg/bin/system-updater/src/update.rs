@@ -74,11 +74,8 @@ enum PrepareError {
     #[error("while determining update mode")]
     ParseUpdateMode(#[source] update_package::ParseUpdateModeError),
 
-    #[error("while writing asset to paver")]
-    PaverWriteAsset(#[source] anyhow::Error),
-
-    #[error("while writing firmware to paver")]
-    PaverWriteFirmware(#[source] anyhow::Error),
+    #[error("while writing image to paver")]
+    PaverWriteImage(#[source] anyhow::Error),
 
     #[error("while preparing partitions for update")]
     PreparePartitionMetdata(#[source] paver::PreparePartitionMetadataError),
@@ -477,7 +474,7 @@ impl ImagesToWrite {
     async fn write(
         &self,
         pkg_resolver: &fpkg::PackageResolverProxy,
-        desired_config: paver::NonCurrentConfiguration,
+        target_config: paver::TargetConfiguration,
         data_sink: &fpaver::DataSinkProxy,
         concurrent_package_resolves: usize,
     ) -> Result<(), StageError> {
@@ -491,44 +488,59 @@ impl ImagesToWrite {
         .await
         .map_err(StageError::Resolve)?;
 
-        for (filename, absolute_component_url) in &self.firmware {
-            let package_url = absolute_component_url.package_url();
-            let resource = absolute_component_url.resource();
-            let proxy = &url_directory_map[package_url];
-            let image = update_package::Image::Firmware { type_: filename.into() };
-            write_image(proxy, resource, &image, data_sink, desired_config).await?;
+        for (type_, absolute_component_url) in &self.firmware {
+            let () = write_image_from_package(
+                &url_directory_map[absolute_component_url.package_url()],
+                absolute_component_url.resource(),
+                data_sink,
+                target_config,
+                ImageType::Firmware { type_ },
+            )
+            .await?;
         }
 
         if let Some(zbi) = &self.fuchsia.zbi {
-            let package_url = zbi.package_url();
-            let resource = zbi.resource();
-            let proxy = &url_directory_map[package_url];
-            let image = update_package::Image::Zbi;
-            write_image(proxy, resource, &image, data_sink, desired_config).await?;
+            let () = write_image_from_package(
+                &url_directory_map[zbi.package_url()],
+                zbi.resource(),
+                data_sink,
+                target_config,
+                ImageType::Asset(fpaver::Asset::Kernel),
+            )
+            .await?;
         }
 
         if let Some(vbmeta) = &self.fuchsia.vbmeta {
-            let package_url = vbmeta.package_url();
-            let proxy = &url_directory_map[package_url];
-            let image = update_package::Image::FuchsiaVbmeta;
-            let resource = vbmeta.resource();
-            write_image(proxy, resource, &image, data_sink, desired_config).await?;
+            let () = write_image_from_package(
+                &url_directory_map[vbmeta.package_url()],
+                vbmeta.resource(),
+                data_sink,
+                target_config,
+                ImageType::Asset(fpaver::Asset::VerifiedBootMetadata),
+            )
+            .await?;
         }
 
         if let Some(zbi) = &self.recovery.zbi {
-            let package_url = zbi.package_url();
-            let proxy = &url_directory_map[package_url];
-            let image = update_package::Image::Recovery;
-            let resource = zbi.resource();
-            write_image(proxy, resource, &image, data_sink, desired_config).await?;
+            let () = write_image_from_package(
+                &url_directory_map[zbi.package_url()],
+                zbi.resource(),
+                data_sink,
+                paver::TargetConfiguration::Single(fpaver::Configuration::Recovery),
+                ImageType::Asset(fpaver::Asset::Kernel),
+            )
+            .await?;
         }
 
         if let Some(vbmeta) = &self.recovery.vbmeta {
-            let package_url = vbmeta.package_url();
-            let proxy = &url_directory_map[package_url];
-            let image = update_package::Image::RecoveryVbmeta;
-            let resource = vbmeta.resource();
-            write_image(proxy, resource, &image, data_sink, desired_config).await?;
+            let () = write_image_from_package(
+                &url_directory_map[vbmeta.package_url()],
+                vbmeta.resource(),
+                data_sink,
+                paver::TargetConfiguration::Single(fpaver::Configuration::Recovery),
+                ImageType::Asset(fpaver::Asset::VerifiedBootMetadata),
+            )
+            .await?;
         }
 
         Ok(())
@@ -795,12 +807,11 @@ impl<'a> Attempt<'a> {
 
             // Determine if the fuchsia zbi has changed in this update. If an error is raised, do
             // not fail the update.
-            match asset_to_write(
+            match image_to_write(
                 fuchsia.zbi(),
                 current_config,
                 &self.env.data_sink,
-                fpaver::Asset::Kernel,
-                &update_package::Image::Zbi,
+                ImageType::Asset(fpaver::Asset::Kernel),
             )
             .await
             {
@@ -816,16 +827,15 @@ impl<'a> Attempt<'a> {
                 }
             };
 
-            if let Some(vbmeta_image) = fuchsia.vbmeta() {
-                target_version.vbmeta_hash = vbmeta_image.hash().to_string();
+            if let Some(vbmeta) = fuchsia.vbmeta() {
+                target_version.vbmeta_hash = vbmeta.hash().to_string();
                 // Determine if the vbmeta has changed in this update. If an error is raised, do
                 // not fail the update.
-                match asset_to_write(
-                    vbmeta_image,
+                match image_to_write(
+                    vbmeta,
                     current_config,
                     &self.env.data_sink,
-                    fpaver::Asset::VerifiedBootMetadata,
-                    &update_package::Image::FuchsiaVbmeta,
+                    ImageType::Asset(fpaver::Asset::VerifiedBootMetadata),
                 )
                 .await
                 {
@@ -837,7 +847,7 @@ impl<'a> Attempt<'a> {
                             update is needed: {:#}",
                             anyhow!(e)
                         );
-                        images_to_write.fuchsia.set_vbmeta(vbmeta_image.url().clone())
+                        images_to_write.fuchsia.set_vbmeta(vbmeta.url().clone())
                     }
                 };
             }
@@ -887,12 +897,11 @@ impl<'a> Attempt<'a> {
         }
 
         for (type_, metadata) in images_metadata.firmware() {
-            match firmware_to_write(
-                type_,
+            match image_to_write(
                 metadata,
                 current_config,
                 &self.env.data_sink,
-                &update_package::Image::Firmware { type_: type_.clone() },
+                ImageType::Firmware { type_ },
             )
             .await
             {
@@ -976,7 +985,7 @@ impl<'a> Attempt<'a> {
         write_image_packages(
             images_to_write,
             &self.env.pkg_resolver,
-            desired_config,
+            desired_config.to_target_configuration(),
             &self.env.data_sink,
             update_pkg.1,
             &self.env.retained_packages,
@@ -1075,63 +1084,17 @@ impl<'a> Attempt<'a> {
     }
 }
 
-async fn write_image(
-    proxy: &update_package::UpdateImagePackage,
-    path: &str,
-    image: &update_package::Image,
+async fn write_image_from_package(
+    package: &update_package::UpdateImagePackage,
+    resource_path: &str,
     data_sink: &fpaver::DataSinkProxy,
-    desired_config: paver::NonCurrentConfiguration,
+    target_config: paver::TargetConfiguration,
+    image_type: ImageType<'_>,
 ) -> Result<(), StageError> {
-    let buffer = proxy.open_image(path).await.map_err(StageError::OpenImageError)?;
-    paver::write_image_buffer(data_sink, buffer, image, desired_config)
+    let buffer = package.open_image(resource_path).await.map_err(StageError::OpenImageError)?;
+    paver::write_image(data_sink, buffer, target_config, image_type)
         .await
-        .map_err(StageError::Write)?;
-    Ok(())
-}
-
-/// Ok(None) indicates that the firmware image is on the device in the desired configuration.
-/// If the firmware image is on the active configuration, this function will write it to the
-/// desired configuration before returning Ok(None).
-///
-/// Ok(Some(url)) indicates that the firmware image in the update differs from the device's.
-async fn firmware_to_write(
-    type_: &str,
-    image_metadata: &update_package::ImageMetadata,
-    current_config: paver::CurrentConfiguration,
-    data_sink: &fpaver::DataSinkProxy,
-    image: &update_package::Image,
-) -> Result<Option<AbsoluteComponentUrl>, PrepareError> {
-    let desired_config = current_config.to_non_current_configuration();
-    if let Some(non_current_config) = desired_config.to_configuration() {
-        if get_firmware_buffer_if_hash_and_size_match(
-            data_sink,
-            non_current_config,
-            type_,
-            image_metadata,
-        )
-        .await
-        .is_some()
-        {
-            return Ok(None);
-        }
-
-        if let Some(current_config) = current_config.to_configuration() {
-            if let Some(buffer) = get_firmware_buffer_if_hash_and_size_match(
-                data_sink,
-                current_config,
-                type_,
-                image_metadata,
-            )
-            .await
-            {
-                paver::write_image_buffer(data_sink, buffer, image, desired_config)
-                    .await
-                    .map_err(PrepareError::PaverWriteFirmware)?;
-                return Ok(None);
-            }
-        }
-    }
-    Ok(Some(image_metadata.url().to_owned()))
+        .map_err(StageError::Write)
 }
 
 /// Ok(None) indicates that the asset is on the device in the desired configuration.
@@ -1139,19 +1102,18 @@ async fn firmware_to_write(
 /// configuration before returning Ok(None).
 ///
 /// Ok(Some(url)) indicates that the asset in the update differs from what is on the device.
-async fn asset_to_write(
+async fn image_to_write(
     image_metadata: &update_package::ImageMetadata,
     current_config: paver::CurrentConfiguration,
     data_sink: &fpaver::DataSinkProxy,
-    asset: fpaver::Asset,
-    image: &update_package::Image,
+    image_type: ImageType<'_>,
 ) -> Result<Option<AbsoluteComponentUrl>, PrepareError> {
     let desired_config = current_config.to_non_current_configuration();
     if let Some(non_current_config) = desired_config.to_configuration() {
-        if get_asset_buffer_if_hash_and_size_match(
+        if get_image_buffer_if_hash_and_size_match(
             data_sink,
             non_current_config,
-            asset,
+            image_type,
             image_metadata,
         )
         .await
@@ -1161,24 +1123,27 @@ async fn asset_to_write(
         }
 
         if let Some(current_config) = current_config.to_configuration() {
-            if let Some(buffer) = get_asset_buffer_if_hash_and_size_match(
+            if let Some(buffer) = get_image_buffer_if_hash_and_size_match(
                 data_sink,
                 current_config,
-                asset,
+                image_type,
                 image_metadata,
             )
             .await
             {
-                paver::write_image_buffer(data_sink, buffer, image, desired_config)
-                    .await
-                    .map_err(PrepareError::PaverWriteAsset)?;
+                paver::write_image(
+                    data_sink,
+                    buffer,
+                    desired_config.to_target_configuration(),
+                    image_type,
+                )
+                .await
+                .map_err(PrepareError::PaverWriteImage)?;
                 return Ok(None);
             }
-
-            return Ok(Some(image_metadata.url().to_owned()));
         }
     }
-    Ok(Some(image_metadata.url().to_owned()))
+    Ok(Some(image_metadata.url().clone()))
 }
 
 /// Ok(None) indicates that the recovery asset is on the device in the recovery configuration.
@@ -1189,10 +1154,10 @@ async fn recovery_to_write(
     data_sink: &fpaver::DataSinkProxy,
     asset: fpaver::Asset,
 ) -> Result<Option<AbsoluteComponentUrl>, PrepareError> {
-    if get_asset_buffer_if_hash_and_size_match(
+    if get_image_buffer_if_hash_and_size_match(
         data_sink,
         fpaver::Configuration::Recovery,
-        asset,
+        ImageType::Asset(asset),
         image_metadata,
     )
     .await
@@ -1203,90 +1168,53 @@ async fn recovery_to_write(
     return Ok(Some(image_metadata.url().to_owned()));
 }
 
-async fn get_firmware_buffer_if_hash_and_size_match(
-    data_sink: &fpaver::DataSinkProxy,
-    configuration: fpaver::Configuration,
-    type_: &str,
-    image: &update_package::ImageMetadata,
-) -> Option<fmem::Buffer> {
-    let fmem::Buffer { vmo, size } =
-        match paver::paver_read_firmware(data_sink, configuration, type_).await {
-            Ok(buffer) => buffer,
-            Err(e) => {
-                warn!(
-                    ?configuration, ?image, %type_,
-                    "Error reading firmware so it will not be used to avoid a download: {:#}",
-                    anyhow!(e)
-                );
-                return None;
-            }
-        };
-
-    // The size field in the fuchsia.mem.Buffer returned by ReadFirmware is the size of the entire
-    // partition.
-    if size < image.size() {
-        return None;
-    }
-    let buffer = fmem::Buffer { vmo, size: image.size() };
-    let buffer_hash = match sha256_buffer(&buffer) {
-        Ok(hash) => hash,
-        Err(e) => {
-            warn!(
-                ?configuration, ?image, %type_,
-                "Error hashing firmware so it will not be used to avoid a download: {:#}",
-                anyhow!(e)
-            );
-            return None;
-        }
-    };
-    if buffer_hash == image.hash() {
-        Some(buffer)
-    } else {
-        None
-    }
+#[derive(Debug, Clone, Copy)]
+enum ImageType<'a> {
+    Asset(fpaver::Asset),
+    Firmware { type_: &'a str },
 }
 
-async fn get_asset_buffer_if_hash_and_size_match(
+async fn get_image_buffer_if_hash_and_size_match(
     data_sink: &fpaver::DataSinkProxy,
     configuration: fpaver::Configuration,
-    asset: fpaver::Asset,
-    image: &update_package::ImageMetadata,
+    image_type: ImageType<'_>,
+    image_metadata: &update_package::ImageMetadata,
 ) -> Option<fmem::Buffer> {
     let fmem::Buffer { vmo, size } =
-        match paver::paver_read_asset(data_sink, configuration, asset).await {
+        match paver::read_image(data_sink, configuration, image_type).await {
             Ok(buffer) => buffer,
             Err(e) => {
                 warn!(
                     ?configuration,
-                    ?image,
-                    ?asset,
-                    "Error reading asset so it will not be used to avoid a download: {:#}",
+                    ?image_type,
+                    ?image_metadata,
+                    "Error reading image, so it will not be used to avoid a download: {:#}",
                     anyhow!(e)
                 );
                 return None;
             }
         };
 
-    // The size field in the fuchsia.mem.Buffer returned by ReadAsset will either be the size of
-    // just the image or the size of the entire partition.
-    if size < image.size() {
+    // The size field of the fuchsia.mem.Buffer is either the size of the entire partition or just
+    // the image.
+    if size < image_metadata.size() {
         return None;
     }
-    let buffer = fmem::Buffer { vmo, size: image.size() };
+    let buffer = fmem::Buffer { vmo, size: image_metadata.size() };
     let buffer_hash = match sha256_buffer(&buffer) {
         Ok(hash) => hash,
         Err(e) => {
             warn!(
                 ?configuration,
-                ?image,
-                ?asset,
-                "Error hashing asset so it will not be used to avoid a download: {:#}",
+                ?image_type,
+                ?image_metadata,
+                "Error hashing image so it will not be used to avoid a download: {:#}",
                 anyhow!(e)
             );
             return None;
         }
     };
-    if buffer_hash == image.hash() {
+    if buffer_hash == image_metadata.hash() {
         Some(buffer)
     } else {
         None
@@ -1340,7 +1268,7 @@ async fn gc(space_manager: &fspace::ManagerProxy) -> Result<(), Error> {
 async fn write_image_packages(
     images_to_write: ImagesToWrite,
     pkg_resolver: &fpkg::PackageResolverProxy,
-    desired_config: paver::NonCurrentConfiguration,
+    target_config: paver::TargetConfiguration,
     data_sink: &fpaver::DataSinkProxy,
     update_pkg: Option<Hash>,
     retained_packages: &fpkg::RetainedPackagesProxy,
@@ -1348,7 +1276,7 @@ async fn write_image_packages(
     concurrent_package_resolves: usize,
 ) -> Result<(), StageError> {
     match images_to_write
-        .write(pkg_resolver, desired_config, data_sink, concurrent_package_resolves)
+        .write(pkg_resolver, target_config, data_sink, concurrent_package_resolves)
         .await
     {
         Ok(()) => return Ok(()),
@@ -1374,9 +1302,7 @@ async fn write_image_packages(
         );
     }
 
-    images_to_write
-        .write(pkg_resolver, desired_config, data_sink, concurrent_package_resolves)
-        .await
+    images_to_write.write(pkg_resolver, target_config, data_sink, concurrent_package_resolves).await
 }
 
 /// Resolve the update package, incorporating an increasingly aggressive GC and retry strategy.

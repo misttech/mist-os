@@ -224,10 +224,16 @@ async fn get_vbmeta_and_zbi_hash_from_environment(
     let configuration = current_configuration
         .to_configuration()
         .ok_or_else(|| anyhow!("device does not support ABR"))?;
-    let vbmeta_buffer =
-        paver::paver_read_asset(data_sink, configuration, Asset::VerifiedBootMetadata).await?;
+    let vbmeta_buffer = paver::read_image(
+        data_sink,
+        configuration,
+        super::super::ImageType::Asset(Asset::VerifiedBootMetadata),
+    )
+    .await?;
     let vbmeta_hash = sha256_hash_with_no_trailing_zeros(vbmeta_buffer)?;
-    let zbi_buffer = paver::paver_read_asset(data_sink, configuration, Asset::Kernel).await?;
+    let zbi_buffer =
+        paver::read_image(data_sink, configuration, super::super::ImageType::Asset(Asset::Kernel))
+            .await?;
     let zbi_hash = sha256_hash_with_no_trailing_zeros(zbi_buffer)?;
     Ok((vbmeta_hash, zbi_hash))
 }

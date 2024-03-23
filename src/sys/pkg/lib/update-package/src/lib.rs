@@ -20,7 +20,7 @@ pub use crate::{
     board::VerifyBoardError,
     epoch::ParseEpochError,
     hash::HashError,
-    image::{Image, OpenImageError},
+    image::OpenImageError,
     images::{
         parse_image_packages_json, ImageMetadata, ImageMetadataError, ImagePackagesError,
         ImagePackagesManifest, ImagePackagesManifestBuilder, ImagesMetadata,

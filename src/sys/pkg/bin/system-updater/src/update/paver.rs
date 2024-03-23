@@ -9,8 +9,7 @@ use {
 };
 
 mod configuration;
-use configuration::TargetConfiguration;
-pub use configuration::{CurrentConfiguration, NonCurrentConfiguration};
+pub use configuration::{CurrentConfiguration, NonCurrentConfiguration, TargetConfiguration};
 
 #[derive(Debug, thiserror::Error)]
 pub enum WriteAssetError {
@@ -41,18 +40,6 @@ async fn paver_write_firmware(
     })
 }
 
-pub async fn paver_read_firmware(
-    data_sink: &fpaver::DataSinkProxy,
-    configuration: fpaver::Configuration,
-    type_: &str,
-) -> anyhow::Result<fmem::Buffer> {
-    data_sink
-        .read_firmware(configuration, type_)
-        .await
-        .context("DataSink.ReadFirmware FIDL error")?
-        .map_err(|s| anyhow!("DataSink.ReadFirmware error {}", zx::Status::from_raw(s)))
-}
-
 async fn paver_write_asset(
     data_sink: &fpaver::DataSinkProxy,
     configuration: fpaver::Configuration,
@@ -62,50 +49,26 @@ async fn paver_write_asset(
     Ok(zx::Status::ok(data_sink.write_asset(configuration, asset, buffer).await?)?)
 }
 
-pub async fn paver_read_asset(
+/// The size field of the fmem::Buffer will be either the size of the entire partition or the size
+/// of just the image.
+pub async fn read_image(
     data_sink: &fpaver::DataSinkProxy,
     configuration: fpaver::Configuration,
-    asset: fpaver::Asset,
+    image_type: super::ImageType<'_>,
 ) -> anyhow::Result<fmem::Buffer> {
-    data_sink
-        .read_asset(configuration, asset)
-        .await
-        .context("DataSink.ReadAsset FIDL error")?
-        .map_err(|s| anyhow!("DataSink.ReadAsset error {}", zx::Status::from_raw(s)))
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum ImageTarget<'a> {
-    Firmware { type_: &'a str, configuration: TargetConfiguration },
-    Asset { asset: fpaver::Asset, configuration: TargetConfiguration },
-}
-
-fn classify_image(
-    image: &update_package::Image,
-    desired_config: NonCurrentConfiguration,
-) -> anyhow::Result<ImageTarget<'_>> {
-    Ok(match image {
-        update_package::Image::Zbi => ImageTarget::Asset {
-            asset: fpaver::Asset::Kernel,
-            configuration: desired_config.to_target_configuration(),
-        },
-        update_package::Image::FuchsiaVbmeta => ImageTarget::Asset {
-            asset: fpaver::Asset::VerifiedBootMetadata,
-            configuration: desired_config.to_target_configuration(),
-        },
-        update_package::Image::Recovery => ImageTarget::Asset {
-            asset: fpaver::Asset::Kernel,
-            configuration: TargetConfiguration::Single(fpaver::Configuration::Recovery),
-        },
-        update_package::Image::RecoveryVbmeta => ImageTarget::Asset {
-            asset: fpaver::Asset::VerifiedBootMetadata,
-            configuration: TargetConfiguration::Single(fpaver::Configuration::Recovery),
-        },
-        update_package::Image::Firmware { type_ } => ImageTarget::Firmware {
-            type_: &type_,
-            configuration: desired_config.to_target_configuration(),
-        },
-    })
+    use super::ImageType::*;
+    match image_type {
+        Asset(asset) => data_sink
+            .read_asset(configuration, asset)
+            .await
+            .context("DataSink.ReadAsset FIDL error")?
+            .map_err(|s| anyhow!("DataSink.ReadAsset error {}", zx::Status::from_raw(s))),
+        Firmware { type_ } => data_sink
+            .read_firmware(configuration, type_)
+            .await
+            .context("DataSink.ReadFirmware FIDL error")?
+            .map_err(|s| anyhow!("DataSink.ReadFirmware error {}", zx::Status::from_raw(s))),
+    }
 }
 
 fn clone_buffer(buffer: &fmem::Buffer) -> anyhow::Result<fmem::Buffer> {
@@ -169,11 +132,11 @@ async fn write_firmware_to_configurations(
 ) -> anyhow::Result<()> {
     Ok(match configuration {
         TargetConfiguration::Single(configuration) => {
-            // Devices supports ABR and/or a specific configuration (ex. Recovery) was requested.
+            // Device supports ABR or a specific configuration (ex. Recovery) was requested.
             paver_write_firmware(data_sink, configuration, type_, buffer).await?
         }
         TargetConfiguration::AB => {
-            // For device that does not support ABR. There will only be one single
+            // For devices that do not support ABR. There will only be one single
             // partition for that firmware. The configuration parameter should be Configuration::A.
             let () = paver_write_firmware(
                 data_sink,
@@ -191,20 +154,21 @@ async fn write_firmware_to_configurations(
     })
 }
 
-pub async fn write_image_buffer(
+pub async fn write_image(
     data_sink: &fpaver::DataSinkProxy,
     buffer: fmem::Buffer,
-    image: &update_package::Image,
-    desired_config: NonCurrentConfiguration,
+    target_config: TargetConfiguration,
+    image_type: super::ImageType<'_>,
 ) -> anyhow::Result<()> {
-    Ok(match classify_image(image, desired_config)? {
-        ImageTarget::Firmware { type_, configuration } => {
-            write_firmware_to_configurations(data_sink, configuration, type_, buffer).await?;
+    use super::ImageType::*;
+    match image_type {
+        Asset(asset) => {
+            write_asset_to_configurations(data_sink, target_config, asset, buffer).await
         }
-        ImageTarget::Asset { asset, configuration } => {
-            write_asset_to_configurations(data_sink, configuration, asset, buffer).await?;
+        Firmware { type_ } => {
+            write_firmware_to_configurations(data_sink, target_config, type_, buffer).await
         }
-    })
+    }
 }
 
 pub fn connect_in_namespace() -> anyhow::Result<(fpaver::DataSinkProxy, fpaver::BootManagerProxy)> {
@@ -447,11 +411,10 @@ pub async fn paver_flush_data_sink(data_sink: &fpaver::DataSinkProxy) -> anyhow:
 
 #[cfg(test)]
 fn make_buffer(contents: impl AsRef<[u8]>) -> fmem::Buffer {
-    use fuchsia_zircon::{Vmo, VmoOptions};
     let contents = contents.as_ref();
     let size = contents.len().try_into().unwrap();
 
-    let vmo = Vmo::create_with_opts(VmoOptions::RESIZABLE, size).unwrap();
+    let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, size).unwrap();
     vmo.write(contents, 0).unwrap();
 
     fmem::Buffer { vmo, size }
@@ -711,26 +674,24 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn write_image_buffer_writes_firmware() {
+    async fn write_image_writes_firmware() {
         let paver = Arc::new(MockPaverServiceBuilder::new().build());
         let data_sink = paver.spawn_data_sink_service();
 
-        write_image_buffer(
+        write_image(
             &data_sink,
             make_buffer("firmware contents"),
-            &update_package::Image::Firmware { type_: "".into() },
-            NonCurrentConfiguration::A,
+            TargetConfiguration::Single(fpaver::Configuration::A),
+            super::super::ImageType::Firmware { type_: "" },
         )
         .await
         .unwrap();
 
-        let image = &update_package::Image::Firmware { type_: "foo".into() };
-
-        write_image_buffer(
+        write_image(
             &data_sink,
             make_buffer("firmware_foo contents"),
-            image,
-            NonCurrentConfiguration::B,
+            TargetConfiguration::Single(fpaver::Configuration::B),
+            super::super::ImageType::Firmware { type_: "foo" },
         )
         .await
         .unwrap();
@@ -753,7 +714,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn write_image_buffer_ignores_unsupported_firmware() {
+    async fn write_image_ignores_unsupported_firmware() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::write_firmware(|_, _, _| {
@@ -763,11 +724,11 @@ mod tests {
         );
         let data_sink = paver.spawn_data_sink_service();
 
-        write_image_buffer(
+        write_image(
             &data_sink,
             make_buffer("firmware of the future!"),
-            &update_package::Image::Firmware { type_: "unknown".into() },
-            NonCurrentConfiguration::A,
+            TargetConfiguration::Single(fpaver::Configuration::A),
+            super::super::ImageType::Firmware { type_: "unknown" },
         )
         .await
         .unwrap();
@@ -783,7 +744,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn write_image_buffer_forwards_other_firmware_errors() {
+    async fn write_image_forwards_other_firmware_errors() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::write_firmware(|_, _, _| {
@@ -794,11 +755,11 @@ mod tests {
         let data_sink = paver.spawn_data_sink_service();
 
         assert_matches!(
-            write_image_buffer(
+            write_image(
                 &data_sink,
                 make_buffer("oops"),
-                &update_package::Image::Firmware{type_: "".into()},
-                NonCurrentConfiguration::A,
+                TargetConfiguration::Single(fpaver::Configuration::A),
+                super::super::ImageType::Firmware{type_: ""},
             )
             .await,
             Err(e) if e.to_string().contains("firmware failed to write")
@@ -815,15 +776,15 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn write_image_buffer_writes_asset_to_single_config() {
+    async fn write_image_writes_asset_to_single_config() {
         let paver = Arc::new(MockPaverServiceBuilder::new().build());
         let data_sink = paver.spawn_data_sink_service();
 
-        write_image_buffer(
+        write_image(
             &data_sink,
             make_buffer("zbi contents"),
-            &update_package::Image::Zbi,
-            NonCurrentConfiguration::A,
+            TargetConfiguration::Single(fpaver::Configuration::A),
+            super::super::ImageType::Asset(fpaver::Asset::Kernel),
         )
         .await
         .unwrap();
@@ -839,7 +800,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn write_image_buffer_write_asset_forwards_errors() {
+    async fn write_image_write_asset_forwards_errors() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::return_error(|event| match event {
@@ -851,44 +812,44 @@ mod tests {
         let data_sink = paver.spawn_data_sink_service();
 
         assert_matches!(
-            write_image_buffer(
+            write_image(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &update_package::Image::Zbi,
-                NonCurrentConfiguration::A,
+                TargetConfiguration::Single(fpaver::Configuration::A),
+                super::super::ImageType::Asset(fpaver::Asset::Kernel)
             )
             .await,
             Err(e) if e.to_string().contains("write_asset responded with")
         );
 
         assert_matches!(
-            write_image_buffer(
+            write_image(
                 &data_sink,
                 make_buffer("vbmeta contents"),
-                &update_package::Image::FuchsiaVbmeta,
-                NonCurrentConfiguration::A,
+                TargetConfiguration::Single(fpaver::Configuration::A),
+                super::super::ImageType::Asset(fpaver::Asset::VerifiedBootMetadata)
             )
             .await,
             Err(e) if e.to_string().contains("write_asset responded with")
         );
 
         assert_matches!(
-            write_image_buffer(
+            write_image(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &update_package::Image::Zbi,
-                NonCurrentConfiguration::B,
+                TargetConfiguration::Single(fpaver::Configuration::B),
+                super::super::ImageType::Asset(fpaver::Asset::Kernel)
             )
             .await,
             Err(e) if e.to_string().contains("write_asset responded with")
         );
 
         assert_matches!(
-            write_image_buffer(
+            write_image(
                 &data_sink,
                 make_buffer("vbmeta contents"),
-                &update_package::Image::FuchsiaVbmeta,
-                NonCurrentConfiguration::B,
+                TargetConfiguration::Single(fpaver::Configuration::B),
+                super::super::ImageType::Asset(fpaver::Asset::VerifiedBootMetadata)
             )
             .await,
             Err(e) if e.to_string().contains("write_asset responded with")
@@ -964,24 +925,24 @@ mod abr_not_supported_tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn write_image_buffer_writes_asset_to_both_configs() {
+    async fn write_image_writes_asset_to_both_configs() {
         let paver = Arc::new(MockPaverServiceBuilder::new().build());
         let data_sink = paver.spawn_data_sink_service();
 
-        write_image_buffer(
+        write_image(
             &data_sink,
             make_buffer("zbi contents"),
-            &update_package::Image::Zbi,
-            NonCurrentConfiguration::NotSupported,
+            TargetConfiguration::AB,
+            super::super::ImageType::Asset(fpaver::Asset::Kernel),
         )
         .await
         .unwrap();
 
-        write_image_buffer(
+        write_image(
             &data_sink,
             make_buffer("the new vbmeta"),
-            &update_package::Image::FuchsiaVbmeta,
-            NonCurrentConfiguration::NotSupported,
+            TargetConfiguration::AB,
+            super::super::ImageType::Asset(fpaver::Asset::VerifiedBootMetadata),
         )
         .await
         .unwrap();
@@ -1014,15 +975,15 @@ mod abr_not_supported_tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn write_image_buffer_writes_firmware_to_both_configs() {
+    async fn write_image_writes_firmware_to_both_configs() {
         let paver = Arc::new(MockPaverServiceBuilder::new().build());
         let data_sink = paver.spawn_data_sink_service();
 
-        write_image_buffer(
+        write_image(
             &data_sink,
             make_buffer("firmware contents"),
-            &update_package::Image::Firmware { type_: "".into() },
-            NonCurrentConfiguration::NotSupported,
+            TargetConfiguration::AB,
+            super::super::ImageType::Firmware { type_: "" },
         )
         .await
         .unwrap();
@@ -1045,7 +1006,7 @@ mod abr_not_supported_tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn write_image_buffer_forwards_config_a_error() {
+    async fn write_image_forwards_config_a_error() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::return_error(|event| match event {
@@ -1061,11 +1022,11 @@ mod abr_not_supported_tests {
         let data_sink = paver.spawn_data_sink_service();
 
         assert_matches!(
-            write_image_buffer(
+            write_image(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &update_package::Image::Zbi,
-                NonCurrentConfiguration::NotSupported,
+                TargetConfiguration::AB,
+                super::super::ImageType::Asset(fpaver::Asset::Kernel)
             )
             .await,
             Err(_)
@@ -1082,7 +1043,7 @@ mod abr_not_supported_tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn write_image_buffer_ignores_config_b_not_supported_error() {
+    async fn write_image_ignores_config_b_not_supported_error() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::return_error(|event| match event {
@@ -1097,11 +1058,11 @@ mod abr_not_supported_tests {
         );
         let data_sink = paver.spawn_data_sink_service();
 
-        write_image_buffer(
+        write_image(
             &data_sink,
             make_buffer("zbi contents"),
-            &update_package::Image::Zbi,
-            NonCurrentConfiguration::NotSupported,
+            TargetConfiguration::AB,
+            super::super::ImageType::Asset(fpaver::Asset::Kernel),
         )
         .await
         .unwrap();
@@ -1124,7 +1085,7 @@ mod abr_not_supported_tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn write_image_buffer_write_firmware_ignores_unsupported_config_b() {
+    async fn write_image_write_firmware_ignores_unsupported_config_b() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::write_firmware(|configuration, _, _| match configuration {
@@ -1135,11 +1096,11 @@ mod abr_not_supported_tests {
         );
         let data_sink = paver.spawn_data_sink_service();
 
-        write_image_buffer(
+        write_image(
             &data_sink,
             make_buffer("firmware contents"),
-            &update_package::Image::Firmware { type_: "".into() },
-            NonCurrentConfiguration::NotSupported,
+            TargetConfiguration::AB,
+            super::super::ImageType::Firmware { type_: "" },
         )
         .await
         .unwrap();
@@ -1162,7 +1123,7 @@ mod abr_not_supported_tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn write_image_buffer_forwards_other_config_b_errors() {
+    async fn write_image_forwards_other_config_b_errors() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::return_error(|event| match event {
@@ -1178,11 +1139,11 @@ mod abr_not_supported_tests {
         let data_sink = paver.spawn_data_sink_service();
 
         assert_matches!(
-            write_image_buffer(
+            write_image(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &update_package::Image::Zbi,
-                NonCurrentConfiguration::NotSupported,
+                TargetConfiguration::AB,
+                super::super::ImageType::Asset(fpaver::Asset::Kernel)
             )
             .await,
             Err(_)
