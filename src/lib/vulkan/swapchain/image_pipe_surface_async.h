@@ -13,8 +13,6 @@
 #include <lib/async/cpp/task.h>
 
 #include <mutex>
-#include <thread>
-#include <unordered_map>
 
 #include "image_pipe_surface.h"
 #include "src/lib/ui/flatland-frame-scheduling/src/simple_present.h"

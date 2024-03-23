@@ -10,6 +10,8 @@
 #include <lib/trace/event.h>
 #include <vk_dispatch_table_helper.h>
 
+#include <string>
+
 #include <vulkan/vk_layer.h>
 
 #include "src/lib/fsl/handles/object_info.h"
@@ -33,6 +35,11 @@ namespace {
 
 const char* const kTag = "ImagePipeSurfaceAsync";
 const fuchsia::ui::composition::TransformId kRootTransform = {1};
+
+const std::string DEBUG_NAME =
+    fsl::GetCurrentProcessName() + "-" + std::to_string(fsl::GetCurrentProcessKoid());
+
+const std::string PER_APP_PRESENT_TRACING_NAME = "Flatland::PerAppPresent[" + DEBUG_NAME + "]";
 
 }  // namespace
 
@@ -95,6 +102,7 @@ bool ImagePipeSurfaceAsync::Init() {
                                                  parent_viewport_watcher.NewRequest());
     flatland_connection_->flatland()->CreateTransform(kRootTransform);
     flatland_connection_->flatland()->SetRootTransform(kRootTransform);
+    flatland_connection_->flatland()->SetDebugName(DEBUG_NAME);
   });
 
   return true;
@@ -445,6 +453,8 @@ void ImagePipeSurfaceAsync::PresentNextImageLocked() {
   auto& present = queue_.front();
   TRACE_FLOW_END("gfx", "image_pipe_swapchain_to_present", present.image_id);
   TRACE_FLOW_BEGIN("gfx", "Flatland::Present", present.image_id);
+
+  TRACE_FLOW_BEGIN("gfx", PER_APP_PRESENT_TRACING_NAME.c_str(), present.image_id);
   if (!channel_closed_) {
     std::vector<zx::event> release_events;
     release_events.reserve(present.release_fences.size());
