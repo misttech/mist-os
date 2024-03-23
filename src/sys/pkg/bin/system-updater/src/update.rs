@@ -1131,14 +1131,18 @@ async fn image_to_write(
             )
             .await
             {
-                paver::write_image(
-                    data_sink,
-                    buffer,
-                    desired_config.to_target_configuration(),
-                    image_type,
-                )
-                .await
-                .map_err(PrepareError::PaverWriteImage)?;
+                let target_config = desired_config.to_target_configuration();
+                info!(
+                    ?current_config,
+                    ?target_config,
+                    ?image_type,
+                    ?image_metadata,
+                    "Current configuration contains the desired target image, \
+                    copying to avoid a download"
+                );
+                paver::write_image(data_sink, buffer, target_config, image_type)
+                    .await
+                    .map_err(PrepareError::PaverWriteImage)?;
                 return Ok(None);
             }
         }
