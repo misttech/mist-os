@@ -77,7 +77,7 @@ You may build the server package via the following:
 1. Add the server to your build configuration. This only needs to be done once:
 
     ```posix-terminal
-    fx set core.qemu-x64 --with //examples/fidl/cpp/server
+    fx set core.x64 --with //examples/fidl/cpp/server
     ```
 
 1. Build the server package:

@@ -51,20 +51,20 @@ Replace the following:
 
 * `PRODUCT`: The Fuchsia product that you want to build; for example, `core` and
   `workbench_eng`.
-* `BOARD`: The architecture of the product; for example, `x64` and `qemu-x64`
+* `BOARD`: The architecture of the product; for example, `x64`.
 
-The example command below sets a build configuration to `core.qemu-x64`:
+The example command below sets a build configuration to `core.x64`:
 
 ```posix-terminal
-fx set core.qemu-x64
+fx set core.x64
 ```
 
 In this example:
 
   * `core` is a product with the minimum feature set of Fuchsia, including
      common network capabilities.
-  * `qemu-x64` is a board that refers to the x64 architecture of the Fuchsia
-    emulator (FEMU), which is based on the open source emulator
+  * `x64` is a board that runs on a wide range of x64 devices, including the
+    Fuchsia emulator (FEMU), which is based on the open source emulator
     [QEMU][qemu]{:.external}.
 
 On the other hand, the example below sets the build configuration to

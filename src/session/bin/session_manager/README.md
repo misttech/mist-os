@@ -40,7 +40,7 @@ the base package set and assign the URL of the session component to the product
 configuration:
 
 ```
-fx set core.qemu-x64 \
+fx set core.x64 \
   --with-base //src/session/bin/session_manager \
   --with-base //path/to/your_session \
   --args=product_config.session_url="fuchsia-pkg://fuchsia.com/your_package#meta/your_session.cm"

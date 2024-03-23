@@ -3,7 +3,7 @@
 ## Set up
 1. Configure example test to be built.
     ```shell
-    $ fx set core.qemu-x64 \
+    $ fx set core.x64 \
         --with //src/testing/sl4f \
         --with //src/sys/bin/start_sl4f \
         --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
@@ -24,7 +24,7 @@
 
     $ ffx target list
     NAME                SERIAL       TYPE             STATE      ADDRS/IP                           RCS
-    fuchsia-emulator*   <unknown>    core.qemu-x64    Product    [fe80::1a1c:ebd2:2db:6104%qemu]    Y
+    fuchsia-emulator*   <unknown>    core.x64    Product    [fe80::1a1c:ebd2:2db:6104%qemu]    Y
     ````
 
 

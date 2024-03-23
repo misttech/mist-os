@@ -21,7 +21,7 @@ To add this project to your build, append the following to your `fx set`
 invocation:
 
 ```
-fx set workstation_eng.qemu-x64\
+fx set workstation_eng.x64\
     --with //examples/fidl/calculator:all\
     --with //examples/fidl/calculator:tests
 ```
@@ -39,7 +39,7 @@ Start the emulator and package server.
 1. start the emulator:
 
 ```
-ffx emu start --headless workstation_eng.qemu-x64
+ffx emu start --headless workstation_eng.x64
 ```
 
 1. start the package server:

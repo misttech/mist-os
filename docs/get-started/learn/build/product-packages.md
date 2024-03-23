@@ -81,7 +81,7 @@ following command adds all the packages in the Fuchsia `tests` bundle to a
 standard `workstation_eng` build.
 
 ```posix-terminal
-fx set workstation_eng.qemu-x64 --with //bundles/tests
+fx set workstation_eng.x64 --with //bundles/tests
 ```
 
 <aside class="key-point">
@@ -140,7 +140,7 @@ You can bundle additional targets with your build configuration using the
 the Fuchsia examples:
 
 ```posix-terminal
-fx set workstation_eng.qemu-x64 --with //examples
+fx set workstation_eng.x64 --with //examples
 ```
 
 This is commonly used to include test packages you need to run on the device or
@@ -300,7 +300,7 @@ discoverable_package_labels += [
 Reconfigure the build for the `fuchsialab` product, running on the FEMU board:
 
 ```posix-terminal
-fx set fuchsialab.qemu-x64
+fx set fuchsialab.x64
 ```
 
 Verify that the Hello World example package is now part of the build:
@@ -331,7 +331,7 @@ Look for the build configuration of the target output:
 ```none {:.devsite-disable-click-to-copy}
 Version: "2000-01-01T12:00:00+00:00"
 {{ '<strong>' }}Product: "fuchsialab"{{ '</strong>' }}
-{{ '<strong>' }}Board: "qemu-x64"{{ '</strong>' }}
+{{ '<strong>' }}Board: "x64"{{ '</strong>' }}
 Commit: "2000-01-01T12:00:00+00:00"
 ```
 

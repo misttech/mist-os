@@ -7,7 +7,7 @@ The main user of this library is `//tools/fidl/fidl_api_summarize`.
 ## Build
 
 ```
-fx set core.qemu-x64 --with //tools/fidl:tests
+fx set core.x64 --with //tools/fidl:tests
 fx build tools/fidl/lib/summarize
 ```
 

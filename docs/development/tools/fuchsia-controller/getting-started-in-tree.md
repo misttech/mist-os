@@ -345,7 +345,7 @@ print(f"{target} build info: {build_info}")
 If you were to run the above code, it would print something like below:
 
 ```sh {:.devsite-disable-click-to-copy}
-foo-target-emu build info: ProviderGetBuildInfoResponse(build_info=BuildInfo(product_config='core', board_config='qemu-x64', version='2023-08-18T23:28:37+00:00', latest_commit_date='2023-08-18T23:28:37+00:00'))
+foo-target-emu build info: ProviderGetBuildInfoResponse(build_info=BuildInfo(product_config='core', board_config='x64', version='2023-08-18T23:28:37+00:00', latest_commit_date='2023-08-18T23:28:37+00:00'))
 ```
 
 If you were to continue this, you could create something akin to the

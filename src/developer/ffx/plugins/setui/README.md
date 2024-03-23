@@ -7,7 +7,7 @@ This is an experimental plugin to modify and query settings. To use it, please o
 * Create a new folder for a new settings as a subcommand of `setui`. (Similar to `setui/privacy`)
 * Set build, for example:
 ```
-fx set core.qemu-x64 --auto-dir --with src/developer/ffx:tests
+fx set core.x64 --auto-dir --with src/developer/ffx:tests
 ```
 * Build plugins:
 ```

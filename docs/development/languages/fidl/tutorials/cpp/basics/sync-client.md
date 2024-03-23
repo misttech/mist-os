@@ -64,7 +64,7 @@ defined in `//examples/fidl/cpp/client_sync/BUILD.gn`:
 1. Add the client to your build configuration. This only needs to be done once:
 
     ```posix-terminal
-    fx set core.qemu-x64 --with //examples/fidl/cpp/client_sync
+    fx set core.x64 --with //examples/fidl/cpp/client_sync
     ```
 
 1. Build the client:
@@ -248,7 +248,7 @@ Note: You can explore the full source for the realm component at
    echo realm, server, and client:
 
     ```posix-terminal
-    fx set core.qemu-x64 --with //examples/fidl/cpp/client_sync
+    fx set core.x64 --with //examples/fidl/cpp/client_sync
     ```
 
 1. Build the Fuchsia image:

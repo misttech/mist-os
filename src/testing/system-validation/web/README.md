@@ -24,7 +24,7 @@ System validation sets up the test with following capability routing relationshi
 1. Build `workstation_eng_paused` product with system validation test targets.
 
 ```
-fx set workstation_eng_paused.qemu-x64 --release --with //src/testing/system-validation:tests
+fx set workstation_eng_paused.x64 --release --with //src/testing/system-validation:tests
 fx build
 ```
 

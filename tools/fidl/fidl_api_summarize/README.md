@@ -6,7 +6,7 @@ IR. It wraps the `//tools/fidl/lib/summarize` library.
 ## Build
 
 ```
-fx set core.qemu-x64 --with //tools/fidl
+fx set core.x64 --with //tools/fidl
 fx build host-tools/fidl_api_summarize
 ```
 

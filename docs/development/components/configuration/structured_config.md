@@ -115,7 +115,7 @@ By using `declare_args`, you can change configuration values on the command line
 * {C++}
 
   ```
-  $ fx set core.qemu-x64 \
+  $ fx set core.x64 \
     --with //examples/components/config \
     --args='config_example_cpp_greeting="C++ CLI Override"'
   ```
@@ -123,7 +123,7 @@ By using `declare_args`, you can change configuration values on the command line
 * {Rust}
 
   ```
-  $ fx set core.qemu-x64 \
+  $ fx set core.x64 \
     --with //examples/components/config \
     --args='config_example_rust_greeting="Rust CLI Override"'
   ```

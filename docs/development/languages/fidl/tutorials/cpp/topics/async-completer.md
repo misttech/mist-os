@@ -96,7 +96,7 @@ Note: You can explore the full source for the realm component at
    echo realm, server, and client:
 
     ```posix-terminal
-    fx set core.qemu-x64 --with //examples/fidl/cpp/server_async_completer:echo-cpp-async
+    fx set core.x64 --with //examples/fidl/cpp/server_async_completer:echo-cpp-async
     ```
 
 1. Build the Fuchsia image:

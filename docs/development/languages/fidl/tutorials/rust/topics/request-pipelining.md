@@ -108,7 +108,7 @@ Optionally, to check that things are correct, try building the server:
 1. Configure your GN build to include the server:
 
    ```posix-terminal
-   fx set core.qemu-x64 --with //examples/fidl/rust/request_pipelining/server:echo-server
+   fx set core.x64 --with //examples/fidl/rust/request_pipelining/server:echo-server
    ```
 1. Build the Fuchsia image:
 
@@ -160,7 +160,7 @@ Optionally, to check that things are correct, try building the client:
 1. Configure your GN build to include the server:
 
    ```posix-terminal
-   fx set core.qemu-x64 --with //examples/fidl/rust/request_pipelining/client:echo-client
+   fx set core.x64 --with //examples/fidl/rust/request_pipelining/client:echo-client
    ```
 
 1. Build the Fuchsia image:
@@ -182,7 +182,7 @@ Note: You can explore the full source for the realm component at
    echo realm, server, and client:
 
     ```posix-terminal
-    fx set core.qemu-x64 --with //examples/fidl/rust:echo-launcher-rust
+    fx set core.x64 --with //examples/fidl/rust:echo-launcher-rust
     ```
 
 1. Build the Fuchsia image:

@@ -58,7 +58,7 @@ Create a new component project at `examples/fidl/hlcpp/client`:
    build configuration:
 
    ```posix-terminal
-   fx set core.qemu-x64 --with //examples/fidl/hlcpp/client:echo-client
+   fx set core.x64 --with //examples/fidl/hlcpp/client:echo-client
    ```
 
 1. Build the Fuchsia image:
@@ -188,7 +188,7 @@ Note: You can explore the full source for the realm component at
    echo realm, server, and client:
 
     ```posix-terminal
-    fx set core.qemu-x64 --with //examples/fidl/hlcpp:echo-hlcpp-client
+    fx set core.x64 --with //examples/fidl/hlcpp:echo-hlcpp-client
     ```
 
 1. Build the Fuchsia image:

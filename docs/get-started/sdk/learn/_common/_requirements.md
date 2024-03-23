@@ -5,7 +5,7 @@
     [file a bug][sdk-bug]{:.external} if you discover issues on macOS.
 
 *   A configured [Fuchsia SDK environment][get-started]{:.external}
-*   [Emulator product bundle][start-femu] for `workstation_eng.qemu-x64`
+*   [Emulator product bundle][start-femu] for `workstation_eng.x64`
 
 
 [get-started]: https://fuchsia.googlesource.com/sdk-samples/getting-started

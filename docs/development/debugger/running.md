@@ -58,7 +58,7 @@ RCS is started on the device.
 ```
 $ ffx target list
 NAME       SERIAL       TYPE             STATE      ADDRS/IP                    RCS
-demo-emu   <unknown>    core.qemu-x64    Product    [10.0.2.15,                 Y
+demo-emu   <unknown>    core.x64         Product    [10.0.2.15,                 Y
                                                     fec0::90e:486e:b6b5:9780,
                                                     fec0::487b:fabd:20fa:43ee,
                                                     127.0.0.1]

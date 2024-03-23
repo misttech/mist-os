@@ -9,9 +9,6 @@ import("//build/rust/rustc_binary.gni")
 
 test_deps = []
 
-# The qemu-x64 board does not build a UEFI partition. Switch to x64 to include
-# this test.
-#
 # TODO(https://fxbug.dev/42079810): optimize shouldn't be required here but needs more
 # investigation why it's a problem
 if (is_host && target_cpu == "x64" && build_uefi_disk &&

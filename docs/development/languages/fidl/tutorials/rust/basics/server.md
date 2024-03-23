@@ -97,7 +97,7 @@ To create a component:
 1. Add the server to your build configuration:
 
    ```posix-terminal
-   fx set core.qemu-x64 --with //examples/fidl/rust/server:echo-rust-server
+   fx set core.x64 --with //examples/fidl/rust/server:echo-rust-server
    ```
 
    Note: This build configuration assumes your device target is the emulator.

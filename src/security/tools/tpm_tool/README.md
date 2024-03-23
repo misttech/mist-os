@@ -10,10 +10,10 @@ enviroments only mostly to assist in the development of the TPM stack.
 
 ## Getting Started
 If you are wanting to test the tool in an emulated environment first setup your
-build to utilize `qemu-x64` which will bring in the `tpm-lpc` driver.
+build to utilize `x64` which will bring in the `tpm-lpc` driver.
 
 ```
-fx set core.qemu-x64 --with //src/security/tools/tpm_tool
+fx set core.x64 --with //src/security/tools/tpm_tool
 ```
 
 Next you will want to setup `swtpm` setup to passthrough to QEMU. This will

@@ -13,7 +13,7 @@ These tests rely on various components from build outputs:
 There are not many requirements to run this test locally.
 
 * Build architecture is `x64` and includes SSH and overnet (e.g. `fx set core.x64`)
-  * `core.qemu-x64` is known not to work with this test as it does not support flashing
+  * `core.x64` on emulators is known not to work with this test as it does not support flashing
 * ffx host tests are included in the build (`fx set <...> --with //src/developer/ffx:tests`)
 * TAP/TUN is configured correctly and a running emulator is not using it
   * `sudo ip tuntap add dev qemu mode tap user $USER && sudo ip link set qemu up`

@@ -12,14 +12,14 @@ the URL from product attributes is desired.
 The description file contains a dictionary of key:value pairs in json which are
 used to find a "transfer_url" (which is the value or payload of the file).
 
-E.g. The following would match a search for board=qemu-x64 and
+E.g. The following would match a search for board=x64 and
 product_name=workstation:
 
 ```
 {
   "schema_version": "1",
   "abi": "0ABC1DEF",
-  "board": "qemu-x64",
+  "board": "x64",
   "platform_version": "0.20221213.2.1",
   "product_name": "workstation",
   "product_version": "2",

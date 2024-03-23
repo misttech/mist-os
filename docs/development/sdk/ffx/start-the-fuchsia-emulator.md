@@ -94,11 +94,6 @@ Progress for "Getting product descriptions"
     "transfer_manifest_url": "gs://fuchsia-public-artifacts-release/builds/8770722574108649841/transfer.json"
   },
   {
-    "name": "terminal.qemu-x64",
-    "product_version": "15.20230906.1.1",
-    "transfer_manifest_url": "gs://fuchsia-public-artifacts-release/builds/8770722574108649825/transfer.json"
-  },
-  {
     "name": "terminal.x64",
     "product_version": "15.20230906.1.1",
     "transfer_manifest_url": "gs://fuchsia-public-artifacts-release/builds/8770722574108649809/transfer.json"

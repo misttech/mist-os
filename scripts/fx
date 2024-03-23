@@ -147,7 +147,7 @@ other
   rfc                       Scaffold RFCs from the template and automatically fills metadata files
 
 example basic workflow using an emulator
-  $ fx set core.qemu-x64 --with //examples/hello_world
+  $ fx set core.x64 --with //examples/hello_world
   $ fx build
   $ fx ffx emu start --headless --net tap  # headless with tun/tap-based networking
   $ fx serve                               # [Start in a new window]

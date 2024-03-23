@@ -118,7 +118,7 @@ It's not clear what ordering guarantees exist regarding the initialization of St
 ## Build the test
 
 ```shell
-$ fx set core.qemu-x64 --with //src/ui/tests/integration_input_tests/starnix-touch:tests
+$ fx set core.x64 --with //src/ui/tests/integration_input_tests/starnix-touch:tests
 ```
 
 ## Run the test

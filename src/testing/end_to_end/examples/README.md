@@ -28,7 +28,7 @@ $ fx test //src/testing/end_to_end/examples/test_hello_world:hello_world_test_fc
 
 ### Data resource access Test
 ```shell
-$ fx set core.qemu-x64 --with //src/testing/end_to_end/examples
+$ fx set core.x64 --with //src/testing/end_to_end/examples
 
 $ fx test //src/testing/end_to_end/examples/test_data_resource_access:data_resource_access_test_fc --e2e --output
 ```

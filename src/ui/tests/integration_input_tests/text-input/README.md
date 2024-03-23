@@ -9,7 +9,7 @@ The `fx set` command for running the test under the QEMU emulator
 is as follows below:
 
 ```
-fx set core.qemu-x64 \
+fx set core.x64 \
   --goma --auto-dir \
   --with=//src/ui/tests/integration_input_tests \
   --with=//src/chromium:web_engine

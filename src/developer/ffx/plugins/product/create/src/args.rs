@@ -11,7 +11,7 @@ use ffx_core::ffx_command;
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "create")]
 pub struct CreateCommand {
-    /// product.board label. e.g. "workstation_eng.qemu-x64".
+    /// product.board label. e.g. "workstation_eng.x64".
     #[argh(option)]
     pub product_name: String,
 

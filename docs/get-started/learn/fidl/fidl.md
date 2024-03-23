@@ -129,13 +129,13 @@ Add the library target to the build configuration:
 * {Rust}
 
   ```posix-terminal
-  fx set workstation_eng.qemu-x64 --with vendor/fuchsia-codelab/echo-fidl:echo_rust
+  fx set workstation_eng.x64 --with vendor/fuchsia-codelab/echo-fidl:echo_rust
   ```
 
 * {C++}
 
   ```posix-terminal
-  fx set workstation_eng.qemu-x64 --with vendor/fuchsia-codelab/echo-fidl:echo_hlcpp
+  fx set workstation_eng.x64 --with vendor/fuchsia-codelab/echo-fidl:echo_hlcpp
   ```
 
 ### Examine the FIDL bindings

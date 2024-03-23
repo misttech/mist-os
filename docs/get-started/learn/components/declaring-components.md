@@ -344,7 +344,7 @@ Update the program's dependencies in your `BUILD.gn` file:
 Add your new component to the build configuration:
 
 ```posix-terminal
-fx set workstation_eng.qemu-x64 --with //vendor/fuchsia-codelab/echo-args
+fx set workstation_eng.x64 --with //vendor/fuchsia-codelab/echo-args
 ```
 
 Run `fx build` and verify that the build completes successfully:

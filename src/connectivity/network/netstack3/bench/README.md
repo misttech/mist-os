@@ -20,7 +20,7 @@ measure Netstack3's performance in a production-like environment.
    which is currently only available on terminal and workstation builds:
 
     ```
-    fx set terminal.qemu-x64 --with //src/tests/end_to_end/perf:test --release
+    fx set terminal.x64 --with //src/tests/end_to_end/perf:test --release
     ```
 
 2. Build Fuchsia

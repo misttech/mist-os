@@ -44,7 +44,7 @@ workbench is designed to be used with an Intel NUC or the Fuchsia emulator
         configuration to use the following workbench product:
 
         ```posix-terminal
-        fx set workbench_eng.qemu-x64 --release
+        fx set workbench_eng.x64 --release
         ```
 
     3.  Complete the [Start the Fuchsia emulator][start-femu] guide.

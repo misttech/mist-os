@@ -21,7 +21,7 @@ Running FEMU requires that you've completed the following guides:
 ## 2. Build Fuchsia for FEMU {#build-fuchsia-for-femu}
 
 To run FEMU, you first need to build a Fuchsia system image that supports
-the emulator environment. This guide uses `qemu-x64` for the board
+the emulator environment. This guide uses `x64` for the board
 and `workbench_eng` for the product as an example.
 
 To build a FEMU Fuchsia image, do the following:
@@ -29,7 +29,7 @@ To build a FEMU Fuchsia image, do the following:
 1. Set the Fuchsia build configuration:
 
    ```posix-terminal
-   fx set workbench_eng.qemu-x64 --release
+   fx set workbench_eng.x64 --release
    ```
 
 2. Build Fuchsia:
@@ -192,7 +192,7 @@ This command prints output similar to the following:
 ```none {:.devsite-disable-click-to-copy}
 $ ffx target list
 NAME                      SERIAL       TYPE                    STATE      ADDRS/IP                            RCS
-fuchsia-emulator    <unknown>    workbench_eng.qemu-x64    Product    [fe80::866a:a5ea:cd9e:69f6%qemu]    N
+fuchsia-emulator    <unknown>    workbench_eng.x64    Product    [fe80::866a:a5ea:cd9e:69f6%qemu]    N
 ```
 
 `fuchsia-emulator` is the default node name of the Fuchsia emulator.

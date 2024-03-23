@@ -20,7 +20,7 @@
       "optionality": "required",
       "long": "--product-name",
       "short": null,
-      "description": "product.board label. e.g. \"workstation_eng.qemu-x64\".",
+      "description": "product.board label. e.g. \"workstation_eng.x64\".",
       "hidden": false
     },
     {

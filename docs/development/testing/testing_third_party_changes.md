@@ -34,7 +34,7 @@ of the build logic concerning it and its tests can be found in
 [//zircon/system/ulib/c/scudo/BUILD.gn](/zircon/system/ulib/c/scudo/BUILD.gn).
 For this particular target it is depended on by `//zircon/system/ulib/c:tests`.
 
-First run `fx set core.qemu-x64 --with //zircon/system/ulib/c:tests`, see the
+First run `fx set core.x64 --with //zircon/system/ulib/c:tests`, see the
 [build](/docs/get-started/build_fuchsia.md) docs on more details, but this
 configuration is a good default. This only needs to be run once.
 

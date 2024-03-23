@@ -46,7 +46,7 @@ These instructions will work with a `core.x64-qemu` build that includes the
 target is also recommended, as it builds the automated unit tests.
 
 ```posix-terminal
-fx set --auto-dir core.qemu-x64 --with //src/graphics/display:tools \
+fx set --auto-dir core.x64 --with //src/graphics/display:tools \
     --with //src/graphics/display:tests
 ```
 

@@ -67,7 +67,7 @@ fuchsia_test_package("system_validation_test_pkg") {
   ]
 }
 
-# fx set workstation_eng_paused.qemu-x64 --release --with-base //sdk/bundles:tools  \
+# fx set workstation_eng_paused.x64 --release --with-base //sdk/bundles:tools  \
 # --with-base //src/testing/system-validation:tests \
 # --with-host //src/testing/system-validation/ui:flatland_view_provider_with_host_script
 #

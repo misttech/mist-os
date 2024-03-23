@@ -178,7 +178,7 @@ Note: You can explore the full source for the realm component at
    echo realm, server, and client:
 
     ```posix-terminal
-    fx set core.qemu-x64 --with //examples/fidl/cpp/request_pipelining
+    fx set core.x64 --with //examples/fidl/cpp/request_pipelining
     ```
 
 1. Build the Fuchsia image:

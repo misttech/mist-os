@@ -105,7 +105,7 @@ when setting your product and board environment:
 For a Fuchsia emulator with the minimum build configuration, the command is:
 
 ```posix-terminal
-fx set core.qemu-x64 --with //examples/hello_world
+fx set core.x64 --with //examples/hello_world
 ```
 
 In this example, `core` is a product with a minimal feature set, which includes

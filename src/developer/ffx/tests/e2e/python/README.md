@@ -2,7 +2,7 @@
 
 ## Set up
 ```shell
-$ fx set core.qemu-x64 \
+$ fx set core.x64 \
     --with-host //src/developer/ffx/tests/e2e/python:tests
 
 $ fx build

@@ -16,18 +16,18 @@ configure the build. This includes any hardware-specific packages such as
 drivers. Recall the `fx set` command used previously:
 
 ```posix-terminal
-fx set workbench_eng.qemu-x64
+fx set workbench_eng.x64
 ```
 
-In this example, `qemu-x64` is the board name for FEMU. To build the same
-**product** for the Intel NUC, you can modify the `set` command to use the
-`x64` board.
+In this example, `x64` is the board name that can run on FEMU and Intel NUC.
+To build the same **product** for the Khadas VIM3, you can modify the `set`
+command to use the `vim3` board.
 
 Note: To determine the Fuchsia board name for your supported hardware, see the
 [device documentation](/docs/development/hardware/README.md).
 
 ```posix-terminal
-fx set workbench_eng.x64
+fx set workbench_eng.vim3
 ```
 
 Running `fx build` will now generate an image for the target device.

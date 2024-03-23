@@ -96,7 +96,7 @@ the build configuration you provide to `fx set`.
 Boards define the architecture that the build targets, which may affect what
 drivers are included and influence device specific kernel parameters.
 
-This codelab targets the `qemu-x64` board, which supports the Fuchsia emulator
+This codelab targets the `x64` board, which supports the Fuchsia emulator
 (FEMU) running on x64 architecture.
 
 <aside class="key-point">
@@ -136,11 +136,11 @@ troubleshoot the build.
 ## Exercise: Build Minimal
 
 In this exercise, you'll build the `minimal_eng` product configuration from
-source to run on the `qemu-x64` emulator board.
+source to run on the `x64` emulator board.
 
 ### Configure the build
 
-Set up the build environment for the `minimal` product and `qemu-x64` board:
+Set up the build environment for the `minimal` product and `x64` board:
 
 ```posix-terminal
 fx set minimal.x64
@@ -203,7 +203,7 @@ Look for the build configuration of the target output:
 ```none {:.devsite-disable-click-to-copy}
 {{ '<strong>' }}Version: "2000-01-01T12:00:00+00:00"{{ '</strong>' }}
 Product: "minimal_eng"
-Board: "qemu-x64"
+Board: "x64"
 {{ '<strong>' }}Commit: "2000-01-01T12:00:00+00:00"{{ '</strong>' }}
 ```
 

@@ -25,7 +25,7 @@ pub struct ProductDescriptionV1 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abi: Option<String>,
 
-    /// Board name and architecture. E.g. "qemu-x64".
+    /// Board name and architecture. E.g. "x64".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub board_name: Option<String>,
 

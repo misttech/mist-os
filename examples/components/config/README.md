@@ -10,7 +10,7 @@ If these components are not present in your build, they can be added by
 appending `--with //examples` to your `fx set` command. For example:
 
 ```bash
-$ fx set core.qemu-x64 --with //examples --with //examples:tests
+$ fx set core.x64 --with //examples --with //examples:tests
 $ fx build
 ```
 
@@ -70,7 +70,7 @@ These examples are able to accept overridden configuration values during
 development by adding to your `fx set`:
 
 ```bash
-$ fx set core.qemu-x64 \
+$ fx set core.x64 \
   --with //examples/components/config \
   --args='config_example_cpp_greeting="C++ CLI Override"' \
   --args='config_example_rust_greeting="Rust CLI Override"'

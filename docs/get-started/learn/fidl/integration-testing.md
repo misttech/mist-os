@@ -302,7 +302,7 @@ component along with the echo server dependencies:
 Add the integration test package to the build configuration:
 
 ```posix-terminal
-fx set workstation_eng.qemu-x64 \
+fx set workstation_eng.x64 \
     --with //vendor/fuchsia-codelab/echo-server \
     --with //vendor/fuchsia-codelab/echo-client \
     --with //vendor/fuchsia-codelab/echo-realm \

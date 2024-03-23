@@ -152,11 +152,11 @@ locally via `fx test`.
 # Step 1 - Configure build
 
 # 1.a - If Fuchsia-Controller transport.
-$ fx set workbench_eng.qemu-x64 \
+$ fx set workbench_eng.x64 \
     --with-host //src/testing/end_to_end/examples/my_test_dir:my_test_target
 
 # 1.b - If SL4F transport.
-$ fx set core.qemu-x64 \
+$ fx set core.x64 \
     --with-host //src/testing/end_to_end/examples/my_test_dir:my_test_target \
     --with //src/testing/sl4f \
     --with //src/sys/bin/start_sl4f \
@@ -302,7 +302,7 @@ host. A quick way to determine what this is in your local environment is to use
 ```sh
 $ ffx target list
 NAME                SERIAL       TYPE             STATE      ADDRS/IP                           RCS
-fuchsia-emulator*   <unknown>    core.qemu-x64    Product    [fe80::1a1c:ebd2:2db:6104%qemu]    Y
+fuchsia-emulator*   <unknown>    core.x64    Product    [fe80::1a1c:ebd2:2db:6104%qemu]    Y
 ```
 
 The `$FUCSHIA_NODENAME` in the above example would be `fuchsia-emulator`.
