@@ -572,25 +572,3 @@ pub fn expose_decl_common_with_availability_derive(
 ) -> proc_macro::TokenStream {
     expose_decl_common_availability_always_required_derive_impl(parse_macro_input!(input)).into()
 }
-
-fn capability_decl_common_derive_impl(input: syn::DeriveInput) -> TokenStream {
-    let struct_ident = match DeclCommonOpts::from_derive_input(&input) {
-        Ok(opts) => opts.ident,
-        Err(e) => return e.write_errors(),
-    };
-
-    quote! {
-        impl CapabilityDeclCommon for #struct_ident {
-            fn name(&self) -> &Name {
-                &self.name
-            }
-        }
-    }
-}
-
-/// A derive-macro that generates an implementation of `CapabilityDeclCommon`. Use this for
-/// the inner structs of each variant of `CapabilityDecl`.
-#[proc_macro_derive(CapabilityDeclCommon)]
-pub fn capability_decl_common_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    capability_decl_common_derive_impl(parse_macro_input!(input)).into()
-}

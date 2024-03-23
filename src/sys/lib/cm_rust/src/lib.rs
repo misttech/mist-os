@@ -4,8 +4,8 @@
 
 use {
     cm_rust_derive::{
-        CapabilityDeclCommon, ExposeDeclCommon, ExposeDeclCommonAlwaysRequired, FidlDecl,
-        OfferDeclCommon, OfferDeclCommonNoAvailability, UseDeclCommon,
+        ExposeDeclCommon, ExposeDeclCommonAlwaysRequired, FidlDecl, OfferDeclCommon,
+        OfferDeclCommonNoAvailability, UseDeclCommon,
     },
     cm_types::{AllowedOffers, BorrowedSeparatedPath, Name, Path, RelativePath},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
@@ -1024,26 +1024,8 @@ pub enum CapabilityDecl {
     Config(ConfigurationDecl),
 }
 
-impl CapabilityDeclCommon for CapabilityDecl {
-    fn name(&self) -> &Name {
-        match self {
-            Self::Service(c) => c.name(),
-            Self::Protocol(c) => c.name(),
-            Self::Directory(c) => c.name(),
-            Self::Storage(c) => c.name(),
-            Self::Runner(c) => c.name(),
-            Self::Resolver(c) => c.name(),
-            Self::EventStream(c) => c.name(),
-            #[cfg(feature = "target_api_level_head")]
-            Self::Dictionary(c) => c.name(),
-            #[cfg(feature = "target_api_level_head")]
-            Self::Config(c) => c.name(),
-        }
-    }
-}
-
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Service")]
 pub struct ServiceDecl {
     pub name: Name,
@@ -1051,7 +1033,7 @@ pub struct ServiceDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Protocol")]
 pub struct ProtocolDecl {
     pub name: Name,
@@ -1061,7 +1043,7 @@ pub struct ProtocolDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Directory")]
 pub struct DirectoryDecl {
     pub name: Name,
@@ -1078,7 +1060,7 @@ pub struct DirectoryDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Storage")]
 pub struct StorageDecl {
     pub name: Name,
@@ -1090,7 +1072,7 @@ pub struct StorageDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Runner")]
 pub struct RunnerDecl {
     pub name: Name,
@@ -1098,7 +1080,7 @@ pub struct RunnerDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Resolver")]
 pub struct ResolverDecl {
     pub name: Name,
@@ -1106,7 +1088,7 @@ pub struct ResolverDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::EventStream")]
 pub struct EventStreamDecl {
     pub name: Name,
@@ -1114,7 +1096,7 @@ pub struct EventStreamDecl {
 
 #[cfg(feature = "target_api_level_head")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Dictionary")]
 pub struct DictionaryDecl {
     pub name: Name,
@@ -1124,7 +1106,7 @@ pub struct DictionaryDecl {
 
 #[cfg(feature = "target_api_level_head")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Configuration")]
 pub struct ConfigurationDecl {
     pub name: Name,
@@ -1134,17 +1116,17 @@ pub struct ConfigurationDecl {
 impl CapabilityDecl {
     pub fn name(&self) -> &Name {
         match self {
-            CapabilityDecl::Directory(decl) => decl.name(),
-            CapabilityDecl::Protocol(decl) => decl.name(),
-            CapabilityDecl::Resolver(decl) => decl.name(),
-            CapabilityDecl::Runner(decl) => decl.name(),
-            CapabilityDecl::Service(decl) => decl.name(),
-            CapabilityDecl::Storage(decl) => decl.name(),
-            CapabilityDecl::EventStream(decl) => decl.name(),
+            CapabilityDecl::Directory(decl) => &decl.name,
+            CapabilityDecl::Protocol(decl) => &decl.name,
+            CapabilityDecl::Resolver(decl) => &decl.name,
+            CapabilityDecl::Runner(decl) => &decl.name,
+            CapabilityDecl::Service(decl) => &decl.name,
+            CapabilityDecl::Storage(decl) => &decl.name,
+            CapabilityDecl::EventStream(decl) => &decl.name,
             #[cfg(feature = "target_api_level_head")]
-            CapabilityDecl::Dictionary(decl) => decl.name(),
+            CapabilityDecl::Dictionary(decl) => &decl.name,
             #[cfg(feature = "target_api_level_head")]
-            CapabilityDecl::Config(decl) => decl.name(),
+            CapabilityDecl::Config(decl) => &decl.name,
         }
     }
 
@@ -1997,11 +1979,6 @@ pub trait ExposeDeclCommon: SourceName + SourcePath + fmt::Debug + Send + Sync {
     fn target(&self) -> &ExposeTarget;
     fn source(&self) -> &ExposeSource;
     fn availability(&self) -> &Availability;
-}
-
-/// The common properties of a [Capability](fdecl::Capability) declaration.
-pub trait CapabilityDeclCommon: Send + Sync {
-    fn name(&self) -> &Name;
 }
 
 /// A named capability type.

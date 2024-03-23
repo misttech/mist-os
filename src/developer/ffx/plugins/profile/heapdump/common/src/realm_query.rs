@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use cm_rust::{CapabilityDecl, CapabilityDeclCommon};
+use cm_rust::CapabilityDecl;
 use component_debug::capability::{get_all_route_segments, RouteSegment};
 use errors::{ffx_bail, ffx_error};
 use fidl::endpoints::DiscoverableProtocolMarker;
@@ -21,7 +21,7 @@ async fn list_collectors(query_proxy: &RealmQueryProxy) -> anyhow::Result<Vec<St
         .into_iter()
         .filter_map(|rs| match rs {
             RouteSegment::DeclareBy { moniker, capability: CapabilityDecl::Protocol(protocol) }
-                if *protocol.name() == COLLECTOR_CAPABILITY =>
+                if protocol.name == COLLECTOR_CAPABILITY =>
             {
                 Some(moniker.to_string())
             }
