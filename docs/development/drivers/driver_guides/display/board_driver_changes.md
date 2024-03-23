@@ -10,7 +10,7 @@ resources, rather than discovery mechanisms like ACPI that are common on
 workstations, servers, or laptops. To add support for an SoC's display
 controller, you will need to modify the [board driver](/docs/glossary/README.md#board-driver)
 to expose hardware resources that your display driver can use. See
-[amlogic-display.cc][amlogic-display] for an example. Most devices need some
+[display-engine.cc][amlogic-display] for an example. Most devices need some
 combination of the following:
 
  * MMIO regions
@@ -38,5 +38,5 @@ bind to this composite device and load the appropriate display driver.
 [bti]: /docs/reference/kernel_objects/bus_transaction_initiator.md
 [sysmem]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem
 [cda]: https://fuchsia.googlesource.com/fuchsia/+/7a5659579e2340a50cbd5063ee7925b46d4fcf6f/src/devices/board/drivers/astro/astro-display.cc#125
-[amlogic-display]: /src/graphics/display/drivers/amlogic-display/amlogic-display.cc
+[amlogic-display]: /src/graphics/display/drivers/amlogic-display/display-engine.cc
 [vim3-cl]: https://fxrev.dev/479034

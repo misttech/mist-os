@@ -28,8 +28,6 @@ source_set("common_srcs") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
-    "amlogic-display.cc",
-    "amlogic-display.h",
     "board-resources.cc",
     "board-resources.h",
     "capture.cc",
@@ -41,6 +39,8 @@ source_set("common_srcs") {
     "common.h",
     "display-device-driver.cc",
     "display-device-driver.h",
+    "display-engine.cc",
+    "display-engine.h",
     "dsi-host.cc",
     "dsi-host.h",
     "dsi.h",
@@ -157,10 +157,10 @@ fuchsia_driver_package("package") {
 test("amlogic-display-test") {
   configs += [ "//build/config:all_source" ]
   sources = [
-    "amlogic-display-test.cc",
     "clock-regs-test.cc",
     "clock-test.cc",
     "common-test.cc",
+    "display-engine-test.cc",
     "fixed-point-util-test.cc",
     "hdmi-transmitter-test.cc",
     "hot-plug-detection-test.cc",

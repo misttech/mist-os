@@ -14,7 +14,7 @@
 
 #include <ddktl/device.h>
 
-#include "src/graphics/display/drivers/amlogic-display/amlogic-display.h"
+#include "src/graphics/display/drivers/amlogic-display/display-engine.h"
 
 namespace amlogic_display {
 
