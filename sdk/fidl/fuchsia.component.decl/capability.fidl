@@ -51,6 +51,12 @@ type Protocol = table {
     ///
     /// Not set for built-in capabilities.
     2: source_path string:MAX_PATH_LENGTH;
+
+    /// (Optional, defaults to `EAGER`) specifies when the framework will open
+    /// the protocol from this component's outgoing directory when someone
+    /// requests the capability. See details on `DeliveryType`.
+    @available(added=HEAD)
+    3: delivery DeliveryType;
 };
 
 /// Declares a directory capability backed by this component.

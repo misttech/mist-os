@@ -523,6 +523,14 @@ This supports the following additional fields:
     }
     ```
 - `value`: (_optional `any`_) (`configuration` only) The value of the configuration.
+- `delivery`: (_optional `string`_) (`protocol` only) Specifies when the framework will open the protocol
+    from this component's outgoing directory when someone requests the
+    capability. Allowed values are:
+
+    - `eager`: (default) the framework will open the capability as soon as
+      some consumer component requests it.
+    - `on_readable`: the framework will open the capability when the server
+      endpoint pipelined in a connection request becomes readable.
 
 
 ### `use` {#use}

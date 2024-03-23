@@ -654,6 +654,7 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
     echo_client_decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
         name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
         source_path: Some("/svc/fidl.examples.routing.echo.Echo".parse().unwrap()),
+        delivery: Default::default(),
     }));
     echo_client_decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
         source: cm_rust::OfferSource::Self_,

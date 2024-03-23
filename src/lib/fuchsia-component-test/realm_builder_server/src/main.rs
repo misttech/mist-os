@@ -1434,7 +1434,11 @@ fn create_capability_decl(
         ftest::Capability::Protocol(protocol) => {
             let name = try_into_source_name(&protocol.name)?;
             let source_path = Some(try_into_service_path(&protocol.name, &protocol.path)?);
-            cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl { name, source_path })
+            cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
+                name,
+                source_path,
+                delivery: Default::default(),
+            })
         }
         ftest::Capability::Directory(directory) => {
             let name = try_into_source_name(&directory.name)?;
@@ -3919,6 +3923,7 @@ mod tests {
                             cm_rust::ProtocolDecl {
                                 name: "fuchsia.examples.Hippo".parse().unwrap(),
                                 source_path: Some("/svc/fuchsia.examples.Hippo".parse().unwrap()),
+                                delivery: Default::default(),
                             },
                         )],
                         exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
@@ -4141,6 +4146,7 @@ mod tests {
                             cm_rust::ProtocolDecl {
                                 name: "fuchsia.examples.Echo".parse().unwrap(),
                                 source_path: Some("/svc/fuchsia.examples.Echo".parse().unwrap()),
+                                delivery: Default::default(),
                             },
                         )],
                         uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {

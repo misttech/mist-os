@@ -1110,6 +1110,7 @@ mod tests {
                     cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
                         name: "foo_svc".parse().unwrap(),
                         source_path: Some("/svc/foo".parse().unwrap()),
+                        delivery: Default::default(),
                     }),
                     cm_rust::CapabilityDecl::Directory(cm_rust::DirectoryDecl {
                         name: "bar_dir".parse().unwrap(),
@@ -1121,6 +1122,7 @@ mod tests {
                     cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
                         name: "foo_protocol".parse().unwrap(),
                         source_path: None,
+                        delivery: Default::default(),
                     }),
                 ],
                 root_component_url: Some(Url::new(FOO_PKG_URL.to_string()).unwrap()),

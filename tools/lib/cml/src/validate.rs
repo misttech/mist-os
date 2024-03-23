@@ -416,6 +416,9 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         if capability.dictionary.is_some() {
             self.features.check(Feature::Dictionaries)?;
         }
+        if capability.delivery.is_some() {
+            self.features.check(Feature::DeliveryType)?;
+        }
         if let Some(from) = capability.from.as_ref() {
             self.validate_component_child_ref("\"capabilities\" source", &AnyRef::from(from))?;
         }

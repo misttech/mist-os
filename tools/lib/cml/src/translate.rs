@@ -1750,7 +1750,7 @@ pub fn translate_capabilities(
                 };
                 out_capabilities.push(fdecl::Capability::Service(fdecl::Service {
                     name: Some(n.clone().into()),
-                    source_path: source_path,
+                    source_path,
                     ..Default::default()
                 }));
             }
@@ -1768,7 +1768,8 @@ pub fn translate_capabilities(
                 };
                 out_capabilities.push(fdecl::Capability::Protocol(fdecl::Protocol {
                     name: Some(n.clone().into()),
-                    source_path: source_path,
+                    source_path,
+                    delivery: capability.delivery.map(Into::into),
                     ..Default::default()
                 }));
             }
@@ -1782,7 +1783,7 @@ pub fn translate_capabilities(
             let rights = extract_required_rights(capability, "capability")?;
             out_capabilities.push(fdecl::Capability::Directory(fdecl::Directory {
                 name: Some(n.clone().into()),
-                source_path: source_path,
+                source_path,
                 rights: Some(rights),
                 ..Default::default()
             }));
@@ -1820,7 +1821,7 @@ pub fn translate_capabilities(
             };
             out_capabilities.push(fdecl::Capability::Runner(fdecl::Runner {
                 name: Some(n.clone().into()),
-                source_path: source_path,
+                source_path,
                 ..Default::default()
             }));
         } else if let Some(n) = &capability.resolver {
@@ -1832,7 +1833,7 @@ pub fn translate_capabilities(
             };
             out_capabilities.push(fdecl::Capability::Resolver(fdecl::Resolver {
                 name: Some(n.clone().into()),
-                source_path: source_path,
+                source_path,
                 ..Default::default()
             }));
         } else if let Some(ns) = &capability.event_stream {
@@ -5692,6 +5693,45 @@ mod tests {
             Some(
                 fdecl::ConfigValueSource::Capabilities(fdecl::ConfigSourceCapabilities::default())
             )
+        );
+    }
+
+    #[test]
+    fn test_compile_protocol_delivery_type() {
+        let input = must_parse_cml!({
+            "capabilities": [
+                {
+                    "protocol": "fuchsia.echo.Echo",
+                    "delivery": "on_readable",
+                }
+            ],
+        });
+        let features = FeatureSet::from(vec![Feature::DeliveryType]);
+        let options = CompileOptions::new().features(&features);
+        let decl = compile(&input, options).unwrap();
+        assert_matches!(
+            decl.capabilities.as_ref().unwrap()[0],
+            fdecl::Capability::Protocol(fdecl::Protocol {
+                delivery: Some(fdecl::DeliveryType::OnReadable),
+                ..
+            })
+        );
+    }
+
+    #[test]
+    fn test_compile_protocol_setting_delivery_type_requires_feature_flag() {
+        let input = must_parse_cml!({
+            "capabilities": [
+                {
+                    "protocol": "fuchsia.echo.Echo",
+                    "delivery": "on_readable",
+                }
+            ],
+        });
+        assert_matches!(
+            compile(&input, CompileOptions::new()),
+            Err(Error::RestrictedFeature(feature))
+            if feature == "delivery_type"
         );
     }
 }

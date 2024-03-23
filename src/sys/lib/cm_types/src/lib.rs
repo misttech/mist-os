@@ -976,6 +976,54 @@ impl PartialOrd for Availability {
     }
 }
 
+/// Specifies when the framework will open the protocol from the provider
+/// component's outgoing directory when someone requests the capability. See
+/// [`DeliveryType`].
+///
+/// [`DeliveryType`]: ../../fidl_fuchsia_component_decl/enum.DeliveryType.html
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum DeliveryType {
+    Immediate,
+    OnReadable,
+}
+
+impl TryFrom<fdecl::DeliveryType> for DeliveryType {
+    type Error = fdecl::DeliveryType;
+
+    fn try_from(value: fdecl::DeliveryType) -> Result<Self, Self::Error> {
+        match value {
+            fdecl::DeliveryType::Immediate => Ok(DeliveryType::Immediate),
+            fdecl::DeliveryType::OnReadable => Ok(DeliveryType::OnReadable),
+            fdecl::DeliveryTypeUnknown!() => Err(value),
+        }
+    }
+}
+
+impl From<DeliveryType> for fdecl::DeliveryType {
+    fn from(value: DeliveryType) -> Self {
+        match value {
+            DeliveryType::Immediate => fdecl::DeliveryType::Immediate,
+            DeliveryType::OnReadable => fdecl::DeliveryType::OnReadable,
+        }
+    }
+}
+
+impl Display for DeliveryType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DeliveryType::Immediate => write!(f, "Immediate"),
+            DeliveryType::OnReadable => write!(f, "OnReadable"),
+        }
+    }
+}
+
+impl Default for DeliveryType {
+    fn default() -> Self {
+        Self::Immediate
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum StorageId {

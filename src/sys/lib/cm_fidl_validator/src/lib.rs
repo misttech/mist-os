@@ -1261,6 +1261,13 @@ impl<'a> ValidationContext<'a> {
                 );
             }
         }
+        match protocol.delivery {
+            Some(delivery) => match cm_types::DeliveryType::try_from(delivery) {
+                Ok(_) => {}
+                Err(_) => self.errors.push(Error::invalid_field(DeclType::Protocol, "delivery")),
+            },
+            None => {}
+        }
     }
 
     fn validate_directory_decl(&mut self, directory: &'a fdecl::Directory, as_builtin: bool) {
@@ -9426,6 +9433,43 @@ mod tests {
                 Error::missing_field(DeclType::Resolver, "name"),
                 Error::extraneous_source_path(DeclType::Resolver, "/foo"),
                 Error::CapabilityCannotBeBuiltin(DeclType::Storage),
+            ])),
+        },
+        test_validate_delivery_type_ok => {
+            input = vec![
+                fdecl::Capability::Protocol(fdecl::Protocol {
+                    name: Some("foo_svc1".into()),
+                    source_path: Some("/svc/foo1".into()),
+                    ..Default::default()
+                }),
+                fdecl::Capability::Protocol(fdecl::Protocol {
+                    name: Some("foo_svc2".into()),
+                    source_path: Some("/svc/foo2".into()),
+                    delivery: Some(fdecl::DeliveryType::Immediate),
+                    ..Default::default()
+                }),
+                fdecl::Capability::Protocol(fdecl::Protocol {
+                    name: Some("foo_svc3".into()),
+                    source_path: Some("/svc/foo3".into()),
+                    delivery: Some(fdecl::DeliveryType::OnReadable),
+                    ..Default::default()
+                }),
+            ],
+            as_builtin = false,
+            result = Ok(()),
+        },
+        test_validate_delivery_type_err => {
+            input = vec![
+                fdecl::Capability::Protocol(fdecl::Protocol {
+                    name: Some("foo_svc".into()),
+                    source_path: Some("/svc/foo".into()),
+                    delivery: Some(fdecl::DeliveryType::unknown()),
+                    ..Default::default()
+                }),
+            ],
+            as_builtin = false,
+            result = Err(ErrorList::new(vec![
+                Error::invalid_field(DeclType::Protocol, "delivery"),
             ])),
         },
     }

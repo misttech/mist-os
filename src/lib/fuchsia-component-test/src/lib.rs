@@ -952,6 +952,7 @@ impl RealmBuilder {
                     let capability = ProtocolDecl {
                         name: decl.target_name.clone(),
                         source_path: Some(source_path),
+                        delivery: Default::default(),
                     };
                     let expose = ExposeProtocolDecl {
                         source: ExposeSource::Self_,

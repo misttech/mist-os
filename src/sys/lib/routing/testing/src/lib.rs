@@ -767,6 +767,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         builder.set_builtin_capabilities(vec![CapabilityDecl::Protocol(ProtocolDecl {
             name: "builtin.Echo".parse().unwrap(),
             source_path: None,
+            delivery: Default::default(),
         })]);
         let model = builder.build().await;
 

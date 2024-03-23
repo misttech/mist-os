@@ -259,6 +259,19 @@ fidl_translations_symmetrical_enums!(
     Transitional
 );
 
+pub use cm_types::DeliveryType;
+
+impl FidlIntoNative<DeliveryType> for fdecl::DeliveryType {
+    fn fidl_into_native(self) -> DeliveryType {
+        self.try_into().unwrap()
+    }
+}
+impl NativeIntoFidl<fdecl::DeliveryType> for DeliveryType {
+    fn native_into_fidl(self) -> fdecl::DeliveryType {
+        self.into()
+    }
+}
+
 pub trait SourcePath {
     fn source_path(&self) -> BorrowedSeparatedPath<'_>;
     fn is_from_dictionary(&self) -> bool {
@@ -1043,6 +1056,8 @@ pub struct ServiceDecl {
 pub struct ProtocolDecl {
     pub name: Name,
     pub source_path: Option<Path>,
+    #[fidl_decl(default)]
+    pub delivery: DeliveryType,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -3136,6 +3151,7 @@ mod tests {
                     fdecl::Capability::Protocol(fdecl::Protocol {
                         name: Some("netstack2".to_string()),
                         source_path: Some("/netstack2".to_string()),
+                        delivery: Some(fdecl::DeliveryType::Immediate),
                         ..Default::default()
                     }),
                     fdecl::Capability::Directory(fdecl::Directory {
@@ -3537,6 +3553,7 @@ mod tests {
                         CapabilityDecl::Protocol(ProtocolDecl {
                             name: "netstack2".parse().unwrap(),
                             source_path: Some("/netstack2".parse().unwrap()),
+                            delivery: DeliveryType::Immediate,
                         }),
                         CapabilityDecl::Directory(DirectoryDecl {
                             name: "data".parse().unwrap(),
@@ -3764,6 +3781,7 @@ mod tests {
                 fdecl::Protocol {
                     name: Some("foo_protocol".to_string()),
                     source_path: None,
+                    delivery: Some(fdecl::DeliveryType::Immediate),
                     ..Default::default()
                 },
             ],
@@ -3772,6 +3790,7 @@ mod tests {
                 ProtocolDecl {
                     name: "foo_protocol".parse().unwrap(),
                     source_path: None,
+                    delivery: DeliveryType::Immediate,
                 }
             ],
             result_type = ProtocolDecl,
@@ -4027,6 +4046,36 @@ mod tests {
             .availability(),
             Availability::Required
         );
+    }
+
+    #[test]
+    fn default_delivery_type() {
+        assert_eq!(
+            fdecl::Protocol {
+                name: Some("foo".to_string()),
+                source_path: Some("/foo".to_string()),
+                delivery: None,
+                ..Default::default()
+            }
+            .fidl_into_native()
+            .delivery,
+            DeliveryType::Immediate
+        )
+    }
+
+    #[test]
+    fn on_readable_delivery_type() {
+        assert_eq!(
+            fdecl::Protocol {
+                name: Some("foo".to_string()),
+                source_path: Some("/foo".to_string()),
+                delivery: Some(fdecl::DeliveryType::OnReadable),
+                ..Default::default()
+            }
+            .fidl_into_native()
+            .delivery,
+            DeliveryType::OnReadable
+        )
     }
 
     #[test]

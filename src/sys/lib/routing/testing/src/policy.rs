@@ -138,6 +138,7 @@ where
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.boot.RootResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.boot.RootResource".parse().unwrap()),
+                delivery: Default::default(),
             }),
             top_instance: Weak::new(),
         };
@@ -195,6 +196,7 @@ where
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.foo.FooBar".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.foo.FooBar".parse().unwrap()),
+                delivery: Default::default(),
             }),
             component: component.as_weak(),
         };
@@ -586,6 +588,7 @@ where
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.boot.RootResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.boot.RootResource".parse().unwrap()),
+                delivery: Default::default(),
             }),
             top_instance: Weak::new(),
         };
@@ -634,6 +637,7 @@ where
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.boot.RootResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.boot.RootResource".parse().unwrap()),
+                delivery: Default::default(),
             }),
             top_instance: Weak::new(),
         };

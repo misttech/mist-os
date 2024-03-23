@@ -520,6 +520,7 @@ impl CapabilityBuilder {
                 cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
                     name: self.name.expect("name not set"),
                     source_path: Some(self.path.expect("path not set")),
+                    delivery: Default::default(),
                 })
             }
             CapabilityTypeName::Service => cm_rust::CapabilityDecl::Service(cm_rust::ServiceDecl {

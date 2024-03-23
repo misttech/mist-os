@@ -683,6 +683,7 @@ async fn get_realm(
     debug_data_decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
         name: "fuchsia.debugdata.Publisher".parse().unwrap(),
         source_path: Some("/svc/fuchsia.debugdata.Publisher".parse().unwrap()),
+        delivery: Default::default(),
     }));
     wrapper_realm.replace_component_decl(&debug_data, debug_data_decl).await?;
 

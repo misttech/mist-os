@@ -209,6 +209,7 @@ mod tests {
                     capabilities: vec![CapabilityDecl::Protocol(ProtocolDecl {
                         name: "fuchsia.foo.bar".parse().unwrap(),
                         source_path: Some("/svc/fuchsia.foo.bar".parse().unwrap()),
+                        delivery: Default::default(),
                     })],
                     ..ComponentDecl::default()
                 }
@@ -292,6 +293,7 @@ mod tests {
                         CapabilityDecl::Protocol(ProtocolDecl {
                             name: "fuchsia.foo.bar".parse().unwrap(),
                             source_path: Some("/svc/fuchsia.foo.bar".parse().unwrap()),
+                            delivery: Default::default(),
                         })
                     );
                 }
