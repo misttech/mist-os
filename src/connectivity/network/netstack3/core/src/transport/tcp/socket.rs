@@ -2345,6 +2345,7 @@ where
                 remote_addr
             });
 
+        debug!("accepted connection {conn_id:?} from {remote_addr:?} on {id:?}");
         Ok((conn_id, remote_addr, client_buffers))
     }
 
