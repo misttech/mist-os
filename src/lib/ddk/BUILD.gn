@@ -267,7 +267,6 @@ sdk_static_library("ddk") {
     "//src/devices/testing/fake-mmio-reg/test:*",
     "//src/devices/testing/goldfish/fake_pipe:*",
     "//src/devices/testing/mock-ddk:*",
-    "//src/devices/testing/mock-mmio-reg/test:*",
     "//src/devices/testing/no_ddk:*",
     "//src/devices/tests/banjo-proxy:*",
     "//src/devices/tests/bind-fail-test:*",

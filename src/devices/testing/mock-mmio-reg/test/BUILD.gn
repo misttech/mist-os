@@ -23,7 +23,6 @@ test("mock-mmio-reg-test-bin") {
     "//sdk/lib/fdio",
     "//src/devices/lib/mmio",
     "//src/devices/testing/mock-mmio-reg",
-    "//src/lib/ddk",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
