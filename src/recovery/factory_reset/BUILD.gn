@@ -112,7 +112,7 @@ group("tools") {
 
 group("tests") {
   testonly = true
-  deps = [ ":factory-reset-tests" ]
+  deps = [ ":factory_reset_tests_pkg" ]
 }
 
 test("factory_reset_unittests") {
@@ -142,7 +142,7 @@ test("factory_reset_unittests") {
   ]
 }
 
-fuchsia_unittest_package("factory-reset-tests") {
+fuchsia_unittest_package("factory_reset_tests_pkg") {
   test_specs = {
     environments = [
       astro_env,
@@ -166,5 +166,5 @@ fuchsia_unittest_package("factory-reset-tests") {
 
 group("factory_reset_tests") {
   testonly = true
-  deps = [ ":factory-reset-tests" ]
+  deps = [ ":factory_reset_tests_pkg" ]
 }
