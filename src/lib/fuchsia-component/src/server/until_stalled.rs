@@ -17,7 +17,7 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::{
     channel::oneshot::{self, Canceled},
-    future::{BoxFuture, FusedFuture},
+    future::FusedFuture,
     FutureExt, Stream, StreamExt,
 };
 use pin_project::pin_project;
@@ -75,7 +75,9 @@ pub enum Item<Output> {
 ///   [`ActiveGuard`]s held by the user or due to other long-running connections.
 enum State {
     Running { stalled: StalledFut },
-    Stalled { channel: Option<zx::Channel>, readable: Option<BoxFuture<'static, ()>> },
+    // If the `channel` is `None`, the outgoing directory stream completed without stalling.
+    // We just need to wait for the `ServiceFs` to finish.
+    Stalled { channel: Option<fasync::OnSignals<'static, zx::Channel>> },
 }
 
 impl<ServiceObjTy: ServiceObjTrait + Send> Stream for StallableServiceFs<ServiceObjTy> {
@@ -97,17 +99,21 @@ impl<ServiceObjTy: ServiceObjTrait + Send> Stream for StallableServiceFs<Service
         // If we get here, the underlying service fs is either finished, or pending.
         // Poll in a loop until the state no longer changes.
         loop {
-            match this.state {
-                State::Running { ref mut stalled } => {
+            match &mut this.state {
+                State::Running { stalled } => {
                     let channel = std::task::ready!(stalled.as_mut().poll(cx));
+                    let channel = channel
+                        .map(|c| fasync::OnSignals::new(c.into(), zx::Signals::CHANNEL_READABLE));
                     // The state will be polled on the next loop iteration.
-                    *this.state = State::Stalled { channel, readable: None };
+                    *this.state = State::Stalled { channel };
                 }
-                State::Stalled { ref mut channel, ref mut readable } => {
+                State::Stalled { channel } => {
                     if let Poll::Ready(None) = poll_fs {
                         // The service fs finished. Return the channel if we have it.
                         *this.is_terminated = true;
-                        return Poll::Ready(channel.take().map(Item::Stalled));
+                        return Poll::Ready(
+                            channel.take().map(|wait| Item::Stalled(wait.take_handle().into())),
+                        );
                     }
                     if channel.is_none() {
                         // The outgoing directory FIDL stream completed (client closed or
@@ -116,22 +122,12 @@ impl<ServiceObjTy: ServiceObjTrait + Send> Stream for StallableServiceFs<Service
                         return Poll::Pending;
                     }
                     // Otherwise, arrange to be polled again if the channel is readable.
-                    let readable = readable
-                        .get_or_insert_with(|| {
-                            fasync::OnSignals::new(
-                                channel.as_ref().unwrap(),
-                                zx::Signals::CHANNEL_READABLE,
-                            )
-                            .extend_lifetime()
-                            .map(|_| ())
-                            .boxed()
-                        })
-                        .poll_unpin(cx);
-                    let () = std::task::ready!(readable);
+                    let readable = channel.as_mut().unwrap().poll_unpin(cx);
+                    let _ = std::task::ready!(readable);
                     // Server endpoint is readable again. Restore the connection.
-                    let stalled = this
-                        .connector
-                        .serve(channel.take().unwrap().into(), *this.debounce_interval);
+                    let wait = channel.take().unwrap();
+                    let stalled =
+                        this.connector.serve(wait.take_handle().into(), *this.debounce_interval);
                     // The state will be polled on the next loop iteration.
                     *this.state = State::Running { stalled };
                 }
@@ -233,7 +229,7 @@ mod tests {
     use fidl_fuchsia_component_client_test::{
         ServiceAMarker, ServiceARequest, ServiceARequestStream,
     };
-    use futures::{pin_mut, select, TryStreamExt};
+    use futures::{future::BoxFuture, pin_mut, select, TryStreamExt};
     use test_util::Counter;
     use zx::AsHandleRef;
 
