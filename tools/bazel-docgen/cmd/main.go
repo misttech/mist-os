@@ -6,22 +6,25 @@ package main
 
 import (
 	"flag"
+	"io"
 	"log"
 	"os"
+	"path/filepath"
 
 	"google.golang.org/protobuf/encoding/prototext"
 
+	"go.fuchsia.dev/fuchsia/tools/bazel-docgen"
 	pb "go.fuchsia.dev/fuchsia/tools/bazel-docgen/third_party/stardoc"
 )
 
 type docGenFlags struct {
-	outputFile string
-	proto      string
+	outDir string
+	proto  string
 }
 
 func parseFlags() docGenFlags {
 	var flags docGenFlags
-	flag.StringVar(&flags.outputFile, "output", "", "path to a file which will contain the output")
+	flag.StringVar(&flags.outDir, "out_dir", "", "path to a directory which will contain output files.")
 	flag.StringVar(&flags.proto, "proto", "", "path to a protobuf, as a textproto, file which contains the docs")
 	flag.Parse()
 
@@ -41,6 +44,19 @@ func main() {
 		log.Fatalln("Failed to parse module info:", err)
 	}
 
-	d1 := []byte("STAMP\n")
-	os.WriteFile(flags.outputFile, d1, 0644)
+	generator := bazel_docgen.NewDocGenerator()
+	renderer := bazel_docgen.NewMarkdownRenderer()
+
+	// Create a simple file creation function which just creates a file. In the
+	// future it will be easier to use the zip writer to create one zip file and
+	// then unzip into the outDir for testing if it is specified.
+	makeFileFn := func(s string) io.Writer {
+		f, err := os.OpenFile(filepath.Join(flags.outDir, s), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatalln("Failed to create new file:", err)
+		}
+		return f
+	}
+
+	generator.RenderModuleInfo(root, &renderer, makeFileFn)
 }

@@ -2,10 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-def _empty_rule_impl(_ctx):
+def _empty_impl(_ctx):
     return []
 
-empty_rule = rule(
-    implementation = _empty_rule_impl,
+empty = rule(
+    implementation = _empty_impl,
     doc = "Just an empty rule",
 )

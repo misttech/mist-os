@@ -1,0 +1,16 @@
+rule_info {
+  rule_name: "empty"
+  doc_string: "Just an empty rule"
+  attribute {
+    name: "name"
+    doc_string: "A unique name for this target."
+    type: NAME
+    mandatory: true
+  }
+  origin_key {
+    name: "empty"
+    file: "//tools/bazel-docgen/testdata/foo:foo_internal.bzl"
+  }
+}
+module_docstring: "Public definitions for the foo library"
+file: "//tools/bazel-docgen/testdata:foo.bzl"

@@ -6,7 +6,7 @@
 
 load(
     "//tools/bazel-docgen/testdata/foo:foo_internal.bzl",
-    _emtpy_rule = "empty_rule",
+    _emtpy = "empty",
 )
 
-empty_rule = _emtpy_rule
+empty = _emtpy
