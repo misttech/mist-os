@@ -8,6 +8,10 @@
 
 namespace radar {
 
+void ReaderInstance::GetBurstSize(GetBurstSizeCompleter::Sync& completer) {
+  Close(ZX_ERR_NOT_SUPPORTED);
+}
+
 void ReaderInstance::GetBurstProperties(GetBurstPropertiesCompleter::Sync& completer) {
   completer.Reply(parent_->burst_properties());
 }

@@ -102,6 +102,10 @@ class FakeRadarDriver : public fidl::Server<fuchsia_hardware_radar::RadarBurstRe
     completer.Reply(fit::ok());
   }
 
+  void GetBurstSize(GetBurstSizeCompleter::Sync& completer) override {
+    ZX_PANIC("not implemented");
+  }
+
   void GetBurstProperties(GetBurstPropertiesCompleter::Sync& completer) override {
     completer.Reply({burst_size_, zx::usec(1).to_nsecs()});
   }

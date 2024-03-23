@@ -19,6 +19,9 @@
 
 #include "src/lib/vmo_store/vmo_store.h"
 
+// TODO(https://fxbug.dev/42085274): Remove when soft transition is complete.
+#define FUCHSIA_HARDWARE_RADAR_IMPLEMENT_GET_BURST_SIZE
+
 namespace radar {
 
 // Thread-safe utility class for keeping track of registered VMOs, their VMARs, and lock states.
