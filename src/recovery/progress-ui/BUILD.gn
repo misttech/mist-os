@@ -18,7 +18,7 @@ rustc_binary("bin") {
   edition = "2018"
 
   # Generates a GN target for unit-tests with the label `bin_test`, and
-  # a binary named `progress_ui_bin_test`.
+  # a binary named `progress-ui_bin_test`.
   with_unit_tests = false
 
   deps = [
@@ -40,8 +40,8 @@ rustc_binary("bin") {
 }
 
 fuchsia_component("component") {
-  component_name = "progress_ui"
-  manifest = "meta/progress_ui.cml"
+  component_name = "progress-ui"
+  manifest = "meta/progress-ui.cml"
   deps = [ ":bin" ]
 }
 

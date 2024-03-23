@@ -35,8 +35,8 @@ rustc_binary("bin") {
 }
 
 fuchsia_component("component") {
-  component_name = "progress_sender"
-  manifest = "meta/progress_sender.cml"
+  component_name = "progress-sender"
+  manifest = "meta/progress-sender.cml"
   deps = [ ":bin" ]
 }
 

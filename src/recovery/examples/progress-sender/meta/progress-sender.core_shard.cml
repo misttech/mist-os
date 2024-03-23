@@ -5,12 +5,12 @@
     children: [
         {
             name: "progress-sender",
-            url: "fuchsia-pkg://fuchsia.com/progress-sender#meta/progress_sender.cm",
+            url: "fuchsia-pkg://fuchsia.com/progress-sender#meta/progress-sender.cm",
             startup: "eager",
         },
         {
             name: "progress-ui",
-            url: "fuchsia-pkg://fuchsia.com/progress-ui#meta/progress_ui.cm",
+            url: "fuchsia-pkg://fuchsia.com/progress-ui#meta/progress-ui.cm",
         },
     ],
     offer: [

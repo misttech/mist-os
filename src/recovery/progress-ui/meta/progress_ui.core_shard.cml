@@ -5,7 +5,7 @@
     children: [
         {
             name: "progress-ui",
-            url: "fuchsia-pkg://fuchsia.com/progress-ui#meta/progress_ui.cm",
+            url: "fuchsia-pkg://fuchsia.com/progress-ui#meta/progress-ui.cm",
         },
     ],
     offer: [
