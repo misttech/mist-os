@@ -28,7 +28,11 @@ if (is_host) {
 
     params_source = "params.yaml"
     transport = "fuchsia-controller"
-    environments = [ emu_env ]
+    environments = [
+      emu_env,
+      vim3_env,
+      nuc_env,
+    ]
   }
 }
 
