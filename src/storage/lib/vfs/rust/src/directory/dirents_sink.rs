@@ -11,9 +11,8 @@ use std::any::Any;
 /// Every sink that can consume directory entry information implements this trait.
 pub trait Sink: Send {
     /// Try to append an entry with the specified entry name and attributes into this sink.
-    /// If the entry was successfully added, `pos` is not invoked and the result is
-    /// [`AppendResult::Ok`].  If the sink could not consume this entry, `pos` is used to get
-    /// current traversal position and an [`AppendResult::Sealed`] value is returned.
+    /// If the entry was successfully added the result is [`AppendResult::Ok`].  If the sink could
+    /// could not consume this entry an [`AppendResult::Sealed`] value is returned.
     ///
     /// `entry` is the [`EntryInfo`] attributes of the next entry.  `name` is the name of the next
     /// entry.
