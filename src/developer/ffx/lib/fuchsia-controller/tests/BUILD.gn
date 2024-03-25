@@ -7,6 +7,9 @@ import("//build/python/python_host_test.gni")
 import("//build/testing/host_test_data.gni")
 
 host_test_data("fuchsia_controller_host_test_data") {
+  # Needed for SDK inclusion
+  testonly = false
+
   sources = [
     get_label_info("//build/fidl:all_fidl_json($default_toolchain)",
                    "root_out_dir") + "/all_fidl_json.txt",
@@ -30,7 +33,9 @@ host_test_data("core_sdk_host_test_data") {
 }
 
 group("fuchsia_controller_test_data") {
-  testonly = true
+  # Needed for SDK inclusion
+  testonly = false
+
   deps = [
     ":fuchsia_controller_host_test_data",
     "//src/developer/ffx:test_data",

@@ -26,6 +26,7 @@ template("_python_action") {
     forward_variables_from(invoker,
                            "*",
                            [
+                             "assert_no_deps",
                              "deps",
                              "binary_label",
                              "script",

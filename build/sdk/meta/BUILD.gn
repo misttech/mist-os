@@ -18,6 +18,7 @@ schemas = [
   "dart_library.json",
   "data.json",
   "documentation.json",
+  "experimental_python_e2e_test.json",
   "ffx_tool.json",
   "fhcp_tests.json",
   "fidl_library.json",

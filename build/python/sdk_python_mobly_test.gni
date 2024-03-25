@@ -1,0 +1,176 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_action.gni")
+import("//build/sdk/sdk_atom.gni")
+
+# Declares an in-tree Python E2E Mobly test for distribution in the SDK.
+#
+# Example:
+# ```
+# python_mobly_test("my-test") {
+#   main_source = "main.py"
+#   transport = "fuchsia-controller"
+#   testonly = false  # Required for SDK inclusion.
+# }
+#
+# sdk_python_mobly_test("my-sdk-test") {
+#   sdk_name = "my-test"
+#   test_label = ":my-test"
+#   category = "partner"
+#   min_python_version = "3.11"
+# }
+# ```
+#
+# Parameters
+#
+#   test_label
+#     The Python E2E test to distribute. Must point to a python_mobly_test()
+#     target.
+#     Type: label.
+#
+#   sdk_name
+#     Name of the test in the SDK.
+#     Type: string.
+#
+#   category
+#     Publication level of the library in SDKs.
+#     See //build/sdk/sdk_atom.gni for more.
+#     Type: string.
+#
+#   min_python_version
+#     The minimum Python version (Major.Minor) this the test is compatible with
+#     - e.g. "3.11".
+#     Type: string.
+
+template("sdk_python_mobly_test") {
+  assert(defined(invoker.category), "Must define an SDK category")
+  assert(defined(invoker.sdk_name),
+         "Must define a distribution name for this test.")
+
+  # TODO(b/330221760): Establish strategy to maintain OOT compatibility when
+  # in-tree's Python version is bumped.
+  assert(
+      defined(invoker.min_python_version) &&
+          invoker.min_python_version == pip_version,
+      "Minimum Python version must be defined and match in-tree's Python version")
+  _sdk_name = invoker.sdk_name
+
+  if (defined(invoker.category) && invoker.category != "excluded") {
+    _full_test_label = get_label_info(invoker.test_label, "label_no_toolchain")
+
+    _labels = {
+      # IDK-bound targets cannot depend on `testonly` targets so instead of
+      # depending on the main python_mobly_test() target which is a host_test()
+      # with `testonly` hardcoded to true, we can instead depend on the
+      # `.binary_and_config` group target for bundling purposes.
+      full_test_bundle = "${_full_test_label}.binary_and_config"
+
+      fidl_ir_list = "${target_name}_fidl_ir_list"
+      meta_json_and_file_list = "${target_name}_metadata_and_file_list"
+    }
+
+    _files = {
+      fidl_ir_list = "${target_gen_dir}/${target_name}_fidl_ir_infos.json"
+      meta_json = "${target_gen_dir}/${target_name}_metadata_and_file_list.sdk_meta.json"
+      file_list =
+          "${target_gen_dir}/${target_name}_metadata_and_file_list.mapping.txt"
+    }
+
+    generated_file(_labels.fidl_ir_list) {
+      visibility = [ ":*" ]
+
+      public_deps = [ _labels.full_test_bundle ]
+
+      outputs = [ _files.fidl_ir_list ]
+      output_conversion = "json"
+      data_keys = [ "fidl_ir_info" ]
+    }
+
+    _test_sources_target = "${target_name}_test_sources"
+    _test_sources_file = "${target_gen_dir}/${target_name}_test_sources.json"
+    generated_file(_test_sources_target) {
+      visibility = [ ":*" ]
+
+      public_deps = [ _labels.full_test_bundle ]
+
+      outputs = [ _test_sources_file ]
+      output_conversion = "json"
+      data_keys = [ "pye2e_test_sources" ]
+    }
+
+    python_action(_labels.meta_json_and_file_list) {
+      binary_label = "//build/python:gen_sdk_metadata_and_file_sources"
+
+      inputs = [
+        _files.fidl_ir_list,
+        _test_sources_file,
+      ]
+
+      outputs = [
+        _files.file_list,
+        _files.meta_json,
+      ]
+
+      args = [
+        "--out-metadata",
+        rebase_path(_files.meta_json, root_build_dir),
+        "--out-sources",
+        rebase_path(_files.file_list, root_build_dir),
+        "--fidl-ir-list",
+        rebase_path(_files.fidl_ir_list, root_build_dir),
+        "--test-sources-list",
+        rebase_path(_test_sources_file, root_build_dir),
+        "--name",
+        _sdk_name,
+        "--root",
+        "python/${_sdk_name}",
+        "--min-python-version",
+        invoker.min_python_version,
+
+        # At the moment, Fuchsia Controler's shared libraries are common to all
+        # tests so they can be hardcoded here.
+        "--c-extension-libs",
+        rebase_path("${root_out_dir}/fidl_codec.so", root_build_dir),
+        rebase_path("${root_out_dir}/fuchsia_controller_internal.so",
+                    root_build_dir),
+      ]
+
+      deps = [
+        ":${_labels.fidl_ir_list}",
+        ":${_test_sources_target}",
+        "//src/developer/ffx/lib/fuchsia-controller:fidl_codec_shlib",
+        "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_internal_shlib",
+        _labels.full_test_bundle,
+      ]
+
+      # Ensure FIDL-IR dependencies used in the test are supported in SDK.
+      #
+      # TODO(b/330629017): Centralize this group in //sdk somewhere.
+      assert_no_deps = [
+        "//sdk:marker-cts",
+        "//sdk:marker-excluded",
+        "//sdk:marker-experimental",
+        "//sdk:marker-internal",
+        "//sdk:marker-unknown",
+      ]
+    }
+
+    sdk_atom(target_name) {
+      id = "sdk://python/${_sdk_name}"
+
+      category = invoker.category
+
+      meta = {
+        schema = "experimental_python_e2e_test"
+        dest = "python/${_sdk_name}/meta.json"
+        source = _files.meta_json
+      }
+
+      non_sdk_deps = [ ":${_labels.meta_json_and_file_list}" ]
+
+      file_list = _files.file_list
+    }
+  }
+}

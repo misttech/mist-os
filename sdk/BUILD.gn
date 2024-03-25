@@ -203,7 +203,15 @@ sdk_molecule("fuchsia_idk_atoms") {
     ]
   }
 
-  host_tools_deps = [ ":fuchsia_idk_atoms_host_tools" ]
+  host_tools_deps = [
+    # These tests are meant to run on hosts, so they are more like a "host tool"
+    # than any other category.
+    #
+    # TODO(b/330373943): Figure out what building host tools for
+    # "each API level" means when these host tests are versioned.
+    ":fuchsia_idk_atoms_host_tests",
+    ":fuchsia_idk_atoms_host_tools",
+  ]
 }
 
 # Prebulilt libraries and packages must be built and included for all API
@@ -270,6 +278,10 @@ sdk_molecule("fuchsia_idk_atoms_host_tools") {
     ":host_tools",
     "//tools/docsgen:ref_docs_sdk",
   ]
+}
+
+sdk_molecule("fuchsia_idk_atoms_host_tests") {
+  deps = [ ":core_experimental_python_e2e_tests" ]
 }
 
 group("tests_no_e2e") {
@@ -534,6 +546,11 @@ sdk_molecule("core_loadable_modules") {
 
 sdk_molecule("core_dart_library") {
   deps = [ "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)" ]
+}
+
+sdk_molecule("core_experimental_python_e2e_tests") {
+  deps =
+      [ "//src/tests/end_to_end/rtc:rtc_conformance_test_sdk($host_toolchain)" ]
 }
 
 # C/C++ code that must be provided as prebuilt libraries for each supported API
