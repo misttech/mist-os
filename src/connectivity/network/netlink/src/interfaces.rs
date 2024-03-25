@@ -26,13 +26,9 @@ use fidl_fuchsia_net_interfaces_ext::{
 };
 use fidl_fuchsia_net_root as fnet_root;
 
-use assert_matches::assert_matches;
 use derivative::Derivative;
 use either::Either;
-use futures::{
-    channel::{mpsc, oneshot},
-    pin_mut, FutureExt as _, StreamExt as _, TryStreamExt as _,
-};
+use futures::{channel::oneshot, StreamExt as _};
 use net_types::ip::{AddrSubnetEither, IpVersion};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
@@ -44,12 +40,13 @@ use netlink_packet_route::{
 
 use crate::{
     client::{ClientTable, InternalClient},
-    errors::EventLoopError,
+    errors::WorkerInitializationError,
     logging::{log_debug, log_error, log_warn},
     messaging::Sender,
     multicast_groups::ModernGroup,
     netlink_packet::{errno::Errno, UNSPECIFIED_SEQUENCE_NUMBER},
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
+    util::respond_to_completer,
 };
 
 /// A handler for interface events.
@@ -240,40 +237,18 @@ pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessa
     pub completer: oneshot::Sender<Result<(), RequestError>>,
 }
 
-fn respond_to_completer<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, D: Debug>(
-    client: InternalClient<NetlinkRoute, S>,
-    completer: oneshot::Sender<Result<(), RequestError>>,
-    result: Result<(), RequestError>,
-    request_for_log: D,
-) {
-    match completer.send(result) {
-        Ok(()) => (),
-        Err(err) => {
-            assert_eq!(err, result, "should get back what we tried to send");
-
-            // Not treated as a hard error because the socket may have been
-            // closed.
-            log_debug!(
-                "failed to send result ({:?}) to {} after handling {:?}",
-                result,
-                client,
-                request_for_log,
-            )
-        }
-    }
-}
-
-/// Contains the asynchronous work related to RTM_LINK and RTM_ADDR messages.
+/// Handles asynchronous work related to RTM_LINK and RTM_ADDR messages.
 ///
-/// Connects to the interfaces watcher and can respond to RTM_LINK and RTM_ADDR
+/// Can respond to interface watcher events and RTM_LINK and RTM_ADDR
 /// message requests.
-pub(crate) struct EventLoop<H, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
+pub(crate) struct InterfacesWorkerState<
+    H,
+    S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+> {
     /// A handler for interface events.
     interfaces_handler: H,
     /// An `InterfacesProxy` to get controlling access to interfaces.
     interfaces_proxy: fnet_root::InterfacesProxy,
-    /// A `StateProxy` to connect to the interfaces watcher.
-    state_proxy: fnet_interfaces::StateProxy,
     /// The current set of clients of NETLINK_ROUTE protocol family.
     route_clients: ClientTable<NetlinkRoute, S>,
     /// The table of interfaces and associated state discovered through the
@@ -287,12 +262,6 @@ pub(crate) enum InterfacesFidlError {
     /// Error in the FIDL event stream.
     #[error("event stream: {0}")]
     EventStream(fidl::Error),
-    /// Error connecting to the root interfaces protocol.
-    #[error("connecting to `fuchsia.net.root/Interfaces`: {0}")]
-    RootInterfaces(anyhow::Error),
-    /// Error connecting to state marker.
-    #[error("connecting to state marker: {0}")]
-    State(anyhow::Error),
     /// Error in getting interface event stream from state.
     #[error("watcher creation: {0}")]
     WatcherCreation(fnet_interfaces_ext::WatcherCreationError),
@@ -359,247 +328,90 @@ enum PendingRequestKind {
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
-struct PendingRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
+pub(crate) struct PendingRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
     kind: PendingRequestKind,
     client: InternalClient<NetlinkRoute, S>,
     completer: oneshot::Sender<Result<(), RequestError>>,
 }
 
 impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>
-    EventLoop<H, S>
+    InterfacesWorkerState<H, S>
 {
-    /// `new` returns a `Result<EventLoop, EventLoopError>` instance.
-    /// This is fallible iff it is not possible to obtain the `StateProxy`.
-    pub(crate) fn new(
-        interfaces_handler: H,
+    pub(crate) async fn create(
+        mut interfaces_handler: H,
         route_clients: ClientTable<NetlinkRoute, S>,
-    ) -> Result<Self, EventLoopError<InterfacesFidlError, InterfacesNetstackError>> {
-        use fuchsia_component::client::connect_to_protocol;
-        let interfaces_proxy = connect_to_protocol::<fnet_root::InterfacesMarker>()
-            .map_err(|e| EventLoopError::Fidl(InterfacesFidlError::RootInterfaces(e)))?;
-        let state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()
-            .map_err(|e| EventLoopError::Fidl(InterfacesFidlError::State(e)))?;
-
-        Ok(EventLoop {
-            interfaces_handler,
-            interfaces_proxy,
-            state_proxy,
-            route_clients,
-            interface_properties: BTreeMap::default(),
-        })
-    }
-
-    /// Run the asynchronous work related to RTM_LINK and RTM_ADDR messages.
-    ///
-    /// The event loop can track interface properties, and is never
-    /// expected to complete.
-    /// Returns: `InterfacesEventLoopError` that requires restarting the
-    /// event loop task, for example, if the watcher stream ends or if
-    /// the FIDL protocol cannot be connected.
-    ///
-    /// `request_stream` is a stream of [`Request`]s for the event loop to
-    /// handle.
-    pub(crate) async fn run(
-        mut self,
-        request_stream: mpsc::Receiver<Request<S>>,
-    ) -> EventLoopError<InterfacesFidlError, InterfacesNetstackError> {
-        let if_event_stream = {
-            let stream_res = fnet_interfaces_ext::event_stream_from_state(
-                &self.state_proxy,
+        interfaces_proxy: fnet_root::InterfacesProxy,
+        interfaces_state_proxy: fnet_interfaces::StateProxy,
+    ) -> Result<
+        (Self, impl futures::Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>),
+        WorkerInitializationError<InterfacesFidlError, InterfacesNetstackError>,
+    > {
+        let mut if_event_stream = Box::pin(
+            fnet_interfaces_ext::event_stream_from_state(
+                &interfaces_state_proxy,
                 fnet_interfaces_ext::IncludedAddresses::All,
-            );
+            )
+            .map_err(|err| {
+                WorkerInitializationError::Fidl(InterfacesFidlError::WatcherCreation(err))
+            })?,
+        );
 
-            match stream_res {
-                Ok(stream) => stream.fuse(),
-                Err(e) => {
-                    return EventLoopError::Fidl(InterfacesFidlError::WatcherCreation(e));
-                }
-            }
-        };
-        pin_mut!(if_event_stream);
-
-        // Fetch the existing interfaces and addresses to generate the initial
-        // state before starting to publish events to members of multicast
-        // groups. This is because messages should not be sent for
-        // interfaces/addresses that already existed. Sending messages in
-        // response to existing (`fnet_interfaces::Event::Existing`) events will
-        // violate that expectation.
-        self.interface_properties = {
-            let mut interface_properties = match fnet_interfaces_ext::existing(
+        let mut interface_properties = {
+            match fnet_interfaces_ext::existing(
                 if_event_stream.by_ref(),
                 BTreeMap::<u64, fnet_interfaces_ext::PropertiesAndState<InterfaceState>>::new(),
             )
             .await
             {
-                Ok(interfaces) => interfaces,
+                Ok(props) => props,
                 Err(fnet_interfaces_ext::WatcherOperationError::UnexpectedEnd { .. }) => {
-                    return EventLoopError::Netstack(InterfacesNetstackError::EventStreamEnded);
-                }
-                Err(fnet_interfaces_ext::WatcherOperationError::EventStream(e)) => {
-                    return EventLoopError::Fidl(InterfacesFidlError::EventStream(e));
-                }
-                Err(fnet_interfaces_ext::WatcherOperationError::Update(e)) => {
-                    return EventLoopError::Netstack(InterfacesNetstackError::Update(e));
-                }
-                Err(fnet_interfaces_ext::WatcherOperationError::UnexpectedEvent(event)) => {
-                    return EventLoopError::Netstack(InterfacesNetstackError::UnexpectedEvent(
-                        event,
+                    return Err(WorkerInitializationError::Netstack(
+                        InterfacesNetstackError::EventStreamEnded,
                     ));
                 }
-            };
-
-            for fnet_interfaces_ext::PropertiesAndState {
-                properties,
-                state: InterfaceState { addresses, link_address, control: _ },
-            } in interface_properties.values_mut()
-            {
-                set_link_address(&self.interfaces_proxy, properties.id, link_address).await;
-
-                if let Some(interface_addresses) =
-                    addresses_optionally_from_interface_properties(properties)
-                {
-                    *addresses = interface_addresses;
+                Err(fnet_interfaces_ext::WatcherOperationError::EventStream(e)) => {
+                    return Err(WorkerInitializationError::Fidl(InterfacesFidlError::EventStream(
+                        e,
+                    )));
                 }
-
-                self.interfaces_handler.handle_new_link(&properties.name);
+                Err(fnet_interfaces_ext::WatcherOperationError::Update(e)) => {
+                    return Err(WorkerInitializationError::Netstack(
+                        InterfacesNetstackError::Update(e),
+                    ));
+                }
+                Err(fnet_interfaces_ext::WatcherOperationError::UnexpectedEvent(event)) => {
+                    return Err(WorkerInitializationError::Netstack(
+                        InterfacesNetstackError::UnexpectedEvent(event),
+                    ));
+                }
             }
-
-            interface_properties
         };
 
-        // Chain a pending so that the stream never ends. This is so that tests
-        // can safely rely on just closing the watcher to terminate the event
-        // loop. This is okay because we do not expect the request stream to
-        // reasonably end and if we did want to support graceful shutdown of the
-        // event loop, we can have a dedicated shutdown signal.
-        let mut request_stream = request_stream.chain(futures::stream::pending());
+        for fnet_interfaces_ext::PropertiesAndState {
+            properties,
+            state: InterfaceState { addresses, link_address, control: _ },
+        } in interface_properties.values_mut()
+        {
+            set_link_address(&interfaces_proxy, properties.id, link_address).await;
 
-        let mut pending_request = None;
-
-        loop {
-            // Don't handle new requests until we complete handling the pending
-            // request.
-            let request_fut = match pending_request {
-                Some(_) => {
-                    log_debug!(
-                        "not awaiting on request stream because of pending request: {:?}",
-                        pending_request,
-                    );
-
-                    futures::future::pending().left_future()
-                }
-                None => request_stream.next().right_future(),
-            }
-            .fuse();
-            futures::pin_mut!(request_fut);
-
-            futures::select! {
-                stream_res = if_event_stream.try_next() => {
-                    let event = match stream_res {
-                        Ok(Some(event)) => event,
-                        Ok(None) => {
-                            return EventLoopError::Netstack(InterfacesNetstackError::EventStreamEnded);
-                        }
-                        Err(e) => {
-                            return EventLoopError::Fidl(InterfacesFidlError::EventStream(e));
-                        }
-                    };
-
-                    match self.handle_interface_watcher_event(
-                        event,
-                    ).await {
-                        Ok(()) => {}
-                        Err(InterfaceEventHandlerError::ExistingEventReceived(properties)) => {
-                            // This error indicates there is an inconsistent interface state shared
-                            // between Netlink and Netstack.
-                            return EventLoopError::Netstack(InterfacesNetstackError::UnexpectedEvent(
-                                fnet_interfaces::Event::Existing(properties.into()),
-                            ));
-                        }
-                        Err(InterfaceEventHandlerError::Update(e)) => {
-                            // This error is severe enough to indicate a larger problem in Netstack.
-                            return EventLoopError::Netstack(InterfacesNetstackError::Update(e));
-                        }
-                    }
-                }
-                req = request_fut => {
-                    assert_matches!(
-                        core::mem::replace(
-                            &mut pending_request,
-                            self.handle_request(
-                                req.expect(
-                                    "request stream should never end because of chained `pending`",
-                                ),
-                            ).await,
-                        ),
-                        None
-                    )
-                }
+            if let Some(interface_addresses) =
+                addresses_optionally_from_interface_properties(properties)
+            {
+                *addresses = interface_addresses;
             }
 
-            if let Some(pending_request_some) = pending_request.take() {
-                let PendingRequest { kind, client: _, completer: _ } = &pending_request_some;
-
-                let contains_addr = |&AddressAndInterfaceArgs { address, interface_id }| {
-                    // NB: The interface must exist, because we were able to
-                    // successfully add/remove an address (hence the pending
-                    // request). The Netstack will send a 'changed' event to
-                    // reflect the address add/remove before sending a `removed`
-                    // event for the interface.
-                    let fnet_interfaces_ext::PropertiesAndState {
-                        properties: _,
-                        state: InterfaceState { addresses, link_address: _, control: _ },
-                    } = self
-                        .interface_properties
-                        .get(&interface_id.get().into())
-                        .expect("interfaces with pending address change should exist");
-                    let fnet::Subnet { addr, prefix_len: _ } = address.clone().into_ext();
-                    addresses.contains_key(&addr)
-                };
-
-                let done = match kind {
-                    PendingRequestKind::AddAddress(address_and_interface_args) => {
-                        contains_addr(address_and_interface_args)
-                    }
-                    PendingRequestKind::DelAddress(address_and_interface_args) => {
-                        !contains_addr(address_and_interface_args)
-                    }
-                    PendingRequestKind::DisableInterface(interface_id) => {
-                        // NB: The interface must exist, because we were able to
-                        // successfully disabled it (hence the pending request).
-                        // The Netstack will send a 'changed' event to reflect
-                        // the disable, before sending a `removed` event.
-                        let fnet_interfaces_ext::PropertiesAndState { properties, state: _ } = self
-                            .interface_properties
-                            .get(&interface_id.get())
-                            .unwrap_or_else(|| {
-                                panic!("interface {interface_id} with pending disable should exist")
-                            });
-                        // Note here we check "is the interface offline" which
-                        // is a combination of, "is the underlying link state
-                        // down" and "is the interface admin disabled". This
-                        // means we cannot know with certainty whether the link
-                        // is enabled or disabled. we take our best guess here.
-                        // TODO(https://issues.fuchsia.dev/290372180): Make this
-                        // check exact once link status is available via a FIDL
-                        // API.
-                        !properties.online
-                    }
-                };
-
-                if done {
-                    log_debug!("completed pending request; req = {pending_request_some:?}");
-
-                    let PendingRequest { kind, client, completer } = pending_request_some;
-
-                    respond_to_completer(client, completer, Ok(()), kind);
-                } else {
-                    // Put the pending request back so that it can be handled later.
-                    log_debug!("pending request not done yet; req = {pending_request_some:?}");
-                    pending_request = Some(pending_request_some);
-                }
-            }
+            interfaces_handler.handle_new_link(&properties.name);
         }
+
+        Ok((
+            InterfacesWorkerState {
+                interfaces_handler,
+                interfaces_proxy,
+                route_clients,
+                interface_properties,
+            },
+            if_event_stream,
+        ))
     }
 
     /// Handles events observed from the interface watcher by updating the
@@ -607,7 +419,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     ///
     /// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
     /// `UpdateError` when updates are not consistent with the current state.
-    async fn handle_interface_watcher_event(
+    pub(crate) async fn handle_interface_watcher_event(
         &mut self,
         event: fnet_interfaces::Event,
     ) -> Result<(), InterfaceEventHandlerError> {
@@ -730,6 +542,73 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             fnet_interfaces_ext::UpdateResult::NoChange => {}
         }
         Ok(())
+    }
+
+    /// Checks whether a `PendingRequest` can be marked completed given the current state of the
+    /// worker. If so, notifies the request's completer and returns `None`. If not, returns
+    /// the `PendingRequest` as `Some`.
+    pub(crate) fn handle_pending_request(
+        &self,
+        pending_request: PendingRequest<S>,
+    ) -> Option<PendingRequest<S>> {
+        let PendingRequest { kind, client: _, completer: _ } = &pending_request;
+        let contains_addr = |&AddressAndInterfaceArgs { address, interface_id }| {
+            // NB: The interface must exist, because we were able to
+            // successfully add/remove an address (hence the pending
+            // request). The Netstack will send a 'changed' event to
+            // reflect the address add/remove before sending a `removed`
+            // event for the interface.
+            let fnet_interfaces_ext::PropertiesAndState {
+                properties: _,
+                state: InterfaceState { addresses, link_address: _, control: _ },
+            } = self
+                .interface_properties
+                .get(&interface_id.get().into())
+                .expect("interfaces with pending address change should exist");
+            let fnet::Subnet { addr, prefix_len: _ } = address.clone().into_ext();
+            addresses.contains_key(&addr)
+        };
+
+        let done = match kind {
+            PendingRequestKind::AddAddress(address_and_interface_args) => {
+                contains_addr(address_and_interface_args)
+            }
+            PendingRequestKind::DelAddress(address_and_interface_args) => {
+                !contains_addr(address_and_interface_args)
+            }
+            PendingRequestKind::DisableInterface(interface_id) => {
+                // NB: The interface must exist, because we were able to
+                // successfully disabled it (hence the pending request).
+                // The Netstack will send a 'changed' event to reflect
+                // the disable, before sending a `removed` event.
+                let fnet_interfaces_ext::PropertiesAndState { properties, state: _ } =
+                    self.interface_properties.get(&interface_id.get()).unwrap_or_else(|| {
+                        panic!("interface {interface_id} with pending disable should exist")
+                    });
+                // Note here we check "is the interface offline" which
+                // is a combination of, "is the underlying link state
+                // down" and "is the interface admin disabled". This
+                // means we cannot know with certainty whether the link
+                // is enabled or disabled. we take our best guess here.
+                // TODO(https://issues.fuchsia.dev/290372180): Make this
+                // check exact once link status is available via a FIDL
+                // API.
+                !properties.online
+            }
+        };
+
+        if done {
+            log_debug!("completed pending request; req = {pending_request:?}");
+
+            let PendingRequest { kind, client, completer } = pending_request;
+
+            respond_to_completer(client, completer, Ok(()), kind);
+            None
+        } else {
+            // Put the pending request back so that it can be handled later.
+            log_debug!("pending request not done yet; req = {pending_request:?}");
+            Some(pending_request)
+        }
     }
 
     /// Returns an admistrative control for the interface.
@@ -1008,7 +887,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     /// Returns a [`PendingRequest`] if state was updated and the caller needs
     /// to make sure the update has been propagated to the local state (the
     /// interfaces watcher has sent an event for our update).
-    async fn handle_request(
+    pub(crate) async fn handle_request(
         &mut self,
         Request { args, sequence_number, mut client, completer }: Request<S>,
     ) -> Option<PendingRequest<S>> {
@@ -1084,12 +963,11 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
 }
 
 /// Errors related to handling interface events.
-#[derive(Debug)]
-enum InterfaceEventHandlerError {
-    /// Interface event handler updated the map with an event, but received an
-    /// unexpected response.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum InterfaceEventHandlerError {
+    #[error("interface event handler updated the map with an event, but received an unexpected response: {0:?}")]
     Update(fnet_interfaces_ext::UpdateError),
-    /// Interface event handler attempted to process an event for an interface that already existed.
+    #[error("interface event handler attempted to process an event for an interface that already existed: {0:?}")]
     ExistingEventReceived(fnet_interfaces_ext::Properties),
 }
 
@@ -1477,9 +1355,13 @@ pub(crate) mod testutil {
 
     use std::sync::{Arc, Mutex};
 
+    use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
     use fuchsia_zircon as zx;
-    use futures::{future::Future, stream::Stream};
+    use futures::{
+        channel::mpsc, future::Future, stream::Stream, FutureExt as _, TryStreamExt as _,
+    };
     use net_declare::{fidl_subnet, net_addr_subnet};
+    use net_types::ip::{Ipv4, Ipv6};
 
     use crate::messaging::testutil::FakeSender;
 
@@ -1576,7 +1458,7 @@ pub(crate) mod testutil {
     pub(crate) struct Setup<E, W> {
         pub event_loop_fut: E,
         pub watcher_stream: W,
-        pub request_sink: mpsc::Sender<Request<FakeSender<RtnlMessage>>>,
+        pub request_sink: mpsc::Sender<crate::eventloop::UnifiedRequest<FakeSender<RtnlMessage>>>,
         pub interfaces_request_stream: fnet_root::InterfacesRequestStream,
         pub interfaces_handler_sink: FakeInterfacesHandlerSink,
     }
@@ -1584,23 +1466,28 @@ pub(crate) mod testutil {
     pub(crate) fn setup_with_route_clients(
         route_clients: ClientTable<NetlinkRoute, FakeSender<RtnlMessage>>,
     ) -> Setup<
-        impl Future<Output = EventLoopError<InterfacesFidlError, InterfacesNetstackError>>,
+        impl Future<Output = Result<std::convert::Infallible, anyhow::Error>>,
         impl Stream<Item = fnet_interfaces::WatcherRequest>,
     > {
-        let (interfaces_proxy, interfaces_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_root::InterfacesMarker>().unwrap();
-        let (state_proxy, if_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
         let (request_sink, request_stream) = mpsc::channel(1);
         let (interfaces_handler, interfaces_handler_sink) = FakeInterfacesHandler::new();
-        let event_loop = EventLoop::<FakeInterfacesHandler, FakeSender<_>> {
-            interfaces_handler,
-            interfaces_proxy,
-            state_proxy,
-            route_clients,
-            interface_properties: BTreeMap::default(),
-        };
+        let (
+            event_loop,
+            crate::eventloop::testutil::EventLoopServerEnd {
+                interfaces,
+                interfaces_state,
+                v4_routes_state,
+                v6_routes_state,
+                v4_routes_set_provider,
+                v6_routes_set_provider,
+            },
+        ) = crate::eventloop::testutil::event_loop_fixture::<
+            FakeInterfacesHandler,
+            FakeSender<RtnlMessage>,
+        >(interfaces_handler, route_clients, request_stream);
 
+        let interfaces_request_stream = interfaces.into_stream().unwrap();
+        let if_stream = interfaces_state.into_stream().unwrap();
         let watcher_stream = if_stream
             .and_then(|req| match req {
                 fnet_interfaces::StateRequest::GetWatcher {
@@ -1613,7 +1500,38 @@ pub(crate) mod testutil {
             .map(|res| res.expect("watcher stream error"));
 
         Setup {
-            event_loop_fut: event_loop.run(request_stream),
+            event_loop_fut: async move {
+                let event_loop_result = futures::select! {
+                    result = event_loop.run().fuse() => result,
+                    () = crate::eventloop::testutil::serve_empty_routes::<Ipv4>(
+                            v4_routes_state
+                            ).fuse() => {
+                        unreachable!()
+                    },
+                    () = crate::eventloop::testutil::serve_empty_routes::<Ipv6>(
+                            v6_routes_state
+                            ).fuse() => {
+                        unreachable!()
+                    },
+                    () = fnet_routes_ext::testutil::admin::serve_noop_route_sets::<Ipv4>(
+                            v4_routes_set_provider
+                            ).fuse() => {
+                        unreachable!()
+                    },
+                    () = fnet_routes_ext::testutil::admin::serve_noop_route_sets::<Ipv6>(
+                            v6_routes_set_provider
+                            ).fuse() => {
+                        unreachable!()
+                    },
+                };
+                match event_loop_result {
+                    Ok(never) => match never {},
+                    Err(e) => {
+                        crate::logging::log_warn!("event loop exited with error: {e:?}");
+                        Err(e)
+                    }
+                }
+            },
             watcher_stream,
             request_sink,
             interfaces_request_stream,
@@ -1622,7 +1540,7 @@ pub(crate) mod testutil {
     }
 
     pub(crate) fn setup() -> Setup<
-        impl Future<Output = EventLoopError<InterfacesFidlError, InterfacesNetstackError>>,
+        impl Future<Output = Result<std::convert::Infallible, anyhow::Error>>,
         impl Stream<Item = fnet_interfaces::WatcherRequest>,
     > {
         setup_with_route_clients(ClientTable::default())
@@ -1739,7 +1657,8 @@ mod tests {
     use fnet_interfaces::AddressAssignmentState;
     use fuchsia_async::{self as fasync};
 
-    use futures::{sink::SinkExt as _, stream::Stream};
+    use assert_matches::assert_matches;
+    use futures::{sink::SinkExt as _, stream::Stream, FutureExt as _};
     use netlink_packet_route::RTNLGRP_IPV4_ROUTE;
     use pretty_assertions::assert_eq;
     use test_case::test_case;
@@ -1905,10 +1824,8 @@ mod tests {
 
         let (err, (), ()) = futures::join!(event_loop_fut, watcher_fut, root_interfaces_fut);
         assert_matches!(
-            err,
-            EventLoopError::Fidl(InterfacesFidlError::EventStream(
-                fidl::Error::ClientChannelClosed { .. }
-            ))
+            err.unwrap_err().downcast::<crate::eventloop::EventStreamError>().unwrap(),
+            crate::eventloop::EventStreamError::Interfaces(fidl::Error::ClientChannelClosed { .. })
         );
     }
 
@@ -1928,13 +1845,17 @@ mod tests {
 
         let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
         // The event being sent again as existing has interface id 1.
-        assert_matches!(err,
-            EventLoopError::Netstack(
+        assert_matches!(
+            err.unwrap_err()
+                .downcast::<WorkerInitializationError<InterfacesFidlError, InterfacesNetstackError>>()
+                .unwrap(),
+            WorkerInitializationError::Netstack(
                 InterfacesNetstackError::Update(
                     fnet_interfaces_ext::UpdateError::DuplicateExisting(properties)
                 )
             )
-            if properties.id.unwrap() == 1);
+            if properties.id.unwrap() == 1
+        );
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -1955,15 +1876,15 @@ mod tests {
         );
         let root_interfaces_fut = expect_only_get_mac_root_requests_fut(interfaces_request_stream);
 
-        let (err, (), ()) = futures::join!(event_loop_fut, watcher_fut, root_interfaces_fut);
+        let (result, (), ()) = futures::join!(event_loop_fut, watcher_fut, root_interfaces_fut);
         // The properties that are being added again has interface id 1.
-        assert_matches!(err,
-            EventLoopError::Netstack(
-                InterfacesNetstackError::Update(
-                    fnet_interfaces_ext::UpdateError::DuplicateAdded(properties)
-                )
-            )
-            if properties.id.unwrap() == 1);
+        assert_matches!(
+            result.unwrap_err()
+                .downcast::<InterfaceEventHandlerError>().unwrap(),
+            InterfaceEventHandlerError::Update(
+                fnet_interfaces_ext::UpdateError::DuplicateAdded(properties)
+            ) if properties.id.unwrap() == 1
+        );
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -1985,16 +1906,14 @@ mod tests {
         );
         let root_interfaces_fut = expect_only_get_mac_root_requests_fut(interfaces_request_stream);
 
-        let (err, (), ()) = futures::join!(event_loop_fut, watcher_fut, root_interfaces_fut);
+        let (result, (), ()) = futures::join!(event_loop_fut, watcher_fut, root_interfaces_fut);
         // The second existing properties has interface id 3.
         assert_matches!(
-            err,
-            EventLoopError::Netstack(
-                InterfacesNetstackError::UnexpectedEvent(
-                    fnet_interfaces::Event::Existing(properties)
-                )
-            )
-            if properties.id.unwrap() == 3);
+            result.unwrap_err()
+                .downcast::<InterfaceEventHandlerError>().unwrap(),
+            InterfaceEventHandlerError::ExistingEventReceived(properties)
+                if properties.id.get() == 3
+        );
     }
 
     #[test_case(ETHERNET, false, 0, ARPHRD_ETHER)]
@@ -2249,10 +2168,8 @@ mod tests {
         let ((), (), err) =
             futures::future::join3(watcher_stream_fut, root_interfaces_fut, event_loop_fut).await;
         assert_matches!(
-            err,
-            EventLoopError::Fidl(InterfacesFidlError::EventStream(
-                fidl::Error::ClientChannelClosed { .. },
-            ))
+            err.unwrap_err().downcast::<crate::eventloop::EventStreamError>().unwrap(),
+            crate::eventloop::EventStreamError::Interfaces(fidl::Error::ClientChannelClosed { .. })
         );
         assert_eq!(
             interfaces_handler_sink.take_handled(),
@@ -2524,12 +2441,12 @@ mod tests {
             |(mut results, mut request_sink), args| async move {
                 let (completer, waiter) = oneshot::channel();
                 request_sink
-                    .send(Request {
+                    .send(crate::eventloop::UnifiedRequest::InterfacesRequest(Request {
                         args,
                         sequence_number: TEST_SEQUENCE_NUMBER,
                         client: expected_client.clone(),
                         completer,
-                    })
+                    }))
                     .await
                     .unwrap();
                 results.push(waiter.await.unwrap());

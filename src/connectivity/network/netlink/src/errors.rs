@@ -5,7 +5,7 @@
 //! A module for shared errors between routes and interfaces watcher workers.
 
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum EventLoopError<F: std::fmt::Debug, N: std::fmt::Debug> {
+pub(crate) enum WorkerInitializationError<F: std::fmt::Debug, N: std::fmt::Debug> {
     /// Errors at the FIDL layer.
     ///
     /// Such as: cannot connect to protocol or watcher, loaded FIDL error

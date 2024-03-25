@@ -47,18 +47,21 @@ to publish to a multicast group. As such, the implementation is organized into
 several `fuchsia_async::Task`s. The tasks can be loosely grouped into the
 following categories:
   * Domain-Specific Eventloop : A task responsible for handling all events
-    related to a specific domain, implemented as an eventloop. For example,
-    there is a routes eventloop, which:
+    related to a synchronization domain, implemented as an eventloop to allow
+    for linearizing events within that domain. Currently, there is one
+    eventloop responsible for operations on interfaces and routes. For routes,
+    this eventloop:
     * keeps track of the current system routing tables by subscribing to the
     `fuchsia.net.routes/WatcherV{4,6}` protocol,
     * publishes events to the `RTNLGRP_IPV{4,6}ROUTE` multicast groups, and
     * handles `RTM_{DEL,GET,NEW}ROUTE` messages by validating the requests, and
     in the case of the `NEW` and `DEL` variants, dispatching the request to the
     `fuchsia.net.routes.admin/RouteSetV{4,6}` protocol.
-
-    Note: The domain-specific eventloops are introducing complexity for
-    synchronizing across domains; we may consider combining them in the future:
-    https://issuetracker.google.com/291629739
+    This eventloop does similar for interface-related requests and state
+    tracking.
+    While routes and interfaces previously were in separate eventloops, this
+    incurred complexity for synchronizing between them; as a result, we combined
+    them (https://issuetracker.google.com/291629739).
 
   * Client Request Handler: A task responsible for handling the requests of an
     *individual netlink client* by dispatching them to the appropriate

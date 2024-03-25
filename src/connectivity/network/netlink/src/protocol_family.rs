@@ -74,6 +74,7 @@ pub mod route {
     };
 
     use crate::{
+        eventloop::UnifiedRequest,
         interfaces,
         netlink_packet::{self, errno::Errno, ip_addr_from_bytes},
         routes,
@@ -158,9 +159,7 @@ pub mod route {
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
         R: RuleRequestHandler<S>,
     > {
-        pub(crate) interfaces_request_sink: mpsc::Sender<interfaces::Request<S>>,
-        pub(crate) v4_routes_request_sink: mpsc::Sender<routes::Request<S, Ipv4>>,
-        pub(crate) v6_routes_request_sink: mpsc::Sender<routes::Request<S, Ipv6>>,
+        pub(crate) unified_request_sink: mpsc::Sender<UnifiedRequest<S>>,
         pub(crate) rules_request_handler: R,
     }
 
@@ -625,12 +624,7 @@ pub mod route {
             req: NetlinkMessage<RtnlMessage>,
             client: &mut InternalClient<NetlinkRoute, S>,
         ) {
-            let Self {
-                interfaces_request_sink,
-                v4_routes_request_sink,
-                v6_routes_request_sink,
-                rules_request_handler,
-            } = self;
+            let Self { unified_request_sink, rules_request_handler } = self;
 
             let (req_header, payload) = req.into_parts();
             let req = match payload {
@@ -661,13 +655,14 @@ pub mod route {
                             return;
                         }
                     };
-                    interfaces_request_sink.send(
+                    unified_request_sink.send(
+                        UnifiedRequest::InterfacesRequest(
                         interfaces::Request{
                         args: interfaces::RequestArgs::Link(interfaces::LinkRequestArgs::Get(args)),
                         sequence_number: req_header.sequence_number,
                         client: client.clone(),
                         completer,
-                    }).await.expect("interface event loop should never terminate");
+                    })).await.expect("interface event loop should never terminate");
                     match waiter
                         .await
                         .expect("interfaces event loop should have handled the request") {
@@ -690,13 +685,14 @@ pub mod route {
                         }
                     };
                     let (completer, waiter) = oneshot::channel();
-                    interfaces_request_sink.send(
+                    unified_request_sink.send(
+                        UnifiedRequest::InterfacesRequest(
                         interfaces::Request{
                         args: interfaces::RequestArgs::Link(interfaces::LinkRequestArgs::Set(args)),
                         sequence_number: req_header.sequence_number,
                         client: client.clone(),
                         completer,
-                    }).await.expect("interface event loop should never terminate");
+                    })).await.expect("interface event loop should never terminate");
                     match waiter
                         .await
                         .expect("interfaces event loop should have handled the request") {
@@ -724,18 +720,21 @@ pub mod route {
                     };
 
                     let (completer, waiter) = oneshot::channel();
-                    interfaces_request_sink.send(interfaces::Request {
-                        args: interfaces::RequestArgs::Address(
-                            interfaces::AddressRequestArgs::Get(
-                                interfaces::GetAddressArgs::Dump {
-                                    ip_version_filter,
-                                },
-                            ),
-                        ),
-                        sequence_number: req_header.sequence_number,
-                        client: client.clone(),
-                        completer,
-                    }).await.expect("interface event loop should never terminate");
+                    unified_request_sink.send(
+                        UnifiedRequest::InterfacesRequest(
+                            interfaces::Request {
+                                args: interfaces::RequestArgs::Address(
+                                    interfaces::AddressRequestArgs::Get(
+                                        interfaces::GetAddressArgs::Dump {
+                                            ip_version_filter,
+                                        },
+                                    ),
+                                ),
+                                sequence_number: req_header.sequence_number,
+                                client: client.clone(),
+                                completer,
+                            }
+                        )).await.expect("interface event loop should never terminate");
                     waiter
                         .await
                         .expect("interfaces event loop should have handled the request")
@@ -760,19 +759,20 @@ pub mod route {
                     }) = extracted_request {
                         let (completer, waiter) = oneshot::channel();
                         let add_subnet_route = addr_flags & IFA_F_NOPREFIXROUTE != IFA_F_NOPREFIXROUTE;
-                        interfaces_request_sink.send(interfaces::Request {
-                            args: interfaces::RequestArgs::Address(
-                                interfaces::AddressRequestArgs::New(
-                                    interfaces::NewAddressArgs {
-                                        address_and_interface_id,
-                                        add_subnet_route,
-                                    },
+                        unified_request_sink.send(UnifiedRequest::InterfacesRequest(
+                            interfaces::Request {
+                                args: interfaces::RequestArgs::Address(
+                                    interfaces::AddressRequestArgs::New(
+                                        interfaces::NewAddressArgs {
+                                            address_and_interface_id,
+                                            add_subnet_route,
+                                        },
+                                    ),
                                 ),
-                            ),
-                            sequence_number: req_header.sequence_number,
-                            client: client.clone(),
-                            completer,
-                        }).await.expect("interface event loop should never terminate");
+                                sequence_number: req_header.sequence_number,
+                                client: client.clone(),
+                                completer,
+                            })).await.expect("interface event loop should never terminate");
                         waiter
                             .await
                             .expect("interfaces event loop should have handled the request")
@@ -806,18 +806,19 @@ pub mod route {
                         addr_flags: _,
                     }) = extracted_request {
                         let (completer, waiter) = oneshot::channel();
-                        interfaces_request_sink.send(interfaces::Request {
-                            args: interfaces::RequestArgs::Address(
-                                interfaces::AddressRequestArgs::Del(
-                                    interfaces::DelAddressArgs {
-                                        address_and_interface_id,
-                                    },
+                        unified_request_sink.send(UnifiedRequest::InterfacesRequest(
+                            interfaces::Request {
+                                args: interfaces::RequestArgs::Address(
+                                    interfaces::AddressRequestArgs::Del(
+                                        interfaces::DelAddressArgs {
+                                            address_and_interface_id,
+                                        },
+                                    ),
                                 ),
-                            ),
-                            sequence_number: req_header.sequence_number,
-                            client: client.clone(),
-                            completer,
-                        }).await.expect("interface event loop should never terminate");
+                                sequence_number: req_header.sequence_number,
+                                client: client.clone(),
+                                completer,
+                            })).await.expect("interface event loop should never terminate");
                         waiter
                             .await
                             .expect("interfaces event loop should have handled the request")
@@ -838,7 +839,7 @@ pub mod route {
                             // V4 routes are requested prior to V6 routes to conform
                             // with `ip list` output.
                             process_routes_worker_request::<_, Ipv4>(
-                                v4_routes_request_sink,
+                                unified_request_sink,
                                 client,
                                 req_header,
                                 routes::RouteRequestArgs::Get(
@@ -847,7 +848,7 @@ pub mod route {
                             ).await
                             .expect("route dump requests are infallible");
                         process_routes_worker_request::<_, Ipv6>(
-                                v6_routes_request_sink,
+                                unified_request_sink,
                                 client,
                                 req_header,
                                 routes::RouteRequestArgs::Get(
@@ -858,7 +859,7 @@ pub mod route {
                         },
                         AF_INET => {
                             process_routes_worker_request::<_, Ipv4>(
-                                v4_routes_request_sink,
+                                unified_request_sink,
                                 client,
                                 req_header,
                                 routes::RouteRequestArgs::Get(
@@ -869,7 +870,7 @@ pub mod route {
                         },
                         AF_INET6 => {
                             process_routes_worker_request::<_, Ipv6>(
-                                v6_routes_request_sink,
+                                unified_request_sink,
                                 client,
                                 req_header,
                                 routes::RouteRequestArgs::Get(
@@ -1019,7 +1020,7 @@ pub mod route {
                             match to_new_route_args::<Ipv4>(message, client, &req) {
                                 Ok(req) => {
                                     process_routes_worker_request::<_, Ipv4>(
-                                        v4_routes_request_sink,
+                                        unified_request_sink,
                                         client,
                                         req_header,
                                         req,
@@ -1036,7 +1037,7 @@ pub mod route {
                             match to_new_route_args::<Ipv6>(message, client, &req) {
                                 Ok(req) => {
                                     process_routes_worker_request::<_, Ipv6>(
-                                        v6_routes_request_sink,
+                                        unified_request_sink,
                                         client,
                                         req_header,
                                         req,
@@ -1080,7 +1081,7 @@ pub mod route {
                         AF_INET => match to_del_route_args::<Ipv4>(message, client, &req) {
                             Ok(req) => {
                                 process_routes_worker_request::<_, Ipv4>(
-                                    v4_routes_request_sink,
+                                    unified_request_sink,
                                     client,
                                     req_header,
                                     req,
@@ -1095,7 +1096,7 @@ pub mod route {
                         AF_INET6 => match to_del_route_args::<Ipv6>(message, client, &req) {
                             Ok(req) => {
                                 process_routes_worker_request::<_, Ipv6>(
-                                    v6_routes_request_sink,
+                                    unified_request_sink,
                                     client,
                                     req_header,
                                     req,
@@ -1202,20 +1203,28 @@ pub mod route {
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
         I: Ip,
     >(
-        sink: &mut mpsc::Sender<routes::Request<S, I>>,
+        sink: &mut mpsc::Sender<UnifiedRequest<S>>,
         client: &mut InternalClient<NetlinkRoute, S>,
         req_header: NetlinkHeader,
         route_request: routes::RouteRequestArgs<I>,
     ) -> Result<(), routes::RequestError> {
         let (completer, waiter) = oneshot::channel();
-        sink.send(routes::Request {
+        let request = routes::Request {
             args: routes::RequestArgs::Route(route_request),
             sequence_number: req_header.sequence_number,
             client: client.clone(),
             completer,
-        })
-        .await
-        .expect("route event loop should never terminate");
+        };
+        let IpInvariant(fut) = I::map_ip(
+            (request, IpInvariant(sink)),
+            |(request, IpInvariant(sink))| {
+                IpInvariant(sink.send(UnifiedRequest::RoutesV4Request(request)))
+            },
+            |(request, IpInvariant(sink))| {
+                IpInvariant(sink.send(UnifiedRequest::RoutesV6Request(request)))
+            },
+        );
+        fut.await.expect("route event loop should never terminate");
         waiter.await.expect("routes event loop should have handled the request")
     }
 
@@ -1341,7 +1350,7 @@ mod test {
     use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 
     use assert_matches::assert_matches;
-    use futures::{channel::mpsc, future::FutureExt as _, stream::StreamExt as _};
+    use futures::{channel::mpsc, future::FutureExt as _, stream::StreamExt as _, SinkExt};
     use net_declare::{net_addr_subnet, net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::{
         ip::{
@@ -1360,6 +1369,7 @@ mod test {
     use test_case::test_case;
 
     use crate::{
+        eventloop::UnifiedRequest,
         interfaces,
         messaging::testutil::{FakeSender, SentMessage},
         netlink_packet::{self, errno::Errno},
@@ -1440,14 +1450,10 @@ mod test {
         flags: u16,
         expected_response: Option<ExpectedResponse>,
     ) {
-        let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
-        let (v4_routes_request_sink, _v4_routes_request_stream) = mpsc::channel(0);
-        let (v6_routes_request_sink, _v6_routes_request_stream) = mpsc::channel(0);
+        let (unified_request_sink, _unified_request_stream) = mpsc::channel(0);
 
         let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
-            interfaces_request_sink,
-            v4_routes_request_sink,
-            v6_routes_request_sink,
+            unified_request_sink,
             rules_request_handler: RuleTable::new(),
         };
 
@@ -1507,16 +1513,18 @@ mod test {
             &[],
         );
 
-        let (interfaces_request_sink, mut interfaces_request_stream) = mpsc::channel(0);
-        let (v4_routes_request_sink, _v4_routes_request_stream) = mpsc::channel(0);
-        let (v6_routes_request_sink, _v6_routes_request_stream) = mpsc::channel(0);
-
+        let (unified_request_sink, unified_request_stream) = mpsc::channel(0);
         let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
-            interfaces_request_sink,
-            v4_routes_request_sink,
-            v6_routes_request_sink,
+            unified_request_sink,
             rules_request_handler: RuleTable::new(),
         };
+
+        let mut interfaces_request_stream = unified_request_stream.filter_map(|req| {
+            futures::future::ready(match req {
+                UnifiedRequest::InterfacesRequest(req) => Some(req),
+                _ => None,
+            })
+        });
 
         let ((), ()) = futures::future::join(handler.handle_request(request, &mut client), async {
             let next = interfaces_request_stream.next();
@@ -2800,6 +2808,40 @@ mod test {
         )
     }
 
+    /// Given a stream of `UnifiedRequest`s and sinks for v4 and v6 routes
+    /// requests, feeds the v4 and v6 routes requests from the stream into the
+    /// appropriate sinks, discarding other requests.
+    async fn split_route_requests(
+        unified_request_stream: mpsc::Receiver<UnifiedRequest<FakeSender<RtnlMessage>>>,
+        v4_routes_request_sink: mpsc::Sender<crate::routes::Request<FakeSender<RtnlMessage>, Ipv4>>,
+        v6_routes_request_sink: mpsc::Sender<crate::routes::Request<FakeSender<RtnlMessage>, Ipv6>>,
+    ) {
+        unified_request_stream
+            .fold(
+                (v4_routes_request_sink, v6_routes_request_sink),
+                |(mut v4_routes_request_sink, mut v6_routes_request_sink), req| async move {
+                    match req {
+                        UnifiedRequest::RoutesV4Request(req) => {
+                            v4_routes_request_sink
+                                .send(req)
+                                .map(|res| res.expect("send should succeed"))
+                                .await
+                        }
+                        UnifiedRequest::RoutesV6Request(req) => {
+                            v6_routes_request_sink
+                                .send(req)
+                                .map(|res| res.expect("send should succeed"))
+                                .await
+                        }
+                        _ => (),
+                    };
+                    (v4_routes_request_sink, v6_routes_request_sink)
+                },
+            )
+            .map(|(_v4_sink, _v6_sink)| ())
+            .await
+    }
+
     // Separate from `test_route_request`, because RTM_GETROUTE requests do not have typed
     // arguments and there needs to be an option to send a DUMP request to the
     // v4 and v6 routes worker.
@@ -2813,47 +2855,61 @@ mod test {
             &[],
         );
 
-        let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
+        let (unified_request_sink, unified_request_stream) = mpsc::channel(0);
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
+            unified_request_sink,
+            rules_request_handler: RuleTable::new(),
+        };
+
         let (v4_routes_request_sink, mut v4_routes_request_stream) = mpsc::channel(0);
         let (v6_routes_request_sink, mut v6_routes_request_stream) = mpsc::channel(0);
 
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
-            interfaces_request_sink,
+        let split_route_requests_background_work = split_route_requests(
+            unified_request_stream,
             v4_routes_request_sink,
             v6_routes_request_sink,
-            rules_request_handler: RuleTable::new(),
+        )
+        .fuse();
+
+        let handler_fut =
+            futures::future::join(handler.handle_request(request, &mut client), async {
+                if family == AF_UNSPEC || family == AF_INET {
+                    let next = v4_routes_request_stream.next();
+                    match expected_request.map(|a| {
+                        routes::RequestArgs::<Ipv4>::Route(routes::RouteRequestArgs::Get(a))
+                    }) {
+                        Some(expected_request) => {
+                            let routes::Request { args, sequence_number: _, client: _, completer } =
+                                next.await.expect("handler should send request");
+                            assert_eq!(args, expected_request);
+                            completer.send(Ok(())).expect("handler should be alive");
+                        }
+                        None => assert_matches!(next.now_or_never(), None),
+                    };
+                }
+                if family == AF_UNSPEC || family == AF_INET6 {
+                    let next = v6_routes_request_stream.next();
+                    match expected_request.map(|a| {
+                        routes::RequestArgs::<Ipv6>::Route(routes::RouteRequestArgs::Get(a))
+                    }) {
+                        Some(expected_request) => {
+                            let routes::Request { args, sequence_number: _, client: _, completer } =
+                                next.await.expect("handler should send request");
+                            assert_eq!(args, expected_request);
+                            completer.send(Ok(())).expect("handler should be alive");
+                        }
+                        None => assert_matches!(next.now_or_never(), None),
+                    };
+                }
+            })
+            .fuse();
+
+        futures::pin_mut!(split_route_requests_background_work, handler_fut);
+
+        futures::select! {
+            ((), ()) = handler_fut => (),
+            () = split_route_requests_background_work => unreachable!(),
         };
-        let ((), ()) = futures::future::join(handler.handle_request(request, &mut client), async {
-            if family == AF_UNSPEC || family == AF_INET {
-                let next = v4_routes_request_stream.next();
-                match expected_request
-                    .map(|a| routes::RequestArgs::<Ipv4>::Route(routes::RouteRequestArgs::Get(a)))
-                {
-                    Some(expected_request) => {
-                        let routes::Request { args, sequence_number: _, client: _, completer } =
-                            next.await.expect("handler should send request");
-                        assert_eq!(args, expected_request);
-                        completer.send(Ok(())).expect("handler should be alive");
-                    }
-                    None => assert_matches!(next.now_or_never(), None),
-                };
-            }
-            if family == AF_UNSPEC || family == AF_INET6 {
-                let next = v6_routes_request_stream.next();
-                match expected_request
-                    .map(|a| routes::RequestArgs::<Ipv6>::Route(routes::RouteRequestArgs::Get(a)))
-                {
-                    Some(expected_request) => {
-                        let routes::Request { args, sequence_number: _, client: _, completer } =
-                            next.await.expect("handler should send request");
-                        assert_eq!(args, expected_request);
-                        completer.send(Ok(())).expect("handler should be alive");
-                    }
-                    None => assert_matches!(next.now_or_never(), None),
-                };
-            }
-        })
-        .await;
 
         client_sink.take_messages()
     }
@@ -3269,14 +3325,9 @@ mod test {
         requests_and_responses: Vec<FakeRuleRequestResponse>,
         expected_response: Option<ExpectedResponse>,
     ) {
-        let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
-        let (v4_routes_request_sink, _v4_routes_request_stream) = mpsc::channel(0);
-        let (v6_routes_request_sink, _v6_routes_request_stream) = mpsc::channel(0);
-
+        let (unified_request_sink, _unified_request_stream) = mpsc::channel(0);
         let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
-            interfaces_request_sink,
-            v4_routes_request_sink,
-            v6_routes_request_sink,
+            unified_request_sink,
             rules_request_handler: FakeRuleRequestHandler::new(requests_and_responses),
         };
 
@@ -3589,20 +3640,35 @@ mod test {
             )
         };
 
-        let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
-        let (v4_routes_request_sink, mut v4_routes_request_stream) = mpsc::channel(0);
-        let (v6_routes_request_sink, mut v6_routes_request_stream) = mpsc::channel(0);
-
+        let (unified_request_sink, unified_request_stream) = mpsc::channel(0);
         let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
-            interfaces_request_sink,
-            v4_routes_request_sink,
-            v6_routes_request_sink,
+            unified_request_sink,
             rules_request_handler: RuleTable::new(),
         };
 
+        let (v4_routes_request_sink, mut v4_routes_request_stream) = mpsc::channel(0);
+        let (v6_routes_request_sink, mut v6_routes_request_stream) = mpsc::channel(0);
+
+        let split_route_requests_background_work = split_route_requests(
+            unified_request_stream,
+            v4_routes_request_sink,
+            v6_routes_request_sink,
+        )
+        .fuse();
+
+        futures::pin_mut!(split_route_requests_background_work);
+
         match req_and_resp {
             None => {
-                handler.handle_request(request, &mut client).await;
+                {
+                    let handler_fut = handler.handle_request(request, &mut client).fuse();
+                    futures::pin_mut!(handler_fut);
+
+                    futures::select! {
+                        () = split_route_requests_background_work => unreachable!(),
+                        () = handler_fut => (),
+                    }
+                }
                 match I::VERSION {
                     IpVersion::V4 => {
                         assert_matches!(v4_routes_request_stream.next().now_or_never(), None)
@@ -3613,7 +3679,7 @@ mod test {
                 }
             }
             Some(RouteRequestAndResponse { request: expected_request, response }) => {
-                let ((), ()) =
+                let handler_fut =
                     futures::future::join(handler.handle_request(request, &mut client), async {
                         let args = match I::VERSION {
                             IpVersion::V4 => {
@@ -3668,7 +3734,13 @@ mod test {
                             },
                         );
                     })
-                    .await;
+                    .fuse();
+                futures::pin_mut!(handler_fut);
+
+                futures::select! {
+                    () = split_route_requests_background_work => unreachable!(),
+                    ((), ()) = handler_fut => (),
+                }
             }
         }
 

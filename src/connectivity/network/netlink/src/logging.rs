@@ -26,10 +26,10 @@ macro_rules! log_debug {
     }
 }
 
-/// Emits an error log.
-macro_rules! log_error {
+/// Emits an info log.
+macro_rules! log_info {
     ($($arg:tt)*) => {
-        $crate::logging::__log_inner!(level = error, $($arg)*)
+        $crate::logging::__log_inner!(level = info, $($arg)*)
     }
 }
 
@@ -37,6 +37,13 @@ macro_rules! log_error {
 macro_rules! log_warn {
     ($($arg:tt)*) => {
         $crate::logging::__log_inner!(level = warn, $($arg)*)
+    }
+}
+
+/// Emits an error log.
+macro_rules! log_error {
+    ($($arg:tt)*) => {
+        $crate::logging::__log_inner!(level = error, $($arg)*)
     }
 }
 
@@ -49,4 +56,5 @@ macro_rules! log_warn {
 pub(crate) use __log_inner;
 pub(crate) use log_debug;
 pub(crate) use log_error;
+pub(crate) use log_info;
 pub(crate) use log_warn;

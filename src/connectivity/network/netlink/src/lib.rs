@@ -13,6 +13,7 @@
 
 mod client;
 mod errors;
+pub(crate) mod eventloop;
 pub mod interfaces;
 pub(crate) mod logging;
 pub mod messaging;
@@ -21,8 +22,13 @@ mod netlink_packet;
 pub mod protocol_family;
 mod routes;
 mod rules;
+pub(crate) mod util;
 
+use fidl_fuchsia_net_interfaces as fnet_interfaces;
+use fidl_fuchsia_net_root as fnet_root;
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_protocol;
 use futures::{
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
     future::Future,
@@ -33,7 +39,7 @@ use netlink_packet_route::RtnlMessage;
 
 use crate::{
     client::{ClientIdGenerator, ClientTable, InternalClient},
-    errors::EventLoopError,
+    eventloop::EventLoop,
     logging::log_debug,
     messaging::{Receiver, Sender, SenderReceiverProvider},
     protocol_family::{
@@ -143,9 +149,48 @@ async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverP
     let NetlinkWorkerParams { interfaces_handler, route_client_receiver } = params;
 
     let route_clients = ClientTable::default();
-    let (interfaces_request_sink, interfaces_request_stream) = mpsc::channel(1);
-    let (v4_routes_request_sink, v4_routes_request_stream) = mpsc::channel(1);
-    let (v6_routes_request_sink, v6_routes_request_stream) = mpsc::channel(1);
+    let (unified_request_sink, unified_request_stream) = mpsc::channel(1);
+
+    let unified_event_loop = fasync::Task::spawn({
+        let route_clients = route_clients.clone();
+        async move {
+            let interfaces_proxy = connect_to_protocol::<fnet_root::InterfacesMarker>()
+                .expect("connect to fuchsia.net.root.Interfaces");
+            let interfaces_state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()
+                .expect("connect to fuchsia.net.interfaces");
+            let v4_routes_state =
+                connect_to_protocol::<<Ipv4 as fnet_routes_ext::FidlRouteIpExt>::StateMarker>()
+                    .expect("connect to fuchsia.net.routes");
+            let v6_routes_state =
+                connect_to_protocol::<<Ipv6 as fnet_routes_ext::FidlRouteIpExt>::StateMarker>()
+                    .expect("connect to fuchsia.net.routes");
+            let v4_routes_set_provider = connect_to_protocol::<
+                <Ipv4 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::SetProviderMarker,
+            >()
+            .expect("connect to fuchsia.net.routes.admin");
+            let v6_routes_set_provider = connect_to_protocol::<
+                <Ipv6 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::SetProviderMarker,
+            >()
+            .expect("connect to fuchsia.net.routes.admin");
+
+            let event_loop: EventLoop<H, P::Sender<_>> = EventLoop {
+                interfaces_proxy,
+                interfaces_state_proxy,
+                v4_routes_state,
+                v6_routes_state,
+                v4_routes_set_provider,
+                v6_routes_set_provider,
+                route_clients,
+                unified_request_stream,
+                interfaces_handler,
+            };
+
+            match event_loop.run().await {
+                Ok(never) => match never {},
+                Err(e) => panic!("error running event loop: {e:?}"),
+            }
+        }
+    });
 
     let _: Vec<()> = futures::future::join_all([
         // Accept new NETLINK_ROUTE clients.
@@ -156,9 +201,7 @@ async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverP
                     route_clients,
                     route_client_receiver,
                     NetlinkRouteRequestHandler {
-                        interfaces_request_sink,
-                        v4_routes_request_sink,
-                        v6_routes_request_sink,
+                        unified_request_sink,
                         rules_request_handler: RuleTable::new_with_defaults(),
                     },
                 )
@@ -166,70 +209,7 @@ async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverP
                 panic!("route_client_receiver stream unexpectedly finished")
             })
         },
-        // IPv4 Routes Worker.
-        {
-            let route_clients = route_clients.clone();
-            fasync::Task::spawn(async move {
-                let worker = match routes::EventLoop::<
-                    P::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
-                    Ipv4,
-                >::new(route_clients, v4_routes_request_stream)
-                {
-                    Ok(worker) => worker,
-                    Err(EventLoopError::Fidl(e)) => {
-                        panic!("Routes event loop creation error: {:?}", e)
-                    }
-                    Err(EventLoopError::Netstack(_)) => {
-                        unreachable!(
-                            "The Netstack variant is not returned when creating a new worker"
-                        );
-                    }
-                };
-                panic!("Ipv4 routes event loop error: {:?}", worker.run().await);
-            })
-        },
-        // Ipv6 Routes Worker.
-        {
-            let route_clients = route_clients.clone();
-            fasync::Task::spawn(async move {
-                let worker = match routes::EventLoop::<
-                    P::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
-                    Ipv6,
-                >::new(route_clients, v6_routes_request_stream)
-                {
-                    Ok(worker) => worker,
-                    Err(EventLoopError::Fidl(e)) => {
-                        panic!("Routes event loop creation error: {:?}", e)
-                    }
-                    Err(EventLoopError::Netstack(_)) => {
-                        unreachable!(
-                            "The Netstack variant is not returned when creating a new worker"
-                        );
-                    }
-                };
-                panic!("Ipv6 routes event loop error: {:?}", worker.run().await);
-            })
-        },
-        // Interfaces Worker.
-        {
-            fasync::Task::spawn(async move {
-                let worker = match interfaces::EventLoop::new(interfaces_handler, route_clients) {
-                    Ok(worker) => worker,
-                    Err(EventLoopError::Fidl(e)) => {
-                        panic!("Interfaces event loop creation error: {:?}", e)
-                    }
-                    Err(EventLoopError::Netstack(_)) => {
-                        unreachable!(
-                            "The Netstack variant is not returned when creating a new worker"
-                        );
-                    }
-                };
-                panic!(
-                    "Interfaces event loop error: {:?}",
-                    worker.run(interfaces_request_stream).await
-                );
-            })
-        },
+        unified_event_loop,
     ])
     .await;
 }

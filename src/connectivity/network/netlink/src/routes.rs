@@ -22,12 +22,8 @@ use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_admin::RouteSetError;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 
-use assert_matches::assert_matches;
 use derivative::Derivative;
-use futures::{
-    channel::{mpsc, oneshot},
-    pin_mut, FutureExt as _, StreamExt as _, TryStreamExt as _,
-};
+use futures::{channel::oneshot, StreamExt as _};
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Subnet},
     SpecifiedAddr, SpecifiedAddress as _, Witness as _,
@@ -41,12 +37,13 @@ use netlink_packet_utils::nla::Nla;
 
 use crate::{
     client::{ClientTable, InternalClient},
-    errors::EventLoopError,
+    errors::WorkerInitializationError,
     logging::{log_debug, log_error, log_warn},
     messaging::Sender,
     multicast_groups::ModernGroup,
     netlink_packet::{errno::Errno, ip_addr_from_bytes, UNSPECIFIED_SEQUENCE_NUMBER},
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
+    util::respond_to_completer,
 };
 
 /// Arguments for an RTM_GETROUTE [`Request`].
@@ -203,7 +200,8 @@ fn map_route_set_error<I: Ip + fnet_routes_ext::FidlRouteIpExt>(
 }
 
 /// A request associated with routes.
-#[derive(Debug)]
+#[derive(Debug, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip> {
     /// The resource and operation-specific argument(s) for this request.
     pub args: RequestArgs<I>,
@@ -218,61 +216,23 @@ pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessa
     pub completer: oneshot::Sender<Result<(), RequestError>>,
 }
 
-fn respond_to_completer<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, D: Debug>(
-    client: InternalClient<NetlinkRoute, S>,
-    completer: oneshot::Sender<Result<(), RequestError>>,
-    result: Result<(), RequestError>,
-    request_for_log: D,
-) {
-    match completer.send(result) {
-        Ok(()) => (),
-        Err(err) => {
-            assert_eq!(err, result, "should get back what we tried to send");
-
-            // Not treated as a hard error because the socket may have been
-            // closed.
-            log_debug!(
-                "failed to send result ({:?}) to {} after handling {:?}",
-                result,
-                client,
-                request_for_log,
-            )
-        }
-    }
-}
-
-/// Contains the asynchronous work related to RTM_ROUTE messages.
+/// Handles asynchronous work related to RTM_ROUTE messages.
 ///
-/// Connects to the route watcher and can respond to RTM_ROUTE
-/// message requests.
-pub(crate) struct EventLoop<
-    S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+/// Can respond to RTM_ROUTE message requests.
+pub(crate) struct RoutesWorkerState<
     I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 > {
-    /// TODO(https://issues.fuchsia.dev/289517742): Share the Control handles
-    /// between Interfaces and Routes.
-    /// An `InterfacesProxy` to authenticate the `RouteSet` to manage
-    /// routes on interfaces.
-    interfaces_proxy: fnet_root::InterfacesProxy,
-    /// A 'StateProxy` to connect to the routes watcher.
-    state_proxy: <I::StateMarker as ProtocolMarker>::Proxy,
     /// TODO(https://issues.fuchsia.dev/289582515): Create a new `RouteSet`
     /// when a request with a new table is received.
     /// A `RouteSetProxy` to provide isolated administrative access
     /// to this worker's `RouteSet`.
     route_set_proxy: <I::RouteSetMarker as ProtocolMarker>::Proxy,
-    /// The current set of clients of NETLINK_ROUTE protocol family.
-    route_clients: ClientTable<NetlinkRoute, S>,
-    /// A stream of [`Request`]s for the event loop to handle.
-    request_stream: mpsc::Receiver<Request<S, I>>,
+    route_messages: HashSet<NetlinkRouteMessage>,
 }
 
 /// FIDL errors from the routes worker.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum RoutesFidlError {
-    /// Error connecting to marker with `connect_to_protocol`.
-    #[error("connecting to marker: {0}")]
-    ProtocolConnection(anyhow::Error),
     /// Error while creating new isolated managed route set.
     #[error("creating new route set: {0}")]
     RouteSetCreation(fnet_routes_ext::admin::RouteSetCreationError),
@@ -290,9 +250,6 @@ pub(crate) enum RoutesNetstackError<I: Ip> {
     /// Event stream ended unexpectedly.
     #[error("event stream ended")]
     EventStreamEnded,
-    /// Unexpected route was received from routes watcher.
-    #[error("unexpected route: {0:?}")]
-    UnexpectedRoute(fnet_routes_ext::InstalledRoute<I>),
     /// Unexpected event was received from routes watcher.
     #[error("unexpected event: {0:?}")]
     UnexpectedEvent(fnet_routes_ext::Event<I>),
@@ -309,192 +266,67 @@ pub(crate) enum PendingRouteRequestArgs<I: Ip> {
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
-struct PendingRouteRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip> {
+pub(crate) struct PendingRouteRequest<
+    S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+    I: Ip,
+> {
     request_args: PendingRouteRequestArgs<I>,
     client: InternalClient<NetlinkRoute, S>,
     completer: oneshot::Sender<Result<(), RequestError>>,
 }
 
-impl<
-        S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
-        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
-    > EventLoop<S, I>
+impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt>
+    RoutesWorkerState<I>
 {
-    /// `new` returns an `EventLoop` instance.
-    pub(crate) fn new(
-        route_clients: ClientTable<NetlinkRoute, S>,
-        request_stream: mpsc::Receiver<Request<S, I>>,
-    ) -> Result<Self, EventLoopError<RoutesFidlError, RoutesNetstackError<I>>> {
-        use fuchsia_component::client::connect_to_protocol;
-        let interfaces_proxy = connect_to_protocol::<fnet_root::InterfacesMarker>()
-            .map_err(|e| EventLoopError::Fidl(RoutesFidlError::ProtocolConnection(e)))?;
-        let state_proxy = connect_to_protocol::<I::StateMarker>()
-            .map_err(|e| EventLoopError::Fidl(RoutesFidlError::ProtocolConnection(e)))?;
-        let set_provider_proxy = connect_to_protocol::<I::SetProviderMarker>()
-            .map_err(|e| EventLoopError::Fidl(RoutesFidlError::ProtocolConnection(e)))?;
-
-        let route_set_proxy = match fnet_routes_ext::admin::new_route_set::<I>(&set_provider_proxy)
-        {
-            Ok(proxy) => proxy,
-            Err(e) => return Err(EventLoopError::Fidl(RoutesFidlError::RouteSetCreation(e))),
-        };
-
-        Ok(EventLoop {
-            interfaces_proxy,
-            state_proxy,
-            route_set_proxy,
-            route_clients,
-            request_stream,
-        })
-    }
-
-    /// Run the asynchronous work related to RTM_ROUTE messages.
-    ///
-    /// The event loop can track Ipv4 or Ipv6 routes, and is
-    /// never expected to complete.
-    /// Returns: `EventLoopError` that requires restarting the event
-    /// loop task, for example, if the watcher stream ends or if the
-    /// FIDL protocol cannot be connected.
-    pub(crate) async fn run(self) -> EventLoopError<RoutesFidlError, RoutesNetstackError<I>> {
-        let EventLoop {
-            interfaces_proxy,
-            state_proxy,
-            route_set_proxy,
-            route_clients,
-            request_stream,
-        } = self;
-
-        let route_event_stream = {
-            let stream_res = fnet_routes_ext::event_stream_from_state(&state_proxy)
-                .map_err(|e| EventLoopError::Fidl(RoutesFidlError::WatcherCreation(e)));
-
-            match stream_res {
-                Ok(stream) => stream.fuse(),
-                Err(e) => return e,
-            }
-        };
-        pin_mut!(route_event_stream);
-
-        let routes_res = fnet_routes_ext::collect_routes_until_idle::<_, HashSet<_>>(
+    pub(crate) async fn create(
+        set_provider_proxy: &<I::SetProviderMarker as ProtocolMarker>::Proxy,
+        routes_state_proxy: &<I::StateMarker as ProtocolMarker>::Proxy,
+    ) -> Result<
+        (
+            Self,
+            impl futures::Stream<
+                    Item = Result<fnet_routes_ext::Event<I>, fnet_routes_ext::WatchError>,
+                > + Unpin,
+        ),
+        WorkerInitializationError<RoutesFidlError, RoutesNetstackError<I>>,
+    > {
+        let mut route_event_stream =
+            Box::pin(fnet_routes_ext::event_stream_from_state(routes_state_proxy).map_err(
+                |e| WorkerInitializationError::Fidl(RoutesFidlError::WatcherCreation(e)),
+            )?);
+        let installed_routes = fnet_routes_ext::collect_routes_until_idle::<_, HashSet<_>>(
             route_event_stream.by_ref(),
         )
-        .await;
-
-        let routes = match routes_res {
-            Ok(routes) => routes,
-            Err(fnet_routes_ext::CollectRoutesUntilIdleError::ErrorInStream(e)) => {
-                return EventLoopError::Fidl(RoutesFidlError::Watch(e));
+        .await
+        .map_err(|e| match e {
+            fnet_routes_ext::CollectRoutesUntilIdleError::ErrorInStream(e) => {
+                WorkerInitializationError::Fidl(RoutesFidlError::Watch(e))
             }
-            Err(fnet_routes_ext::CollectRoutesUntilIdleError::StreamEnded) => {
-                return EventLoopError::Netstack(RoutesNetstackError::EventStreamEnded);
+            fnet_routes_ext::CollectRoutesUntilIdleError::StreamEnded => {
+                WorkerInitializationError::Netstack(RoutesNetstackError::EventStreamEnded)
             }
-            Err(fnet_routes_ext::CollectRoutesUntilIdleError::UnexpectedEvent(event)) => {
-                return EventLoopError::Netstack(RoutesNetstackError::UnexpectedEvent(event));
+            fnet_routes_ext::CollectRoutesUntilIdleError::UnexpectedEvent(event) => {
+                WorkerInitializationError::Netstack(RoutesNetstackError::UnexpectedEvent(event))
             }
-        };
+        })?;
+        let route_messages = new_set_with_existing_routes(installed_routes);
+        let route_set_proxy = fnet_routes_ext::admin::new_route_set::<I>(&set_provider_proxy)
+            .map_err(|e| WorkerInitializationError::Fidl(RoutesFidlError::RouteSetCreation(e)))?;
+        Ok((Self { route_set_proxy, route_messages }, route_event_stream))
+    }
 
-        let mut route_messages = new_set_with_existing_routes(routes);
-
-        // Chain a pending so that the stream never ends. This is so that tests
-        // can safely rely on just closing the watcher to terminate the event
-        // loop. This is okay because we do not expect the request stream to
-        // reasonably end and if we did want to support graceful shutdown of the
-        // event loop, we can have a dedicated shutdown signal.
-        let mut request_stream = request_stream.chain(futures::stream::pending());
-
-        let mut pending_route_request = None;
-
-        loop {
-            // Don't handle new requests until we complete handling the pending
-            // request.
-            let request_fut = match pending_route_request {
-                Some(_) => {
-                    log_debug!(
-                        "not awaiting on request stream because of pending request: {:?}",
-                        pending_route_request,
-                    );
-
-                    futures::future::pending().left_future()
-                }
-                None => request_stream.next().right_future(),
-            }
-            .fuse();
-            futures::pin_mut!(request_fut);
-
-            futures::select! {
-                stream_res = route_event_stream.try_next() => {
-                    let event = match stream_res {
-                        Ok(Some(event)) => event,
-                        Ok(None) => return EventLoopError::Netstack(
-                            RoutesNetstackError::EventStreamEnded
-                        ),
-                        Err(e) => {
-                            return EventLoopError::Fidl(RoutesFidlError::Watch(e));
-                        }
-                    };
-
-                    match handle_route_watcher_event(&mut route_messages, &route_clients, event) {
-                        Ok(()) => {}
-                        // These errors are severe enough to indicate a larger problem in Netstack.
-                        Err(RouteEventHandlerError::AlreadyExistingRouteAddition(route))
-                        | Err(RouteEventHandlerError::NonExistentRouteDeletion(route)) => {
-                            return EventLoopError::Netstack(
-                                RoutesNetstackError::UnexpectedRoute(route)
-                            );
-                        }
-                        Err(RouteEventHandlerError::NonAddOrRemoveEventReceived(event)) => {
-                            return EventLoopError::Netstack(
-                                RoutesNetstackError::UnexpectedEvent(event)
-                            );
-                        }
-                    }
-                }
-                req = request_fut => {
-                    assert_matches!(
-                        core::mem::replace(
-                            &mut pending_route_request,
-                            Self::handle_request(
-                                &interfaces_proxy,
-                                &route_set_proxy,
-                                &route_messages,
-                                req.expect(
-                                    "request stream should never end because of chained `pending`",
-                                ),
-                            ).await,
-                        ),
-                        None
-                    )
-                }
-            }
-
-            if let Some(pending_route_request_some) = pending_route_request.take() {
-                let PendingRouteRequest { request_args, client: _, completer: _ } =
-                    &pending_route_request_some;
-
-                let done = match request_args {
-                    PendingRouteRequestArgs::New(route) => {
-                        new_route_matches_existing(&route, &route_messages)
-                    }
-                    // For `Del` messages, we expect the exact `NetlinkRouteMessage` to match,
-                    // which was received as part of the `select_route_for_deletion` flow.
-                    PendingRouteRequestArgs::Del(route_msg) => !route_messages.contains(route_msg),
-                };
-
-                if done {
-                    log_debug!("completed pending request; req = {pending_route_request_some:?}");
-                    let PendingRouteRequest { request_args, client, completer } =
-                        pending_route_request_some;
-
-                    respond_to_completer(client, completer, Ok(()), request_args);
-                } else {
-                    // Put the pending request back so that it can be handled later.
-                    log_debug!(
-                        "pending request not done yet; req = {pending_route_request_some:?}"
-                    );
-                    pending_route_request = Some(pending_route_request_some);
-                }
-            }
-        }
+    /// Handles events observed by the route watchers by adding/removing routes
+    /// from the underlying `NetlinkRouteMessage` set.
+    ///
+    /// Returns a `RouteEventHandlerError` when unexpected events or HashSet issues occur.
+    pub(crate) fn handle_route_watcher_event<
+        S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+    >(
+        &mut self,
+        route_clients: &ClientTable<NetlinkRoute, S>,
+        event: fnet_routes_ext::Event<I>,
+    ) -> Result<(), RouteEventHandlerError<I>> {
+        handle_route_watcher_event::<I, S>(&mut self.route_messages, route_clients, event)
     }
 
     // TODO(https://issues.fuchsia.dev/289518265): Once `authenticate_for_interface` call is
@@ -699,12 +531,14 @@ impl<
     /// Returns a [`PendingRouteRequest`] if a route was updated and the
     /// caller needs to make sure the update has been propagated to the local
     /// state (the routes watcher has sent an event for our update).
-    async fn handle_request(
+    pub(crate) async fn handle_request<
+        S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+    >(
+        &mut self,
         interfaces_proxy: &fnet_root::InterfacesProxy,
-        route_set_proxy: &<I::RouteSetMarker as ProtocolMarker>::Proxy,
-        route_messages: &HashSet<NetlinkRouteMessage>,
         Request { args, sequence_number, mut client, completer }: Request<S, I>,
     ) -> Option<PendingRouteRequest<S, I>> {
+        let Self { route_set_proxy, route_messages } = self;
         log_debug!("handling request {args:?} from {client}");
 
         let result = match args {
@@ -768,23 +602,52 @@ impl<
         respond_to_completer(client, completer, result, args);
         None
     }
+
+    /// Checks whether a `PendingRequest` can be marked completed given the current state of the
+    /// worker. If so, notifies the request's completer and returns `None`. If not, returns
+    /// the `PendingRequest` as `Some`.
+    pub(crate) fn handle_pending_request<
+        S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+    >(
+        &self,
+        pending_route_request: PendingRouteRequest<S, I>,
+    ) -> Option<PendingRouteRequest<S, I>> {
+        let PendingRouteRequest { request_args, client: _, completer: _ } = &pending_route_request;
+
+        let done = match request_args {
+            PendingRouteRequestArgs::New(route) => {
+                new_route_matches_existing(&route, &self.route_messages)
+            }
+            // For `Del` messages, we expect the exact `NetlinkRouteMessage` to match,
+            // which was received as part of the `select_route_for_deletion` flow.
+            PendingRouteRequestArgs::Del(route_msg) => !self.route_messages.contains(route_msg),
+        };
+
+        if done {
+            log_debug!("completed pending request; req = {pending_route_request:?}");
+            let PendingRouteRequest { request_args, client, completer } = pending_route_request;
+
+            respond_to_completer(client, completer, Ok(()), request_args);
+            None
+        } else {
+            // Put the pending request back so that it can be handled later.
+            log_debug!("pending request not done yet; req = {pending_route_request:?}");
+            Some(pending_route_request)
+        }
+    }
 }
 
 // Errors related to handling route events.
-#[derive(Debug, PartialEq)]
-enum RouteEventHandlerError<I: Ip> {
-    // Route watcher event handler attempted to add a route that already existed.
+#[derive(Debug, PartialEq, thiserror::Error)]
+pub(crate) enum RouteEventHandlerError<I: Ip> {
+    #[error("route watcher event handler attempted to add a route that already existed: {0:?}")]
     AlreadyExistingRouteAddition(fnet_routes_ext::InstalledRoute<I>),
-    // Route watcher event handler attempted to remove a route that does not exist.
+    #[error("route watcher event handler attempted to remove a route that does not exist: {0:?}")]
     NonExistentRouteDeletion(fnet_routes_ext::InstalledRoute<I>),
-    // Route watcher event handler attempted to process a route event that was not add or remove.
+    #[error("route watcher event handler attempted to process a route event that was not add or remove: {0:?}")]
     NonAddOrRemoveEventReceived(fnet_routes_ext::Event<I>),
 }
 
-/// Handles events observed by the route watchers by adding/removing routes
-/// from the underlying `NetlinkRouteMessage` set.
-///
-/// Returns a `RoutesEventLoopError` when unexpected events or HashSet issues occur.
 fn handle_route_watcher_event<I: Ip, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
     route_messages: &mut HashSet<NetlinkRouteMessage>,
     route_clients: &ClientTable<NetlinkRoute, S>,
@@ -1223,7 +1086,12 @@ mod tests {
     use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 
     use assert_matches::assert_matches;
-    use futures::{future::Future, sink::SinkExt as _, Stream};
+    use futures::{
+        channel::mpsc,
+        future::{Future, FutureExt as _},
+        stream::BoxStream,
+        SinkExt as _, Stream,
+    };
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::{
         ip::{GenericOverIp, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
@@ -1233,7 +1101,10 @@ mod tests {
     use netlink_packet_route::RTNLGRP_LINK;
     use test_case::test_case;
 
-    use crate::messaging::testutil::{FakeSender, SentMessage};
+    use crate::{
+        interfaces::testutil::FakeInterfacesHandler,
+        messaging::testutil::{FakeSender, SentMessage},
+    };
 
     const V4_DFLT: Subnet<Ipv4Addr> = net_subnet_v4!("0.0.0.0/0");
     const V4_SUB1: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/32");
@@ -1555,16 +1426,13 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    struct Setup<
-        W,
-        R,
-        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
-    > {
-        pub event_loop: EventLoop<FakeSender<RtnlMessage>, I>,
+    struct Setup<W, R, B> {
+        pub event_loop: crate::eventloop::EventLoop<FakeInterfacesHandler, FakeSender<RtnlMessage>>,
         pub watcher_stream: W,
         pub route_set_stream: R,
         pub interfaces_request_stream: fnet_root::InterfacesRequestStream,
-        pub request_sink: mpsc::Sender<Request<FakeSender<RtnlMessage>, I>>,
+        pub request_sink: mpsc::Sender<crate::eventloop::UnifiedRequest<FakeSender<RtnlMessage>>>,
+        pub background_work: B,
     }
 
     fn setup_with_route_clients<
@@ -1574,27 +1442,108 @@ mod tests {
     ) -> Setup<
         impl Stream<Item = <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
         impl Stream<Item = <<I::RouteSetMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
-        I,
+        impl Future<Output = ()>,
     > {
-        let (state_proxy, state_stream) =
-            fidl::endpoints::create_proxy_and_stream::<I::StateMarker>().unwrap();
-        let (interfaces_proxy, interfaces_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_root::InterfacesMarker>().unwrap();
-        let (route_set_proxy, route_set_stream) =
-            fidl::endpoints::create_proxy_and_stream::<I::RouteSetMarker>().unwrap();
+        let (interfaces_handler, _interfaces_handler_sink) = FakeInterfacesHandler::new();
         let (request_sink, request_stream) = mpsc::channel(1);
-        let event_loop = EventLoop::<FakeSender<_>, I> {
-            interfaces_proxy,
-            state_proxy,
-            route_set_proxy,
+        let (
+            event_loop,
+            crate::eventloop::testutil::EventLoopServerEnd {
+                interfaces,
+                interfaces_state,
+                v4_routes_state,
+                v6_routes_state,
+                v4_routes_set_provider,
+                v6_routes_set_provider,
+            },
+        ) = crate::eventloop::testutil::event_loop_fixture(
+            interfaces_handler,
             route_clients,
             request_stream,
-        };
+        );
+
+        let interfaces_state_background_work =
+            crate::eventloop::testutil::serve_empty_interfaces_state(interfaces_state);
+
+        let interfaces_request_stream = interfaces.into_stream().expect("into stream");
+
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct StateStreamWrapper<'a, I: fnet_routes_ext::FidlRouteIpExt>(
+            futures::stream::LocalBoxStream<
+                'a,
+                <<I::StateMarker as ProtocolMarker>::RequestStream as Stream>::Item,
+            >,
+        );
+
+        let (StateStreamWrapper(state_stream), IpInvariant(routes_state_background_work)) =
+            I::map_ip(
+                IpInvariant((v4_routes_state, v6_routes_state)),
+                |IpInvariant((main_state, other_state))| {
+                    let main_stream = main_state.into_stream().expect("into stream");
+                    (
+                        StateStreamWrapper(main_stream.boxed_local()),
+                        IpInvariant(
+                            crate::eventloop::testutil::serve_empty_routes::<Ipv6>(other_state)
+                                .boxed_local(),
+                        ),
+                    )
+                },
+                |IpInvariant((other_state, main_state))| {
+                    let main_stream = main_state.into_stream().expect("into stream");
+                    (
+                        StateStreamWrapper(main_stream.boxed_local()),
+                        IpInvariant(
+                            crate::eventloop::testutil::serve_empty_routes::<Ipv4>(other_state)
+                                .boxed_local(),
+                        ),
+                    )
+                },
+            );
+
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct RouteSetStreamWrapper<'a, I: fnet_routes_ext::admin::FidlRouteAdminIpExt>(
+            BoxStream<'a, <<I::RouteSetMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
+        );
+
+        let (RouteSetStreamWrapper(route_set_stream), IpInvariant(route_set_background_work)) =
+            I::map_ip(
+                IpInvariant((v4_routes_set_provider, v6_routes_set_provider)),
+                |IpInvariant((main_set_provider, other_set_provider))| {
+                    let main_stream = fnet_routes_ext::testutil::admin::serve_one_route_set::<Ipv4>(
+                        main_set_provider,
+                    );
+                    (
+                        RouteSetStreamWrapper(main_stream.boxed()),
+                        IpInvariant(
+                            fnet_routes_ext::testutil::admin::serve_noop_route_sets::<Ipv6>(
+                                other_set_provider,
+                            )
+                            .boxed(),
+                        ),
+                    )
+                },
+                |IpInvariant((other_set_provider, main_set_provider))| {
+                    let main_stream = fnet_routes_ext::testutil::admin::serve_one_route_set::<Ipv6>(
+                        main_set_provider,
+                    );
+                    (
+                        RouteSetStreamWrapper(main_stream.boxed()),
+                        IpInvariant(
+                            fnet_routes_ext::testutil::admin::serve_noop_route_sets::<Ipv4>(
+                                other_set_provider,
+                            )
+                            .boxed(),
+                        ),
+                    )
+                },
+            );
 
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         struct StateRequestWrapper<I: fnet_routes_ext::FidlRouteIpExt> {
-            request: <<I::StateMarker as ProtocolMarker>::RequestStream as futures::TryStream>::Ok,
+            request: <<I::StateMarker as ProtocolMarker>::RequestStream as futures::Stream>::Item,
         }
 
         #[derive(GenericOverIp)]
@@ -1604,17 +1553,17 @@ mod tests {
         }
 
         let watcher_stream = state_stream
-            .and_then(|request| {
+            .map(|request| {
                 let wrapper = I::map_ip(
                     StateRequestWrapper { request },
-                    |StateRequestWrapper { request }| match request {
+                    |StateRequestWrapper { request }| match request.expect("watcher stream error") {
                         fnet_routes::StateV4Request::GetWatcherV4 {
                             options: _,
                             watcher,
                             control_handle: _,
                         } => WatcherRequestWrapper { watcher: watcher.into_stream().unwrap() },
                     },
-                    |StateRequestWrapper { request }| match request {
+                    |StateRequestWrapper { request }| match request.expect("watcher stream error") {
                         fnet_routes::StateV6Request::GetWatcherV6 {
                             options: _,
                             watcher,
@@ -1622,9 +1571,8 @@ mod tests {
                         } => WatcherRequestWrapper { watcher: watcher.into_stream().unwrap() },
                     },
                 );
-                futures::future::ok(wrapper)
+                wrapper
             })
-            .map(|res| res.expect("watcher stream error"))
             .map(|WatcherRequestWrapper { watcher }| watcher)
             // For testing, we only expect there to be a single connection to the watcher, so the
             // stream is condensed into a single `WatchRequest` stream.
@@ -1636,6 +1584,13 @@ mod tests {
             route_set_stream,
             interfaces_request_stream,
             request_sink,
+            background_work: async move {
+                let ((), (), ()) = futures::join!(
+                    interfaces_state_background_work,
+                    routes_state_background_work,
+                    route_set_background_work,
+                );
+            },
         }
     }
 
@@ -1643,7 +1598,7 @@ mod tests {
     ) -> Setup<
         impl Stream<Item = <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
         impl Stream<Item = <<I::RouteSetMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
-        I,
+        impl Future<Output = ()>,
     > {
         setup_with_route_clients::<I>(ClientTable::default())
     }
@@ -1728,17 +1683,37 @@ mod tests {
             route_set_stream: _,
             interfaces_request_stream: _,
             request_sink: _,
+            background_work,
         } = setup::<I>();
         let event_loop_fut = event_loop.run();
         let watcher_fut = respond_to_watcher_with_routes(watcher_stream, [route], None);
 
-        let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
-        assert_matches!(
-            err,
-            EventLoopError::Fidl(RoutesFidlError::Watch(fnet_routes_ext::WatchError::Fidl(
-                fidl::Error::ClientChannelClosed { .. }
-            )))
-        );
+        futures::pin_mut!(event_loop_fut, watcher_fut, background_work);
+        let ((err, ()), _incomplete_background_work) = futures::future::select(
+            futures::future::join(event_loop_fut, watcher_fut),
+            background_work.map(|_output| unreachable!()),
+        )
+        .await
+        .factor_first();
+
+        match I::VERSION {
+            IpVersion::V4 => {
+                assert_matches!(
+                    err.unwrap_err().downcast::<crate::eventloop::EventStreamError>().unwrap(),
+                    crate::eventloop::EventStreamError::RoutesV4(
+                        fnet_routes_ext::WatchError::Fidl(fidl::Error::ClientChannelClosed { .. })
+                    )
+                );
+            }
+            IpVersion::V6 => {
+                assert_matches!(
+                    err.unwrap_err().downcast::<crate::eventloop::EventStreamError>().unwrap(),
+                    crate::eventloop::EventStreamError::RoutesV6(
+                        fnet_routes_ext::WatchError::Fidl(fidl::Error::ClientChannelClosed { .. })
+                    )
+                );
+            }
+        }
     }
 
     async fn event_loop_errors_existing_after_add_helper<
@@ -1752,6 +1727,7 @@ mod tests {
             route_set_stream: _,
             interfaces_request_stream: _,
             request_sink: _,
+            background_work,
         } = setup::<I>();
         let event_loop_fut = event_loop.run();
         let routes_existing = [route.clone()];
@@ -1759,15 +1735,20 @@ mod tests {
         let watcher_fut =
             respond_to_watcher_with_routes(watcher_stream, routes_existing, Some(new_event));
 
-        let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
+        futures::pin_mut!(event_loop_fut, watcher_fut, background_work);
+        let ((err, ()), _incomplete_background_work) = futures::future::select(
+            futures::future::join(event_loop_fut, watcher_fut),
+            background_work.map(|_output| unreachable!()),
+        )
+        .await
+        .factor_first();
+
         assert_matches!(
-            err,
-            EventLoopError::Netstack(
-                RoutesNetstackError::UnexpectedEvent(
-                    fnet_routes_ext::Event::Existing(res)
-                )
+            err.unwrap_err().downcast::<RouteEventHandlerError<I>>().unwrap(),
+            RouteEventHandlerError::NonAddOrRemoveEventReceived(
+                fnet_routes_ext::Event::Existing(res)
             ) => {
-                assert_eq!(res, route)
+                assert_eq!(res, route);
             }
         );
     }
@@ -1783,6 +1764,7 @@ mod tests {
             route_set_stream: _,
             interfaces_request_stream: _,
             request_sink: _,
+            background_work,
         } = setup::<I>();
         let event_loop_fut = event_loop.run();
         let routes_existing = [route.clone()];
@@ -1790,11 +1772,20 @@ mod tests {
         let watcher_fut =
             respond_to_watcher_with_routes(watcher_stream, routes_existing, Some(new_event));
 
-        let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
+        futures::pin_mut!(event_loop_fut, watcher_fut, background_work);
+        let ((err, ()), _incomplete_background_work) = futures::future::select(
+            futures::future::join(event_loop_fut, watcher_fut),
+            background_work.map(|_output| unreachable!()),
+        )
+        .await
+        .factor_first();
+
         assert_matches!(
-            err,
-            EventLoopError::Netstack(RoutesNetstackError::UnexpectedRoute(res)) => {
-                assert_eq!(res, route)
+            err.unwrap_err().downcast::<RouteEventHandlerError<I>>().unwrap(),
+            RouteEventHandlerError::AlreadyExistingRouteAddition(
+                res
+            ) => {
+                assert_eq!(res, route);
             }
         );
     }
@@ -1904,14 +1895,25 @@ mod tests {
             mut route_set_stream,
             interfaces_request_stream,
             request_sink,
+            background_work,
         } = setup_with_route_clients::<A::Version>({
             let route_clients = ClientTable::default();
             route_clients.add_client(route_client.clone());
             route_clients.add_client(other_client);
             route_clients
         });
-        let event_loop_fut = event_loop.run().fuse();
-        futures::pin_mut!(event_loop_fut);
+        let event_loop_fut = event_loop
+            .run()
+            .map(|res| match res {
+                Ok(never) => match never {},
+                Err(e) => {
+                    log_debug!("event_loop_fut exiting with error {:?}", e);
+                    Err::<std::convert::Infallible, _>(e)
+                }
+            })
+            .fuse();
+        let background_work = background_work.fuse();
+        futures::pin_mut!(event_loop_fut, background_work);
 
         let watcher_stream_fut = respond_to_watcher::<A::Version, _>(
             watcher_stream.by_ref(),
@@ -1919,6 +1921,7 @@ mod tests {
         );
         futures::select! {
             () = watcher_stream_fut.fuse() => {},
+            () = background_work => {},
             err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
         }
         assert_eq!(&route_sink.take_messages()[..], &[]);
@@ -1932,12 +1935,15 @@ mod tests {
                     |(mut results, mut request_sink), args| async move {
                         let (completer, waiter) = oneshot::channel();
                         request_sink
-                            .send(Request {
-                                args,
-                                sequence_number: TEST_SEQUENCE_NUMBER,
-                                client: route_client.clone(),
-                                completer,
-                            })
+                            .send(
+                                Request {
+                                    args,
+                                    sequence_number: TEST_SEQUENCE_NUMBER,
+                                    client: route_client.clone(),
+                                    completer,
+                                }
+                                .into(),
+                            )
                             .await
                             .unwrap();
                         results.push(waiter.await.unwrap());
@@ -1970,7 +1976,12 @@ mod tests {
 
         let (messages, results) = futures::select! {
             (messages, results) = fut.fuse() => (messages, results),
-            res = futures::future::join3(route_set_fut, root_interfaces_fut, event_loop_fut) => {
+            res = futures::future::join4(
+                    route_set_fut,
+                    root_interfaces_fut,
+                    event_loop_fut,
+                    background_work,
+                ) => {
                 unreachable!("eventloop/stream handlers should not return: {res:?}")
             }
         };
