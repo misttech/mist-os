@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.component.decl/cpp/fidl.h>
 #include <fidl/fuchsia.component/cpp/fidl.h>
+#include <fidl/fuchsia.element/cpp/fidl.h>
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <fidl/fuchsia.process/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
@@ -272,15 +273,14 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
         // Route capabilities from test-ui-stack to the Debian realm.
         {.capabilities = {Proto<fuchsia_ui_composition::Allocator>(),
                           Proto<fuchsia_ui_composition::Flatland>(),
-                          Proto<fuchsia_ui_display_singleton::Info>()},
+                          Proto<fuchsia_ui_display_singleton::Info>(),
+                          Proto<fuchsia_element::GraphicalPresenter>()},
          .source = ui_testing::PortableUITest::kTestUIStackRef,
          .targets = {ChildRef{kDebianRealm}}},
 
         // Route capabilities from the Debian realm to the parent.
         {.capabilities =
-             {// Allow this test to connect the Starnix view to the Fuchsia view and input systems.
-              Proto<fuchsia_ui_app::ViewProvider>(),
-              // Allow this test to launch `touch_dump` inside the Debian realm.
+             {// Allow this test to launch `touch_dump` inside the Debian realm.
               Proto<fuchsia_component::Realm>()},
          .source = ChildRef{kDebianRealm},
          .targets = {ParentRef()}},
@@ -340,8 +340,10 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
 
 // TODO: https://fxbug.dev/42082519 - Test for DPR=2.0, too.
 TEST_F(StarnixTouchTest, Tap) {
-  LaunchClient();
   LaunchDumper();
+
+  // Wait until #launch_input is presented before injecting input.
+  WaitForViewPresentation();
 
   // Top-left.
   InjectInput(TapLocation::kTopLeft);

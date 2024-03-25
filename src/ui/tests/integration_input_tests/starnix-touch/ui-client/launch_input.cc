@@ -8,8 +8,8 @@
 
 int main() {
   std::cout << "launch_input started is running";
-  // Run until interrupted, to let Starnix serve the `ViewProvider` protocol
-  // on behalf of this component.
+  // Run until interrupted, to let Starnix connect to the `GraphicalPresenter`
+  // protocol on behalf of this component.
   pause();
   std::cout << "launch_input started is exiting";
 }

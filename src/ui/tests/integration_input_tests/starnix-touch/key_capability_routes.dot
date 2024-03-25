@@ -10,10 +10,11 @@ digraph {
     label="\
         fui.composition.Allocator\n\
         fui.composition.Flatland\n\
-        fui.display.singleton.Info"
+        fui.display.singleton.Info\n\
+        f.element.GraphicalPresenter"
   ]
-  debian_realm -> test_realm        [label="f.component.Realm\nfui.app.ViewProvider"]
-  debian_container -> debian_realm  [label="f.component.Realm\nfui.app.ViewProvider"]
+  debian_realm -> test_realm        [label="f.component.Realm"]
+  debian_container -> debian_realm  [label="f.component.Realm"]
   debian_realm -> starnix_kernel [
     label="\
         /dev/gpu\n\
@@ -27,5 +28,6 @@ digraph {
         fui.composition.Flatland\n\
         fui.display.singleton.Info"
   ]
-  launch_input -> debian_container  [label="fui.app.ViewProvider"]
+  debian_realm -> debian_container  [label="f.element.GraphicalPresenter"]
+  debian_container -> launch_input  [label="f.element.GraphicalPresenter"]
 }

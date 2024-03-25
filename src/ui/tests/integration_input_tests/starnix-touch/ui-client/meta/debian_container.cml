@@ -26,6 +26,7 @@
         {
             name: "launch_input",
             url: "#meta/launch_input.cm",
+            startup: "eager",
             environment: "#daemon-env",
         },
     ],
@@ -40,19 +41,19 @@
             durability: "single_run",
         },
     ],
+    offer: [
+        {
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
+            from: "parent",
+            to: [ "#launch_input" ],
+        },
+    ],
     expose: [
         {
             // Expose the `Realm` protocol, so that `starnix-touch-test.cc`
             // can call `CreateChild()` to launch `touch_dump.cm`.
             protocol: [ "fuchsia.component.Realm" ],
             from: "framework",
-        },
-        {
-            // Expose the `ViewProvider` protocol, so that `PortableUITest`
-            // can connect the Starnix view to Fuchsia's view and input
-            // systems.
-            protocol: [ "fuchsia.ui.app.ViewProvider" ],
-            from: "#launch_input",
         },
     ],
 }

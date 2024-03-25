@@ -7,13 +7,7 @@
         binary: "data/linux_bin/launch_input",
         features: [ "framebuffer" ],
     },
-    capabilities: [
-        { protocol: "fuchsia.ui.app.ViewProvider" },
-    ],
-    expose: [
-        {
-            protocol: "fuchsia.ui.app.ViewProvider",
-            from: "self",
-        },
+    use: [
+        { protocol: "fuchsia.element.GraphicalPresenter" },
     ],
 }

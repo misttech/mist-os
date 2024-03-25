@@ -23,6 +23,7 @@ executable("starnix-touch-test-bin") {
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
+    "//sdk/fidl/fuchsia.element:fuchsia.element_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.process:fuchsia.process_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",

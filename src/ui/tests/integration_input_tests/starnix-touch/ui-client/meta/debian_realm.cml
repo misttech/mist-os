@@ -17,11 +17,6 @@
             environment: "#starnix_kernel_env",
         },
     ],
-    capabilities: [
-        {
-            protocol: [ "fuchsia.ui.app.ViewProvider" ],
-        },
-    ],
     use: [
         {
             protocol: "fuchsia.component.Realm",
@@ -55,13 +50,15 @@
             from: "parent",
             to: [ "#kernel" ],
         },
+        {
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
+            from: "parent",
+            to: [ "#debian_container" ],
+        },
     ],
     expose: [
         {
-            protocol: [
-                "fuchsia.component.Realm",
-                "fuchsia.ui.app.ViewProvider",
-            ],
+            protocol: [ "fuchsia.component.Realm" ],
             from: "#debian_container",
         },
     ],

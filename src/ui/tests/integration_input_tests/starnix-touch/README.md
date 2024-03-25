@@ -1,9 +1,12 @@
 ## Overview
+
 This test exercises the touch input dispatch path from Input Pipeline to a Scenic client. It is a multi-component test, and carefully avoids polling for component coordination.
+
 - It runs real Scene Manager and Scenic components.
 - It uses a fake display controller; the physical device is unused.
 
 ### Components involved
+
 - [starnix-touch-test.cc](starnix-touch-test.cc): Instantiates the component hierarchy,
   injects touch events, reads back events from the `evdev` client running under
   Starnix
@@ -11,6 +14,7 @@ This test exercises the touch input dispatch path from Input Pipeline to a Sceni
   role in routing input events
 - Scenic: Unmodified Fuchsia component
 - Starnix
+
   - [debian_realm](ui-client/meta/debian_realm.cml): The root of the Starnix subtree
     within the component hierarchy. Instantiates the Starnix kernel and the `debian_container`, and sets up the `starnix_kernel_env` needed for the Starnix kernel to be the runner for `debian_container`.
 
@@ -24,6 +28,7 @@ This test exercises the touch input dispatch path from Input Pipeline to a Sceni
 
     In particular, the test does not depend on, e.g., daemons in Debian that create
     device nodes in response to `udev` events.
+
   - [debian_container](ui-client/meta/debian_container.cml): The Linux userspace that
     is run by the Starnix kernel. This provides a shell environment (e.g. `/bin/sh`),
     runs the `launch_input` program to initialize Starnix input, and runs the
@@ -42,9 +47,11 @@ This test exercises the touch input dispatch path from Input Pipeline to a Sceni
     read from that device, and prints them out in a simple text format.
 
 ### Touch dispatch path
+
 - `starnix-touch-test.cc` -> Input Pipeline -> Scenic -> Starnix kernel -> touch_dump
 
 ### Setup sequence
+
 1. `starnix-touch-test.cc` sets up this view hierarchy:
    - Top level scene, owned by Scene Manager.
    - Child view, owned by Starnix.
@@ -61,6 +68,7 @@ This test exercises the touch input dispatch path from Input Pipeline to a Sceni
 1. `starnix-touch-test.cc` validates the contents of the event.
 
 ### Capability routes
+
 Here are some of the capability routes configured in this test. This is by no means
 comprehensive. It just focuses on the routes that are apparent from the source
 code in this directory.
@@ -68,6 +76,7 @@ code in this directory.
 ![key_capability_routes](key_capability_routes.png)
 
 ### Synchronization
+
 It's not clear what ordering guarantees exist regarding the initialization of Starnix input. With that in mind, there are a couple of synchronization risks that come to mind, and why they seem unlikely.
 
 1. It might be possible for `touch_dump` to start execution before `/dev/input/event0`
@@ -108,9 +117,9 @@ It's not clear what ordering guarantees exist regarding the initialization of St
       -> s/k/d/input.rs:start_relay()
       -> fidl::endpoints::create_proxy()
       ```
-   1. `starnix-touch-test.cc` calls `LaunchClient()` before starting `touch_dump`.
-   1. `LaunchClient()` connects to the `f.ui.app.ViewProvider` protocol served by
-      `launch_input`.
+   1. `starnix-touch-test.cc` eagerly starts `launch_input` before manually starting `touch_dump`.
+   1. `starnix-touch-test.cc` waits until at least one view (`launch_input`) is presented before
+      injecting input.
 
    If, however, we do encounter flake in receiving touch events, we can probably
    work around it with a retry loop for `InjectInput()`.
