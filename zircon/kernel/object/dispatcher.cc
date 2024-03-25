@@ -174,17 +174,18 @@ bool Dispatcher::CancelByKey(const Handle* handle, const void* port, uint64_t ke
   return remove_performed;
 }
 
-void Dispatcher::UpdateState(zx_signals_t clear_mask, zx_signals_t set_mask) {
+void Dispatcher::UpdateState(zx_signals_t clear_mask, zx_signals_t set_mask,
+                             zx_signals_t strobe_mask) {
   canary_.Assert();
 
-  if (set_mask == 0) {
+  if (set_mask == 0 && strobe_mask == 0) {
     ClearSignals(clear_mask);
     return;
   }
 
   Guard<CriticalMutex> guard{get_lock()};
 
-  UpdateStateLocked(clear_mask, set_mask);
+  UpdateStateLocked(clear_mask, set_mask, strobe_mask);
 }
 
 void Dispatcher::NotifyObserversLocked(zx_signals_t signals) {
@@ -202,7 +203,8 @@ void Dispatcher::NotifyObserversLocked(zx_signals_t signals) {
   }
 }
 
-void Dispatcher::UpdateStateLocked(zx_signals_t clear_mask, zx_signals_t set_mask) {
+void Dispatcher::UpdateStateLocked(zx_signals_t clear_mask, zx_signals_t set_mask,
+                                   zx_signals_t strobe_mask) {
   ZX_DEBUG_ASSERT(is_waitable());
 
   zx_signals_t previous = signals_.load(ktl::memory_order_acquire);
@@ -212,15 +214,15 @@ void Dispatcher::UpdateStateLocked(zx_signals_t clear_mask, zx_signals_t set_mas
   } while (!signals_.compare_exchange_strong(previous, updated, ktl::memory_order_acq_rel,
                                              ktl::memory_order_relaxed));
 
-  // Did we assert any new signals?  Because an observer can only be triggered when a signal
-  // transitions from inactive to active, there is no need to look for matching observers unless we
-  // have newly active signals.
+  // Because an observer can only be triggered when a signal transitions from inactive to
+  // active or when a signal is strobed, there is no need to look for matching observers
+  // unless we are in one of those two cases.
   const zx_signals_t newly_active = set_mask & ~previous;
-  if (newly_active == 0) {
+  if (newly_active == 0 && strobe_mask == 0) {
     return;
   }
 
-  NotifyObserversLocked(updated);
+  NotifyObserversLocked(updated | strobe_mask);
 }
 
 zx_signals_t Dispatcher::PollSignals() const {

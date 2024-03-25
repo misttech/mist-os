@@ -230,14 +230,16 @@ class Dispatcher : private fbl::RefCountedUpgradeable<Dispatcher>,
   // Update this object's signal state and notify matching observers.
   //
   // Clear the signals specified by |clear|, set the signals specified by |set|, then invoke each
-  // observer that's waiting on one or more of the signals in |set|.
+  // observer that's waiting on one or more of the signals in |set| or |strobe|.
   //
   // Note, clearing a signal or setting a signal that was already set will not cause an observer to
   // be notified.
   //
   // May only be called when |is_waitable| reports true.
-  void UpdateState(zx_signals_t clear, zx_signals_t set) TA_EXCL(get_lock());
-  void UpdateStateLocked(zx_signals_t clear, zx_signals_t set) TA_REQ(get_lock());
+  void UpdateState(zx_signals_t clear, zx_signals_t set, zx_signals_t strobe = 0)
+      TA_EXCL(get_lock());
+  void UpdateStateLocked(zx_signals_t clear, zx_signals_t set, zx_signals_t strobe = 0)
+      TA_REQ(get_lock());
 
   // Clear the signals specified by |signals|.
   void ClearSignals(zx_signals_t signals) {

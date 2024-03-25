@@ -287,6 +287,7 @@ multiconst!(zx_signals_t, [
 
     // Clock
     ZX_CLOCK_STARTED            = ZX_OBJECT_SIGNAL_4;
+    ZX_CLOCK_UPDATED            = ZX_OBJECT_SIGNAL_5;
 
     // Socket
     ZX_SOCKET_READABLE            = ZX_OBJECT_READABLE;

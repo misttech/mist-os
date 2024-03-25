@@ -5,9 +5,12 @@
 #include <inttypes.h>
 #include <lib/affine/transform.h>
 #include <lib/zx/clock.h>
+#include <lib/zx/time.h>
 #include <zircon/syscalls/clock.h>
+#include <zircon/syscalls/port.h>
 
 #include <array>
+#include <thread>
 
 #include <zxtest/zxtest.h>
 
@@ -1024,6 +1027,120 @@ TEST(KernelClocksTestCase, StartedSignal) {
       }
     }
   }
+}
+
+TEST(KernelClocksUpdatedSignalTest, ManualSetSignalFails) {
+  std::array options{
+      static_cast<uint64_t>(0),
+      ZX_CLOCK_OPT_MONOTONIC,
+      ZX_CLOCK_OPT_MONOTONIC | ZX_CLOCK_OPT_CONTINUOUS,
+  };
+  for (auto option : options) {
+    // Make a simple clock.
+    zx::clock clock;
+    ASSERT_OK(zx::clock::create(option, nullptr, &clock));
+
+    // Try to set the ZX_CLOCK_UPDATED signal explicitly using zx_object_signal.
+    // This should fail, as the only way to set the ZX_CLOCK_UPDATED signal is
+    // with a zx_clock_update call.
+    ASSERT_EQ(ZX_ERR_INVALID_ARGS, clock.signal(0, ZX_CLOCK_UPDATED));
+  }
+}
+
+TEST(KernelClocksUpdatedSignalTest, UpdateBeforeAsyncWait) {
+  // Make a simple clock.
+  zx::clock clock;
+  ASSERT_OK(zx::clock::create(ZX_CLOCK_OPT_MONOTONIC, nullptr, &clock));
+
+  // Update clock
+  zx::clock::update_args args;
+  args.set_rate_adjust(1);
+  ASSERT_OK(clock.update(args.set_value(zx::time(1))));
+
+  // Start waiting for ZX_CLOCK_UPDATED
+  zx::port port;
+  ASSERT_OK(zx::port::create(0u, &port));
+  ASSERT_OK(clock.wait_async(port, 0, ZX_CLOCK_UPDATED, 0));
+
+  // Wait for async_wait
+  zx_status_t return_status;
+  zx_port_packet_t packet = {};
+  return_status = port.wait(zx::deadline_after(zx::msec(100)), &packet);
+
+  // async_wait should time out, since update occurred before async_wait posted
+  ASSERT_STATUS(return_status, ZX_ERR_TIMED_OUT);
+}
+
+TEST(KernelClocksUpdatedSignalTest, UpdateAfterAsyncWait) {
+  // Make a simple clock.
+  zx::clock clock;
+  ASSERT_OK(zx::clock::create(ZX_CLOCK_OPT_MONOTONIC, nullptr, &clock));
+
+  // Start waiting for ZX_CLOCK_UPDATED
+  zx::port port;
+  ASSERT_OK(zx::port::create(0u, &port));
+  ASSERT_OK(clock.wait_async(port, 0, ZX_CLOCK_UPDATED, 0));
+
+  // Update clock
+  zx::clock::update_args args;
+  args.set_rate_adjust(1);
+  ASSERT_OK(clock.update(args.set_value(zx::time(1))));
+
+  // Wait for async_wait
+  zx_status_t return_status;
+  zx_port_packet_t packet = {};
+  return_status = port.wait(zx::deadline_after(zx::msec(1000)), &packet);
+  // async_wait should receive pulse, as clock has been updated since async_wait posted
+  ASSERT_OK(return_status);
+  ASSERT_NE(packet.signal.observed & ZX_CLOCK_UPDATED, 0);
+}
+
+// Test that the observer is notified each time the clock is updated (and not only on clock start)
+TEST(KernelClocksUpdatedSignalTest, UpdateAfterStart) {
+  // Make a simple clock.
+  zx::clock clock;
+  ASSERT_OK(zx::clock::create(0, nullptr, &clock));
+
+  // Start waiting for ZX_CLOCK_UPDATED and ZX_CLOCK_STARTED
+  zx::port port;
+  ASSERT_OK(zx::port::create(0u, &port));
+  ASSERT_OK(clock.wait_async(port, 0, ZX_CLOCK_UPDATED | ZX_CLOCK_STARTED, 0));
+
+  // Wait for async_wait
+  zx_status_t return_status;
+  zx_port_packet_t packet = {};
+  std::thread waiter(
+      [&]() { return_status = port.wait(zx::deadline_after(zx::msec(1000)), &packet); });
+
+  // Update the clock. The first update also starts the clock
+  zx::nanosleep(zx::deadline_after(zx::msec(5)));
+  zx::clock::update_args args;
+  args.set_rate_adjust(1);
+  ASSERT_OK(clock.update(args.set_value(zx::time(1))));
+
+  waiter.join();
+
+  // async_wait should first receive notification that the clock was started and updated
+  ASSERT_OK(return_status);
+  ASSERT_NE(packet.signal.observed & ZX_CLOCK_STARTED, 0);
+  ASSERT_NE(packet.signal.observed & ZX_CLOCK_UPDATED, 0);
+
+  // Restart the wait, this time watching only for updates
+  ASSERT_OK(clock.wait_async(port, 0, ZX_CLOCK_UPDATED, 0));
+  waiter = std::thread(
+      [&]() { return_status = port.wait(zx::deadline_after(zx::msec(1000)), &packet); });
+
+  // Update the clock again
+  zx::nanosleep(zx::deadline_after(zx::msec(5)));
+  args.set_rate_adjust(2);
+  ASSERT_OK(clock.update(args.set_value(zx::time(2))));
+
+  waiter.join();
+
+  // async_wait should receive pulse, as clock has been updated since async_wait posted, even though
+  // the status of ZX_CLOCK_STARTED didn't change
+  ASSERT_OK(return_status);
+  ASSERT_NE(packet.signal.observed & ZX_CLOCK_UPDATED, 0);
 }
 
 TEST(KernelClocksTestCase, DefaultRights) {

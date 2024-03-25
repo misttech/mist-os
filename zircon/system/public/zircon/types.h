@@ -132,6 +132,7 @@ typedef uint32_t zx_signals_t;
 
 // Clock
 #define ZX_CLOCK_STARTED            __ZX_OBJECT_SIGNAL_4
+#define ZX_CLOCK_UPDATED            __ZX_OBJECT_SIGNAL_5
 
 // Socket
 #define ZX_SOCKET_READABLE            __ZX_OBJECT_READABLE

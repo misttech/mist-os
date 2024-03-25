@@ -79,6 +79,7 @@ bitflags! {
 
         // Clock
         const CLOCK_STARTED       = ZX_CLOCK_STARTED;
+        const CLOCK_UPDATED       = ZX_CLOCK_UPDATED;
 
         // Socket
         const SOCKET_READABLE            = ZX_SOCKET_READABLE;

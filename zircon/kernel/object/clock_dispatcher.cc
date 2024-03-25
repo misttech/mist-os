@@ -378,9 +378,10 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
 
   // Now that we are out of the time critical section, if the clock was just
   // started, make sure to assert the ZX_CLOCK_STARTED signal to observers.
-  if (clock_was_started) {
-    UpdateState(0, ZX_CLOCK_STARTED);
-  }
+  const zx_signals_t set_mask = clock_was_started ? ZX_CLOCK_STARTED : 0;
+
+  // Pulse ZX_CLOCK_UPDATED to announce that a clock update has occurred.
+  UpdateState(0, set_mask, ZX_CLOCK_UPDATED);
 
   return ZX_OK;
 }
