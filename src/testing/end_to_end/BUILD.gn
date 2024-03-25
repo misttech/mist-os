@@ -58,18 +58,14 @@ if (is_host) {
   # core.emulator
   group_with_no_dir_target_deps("core_emulator_stable_sl4f_tests") {
     testonly = true
-    public_deps = [
-      "honeydew/tests/functional_tests:core_emulator_stable_sl4f_tests",
-      "//src/tests/end_to_end/snapshot:snapshot_test_sl4f($host_toolchain)",
-    ]
+    public_deps =
+        [ "honeydew/tests/functional_tests:core_emulator_stable_sl4f_tests" ]
   }
 
   group_with_no_dir_target_deps("core_emulator_stable_tests") {
     testonly = true
-    public_deps = [
-      "honeydew/tests/functional_tests:core_emulator_stable_tests",
-      "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
-    ]
+    public_deps =
+        [ "honeydew/tests/functional_tests:core_emulator_stable_tests" ]
   }
 
   group_with_no_dir_target_deps("core_emulator_unstable_sl4f_tests") {
@@ -108,10 +104,8 @@ if (is_host) {
   # Note - workbench does not support SL4F
   group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
     testonly = true
-    public_deps = [
-      "honeydew/tests/functional_tests:workbench_emulator_stable_tests",
-      "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
-    ]
+    public_deps =
+        [ "honeydew/tests/functional_tests:workbench_emulator_stable_tests" ]
   }
 
   group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
