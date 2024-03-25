@@ -85,10 +85,7 @@ using zx;
 /// ApplicationActivity which provides more semantic meaning to the
 /// dependencies.
 ///
-/// The execution state power element supports the following power levels:
-///   * [`fuchsia.power.system/EXECUTION_STATE_INACTIVE`]: The hardware platform has little to no capability to execute code.
-///   * [`fuchsia.power.system/EXECUTION_STATE_WAKE_HANDLING`]: The hardware platform is handling a wakeup event.
-///   * [`fuchsia.power.system/EXECUTION_STATE_ACTIVE`]: The hardware platform is fully capable of executing code.
+/// [`fuchsia.power.system/ExecutionStateLevel`] defines the power levels supported by this power element.
 type ExecutionState = resource table {
     1: passive_dependency_token fuchsia.power.broker.DependencyToken;
 };
@@ -127,11 +124,28 @@ type ExecutionResumeLatency = resource table {
     3: resume_latencies vector<zx.Duration>:MAX;
 };
 
+/// Holds tokens to the full wake handling power element.
+///
+/// [`fuchsia.power.system/FullWakeHandlingLevel`] defines the power levels supported by this power element.
+type FullWakeHandling = resource table {
+    1: active_dependency_token fuchsia.power.broker.DependencyToken;
+};
+
+/// Full wake handling power levels
+///
+/// Driver power elements should take an active dependency on
+/// `FullWakeHandlingLevel::ACTIVE` if it expects the system to perform a full
+/// wakeup. While the drivers are handling a wake event, they should request a
+/// lease to pull the state to Active, and drop the release once the event is
+/// fully handled.
+type FullWakeHandlingLevel = flexible enum : uint8 {
+    INACTIVE = 0;
+    ACTIVE = 1;
+};
+
 /// Holds tokens to the wake handling power element.
 ///
-/// The wake handling power element supports the following power levels:
-///   * [`fuchsia.power.system/WAKE_HANDLING_INACTIVE`]: The hardware platform is not handling a wakeup event.
-///   * [`fuchsia.power.system/WAKE_HANDLING_ACTIVE`]: The hardware platform is currently handling a wakeup event.
+/// [`fuchsia.power.system/WakeHandlingLevel`] defines the power levels supported by this power element.
 type WakeHandling = resource table {
     1: active_dependency_token fuchsia.power.broker.DependencyToken;
 };
@@ -139,9 +153,10 @@ type WakeHandling = resource table {
 /// Wake handling power levels
 ///
 /// Driver power elements should take an active dependency on
-/// `WakeHandlingLevel::ACTIVE`. While the drivers are handling a wake event
-/// they should request a lease to pull the state to Active, and drop the
-/// release once the event is fully handled.
+/// `WakeHandlingLevel::ACTIVE` if it does NOT expect the system to
+/// perform a full wakeup. While the drivers are handling a wake event, they
+/// should request a lease to pull the state to Active, and drop the release
+/// once the event is fully handled.
 type WakeHandlingLevel = flexible enum : uint8 {
     INACTIVE = 0;
     ACTIVE = 1;
@@ -149,9 +164,7 @@ type WakeHandlingLevel = flexible enum : uint8 {
 
 /// Holds tokens to the application activity power element.
 ///
-/// The application activity power element supports the following power levels:
-///   * [`fuchsia.power.system/APPLICATION_ACTIVITY_INACTIVE`]: The application layer is not running an execution sensitive operation.
-///   * [`fuchsia.power.system/APPLICATION_ACTIVITY_ACTIVE`]: The application layer is running an execution sensitive operation.
+/// [`fuchsia.power.system/ApplicationActivityLevel`] defines the power levels supported by this power element.
 type ApplicationActivity = resource table {
     1: active_dependency_token fuchsia.power.broker.DependencyToken;
 };
@@ -171,8 +184,9 @@ type ApplicationActivityLevel = flexible enum : uint8 {
 type PowerElements = resource table {
     1: execution_state ExecutionState;
     2: execution_resume_latency ExecutionResumeLatency;
-    3: wake_handling WakeHandling;
-    4: application_activity ApplicationActivity;
+    3: application_activity ApplicationActivity;
+    4: full_wake_handling FullWakeHandling;
+    5: wake_handling WakeHandling;
 };
 
 /// A listener for activity governor events.

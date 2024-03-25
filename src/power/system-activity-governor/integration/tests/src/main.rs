@@ -78,6 +78,10 @@ async fn test_activity_governor_returns_expected_power_elements() -> Result<()> 
     let wh_active_token = wh_element.active_dependency_token.unwrap();
     assert!(!wh_active_token.is_invalid_handle());
 
+    let fwh_element = power_elements.full_wake_handling.unwrap();
+    let fwh_active_token = fwh_element.active_dependency_token.unwrap();
+    assert!(!fwh_active_token.is_invalid_handle());
+
     let erl_element = power_elements.execution_resume_latency.unwrap();
     let erl_passive_token = erl_element.passive_dependency_token.unwrap();
     assert!(!erl_passive_token.is_invalid_handle());
@@ -123,6 +127,25 @@ async fn create_wake_topology(realm: &RealmProxyClient) -> Result<PowerElementCo
         .await?;
 
     Ok(wake_controller)
+}
+
+async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<PowerElementContext> {
+    let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let power_elements = activity_governor.get_power_elements().await?;
+    let fwh_token = power_elements.full_wake_handling.unwrap().active_dependency_token.unwrap();
+
+    let full_wake_controller = PowerElementContext::builder(&topology, "wake_controller", &[0, 1])
+        .dependencies(vec![fbroker::LevelDependency {
+            dependency_type: fbroker::DependencyType::Active,
+            dependent_level: 1,
+            requires_token: fwh_token,
+            requires_level: 1,
+        }])
+        .build()
+        .await?;
+
+    Ok(full_wake_controller)
 }
 
 async fn create_latency_topology(
@@ -229,6 +252,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 application_activity: {
                     power_level: 0u64,
                 },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
                 wake_handling: {
                     power_level: 0u64,
                 },
@@ -261,6 +287,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
                 application_activity: {
                     power_level: 1u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
                 },
                 wake_handling: {
                     power_level: 0u64,
@@ -310,6 +339,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 application_activity: {
                     power_level: 0u64,
                 },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
                 wake_handling: {
                     power_level: 0u64,
                 },
@@ -342,6 +374,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
                 application_activity: {
                     power_level: 1u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
                 },
                 wake_handling: {
                     power_level: 0u64,
@@ -389,6 +424,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                     power_level: 0u64,
                 },
                 application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
                     power_level: 0u64,
                 },
                 wake_handling: {
@@ -441,6 +479,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 application_activity: {
                     power_level: 0u64,
                 },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
                 wake_handling: {
                     power_level: 1u64,
                 },
@@ -481,6 +522,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                     power_level: 0u64,
                 },
                 application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
                     power_level: 0u64,
                 },
                 wake_handling: {
@@ -548,6 +592,9 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
                     application_activity: {
                         power_level: 0u64,
                     },
+                    full_wake_handling: {
+                        power_level: 0u64,
+                    },
                     wake_handling: {
                         power_level: 0u64,
                     },
@@ -609,6 +656,9 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                 application_activity: {
                     power_level: 1u64,
                 },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
                 wake_handling: {
                     power_level: 0u64,
                 },
@@ -654,6 +704,9 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                     power_level: 0u64,
                 },
                 application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
                     power_level: 0u64,
                 },
                 wake_handling: {
@@ -716,6 +769,9 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 application_activity: {
                     power_level: 1u64,
                 },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
                 wake_handling: {
                     power_level: 0u64,
                 },
@@ -753,6 +809,9 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                     power_level: 0u64,
                 },
                 application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
                     power_level: 0u64,
                 },
                 wake_handling: {
@@ -831,11 +890,11 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
     })
     .detach();
 
-    let wake_controller = create_wake_topology(&realm).await?;
+    let full_wake_controller = create_full_wake_topology(&realm).await?;
 
     // Cycle execution_state power level to trigger a suspend/resume cycle.
-    let wake_lease_control = lease(&wake_controller, 1).await?;
-    drop(wake_lease_control);
+    let full_wake_lease_control = lease(&full_wake_controller, 1).await?;
+    drop(full_wake_lease_control);
 
     // OnSuspend and OnResume should have been called once.
     on_suspend_rx.next().await.unwrap();
@@ -869,6 +928,9 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                     power_level: 0u64,
                 },
                 application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
                     power_level: 0u64,
                 },
                 wake_handling: {
@@ -946,11 +1008,11 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
     })
     .detach();
 
-    let wake_controller = create_wake_topology(&realm).await?;
+    let full_wake_controller = create_full_wake_topology(&realm).await?;
 
     // Cycle execution_state power level to trigger a suspend/resume cycle.
-    let wake_lease_control = lease(&wake_controller, 1).await?;
-    drop(wake_lease_control);
+    let full_wake_lease_control = lease(&full_wake_controller, 1).await?;
+    drop(full_wake_lease_control);
 
     // OnSuspend should have been called.
     on_suspend_rx.next().await.unwrap();
@@ -982,6 +1044,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 },
                 application_activity: {
                     power_level: 1u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
                 },
                 wake_handling: {
                     power_level: 0u64,
@@ -1030,6 +1095,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 },
                 application_activity: {
                     power_level: 1u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
                 },
                 wake_handling: {
                     power_level: 0u64,

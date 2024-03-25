@@ -8,7 +8,8 @@ use fidl_fuchsia_hardware_suspend as fhsuspend;
 use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system::{
-    self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, WakeHandlingLevel,
+    self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, FullWakeHandlingLevel,
+    WakeHandlingLevel,
 };
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
@@ -140,6 +141,8 @@ pub struct SystemActivityGovernor {
     execution_state: PowerElementContext,
     /// The context used to manage the application activity power element.
     application_activity: PowerElementContext,
+    /// The context used to manage the full wake handling power element.
+    full_wake_handling: PowerElementContext,
     /// The context used to manage the wake handling power element.
     wake_handling: PowerElementContext,
     /// The context used to manage the execution resume latency power element.
@@ -204,6 +207,24 @@ impl SystemActivityGovernor {
         .await
         .expect("PowerElementContext encountered error while building application_activity");
 
+        let full_wake_handling = PowerElementContext::builder(
+            topology,
+            "full_wake_handling",
+            &[
+                FullWakeHandlingLevel::Inactive.into_primitive(),
+                FullWakeHandlingLevel::Active.into_primitive(),
+            ],
+        )
+        .dependencies(vec![fbroker::LevelDependency {
+            dependency_type: fbroker::DependencyType::Active,
+            dependent_level: FullWakeHandlingLevel::Active.into_primitive(),
+            requires_token: execution_state.active_dependency_token(),
+            requires_level: ExecutionStateLevel::WakeHandling.into_primitive(),
+        }])
+        .build()
+        .await
+        .expect("PowerElementContext encountered error while building full_wake_handling");
+
         let wake_handling = PowerElementContext::builder(
             topology,
             "wake_handling",
@@ -252,6 +273,7 @@ impl SystemActivityGovernor {
             inspect_root,
             execution_state,
             application_activity,
+            full_wake_handling,
             wake_handling,
             execution_resume_latency,
             resume_latencies,
@@ -278,6 +300,7 @@ impl SystemActivityGovernor {
                 );
                 self.run_execution_state(&elements_node, es_suspend_tx, listeners_suspend_tx);
                 self.run_application_activity(&elements_node);
+                self.run_full_wake_handling(&elements_node);
                 self.run_wake_handling(&elements_node);
                 self.run_execution_resume_latency(elements_node);
             });
@@ -373,6 +396,23 @@ impl SystemActivityGovernor {
                 &this.application_activity,
                 ApplicationActivityLevel::Inactive.into_primitive(),
                 application_activity_node,
+                None,
+                None,
+            )
+            .await;
+        })
+        .detach();
+    }
+
+    fn run_full_wake_handling(self: &Rc<Self>, inspect_node: &fuchsia_inspect::Node) {
+        let full_wake_handling_node = inspect_node.create_child("full_wake_handling");
+        let this = self.clone();
+
+        fasync::Task::local(async move {
+            Self::run_power_element(
+                &this.full_wake_handling,
+                FullWakeHandlingLevel::Inactive.into_primitive(),
+                full_wake_handling_node,
                 None,
                 None,
             )
@@ -626,6 +666,12 @@ impl SystemActivityGovernor {
                         application_activity: Some(fsystem::ApplicationActivity {
                             active_dependency_token: Some(
                                 self.application_activity.active_dependency_token(),
+                            ),
+                            ..Default::default()
+                        }),
+                        full_wake_handling: Some(fsystem::FullWakeHandling {
+                            active_dependency_token: Some(
+                                self.full_wake_handling.active_dependency_token(),
                             ),
                             ..Default::default()
                         }),
