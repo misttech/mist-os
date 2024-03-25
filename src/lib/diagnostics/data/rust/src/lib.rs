@@ -12,6 +12,7 @@ use chrono::{Local, TimeZone, Utc};
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{DataType, Selector, Severity as FidlSeverity};
 use flyweights::FlyStr;
+use itertools::Itertools;
 use moniker::{ExtendedMoniker, MonikerError};
 use selectors::SelectorExt;
 use serde::{
@@ -1268,7 +1269,10 @@ impl fmt::Display for LogTextPresenter<'_> {
         if self.options.show_tags {
             match &self.metadata.tags {
                 Some(tags) if !tags.is_empty() => {
-                    write!(f, "[{}]", tags.join(","))?;
+                    let mut filtered = tags.iter().filter(|tag| *tag != moniker).peekable();
+                    if filtered.peek().is_some() {
+                        write!(f, "[{}]", filtered.join(","))?;
+                    }
                 }
                 _ => {}
             }
@@ -1836,6 +1840,57 @@ mod tests {
 
         assert_eq!(
             "[00012.345678][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test",
+            format!("{}", data)
+        )
+    }
+
+    #[fuchsia::test]
+    fn display_for_logs_with_duplicate_moniker() {
+        let data = LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            component_url: Some(String::from("fake-url")),
+            moniker: String::from("moniker"),
+            severity: Severity::Info,
+        })
+        .set_pid(123)
+        .set_tid(456)
+        .set_message("some message".to_string())
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .add_tag("moniker")
+        .add_tag("bar")
+        .add_tag("moniker")
+        .add_key(LogsProperty::String(LogsField::Other("test".to_string()), "property".to_string()))
+        .add_key(LogsProperty::String(LogsField::MsgStructured, "test".to_string()))
+        .build();
+
+        assert_eq!(
+            "[00012.345678][123][456][moniker][bar] INFO: [some_file.cc(420)] some message test=property value=test",
+            format!("{}", data)
+        )
+    }
+
+    #[fuchsia::test]
+    fn display_for_logs_with_duplicate_moniker_and_no_other_tags() {
+        let data = LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            component_url: Some(String::from("fake-url")),
+            moniker: String::from("moniker"),
+            severity: Severity::Info,
+        })
+        .set_pid(123)
+        .set_tid(456)
+        .set_message("some message".to_string())
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .add_tag("moniker")
+        .add_tag("moniker")
+        .add_key(LogsProperty::String(LogsField::Other("test".to_string()), "property".to_string()))
+        .add_key(LogsProperty::String(LogsField::MsgStructured, "test".to_string()))
+        .build();
+
+        assert_eq!(
+            "[00012.345678][123][456][moniker] INFO: [some_file.cc(420)] some message test=property value=test",
             format!("{}", data)
         )
     }
