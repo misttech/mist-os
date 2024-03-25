@@ -113,7 +113,7 @@ type BufferCollectionConstraints = struct {
             array<ImageFormatConstraints, MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS>;
 };
 
-@available(added=7, deprecated=9, removed=HEAD)
+@available(added=7, deprecated=9, removed=HEAD, legacy=true)
 type BufferCollectionConstraintsAuxBuffers = struct {
     /// If true, a secure heap may only be selected if all participants with
     /// BufferMemoryConstraints specify allow_clear_aux_buffers_for_secure.  If

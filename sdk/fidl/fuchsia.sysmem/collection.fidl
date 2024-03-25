@@ -674,11 +674,11 @@ closed protocol BufferCollection {
     strict CheckSingleBufferAllocated(struct {
         buffer_index uint64;
     });
-    @available(added=7, deprecated=9, removed=HEAD)
+    @available(added=7, deprecated=9, removed=HEAD, legacy=true)
     strict SetConstraintsAuxBuffers(struct {
         constraints BufferCollectionConstraintsAuxBuffers;
     });
-    @available(added=7, deprecated=9, removed=HEAD)
+    @available(added=7, deprecated=9, removed=HEAD, legacy=true)
     strict GetAuxBuffers() -> (resource struct {
         status zx.Status;
         buffer_collection_info_aux_buffers BufferCollectionInfo_2;

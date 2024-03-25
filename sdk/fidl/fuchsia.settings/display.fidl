@@ -26,11 +26,7 @@ closed protocol Display {
     ///
     /// If this call fails, it is considered a fatal error and the channel
     /// will be closed.
-    @available(
-            deprecated=10,
-            removed=16,
-            legacy=false,
-            note="Use fuchsia.lightsensor.Sensor::Watch")
+    @available(deprecated=10, removed=16, legacy=true, note="Use fuchsia.lightsensor.Sensor::Watch")
     strict WatchLightSensor(struct {
         delta float32;
     }) -> (struct {
@@ -77,7 +73,7 @@ type DisplaySettings = table {
 /// fuchsia.lightsensor.LightSensorData. The [illuminance_lux] value here was
 /// incorrectly named and actually represents the clear color channel from the
 /// light sensor.
-@available(deprecated=10, removed=16, legacy=false, note="Use fuchsia.lightsensor.LightSensorData")
+@available(deprecated=10, removed=16, legacy=true, note="Use fuchsia.lightsensor.LightSensorData")
 type LightSensorData = table {
     /// Brightness from the light sensor (a.k.a. the `Clear` value in RGBC).
     1: illuminance_lux float32;

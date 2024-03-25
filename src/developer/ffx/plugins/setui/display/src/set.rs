@@ -38,6 +38,9 @@ mod test {
             DisplayRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
             }
+            DisplayRequest::WatchLightSensor { .. } => {
+                panic!("Unexpected call to watch light sensor");
+            }
         });
 
         let display = SetArgs {
@@ -86,6 +89,9 @@ mod test {
             }
             DisplayRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
+            }
+            DisplayRequest::WatchLightSensor { .. } => {
+                panic!("Unexpected call to watch light sensor");
             }
         });
 

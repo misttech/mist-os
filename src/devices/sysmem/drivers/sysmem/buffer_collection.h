@@ -122,6 +122,9 @@ class BufferCollection : public Node {
                         SetConstraintsCompleter::Sync& completer) override;
     void WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& completer) override;
     void CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) override;
+    void SetConstraintsAuxBuffers(SetConstraintsAuxBuffersRequest& request,
+                                  SetConstraintsAuxBuffersCompleter::Sync& completer) override;
+    void GetAuxBuffers(GetAuxBuffersCompleter::Sync& completer) override;
     void AttachToken(AttachTokenRequest& request, AttachTokenCompleter::Sync& completer) override;
     void AttachLifetimeTracking(AttachLifetimeTrackingRequest& request,
                                 AttachLifetimeTrackingCompleter::Sync& completer) override;
