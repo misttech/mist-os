@@ -150,8 +150,8 @@ mod test {
         diagnostics_assertions::{
             assert_data_tree, AnyBoolProperty, AnyNumericProperty, AnyProperty, AnyStringProperty,
         },
-        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
-        fuchsia_async as fasync, fuchsia_inspect as inspect,
+        fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
+        fuchsia_inspect as inspect,
         futures::channel::mpsc,
         ieee80211_testutils::{BSSID_REGEX, SSID_REGEX},
         rand::Rng,
@@ -388,7 +388,6 @@ mod test {
             Some(candidates[2].clone())
         );
 
-        let fidl_channel = fidl_common::WlanChannel::from(candidates[2].bss.channel);
         assert_data_tree!(test_values.inspector, root: {
             bss_select_test: {
                 "0": {
@@ -401,11 +400,7 @@ mod test {
                             rssi: AnyNumericProperty,
                             security_type_saved: AnyStringProperty,
                             security_type_scanned: AnyStringProperty,
-                            channel: {
-                                cbw: AnyProperty,
-                                primary: AnyNumericProperty,
-                                secondary80: AnyNumericProperty,
-                            },
+                            channel: AnyStringProperty,
                             compatible: AnyBoolProperty,
                             recent_failure_count: AnyNumericProperty,
                             saved_network_has_ever_connected: AnyBoolProperty,
@@ -424,11 +419,7 @@ mod test {
                         score: i64::from(scoring_functions::score_bss_scanned_candidate(candidates[2].clone())),
                         security_type_saved: candidates[2].saved_security_type_to_string(),
                         security_type_scanned: format!("{}", wlan_common::bss::Protection::from(candidates[2].security_type_detailed)),
-                        channel: {
-                            cbw: AnyProperty,
-                            primary: u64::from(fidl_channel.primary),
-                            secondary80: u64::from(fidl_channel.secondary80),
-                        },
+                        channel: AnyStringProperty,
                         compatible: candidates[2].bss.compatibility.is_some(),
                         recent_failure_count: candidates[2].recent_failure_count(),
                         saved_network_has_ever_connected: candidates[2].saved_network_info.has_ever_connected,

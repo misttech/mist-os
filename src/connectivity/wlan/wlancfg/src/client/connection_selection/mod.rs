@@ -29,7 +29,6 @@ use {
     std::{collections::HashSet, sync::Arc},
     tracing::{debug, error, info, warn},
     wlan_common::{security::SecurityAuthenticator, sequestered::Sequestered},
-    wlan_inspect::wrappers::InspectWlanChan,
 };
 
 pub mod bss_selection;
@@ -478,7 +477,7 @@ impl WriteInspect for types::ScannedCandidate {
             score: scoring_functions::score_bss_scanned_candidate(self.clone()),
             security_type_saved: self.saved_security_type_to_string(),
             security_type_scanned: format!("{}", wlan_common::bss::Protection::from(self.security_type_detailed)),
-            channel: InspectWlanChan(&self.bss.channel.into()),
+            channel: format!("{}", self.bss.channel),
             compatible: self.bss.is_compatible(),
             recent_failure_count: self.recent_failure_count(),
             saved_network_has_ever_connected: self.saved_network_info.has_ever_connected,
