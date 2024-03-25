@@ -7,8 +7,10 @@
 //! Library for reading and writing a description of the partitions for a
 //! specific hardware.
 
+mod partition_image_mapper;
 mod partitions_config;
 
+pub use partition_image_mapper::{ImageType, PartitionAndImage, PartitionImageMapper};
 pub use partitions_config::{
     BootloaderPartition, BootstrapPartition, Partition, PartitionsConfig, Slot,
 };
