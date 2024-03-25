@@ -38,7 +38,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to FUCHSIA_API_LEVEL specified in version_history.json.
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 62;
+constexpr uint32_t kCurrentProtocolVersion = 63;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -147,6 +147,7 @@ static_assert(static_cast<int>(debug::Arch::kArm64) == 2);
   FN(NotifyLog)                        \
   FN(NotifyComponentExiting)           \
   FN(NotifyComponentStarting)          \
+  FN(NotifyComponentDiscovered)        \
   FN(NotifyTestExited)
 
 // A message consists of a MsgHeader followed by a serialized version of
@@ -195,6 +196,7 @@ struct MsgHeader {
     kNotifyComponentExiting = 109,
     kNotifyComponentStarting = 110,
     kNotifyTestExited = 111,
+    kNotifyComponentDiscovered = 112,
   };
   static const char* TypeToString(Type);
 
@@ -899,6 +901,18 @@ struct NotifyLog {
   std::string log;
 
   void Serialize(Serializer& ser, uint32_t ver) { ser | timestamp | severity | location | log; }
+};
+
+// When a filter has been installed recursively, we need to let the front end know about it,
+// particularly if it's a weak filter. Otherwise the frontend will take the default approach to not
+// treat a process starting event as a weak attach.
+struct NotifyComponentDiscovered {
+  static constexpr uint32_t kSupportedSinceVersion = 63;
+
+  // The filter that the backend installed to match this realm.
+  Filter filter;
+
+  void Serialize(Serializer& ser, uint32_t ver) { ser | filter; }
 };
 
 // Notify that a component has started.

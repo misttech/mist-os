@@ -872,19 +872,26 @@ void DebugAgent::OnComponentDiscovered(const std::string& moniker, const std::st
 
   for (auto filter : matched_filters) {
     if (filter != nullptr && filter->filter().recursive) {
-      // When any recursive filter matches here, we install a component moniker prefix so that any
-      // sub-components created as children of this one are attached implicitly. Only one filter
-      // match needs to be recursive for us to install the prefix filter for |moniker|, and we only
-      // need to install one new filter per invocation of this function.
-      //
-      // TODO(b/330571289): This internal filter will be removed the next time the client
-      // synchronizes filters via UpdateFilters, which could result in child components not being
-      // attached unexpectedly. In practice filter updates don't happen that often, but we should
-      // still handle this case.
-      debug_ipc::Filter filter;
-      filter.type = debug_ipc::Filter::Type::kComponentMonikerPrefix;
-      filter.pattern = moniker;
-      filters_.emplace_back(filter);
+      // When any recursive filter matches here, we install a component moniker prefix filter so
+      // that any sub-components created as children of this one are attached implicitly. Only one
+      // filter match needs to be recursive for us to install the prefix filter for |moniker|, and
+      // we only need to install one new filter per invocation of this function. The client is
+      // notified of this filter so that it is not removed on subsequent UpdateFilter requests,
+      // which the client will do shortly after receiving this notification. The new version of
+      // this filter will include a filter id and with all of the settings given here. Notably, we
+      // do not enable the recursive flag on this filter, which would be redundant with the parent
+      // filter.
+      debug_ipc::Filter realm_filter;
+      realm_filter.type = debug_ipc::Filter::Type::kComponentMonikerPrefix;
+      realm_filter.pattern = moniker;
+      realm_filter.weak = filter->filter().weak;
+
+      filters_.emplace_back(realm_filter);
+
+      debug_ipc::NotifyComponentDiscovered notify;
+      notify.filter = realm_filter;
+
+      SendNotification(notify);
       return;
     }
   }

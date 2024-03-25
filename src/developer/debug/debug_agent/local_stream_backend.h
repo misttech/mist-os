@@ -32,6 +32,7 @@ class LocalStreamBackend : public debug::BufferedStream {
   // This should be overriden by every test interested in a particular set of
   // messages. By default they do nothing.
   virtual void HandleAttach(debug_ipc::AttachReply) {}
+  virtual void HandleNotifyComponentDiscovered(debug_ipc::NotifyComponentDiscovered) {}
   virtual void HandleNotifyComponentStarting(debug_ipc::NotifyComponentStarting) {}
   virtual void HandleNotifyException(debug_ipc::NotifyException) {}
   virtual void HandleNotifyIO(debug_ipc::NotifyIO) {}

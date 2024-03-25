@@ -750,6 +750,16 @@ void Session::DispatchNotifyLog(const debug_ipc::NotifyLog& notify) {
       << notify.log;
 }
 
+void Session::DispatchNotifyComponentDiscovered(
+    const debug_ipc::NotifyComponentDiscovered& notify) {
+  auto filter = system_.CreateNewFilter();
+  filter->SetPattern(notify.filter.pattern);
+  filter->SetType(notify.filter.type);
+  filter->SetJobKoid(notify.filter.job_koid);
+  filter->SetWeak(notify.filter.weak);
+  filter->SetRecursive(notify.filter.recursive);
+}
+
 void Session::DispatchNotifyComponentStarting(const debug_ipc::NotifyComponentStarting& notify) {
   for (auto& observer : component_observers_) {
     observer.OnComponentStarted(notify.component.moniker, notify.component.url);
