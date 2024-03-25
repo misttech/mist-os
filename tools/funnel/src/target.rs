@@ -113,11 +113,11 @@ where
     let mut choice = String::new();
     input.read_line(&mut choice)?;
     let idx: usize = choice.trim().parse().map_err(|_| ChooseTargetError::InvalidChoice(choice))?;
-    if idx == 0 || idx > targets.len() {
+    if idx >= targets.len() {
         return Err(ChooseTargetError::OutOfRangeChoice(idx));
     }
 
-    targets.get(idx - 1).ok_or_else(|| ChooseTargetError::CollectionError(idx - 1)).cloned()
+    targets.get(idx).ok_or_else(|| ChooseTargetError::CollectionError(idx)).cloned()
 }
 
 #[cfg(test)]
@@ -126,8 +126,8 @@ mod test {
     use pretty_assertions::assert_eq;
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_prompt_for_target() -> Result<()> {
-        let input = b"1";
+    async fn test_prompt_for_first_target() -> Result<()> {
+        let input = b"0";
         let output = Vec::new();
         let targets = vec![
             TargetInfo { nodename: "cytherera".to_string(), ..Default::default() },
@@ -136,6 +136,35 @@ mod test {
 
         let res = prompt_for_target(&input[..], output, targets).await?;
         assert_eq!(res, TargetInfo { nodename: "cytherera".to_string(), ..Default::default() });
+        Ok(())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_prompt_for_last_target() -> Result<()> {
+        let input = b"1";
+        let output = Vec::new();
+        let targets = vec![
+            TargetInfo { nodename: "cytherera".to_string(), ..Default::default() },
+            TargetInfo { nodename: "alecto".to_string(), ..Default::default() },
+        ];
+
+        let res = prompt_for_target(&input[..], output, targets).await?;
+        assert_eq!(res, TargetInfo { nodename: "alecto".to_string(), ..Default::default() });
+        Ok(())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_prompt_for_negative_target() -> Result<()> {
+        let input = b"-1";
+        let output = Vec::new();
+        let targets = vec![
+            TargetInfo { nodename: "cytherera".to_string(), ..Default::default() },
+            TargetInfo { nodename: "alecto".to_string(), ..Default::default() },
+        ];
+
+        let res = prompt_for_target(&input[..], output, targets).await;
+        assert!(res.is_err());
+        assert_eq!(format!("{}", res.unwrap_err()), "Choice -1 was not an unsigned integer");
         Ok(())
     }
 
@@ -150,13 +179,13 @@ mod test {
 
         let res = prompt_for_target(&input[..], output, targets).await;
         assert!(res.is_err());
-        assert_eq!(format!("{}", res.unwrap_err()), "Choice: asdf was not an unsigned integer");
+        assert_eq!(format!("{}", res.unwrap_err()), "Choice asdf was not an unsigned integer");
         Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_prompt_for_target_out_of_range_error() -> Result<()> {
-        let input = b"4";
+        let input = b"2";
         let output = Vec::new();
         let targets = vec![
             TargetInfo { nodename: "cytherera".to_string(), ..Default::default() },
@@ -165,7 +194,7 @@ mod test {
 
         let res = prompt_for_target(&input[..], output, targets).await;
         assert!(res.is_err());
-        assert_eq!(format!("{}", res.unwrap_err()), "Invalid choice: 4");
+        assert_eq!(format!("{}", res.unwrap_err()), "Invalid choice: 2");
         Ok(())
     }
 }
