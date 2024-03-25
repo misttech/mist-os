@@ -468,6 +468,236 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         Ok(())
     }
 
+    /// Pre-allocate disk space for the given logical file range. If any part of the allocation
+    /// range is beyond the end of the file, the file size is updated.
+    /// NB: Do not hook this up yet! This is just for testing until all the fallocate features are
+    /// implemented.
+    #[cfg(test)]
+    async fn allocate(&self, range: Range<u64>) -> Result<(), Error> {
+        debug_assert!(range.start < range.end);
+        debug_assert_eq!(range.start % self.block_size(), 0);
+        debug_assert_eq!(range.end % self.block_size(), 0);
+
+        let mut transaction = self.new_transaction().await?;
+        let mut to_allocate = Vec::new();
+        let mut to_switch = Vec::new();
+        let mut new_range = range.clone();
+
+        {
+            let tree = &self.store().tree;
+            let layer_set = tree.layer_set();
+            let offset_key = ObjectKey::attribute(
+                self.object_id(),
+                self.attribute_id(),
+                AttributeKey::Extent(ExtentKey::search_key_from_offset(new_range.start)),
+            );
+            let mut merger = layer_set.merger();
+            let mut iter = merger.seek(Bound::Included(&offset_key)).await?;
+
+            loop {
+                match iter.get() {
+                    Some(ItemRef {
+                        key:
+                            ObjectKey {
+                                object_id,
+                                data:
+                                    ObjectKeyData::Attribute(
+                                        attribute_id,
+                                        AttributeKey::Extent(extent_key),
+                                    ),
+                            },
+                        value: ObjectValue::Extent(extent_value),
+                        ..
+                    }) if *object_id == self.object_id()
+                        && *attribute_id == self.attribute_id() =>
+                    {
+                        // If the start of this extent is beyond the end of the range we are
+                        // allocating, we don't have any more work to do.
+                        if new_range.end <= extent_key.range.start {
+                            break;
+                        }
+                        let device_offset = match extent_value {
+                            ExtentValue::None => {
+                                // If the extent value is None, it indicates a deleted extent. In
+                                // that case, we just skip it entirely. By keeping the new_range
+                                // where it is, this section will get included in the new
+                                // allocations.
+                                iter.advance().await?;
+                                continue;
+                            }
+                            ExtentValue::Some { mode: ExtentMode::OverwritePartial(_), .. }
+                            | ExtentValue::Some { mode: ExtentMode::Overwrite, .. } => {
+                                // If this extent is already in overwrite mode, we can skip it.
+                                if extent_key.range.end < new_range.end {
+                                    new_range.start = extent_key.range.end;
+                                    iter.advance().await?;
+                                    continue;
+                                } else {
+                                    new_range.start = new_range.end;
+                                    break;
+                                }
+                            }
+                            ExtentValue::Some { device_offset, .. } => *device_offset,
+                        };
+
+                        // Figure out how we have to break up the ranges.
+                        if extent_key.range.start <= new_range.start {
+                            // [ extent
+                            //    [ new
+                            // and
+                            // [ extent
+                            // [ new
+                            assert!(new_range.start < extent_key.range.end);
+                            let device_offset =
+                                device_offset + (new_range.start - extent_key.range.start);
+
+                            if extent_key.range.end < new_range.end {
+                                // [ extent ]
+                                //    [ new    ]
+                                to_switch
+                                    .push((new_range.start..extent_key.range.end, device_offset));
+                                new_range.start = extent_key.range.end;
+                            } else {
+                                // [ extent    ]
+                                //    [ new    ]
+                                // or
+                                // [ extent       ]
+                                //    [ new    ]
+                                to_switch.push((new_range.start..new_range.end, device_offset));
+                                new_range.start = new_range.end;
+                                break;
+                            }
+                        } else {
+                            //    [ extent
+                            // [ new          ]
+                            to_allocate.push(new_range.start..extent_key.range.start);
+                            if extent_key.range.end < new_range.end {
+                                //    [ extent ]
+                                // [ new          ]
+                                to_switch.push((extent_key.range.clone(), device_offset));
+                                new_range.start = extent_key.range.end;
+                            } else {
+                                //    [ extent    ]
+                                // [ new          ]
+                                // or
+                                //    [ extent       ]
+                                // [ new          ]
+                                to_switch
+                                    .push((extent_key.range.start..new_range.end, device_offset));
+                                new_range.start = new_range.end;
+                                break;
+                            }
+                        }
+                    }
+                    // The records are sorted so if we find something that isn't an extent or
+                    // doesn't match the object id then there are no more extent records for this
+                    // object.
+                    _ => break,
+                }
+                iter.advance().await?;
+            }
+        }
+
+        if new_range.start < new_range.end {
+            to_allocate.push(new_range.clone());
+        }
+
+        // Make sure the mutation that flips the has_overwrite_extents advisory flag is in the
+        // first transaction, in case we split transactions. This makes it okay to only replay the
+        // first transaction if power loss occurs - the file will be in an unusual state, but not
+        // an invalid one, if only part of the allocate goes through.
+        let mut mutation =
+            self.store().txn_get_object_mutation(&transaction, self.object_id()).await?;
+        if let ObjectValue::Object {
+            kind: ObjectKind::File { has_overwrite_extents, .. }, ..
+        } = &mut mutation.item.value
+        {
+            *has_overwrite_extents = true;
+        } else {
+            bail!(anyhow!(FxfsError::Inconsistent).context("Unexpected object value"));
+        }
+        transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
+
+        // The maximum number of mutations we are going to allow per transaction in allocate. This
+        // is probably quite a bit lower than the actual limit, but it should be large enough to
+        // handle most non-edge-case versions of allocate without splitting the transaction.
+        const MAX_TRANSACTION_SIZE: usize = 256;
+        for (switch_range, device_offset) in to_switch {
+            transaction.add_with_object(
+                self.store().store_object_id(),
+                Mutation::merge_object(
+                    ObjectKey::extent(self.object_id(), self.attribute_id(), switch_range),
+                    ObjectValue::Extent(ExtentValue::initialized_overwrite_extent(device_offset)),
+                ),
+                AssocObj::Borrowed(self),
+            );
+            if transaction.mutations().len() >= MAX_TRANSACTION_SIZE {
+                transaction.commit_and_continue().await?;
+            }
+        }
+
+        let mut allocated = 0;
+        let allocator = self.store().allocator();
+        for mut allocate_range in to_allocate {
+            while allocate_range.start < allocate_range.end {
+                // TODO(https://fxbug.dev/293943124): if any extents are beyond the end of the file
+                // and the transaction gets split, it will cause an fsck failure. We need to handle
+                // that case somehow (probably by adding a temporary TRIM record).
+                let device_range = allocator
+                    .allocate(
+                        &mut transaction,
+                        self.store().store_object_id(),
+                        allocate_range.end - allocate_range.start,
+                    )
+                    .await
+                    .context("allocation failed")?;
+                let device_range_len = device_range.end - device_range.start;
+
+                transaction.add_with_object(
+                    self.store().store_object_id(),
+                    Mutation::merge_object(
+                        ObjectKey::extent(
+                            self.object_id(),
+                            self.attribute_id(),
+                            allocate_range.start..allocate_range.start + device_range_len,
+                        ),
+                        ObjectValue::Extent(ExtentValue::blank_overwrite_extent(
+                            device_range.start,
+                            (device_range_len / self.block_size()) as usize,
+                        )),
+                    ),
+                    AssocObj::Borrowed(self),
+                );
+
+                allocate_range.start += device_range_len;
+                allocated += device_range_len;
+
+                if transaction.mutations().len() >= MAX_TRANSACTION_SIZE {
+                    transaction.commit_and_continue().await?;
+                }
+            }
+        }
+
+        if new_range.end > self.txn_get_size(&transaction) {
+            transaction.add_with_object(
+                self.store().store_object_id(),
+                Mutation::replace_or_insert_object(
+                    ObjectKey::attribute(
+                        self.object_id(),
+                        self.attribute_id(),
+                        AttributeKey::Attribute,
+                    ),
+                    ObjectValue::attribute(new_range.end),
+                ),
+                AssocObj::Borrowed(self),
+            );
+        }
+        self.update_allocated_size(&mut transaction, allocated, 0).await?;
+
+        transaction.commit().await?;
+        Ok(())
+    }
+
     /// Return information on a contiguous set of extents that has the same allocation status,
     /// starting from `start_offset`. The information returned is if this set of extents are marked
     /// allocated/not allocated and also the size of this set (in bytes). This is used when
@@ -945,8 +1175,19 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                         .ok_or(FxfsError::Inconsistent)?;
                     ensure!(device_offset % block_size == 0, FxfsError::Inconsistent);
                     let mut buf = self.allocate_buffer(block_size as usize).await;
-                    self.read_and_decrypt(device_offset, aligned_old_size, buf.as_mut(), *key_id)
-                        .await?;
+                    // In the case that this extent is in OverwritePartial mode, there is a
+                    // possibility that the last block is allocated, but not initialized yet, in
+                    // which case we don't actually need to bother zeroing out the tail. However,
+                    // it's not strictly incorrect to change uninitialized data, so we skip the
+                    // check and blindly do it to keep it simpler here.
+                    self.read_and_decrypt(
+                        device_offset,
+                        aligned_old_size,
+                        buf.as_mut(),
+                        *key_id,
+                        None,
+                    )
+                    .await?;
                     buf.as_mut_slice()[(old_size % block_size) as usize..].fill(0);
                     self.multi_write(
                         transaction,
@@ -1193,8 +1434,9 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         file_offset: u64,
         buffer: MutableBufferRef<'_>,
         key_id: u64,
+        block_bitmap: Option<bit_vec::BitVec>,
     ) -> Result<(), Error> {
-        self.handle.read_and_decrypt(device_offset, file_offset, buffer, key_id).await
+        self.handle.read_and_decrypt(device_offset, file_offset, buffer, key_id, block_bitmap).await
     }
 
     /// Truncates a file to a given size (growing/shrinking as required).
@@ -3267,5 +3509,181 @@ mod tests {
         assert_eq!(&data[..], &rdata[..]);
 
         assert_eq!(object.read_attr(21).await.expect("read_attr failed"), None);
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_allocate_basic() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let block_size = fs.block_size();
+        let file_size = block_size * 10;
+        object.truncate(file_size).await.unwrap();
+
+        let small_buf_size = 1024;
+        let large_buf_aligned_size = block_size as usize * 2;
+        let large_buf_size = block_size as usize * 2 + 1024;
+
+        let mut small_buf = object.allocate_buffer(small_buf_size).await;
+        let mut large_buf_aligned = object.allocate_buffer(large_buf_aligned_size).await;
+        let mut large_buf = object.allocate_buffer(large_buf_size).await;
+
+        assert_eq!(object.read(0, small_buf.as_mut()).await.unwrap(), small_buf_size);
+        assert_eq!(small_buf.as_slice(), &vec![0; small_buf_size]);
+        assert_eq!(object.read(0, large_buf.as_mut()).await.unwrap(), large_buf_size);
+        assert_eq!(large_buf.as_slice(), &vec![0; large_buf_size]);
+        assert_eq!(
+            object.read(0, large_buf_aligned.as_mut()).await.unwrap(),
+            large_buf_aligned_size
+        );
+        assert_eq!(large_buf_aligned.as_slice(), &vec![0; large_buf_aligned_size]);
+
+        // Allocation succeeds, and without any writes to the location it shows up as zero.
+        object.allocate(block_size..block_size * 3).await.unwrap();
+
+        // Test starting before, inside, and after the allocated section with every sized buffer.
+        for (buf_index, buf) in [small_buf, large_buf, large_buf_aligned].iter_mut().enumerate() {
+            for offset in 0..4 {
+                assert_eq!(
+                    object.read(block_size * offset, buf.as_mut()).await.unwrap(),
+                    buf.len(),
+                    "buf_index: {}, read offset: {}",
+                    buf_index,
+                    offset,
+                );
+                assert_eq!(
+                    buf.as_slice(),
+                    &vec![0; buf.len()],
+                    "buf_index: {}, read offset: {}",
+                    buf_index,
+                    offset,
+                );
+            }
+        }
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_allocate_extends_file() {
+        const BUF_SIZE: usize = 1024;
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let mut buf = object.allocate_buffer(BUF_SIZE).await;
+        let block_size = fs.block_size();
+
+        assert_eq!(object.read(0, buf.as_mut()).await.unwrap(), buf.len());
+        assert_eq!(buf.as_slice(), &[0; BUF_SIZE]);
+
+        assert!(TEST_OBJECT_SIZE < block_size * 4);
+        // Allocation succeeds, and without any writes to the location it shows up as zero.
+        object.allocate(0..block_size * 4).await.unwrap();
+        assert_eq!(object.read(0, buf.as_mut()).await.unwrap(), buf.len());
+        assert_eq!(buf.as_slice(), &[0; BUF_SIZE]);
+        assert_eq!(object.read(block_size, buf.as_mut()).await.unwrap(), buf.len());
+        assert_eq!(buf.as_slice(), &[0; BUF_SIZE]);
+        assert_eq!(object.read(block_size * 3, buf.as_mut()).await.unwrap(), buf.len());
+        assert_eq!(buf.as_slice(), &[0; BUF_SIZE]);
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_allocate_past_end() {
+        const BUF_SIZE: usize = 1024;
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let mut buf = object.allocate_buffer(BUF_SIZE).await;
+        let block_size = fs.block_size();
+
+        assert_eq!(object.read(0, buf.as_mut()).await.unwrap(), buf.len());
+        assert_eq!(buf.as_slice(), &[0; BUF_SIZE]);
+
+        assert!(TEST_OBJECT_SIZE < block_size * 4);
+        // Allocation succeeds, and without any writes to the location it shows up as zero.
+        object.allocate(block_size * 4..block_size * 6).await.unwrap();
+        assert_eq!(object.read(0, buf.as_mut()).await.unwrap(), buf.len());
+        assert_eq!(buf.as_slice(), &[0; BUF_SIZE]);
+        assert_eq!(object.read(block_size * 4, buf.as_mut()).await.unwrap(), buf.len());
+        assert_eq!(buf.as_slice(), &[0; BUF_SIZE]);
+        assert_eq!(object.read(block_size * 5, buf.as_mut()).await.unwrap(), buf.len());
+        assert_eq!(buf.as_slice(), &[0; BUF_SIZE]);
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_allocate_read_attr() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let block_size = fs.block_size();
+        let file_size = block_size * 4;
+        object.truncate(file_size).await.unwrap();
+
+        let content = object
+            .read_attr(object.attribute_id())
+            .await
+            .expect("failed to read attr")
+            .expect("attr returned none");
+        assert_eq!(content.as_ref(), &vec![0; file_size as usize]);
+
+        object.allocate(block_size..block_size * 3).await.unwrap();
+
+        let content = object
+            .read_attr(object.attribute_id())
+            .await
+            .expect("failed to read attr")
+            .expect("attr returned none");
+        assert_eq!(content.as_ref(), &vec![0; file_size as usize]);
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_allocate_existing_data() {
+        struct Case {
+            written_ranges: Vec<Range<usize>>,
+            allocate_range: Range<u64>,
+        }
+        let cases = [
+            Case { written_ranges: vec![4..7], allocate_range: 4..7 },
+            Case { written_ranges: vec![4..7], allocate_range: 3..8 },
+            Case { written_ranges: vec![4..7], allocate_range: 5..6 },
+            Case { written_ranges: vec![4..7], allocate_range: 5..8 },
+            Case { written_ranges: vec![4..7], allocate_range: 3..5 },
+            Case { written_ranges: vec![0..1, 2..3, 4..5, 6..7, 8..9], allocate_range: 0..10 },
+            Case { written_ranges: vec![0..2, 4..6, 7..10], allocate_range: 1..8 },
+        ];
+
+        for case in cases {
+            let (fs, object) = test_filesystem_and_empty_object().await;
+            let block_size = fs.block_size();
+            let file_size = block_size * 10;
+            object.truncate(file_size).await.unwrap();
+
+            for write in &case.written_ranges {
+                let write_len = (write.end - write.start) * block_size as usize;
+                let mut write_buf = object.allocate_buffer(write_len).await;
+                write_buf.as_mut_slice().fill(0xff);
+                assert_eq!(
+                    object
+                        .write_or_append(Some(block_size * write.start as u64), write_buf.as_ref())
+                        .await
+                        .unwrap(),
+                    file_size
+                );
+            }
+
+            let mut expected_buf = object.allocate_buffer(file_size as usize).await;
+            assert_eq!(object.read(0, expected_buf.as_mut()).await.unwrap(), expected_buf.len());
+
+            object
+                .allocate(
+                    case.allocate_range.start * block_size..case.allocate_range.end * block_size,
+                )
+                .await
+                .unwrap();
+
+            let mut read_buf = object.allocate_buffer(file_size as usize).await;
+            assert_eq!(object.read(0, read_buf.as_mut()).await.unwrap(), read_buf.len());
+            assert_eq!(read_buf.as_slice(), expected_buf.as_slice());
+
+            fs.close().await.expect("close failed");
+        }
     }
 }

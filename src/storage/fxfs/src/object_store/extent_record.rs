@@ -191,8 +191,8 @@ impl ExtentValue {
     }
 
     /// Creates an ExtentValue for an overwrite range with no blocks written to yet.
-    pub fn blank_overwrite_extent(device_offset: u64, length: usize) -> ExtentValue {
-        Self::new(device_offset, ExtentMode::OverwritePartial(BitVec::from_elem(length, false)))
+    pub fn blank_overwrite_extent(device_offset: u64, num_blocks: usize) -> ExtentValue {
+        Self::new(device_offset, ExtentMode::OverwritePartial(BitVec::from_elem(num_blocks, false)))
     }
 
     /// Creates an ExtentValue for an overwrite range with all the blocks initialized.

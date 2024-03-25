@@ -527,6 +527,10 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         file_offset: u64,
         mut buffer: MutableBufferRef<'_>,
         key_id: u64,
+        // If provided, blocks in the bitmap that are zero will have their contents zeroed out. The
+        // bitmap should be exactly the size of the buffer and aligned to the offset in the extent
+        // the read is starting at.
+        block_bitmap: Option<bit_vec::BitVec>,
     ) -> Result<(), Error> {
         let store = self.store();
         store.device_read_ops.fetch_add(1, Ordering::Relaxed);
@@ -537,6 +541,17 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         .await?;
         if let Some(keys) = keys {
             keys.decrypt(file_offset, key_id, buffer.as_mut_slice())?;
+        }
+        if let Some(bitmap) = block_bitmap {
+            let block_size = self.block_size() as usize;
+            let buf = buffer.as_mut_slice();
+            debug_assert_eq!(bitmap.len() * block_size, buf.len());
+            for (i, block) in bitmap.iter().enumerate() {
+                if !block {
+                    let start = i * block_size;
+                    buf[start..start + block_size].fill(0);
+                }
+            }
         }
         Ok(())
     }
@@ -753,8 +768,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 offset += to_zero as u64;
             }
 
-            if let ExtentValue::Some { device_offset, key_id, .. } = extent_value {
+            if let ExtentValue::Some { device_offset, key_id, mode } = extent_value {
                 let mut device_offset = device_offset + (offset - extent_key.range.start);
+                let key_id = *key_id;
 
                 let to_copy = min(buf.len() - end_align, (extent_key.range.end - offset) as usize);
                 if to_copy > 0 {
@@ -763,11 +779,30 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                             store_id = self.store().store_object_id(),
                             oid = self.object_id(),
                             device_range = ?(device_offset..device_offset + to_copy as u64),
+                            offset,
+                            range = ?extent_key.range,
+                            block_size,
                             "R",
                         );
                     }
                     let (head, tail) = buf.split_at_mut(to_copy);
-                    reads.push(self.read_and_decrypt(device_offset, offset, head, *key_id));
+                    let maybe_bitmap = match mode {
+                        ExtentMode::OverwritePartial(bitmap) => {
+                            let mut read_bitmap = bitmap.clone().split_off(
+                                ((offset - extent_key.range.start) / block_size) as usize,
+                            );
+                            read_bitmap.truncate(to_copy / block_size as usize);
+                            Some(read_bitmap)
+                        }
+                        _ => None,
+                    };
+                    reads.push(self.read_and_decrypt(
+                        device_offset,
+                        offset,
+                        head,
+                        key_id,
+                        maybe_bitmap,
+                    ));
                     buf = tail;
                     if buf.is_empty() {
                         break;
@@ -779,6 +814,13 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 // Deal with end alignment by reading the existing contents into an alignment
                 // buffer.
                 if offset < extent_key.range.end && end_align > 0 {
+                    if let ExtentMode::OverwritePartial(bitmap) = mode {
+                        let bitmap_offset = (offset - extent_key.range.start) / block_size;
+                        if !bitmap.get(bitmap_offset as usize).ok_or(FxfsError::Inconsistent)? {
+                            // If this block isn't actually initialized, skip it.
+                            break;
+                        }
+                    }
                     let mut align_buf =
                         self.store().device.allocate_buffer(block_size as usize).await;
                     if trace {
@@ -789,7 +831,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                             "RT",
                         );
                     }
-                    self.read_and_decrypt(device_offset, offset, align_buf.as_mut(), *key_id)
+                    self.read_and_decrypt(device_offset, offset, align_buf.as_mut(), key_id, None)
                         .await?;
                     buf.as_mut_slice().copy_from_slice(&align_buf.as_slice()[..end_align]);
                     buf = buf.subslice_mut(0..0);
@@ -848,15 +890,29 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                     value: ObjectValue::Extent(extent_value),
                     ..
                 }) if *object_id == self.object_id() && *attr_id == attribute_id => {
-                    if let ExtentValue::Some { device_offset, key_id, .. } = extent_value {
+                    if let ExtentValue::Some { device_offset, key_id, mode } = extent_value {
                         let offset = extent_key.range.start as usize;
                         buffer.as_mut_slice()[last_offset..offset].fill(0);
                         let end = std::cmp::min(extent_key.range.end as usize, buffer.len());
+                        let maybe_bitmap = match mode {
+                            ExtentMode::OverwritePartial(bitmap) => {
+                                // The caller has to adjust the bitmap if necessary, but we always
+                                // start from the beginning of any extent, so we only truncate.
+                                let mut read_bitmap = bitmap.clone();
+                                read_bitmap.truncate(
+                                    (end - extent_key.range.start as usize)
+                                        / self.block_size() as usize,
+                                );
+                                Some(read_bitmap)
+                            }
+                            _ => None,
+                        };
                         self.read_and_decrypt(
                             *device_offset,
                             extent_key.range.start,
                             buffer.subslice_mut(offset..end as usize),
                             *key_id,
+                            maybe_bitmap,
                         )
                         .await?;
                         last_offset = end;
