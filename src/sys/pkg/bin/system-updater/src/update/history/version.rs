@@ -6,10 +6,9 @@ use {
     crate::update::{paver, BuildInfo, SystemInfo},
     anyhow::anyhow,
     epoch::EpochFile,
-    fidl_fuchsia_mem::Buffer,
+    fidl_fuchsia_mem as fmem,
     fidl_fuchsia_paver::{Asset, BootManagerProxy, DataSinkProxy},
     fuchsia_inspect as inspect,
-    mundane::hash::{Hasher as _, Sha256},
     serde::{Deserialize, Serialize},
     std::{convert::TryInto as _, str::FromStr},
     tracing::{error, info, warn},
@@ -233,16 +232,18 @@ async fn get_vbmeta_and_zbi_hash_from_environment(
         super::super::ImageType::Asset(Asset::VerifiedBootMetadata),
     )
     .await?;
-    let vbmeta_hash = sha256_hash_with_no_trailing_zeros(vbmeta_buffer)?;
+    let vbmeta_hash = sha256_hash_ignore_trailing_zeros(vbmeta_buffer)?;
     let zbi_buffer =
         paver::read_image(data_sink, configuration, super::super::ImageType::Asset(Asset::Kernel))
             .await?;
-    let zbi_hash = sha256_hash_with_no_trailing_zeros(zbi_buffer)?;
-    Ok((vbmeta_hash, zbi_hash))
+    let zbi_hash = sha256_hash_ignore_trailing_zeros(zbi_buffer)?;
+    Ok((vbmeta_hash.to_string(), zbi_hash.to_string()))
 }
 
-// Compute the SHA256 hash of the buffer with trailing zeros stripped.
-fn sha256_hash_with_no_trailing_zeros(buffer: Buffer) -> Result<String, anyhow::Error> {
+// Compute the SHA256 hash of the buffer with the trailing zeros ignored.
+fn sha256_hash_ignore_trailing_zeros(
+    buffer: fmem::Buffer,
+) -> Result<fuchsia_hash::Sha256, anyhow::Error> {
     let mut size = buffer.size.try_into()?;
     let mut data = vec![0u8; size];
     buffer.vmo.read(&mut data, 0)?;
@@ -252,7 +253,9 @@ fn sha256_hash_with_no_trailing_zeros(buffer: Buffer) -> Result<String, anyhow::
     if size == 0 {
         warn!(size = buffer.size, "entire buffer is 0");
     }
-    Ok(Sha256::hash(&data[..size]).to_string())
+    Ok(From::from(*AsRef::<[u8; 32]>::as_ref(&<sha2::Sha256 as sha2::Digest>::digest(
+        &data[..size],
+    ))))
 }
 
 #[cfg(test)]
@@ -504,17 +507,13 @@ mod tests {
             "838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67".parse().unwrap(),
         ));
         let last_target_version = Version {
-            update_hash: "2937013f2181810606b2a799b05bda2849f3e369a20982a4138f0e0a55984ce4"
-                .to_string(),
+            update_hash: "2937013f2181810606b2a799b05bda2849f3e369a20982a4138f0e0a55984ce4".into(),
             system_image_hash: "838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67"
-                .to_string(),
-            vbmeta_hash: "a0c6f07a4b3a17fb9348db981de3c5602e2685d626599be1bd909195c694a57b"
-                .to_string(),
-            // Should be "a7124150e065aa234710ab3875230f17deb36a9249938e11f2f3656954412ab8"
-            // See comment in sha256_hash_removed_trailing_zeros test.
-            zbi_hash: "a7124150e065aa234710ab387523f17deb36a9249938e11f2f3656954412ab8".to_string(),
-            build_version: SystemVersion::Opaque("".to_string()),
-            epoch: "42".to_string(),
+                .into(),
+            vbmeta_hash: "a0c6f07a4b3a17fb9348db981de3c5602e2685d626599be1bd909195c694a57b".into(),
+            zbi_hash: "a7124150e065aa234710ab3875230f17deb36a9249938e11f2f3656954412ab8".into(),
+            build_version: SystemVersion::Opaque("".into()),
+            epoch: "42".into(),
         };
         assert_eq!(
             Version::current(
@@ -526,15 +525,15 @@ mod tests {
                 &make_epoch_json(42)
             )
             .await,
-            last_target_version
+            last_target_version,
         );
     }
 
     #[test]
     fn sha256_hash_empty_buffer() {
-        let buffer = Buffer { vmo: Vmo::create(0).unwrap(), size: 0 };
+        let buffer = fmem::Buffer { vmo: Vmo::create(0).unwrap(), size: 0 };
         assert_eq!(
-            sha256_hash_with_no_trailing_zeros(buffer).unwrap(),
+            sha256_hash_ignore_trailing_zeros(buffer).unwrap().to_string(),
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         );
     }
@@ -543,9 +542,9 @@ mod tests {
     fn sha256_hash_all_zero_buffer() {
         let vmo = Vmo::create(100).unwrap();
         vmo.write(&[0; 100], 0).unwrap();
-        let buffer = Buffer { vmo, size: 100 };
+        let buffer = fmem::Buffer { vmo, size: 100 };
         assert_eq!(
-            sha256_hash_with_no_trailing_zeros(buffer).unwrap(),
+            sha256_hash_ignore_trailing_zeros(buffer).unwrap().to_string(),
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         );
     }
@@ -555,13 +554,10 @@ mod tests {
         let vmo = Vmo::create(100).unwrap();
         vmo.write(&[0; 100], 0).unwrap();
         vmo.write(&[1; 1], 0).unwrap();
-        let buffer = Buffer { vmo, size: 100 };
+        let buffer = fmem::Buffer { vmo, size: 100 };
         assert_eq!(
-            sha256_hash_with_no_trailing_zeros(buffer).unwrap(),
-            // This hash string is only 63 characters, but it should be 64:
-            // 4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a
-            // note the "00" becomes "0", this is a bug in mundane, see fxr/410079.
-            "4bf5122f344554c53bde2ebb8cd2b7e3d160ad631c385a5d7cce23c7785459a"
+            sha256_hash_ignore_trailing_zeros(buffer).unwrap().to_string(),
+            "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a"
         );
     }
 }
