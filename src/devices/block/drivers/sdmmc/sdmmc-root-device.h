@@ -36,7 +36,8 @@ class SdmmcRootDevice : public fdf::DriverBase {
   const std::optional<std::string>& driver_node_name() const { return node_name(); }
 
   // Visible for testing.
-  const std::variant<std::unique_ptr<SdioControllerDevice>, std::unique_ptr<SdmmcBlockDevice>>&
+  const std::variant<std::monostate, std::unique_ptr<SdioControllerDevice>,
+                     std::unique_ptr<SdmmcBlockDevice>>&
   child_device() const {
     return child_device_;
   }
@@ -44,7 +45,8 @@ class SdmmcRootDevice : public fdf::DriverBase {
  protected:
   virtual zx_status_t Init(fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata);
 
-  std::variant<std::unique_ptr<SdioControllerDevice>, std::unique_ptr<SdmmcBlockDevice>>
+  std::variant<std::monostate, std::unique_ptr<SdioControllerDevice>,
+               std::unique_ptr<SdmmcBlockDevice>>
       child_device_;
 
  private:
