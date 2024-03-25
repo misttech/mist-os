@@ -1017,6 +1017,19 @@ impl<A: ScopeableAddress, Z> AddrAndZone<A, Z> {
     }
 }
 
+impl<A: ScopeableAddress + IpAddress, Z> AddrAndZone<A, Z> {
+    /// Constructs a new `AddrAndZone`, returning `Some` only if the provided
+    /// `addr`'s scope can have a zone (`addr.scope().can_have_zone()`) and
+    /// `addr` is not a loopback address.
+    pub fn new_not_loopback(addr: A, zone: Z) -> Option<Self> {
+        if addr.scope().can_have_zone() && !addr.is_loopback() {
+            Some(Self(addr, zone))
+        } else {
+            None
+        }
+    }
+}
+
 impl<A, Z> AddrAndZone<A, Z> {
     /// Constructs a new `AddrAndZone` without checking to see if `addr`'s scope
     /// can have a zone.
@@ -1164,6 +1177,19 @@ impl<A: ScopeableAddress, Z> ZonedAddr<A, Z> {
         match zone {
             Some(zone) => AddrAndZone::new(addr, zone).map(ZonedAddr::Zoned),
             None => Some(ZonedAddr::Unzoned(addr)),
+        }
+    }
+}
+
+impl<A: IpAddress + ScopeableAddress, Z: Clone> ZonedAddr<A, Z> {
+    /// Creates a [`ZonedAddr::Zoned`] iff `addr` can have a zone and is not
+    /// loopback.
+    ///
+    /// `get_zone` is only called if the address needs a zone.
+    pub fn new_zoned_if_necessary(addr: A, get_zone: impl FnOnce() -> Z) -> Self {
+        match AddrAndZone::new_not_loopback(addr, ()) {
+            Some(addr_and_zone) => Self::Zoned(addr_and_zone.map_zone(move |()| get_zone())),
+            None => Self::Unzoned(addr),
         }
     }
 }

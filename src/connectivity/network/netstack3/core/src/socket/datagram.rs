@@ -35,6 +35,7 @@ use crate::{
     device::{self, AnyDevice, DeviceIdContext},
     error::ExistsError,
     error::{LocalAddressError, NotFoundError, RemoteAddressError, SocketError, ZonedAddressError},
+    inspect::Inspector,
     ip::{
         socket::{
             IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
@@ -120,6 +121,31 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S
             Self::Unbound(unbound) => unbound.as_ref(),
             Self::Bound(bound) => bound.as_ref(),
         }
+    }
+}
+
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SocketState<I, D, S> {
+    pub(crate) fn to_socket_info(&self) -> SocketInfo<I, D, S> {
+        match self {
+            Self::Unbound(_) => SocketInfo::Unbound,
+            Self::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+                match socket_type {
+                    BoundSocketStateType::Listener { state, sharing: _ } => {
+                        let ListenerState { addr, ip_options: _ } = state;
+                        SocketInfo::Listener(addr.clone())
+                    }
+                    BoundSocketStateType::Connected { state, sharing: _ } => {
+                        SocketInfo::Connected(S::conn_addr_from_state(state))
+                    }
+                }
+            }
+        }
+    }
+
+    /// Record inspect information generic to each datagram protocol.
+    pub(crate) fn record_common_info<N: Inspector>(&self, inspector: &mut N) {
+        inspector.record_str("TransportProtocol", S::NAME);
+        inspector.record_str("NetworkProtocol", I::NAME);
     }
 }
 
@@ -595,6 +621,14 @@ pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
         id: &S::SocketId<I, Self::WeakDeviceId>,
         cb: F,
     ) -> O;
+
+    /// Call `f` with each socket's state.
+    fn for_each_socket<
+        F: FnMut(&mut Self::SocketsStateCtx<'_>, &SocketState<I, Self::WeakDeviceId, S>),
+    >(
+        &mut self,
+        cb: F,
+    );
 }
 
 pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: DatagramSocketSpec>:
@@ -1080,6 +1114,9 @@ pub(crate) struct WrapOtherStackIpOptionsMut<
 ///
 /// These sockets may or may not support dual-stack operation.
 pub trait DatagramSocketSpec: Sized {
+    /// Name of this datagram protocol.
+    const NAME: &'static str;
+
     /// The socket address spec for the datagram socket type.
     ///
     /// This describes the types of identifiers the socket uses, e.g.
@@ -1788,20 +1825,7 @@ pub(crate) fn get_info<
     _bindings_ctx: &mut BC,
     id: &S::SocketId<I, CC::WeakDeviceId>,
 ) -> SocketInfo<I, CC::WeakDeviceId, S> {
-    core_ctx.with_socket_state(id, |_core_ctx, state| match state {
-        SocketState::Unbound(_) => SocketInfo::Unbound,
-        SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
-            match socket_type {
-                BoundSocketStateType::Listener { state, sharing: _ } => {
-                    let ListenerState { addr, ip_options: _ } = state;
-                    SocketInfo::Listener(addr.clone())
-                }
-                BoundSocketStateType::Connected { state, sharing: _ } => {
-                    SocketInfo::Connected(S::conn_addr_from_state(state))
-                }
-            }
-        }
-    })
+    core_ctx.with_socket_state(id, |_core_ctx, state| state.to_socket_info())
 }
 
 pub(crate) fn listen<
@@ -4944,6 +4968,7 @@ mod test {
     const FAKE_DATAGRAM_IPV6_PROTOCOL: Ipv6Proto = Ipv6Proto::Other(254);
 
     impl DatagramSocketSpec for FakeStateSpec {
+        const NAME: &'static str = "FAKE";
         type AddrSpec = FakeAddrSpec;
         type SocketId<I: IpExt, D: device::WeakId> = Id<I, D>;
         type OtherStackIpOptions<I: IpExt> = SocketHopLimits<I::OtherVersion>;
@@ -5261,6 +5286,21 @@ mod test {
             cb: F,
         ) -> O {
             cb(&mut self.inner, &mut id.get_mut())
+        }
+
+        fn for_each_socket<
+            F: FnMut(
+                &mut Self::SocketsStateCtx<'_>,
+                &SocketState<I, Self::WeakDeviceId, FakeStateSpec>,
+            ),
+        >(
+            &mut self,
+            mut cb: F,
+        ) {
+            self.outer.keys().for_each(|id| {
+                let id = Id::from(id.clone());
+                cb(&mut self.inner, &id.get());
+            })
         }
     }
 

@@ -19,7 +19,7 @@ use either::Either;
 
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker},
-    SpecifiedAddr, ZonedAddr,
+    AddrAndPortFormatter, SpecifiedAddr, Witness as _, ZonedAddr,
 };
 use packet::{BufferMut, Serializer};
 use packet_formats::{
@@ -33,6 +33,7 @@ use crate::{
     data_structures::socketmap::IterShadows as _,
     device::{self, AnyDevice, DeviceIdContext},
     error::{LocalAddressError, SocketError},
+    inspect::{Inspector, InspectorDeviceExt},
     ip::{
         icmp::{IcmpAddr, IcmpBindingsContext, IcmpIpExt, IcmpStateContext, InnerIcmpContext},
         socket::IpSock,
@@ -176,6 +177,46 @@ impl<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> WeakIcmpSocketId<I,
 pub(crate) type IcmpSocketSet<I, D, BT> = DatagramSocketSet<I, D, Icmp<BT>>;
 pub(crate) type IcmpSocketState<I, D, BT> = datagram::SocketState<I, D, Icmp<BT>>;
 
+impl<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> IcmpSocketState<I, D, BT> {
+    fn to_icmp_socket_info(&self) -> SocketInfo<I::Addr, D> {
+        match self {
+            Self::Unbound(_) => SocketInfo::Unbound,
+            Self::Bound(datagram::BoundSocketState { socket_type, original_bound_addr: _ }) => {
+                match socket_type {
+                    datagram::BoundSocketStateType::Listener { state, sharing: _ } => {
+                        let datagram::ListenerState {
+                            addr: ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
+                            ip_options: _,
+                        } = state;
+                        SocketInfo::Bound {
+                            local_ip: addr.map(Into::into),
+                            id: *identifier,
+                            device: device.clone(),
+                        }
+                    }
+                    datagram::BoundSocketStateType::Connected { state, sharing: _ } => {
+                        // Rustfmt gives bad formatting when the following two destructures
+                        // are combined into one.
+                        let datagram::ConnState {
+                            addr: ConnAddr { ip, device },
+                            extra: remote_id,
+                            ..
+                        } = state;
+                        let ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) } = ip;
+                        SocketInfo::Connected {
+                            remote_ip: (*remote_ip).into(),
+                            local_ip: (*local_ip).into(),
+                            id: *id,
+                            device: device.clone(),
+                            remote_id: *remote_id,
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct IcmpConn<S> {
     icmp_id: u16,
@@ -275,12 +316,21 @@ pub trait StateContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self::De
         id: &IcmpSocketId<I, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O;
+
+    /// Call `f` with each socket's state.
+    fn for_each_socket<
+        F: FnMut(&mut Self::SocketStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId, BC>),
+    >(
+        &mut self,
+        cb: F,
+    );
 }
 
 /// Uninstantiatable type for implementing [`DatagramSocketSpec`].
 pub struct Icmp<BT>(PhantomData<BT>, Never);
 
 impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
+    const NAME: &'static str = "ICMP_ECHO";
     type AddrSpec = IcmpAddrSpec;
 
     type SocketId<I: datagram::IpExt, D: device::WeakId> = IcmpSocketId<I, D, BT>;
@@ -537,6 +587,15 @@ where
     ) -> O {
         StateContext::with_socket_state_mut(self, id, cb)
     }
+
+    fn for_each_socket<
+        F: FnMut(&mut Self::SocketsStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId, BC>),
+    >(
+        &mut self,
+        cb: F,
+    ) {
+        StateContext::for_each_socket(self, cb)
+    }
 }
 
 impl<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> SocketMapStateSpec
@@ -731,42 +790,8 @@ where
         &mut self,
         id: &IcmpApiSocketId<I, C>,
     ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
-        StateContext::with_socket_state(self.core_ctx(), id, |_core_ctx, state| match state {
-            datagram::SocketState::Unbound(_) => SocketInfo::Unbound,
-            datagram::SocketState::Bound(datagram::BoundSocketState {
-                socket_type,
-                original_bound_addr: _,
-            }) => match socket_type {
-                datagram::BoundSocketStateType::Listener { state, sharing: _ } => {
-                    let datagram::ListenerState {
-                        addr: ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
-                        ip_options: _,
-                    } = state;
-                    SocketInfo::Bound {
-                        local_ip: addr.map(Into::into),
-                        id: *identifier,
-                        device: device.clone(),
-                    }
-                }
-                datagram::BoundSocketStateType::Connected { state, sharing: _ } => {
-                    let datagram::ConnState {
-                        addr:
-                            ConnAddr {
-                                ip: ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) },
-                                device,
-                            },
-                        extra: remote_id,
-                        ..
-                    } = state;
-                    SocketInfo::Connected {
-                        remote_ip: (*remote_ip).into(),
-                        local_ip: (*local_ip).into(),
-                        id: *id,
-                        device: device.clone(),
-                        remote_id: *remote_id,
-                    }
-                }
-            },
+        StateContext::with_socket_state(self.core_ctx(), id, |_core_ctx, state| {
+            state.to_icmp_socket_info()
         })
     }
 
@@ -921,6 +946,67 @@ where
     /// each one.
     pub fn collect_all_sockets(&mut self) -> Vec<IcmpApiSocketId<I, C>> {
         datagram::collect_all_sockets(self.core_ctx())
+    }
+
+    /// Provides inspect data for ICMP echo sockets.
+    pub fn inspect<N>(&mut self, inspector: &mut N)
+    where
+        N: Inspector
+            + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+    {
+        DatagramStateContext::for_each_socket(self.core_ctx(), |_ctx, socket_state| {
+            inspector.record_unnamed_child(|node| {
+                socket_state.record_common_info(node);
+
+                let socket_info = socket_state.to_icmp_socket_info();
+                let (local, remote) = match socket_info {
+                    SocketInfo::Unbound => (None, None),
+                    SocketInfo::Bound { local_ip, id, device } => (
+                        Some((
+                            local_ip.map_or_else(
+                                || ZonedAddr::Unzoned(I::UNSPECIFIED_ADDRESS),
+                                |addr| {
+                                    ZonedAddr::new_zoned_if_necessary(addr.into_addr(), || {
+                                        device.expect("address needs a zone but device missing")
+                                    })
+                                },
+                            ),
+                            id,
+                        )),
+                        None,
+                    ),
+                    SocketInfo::Connected { local_ip, device, id, remote_ip, remote_id: _ } => (
+                        Some((
+                            ZonedAddr::new_zoned_if_necessary(local_ip.into_addr(), || {
+                                device.clone().expect("address needs a zone but device missing")
+                            }),
+                            id,
+                        )),
+                        Some(ZonedAddr::new_zoned_if_necessary(remote_ip.into_addr(), || {
+                            device.clone().expect("address needs a zone but device missing")
+                        })),
+                    ),
+                };
+
+                match local {
+                    None => node.record_str("LocalAddress", "[NOT BOUND]"),
+                    Some((addr, port)) => node.record_display(
+                        "LocalAddress",
+                        AddrAndPortFormatter::<_, _, I>::new(
+                            addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
+                            port,
+                        ),
+                    ),
+                };
+                match remote {
+                    None => node.record_str("RemoteAddress", "[NOT CONNECTED]"),
+                    Some(addr) => node.record_display(
+                        "RemoteAddress",
+                        addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
+                    ),
+                };
+            })
+        });
     }
 }
 

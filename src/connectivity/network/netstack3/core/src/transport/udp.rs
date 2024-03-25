@@ -23,7 +23,7 @@ use net_types::{
         GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4,
         Ipv4Addr, Ipv6, Ipv6Addr,
     },
-    MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
+    AddrAndPortFormatter, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::{
@@ -44,6 +44,7 @@ use crate::{
     data_structures::socketmap::{IterShadows as _, SocketMap, Tagged},
     device::{self, AnyDevice, DeviceIdContext},
     error::{LocalAddressError, SocketError, ZonedAddressError},
+    inspect::{Inspector, InspectorDeviceExt},
     ip::{
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
         HopLimits, IpTransportContext, MulticastMembershipHandler, TransportIpContext,
@@ -556,6 +557,7 @@ pub enum UdpSerializeError {
 }
 
 impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
+    const NAME: &'static str = "UDP";
     type AddrSpec = UdpAddrSpec;
     type SocketId<I: IpExt, D: device::WeakId> = UdpSocketId<I, D, BT>;
     type OtherStackIpOptions<I: IpExt> = I::OtherStackIpOptions<DualStackSocketState>;
@@ -1322,6 +1324,14 @@ pub trait StateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
 
     /// Returns true if UDP may send a port unreachable ICMP error message.
     fn should_send_port_unreachable(&mut self) -> bool;
+
+    /// Call `f` with each socket's state.
+    fn for_each_socket<
+        F: FnMut(&mut Self::SocketStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId, BC>),
+    >(
+        &mut self,
+        cb: F,
+    );
 }
 
 /// Empty trait to work around coherence issues.
@@ -2318,6 +2328,64 @@ where
     pub fn collect_all_sockets(&mut self) -> Vec<UdpApiSocketId<I, C>> {
         datagram::collect_all_sockets(self.core_ctx())
     }
+
+    /// Provides inspect data for UDP sockets.
+    pub fn inspect<N>(&mut self, inspector: &mut N)
+    where
+        N: Inspector
+            + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+    {
+        DatagramStateContext::for_each_socket(self.core_ctx(), |_ctx, socket_state| {
+            inspector.record_unnamed_child(|node| {
+                socket_state.record_common_info(node);
+
+                let socket_info = socket_state.to_socket_info().into();
+                let (local, remote) = match socket_info {
+                    SocketInfo::Unbound => (None, None),
+                    SocketInfo::Listener(ListenerInfo { local_ip, local_port }) => (
+                        Some((
+                            local_ip.map_or_else(
+                                || ZonedAddr::Unzoned(I::UNSPECIFIED_ADDRESS),
+                                |addr| addr.into_inner_without_witness(),
+                            ),
+                            local_port,
+                        )),
+                        None,
+                    ),
+                    SocketInfo::Connected(ConnInfo {
+                        local_ip,
+                        local_port,
+                        remote_ip,
+                        remote_port,
+                    }) => (
+                        Some((local_ip.into_inner_without_witness(), local_port)),
+                        Some((remote_ip.into_inner_without_witness(), remote_port)),
+                    ),
+                };
+
+                match local {
+                    None => node.record_str("LocalAddress", "[NOT BOUND]"),
+                    Some((addr, port)) => node.record_display(
+                        "LocalAddress",
+                        AddrAndPortFormatter::<_, _, I>::new(
+                            addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
+                            port,
+                        ),
+                    ),
+                };
+                match remote {
+                    None => node.record_str("RemoteAddress", "[NOT CONNECTED]"),
+                    Some((addr, port)) => node.record_display(
+                        "RemoteAddress",
+                        AddrAndPortFormatter::<_, _, I>::new(
+                            addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
+                            u16::from(port),
+                        ),
+                    ),
+                };
+            })
+        });
+    }
 }
 
 /// Error when sending a packet on a socket.
@@ -2372,6 +2440,15 @@ impl<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>, CC: StateContext<I, BC
         cb: F,
     ) -> O {
         StateContext::with_socket_state_mut(self, id, cb)
+    }
+
+    fn for_each_socket<
+        F: FnMut(&mut Self::SocketsStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId, BC>),
+    >(
+        &mut self,
+        cb: F,
+    ) {
+        StateContext::for_each_socket(self, cb)
     }
 }
 
@@ -2859,6 +2936,21 @@ mod tests {
 
         fn should_send_port_unreachable(&mut self) -> bool {
             false
+        }
+
+        fn for_each_socket<
+            F: FnMut(
+                &mut Self::SocketStateCtx<'_>,
+                &UdpSocketState<I, Self::WeakDeviceId, FakeUdpBindingsCtx<D>>,
+            ),
+        >(
+            &mut self,
+            mut cb: F,
+        ) {
+            self.outer.borrow().keys().for_each(|id| {
+                let id = UdpSocketId::from(id.clone());
+                cb(&mut self.inner, &id.get());
+            })
         }
     }
 

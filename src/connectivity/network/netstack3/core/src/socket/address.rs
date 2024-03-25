@@ -53,6 +53,11 @@ impl<A: IpAddress, W: Witness<A> + ScopeableAddress + Copy, Z> StrictlyZonedAddr
         addr
     }
 
+    /// Convert self into the inner [`ZonedAddr`] while discarding the witness.
+    pub fn into_inner_without_witness(self) -> ZonedAddr<A, Z> {
+        self.into_inner().map_addr(|addr| addr.into_addr())
+    }
+
     /// Creates from a specified IP address and an optional zone.
     ///
     /// If `addr` requires a zone, then `get_zone` will be called to provide

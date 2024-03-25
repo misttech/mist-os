@@ -3343,6 +3343,21 @@ mod tests {
         ) -> O {
             cb(&mut self.inner)
         }
+
+        fn for_each_socket<
+            F: FnMut(
+                &mut Self::SocketStateCtx<'_>,
+                &IcmpSocketState<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>,
+            ),
+        >(
+            &mut self,
+            mut cb: F,
+        ) {
+            self.outer.keys().for_each(|id| {
+                let id = IcmpSocketId::from(id.clone());
+                cb(&mut self.inner, &id.get());
+            })
+        }
     }
 
     impl<I: socket::IpExt> IcmpEchoBindingsContext<I, FakeDeviceId> for FakeIcmpBindingsCtx<I> {

@@ -11,9 +11,14 @@ use std::{collections::HashMap, convert::TryFrom as _};
 use fidl_fuchsia_posix_socket as fposix_socket;
 
 use net_declare::{fidl_mac, fidl_subnet, std_ip_v4};
+use net_types::{
+    ip::{IpAddress, Ipv4, Ipv6},
+    AddrAndPortFormatter, Witness as _,
+};
 use netstack_testing_common::{constants, get_inspect_data, realms::TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
+use test_case::test_case;
 
 #[netstack_test]
 async fn inspect_sockets(name: &str) {
@@ -71,6 +76,103 @@ async fn inspect_sockets(name: &str) {
                 TransportProtocol: "TCP",
                 NetworkProtocol: "IPv6"
             }
+        }
+    })
+}
+
+enum SocketState {
+    Bound,
+    Connected,
+}
+
+trait TestIpExt: net_types::ip::Ip {
+    const DOMAIN: fposix_socket::Domain;
+}
+
+impl TestIpExt for Ipv4 {
+    const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv4;
+}
+
+impl TestIpExt for Ipv6 {
+    const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv6;
+}
+
+#[netstack_test]
+#[test_case(
+    fposix_socket::DatagramSocketProtocol::Udp, SocketState::Bound;
+    "udp_bound"
+)]
+#[test_case(
+    fposix_socket::DatagramSocketProtocol::IcmpEcho, SocketState::Bound;
+    "icmp_bound"
+)]
+#[test_case(
+    fposix_socket::DatagramSocketProtocol::Udp, SocketState::Connected;
+    "udp_connected"
+)]
+#[test_case(
+    fposix_socket::DatagramSocketProtocol::IcmpEcho, SocketState::Connected;
+    "icmp_connected"
+)]
+async fn inspect_datagram_sockets<I: net_types::ip::Ip + TestIpExt>(
+    name: &str,
+    proto: fposix_socket::DatagramSocketProtocol,
+    socket_state: SocketState,
+) {
+    type N = netstack_testing_common::realms::Netstack3;
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+
+    // Ensure ns3 has started and that there is a Socket to collect inspect data about.
+    let socket = realm.datagram_socket(I::DOMAIN, proto).await.expect("create datagram socket");
+    const SRC_PORT: u16 = 1234;
+    const DST_PORT: u16 = 5678;
+    let addr = std::net::IpAddr::from(
+        match socket_state {
+            SocketState::Bound => I::UNSPECIFIED_ADDRESS,
+            SocketState::Connected => I::LOOPBACK_ADDRESS.get(),
+        }
+        .to_ip_addr(),
+    );
+    socket.bind(&std::net::SocketAddr::from((addr, SRC_PORT)).into()).expect("bind");
+
+    match socket_state {
+        SocketState::Connected => {
+            socket.connect(&std::net::SocketAddr::from((addr, DST_PORT)).into()).expect("connect");
+        }
+        SocketState::Bound => {}
+    }
+
+    let want_local = AddrAndPortFormatter::<_, _, I>::new(addr, SRC_PORT).to_string();
+    let want_remote = match socket_state {
+        SocketState::Connected => match proto {
+            fposix_socket::DatagramSocketProtocol::Udp => {
+                AddrAndPortFormatter::<_, _, I>::new(addr, DST_PORT).to_string()
+            }
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => addr.to_string(),
+        },
+        SocketState::Bound => "[NOT CONNECTED]".to_string(),
+    };
+    let want_proto = match proto {
+        fposix_socket::DatagramSocketProtocol::Udp => "UDP",
+        fposix_socket::DatagramSocketProtocol::IcmpEcho => "ICMP_ECHO",
+    };
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
+
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
+        Sockets: {
+            "0": {
+                LocalAddress: want_local,
+                RemoteAddress: want_remote,
+                TransportProtocol: want_proto,
+                NetworkProtocol: I::NAME,
+            },
         }
     })
 }

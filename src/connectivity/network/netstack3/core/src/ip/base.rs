@@ -3117,6 +3117,24 @@ impl<
     ) -> O {
         cb(&mut self.cast_locked())
     }
+
+    fn for_each_socket<
+        F: FnMut(&mut Self::SocketStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId, BC>),
+    >(
+        &mut self,
+        mut cb: F,
+    ) {
+        let (all_sockets, mut locked) =
+            self.read_lock_and::<crate::lock_ordering::IcmpAllSocketsSet<I>>();
+        all_sockets.keys().for_each(|id| {
+            let id = IcmpSocketId::from(id.clone());
+            let mut locked = locked.adopt(&id);
+            let (socket_state, mut restricted) = locked
+                .read_lock_with_and::<crate::lock_ordering::IcmpSocketState<I>, _>(|c| c.right());
+            let mut restricted = restricted.cast_core_ctx();
+            cb(&mut restricted, &socket_state);
+        });
+    }
 }
 
 #[cfg(test)]

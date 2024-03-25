@@ -371,6 +371,24 @@ impl<I: Ip, BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpAllSocke
         })
         .copied()
     }
+
+    fn for_each_socket<
+        F: FnMut(&mut Self::SocketStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId, BC>),
+    >(
+        &mut self,
+        mut cb: F,
+    ) {
+        let (all_sockets, mut locked) =
+            self.read_lock_and::<crate::lock_ordering::UdpAllSocketsSet<I>>();
+        all_sockets.keys().for_each(|id| {
+            let id = UdpSocketId::from(id.clone());
+            let mut locked = locked.adopt(&id);
+            let (socket_state, mut restricted) = locked
+                .read_lock_with_and::<crate::lock_ordering::UdpSocketState<I>, _>(|c| c.right());
+            let mut restricted = restricted.cast_core_ctx();
+            cb(&mut restricted, &socket_state);
+        });
+    }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
