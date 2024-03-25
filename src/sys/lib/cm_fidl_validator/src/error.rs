@@ -282,6 +282,7 @@ impl Error {
             }
             ParseError::InvalidValue => Error::invalid_field(decl_type, keyword),
             ParseError::InvalidSegment => Error::field_invalid_segment(decl_type, keyword),
+            ParseError::NoLeadingSlash => Error::invalid_field(decl_type, keyword),
         }
     }
 }

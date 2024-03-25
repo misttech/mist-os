@@ -6,6 +6,7 @@ use {
     super::config::StreamSink,
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
+    cm_types::NamespacePath,
     fidl::prelude::*,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
@@ -13,7 +14,7 @@ use {
     fuchsia_zircon as zx,
     futures::StreamExt,
     lazy_static::lazy_static,
-    namespace::{Namespace, Path},
+    namespace::Namespace,
     once_cell::unsync::OnceCell,
     socket_parsing::{NewlineChunker, NewlineChunkerError},
     std::sync::Arc,
@@ -25,7 +26,7 @@ const STDOUT_FD: i32 = 1;
 const STDERR_FD: i32 = 2;
 
 lazy_static! {
-    static ref SVC_DIRECTORY_PATH: Path = "/svc".try_into().unwrap();
+    static ref SVC_DIRECTORY_PATH: NamespacePath = "/svc".parse().unwrap();
 }
 
 /// Max size for message when draining input stream socket. This number is

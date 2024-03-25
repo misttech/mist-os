@@ -92,7 +92,7 @@ impl TryFrom<cm_rust::ChildRef> for ChildName {
     type Error = cm_types::ParseError;
 
     fn try_from(child_ref: cm_rust::ChildRef) -> Result<Self, Self::Error> {
-        Ok(Self { name: child_ref.name.try_into()?, collection: child_ref.collection })
+        Ok(Self { name: child_ref.name.parse()?, collection: child_ref.collection })
     }
 }
 

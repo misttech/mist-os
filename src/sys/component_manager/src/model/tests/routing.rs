@@ -1240,14 +1240,15 @@ async fn destroying_instance_blocks_on_routing() {
     .await;
 
     // Connect to `data` in `b`'s namespace to kick off a directory routing task.
-    let dir_proxy = capability_util::take_dir_from_namespace(&namespace, "/data").await;
+    let dir_proxy =
+        capability_util::take_dir_from_namespace(&namespace, &"/data".parse().unwrap()).await;
     let file_proxy = fuchsia_fs::directory::open_file_no_describe(
         &dir_proxy,
         "hippo",
         fio::OpenFlags::RIGHT_READABLE,
     )
     .unwrap();
-    capability_util::add_dir_to_namespace(&namespace, "/data", dir_proxy).await;
+    capability_util::add_dir_to_namespace(&namespace, &"/data".parse().unwrap(), dir_proxy).await;
 
     // Destroy `b`.
     let root = test.model.root().find_and_maybe_resolve(&Moniker::root()).await.unwrap();
@@ -3138,7 +3139,8 @@ async fn use_filtered_service_from_sibling() {
 
     // Check that instance c only has access to the filtered service instance.
     let namespace_c = test.bind_and_get_namespace(vec!["c"].try_into().unwrap()).await;
-    let dir_c = capability_util::take_dir_from_namespace(&namespace_c, "/svc").await;
+    let dir_c =
+        capability_util::take_dir_from_namespace(&namespace_c, &"/svc".parse().unwrap()).await;
     let service_dir_c = fuchsia_fs::directory::open_directory(
         &dir_c,
         "my.service.Service",
@@ -3154,11 +3156,12 @@ async fn use_filtered_service_from_sibling() {
         .collect();
     assert_eq!(entries.len(), 1);
     assert!(entries.contains("variantinstance"));
-    capability_util::add_dir_to_namespace(&namespace_c, "/svc", dir_c).await;
+    capability_util::add_dir_to_namespace(&namespace_c, &"/svc".parse().unwrap(), dir_c).await;
 
     // Check that instance d connects to the renamed instances correctly
     let namespace_d = test.bind_and_get_namespace(vec!["d"].try_into().unwrap()).await;
-    let dir_d = capability_util::take_dir_from_namespace(&namespace_d, "/svc").await;
+    let dir_d =
+        capability_util::take_dir_from_namespace(&namespace_d, &"/svc".parse().unwrap()).await;
     let service_dir_d = fuchsia_fs::directory::open_directory(
         &dir_d,
         "my.service.Service",
@@ -3174,7 +3177,7 @@ async fn use_filtered_service_from_sibling() {
         .collect();
     assert_eq!(entries.len(), 1);
     assert!(entries.contains("renamed_default"));
-    capability_util::add_dir_to_namespace(&namespace_d, "/svc", dir_d).await;
+    capability_util::add_dir_to_namespace(&namespace_d, &"/svc".parse().unwrap(), dir_d).await;
 
     let _server_handle = fasync::Task::spawn(async move {
         while let Some(echo::EchoRequest::EchoString { value, responder }) = receiver.next().await {
@@ -3273,7 +3276,8 @@ async fn use_filtered_aggregate_service_from_sibling() {
 
     // Check that instance c only has access to the filtered service instance.
     let namespace_c = test.bind_and_get_namespace(vec!["c"].try_into().unwrap()).await;
-    let dir_c = capability_util::take_dir_from_namespace(&namespace_c, "/svc").await;
+    let dir_c =
+        capability_util::take_dir_from_namespace(&namespace_c, &"/svc".parse().unwrap()).await;
     let service_dir_c = fuchsia_fs::directory::open_directory(
         &dir_c,
         "my.service.Service",
@@ -3290,7 +3294,7 @@ async fn use_filtered_aggregate_service_from_sibling() {
     assert_eq!(entries.len(), 2);
     assert!(entries.contains("variantinstance"));
     assert!(entries.contains("renamed_default"));
-    capability_util::add_dir_to_namespace(&namespace_c, "/svc", dir_c).await;
+    capability_util::add_dir_to_namespace(&namespace_c, &"/svc".parse().unwrap(), dir_c).await;
 
     let _server_handle = fasync::Task::spawn(async move {
         while let Some(echo::EchoRequest::EchoString { value, responder }) = receiver.next().await {
@@ -3507,7 +3511,7 @@ async fn route_from_while_component_is_stopping() {
     let route_and_open_fut = async {
         // Route the capability.
         let entry = output
-            .get_capability(iter::once("foo"))
+            .get_capability(iter::once(&"foo".parse().unwrap()))
             .unwrap()
             .route(crate::model::routing::router::Request {
                 availability: Availability::Required,

@@ -478,10 +478,10 @@ impl RoutingTest {
             .into_iter()
             .filter_map(|u| match u {
                 UseDecl::Directory(d) => Some(d.target_path.to_string()),
-                UseDecl::Service(s) => Some(s.target_path.dirname().into()),
-                UseDecl::Protocol(s) => Some(s.target_path.dirname().into()),
+                UseDecl::Service(s) => Some(s.target_path.parent().to_string()),
+                UseDecl::Protocol(s) => Some(s.target_path.parent().to_string()),
                 UseDecl::Storage(s) => Some(s.target_path.to_string()),
-                UseDecl::EventStream(s) => Some(s.target_path.dirname().into()),
+                UseDecl::EventStream(s) => Some(s.target_path.parent().to_string()),
                 UseDecl::Runner(s) => Some(s.source_name.to_string().into()),
                 UseDecl::Config(s) => Some(s.source_name.to_string().into()),
             })
@@ -963,8 +963,8 @@ impl RoutingTestModel for RoutingTest {
 
 /// Contains functions to use capabilities in routing tests.
 pub mod capability_util {
+    use cm_types::NamespacePath;
     use fuchsia_fs::node::OpenError;
-    use namespace::Path as NamespacePath;
 
     use {
         super::*,
@@ -980,7 +980,7 @@ pub mod capability_util {
         file: &str,
         expected_res: ExpectedResult,
     ) {
-        let path = path.to_string();
+        let path = NamespacePath::from(path);
         let dir_proxy = take_dir_from_namespace(namespace, &path).await;
         match expected_res {
             ExpectedResult::Ok => {
@@ -1036,10 +1036,10 @@ pub mod capability_util {
         path: cm_types::Path,
         expected_res: ExpectedResult,
     ) {
-        let dir_path = path.to_string();
-        let dir_proxy = take_dir_from_namespace(namespace, dir_path.as_str()).await;
+        let path = path.into();
+        let dir_proxy = take_dir_from_namespace(namespace, &path).await;
         write_hippo_file_to_directory(&dir_proxy, expected_res).await;
-        add_dir_to_namespace(namespace, dir_path.as_str(), dir_proxy).await;
+        add_dir_to_namespace(namespace, &path, dir_proxy).await;
     }
 
     pub async fn write_hippo_file_to_directory(
@@ -1168,10 +1168,12 @@ pub mod capability_util {
         namespace: &ManagedNamespace,
         path: &cm_types::Path,
     ) -> T::Proxy {
-        let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
-        let proxy = connect_to_named_protocol_at_dir_root::<T>(&dir_proxy, path.basename())
-            .expect("failed to open service");
-        add_dir_to_namespace(namespace, path.dirname(), dir_proxy).await;
+        let dirname = path.parent();
+        let dir_proxy = take_dir_from_namespace(namespace, &dirname).await;
+        let proxy =
+            connect_to_named_protocol_at_dir_root::<T>(&dir_proxy, path.basename().as_str())
+                .expect("failed to open service");
+        add_dir_to_namespace(namespace, &dirname, dir_proxy).await;
         proxy
     }
 
@@ -1181,16 +1183,17 @@ pub mod capability_util {
         instance: &str,
         member: &str,
     ) -> Result<T::Proxy, fidl::Error> {
-        let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
+        let dirname = path.parent();
+        let dir_proxy = take_dir_from_namespace(namespace, &dirname).await;
         // TODO(https://fxbug.dev/42069409): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fuchsia_fs::directory::open_directory(
             &dir_proxy,
-            path.basename(),
+            path.basename().as_str(),
             fio::OpenFlags::empty(),
         )
         .await;
-        add_dir_to_namespace(namespace, path.dirname(), dir_proxy).await;
+        add_dir_to_namespace(namespace, &dirname, dir_proxy).await;
         let service_dir = service_dir
             // `open_directory` could fail if service capability routing fails.
             .map_err(|e| match e {
@@ -1213,10 +1216,11 @@ pub mod capability_util {
         namespace: &ManagedNamespace,
         path: cm_types::Path,
     ) -> Vec<String> {
-        let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
+        let dirname = path.parent();
+        let dir_proxy = take_dir_from_namespace(namespace, &dirname).await;
         let service_dir = fuchsia_fs::directory::open_directory(
             &dir_proxy,
-            path.basename(),
+            path.basename().as_str(),
             fio::OpenFlags::empty(),
         )
         .await
@@ -1229,7 +1233,7 @@ pub mod capability_util {
             .map(|e| e.name)
             .collect();
 
-        add_dir_to_namespace(namespace, path.dirname(), dir_proxy).await;
+        add_dir_to_namespace(namespace, &dirname, dir_proxy).await;
         entries
     }
 
@@ -1317,11 +1321,14 @@ pub mod capability_util {
     /// Expects the service to work like a fuchsia.io service, and respond with
     /// an OnOpen event when opened with OPEN_FLAG_DESCRIBE.
     pub async fn call_node_svc_from_namespace(namespace: &ManagedNamespace, path: cm_types::Path) {
-        let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
-        let _node_proxy =
-            fuchsia_fs::directory::open_node(&dir_proxy, path.basename(), fio::OpenFlags::empty())
-                .await
-                .expect("failed to open node");
+        let dir_proxy = take_dir_from_namespace(namespace, &path.parent()).await;
+        let _node_proxy = fuchsia_fs::directory::open_node(
+            &dir_proxy,
+            path.basename().as_str(),
+            fio::OpenFlags::empty(),
+        )
+        .await
+        .expect("failed to open node");
     }
 
     /// Attempts to read ${path}/hippo in `moniker`'s exposed directory. The file should
@@ -1456,23 +1463,23 @@ pub mod capability_util {
 
     pub async fn take_dir_from_namespace(
         namespace: &ManagedNamespace,
-        dir_path: &str,
+        dir_path: &NamespacePath,
     ) -> fio::DirectoryProxy {
         let mut ns = namespace.lock().await;
-        ns.remove(&NamespacePath::new(dir_path).unwrap()).unwrap().into_proxy().unwrap()
+        ns.remove(dir_path).unwrap().into_proxy().unwrap()
     }
 
     /// Adds `dir_proxy` back to the namespace. Useful for restoring the namespace after a call
     /// to `take_dir_from_namespace`.
     pub async fn add_dir_to_namespace(
         namespace: &ManagedNamespace,
-        dir_path: &str,
+        path: &NamespacePath,
         dir_proxy: fio::DirectoryProxy,
     ) {
         let mut ns = namespace.lock().await;
         // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
         let client_end = ClientEnd::new(dir_proxy.into_channel().unwrap().into_zx_channel());
-        ns.add(&NamespacePath::new(dir_path).unwrap(), client_end).unwrap();
+        ns.add(path, client_end).unwrap();
     }
 
     /// Open the exposed dir for `moniker`.
@@ -1506,11 +1513,9 @@ pub mod capability_util {
         }
     }
 
-    /// Function to convert a cm_types::Path to a pseudo_fs_mt::Path
+    /// Function to convert a [cm_types::Path] to a [vfs::path::Path]
     fn to_fvfs_path(path: &cm_types::Path) -> vfs::path::Path {
-        let full_path = format!("{}/{}", path.dirname(), path.basename());
-        let split_string = full_path.split('/').filter(|s| !s.is_empty()).collect::<Vec<_>>();
-        vfs::path::Path::validate_and_split(split_string.join("/"))
+        vfs::path::Path::validate_and_split(path.to_string())
             .expect("Failed to validate and split path")
     }
 }

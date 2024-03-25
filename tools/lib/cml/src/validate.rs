@@ -515,14 +515,12 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     capability_id.type_str()
                 )));
             }
-            let dir = match capability_id.get_dir_path() {
-                Some(d) => d,
-                None => continue,
-            };
+            let dir = capability_id.get_dir_path();
 
             // Capability paths must not conflict with `/pkg`, or namespace generation might fail
-            if let Some(path) = capability_id.get_dir_path() {
-                if path == Path::new("/pkg") || path.starts_with("/pkg/") {
+            let pkg_path = cm_types::NamespacePath::new("/pkg").unwrap();
+            if let Some(ref dir) = dir {
+                if dir.has_prefix(&pkg_path) {
                     return Err(Error::validate(format!(
                         "{} \"{}\" conflicts with the protected path \"/pkg\", please use this capability with a different path",
                         capability_id.type_str(), capability_id,
@@ -536,9 +534,11 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 if capability_id == *used_id {
                     continue;
                 }
-                let used_dir = match used_id.get_dir_path() {
-                    Some(d) => d,
-                    None => continue,
+                let Some(ref dir) = dir else {
+                    continue;
+                };
+                let Some(used_dir) = used_id.get_dir_path() else {
+                    continue;
                 };
 
                 if match (used_id, &capability_id) {
@@ -547,7 +547,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     | (CapabilityId::UsedStorage(_), CapabilityId::UsedDirectory(_))
                     | (CapabilityId::UsedDirectory(_), CapabilityId::UsedDirectory(_))
                     | (CapabilityId::UsedStorage(_), CapabilityId::UsedStorage(_)) => {
-                        dir == used_dir || dir.starts_with(used_dir) || used_dir.starts_with(dir)
+                        dir.has_prefix(&used_dir) || used_dir.has_prefix(&dir)
                     }
 
                     // Protocols and services can't overlap with directories or storage.
@@ -555,13 +555,13 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     | (CapabilityId::UsedStorage(_), _)
                     | (_, CapabilityId::UsedDirectory(_))
                     | (_, CapabilityId::UsedStorage(_)) => {
-                        dir == used_dir || dir.starts_with(used_dir) || used_dir.starts_with(dir)
+                        dir.has_prefix(&used_dir) || used_dir.has_prefix(&dir)
                     }
 
                     // Protocols and services containing directories may be same, but
                     // partial overlap is disallowed.
                     (_, _) => {
-                        dir != used_dir && (dir.starts_with(used_dir) || used_dir.starts_with(dir))
+                        *dir != used_dir && (dir.has_prefix(&used_dir) || used_dir.has_prefix(&dir))
                     }
                 } {
                     return Err(Error::validate(format!(
@@ -5691,7 +5691,7 @@ mod tests {
                 "capabilities": [
                     {
                         "protocol": "foo",
-                        "path": "/foo/?!@#$%/Bar",
+                        "path": "/foo/in.-_/Bar",
                     },
                 ]
             }),
@@ -5752,7 +5752,7 @@ mod tests {
                         "directory": "foo",
                         "path": "/foo",
                         "rights": ["r*"],
-                        "subdir": "?!@#$%/Bar",
+                        "subdir": "Baz/Bar",
                     },
                 ]
             }),

@@ -156,7 +156,7 @@ impl RouteValidator {
             let exposes = routing::aggregate_exposes(resolved.decl().exposes.iter());
             let expose_requests = exposes.into_iter().map(|(target_name, e)| {
                 let target = fsys::RouteTarget {
-                    name: target_name.into(),
+                    name: target_name.to_string(),
                     decl_type: fsys::DeclType::Expose,
                 };
                 let request = e.into();
@@ -205,12 +205,12 @@ impl RouteValidator {
                         let matching_requests: Vec<_> = exposes
                             .into_iter()
                             .filter_map(|(target_name, e)| {
-                                if !target_name.contains(&target.name) {
+                                if !target_name.as_str().contains(&target.name) {
                                     return None;
                                 }
                                 // This could be a fuzzy match so update the capability name.
                                 let target = fsys::RouteTarget {
-                                    name: target_name.into(),
+                                    name: target_name.to_string(),
                                     decl_type: target.decl_type,
                                 };
                                 let request = e.into();
@@ -1047,7 +1047,7 @@ mod tests {
             ns.sort();
             assert_eq!(ns.len(), 2);
             let ns = ns.remove(1);
-            assert_eq!(ns.path.as_str(), "/svc");
+            assert_eq!(ns.path.to_string(), "/svc");
             let svc_dir = ns.directory.into_proxy().unwrap();
             fuchsia_fs::directory::open_directory(&svc_dir, "foo.bar", fio::OpenFlags::empty())
                 .await

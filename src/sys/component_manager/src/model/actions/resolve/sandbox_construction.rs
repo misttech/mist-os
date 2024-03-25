@@ -77,7 +77,7 @@ impl ComponentInput {
 
     pub fn insert_capability<'a>(
         &self,
-        path: impl Iterator<Item = &'a str>,
+        path: impl Iterator<Item = &'a Name>,
         capability: Capability,
     ) {
         self.capabilities.insert_capability(path, capability.into())
@@ -262,8 +262,7 @@ fn extend_dict_with_capability(
                 },
                 component.policy_checker().clone(),
             );
-            program_output_dict
-                .insert_capability(iter::once(capability.name().as_str()), router.into());
+            program_output_dict.insert_capability(iter::once(capability.name()), router.into());
         }
         cm_rust::CapabilityDecl::Dictionary(d) => {
             extend_dict_with_dictionary(
@@ -337,8 +336,8 @@ fn extend_dict_with_dictionary(
     } else {
         Router::new_ok(dict.clone())
     };
-    declared_dictionaries.insert_capability(iter::once(decl.name.as_str()), dict.into());
-    program_output_dict.insert_capability(iter::once(decl.name.as_str()), router.into());
+    declared_dictionaries.insert_capability(iter::once(&decl.name), dict.into());
+    program_output_dict.insert_capability(iter::once(&decl.name), router.into());
 }
 
 fn build_environment(
@@ -355,7 +354,7 @@ fn build_environment(
     for debug_registration in &environment_decl.debug_capabilities {
         let cm_rust::DebugRegistration::Protocol(debug_protocol) = debug_registration;
         let source_path =
-            SeparatedPath { dirname: None, basename: debug_protocol.source_name.to_string() };
+            SeparatedPath { dirname: None, basename: debug_protocol.source_name.clone() };
         let router = match &debug_protocol.source {
             cm_rust::RegistrationSource::Parent => {
                 use_from_parent_router(component_input, source_path, component.as_weak())
@@ -385,7 +384,7 @@ fn build_environment(
         };
         environment
             .debug_capabilities
-            .insert_capability(iter::once(debug_protocol.target_name.as_str()), router.into());
+            .insert_capability(iter::once(&debug_protocol.target_name), router.into());
     }
     environment
 }
@@ -542,7 +541,7 @@ fn extend_dict_with_use(
         }
         cm_rust::UseSource::Debug => {
             component_input.environment.debug_capabilities.get_router_or_error(
-                iter::once(use_protocol.source_name.as_str()),
+                iter::once(&use_protocol.source_name),
                 RoutingError::use_from_environment_not_found(
                     &component.moniker,
                     "protocol",
@@ -650,7 +649,7 @@ fn extend_dict_with_offer(
             "duplicate sources for protocol {} in a dict, unable to populate dict entry",
             target_name
         );
-        target_dict.remove_capability(iter::once(target_name.as_str()));
+        target_dict.remove_capability(iter::once(target_name));
         return;
     }
     let router = match offer.source() {
@@ -719,7 +718,7 @@ fn extend_dict_with_offer(
         cm_rust::OfferSource::Collection(_name) => return,
     };
     target_dict.insert_capability(
-        iter::once(target_name.as_str()),
+        iter::once(target_name),
         router.with_availability(*offer.availability()).into(),
     );
 }
@@ -807,7 +806,7 @@ fn extend_dict_with_expose(
         cm_rust::ExposeSource::Collection(_name) => return,
     };
     target_dict.insert_capability(
-        iter::once(target_name.as_str()),
+        iter::once(target_name),
         router.with_availability(*expose.availability()).into(),
     );
 }

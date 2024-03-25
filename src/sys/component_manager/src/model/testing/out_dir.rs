@@ -62,7 +62,7 @@ impl OutDir {
         // Add any external files.
         for (path, entry) in self.paths.iter() {
             let path = path.split();
-            let path = path.iter().map(|x| x as &str).collect::<Vec<_>>();
+            let path = path.iter().map(|x| x.as_str()).collect::<Vec<_>>();
             tree.add_entry(&path, entry.clone())?;
         }
 

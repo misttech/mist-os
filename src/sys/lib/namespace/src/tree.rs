@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{path::Path, NamespaceError};
+use crate::NamespaceError;
+use cm_types::{IterablePath, Name, NamespacePath};
 use std::collections::BTreeMap;
 
 /// A tree representation of a namespace.
@@ -19,7 +20,7 @@ impl<T> Tree<T> {
         Tree { root: Node::Internal(BTreeMap::new()) }
     }
 
-    pub fn add(self: &mut Self, path: &Path, thing: T) -> Result<&mut T, NamespaceError> {
+    pub fn add(self: &mut Self, path: &NamespacePath, thing: T) -> Result<&mut T, NamespaceError> {
         let names = path.split();
         self.root.add(names.into_iter(), thing).map_err(|e| match e {
             AddError::Shadow => NamespaceError::Shadow(path.clone()),
@@ -27,23 +28,23 @@ impl<T> Tree<T> {
         })
     }
 
-    pub fn get_mut(&mut self, path: &Path) -> Option<&mut T> {
+    pub fn get_mut(&mut self, path: &NamespacePath) -> Option<&mut T> {
         self.root.get_mut(path.iter_segments())
     }
 
-    pub fn get(&self, path: &Path) -> Option<&T> {
+    pub fn get(&self, path: &NamespacePath) -> Option<&T> {
         self.root.get(path.iter_segments())
     }
 
-    pub fn remove(&mut self, path: &Path) -> Option<T> {
+    pub fn remove(&mut self, path: &NamespacePath) -> Option<T> {
         self.root.remove(path.iter_segments().peekable())
     }
 
-    pub fn flatten(self) -> Vec<(Path, T)> {
+    pub fn flatten(self) -> Vec<(NamespacePath, T)> {
         self.root
             .flatten()
             .into_iter()
-            .map(|(path, thing)| (Path::new(path).unwrap(), thing))
+            .map(|(path, thing)| (NamespacePath::new(path).unwrap(), thing))
             .collect()
     }
 
@@ -66,7 +67,7 @@ impl<T: Clone> Clone for Tree<T> {
 
 #[derive(Debug)]
 enum Node<T> {
-    Internal(BTreeMap<String, Node<T>>),
+    Internal(BTreeMap<Name, Node<T>>),
     Leaf(T),
 }
 
@@ -76,7 +77,7 @@ enum AddError {
 }
 
 impl<T> Node<T> {
-    fn add(&mut self, mut path: std::vec::IntoIter<String>, thing: T) -> Result<&mut T, AddError> {
+    fn add(&mut self, mut path: std::vec::IntoIter<Name>, thing: T) -> Result<&mut T, AddError> {
         match path.next() {
             Some(name) => match self {
                 Node::Leaf(_) => Err(AddError::Shadow),
@@ -146,26 +147,25 @@ impl<T> Node<T> {
         }
     }
 
-    fn remove<I, V>(&mut self, mut path: std::iter::Peekable<I>) -> Option<T>
+    fn remove<'a, I>(&mut self, mut path: std::iter::Peekable<I>) -> Option<T>
     where
-        I: Iterator<Item = V>,
-        V: AsRef<str> + std::hash::Hash + std::cmp::Eq,
+        I: Iterator<Item = &'a Name>,
     {
         match path.next() {
             Some(name) => match self {
                 Node::Leaf(_) => None,
                 Node::Internal(children) => {
                     if path.peek().is_none() {
-                        match children.remove(name.as_ref()) {
+                        match children.remove(name) {
                             Some(Node::Leaf(n)) => Some(n),
                             Some(Node::Internal(c)) => {
-                                children.insert(name.as_ref().to_owned(), Node::Internal(c));
+                                children.insert(name.clone(), Node::Internal(c));
                                 return None;
                             }
                             None => None,
                         }
                     } else {
-                        match children.get_mut(name.as_ref()) {
+                        match children.get_mut(name.as_str()) {
                             Some(node) => node.remove(path),
                             None => None,
                         }
@@ -214,8 +214,11 @@ impl<T> Node<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::path::ns_path;
     use assert_matches::assert_matches;
+
+    fn ns_path(str: &str) -> NamespacePath {
+        str.parse().unwrap()
+    }
 
     #[test]
     fn test_add() {
@@ -243,11 +246,11 @@ mod tests {
         tree.add(&ns_path("/"), 1).unwrap();
         assert_matches!(
             tree.add(&ns_path("/"), 2),
-            Err(NamespaceError::Duplicate(path)) if path.as_str() == "/"
+            Err(NamespaceError::Duplicate(path)) if path.to_string() == "/"
         );
         assert_matches!(
             tree.add(&ns_path("/a"), 3),
-            Err(NamespaceError::Shadow(path)) if path.as_str() == "/a"
+            Err(NamespaceError::Shadow(path)) if path.to_string() == "/a"
         );
     }
 
@@ -305,11 +308,11 @@ mod tests {
         let mut entries = tree.flatten();
         entries.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         assert_eq!(entries.len(), 3);
-        assert_eq!(entries[0].0.as_str(), "/a/b/c");
+        assert_eq!(entries[0].0.to_string(), "/a/b/c");
         assert_eq!(entries[0].1, 1);
-        assert_eq!(entries[1].0.as_str(), "/b/c/d/e");
+        assert_eq!(entries[1].0.to_string(), "/b/c/d/e");
         assert_eq!(entries[1].1, 2);
-        assert_eq!(entries[2].0.as_str(), "/b/c/e/f");
+        assert_eq!(entries[2].0.to_string(), "/b/c/e/f");
         assert_eq!(entries[2].1, 3);
     }
 
@@ -319,7 +322,7 @@ mod tests {
         tree.add(&ns_path("/"), 1).unwrap();
         let entries = tree.flatten();
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].0.as_str(), "/");
+        assert_eq!(entries[0].0.to_string(), "/");
         assert_eq!(entries[0].1, 1);
     }
 

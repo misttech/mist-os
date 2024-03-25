@@ -4793,7 +4793,7 @@ mod tests {
                     fdecl::Use::Service(fdecl::UseService {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         source_name: Some(format!("{}", "a".repeat(256))),
-                        target_path: Some(format!("/s/{}", "b".repeat(1024))),
+                        target_path: Some("/a".repeat(2048)),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
                     }),
@@ -4801,21 +4801,21 @@ mod tests {
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         source_name: Some(format!("{}", "a".repeat(256))),
-                        target_path: Some(format!("/p/{}", "c".repeat(1024))),
+                        target_path: Some("/b".repeat(2048)),
                         ..Default::default()
                     }),
                     fdecl::Use::Directory(fdecl::UseDirectory {
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         source_name: Some(format!("{}", "a".repeat(256))),
-                        target_path: Some(format!("/d/{}", "d".repeat(1024))),
+                        target_path: Some("/c".repeat(2048)),
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
                         ..Default::default()
                     }),
                     fdecl::Use::Storage(fdecl::UseStorage {
                         source_name: Some("cache".to_string()),
-                        target_path: Some(format!("/{}", "e".repeat(1024))),
+                        target_path: Some("/d".repeat(2048)),
                         ..Default::default()
                     }),
                 ]);
@@ -8507,17 +8507,17 @@ mod tests {
                 decl.capabilities = Some(vec![
                     fdecl::Capability::Service(fdecl::Service {
                         name: Some("a".repeat(256)),
-                        source_path: Some(format!("/{}", "c".repeat(1024))),
+                        source_path: Some("/c".repeat(2048)),
                         ..Default::default()
                     }),
                     fdecl::Capability::Protocol(fdecl::Protocol {
                         name: Some("a".repeat(256)),
-                        source_path: Some(format!("/{}", "c".repeat(1024))),
+                        source_path: Some("/c".repeat(2048)),
                         ..Default::default()
                     }),
                     fdecl::Capability::Directory(fdecl::Directory {
                         name: Some("a".repeat(256)),
-                        source_path: Some(format!("/{}", "c".repeat(1024))),
+                        source_path: Some("/c".repeat(2048)),
                         rights: Some(fio::Operations::CONNECT),
                         ..Default::default()
                     }),
@@ -8534,12 +8534,12 @@ mod tests {
                     }),
                     fdecl::Capability::Runner(fdecl::Runner {
                         name: Some("a".repeat(256)),
-                        source_path: Some(format!("/{}", "c".repeat(1024))),
+                        source_path: Some("/c".repeat(2048)),
                         ..Default::default()
                     }),
                     fdecl::Capability::Resolver(fdecl::Resolver {
                         name: Some("a".repeat(256)),
-                        source_path: Some(format!("/{}", "b".repeat(1024))),
+                        source_path: Some("/c".repeat(2048)),
                         ..Default::default()
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {

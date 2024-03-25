@@ -16,6 +16,7 @@ use {
     },
     async_trait::async_trait,
     bedrock_error::BedrockError,
+    cm_types::Name,
     cm_util::WeakTaskGroup,
     fidl::{
         endpoints::{ProtocolMarker, RequestStream},
@@ -38,41 +39,39 @@ pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::Requ
     P::RequestStream::from_channel(channel)
 }
 
-// TODO: use the `Name` type in `Dict`, so that Dicts aren't holding duplicate strings.
-
 pub trait DictExt {
-    fn get_or_insert_sub_dict<'a>(&self, path: impl Iterator<Item = &'a str>) -> Dict;
+    fn get_or_insert_sub_dict<'a>(&self, path: impl Iterator<Item = &'a Name>) -> Dict;
 
     /// Returns the capability at the path, if it exists. Returns `None` if path is empty.
-    fn get_capability<'a>(&self, path: impl Iterator<Item = &'a str>) -> Option<Capability>;
+    fn get_capability<'a>(&self, path: impl Iterator<Item = &'a Name>) -> Option<Capability>;
 
     /// Attempts to walk `path` in `self` until a router is found. If one is, it is then downscoped
     /// to the remaining path. If a router is not found, then a router is returned which will
     /// unconditionally fail routing requests with `error`.
     fn get_router_or_error<'a>(
         &self,
-        path: impl DoubleEndedIterator<Item = &'a str>,
+        path: impl DoubleEndedIterator<Item = &'a Name>,
         error: RoutingError,
     ) -> Router;
 
     /// Inserts the capability at the path. Intermediary dictionaries are created as needed.
-    fn insert_capability<'a>(&self, path: impl Iterator<Item = &'a str>, capability: Capability);
+    fn insert_capability<'a>(&self, path: impl Iterator<Item = &'a Name>, capability: Capability);
 
     /// Removes the capability at the path, if it exists.
-    fn remove_capability<'a>(&self, path: impl Iterator<Item = &'a str>);
+    fn remove_capability<'a>(&self, path: impl Iterator<Item = &'a Name>);
 
     /// Looks up the element at `path`. When encountering an intermediate router, use `request`
     /// to request the underlying capability from it. In contrast, `get_capability` will return
     /// `None`.
     async fn get_with_request<'a>(
         &self,
-        path: impl Iterator<Item = &'a str>,
+        path: impl Iterator<Item = &'a Name>,
         request: Request,
     ) -> Result<Option<Capability>, BedrockError>;
 }
 
 impl DictExt for Dict {
-    fn get_or_insert_sub_dict<'a>(&self, mut path: impl Iterator<Item = &'a str>) -> Dict {
+    fn get_or_insert_sub_dict<'a>(&self, mut path: impl Iterator<Item = &'a Name>) -> Dict {
         let Some(next_name) = path.next() else { return self.clone() };
         let sub_dict: Dict = self
             .lock_entries()
@@ -84,7 +83,7 @@ impl DictExt for Dict {
         sub_dict.get_or_insert_sub_dict(path)
     }
 
-    fn get_capability<'a>(&self, mut path: impl Iterator<Item = &'a str>) -> Option<Capability> {
+    fn get_capability<'a>(&self, mut path: impl Iterator<Item = &'a Name>) -> Option<Capability> {
         let Some(mut current_name) = path.next() else { return Some(self.clone().into()) };
         let mut current_dict = self.clone();
         loop {
@@ -93,13 +92,13 @@ impl DictExt for Dict {
                     // Lifetimes are weird here with the MutexGuard, so we do this in two steps
                     let sub_dict = current_dict
                         .lock_entries()
-                        .get(&current_name.to_string())
+                        .get(current_name.as_str())
                         .and_then(|value| value.clone().to_dictionary())?;
                     current_dict = sub_dict;
 
                     current_name = next_name;
                 }
-                None => return current_dict.lock_entries().get(&current_name.to_string()).cloned(),
+                None => return current_dict.lock_entries().get(current_name.as_str()).cloned(),
             }
         }
     }
@@ -109,7 +108,7 @@ impl DictExt for Dict {
     /// unconditionally fail routing requests with `error`.
     fn get_router_or_error<'a>(
         &self,
-        mut path: impl DoubleEndedIterator<Item = &'a str>,
+        mut path: impl DoubleEndedIterator<Item = &'a Name>,
         error: RoutingError,
     ) -> Router {
         let mut current = self.clone();
@@ -126,7 +125,7 @@ impl DictExt for Dict {
 
     fn insert_capability<'a>(
         &self,
-        mut path: impl Iterator<Item = &'a str>,
+        mut path: impl Iterator<Item = &'a Name>,
         capability: Capability,
     ) {
         let mut current_name = path.next().expect("path must be non-empty");
@@ -154,7 +153,7 @@ impl DictExt for Dict {
         }
     }
 
-    fn remove_capability<'a>(&self, mut path: impl Iterator<Item = &'a str>) {
+    fn remove_capability<'a>(&self, mut path: impl Iterator<Item = &'a Name>) {
         let mut current_name = path.next().expect("path must be non-empty");
         let mut current_dict = self.clone();
         loop {
@@ -162,7 +161,7 @@ impl DictExt for Dict {
                 Some(next_name) => {
                     let sub_dict = current_dict
                         .lock_entries()
-                        .get(&current_name.to_string())
+                        .get(current_name.as_str())
                         .and_then(|value| value.clone().to_dictionary());
                     if sub_dict.is_none() {
                         // The capability doesn't exist, there's nothing to remove.
@@ -172,7 +171,7 @@ impl DictExt for Dict {
                     current_name = next_name;
                 }
                 None => {
-                    current_dict.lock_entries().remove(&current_name.to_string());
+                    current_dict.lock_entries().remove(current_name.as_str());
                     return;
                 }
             }
@@ -181,7 +180,7 @@ impl DictExt for Dict {
 
     async fn get_with_request<'a>(
         &self,
-        path: impl Iterator<Item = &'a str>,
+        path: impl Iterator<Item = &'a Name>,
         request: Request,
     ) -> Result<Option<Capability>, BedrockError> {
         let mut current_capability: Capability = self.clone().into();
@@ -190,7 +189,7 @@ impl DictExt for Dict {
             let Capability::Dictionary(current_dict) = &current_capability else { return Ok(None) };
 
             // Get the capability.
-            let capability = current_dict.lock_entries().get(&next_name.to_string()).cloned();
+            let capability = current_dict.lock_entries().get(next_name.as_str()).cloned();
 
             // The capability doesn't exist.
             let Some(capability) = capability else { return Ok(None) };
@@ -339,58 +338,82 @@ pub mod tests {
         test_dict.lock_entries().insert("foo".to_string(), Capability::Dictionary(sub_dict));
 
         assert!(test_dict.get_capability(iter::empty()).is_some());
-        assert!(test_dict.get_capability(iter::once("nonexistent")).is_none());
-        assert!(test_dict.get_capability(iter::once("foo")).is_some());
-        assert!(test_dict.get_capability(["foo", "bar"].into_iter()).is_some());
-        assert!(test_dict.get_capability(["foo", "nonexistent"].into_iter()).is_none());
-        assert!(test_dict.get_capability(["foo", "baz"].into_iter()).is_some());
+        assert!(test_dict.get_capability(iter::once(&"nonexistent".parse().unwrap())).is_none());
+        assert!(test_dict.get_capability(iter::once(&"foo".parse().unwrap())).is_some());
+        assert!(test_dict
+            .get_capability([&"foo".parse().unwrap(), &"bar".parse().unwrap()].into_iter())
+            .is_some());
+        assert!(test_dict
+            .get_capability([&"foo".parse().unwrap(), &"nonexistent".parse().unwrap()].into_iter())
+            .is_none());
+        assert!(test_dict
+            .get_capability([&"foo".parse().unwrap(), &"baz".parse().unwrap()].into_iter())
+            .is_some());
     }
 
     #[fuchsia::test]
     async fn insert_capability() {
         let test_dict = Dict::new();
-        test_dict.insert_capability(["foo", "bar"].into_iter(), Dict::new().into());
-        assert!(test_dict.get_capability(["foo", "bar"].into_iter()).is_some());
+        test_dict.insert_capability(
+            [&"foo".parse().unwrap(), &"bar".parse().unwrap()].into_iter(),
+            Dict::new().into(),
+        );
+        assert!(test_dict
+            .get_capability([&"foo".parse().unwrap(), &"bar".parse().unwrap()].into_iter())
+            .is_some());
 
         let (_, sender) = Receiver::new();
-        test_dict.insert_capability(["foo", "baz"].into_iter(), sender.into());
-        assert!(test_dict.get_capability(["foo", "baz"].into_iter()).is_some());
+        test_dict.insert_capability(
+            [&"foo".parse().unwrap(), &"baz".parse().unwrap()].into_iter(),
+            sender.into(),
+        );
+        assert!(test_dict
+            .get_capability([&"foo".parse().unwrap(), &"baz".parse().unwrap()].into_iter())
+            .is_some());
     }
 
     #[fuchsia::test]
     async fn remove_capability() {
         let test_dict = Dict::new();
-        test_dict.insert_capability(["foo", "bar"].into_iter(), Dict::new().into());
-        assert!(test_dict.get_capability(["foo", "bar"].into_iter()).is_some());
+        test_dict.insert_capability(
+            [&"foo".parse().unwrap(), &"bar".parse().unwrap()].into_iter(),
+            Dict::new().into(),
+        );
+        assert!(test_dict
+            .get_capability([&"foo".parse().unwrap(), &"bar".parse().unwrap()].into_iter())
+            .is_some());
 
-        test_dict.remove_capability(["foo", "bar"].into_iter());
-        assert!(test_dict.get_capability(["foo", "bar"].into_iter()).is_none());
-        assert!(test_dict.get_capability(["foo"].into_iter()).is_some());
+        test_dict.remove_capability([&"foo".parse().unwrap(), &"bar".parse().unwrap()].into_iter());
+        assert!(test_dict
+            .get_capability([&"foo".parse().unwrap(), &"bar".parse().unwrap()].into_iter())
+            .is_none());
+        assert!(test_dict.get_capability([&"foo".parse().unwrap()].into_iter()).is_some());
 
-        test_dict.remove_capability(iter::once("foo"));
-        assert!(test_dict.get_capability(["foo"].into_iter()).is_none());
+        test_dict.remove_capability(iter::once(&"foo".parse().unwrap()));
+        assert!(test_dict.get_capability([&"foo".parse().unwrap()].into_iter()).is_none());
     }
 
     #[fuchsia::test]
     async fn get_with_request_ok() {
         let bar = Dict::new();
         let data = Data::String("hello".to_owned());
-        bar.insert_capability(iter::once("data"), data.into());
+        bar.insert_capability(iter::once(&"data".parse().unwrap()), data.into());
         // Put bar behind a few layers of Router for good measure.
         let bar_router = Router::new_ok(bar);
         let bar_router = Router::new_ok(bar_router);
         let bar_router = Router::new_ok(bar_router);
 
         let foo = Dict::new();
-        foo.insert_capability(iter::once("bar"), bar_router.into());
+        foo.insert_capability(iter::once(&"bar".parse().unwrap()), bar_router.into());
         let foo_router = Router::new_ok(foo);
 
         let dict = Dict::new();
-        dict.insert_capability(iter::once("foo"), foo_router.into());
+        dict.insert_capability(iter::once(&"foo".parse().unwrap()), foo_router.into());
 
         let cap = dict
             .get_with_request(
-                ["foo", "bar", "data"].into_iter(),
+                [&"foo".parse().unwrap(), &"bar".parse().unwrap(), &"data".parse().unwrap()]
+                    .into_iter(),
                 Request {
                     availability: Availability::Required,
                     target: WeakComponentInstance::invalid(),
@@ -404,10 +427,10 @@ pub mod tests {
     async fn get_with_request_error() {
         let dict = Dict::new();
         let foo = Router::new_error(RoutingError::SourceCapabilityIsVoid);
-        dict.insert_capability(iter::once("foo"), foo.into());
+        dict.insert_capability(iter::once(&"foo".parse().unwrap()), foo.into());
         let cap = dict
             .get_with_request(
-                ["foo", "bar"].into_iter(),
+                [&"foo".parse().unwrap(), &"bar".parse().unwrap()].into_iter(),
                 Request {
                     availability: Availability::Required,
                     target: WeakComponentInstance::invalid(),
@@ -429,7 +452,7 @@ pub mod tests {
         let dict = Dict::new();
         let cap = dict
             .get_with_request(
-                ["foo", "bar"].into_iter(),
+                [&"foo".parse().unwrap(), &"bar".parse().unwrap()].into_iter(),
                 Request {
                     availability: Availability::Required,
                     target: WeakComponentInstance::invalid(),
@@ -445,11 +468,11 @@ pub mod tests {
 
         let foo = Dict::new();
         let foo = Router::new_ok(foo);
-        dict.insert_capability(iter::once("foo"), foo.into());
+        dict.insert_capability(iter::once(&"foo".parse().unwrap()), foo.into());
 
         let cap = dict
             .get_with_request(
-                ["foo"].into_iter(),
+                [&"foo".parse().unwrap()].into_iter(),
                 Request {
                     availability: Availability::Required,
                     target: WeakComponentInstance::invalid(),
@@ -460,7 +483,7 @@ pub mod tests {
 
         let cap = dict
             .get_with_request(
-                ["foo", "bar"].into_iter(),
+                [&"foo".parse().unwrap(), &"bar".parse().unwrap()].into_iter(),
                 Request {
                     availability: Availability::Required,
                     target: WeakComponentInstance::invalid(),

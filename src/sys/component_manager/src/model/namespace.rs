@@ -100,8 +100,8 @@ fn add_pkg_directory(
     // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
     let client_end = ClientEnd::new(pkg_dir.into_channel().unwrap().into_zx_channel());
     let directory: sandbox::Directory = client_end.into();
-    let path = cm_types::Path::new(PKG_PATH.to_str().unwrap()).unwrap();
-    namespace.add_entry(Capability::Directory(directory), path.as_ref())?;
+    let path = cm_types::NamespacePath::new(PKG_PATH.to_str().unwrap()).unwrap();
+    namespace.add_entry(Capability::Directory(directory), &path)?;
     Ok(())
 }
 
@@ -162,13 +162,11 @@ async fn add_use_decls(
         };
         match use_ {
             cm_rust::UseDecl::Directory(_) | cm_rust::UseDecl::Storage(_) => {
-                namespace.add_entry(capability, target_path.as_ref())
+                namespace.add_entry(capability, &target_path.clone().into())
             }
             cm_rust::UseDecl::Protocol(_)
             | cm_rust::UseDecl::Service(_)
-            | cm_rust::UseDecl::EventStream(_) => {
-                namespace.add_object(capability, target_path.as_ref())
-            }
+            | cm_rust::UseDecl::EventStream(_) => namespace.add_object(capability, target_path),
             cm_rust::UseDecl::Runner(_) => {
                 std::process::abort();
             }

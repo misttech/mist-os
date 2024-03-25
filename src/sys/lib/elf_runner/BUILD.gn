@@ -36,6 +36,7 @@ rustc_library("elf_runner") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/component_manager/lib/logger",
+    "//src/sys/lib/cm_types",
     "//src/sys/lib/fidl-connector",
     "//src/sys/lib/moniker",
     "//src/sys/lib/namespace",

@@ -7,7 +7,7 @@ use crate::{capability::CapabilitySource, sandbox_util::DictExt};
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
 use bedrock_error::{BedrockError, Explain};
-use cm_types::Availability;
+use cm_types::{Availability, Name};
 use cm_util::TaskGroup;
 use fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt};
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -117,8 +117,8 @@ impl Router {
     /// Returns an router that requests capabilities from the specified `path` relative
     /// to the base router, i.e. attenuates the base router to the subset of capabilities
     /// that live under `path`.
-    pub fn with_path<'a>(self, path: impl DoubleEndedIterator<Item = &'a str>) -> Router {
-        let segments: Vec<_> = path.map(|s| s.to_string()).collect();
+    pub fn with_path<'a>(self, path: impl DoubleEndedIterator<Item = &'a Name>) -> Router {
+        let segments: Vec<_> = path.map(|s| s.clone()).collect();
         if segments.is_empty() {
             return self;
         }
@@ -128,13 +128,14 @@ impl Router {
             async move {
                 match router.route(request.clone()).await? {
                     Capability::Dictionary(dict) => {
-                        match dict
-                            .get_with_request(segments.iter().map(AsRef::as_ref), request.clone())
-                            .await?
-                        {
+                        match dict.get_with_request(segments.iter(), request.clone()).await? {
                             Some(cap) => cap.route(request).await,
                             None => Err(RoutingError::BedrockNotPresentInDictionary {
-                                name: segments.join("/"),
+                                name: segments
+                                    .into_iter()
+                                    .map(|s| s.to_string())
+                                    .collect::<Vec<_>>()
+                                    .join("/"),
                             }
                             .into()),
                         }
@@ -519,7 +520,7 @@ mod tests {
         dict1.lock_entries().insert("source".to_owned(), source);
 
         let base_router = Router::new_ok(dict1);
-        let downscoped_router = base_router.with_path(iter::once("source"));
+        let downscoped_router = base_router.with_path(iter::once(&"source".parse().unwrap()));
 
         let capability = downscoped_router
             .route(Request {
@@ -548,8 +549,15 @@ mod tests {
         dict4.lock_entries().insert("dict3".to_owned(), Capability::Dictionary(dict3));
 
         let base_router = Router::new_ok(dict4);
-        let downscoped_router =
-            base_router.with_path(vec!["dict3", "dict2", "dict1", "source"].into_iter());
+        let downscoped_router = base_router.with_path(
+            vec![
+                &"dict3".parse().unwrap(),
+                &"dict2".parse().unwrap(),
+                &"dict1".parse().unwrap(),
+                &"source".parse().unwrap(),
+            ]
+            .into_iter(),
+        );
 
         let capability = downscoped_router
             .route(Request {

@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use cm_types::{NamespacePath, Path};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
-use namespace::{Entry as NamespaceEntry, Namespace, NamespaceError, Path as NamespacePath, Tree};
+use namespace::{Entry as NamespaceEntry, Namespace, NamespaceError, Tree};
 use sandbox::{Capability, Dict};
 use thiserror::Error;
 use vfs::{directory::entry::serve_directory, execution_scope::ExecutionScope};
@@ -57,15 +58,15 @@ impl NamespaceBuilder {
     pub fn add_object(
         self: &mut Self,
         cap: Capability,
-        path: &NamespacePath,
+        path: &Path,
     ) -> Result<(), BuildNamespaceError> {
-        let dirname = path.dirname_ns_path();
+        let dirname = path.parent();
 
         // Get the entry, or if it doesn't exist, make an empty dictionary.
         let any = match self.entries.get(&dirname) {
             Some(dir) => dir,
             None => {
-                let dict = self.make_dict_with_not_found_logging(path.dirname().into());
+                let dict = self.make_dict_with_not_found_logging(dirname.to_string());
                 self.entries.add(&dirname, Capability::Dictionary(dict))?
             }
         };
@@ -74,16 +75,16 @@ impl NamespaceBuilder {
         // namespace entry that is not a Dict (see `add_entry`).
         let dict = match any {
             Capability::Dictionary(d) => d,
-            _ => Err(NamespaceError::Duplicate(path.clone()))?,
+            _ => Err(NamespaceError::Duplicate(path.clone().into()))?,
         };
 
         // Insert the capability into the Dict.
         {
             let mut entries = dict.lock_entries();
-            if entries.contains_key(path.basename()) {
-                return Err(NamespaceError::Duplicate(path.clone()).into());
+            if entries.contains_key(path.basename().as_str()) {
+                return Err(NamespaceError::Duplicate(path.clone().into()).into());
             }
-            entries.insert(path.basename().to_owned(), cap);
+            entries.insert(path.basename().to_string(), cap);
         }
         Ok(())
     }
@@ -173,13 +174,11 @@ mod tests {
         crate::test_util::multishot,
         anyhow::Result,
         assert_matches::assert_matches,
-        cm_types::Path,
         fidl::{endpoints::Proxy, AsHandleRef, Peered},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::directory::DirEntry,
         fuchsia_zircon as zx,
         futures::StreamExt,
-        std::str::FromStr,
     };
 
     fn open_cap() -> Capability {
@@ -188,13 +187,17 @@ mod tests {
     }
 
     fn ns_path(str: &str) -> NamespacePath {
-        Path::from_str(str).unwrap().into()
+        str.parse().unwrap()
+    }
+
+    fn path(str: &str) -> Path {
+        str.parse().unwrap()
     }
 
     fn parents_valid(paths: Vec<&str>) -> Result<(), BuildNamespaceError> {
         let mut shadow = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        for path in paths {
-            shadow.add_object(open_cap(), &ns_path(path))?;
+        for p in paths {
+            shadow.add_object(open_cap(), &path(p))?;
         }
         Ok(())
     }
@@ -209,23 +212,23 @@ mod tests {
         assert_matches!(parents_valid(vec!["/a", "/b", "/c"]), Ok(()));
 
         let mut shadow = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        shadow.add_object(open_cap(), &ns_path("/svc/foo")).unwrap();
-        assert_matches!(shadow.add_object(open_cap(), &ns_path("/svc/foo/bar")), Err(_));
+        shadow.add_object(open_cap(), &path("/svc/foo")).unwrap();
+        assert_matches!(shadow.add_object(open_cap(), &path("/svc/foo/bar")), Err(_));
 
         let mut shadow = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        shadow.add_object(open_cap(), &ns_path("/svc/foo")).unwrap();
+        shadow.add_object(open_cap(), &path("/svc/foo")).unwrap();
         assert_matches!(shadow.add_entry(open_cap(), &ns_path("/svc2")), Ok(_));
     }
 
     #[fuchsia::test]
     async fn test_duplicate_object() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_object(open_cap(), &ns_path("/svc/a")).expect("");
+        namespace.add_object(open_cap(), &path("/svc/a")).expect("");
         // Adding again will fail.
         assert_matches!(
-            namespace.add_object(open_cap(), &ns_path("/svc/a")),
+            namespace.add_object(open_cap(), &path("/svc/a")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Duplicate(path)))
-            if path.as_str() == "/svc/a"
+            if path.to_string() == "/svc/a"
         );
     }
 
@@ -237,18 +240,18 @@ mod tests {
         assert_matches!(
             namespace.add_entry(open_cap(), &ns_path("/svc/a")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Duplicate(path)))
-            if path.as_str() == "/svc/a"
+            if path.to_string() == "/svc/a"
         );
     }
 
     #[fuchsia::test]
     async fn test_duplicate_object_and_entry() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_object(open_cap(), &ns_path("/svc/a")).expect("");
+        namespace.add_object(open_cap(), &path("/svc/a")).expect("");
         assert_matches!(
             namespace.add_entry(open_cap(), &ns_path("/svc/a")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Shadow(path)))
-            if path.as_str() == "/svc/a"
+            if path.to_string() == "/svc/a"
         );
     }
 
@@ -257,11 +260,11 @@ mod tests {
     #[fuchsia::test]
     async fn test_duplicate_entry_at_object_parent() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_object(open_cap(), &ns_path("/foo/bar")).expect("");
+        namespace.add_object(open_cap(), &path("/foo/bar")).expect("");
         assert_matches!(
             namespace.add_entry(open_cap(), &ns_path("/foo")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Duplicate(path)))
-            if path.as_str() == "/foo"
+            if path.to_string() == "/foo"
         );
     }
 
@@ -273,9 +276,9 @@ mod tests {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         namespace.add_entry(open_cap(), &ns_path("/foo")).expect("");
         assert_matches!(
-            namespace.add_object(open_cap(), &ns_path("/foo/bar")),
+            namespace.add_object(open_cap(), &path("/foo/bar")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Duplicate(path)))
-            if path.as_str() == "/foo/bar"
+            if path.to_string() == "/foo/bar"
         );
     }
 
@@ -291,12 +294,12 @@ mod tests {
         let (open, receiver) = multishot();
 
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_object(Capability::Open(open), &ns_path("/svc/a")).unwrap();
+        namespace.add_object(Capability::Open(open), &path("/svc/a")).unwrap();
         let ns = namespace.serve().unwrap();
 
         let mut ns = ns.flatten();
         assert_eq!(ns.len(), 1);
-        assert_eq!(ns[0].path.as_str(), "/svc");
+        assert_eq!(ns[0].path.to_string(), "/svc");
 
         // Check that there is exactly one protocol inside the svc directory.
         let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
@@ -321,13 +324,13 @@ mod tests {
     async fn test_two_senders_in_same_namespace_entry() {
         let scope = ExecutionScope::new();
         let mut namespace = NamespaceBuilder::new(scope.clone(), ignore_not_found());
-        namespace.add_object(open_cap(), &ns_path("/svc/a")).unwrap();
-        namespace.add_object(open_cap(), &ns_path("/svc/b")).unwrap();
+        namespace.add_object(open_cap(), &path("/svc/a")).unwrap();
+        namespace.add_object(open_cap(), &path("/svc/b")).unwrap();
         let ns = namespace.serve().unwrap();
 
         let mut ns = ns.flatten();
         assert_eq!(ns.len(), 1);
-        assert_eq!(ns[0].path.as_str(), "/svc");
+        assert_eq!(ns[0].path.to_string(), "/svc");
 
         // Check that there are exactly two protocols inside the svc directory.
         let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
@@ -346,16 +349,16 @@ mod tests {
     #[fuchsia::test]
     async fn test_two_senders_in_different_namespace_entries() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_object(open_cap(), &ns_path("/svc1/a")).unwrap();
-        namespace.add_object(open_cap(), &ns_path("/svc2/b")).unwrap();
+        namespace.add_object(open_cap(), &path("/svc1/a")).unwrap();
+        namespace.add_object(open_cap(), &path("/svc2/b")).unwrap();
         let ns = namespace.serve().unwrap();
 
         let ns = ns.flatten();
         assert_eq!(ns.len(), 2);
         let (mut svc1, ns): (Vec<_>, Vec<_>) =
-            ns.into_iter().partition(|e| e.path.as_str() == "/svc1");
+            ns.into_iter().partition(|e| e.path.to_string() == "/svc1");
         let (mut svc2, _ns): (Vec<_>, Vec<_>) =
-            ns.into_iter().partition(|e| e.path.as_str() == "/svc2");
+            ns.into_iter().partition(|e| e.path.to_string() == "/svc2");
 
         // Check that there are one protocol inside each directory.
         {
@@ -381,12 +384,12 @@ mod tests {
     async fn test_not_found() {
         let (not_found_sender, mut not_found_receiver) = unbounded();
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), not_found_sender);
-        namespace.add_object(open_cap(), &ns_path("/svc/a")).unwrap();
+        namespace.add_object(open_cap(), &path("/svc/a")).unwrap();
         let ns = namespace.serve().unwrap();
 
         let mut ns = ns.flatten();
         assert_eq!(ns.len(), 1);
-        assert_eq!(ns[0].path.as_str(), "/svc");
+        assert_eq!(ns[0].path.to_string(), "/svc");
 
         let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
         let (client_end, server_end) = zx::Channel::create();

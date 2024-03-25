@@ -5,6 +5,7 @@
 use {
     crate::vdso_vmo::get_stable_vdso_vmo,
     anyhow::Context,
+    cm_types::NamespacePath,
     fidl_connector::Connect,
     fidl_fuchsia_process as fproc, fuchsia_async as fasync,
     fuchsia_runtime::{HandleInfo, HandleInfoError},
@@ -325,7 +326,7 @@ pub struct NamespaceConnector {
 #[derive(Error, Debug)]
 enum NamespaceConnectorError {
     #[error("Missing /svc in namespace: {0:?}")]
-    MissingSvcInNamespace(Vec<namespace::Path>),
+    MissingSvcInNamespace(Vec<NamespacePath>),
 }
 
 impl Connect for NamespaceConnector {
@@ -333,7 +334,7 @@ impl Connect for NamespaceConnector {
 
     fn connect(&self) -> Result<Self::Proxy, anyhow::Error> {
         lazy_static! {
-            static ref PATH: namespace::Path = "/svc".try_into().unwrap();
+            static ref PATH: NamespacePath = "/svc".parse().unwrap();
         };
         let svc = self.namespace.get(&PATH).ok_or_else(|| {
             NamespaceConnectorError::MissingSvcInNamespace(self.namespace.paths())

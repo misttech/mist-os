@@ -386,7 +386,6 @@ fn translate_use(
                         .iter()
                         .next()
                         .ok_or_else(|| Error::internal(internal_error.clone()))?
-                        .as_str()
                         .to_string(),
                     ),
                     filter: match use_.filter.clone() {

@@ -4,6 +4,7 @@
 
 //! `namespace` defines namespace types and transformations between their common representations.
 
+use cm_types::{IterablePath, NamespacePath};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as fcrunner;
@@ -14,9 +15,7 @@ use thiserror::Error;
 #[cfg(target_os = "fuchsia")]
 use std::sync::Arc;
 
-mod path;
 mod tree;
-pub use path::{Path, PathError, MAX_PATH_LENGTH};
 pub use tree::Tree;
 
 /// The namespace of a component instance.
@@ -39,10 +38,10 @@ pub enum NamespaceError {
         "path `{0}` is the parent or child of another namespace entry. \
         This is not supported."
     )]
-    Shadow(Path),
+    Shadow(NamespacePath),
 
     #[error("duplicate namespace path `{0}`")]
-    Duplicate(Path),
+    Duplicate(NamespacePath),
 
     #[error("invalid namespace entry `{0}`")]
     EntryError(#[from] EntryError),
@@ -55,18 +54,18 @@ impl Namespace {
 
     pub fn add(
         &mut self,
-        path: &Path,
+        path: &NamespacePath,
         directory: ClientEnd<fio::DirectoryMarker>,
     ) -> Result<(), NamespaceError> {
         self.tree.add(path, directory)?;
         Ok(())
     }
 
-    pub fn get(&self, path: &Path) -> Option<&ClientEnd<fio::DirectoryMarker>> {
+    pub fn get(&self, path: &NamespacePath) -> Option<&ClientEnd<fio::DirectoryMarker>> {
         self.tree.get(path)
     }
 
-    pub fn remove(&mut self, path: &Path) -> Option<ClientEnd<fio::DirectoryMarker>> {
+    pub fn remove(&mut self, path: &NamespacePath) -> Option<ClientEnd<fio::DirectoryMarker>> {
         self.tree.remove(path)
     }
 
@@ -75,7 +74,7 @@ impl Namespace {
     }
 
     /// Get a copy of the paths in the namespace.
-    pub fn paths(&self) -> Vec<Path> {
+    pub fn paths(&self) -> Vec<NamespacePath> {
         self.tree.map_ref(|_| ()).clone().flatten().into_iter().map(|(path, ())| path).collect()
     }
 }
@@ -145,7 +144,7 @@ impl TryFrom<Namespace> for vfs::tree_builder::TreeBuilder {
     fn try_from(namespace: Namespace) -> Result<Self, Self::Error> {
         let mut builder = vfs::tree_builder::TreeBuilder::empty_dir();
         for Entry { path, directory } in namespace.flatten().into_iter() {
-            let path: Vec<&str> = path.iter_segments().collect();
+            let path: Vec<&str> = path.iter_segments().map(|s| s.as_str()).collect();
             builder.add_entry(path, vfs::remote::remote_dir(directory.into_proxy().unwrap()))?;
         }
         Ok(builder)
@@ -226,7 +225,7 @@ impl TryFrom<Vec<process_builder::NamespaceEntry>> for Namespace {
 #[derive(Eq, Ord, PartialOrd, PartialEq, Debug)]
 pub struct Entry {
     /// Namespace path.
-    pub path: Path,
+    pub path: NamespacePath,
 
     /// Namespace directory handle.
     pub directory: ClientEnd<fio::DirectoryMarker>,
@@ -274,7 +273,7 @@ pub enum EntryError {
     MissingDirectory,
 
     #[error("path is invalid for a namespace entry: `{0}`")]
-    InvalidPath(#[from] PathError),
+    InvalidPath(#[from] cm_types::ParseError),
 }
 
 impl TryFrom<fcrunner::ComponentNamespaceEntry> for Entry {
@@ -282,7 +281,7 @@ impl TryFrom<fcrunner::ComponentNamespaceEntry> for Entry {
 
     fn try_from(entry: fcrunner::ComponentNamespaceEntry) -> Result<Self, Self::Error> {
         Ok(Self {
-            path: entry.path.ok_or_else(|| EntryError::MissingPath)?.try_into()?,
+            path: entry.path.ok_or_else(|| EntryError::MissingPath)?.parse()?,
             directory: entry.directory.ok_or_else(|| EntryError::MissingDirectory)?,
         })
     }
@@ -293,7 +292,7 @@ impl TryFrom<fcomponent::NamespaceEntry> for Entry {
 
     fn try_from(entry: fcomponent::NamespaceEntry) -> Result<Self, Self::Error> {
         Ok(Self {
-            path: entry.path.ok_or_else(|| EntryError::MissingPath)?.try_into()?,
+            path: entry.path.ok_or_else(|| EntryError::MissingPath)?.parse()?,
             directory: entry.directory.ok_or_else(|| EntryError::MissingDirectory)?,
         })
     }
@@ -303,7 +302,7 @@ impl TryFrom<fprocess::NameInfo> for Entry {
     type Error = EntryError;
 
     fn try_from(entry: fprocess::NameInfo) -> Result<Self, Self::Error> {
-        Ok(Self { path: entry.path.try_into()?, directory: entry.directory })
+        Ok(Self { path: entry.path.parse()?, directory: entry.directory })
     }
 }
 
@@ -319,11 +318,14 @@ impl TryFrom<process_builder::NamespaceEntry> for Entry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::path::ns_path;
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
     use zx::{AsHandleRef, Peered};
+
+    fn ns_path(str: &str) -> NamespacePath {
+        str.parse().unwrap()
+    }
 
     #[test]
     fn test_try_from_namespace() {
@@ -336,7 +338,7 @@ mod tests {
             ];
             assert_matches!(
                 Namespace::try_from(entries),
-                Err(NamespaceError::Shadow(path)) if path.as_str() == "/foo/bar"
+                Err(NamespaceError::Shadow(path)) if path.to_string() == "/foo/bar"
             );
         }
         {
@@ -348,7 +350,7 @@ mod tests {
             ];
             assert_matches!(
                 Namespace::try_from(entries),
-                Err(NamespaceError::Duplicate(path)) if path.as_str() == "/foo"
+                Err(NamespaceError::Duplicate(path)) if path.to_string() == "/foo"
             );
         }
     }
@@ -387,7 +389,7 @@ mod tests {
         let mut entries_clone = namespace_clone.flatten();
 
         async fn verify(entry: Entry) {
-            assert_eq!(entry.path.as_str(), "/data");
+            assert_eq!(entry.path.to_string(), "/data");
             let dir = entry.directory.into_proxy().unwrap();
             let file =
                 fuchsia_fs::directory::open_file(&dir, "foo/bar", fio::OpenFlags::RIGHT_READABLE)
@@ -407,7 +409,7 @@ mod tests {
         let (client_end, server_end) = fidl::endpoints::create_endpoints();
         namespace.add(&ns_path("/svc"), client_end).unwrap();
         let mut entries = namespace.flatten();
-        assert_eq!(entries[0].path.as_str(), "/svc");
+        assert_eq!(entries[0].path.to_string(), "/svc");
         entries
             .remove(0)
             .directory

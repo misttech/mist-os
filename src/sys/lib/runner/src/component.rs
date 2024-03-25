@@ -4,6 +4,7 @@
 
 use {
     async_trait::async_trait,
+    cm_types::NamespacePath,
     fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt, prelude::*},
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
@@ -15,14 +16,13 @@ use {
         stream::BoxStream,
     },
     lazy_static::lazy_static,
-    namespace::{Namespace, Path},
-    std::path::PathBuf,
+    namespace::Namespace,
     thiserror::Error,
     tracing::*,
 };
 
 lazy_static! {
-    pub static ref PKG_PATH: Path = "/pkg".try_into().unwrap();
+    pub static ref PKG_PATH: NamespacePath = "/pkg".parse().unwrap();
 }
 
 /// Object implementing this type can be killed by calling kill function.
@@ -331,7 +331,8 @@ pub async fn configure_launcher(
         .unwrap_or(job_default().create_child_job().map_err(LaunchError::JobCreation)?);
 
     // Build the command line args for the new process and send them to the launcher.
-    let bin_arg = PathBuf::from(PKG_PATH.as_str())
+    let bin_arg = PKG_PATH
+        .to_path_buf()
         .join(&config_args.bin_path)
         .to_str()
         .ok_or(LaunchError::InvalidBinaryPath(config_args.bin_path.to_string()))?

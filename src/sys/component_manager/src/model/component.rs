@@ -1728,8 +1728,9 @@ impl ResolvedInstanceState {
         capability: &CapabilityDecl,
     ) -> Option<Router> {
         let path = capability.path()?;
-        let name = capability.name().as_str();
-        let path = fuchsia_fs::canonicalize_path(path.as_str());
+        let name = capability.name();
+        let path = path.to_string();
+        let path = fuchsia_fs::canonicalize_path(&path);
         let Some(open) = component.get_outgoing().downscope_path(
             Path::validate_and_split(path).unwrap(),
             ComponentCapability::from(capability.clone()).type_name().into(),
@@ -1744,7 +1745,7 @@ impl ResolvedInstanceState {
         let sender = sandbox::Sender::new_sendable(open);
         Some(Router::new(CapabilityRequestedHook {
             source: component.as_weak(),
-            name: capability.name().clone(),
+            name: name.clone(),
             sender,
         }))
     }

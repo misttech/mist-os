@@ -167,7 +167,7 @@ fn fidl_decl_derive_impl(input: syn::DeriveInput) -> TokenStream {
                         let dirname = None;
                         BorrowedSeparatedPath {
                             dirname,
-                            basename: self.source_name.as_str(),
+                            basename: &self.source_name,
                         }
                     }
                 }
@@ -184,7 +184,7 @@ fn fidl_decl_derive_impl(input: syn::DeriveInput) -> TokenStream {
                     fn source_path(&self) -> BorrowedSeparatedPath<'_> {
                         BorrowedSeparatedPath {
                             dirname: None,
-                            basename: self.source_name.as_str(),
+                            basename: &self.source_name,
                         }
                     }
                 }

@@ -361,7 +361,7 @@ fn get_pkg_and_lib_proxy<'a>(
 ) -> Result<(&'a ClientEnd<fio::DirectoryMarker>, fio::DirectoryProxy), ComponentError> {
     // Locate the '/pkg' directory proxy previously added to the new component's namespace.
     let pkg_dir = ns
-        .get(&PKG_PATH.try_into().unwrap())
+        .get(&PKG_PATH.parse().unwrap())
         .ok_or_else(|| ComponentError::MissingPkg(url.clone()))?;
 
     let lib_proxy = fuchsia_component::directory::open_directory_no_describe(

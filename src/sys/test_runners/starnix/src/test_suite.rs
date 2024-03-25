@@ -45,7 +45,7 @@ async fn component_runner_from_start_info(
     let ns = start_info.ns.ok_or_else(|| anyhow!("start info does not have namespace"))?;
     let ns = Namespace::try_from(ns)?;
     let svc = ns
-        .get(&"/svc".try_into().unwrap())
+        .get(&"/svc".parse().unwrap())
         .ok_or_else(|| anyhow!("test component namespace does not have /svc"))?;
     return Ok(
         fuchsia_component::client::connect_to_protocol_at_dir_root::<ComponentRunnerMarker>(svc)?,

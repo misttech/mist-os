@@ -20,10 +20,7 @@ rustc_library("namespace") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/flyweights",
-    "//src/storage/lib/vfs/rust/name",
-    "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:static_assertions",
+    "//src/sys/lib/cm_types",
     "//third_party/rust_crates:thiserror",
   ]
 
@@ -44,7 +41,6 @@ rustc_library("namespace") {
 
   sources = [
     "src/lib.rs",
-    "src/path.rs",
     "src/tree.rs",
   ]
 }

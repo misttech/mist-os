@@ -89,10 +89,10 @@ pub fn add_to_processargs(
     // Take entries away from dict and install them accordingly.
     visit_map(delivery_map, dict, &mut |cap: Capability, delivery: &Delivery| match delivery {
         Delivery::NamespacedObject(path) => {
-            namespace.add_object(cap, path.as_ref()).map_err(DeliveryError::NamespaceError)
+            namespace.add_object(cap, &path).map_err(DeliveryError::NamespaceError)
         }
         Delivery::NamespaceEntry(path) => {
-            namespace.add_entry(cap, path.as_ref()).map_err(DeliveryError::NamespaceError)
+            namespace.add_entry(cap, &path.clone().into()).map_err(DeliveryError::NamespaceError)
         }
         Delivery::Handle(info) => {
             processargs.add_handles(once(translate_handle(cap, info)?));
@@ -692,7 +692,7 @@ mod tests {
             DeliveryError::NamespaceError(BuildNamespaceError::Conversion {
                 path, ..
             })
-            if path.as_ref() == "/svc"
+            if path.to_string() == "/svc"
         );
     }
 }

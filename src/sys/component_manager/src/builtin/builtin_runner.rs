@@ -347,6 +347,7 @@ impl Controllable for ElfRunnerProgram {
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
+    use cm_types::NamespacePath;
     use fcrunner::{ComponentNamespaceEntry, ComponentStartInfo};
     use fidl::endpoints::ClientEnd;
     use fidl_fuchsia_data::{Dictionary, DictionaryEntry, DictionaryValue};
@@ -356,7 +357,6 @@ mod tests {
     use fuchsia_runtime::{HandleInfo, HandleType};
     use futures::channel::{self, oneshot};
     use moniker::{Moniker, MonikerBase};
-    use namespace::Path;
     use sandbox::Directory;
     use serve_processargs::NamespaceBuilder;
 
@@ -458,7 +458,10 @@ mod tests {
         let (not_found, _) = channel::mpsc::unbounded();
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), not_found);
         namespace
-            .add_entry(Capability::Directory(Directory::new(pkg)), &Path::new("/pkg").unwrap())
+            .add_entry(
+                Capability::Directory(Directory::new(pkg)),
+                &NamespacePath::new("/pkg").unwrap(),
+            )
             .unwrap();
 
         let moniker = Moniker::try_from(vec!["signal_then_hang"]).unwrap();

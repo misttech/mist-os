@@ -178,6 +178,7 @@ mod tests {
 
         pub fn path_strategy() -> SBoxedStrategy<String> {
             ROUGH_PATH_REGEX_STR
+                .as_str()
                 .prop_filter("Length and segment must be valid", check_segment_and_length)
                 .sboxed()
         }
@@ -190,11 +191,10 @@ mod tests {
             s.split("/").all(|v| v != "." && v != ".." && v.len() <= MAX_NAME_LENGTH)
         }
 
-        const ROUGH_PATH_REGEX_STR: &str = "(/[^/\0]+)+";
-
         lazy_static! {
+            static ref ROUGH_PATH_REGEX_STR: String = format!("(/{})+", super::NAME_REGEX_STR);
             static ref ROUGH_PATH_REGEX: Regex =
-                Regex::new(&("^".to_string() + ROUGH_PATH_REGEX_STR + "$")).unwrap();
+                Regex::new(&("^".to_string() + &ROUGH_PATH_REGEX_STR + "$")).unwrap();
         }
     }
 
@@ -325,12 +325,12 @@ mod tests {
         test_identifier_path_invalid_trailing => {
             check_fn = check_path,
             input = "/foo/bar/",
-            result = Err(ErrorList::new(vec![Error::field_invalid_segment(DeclType::Child, "foo")])),
+            result = Err(ErrorList::new(vec![Error::invalid_field(DeclType::Child, "foo")])),
         },
         test_identifier_path_segment_too_long => {
             check_fn = check_path,
             input = &format!("/{}", "a".repeat(256)),
-            result = Err(ErrorList::new(vec![Error::field_too_long(DeclType::Child, "foo")])),
+            result = Err(ErrorList::new(vec![Error::field_invalid_segment(DeclType::Child, "foo")])),
         },
         test_identifier_path_too_long => {
             check_fn = check_path,

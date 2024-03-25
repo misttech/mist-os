@@ -18,7 +18,7 @@ use {
     async_trait::async_trait,
     bedrock_error::{BedrockError, Explain},
     cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl},
-    cm_types::Availability,
+    cm_types::{Availability, Name},
     fidl::epitaph::ChannelEpitaphExt,
     fuchsia_zircon as zx,
     moniker::MonikerBase,
@@ -202,10 +202,10 @@ pub async fn report_routing_failure(
 /// together.
 pub fn aggregate_exposes<'a>(
     exposes: impl Iterator<Item = &'a ExposeDecl>,
-) -> BTreeMap<&'a str, Vec<&'a ExposeDecl>> {
-    let mut out: BTreeMap<&str, Vec<&ExposeDecl>> = BTreeMap::new();
+) -> BTreeMap<&'a Name, Vec<&'a ExposeDecl>> {
+    let mut out: BTreeMap<&Name, Vec<&ExposeDecl>> = BTreeMap::new();
     for expose in exposes {
-        out.entry(expose.target_name().as_str()).or_insert(vec![]).push(expose);
+        out.entry(&expose.target_name()).or_insert(vec![]).push(expose);
     }
     out
 }

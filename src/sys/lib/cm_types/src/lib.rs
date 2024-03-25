@@ -7,14 +7,14 @@
 //! and deserialization implementations that perform the required validation.
 
 use {
-    fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     flyweights::FlyStr,
     lazy_static::lazy_static,
-    namespace::{Path as NamespacePath, PathError},
-    serde::{de, ser},
-    serde::{Deserialize, Serialize},
+    serde::{de, ser, Deserialize, Serialize},
     std::{
+        borrow::Borrow,
         cmp,
+        ffi::CString,
         fmt::{self, Display},
         iter,
         path::PathBuf,
@@ -100,6 +100,9 @@ pub enum ParseError {
     /// The string was too long.
     #[error("too long")]
     TooLong,
+    /// A required leading slash was missing.
+    #[error("no leading slash")]
+    NoLeadingSlash,
     /// The path segment is invalid.
     #[error("invalid path segment")]
     InvalidSegment,
@@ -107,7 +110,7 @@ pub enum ParseError {
 
 pub const MAX_NAME_LENGTH: usize = name::MAX_NAME_LENGTH;
 pub const MAX_LONG_NAME_LENGTH: usize = 1024;
-pub const MAX_PATH_LENGTH: usize = namespace::MAX_PATH_LENGTH;
+pub const MAX_PATH_LENGTH: usize = fio::MAX_PATH_LENGTH as usize;
 pub const MAX_URL_LENGTH: usize = 4096;
 
 /// A name that can refer to a component, collection, or other entity in the
@@ -127,27 +130,25 @@ impl<const N: usize> BoundedName<N> {
     /// following characters: `A-Z`, `a-z`, `0-9`, `_`, `.`, `-`. It may not start
     /// with `.` or `-`.
     pub fn new(name: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
-        Self::validate(name.as_ref())?;
+        {
+            let name = name.as_ref();
+            if name.is_empty() {
+                return Err(ParseError::Empty);
+            }
+            if name.len() > N {
+                return Err(ParseError::TooLong);
+            }
+            let mut char_iter = name.chars();
+            let first_char = char_iter.next().unwrap();
+            if !first_char.is_ascii_alphanumeric() && first_char != '_' {
+                return Err(ParseError::InvalidValue);
+            }
+            let valid_fn = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.';
+            if !char_iter.all(valid_fn) {
+                return Err(ParseError::InvalidValue);
+            }
+        }
         Ok(Self(FlyStr::new(name)))
-    }
-
-    pub fn validate(name: &str) -> Result<(), ParseError> {
-        if name.is_empty() {
-            return Err(ParseError::Empty);
-        }
-        if name.len() > N {
-            return Err(ParseError::TooLong);
-        }
-        let mut char_iter = name.chars();
-        let first_char = char_iter.next().unwrap();
-        if !first_char.is_ascii_alphanumeric() && first_char != '_' {
-            return Err(ParseError::InvalidValue);
-        }
-        let valid_fn = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.';
-        if !char_iter.all(valid_fn) {
-            return Err(ParseError::InvalidValue);
-        }
-        Ok(())
     }
 
     pub fn as_str(&self) -> &str {
@@ -159,12 +160,15 @@ impl<const N: usize> BoundedName<N> {
     }
 }
 
-impl<const N: usize> TryFrom<FlyStr> for BoundedName<N> {
-    type Error = ParseError;
+impl<const N: usize> AsRef<str> for BoundedName<N> {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
 
-    fn try_from(flystr: FlyStr) -> Result<Self, Self::Error> {
-        Self::validate(flystr.as_str())?;
-        Ok(Self(flystr))
+impl<const N: usize> Borrow<str> for BoundedName<N> {
+    fn borrow(&self) -> &str {
+        self.as_str()
     }
 }
 
@@ -248,19 +252,159 @@ impl<'de, const N: usize> de::Deserialize<'de> for BoundedName<N> {
     }
 }
 
-/// A filesystem path.
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Path(NamespacePath);
+/// [NamespacePath] is the same as [Path] but accepts `"/"` (which is also a valid namespace
+/// path).
+///
+/// Note that while `"/"` is accepted, `"."` (which is synonymous in fuchsia.io) is rejected.
+#[derive(Eq, Ord, PartialOrd, PartialEq, Hash, Clone)]
+pub struct NamespacePath(Option<RelativePath>);
+
+impl NamespacePath {
+    /// Like [Path::new] but `path` may be `/`.
+    pub fn new(path: impl AsRef<str>) -> Result<Self, ParseError> {
+        let path = path.as_ref();
+        if path.is_empty() {
+            return Err(ParseError::Empty);
+        }
+        if !path.starts_with('/') {
+            return Err(ParseError::NoLeadingSlash);
+        }
+        if path.len() > MAX_PATH_LENGTH {
+            return Err(ParseError::TooLong);
+        }
+        if path == "/" {
+            Ok(Self(None))
+        } else {
+            Ok(Self(Some(path[1..].parse()?)))
+        }
+    }
+
+    /// Returns the [NamespacePath] for `"/"`.
+    pub fn root() -> Self {
+        Self(None)
+    }
+
+    /// Splits the path according to `"/"`.
+    pub fn split(&self) -> Vec<Name> {
+        self.0.as_ref().map(|p| p.split()).unwrap_or_default()
+    }
+
+    pub fn to_path_buf(&self) -> PathBuf {
+        PathBuf::from(self.to_string())
+    }
+
+    /// Returns a path that represents the parent directory of this one, or None if this is a
+    /// root dir.
+    pub fn parent(&self) -> Option<Self> {
+        self.0.as_ref().map(|p| Self(p.parent()))
+    }
+
+    /// Returns whether `prefix` is a prefix of `self` in terms of path segments.
+    ///
+    /// For example:
+    /// ```
+    /// Path("/pkg/data").has_prefix("/pkg") == true
+    /// Path("/pkg_data").has_prefix("/pkg") == false
+    /// ```
+    pub fn has_prefix(&self, prefix: &Self) -> bool {
+        let my_segments = self.split();
+        let prefix_segments = prefix.split();
+        prefix_segments.into_iter().zip(my_segments.into_iter()).all(|(a, b)| a == b)
+    }
+
+    /// The last path segment, or None.
+    pub fn basename(&self) -> Option<&Name> {
+        self.0.as_ref().map(|p| p.basename())
+    }
+}
+
+impl IterablePath for NamespacePath {
+    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + '_> {
+        self.0.as_ref().map(|p| p.iter_segments()).unwrap_or_else(|| Box::new(iter::empty()))
+    }
+}
+
+impl serde::ser::Serialize for NamespacePath {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        self.to_string().serialize(serializer)
+    }
+}
+
+impl TryFrom<CString> for NamespacePath {
+    type Error = ParseError;
+
+    fn try_from(path: CString) -> Result<Self, ParseError> {
+        Self::new(path.into_string().map_err(|_| ParseError::InvalidValue)?)
+    }
+}
+
+impl From<NamespacePath> for CString {
+    fn from(path: NamespacePath) -> Self {
+        // SAFETY: in `Path::new` we already verified that there are no
+        // embedded NULs.
+        unsafe { CString::from_vec_unchecked(path.to_string().as_bytes().to_owned()) }
+    }
+}
+
+impl From<NamespacePath> for String {
+    fn from(path: NamespacePath) -> Self {
+        path.to_string()
+    }
+}
+
+impl FromStr for NamespacePath {
+    type Err = ParseError;
+
+    fn from_str(path: &str) -> Result<Self, Self::Err> {
+        Self::new(path)
+    }
+}
+
+impl fmt::Debug for NamespacePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl fmt::Display for NamespacePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(p) = &self.0 {
+            write!(f, "/{p}")
+        } else {
+            write!(f, "/")
+        }
+    }
+}
+
+/// A path type used throughout Component Framework, along with its variants [NamespacePath] and
+/// [RelativePath]. Examples of use:
+///
+/// - [NamespacePath]: Namespace paths
+/// - [Path]: Outgoing paths and namespace paths that can't be "/"
+/// - [RelativePath]: Dictionary paths and subdir paths
+///
+/// [Path] obeys the following constraints:
+///
+/// - Is a [fuchsia.io.Path](https://fuchsia.dev/reference/fidl/fuchsia.io#Directory.Open).
+/// - Begins with `/`.
+/// - Contains at least one path segment (just `/` is disallowed).
+/// - Each path segment is a [Name]. (This is strictly more constrained than a fuchsia.io
+///   path segment.)
+#[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct Path(RelativePath);
 
 impl fmt::Debug for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.0)
+        write!(f, "{}", self)
     }
 }
 
 impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "/{}", self.0)
     }
 }
 
@@ -269,73 +413,64 @@ impl ser::Serialize for Path {
     where
         S: serde::ser::Serializer,
     {
-        self.0.serialize(serializer)
+        self.to_string().serialize(serializer)
     }
 }
 
 impl Path {
-    /// Creates a [`Path`] from a [`String`], returning an `Err` if the string fails
-    /// validation. The string must be non-empty, no more than [`MAX_PATH_LENGTH`] bytes
-    /// in length, start with a leading `/`, not be exactly `/`, not have embedded NULs,
-    /// and be made up of valid fuchsia.io names. As a result, [`Path`]s are always valid
-    /// [`NamespacePath`]s.
-    pub fn new(path: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
-        match NamespacePath::new(path) {
-            Ok(path) => {
-                if path.as_ref() == "/" {
-                    // The `/` is a valid [`NamespacePath`], but the way capabilities
-                    // are installed into namespaces require [`Path`]s to always have
-                    // a parent, so `/` is an invalid [`Path`].
-                    Err(ParseError::InvalidValue)
-                } else {
-                    Ok(Path(path))
-                }
-            }
-            Err(e) => match e {
-                PathError::Empty => Err(ParseError::Empty),
-                PathError::TooLong(_) => Err(ParseError::TooLong),
-                PathError::InvalidSegment(name::ParseNameError::TooLong(_)) => {
-                    Err(ParseError::TooLong)
-                }
-                PathError::InvalidSegment(_) => Err(ParseError::InvalidSegment),
-                PathError::NotUtf8(_) | PathError::NoLeadingSlash(_) => {
-                    Err(ParseError::InvalidValue)
-                }
-            },
+    /// Creates a [`Path`] from a [`String`], returning an `Err` if the string fails validation.
+    /// The string must be non-empty, no more than [`MAX_PATH_LENGTH`] bytes in length, start with
+    /// a leading `/`, not be exactly `/`, and each segment must be a valid [`Name`]. As a result,
+    /// [`Path`]s are always valid [`NamespacePath`]s.
+    pub fn new(path: impl AsRef<str>) -> Result<Self, ParseError> {
+        let path = path.as_ref();
+        if path.is_empty() {
+            return Err(ParseError::Empty);
         }
+        if path == "/" {
+            return Err(ParseError::InvalidValue);
+        }
+        if !path.starts_with('/') {
+            return Err(ParseError::NoLeadingSlash);
+        }
+        if path.len() > MAX_PATH_LENGTH {
+            return Err(ParseError::TooLong);
+        }
+        Ok(Self(path[1..].parse()?))
     }
 
     /// Splits the path according to "/".
-    pub fn split(&self) -> Vec<String> {
+    pub fn split(&self) -> Vec<Name> {
         self.0.split()
     }
 
-    pub fn as_str(&self) -> &str {
-        &self.0.as_str()
-    }
-
     pub fn to_path_buf(&self) -> PathBuf {
-        PathBuf::from(self.0.to_string())
+        PathBuf::from(self.to_string())
     }
 
-    pub fn dirname(&self) -> &str {
-        self.0.dirname()
+    /// Returns a path that represents the parent directory of this one. Returns [NamespacePath]
+    /// instead of [Path] because the parent could be the root dir.
+    pub fn parent(&self) -> NamespacePath {
+        match self.0.parent() {
+            p @ Some(_) => NamespacePath(p),
+            None => NamespacePath::root(),
+        }
     }
 
-    pub fn basename(&self) -> &str {
+    pub fn basename(&self) -> &Name {
         self.0.basename()
     }
 }
 
 impl IterablePath for Path {
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
+    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + '_> {
         Box::new(self.0.iter_segments())
     }
 }
 
 impl From<Path> for NamespacePath {
     fn from(value: Path) -> Self {
-        value.0
+        Self(Some(value.0))
     }
 }
 
@@ -347,15 +482,25 @@ impl FromStr for Path {
     }
 }
 
-impl AsRef<NamespacePath> for Path {
-    fn as_ref(&self) -> &NamespacePath {
-        &self.0
+impl TryFrom<CString> for Path {
+    type Error = ParseError;
+
+    fn try_from(path: CString) -> Result<Self, ParseError> {
+        Self::new(path.into_string().map_err(|_| ParseError::InvalidValue)?)
+    }
+}
+
+impl From<Path> for CString {
+    fn from(path: Path) -> Self {
+        // SAFETY: in `Path::new` we already verified that there are no
+        // embedded NULs.
+        unsafe { CString::from_vec_unchecked(path.to_string().as_bytes().to_owned()) }
     }
 }
 
 impl From<Path> for String {
     fn from(path: Path) -> String {
-        path.0.to_string()
+        path.to_string()
     }
 }
 
@@ -383,7 +528,7 @@ impl<'de> de::Deserialize<'de> for Path {
             {
                 s.parse().map_err(|err| {
                     match err {
-                    ParseError::InvalidValue | ParseError::InvalidSegment => E::invalid_value(
+                    ParseError::InvalidValue | ParseError::InvalidSegment | ParseError::NoLeadingSlash => E::invalid_value(
                         de::Unexpected::Str(s),
                         &"a path with leading `/` and non-empty segments, where each segment is no \
                         more than fuchsia.io/MAX_NAME_LENGTH bytes in length, cannot be . or .., \
@@ -405,45 +550,60 @@ impl<'de> de::Deserialize<'de> for Path {
     }
 }
 
-/// A relative filesystem path.
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct RelativePath(FlyStr);
+/// Same as [Path] except the path does not begin with `/`.
+#[derive(Eq, Ord, PartialOrd, PartialEq, Hash, Clone)]
+pub struct RelativePath {
+    segments: Vec<Name>,
+}
 
 impl RelativePath {
-    /// Creates a `RelativePath` from a `String`, returning an `Err` if the string fails
-    /// validation. The string must be non-empty, no more than [`MAX_PATH_LENGTH`] characters
-    /// in length, not start with a `/`, and contain no empty path segments.
-    pub fn new(path: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
-        let p = path.as_ref();
-        if p.is_empty() {
+    /// Like [Path::new] but `path` must not begin with `/`.
+    pub fn new(path: impl AsRef<str>) -> Result<Self, ParseError> {
+        let path: &str = path.as_ref();
+        if path.is_empty() {
             return Err(ParseError::Empty);
         }
-        if p.len() > MAX_PATH_LENGTH {
+        if path.len() > MAX_PATH_LENGTH {
             return Err(ParseError::TooLong);
         }
-        for segment in p.split('/') {
-            if segment.is_empty() {
-                return Err(ParseError::InvalidValue);
-            }
-            name::validate_name(segment).map_err(|_| ParseError::InvalidSegment)?;
-        }
-        return Ok(Self(FlyStr::new(path)));
+        let segments = path
+            .split('/')
+            .map(|s| {
+                Name::new(s).map_err(|e| match e {
+                    ParseError::Empty => ParseError::InvalidValue,
+                    _ => ParseError::InvalidSegment,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self { segments })
     }
 
-    pub fn as_str(&self) -> &str {
-        &*self.0
+    pub fn parent(&self) -> Option<Self> {
+        if self.segments.len() <= 1 {
+            None
+        } else {
+            let segments: Vec<_> =
+                self.segments[0..self.segments.len() - 1].into_iter().map(Clone::clone).collect();
+            Some(Self { segments })
+        }
+    }
+
+    pub fn split(&self) -> Vec<Name> {
+        self.segments.clone()
+    }
+
+    pub fn basename(&self) -> &Name {
+        self.segments.last().expect("can't be empty")
+    }
+
+    pub fn to_path_buf(&self) -> PathBuf {
+        PathBuf::from(self.to_string())
     }
 }
 
 impl IterablePath for RelativePath {
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
-        let i = self
-            .0
-            .as_str()
-            .split('/')
-            // `split('/')` produces empty segments if there is nothing before or after a slash.
-            .filter(|s| !s.is_empty());
-        Box::new(i)
+    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + '_> {
+        Box::new(self.segments.iter())
     }
 }
 
@@ -457,19 +617,19 @@ impl FromStr for RelativePath {
 
 impl From<RelativePath> for String {
     fn from(path: RelativePath) -> String {
-        path.0.into()
+        path.to_string()
     }
 }
 
 impl fmt::Debug for RelativePath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.0)
+        write!(f, "{}", self)
     }
 }
 
 impl fmt::Display for RelativePath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.segments.join("/"))
     }
 }
 
@@ -478,7 +638,7 @@ impl ser::Serialize for RelativePath {
     where
         S: serde::ser::Serializer,
     {
-        self.0.serialize(serializer)
+        self.to_string().serialize(serializer)
     }
 }
 
@@ -505,7 +665,9 @@ impl<'de> de::Deserialize<'de> for RelativePath {
                 E: de::Error,
             {
                 s.parse().map_err(|err| match err {
-                    ParseError::InvalidValue | ParseError::InvalidSegment => E::invalid_value(
+                    ParseError::InvalidValue
+                    | ParseError::InvalidSegment
+                    | ParseError::NoLeadingSlash => E::invalid_value(
                         de::Unexpected::Str(s),
                         &"a path with no leading `/` and non-empty segments",
                     ),
@@ -530,13 +692,13 @@ impl<'de> de::Deserialize<'de> for RelativePath {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BorrowedSeparatedPath<'a> {
     pub dirname: Option<&'a RelativePath>,
-    pub basename: &'a str,
+    pub basename: &'a Name,
 }
 
 impl BorrowedSeparatedPath<'_> {
     /// Converts this [BorrowedSeparatedPath] to the owned type.
     pub fn to_owned(&self) -> SeparatedPath {
-        SeparatedPath { dirname: self.dirname.map(Clone::clone), basename: self.basename.into() }
+        SeparatedPath { dirname: self.dirname.map(Clone::clone), basename: self.basename.clone() }
     }
 }
 
@@ -551,7 +713,7 @@ impl fmt::Display for BorrowedSeparatedPath<'_> {
 }
 
 impl IterablePath for BorrowedSeparatedPath<'_> {
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
+    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + '_> {
         if let Some(d) = self.dirname {
             Box::new(d.iter_segments().chain(iter::once(self.basename)))
         } else {
@@ -566,7 +728,7 @@ impl IterablePath for BorrowedSeparatedPath<'_> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SeparatedPath {
     pub dirname: Option<RelativePath>,
-    pub basename: String,
+    pub basename: Name,
 }
 
 impl SeparatedPath {
@@ -577,11 +739,11 @@ impl SeparatedPath {
 }
 
 impl IterablePath for SeparatedPath {
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
+    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + '_> {
         if let Some(d) = &self.dirname {
-            Box::new(d.iter_segments().chain(iter::once(self.basename.as_str())))
+            Box::new(d.iter_segments().chain(iter::once(&self.basename)))
         } else {
-            Box::new(iter::once(self.basename.as_str()))
+            Box::new(iter::once(&self.basename))
         }
     }
 }
@@ -599,7 +761,7 @@ impl fmt::Display for SeparatedPath {
 /// Trait implemented by path types that provides an API to iterate over path segments.
 pub trait IterablePath: Clone + Send + Sync {
     /// Returns a double-sided iterator over the segments in this path.
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_>;
+    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + '_>;
 }
 
 /// A component URL. The URL is validated, but represented as a string to avoid
@@ -1035,17 +1197,27 @@ symmetrical_enums!(StorageId, fdecl::StorageId, StaticInstanceId, StaticInstance
 
 #[cfg(test)]
 mod tests {
-    use {super::*, serde_json::json, std::iter::repeat};
+    use {super::*, assert_matches::assert_matches, serde_json::json, std::iter::repeat};
 
     macro_rules! expect_ok {
         ($type_:ty, $($input:tt)+) => {
-            assert!(serde_json::from_str::<$type_>(&json!($($input)*).to_string()).is_ok());
+            assert_matches!(
+                serde_json::from_str::<$type_>(&json!($($input)*).to_string()),
+                Ok(_)
+            );
         };
     }
 
     macro_rules! expect_err {
-        ($type_:ty, $($input:tt)+) => {
-            assert!(serde_json::from_str::<$type_>(&json!($($input)*).to_string()).is_err());
+        ($type_:ty, $err:pat, $($input:tt)+) => {
+            assert_matches!(
+                ($($input)*).parse::<$type_>(),
+                Err($err)
+            );
+            assert_matches!(
+                serde_json::from_str::<$type_>(&json!($($input)*).to_string()),
+                Err(_)
+            );
         };
     }
 
@@ -1060,49 +1232,69 @@ mod tests {
 
     #[test]
     fn test_invalid_name() {
-        expect_err!(Name, "");
-        expect_err!(Name, "-");
-        expect_err!(Name, ".");
-        expect_err!(Name, "@&%^");
-        expect_err!(Name, repeat("x").take(256).collect::<String>());
+        expect_err!(Name, ParseError::Empty, "");
+        expect_err!(Name, ParseError::InvalidValue, "-");
+        expect_err!(Name, ParseError::InvalidValue, ".");
+        expect_err!(Name, ParseError::InvalidValue, "@&%^");
+        expect_err!(Name, ParseError::TooLong, repeat("x").take(256).collect::<String>());
     }
 
     #[test]
     fn test_valid_path() {
         expect_ok!(Path, "/foo");
         expect_ok!(Path, "/foo/bar");
-        expect_ok!(Path, &format!("/{}", repeat("x").take(255).collect::<String>()));
+        expect_ok!(Path, format!("/{}", repeat("x").take(100).collect::<String>()).as_str());
         // 2047 * 2 characters per repeat = 4094
-        expect_ok!(Path, &repeat("/x").take(2047).collect::<String>());
+        expect_ok!(Path, repeat("/x").take(2047).collect::<String>().as_str());
     }
 
     #[test]
     fn test_invalid_path() {
-        expect_err!(Path, "");
-        expect_err!(Path, "/");
-        expect_err!(Path, "foo");
-        expect_err!(Path, "foo/");
-        expect_err!(Path, "/foo/");
-        expect_err!(Path, "/foo//bar");
-        expect_err!(Path, "/fo\0b/bar");
-        expect_err!(Path, &format!("/{}", repeat("x").take(256).collect::<String>()));
+        expect_err!(Path, ParseError::Empty, "");
+        expect_err!(Path, ParseError::InvalidValue, "/");
+        expect_err!(Path, ParseError::NoLeadingSlash, "foo");
+        expect_err!(Path, ParseError::NoLeadingSlash, "foo/");
+        expect_err!(Path, ParseError::InvalidValue, "/foo/");
+        expect_err!(Path, ParseError::InvalidValue, "/foo//bar");
+        expect_err!(Path, ParseError::InvalidSegment, "/fo\0b/bar");
+        expect_err!(
+            Path,
+            ParseError::InvalidSegment,
+            format!("/{}", repeat("x").take(256).collect::<String>()).as_str()
+        );
         // 2048 * 2 characters per repeat = 4096
-        expect_err!(Path, &repeat("/x").take(2048).collect::<String>());
+        expect_err!(
+            Path,
+            ParseError::TooLong,
+            repeat("/x").take(2048).collect::<String>().as_str()
+        );
     }
 
     #[test]
-    fn test_path_dirname_basename() {
+    fn test_path_parent_basename() {
         let path = Path::new("/foo").unwrap();
-        assert_eq!((path.dirname(), path.basename()), ("/", "foo"));
+        assert_eq!(
+            (path.parent(), path.basename()),
+            ("/".parse().unwrap(), &"foo".parse().unwrap())
+        );
         let path = Path::new("/foo/bar").unwrap();
-        assert_eq!((path.dirname(), path.basename()), ("/foo", "bar"));
+        assert_eq!(
+            (path.parent(), path.basename()),
+            ("/foo".parse().unwrap(), &"bar".parse().unwrap())
+        );
         let path = Path::new("/foo/bar/baz").unwrap();
-        assert_eq!((path.dirname(), path.basename()), ("/foo/bar", "baz"));
+        assert_eq!(
+            (path.parent(), path.basename()),
+            ("/foo/bar".parse().unwrap(), &"baz".parse().unwrap())
+        );
     }
 
     #[test]
     fn test_separated_path() {
-        fn test_path(path: SeparatedPath, expected_segments: Vec<&str>) {
+        fn test_path(path: SeparatedPath, in_expected_segments: Vec<&str>) {
+            let expected_segments: Vec<_> =
+                in_expected_segments.iter().map(|s| Name::new(*s).unwrap()).collect();
+            let expected_segments: Vec<_> = expected_segments.iter().collect();
             let segments: Vec<_> = path.iter_segments().collect();
             assert_eq!(segments, expected_segments);
             let borrowed_path = path.as_ref();
@@ -1110,17 +1302,23 @@ mod tests {
             assert_eq!(segments, expected_segments);
             let owned_path = borrowed_path.to_owned();
             assert_eq!(path, owned_path);
-            let expected_fmt = expected_segments.join("/");
+            let expected_fmt = in_expected_segments.join("/");
             assert_eq!(format!("{path}"), expected_fmt);
             assert_eq!(format!("{owned_path}"), expected_fmt);
         }
-        test_path(SeparatedPath { dirname: None, basename: "foo".into() }, vec!["foo"]);
+        test_path(SeparatedPath { dirname: None, basename: "foo".parse().unwrap() }, vec!["foo"]);
         test_path(
-            SeparatedPath { dirname: Some("bar".parse().unwrap()), basename: "foo".into() },
+            SeparatedPath {
+                dirname: Some("bar".parse().unwrap()),
+                basename: "foo".parse().unwrap(),
+            },
             vec!["bar", "foo"],
         );
         test_path(
-            SeparatedPath { dirname: Some("bar/baz".parse().unwrap()), basename: "foo".into() },
+            SeparatedPath {
+                dirname: Some("bar/baz".parse().unwrap()),
+                basename: "foo".parse().unwrap(),
+            },
             vec!["bar", "baz", "foo"],
         );
     }
@@ -1134,14 +1332,18 @@ mod tests {
 
     #[test]
     fn test_invalid_relative_path() {
-        expect_err!(RelativePath, "");
-        expect_err!(RelativePath, "/");
-        expect_err!(RelativePath, "/foo");
-        expect_err!(RelativePath, "foo/");
-        expect_err!(RelativePath, "/foo/");
-        expect_err!(RelativePath, "foo//bar");
-        expect_err!(RelativePath, "foo/..");
-        expect_err!(RelativePath, &format!("x{}", repeat("/x").take(2048).collect::<String>()));
+        expect_err!(RelativePath, ParseError::Empty, "");
+        expect_err!(RelativePath, ParseError::InvalidValue, "/");
+        expect_err!(RelativePath, ParseError::InvalidValue, "/foo");
+        expect_err!(RelativePath, ParseError::InvalidValue, "foo/");
+        expect_err!(RelativePath, ParseError::InvalidValue, "/foo/");
+        expect_err!(RelativePath, ParseError::InvalidValue, "foo//bar");
+        expect_err!(RelativePath, ParseError::InvalidSegment, "foo/..");
+        expect_err!(
+            RelativePath,
+            ParseError::TooLong,
+            &format!("x{}", repeat("/x").take(2048).collect::<String>())
+        );
     }
 
     #[test]
@@ -1153,9 +1355,13 @@ mod tests {
 
     #[test]
     fn test_invalid_url() {
-        expect_err!(Url, "");
-        expect_err!(Url, "foo");
-        expect_err!(Url, &format!("a://{}", repeat("x").take(4093).collect::<String>()));
+        expect_err!(Url, ParseError::Empty, "");
+        expect_err!(Url, ParseError::InvalidComponentUrl { .. }, "foo");
+        expect_err!(
+            Url,
+            ParseError::TooLong,
+            &format!("a://{}", repeat("x").take(4093).collect::<String>())
+        );
     }
 
     #[test]
@@ -1166,11 +1372,15 @@ mod tests {
 
     #[test]
     fn test_invalid_url_scheme() {
-        expect_err!(UrlScheme, "");
-        expect_err!(UrlScheme, "0fuch.sia-pkg+0");
-        expect_err!(UrlScheme, "fuchsia_pkg");
-        expect_err!(UrlScheme, "FUCHSIA-PKG");
-        expect_err!(UrlScheme, &format!("{}", repeat("f").take(256).collect::<String>()));
+        expect_err!(UrlScheme, ParseError::Empty, "");
+        expect_err!(UrlScheme, ParseError::InvalidValue, "0fuch.sia-pkg+0");
+        expect_err!(UrlScheme, ParseError::InvalidValue, "fuchsia_pkg");
+        expect_err!(UrlScheme, ParseError::InvalidValue, "FUCHSIA-PKG");
+        expect_err!(
+            UrlScheme,
+            ParseError::TooLong,
+            &format!("{}", repeat("f").take(256).collect::<String>())
+        );
     }
 
     #[test]

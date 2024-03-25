@@ -9,7 +9,7 @@ use {
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
-    cm_types::Name,
+    cm_types::{Name, Path},
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx,
     futures::{
@@ -114,7 +114,7 @@ impl NamespaceCapabilityHost {
                 dict.read().await.map_err(|_| fcomponent::NamespaceError::DictionaryRead)?;
             for item in items {
                 let capability: Capability = item.value.try_into().unwrap();
-                let path = namespace::Path::new(format!("{}/{}", path, item.key))
+                let path = Path::new(format!("{}/{}", path, item.key))
                     .map_err(|_| fcomponent::NamespaceError::BadEntry)?;
                 namespace_builder.add_object(capability, &path).map_err(Self::error_to_fidl)?;
             }

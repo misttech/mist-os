@@ -41,8 +41,8 @@ use {
 };
 
 pub use cm_types::{
-    AllowedOffers, Availability, DeliveryType, DependencyType, Durability, Name, OnTerminate,
-    ParseError, Path, RelativePath, StartupMode, StorageId, Url,
+    AllowedOffers, Availability, DeliveryType, DependencyType, Durability, Name, NamespacePath,
+    OnTerminate, ParseError, Path, RelativePath, StartupMode, StorageId, Url,
 };
 use error::Location;
 
@@ -157,14 +157,13 @@ impl<'a> CapabilityId<'a> {
         }
     }
 
-    /// Return the directory containing the capability.
-    pub fn get_dir_path(&self) -> Option<&path::Path> {
+    /// Return the directory containing the capability, if this capability takes a target path.
+    pub fn get_dir_path(&self) -> Option<NamespacePath> {
         match self {
-            CapabilityId::UsedService(p) => path::Path::new(p.as_str()).parent(),
-            CapabilityId::UsedProtocol(p) => path::Path::new(p.as_str()).parent(),
-            CapabilityId::UsedDirectory(p) => Some(path::Path::new(p.as_str())),
-            CapabilityId::UsedStorage(p) => Some(path::Path::new(p.as_str())),
-            CapabilityId::UsedEventStream(p) => path::Path::new(p.as_str()).parent(),
+            CapabilityId::UsedService(p)
+            | CapabilityId::UsedProtocol(p)
+            | CapabilityId::UsedEventStream(p) => Some(p.parent()),
+            CapabilityId::UsedDirectory(p) | CapabilityId::UsedStorage(p) => Some(p.clone().into()),
             _ => None,
         }
     }
@@ -466,7 +465,7 @@ impl<'a> CapabilityId<'a> {
 impl fmt::Display for CapabilityId<'_> {
     /// Return the string ID of this clause.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
+        match self {
             CapabilityId::Service(n)
             | CapabilityId::Storage(n)
             | CapabilityId::Runner(n)
@@ -475,15 +474,14 @@ impl fmt::Display for CapabilityId<'_> {
             | CapabilityId::EventStream(n)
             | CapabilityId::Configuration(n)
             | CapabilityId::UsedConfiguration(n)
-            | CapabilityId::Dictionary(n) => n.as_str(),
+            | CapabilityId::Dictionary(n) => write!(f, "{}", n),
             CapabilityId::UsedService(p)
             | CapabilityId::UsedProtocol(p)
             | CapabilityId::UsedDirectory(p)
             | CapabilityId::UsedStorage(p)
-            | CapabilityId::UsedEventStream(p) => p.as_str(),
-            CapabilityId::Protocol(p) | CapabilityId::Directory(p) => p.as_str(),
-        };
-        write!(f, "{}", s)
+            | CapabilityId::UsedEventStream(p) => write!(f, "{}", p),
+            CapabilityId::Protocol(p) | CapabilityId::Directory(p) => write!(f, "{}", p),
+        }
     }
 }
 
@@ -799,9 +797,7 @@ impl<'a> From<&'a DictionaryRef> for AnyRef<'a> {
 impl FromStr for DictionaryRef {
     type Err = ParseError;
 
-    fn from_str(s: &str) -> Result<Self, ParseError> {
-        let path = RelativePath::new(s)?;
-        let path = path.as_str();
+    fn from_str(path: &str) -> Result<Self, ParseError> {
         match path.find('/') {
             Some(n) => {
                 let root = path[..n].parse().map_err(|_| ParseError::InvalidValue)?;

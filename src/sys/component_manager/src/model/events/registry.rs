@@ -259,7 +259,7 @@ impl EventRegistry {
         // Neither task can make progress.
         let dispatchers = {
             let mut dispatcher_map = self.dispatcher_map.lock().await;
-            if let Some(dispatchers) = dispatcher_map.get_mut(&event.event_type().into()) {
+            if let Some(dispatchers) = dispatcher_map.get_mut(&Name::from(event.event_type())) {
                 let mut strong_dispatchers = vec![];
                 dispatchers.retain(|dispatcher| {
                     if let Some(dispatcher) = dispatcher.upgrade() {
@@ -391,7 +391,7 @@ impl EventRegistry {
     async fn dispatchers_per_event_type(&self, event_type: EventType) -> usize {
         let dispatcher_map = self.dispatcher_map.lock().await;
         dispatcher_map
-            .get(&event_type.into())
+            .get(&Name::from(event_type))
             .map(|dispatchers| dispatchers.len())
             .unwrap_or_default()
     }

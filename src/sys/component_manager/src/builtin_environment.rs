@@ -431,11 +431,14 @@ impl RootComponentInputBuilder {
             }),
         );
 
-        self.input.insert_capability(iter::once(P::PROTOCOL_NAME), launch.into_router().into());
+        self.input.insert_capability(
+            iter::once(&P::PROTOCOL_NAME.parse().unwrap()),
+            launch.into_router().into(),
+        );
     }
 
     fn add_namespace_protocol(&mut self, protocol: &cm_rust::ProtocolDecl) {
-        let path = protocol.source_path.as_ref().unwrap().clone();
+        let path = protocol.source_path.as_ref().unwrap().to_string();
         let capability_source = CapabilitySource::Namespace {
             capability: ComponentCapability::Protocol(protocol.clone()),
             top_instance: Arc::downgrade(&self.top_instance),
@@ -448,7 +451,7 @@ impl RootComponentInputBuilder {
                 let path = path.clone();
                 let fut = async move {
                     fuchsia_fs::node::open_channel_in_namespace(
-                        path.as_str(),
+                        &path,
                         fio::OpenFlags::empty(),
                         ServerEnd::new(server_end),
                     )
@@ -463,8 +466,7 @@ impl RootComponentInputBuilder {
                 fut.boxed()
             }),
         );
-        self.input
-            .insert_capability(iter::once(protocol.name.as_str()), launch.into_router().into());
+        self.input.insert_capability(iter::once(&protocol.name), launch.into_router().into());
     }
 
     fn build(self) -> ComponentInput {
@@ -1388,8 +1390,7 @@ impl BuiltinEnvironment {
                 task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
             }),
         );
-        self.root_component_input
-            .insert_capability(iter::once(name.as_str()), launch.into_router().into());
+        self.root_component_input.insert_capability(iter::once(&name), launch.into_router().into());
     }
 
     #[cfg(test)]
