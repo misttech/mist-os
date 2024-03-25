@@ -1,0 +1,57 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "fuchsia_board_configuration",
+    "fuchsia_board_input_bundle",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+fuchsia_board_input_bundle(
+    name = "board_driver",
+    bootfs_driver_packages = [
+        "//src/devices/board/drivers/vim3-devicetree",
+    ],
+)
+
+fuchsia_board_input_bundle(
+    name = "main_bundle",
+    bootfs_driver_packages = [
+        "//src/devices/gpio/drivers/aml-gpio",
+        "//src/devices/i2c/drivers/aml-i2c",
+    ],
+)
+
+fuchsia_board_configuration(
+    name = "emac",
+    board_input_bundles = [
+        ":board_driver",
+        ":main_bundle",
+    ],
+    board_name = "emac",
+    devicetree = "@legacy_ninja_build_outputs//:vim3-dtb",
+    filesystems = {
+        "vbmeta": {
+            "key": "LABEL(//src/firmware/avb_keys/vim3/vim3-dev-key:vim3_devkey_atx_psk.pem)",
+            "key_metadata": "LABEL(//src/firmware/avb_keys/vim3/vim3-dev-key:vim3_dev_atx_metadata.bin)",
+        },
+        "fvm": {
+            "blobfs": {
+                "size_checker_maximum_bytes": 5216665600,
+            },
+            "fastboot_output": {
+                "truncate_to_length": 3439329280,
+            },
+        },
+        "fxfs": {
+            "size_checker_maximum_bytes": 5216665600,
+        },
+    },
+    provided_features = [
+        "fuchsia::driver_framework_v2_support",
+        "fuchsia::usb_peripheral_support",
+    ],
+)
