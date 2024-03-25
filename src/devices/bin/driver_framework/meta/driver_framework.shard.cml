@@ -204,11 +204,6 @@
             to: "#boot-drivers",
         },
         {
-            protocol: "fuchsia.boot.RootResource",
-            from: "parent",
-            to: [ "#boot-drivers" ],
-        },
-        {
             protocol: "fuchsia.kernel.InfoResource",
             from: "parent",
             to: [

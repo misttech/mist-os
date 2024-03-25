@@ -19,14 +19,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/console-launcher",
-
-                    // Driver component names vary depending on the
-                    // exact hardware configuration of the board.
-                    // Grant all drivers the ability to access the root
-                    // resource because of this.
-                    // TODO(https://fxbug.dev/42174945): remove this once the root
-                    // resource is not widely used.
-                    "/bootstrap/boot-drivers:**",
                     "/bootstrap/netsvc",
                     "/bootstrap/svchost",
                 ],
