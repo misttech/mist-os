@@ -24,17 +24,14 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("bar_data")
+                            .target_name("baz_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -78,17 +75,14 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::W_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("bar_data")
+                            .target_name("baz_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::W_STAR_DIR),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -132,17 +126,14 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("bar_data")
+                            .target_name("baz_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -186,17 +177,14 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("bar_data")
+                            .target_name("baz_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -240,17 +228,14 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("bar_data")
+                            .target_name("baz_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -294,17 +279,14 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("bar_data")
+                            .target_name("baz_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -356,17 +338,13 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Parent,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: None,
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("foo_data")
+                            .target_name("bar_data")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .build(),
             ),

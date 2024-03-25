@@ -79,36 +79,28 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 (
                     "a",
                     ComponentDeclBuilder::new()
-                        .offer(OfferDecl::Service(OfferServiceDecl {
-                            source: OfferSource::static_child("b".to_string()),
-                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            target: OfferTarget::static_child("c".to_string()),
-                            source_instance_filter: None,
-                            renamed_instances: None,
-                            availability: test_case.provider_availability,
-                        }))
-                        .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                            source: OfferSource::static_child("b".to_string()),
-                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            target: OfferTarget::static_child("c".to_string()),
-                            dependency_type: DependencyType::Strong,
-                            availability: test_case.provider_availability,
-                        }))
-                        .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                            source: OfferSource::static_child("b".to_string()),
-                            source_name: "dir".parse().unwrap(),
-                            source_dictionary: None,
-                            target: OfferTarget::static_child("c".to_string()),
-                            target_name: "dir".parse().unwrap(),
-                            rights: Some(fio::R_STAR_DIR),
-                            subdir: None,
-                            dependency_type: DependencyType::Strong,
-                            availability: test_case.provider_availability,
-                        }))
+                        .offer(
+                            OfferBuilder::service()
+                                .name("fuchsia.examples.EchoService")
+                                .source(OfferSource::static_child("b".to_string()))
+                                .target(OfferTarget::static_child("c".to_string()))
+                                .availability(test_case.provider_availability),
+                        )
+                        .offer(
+                            OfferBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .source(OfferSource::static_child("b".to_string()))
+                                .target(OfferTarget::static_child("c".to_string()))
+                                .availability(test_case.provider_availability),
+                        )
+                        .offer(
+                            OfferBuilder::directory()
+                                .name("dir")
+                                .source(OfferSource::static_child("b".to_string()))
+                                .target(OfferTarget::static_child("c".to_string()))
+                                .rights(fio::R_STAR_DIR)
+                                .availability(test_case.provider_availability),
+                        )
                         .capability(
                             CapabilityBuilder::directory()
                                 .name("data")
@@ -122,24 +114,20 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                                 .source(StorageDirectorySource::Self_)
                                 .subdir("cache"),
                         )
-                        .offer(OfferDecl::Storage(OfferStorageDecl {
-                            source: OfferSource::Self_,
-                            target: OfferTarget::static_child("c".to_string()),
-                            source_name: "cache".parse().unwrap(),
-                            target_name: "cache".parse().unwrap(),
-                            availability: test_case.provider_availability,
-                        }))
-                        .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                            source: OfferSource::Parent,
-                            source_name: "started".parse().unwrap(),
-                            scope: None,
-                            target: OfferTarget::Child(ChildRef {
-                                name: "c".into(),
-                                collection: None,
-                            }),
-                            target_name: "started".parse().unwrap(),
-                            availability: test_case.provider_availability,
-                        }))
+                        .offer(
+                            OfferBuilder::storage()
+                                .name("cache")
+                                .source(OfferSource::Self_)
+                                .target(OfferTarget::static_child("c".to_string()))
+                                .availability(test_case.provider_availability),
+                        )
+                        .offer(
+                            OfferBuilder::event_stream()
+                                .name("started")
+                                .source(OfferSource::Parent)
+                                .target(OfferTarget::static_child("c".to_string()))
+                                .availability(test_case.provider_availability),
+                        )
                         .child_default("b")
                         .child_default("c")
                         .build(),
@@ -292,47 +280,41 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 (
                     "a",
                     ComponentDeclBuilder::new()
-                        .offer(OfferDecl::Service(OfferServiceDecl {
-                            source: test_case.source.clone(),
-                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            target: OfferTarget::static_child("c".to_string()),
-                            source_instance_filter: None,
-                            renamed_instances: None,
-                            availability: test_case.offer_availability,
-                        }))
-                        .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                            source: test_case.source.clone(),
-                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            target: OfferTarget::static_child("c".to_string()),
-                            dependency_type: DependencyType::Strong,
-                            availability: test_case.offer_availability,
-                        }))
-                        .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                            source: test_case.source.clone(),
-                            source_name: "dir".parse().unwrap(),
-                            source_dictionary: None,
-                            target: OfferTarget::static_child("c".to_string()),
-                            target_name: "dir".parse().unwrap(),
-                            rights: Some(fio::Operations::CONNECT),
-                            subdir: None,
-                            dependency_type: DependencyType::Strong,
-                            availability: test_case.offer_availability,
-                        }))
-                        .offer(OfferDecl::Storage(OfferStorageDecl {
-                            source: test_case
-                                .storage_source
-                                .as_ref()
-                                .map(Clone::clone)
-                                .unwrap_or(test_case.source.clone()),
-                            source_name: "data".parse().unwrap(),
-                            target_name: "data".parse().unwrap(),
-                            target: OfferTarget::static_child("c".to_string()),
-                            availability: test_case.offer_availability,
-                        }))
+                        .offer(
+                            OfferBuilder::service()
+                                .name("fuchsia.examples.EchoService")
+                                .source(test_case.source.clone())
+                                .target(OfferTarget::static_child("c".to_string()))
+                                .availability(test_case.offer_availability),
+                        )
+                        .offer(
+                            OfferBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .source(test_case.source.clone())
+                                .target(OfferTarget::static_child("c".to_string()))
+                                .availability(test_case.offer_availability),
+                        )
+                        .offer(
+                            OfferBuilder::directory()
+                                .name("dir")
+                                .source(test_case.source.clone())
+                                .target(OfferTarget::static_child("c".to_string()))
+                                .rights(fio::Operations::CONNECT)
+                                .availability(test_case.offer_availability),
+                        )
+                        .offer(
+                            OfferBuilder::storage()
+                                .name("data")
+                                .source(
+                                    test_case
+                                        .storage_source
+                                        .as_ref()
+                                        .map(Clone::clone)
+                                        .unwrap_or(test_case.source.clone()),
+                                )
+                                .target(OfferTarget::static_child("c".to_string()))
+                                .availability(test_case.offer_availability),
+                        )
                         .capability(
                             CapabilityBuilder::storage()
                                 .name("data")

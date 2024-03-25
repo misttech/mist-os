@@ -78,16 +78,15 @@ mod tests {
                             .name("fuchsia.MyConfig")
                             .value(good_value.clone().into()),
                     )
-                    .offer(cm_rust::OfferDecl::Config(cm_rust::OfferConfigurationDecl {
-                        source: cm_rust::OfferSource::Self_,
-                        source_name: "fuchsia.MyConfig".parse().unwrap(),
-                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "child".into(),
-                            collection: None,
-                        }),
-                        target_name: "fuchsia.MyConfig".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::config()
+                            .name("fuchsia.MyConfig")
+                            .source(cm_rust::OfferSource::Self_)
+                            .target(cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                                name: "child".into(),
+                                collection: None,
+                            })),
+                    )
                     .child_default("child")
                     .build(),
             ),

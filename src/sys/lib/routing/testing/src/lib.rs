@@ -392,35 +392,28 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .protocol_default("file")
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Self_,
-                        source_name: "file".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "device".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("foo_data")
+                            .target_name("bar_data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("foo")
+                            .target_name("bar")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("file")
+                            .target_name("device")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .build(),
             ),
@@ -639,52 +632,42 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("foo_data")
+                            .target_name("bar_data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("foo")
+                            .target_name("bar")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Parent,
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Parent,
-                        source_name: "bar".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("bar_data")
+                            .target_name("baz_data")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("bar")
+                            .target_name("baz")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("c")
                     .build(),
             ),
@@ -728,30 +711,24 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Parent,
-                        source_name: "builtin.Echo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "builtin.Echo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("builtin.Echo")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Parent,
-                        source_name: "builtin.Echo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "builtin.Echo".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("builtin.Echo")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("c")
                     .build(),
             ),
@@ -797,26 +774,21 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("d".to_string()),
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foobar_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("d".to_string()),
-                        source_name: "bar".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foobar".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("bar_data")
+                            .target_name("foobar_data")
+                            .source(OfferSource::static_child("d".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("bar")
+                            .target_name("foobar")
+                            .source(OfferSource::static_child("d".to_string()))
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("c")
                     .child_default("d")
                     .build(),
@@ -879,26 +851,21 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("bar_data")
+                            .target_name("baz_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("bar")
+                            .target_name("baz")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -964,26 +931,21 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "baz_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foobar_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "baz".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foobar".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("baz_data")
+                            .target_name("foobar_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("baz")
+                            .target_name("foobar")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -1071,26 +1033,20 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .protocol_default("foo")
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_from_a_svc".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "foo_from_d_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_from_d_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("foo")
+                            .target_name("foo_from_a_svc")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("foo_from_d_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -1098,26 +1054,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new_empty_component()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("d".to_string()),
-                        source_name: "foo_from_d_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_from_d_data".parse().unwrap(),
-                        target: OfferTarget::static_child("e".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Parent,
-                        source_name: "foo_from_a_svc".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_from_a_svc".parse().unwrap(),
-                        target: OfferTarget::static_child("e".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("foo_from_d_data")
+                            .source(OfferSource::static_child("d".to_string()))
+                            .target(OfferTarget::static_child("e".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("foo_from_a_svc")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("e".to_string())),
+                    )
                     .expose(
                         ExposeBuilder::directory()
                             .name("foo_from_d_data")
@@ -1131,26 +1080,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new_empty_component()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Parent,
-                        source_name: "foo_from_d_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_from_d_data".parse().unwrap(),
-                        target: OfferTarget::static_child("f".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("g".to_string()),
-                        source_name: "foo_from_h_svc".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_from_h_svc".parse().unwrap(),
-                        target: OfferTarget::static_child("f".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("foo_from_d_data")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("f".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("foo_from_h_svc")
+                            .source(OfferSource::static_child("g".to_string()))
+                            .target(OfferTarget::static_child("f".to_string())),
+                    )
                     .child_default("f")
                     .child_default("g")
                     .build(),
@@ -1295,26 +1237,21 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Parent,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Parent,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("foo_data")
+                            .target_name("bar_data")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("foo")
+                            .target_name("bar")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .build(),
             ),
@@ -1406,26 +1343,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new_empty_component()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source_name: "hippo_data".parse().unwrap(),
-                        source: OfferSource::static_child("b".to_string()),
-                        source_dictionary: None,
-                        target_name: "hippo_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source_name: "hippo".parse().unwrap(),
-                        source: OfferSource::static_child("b".to_string()),
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("hippo_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("hippo")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -1473,26 +1403,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new_empty_component()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source_name: "hippo_data".parse().unwrap(),
-                        source: OfferSource::Parent,
-                        source_dictionary: None,
-                        target_name: "hippo_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source_name: "hippo".parse().unwrap(),
-                        source: OfferSource::Parent,
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("hippo_data")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("hippo")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("c")
                     .build(),
             ),
@@ -1636,26 +1559,21 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("bar_data")
+                            .target_name("baz_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("bar")
+                            .target_name("baz")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -1723,26 +1641,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new_empty_component()
                     .capability(CapabilityBuilder::directory().name("hippo_data").path("/data"))
                     .protocol_default("hippo")
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source_name: "hippo_data".parse().unwrap(),
-                        source: OfferSource::Self_,
-                        source_dictionary: None,
-                        target_name: "hippo_data".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source_name: "hippo".parse().unwrap(),
-                        source: OfferSource::Self_,
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("hippo_data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("hippo")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .build(),
             ),
@@ -1787,32 +1698,26 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("b".parse().unwrap()),
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
-                        source_instance_filter: Some(vec![
-                            "instance_0".to_string(),
-                            "instance_1".to_string(),
-                        ]),
-                        renamed_instances: None,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".parse().unwrap()),
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
-                        source_instance_filter: Some(vec![
-                            "instance_2".to_string(),
-                            "instance_3".to_string(),
-                        ]),
-                        renamed_instances: None,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::static_child("b".parse().unwrap()))
+                            .target(OfferTarget::static_child("d".to_string()))
+                            .source_instance_filter(vec![
+                                "instance_0".to_string(),
+                                "instance_1".to_string(),
+                            ]),
+                    )
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::static_child("c".parse().unwrap()))
+                            .target(OfferTarget::static_child("d".to_string()))
+                            .source_instance_filter(vec![
+                                "instance_2".to_string(),
+                                "instance_3".to_string(),
+                            ]),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .child_default("d")
@@ -1887,16 +1792,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .capability(expected_service_decl.clone())
                     .child_default("b")
                     .build(),
@@ -1904,36 +1805,24 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".parse().unwrap()),
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::Parent,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::static_child("c".parse().unwrap()))
+                            .target(OfferTarget::static_child("d".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("d".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("d".to_string())),
+                    )
                     .capability(expected_service_decl.clone())
                     .child_default("c")
                     .child_default("d")
@@ -2003,32 +1892,26 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("b".parse().unwrap()),
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
-                        source_instance_filter: Some(vec![
-                            "default".to_string(),
-                            "other_a".to_string(),
-                        ]),
-                        renamed_instances: None,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".parse().unwrap()),
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
-                        source_instance_filter: Some(vec![
-                            "default".to_string(),
-                            "other_b".to_string(),
-                        ]),
-                        renamed_instances: None,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::static_child("b".parse().unwrap()))
+                            .target(OfferTarget::static_child("d".to_string()))
+                            .source_instance_filter(vec![
+                                "default".to_string(),
+                                "other_a".to_string(),
+                            ]),
+                    )
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::static_child("c".parse().unwrap()))
+                            .target(OfferTarget::static_child("d".to_string()))
+                            .source_instance_filter(vec![
+                                "default".to_string(),
+                                "other_b".to_string(),
+                            ]),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .child_default("d")
@@ -2088,34 +1971,28 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_data".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: Some(PathBuf::from("s1/s2")),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("foo_data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .rights(fio::R_STAR_DIR)
+                            .subdir("s1/s2"),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Parent,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_data".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: Some(PathBuf::from("s3")),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("foo_data")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR)
+                            .subdir("s3"),
+                    )
                     .child_default("c")
                     .build(),
             ),
@@ -2156,17 +2033,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::static_child("b".to_string()),
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target: OfferTarget::static_child("c".to_string()),
-                        target_name: "foo_data".parse().unwrap(),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: Some(PathBuf::from("s3")),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("foo_data")
+                            .source(OfferSource::static_child("b".to_string()))
+                            .target(OfferTarget::static_child("c".to_string()))
+                            .rights(fio::R_STAR_DIR)
+                            .subdir("s3"),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -2468,15 +2342,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source_name: "invalid".parse().unwrap(),
-                        source: OfferSource::Parent,
-                        source_dictionary: None,
-                        target_name: "valid".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("invalid")
+                            .target_name("valid")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .build(),
             ),
@@ -2604,39 +2476,45 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                        source: OfferSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        scope: Some(vec![EventScope::Child(ChildRef {
-                            name: "b".into(),
-                            collection: None,
-                        })]),
-                        target: OfferTarget::Child(ChildRef { name: "b".into(), collection: None }),
-                        target_name: "started".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                        source: OfferSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        scope: Some(vec![EventScope::Child(ChildRef {
-                            name: "c".into(),
-                            collection: None,
-                        })]),
-                        target: OfferTarget::Child(ChildRef { name: "d".into(), collection: None }),
-                        target_name: "started".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                        source: OfferSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        scope: Some(vec![EventScope::Child(ChildRef {
-                            name: "d".into(),
-                            collection: None,
-                        })]),
-                        target: OfferTarget::Child(ChildRef { name: "c".into(), collection: None }),
-                        target_name: "started".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::event_stream()
+                            .name("started")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::Child(ChildRef {
+                                name: "b".into(),
+                                collection: None,
+                            }))
+                            .scope(vec![EventScope::Child(ChildRef {
+                                name: "b".into(),
+                                collection: None,
+                            })]),
+                    )
+                    .offer(
+                        OfferBuilder::event_stream()
+                            .name("started")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::Child(ChildRef {
+                                name: "d".into(),
+                                collection: None,
+                            }))
+                            .scope(vec![EventScope::Child(ChildRef {
+                                name: "c".into(),
+                                collection: None,
+                            })]),
+                    )
+                    .offer(
+                        OfferBuilder::event_stream()
+                            .name("started")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::Child(ChildRef {
+                                name: "c".into(),
+                                collection: None,
+                            }))
+                            .scope(vec![EventScope::Child(ChildRef {
+                                name: "d".into(),
+                                collection: None,
+                            })]),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .child_default("d")
@@ -2758,28 +2636,32 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                        source: OfferSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        scope: Some(vec![
-                            EventScope::Child(ChildRef { name: "b".into(), collection: None }),
-                            EventScope::Child(ChildRef { name: "c".into(), collection: None }),
-                        ]),
-                        target: OfferTarget::Child(ChildRef { name: "b".into(), collection: None }),
-                        target_name: "started".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                        source: OfferSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        scope: Some(vec![
-                            EventScope::Child(ChildRef { name: "b".into(), collection: None }),
-                            EventScope::Child(ChildRef { name: "c".into(), collection: None }),
-                        ]),
-                        target: OfferTarget::Child(ChildRef { name: "c".into(), collection: None }),
-                        target_name: "started".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::event_stream()
+                            .name("started")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::Child(ChildRef {
+                                name: "b".into(),
+                                collection: None,
+                            }))
+                            .scope(vec![
+                                EventScope::Child(ChildRef { name: "b".into(), collection: None }),
+                                EventScope::Child(ChildRef { name: "c".into(), collection: None }),
+                            ]),
+                    )
+                    .offer(
+                        OfferBuilder::event_stream()
+                            .name("started")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::Child(ChildRef {
+                                name: "c".into(),
+                                collection: None,
+                            }))
+                            .scope(vec![
+                                EventScope::Child(ChildRef { name: "b".into(), collection: None }),
+                                EventScope::Child(ChildRef { name: "c".into(), collection: None }),
+                            ]),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -2794,17 +2676,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .use_(UseBuilder::event_stream().name("started").path("/event/stream"))
-                    .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                        source: OfferSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        scope: Some(vec![EventScope::Child(ChildRef {
-                            name: "e".into(),
-                            collection: None,
-                        })]),
-                        target: OfferTarget::Child(ChildRef { name: "d".into(), collection: None }),
-                        target_name: "started".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::event_stream()
+                            .name("started")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::Child(ChildRef {
+                                name: "d".into(),
+                                collection: None,
+                            }))
+                            .scope(vec![EventScope::Child(ChildRef {
+                                name: "e".into(),
+                                collection: None,
+                            })]),
+                    )
                     .child_default("d")
                     .child_default("e")
                     .build(),
@@ -2884,14 +2768,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                        source: OfferSource::Parent,
-                        source_name: "capability_requested".parse().unwrap(),
-                        target_name: "capability_requested_on_a".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        scope: None,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::event_stream()
+                            .name("capability_requested")
+                            .target_name("capability_requested_on_a")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .build(),
             ),
@@ -2934,15 +2817,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .protocol_default("hippo")
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Self_,
-                        source_name: "hippo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("hippo")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .build(),
             ),
@@ -2983,17 +2863,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("foo_data")
+                            .target_name("bar_data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
                     .child_default("b")
                     .build(),
             ),
@@ -3038,30 +2915,24 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .protocol_default("hippo")
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Self_,
-                        source_name: "hippo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("hippo")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Parent,
-                        source_name: "hippo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("hippo")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .use_(UseBuilder::protocol().name("hippo"))
                     .child_default("c")
                     .build(),
@@ -3120,39 +2991,30 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .protocol_default("hippo")
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Self_,
-                        source_name: "hippo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("hippo")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Parent,
-                        source_name: "hippo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Parent,
-                        source_name: "hippo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("hippo")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("hippo")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("d".to_string())),
+                    )
                     .child_default("c")
                     .child_default("d")
                     .build(),
@@ -3251,16 +3113,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .service_default("foo")
                     .child_default("b")
                     .build(),
@@ -3367,16 +3225,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".parse().unwrap()),
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::static_child("c".parse().unwrap()))
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -3436,22 +3290,20 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// c: expose from self
     pub async fn test_route_filtered_service_from_sibling(&self) {
         let use_decl = UseBuilder::service().name("foo").build();
-        let source_instance_filter = Some(vec!["service_instance_0".to_string()]);
-        let renamed_instances = Some(vec![]);
+        let source_instance_filter = vec!["service_instance_0".to_string()];
+        let renamed_instances = vec![];
         let components = vec![
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".parse().unwrap()),
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        source_instance_filter,
-                        renamed_instances,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::static_child("c".parse().unwrap()))
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .source_instance_filter(source_instance_filter)
+                            .renamed_instances(renamed_instances),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -3530,26 +3382,24 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// c: expose from self
     pub async fn test_route_renamed_service_instance_from_sibling(&self) {
         let use_decl = UseBuilder::service().name("foo").build();
-        let source_instance_filter = Some(vec![]);
-        let renamed_instances = Some(vec![NameMapping {
+        let source_instance_filter = vec![];
+        let renamed_instances = vec![NameMapping {
             source_name: "instance_0".to_string(),
             target_name: "renamed_instance_0".to_string(),
-        }]);
+        }];
 
         let components = vec![
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".parse().unwrap()),
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        source_instance_filter,
-                        renamed_instances,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::static_child("c".parse().unwrap()))
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .source_instance_filter(source_instance_filter)
+                            .renamed_instances(renamed_instances),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -3698,13 +3548,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .child_default("b")
-                    .offer(OfferDecl::Runner(OfferRunnerDecl {
-                        source: OfferSource::Self_,
-                        source_name: "elf".parse().unwrap(),
-                        source_dictionary: None,
-                        target: OfferTarget::static_child("b".to_string()),
-                        target_name: "dwarf".parse().unwrap(),
-                    }))
+                    .offer(
+                        OfferBuilder::runner()
+                            .name("elf")
+                            .target_name("dwarf")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .runner_default("elf")
                     .build(),
             ),
@@ -4243,13 +4093,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Runner(OfferRunnerDecl {
-                        source: OfferSource::Self_,
-                        source_name: "elf".parse().unwrap(),
-                        source_dictionary: None,
-                        target: OfferTarget::static_child("b".to_string()),
-                        target_name: "dwarf".parse().unwrap(),
-                    }))
+                    .offer(
+                        OfferBuilder::runner()
+                            .name("elf")
+                            .target_name("dwarf")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .runner_default("elf")
                     .child_default("b")
                     .build(),

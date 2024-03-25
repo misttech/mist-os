@@ -198,15 +198,12 @@ async fn capability_requested_event_at_parent() {
             "a",
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "bar".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(OfferBuilder::protocol()
+                    .name("foo")
+                    .target_name("bar")
+                    .source(OfferSource::Self_)
+                    .target(OfferTarget::static_child("b".to_string()))
+                )
                 .use_(UseBuilder::event_stream()
                     .name("capability_requested")
                     .path("/events/capability_requested")
@@ -293,26 +290,21 @@ async fn use_in_collection() {
             ComponentDeclBuilder::new()
                 .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                 .protocol_default("foo")
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source_name: "foo_data".parse().unwrap(),
-                    source: OfferSource::Self_,
-                    source_dictionary: None,
-                    target_name: "hippo_data".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source_name: "foo".parse().unwrap(),
-                    source: OfferSource::Self_,
-                    source_dictionary: None,
-                    target_name: "hippo".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::directory()
+                        .name("foo_data")
+                        .target_name("hippo_data")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string()))
+                        .rights(fio::R_STAR_DIR),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("hippo")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
                 .child_default("b")
                 .build(),
         ),
@@ -324,26 +316,19 @@ async fn use_in_collection() {
                         .source(UseSource::Framework)
                         .name("fuchsia.component.Realm"),
                 )
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source_name: "hippo_data".parse().unwrap(),
-                    source: OfferSource::Parent,
-                    source_dictionary: None,
-                    target_name: "hippo_data".parse().unwrap(),
-                    target: OfferTarget::Collection("coll".parse().unwrap()),
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: OfferSource::Parent,
-                    source_dictionary: None,
-                    target_name: "hippo".parse().unwrap(),
-                    target: OfferTarget::Collection("coll".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::directory()
+                        .name("hippo_data")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Collection("coll".parse().unwrap()))
+                        .rights(fio::R_STAR_DIR),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("hippo")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Collection("coll".parse().unwrap())),
+                )
                 .collection_default("coll")
                 .build(),
         ),
@@ -415,26 +400,21 @@ async fn use_in_collection_not_offered() {
             ComponentDeclBuilder::new()
                 .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                 .protocol_default("foo")
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source_name: "foo_data".parse().unwrap(),
-                    source: OfferSource::Self_,
-                    source_dictionary: None,
-                    target_name: "hippo_data".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source_name: "foo".parse().unwrap(),
-                    source: OfferSource::Self_,
-                    source_dictionary: None,
-                    target_name: "hippo".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::directory()
+                        .name("foo_data")
+                        .target_name("hippo_data")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string()))
+                        .rights(fio::R_STAR_DIR),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("hippo")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
                 .child_default("b")
                 .build(),
         ),
@@ -502,15 +482,13 @@ async fn dynamic_offer_from_parent() {
             "a",
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source_name: "foo".parse().unwrap(),
-                    source: OfferSource::Self_,
-                    source_dictionary: None,
-                    target_name: "hippo".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("hippo")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
                 .child_default("b")
                 .build(),
         ),
@@ -1002,15 +980,12 @@ async fn dynamic_offer_to_static_offer() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: OfferSource::Parent,
-                    source_dictionary: None,
-                    target_name: "hippo".parse().unwrap(),
-                    target: OfferTarget::static_child("d".to_string()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("hippo")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("d".to_string())),
+                )
                 .child_default("d")
                 .build(),
         ),
@@ -1173,26 +1148,18 @@ async fn destroying_instance_blocks_on_routing() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::static_child("c".into()),
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: OfferTarget::static_child("b".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source: OfferSource::static_child("c".into()),
-                    source_name: "foo_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo_data".parse().unwrap(),
-                    target: OfferTarget::static_child("b".into()),
-                    rights: None,
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .source(OfferSource::static_child("c".into()))
+                        .target(OfferTarget::static_child("b".into())),
+                )
+                .offer(
+                    OfferBuilder::directory()
+                        .name("foo_data")
+                        .source(OfferSource::static_child("c".into()))
+                        .target(OfferTarget::static_child("b".into())),
+                )
                 .child_default("b")
                 .child_default("c")
                 .build(),
@@ -1423,13 +1390,13 @@ async fn use_runner_from_grandparent_environment() {
             "a",
             ComponentDeclBuilder::new()
                 .child_default("b")
-                .offer(OfferDecl::Runner(OfferRunnerDecl {
-                    source: OfferSource::Self_,
-                    source_name: "elf".parse().unwrap(),
-                    source_dictionary: None,
-                    target: OfferTarget::static_child("b".to_string()),
-                    target_name: "dwarf".parse().unwrap(),
-                }))
+                .offer(
+                    OfferBuilder::runner()
+                        .name("elf")
+                        .target_name("dwarf")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
                 .runner_default("elf")
                 .build(),
         ),
@@ -1776,30 +1743,24 @@ async fn use_with_destroyed_parent() {
                         .source(UseSource::Framework)
                         .name("fuchsia.component.Realm"),
                 )
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: OfferTarget::Collection("coll".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Collection("coll".parse().unwrap())),
+                )
                 .collection_default("coll")
                 .build(),
         ),
         (
             "b",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Parent,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: OfferTarget::static_child("c".to_string()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("c".to_string())),
+                )
                 .child_default("c")
                 .build(),
         ),
@@ -1868,15 +1829,13 @@ async fn use_from_destroyed_but_not_removed() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::static_child("b".to_string()),
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "baz".parse().unwrap(),
-                    target: OfferTarget::static_child("c".to_string()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .target_name("baz")
+                        .source(OfferSource::static_child("b".to_string()))
+                        .target(OfferTarget::static_child("c".to_string())),
+                )
                 .child_default("b")
                 .child_default("c")
                 .build(),
@@ -2434,16 +2393,12 @@ async fn offer_service_from_collection() {
             "a",
             ComponentDeclBuilder::new()
                 .use_realm()
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::Collection("coll".parse().unwrap()),
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    source_instance_filter: None,
-                    renamed_instances: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: OfferTarget::static_child("b".into()),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::service()
+                        .name("foo")
+                        .source(OfferSource::Collection("coll".parse().unwrap()))
+                        .target(OfferTarget::static_child("b".into())),
+                )
                 .collection_default("coll")
                 .child_default("b")
                 .build(),
@@ -2484,16 +2439,11 @@ async fn offer_service_from_collections() {
     let mut offers: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
-            OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection(coll.parse().unwrap()),
-                source_name: "foo".parse().unwrap(),
-                source_dictionary: None,
-                source_instance_filter: None,
-                renamed_instances: None,
-                target_name: "foo".parse().unwrap(),
-                target: OfferTarget::static_child("b".into()),
-                availability: Availability::Required,
-            })
+            OfferBuilder::service()
+                .name("foo")
+                .source(OfferSource::Collection(coll.parse().unwrap()))
+                .target(OfferTarget::static_child("b".into()))
+                .build()
         })
         .collect();
     let mut components = vec![
@@ -2548,16 +2498,11 @@ async fn offer_service_from_collections_multilevel() {
     let mut offers: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
-            OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection(coll.parse().unwrap()),
-                source_name: "foo".parse().unwrap(),
-                source_dictionary: None,
-                source_instance_filter: None,
-                renamed_instances: None,
-                target_name: "foo".parse().unwrap(),
-                target: OfferTarget::static_child("m".into()),
-                availability: Availability::Required,
-            })
+            OfferBuilder::service()
+                .name("foo")
+                .source(OfferSource::Collection(coll.parse().unwrap()))
+                .target(OfferTarget::static_child("m".into()))
+                .build()
         })
         .collect();
     let mut components = vec![
@@ -2577,16 +2522,12 @@ async fn offer_service_from_collections_multilevel() {
         (
             "m",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::Parent,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    source_instance_filter: None,
-                    renamed_instances: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: OfferTarget::static_child("b".into()),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::service()
+                        .name("foo")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("b".into())),
+                )
                 .child_default("b")
                 .build(),
         ),
@@ -2634,8 +2575,7 @@ async fn expose_service_from_collection() {
                 .expose(
                     ExposeBuilder::service()
                         .name("foo")
-                        .source(ExposeSource::Collection("coll".parse().unwrap()))
-                        .availability(Availability::Required),
+                        .source(ExposeSource::Collection("coll".parse().unwrap())),
                 )
                 .collection_default("coll")
                 .build(),
@@ -2799,16 +2739,11 @@ async fn list_service_instances_from_collections() {
     let mut offers: Vec<_> = ["coll1", "coll2"]
         .into_iter()
         .map(|coll| {
-            OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection(coll.parse().unwrap()),
-                source_name: "foo".parse().unwrap(),
-                source_dictionary: None,
-                source_instance_filter: None,
-                renamed_instances: None,
-                target_name: "foo".parse().unwrap(),
-                target: OfferTarget::static_child("client".into()),
-                availability: Availability::Required,
-            })
+            OfferBuilder::service()
+                .name("foo")
+                .source(OfferSource::Collection(coll.parse().unwrap()))
+                .target(OfferTarget::static_child("client".into()))
+                .build()
         })
         .collect();
     let components = vec![
@@ -2934,16 +2869,12 @@ async fn use_service_from_sibling_collection() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::static_child("c".to_string()),
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    source_instance_filter: None,
-                    renamed_instances: None,
-                    target: OfferTarget::static_child("b".to_string()),
-                    target_name: "my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::service()
+                        .name("my.service.Service")
+                        .source(OfferSource::static_child("c".to_string()))
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
                 .child(ChildBuilder::new().name("b"))
                 .child(ChildBuilder::new().name("c"))
                 .build(),
@@ -3068,29 +2999,23 @@ async fn use_filtered_service_from_sibling() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::static_child("b".to_string()),
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    source_instance_filter: Some(vec!["variantinstance".to_string()]),
-                    renamed_instances: None,
-                    target: OfferTarget::static_child("c".to_string()),
-                    target_name: "my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::static_child("b".to_string()),
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    source_instance_filter: None,
-                    renamed_instances: Some(vec![NameMapping {
-                        source_name: "default".to_string(),
-                        target_name: "renamed_default".to_string(),
-                    }]),
-                    target: OfferTarget::static_child("d".to_string()),
-                    target_name: "my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::service()
+                        .name("my.service.Service")
+                        .source(OfferSource::static_child("b".to_string()))
+                        .target(OfferTarget::static_child("c".to_string()))
+                        .source_instance_filter(vec!["variantinstance".to_string()]),
+                )
+                .offer(
+                    OfferBuilder::service()
+                        .name("my.service.Service")
+                        .source(OfferSource::static_child("b".to_string()))
+                        .target(OfferTarget::static_child("d".to_string()))
+                        .renamed_instances(vec![NameMapping {
+                            source_name: "default".to_string(),
+                            target_name: "renamed_default".to_string(),
+                        }]),
+                )
                 .child(ChildBuilder::new().name("b"))
                 .child(ChildBuilder::new().name("c"))
                 .child(ChildBuilder::new().name("d"))
@@ -3212,29 +3137,24 @@ async fn use_filtered_aggregate_service_from_sibling() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::static_child("b".to_string()),
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    source_instance_filter: Some(vec!["variantinstance".to_string()]),
-                    renamed_instances: None,
-                    target: OfferTarget::static_child("c".to_string()),
-                    target_name: "my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::static_child("b".to_string()),
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    source_instance_filter: Some(vec!["renamed_default".to_string()]),
-                    renamed_instances: Some(vec![NameMapping {
-                        source_name: "default".to_string(),
-                        target_name: "renamed_default".to_string(),
-                    }]),
-                    target: OfferTarget::static_child("c".to_string()),
-                    target_name: "my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::service()
+                        .name("my.service.Service")
+                        .source(OfferSource::static_child("b".to_string()))
+                        .target(OfferTarget::static_child("c".to_string()))
+                        .source_instance_filter(vec!["variantinstance".to_string()]),
+                )
+                .offer(
+                    OfferBuilder::service()
+                        .name("my.service.Service")
+                        .source(OfferSource::static_child("b".to_string()))
+                        .target(OfferTarget::static_child("c".to_string()))
+                        .source_instance_filter(vec!["renamed_default".to_string()])
+                        .renamed_instances(vec![NameMapping {
+                            source_name: "default".to_string(),
+                            target_name: "renamed_default".to_string(),
+                        }]),
+                )
                 .child(ChildBuilder::new().name("b"))
                 .child(ChildBuilder::new().name("c"))
                 .build(),
@@ -3333,16 +3253,12 @@ async fn use_anonymized_aggregate_service() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::Self_,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target: OfferTarget::static_child("b".to_string()),
-                    target_name: "my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                    source_instance_filter: None,
-                    renamed_instances: None,
-                }))
+                .offer(
+                    OfferBuilder::service()
+                        .name("my.service.Service")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
                 .service_default("my.service.Service")
                 .child(ChildBuilder::new().name("b"))
                 .build(),
@@ -3350,46 +3266,30 @@ async fn use_anonymized_aggregate_service() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::static_child("c".to_string()),
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target: OfferTarget::static_child("e".to_string()),
-                    target_name: "my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                    source_instance_filter: None,
-                    renamed_instances: None,
-                }))
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::static_child("d".to_string()),
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target: OfferTarget::static_child("e".to_string()),
-                    target_name: "my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                    source_instance_filter: None,
-                    renamed_instances: None,
-                }))
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::Parent,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target: OfferTarget::static_child("e".to_string()),
-                    target_name: "my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                    source_instance_filter: None,
-                    renamed_instances: None,
-                }))
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::Self_,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target: OfferTarget::static_child("e".to_string()),
-                    target_name: "my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                    source_instance_filter: None,
-                    renamed_instances: None,
-                }))
+                .offer(
+                    OfferBuilder::service()
+                        .name("my.service.Service")
+                        .source(OfferSource::static_child("c".to_string()))
+                        .target(OfferTarget::static_child("e".to_string())),
+                )
+                .offer(
+                    OfferBuilder::service()
+                        .name("my.service.Service")
+                        .source(OfferSource::static_child("d".to_string()))
+                        .target(OfferTarget::static_child("e".to_string())),
+                )
+                .offer(
+                    OfferBuilder::service()
+                        .name("my.service.Service")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("e".to_string())),
+                )
+                .offer(
+                    OfferBuilder::service()
+                        .name("my.service.Service")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("e".to_string())),
+                )
                 .service_default("my.service.Service")
                 .child(ChildBuilder::new().name("c"))
                 .child(ChildBuilder::new().name("d"))

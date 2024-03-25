@@ -547,16 +547,13 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .target_name("foo")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .service_default("foo")
                     .child_default("b")
                     .build(),
@@ -590,16 +587,13 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new_empty_component()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .target_name("foo")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .service_default("foo")
                     .child_default("b")
                     .build(),
@@ -671,16 +665,13 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".into()),
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .target_name("foo")
+                            .source(OfferSource::static_child("c".into()))
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -805,28 +796,32 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                        source: OfferSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        scope: Some(vec![
-                            EventScope::Child(ChildRef { name: "b".into(), collection: None }),
-                            EventScope::Child(ChildRef { name: "c".into(), collection: None }),
-                        ]),
-                        target: OfferTarget::Child(ChildRef { name: "b".into(), collection: None }),
-                        target_name: "started".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                        source: OfferSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        scope: Some(vec![
-                            EventScope::Child(ChildRef { name: "b".into(), collection: None }),
-                            EventScope::Child(ChildRef { name: "c".into(), collection: None }),
-                        ]),
-                        target: OfferTarget::Child(ChildRef { name: "c".into(), collection: None }),
-                        target_name: "started".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::event_stream()
+                            .name("started")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::Child(ChildRef {
+                                name: "b".into(),
+                                collection: None,
+                            }))
+                            .scope(vec![
+                                EventScope::Child(ChildRef { name: "b".into(), collection: None }),
+                                EventScope::Child(ChildRef { name: "c".into(), collection: None }),
+                            ]),
+                    )
+                    .offer(
+                        OfferBuilder::event_stream()
+                            .name("started")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::Child(ChildRef {
+                                name: "c".into(),
+                                collection: None,
+                            }))
+                            .scope(vec![
+                                EventScope::Child(ChildRef { name: "b".into(), collection: None }),
+                                EventScope::Child(ChildRef { name: "c".into(), collection: None }),
+                            ]),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -841,17 +836,19 @@ mod tests {
                 "c",
                 ComponentDeclBuilder::new()
                     .use_(UseBuilder::event_stream().name("started").path("/event/stream"))
-                    .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                        source: OfferSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        scope: Some(vec![EventScope::Child(ChildRef {
-                            name: "e".into(),
-                            collection: None,
-                        })]),
-                        target: OfferTarget::Child(ChildRef { name: "d".into(), collection: None }),
-                        target_name: "started".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::event_stream()
+                            .name("started")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::Child(ChildRef {
+                                name: "d".into(),
+                                collection: None,
+                            }))
+                            .scope(vec![EventScope::Child(ChildRef {
+                                name: "e".into(),
+                                collection: None,
+                            })]),
+                    )
                     .child_default("d")
                     .child_default("e")
                     .build(),
@@ -1120,15 +1117,12 @@ mod tests {
     #[fuchsia::test]
     async fn map_route_use_from_parent() {
         let use_decl = UseBuilder::protocol().name("bar").path("/svc/hippo").build();
-        let offer_decl = OfferDecl::Protocol(OfferProtocolDecl {
-            source: OfferSource::Self_,
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "bar".parse().unwrap(),
-            target: OfferTarget::Child(ChildRef { name: "b".into(), collection: None }),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let offer_decl = OfferBuilder::protocol()
+            .name("foo")
+            .target_name("bar")
+            .source(OfferSource::Self_)
+            .target(OfferTarget::Child(ChildRef { name: "b".into(), collection: None }))
+            .build();
         let protocol_decl = CapabilityBuilder::protocol().name("foo").build();
         let components = vec![
             (
@@ -1257,17 +1251,13 @@ mod tests {
     #[fuchsia::test]
     async fn map_route_use_from_niece() {
         let use_decl = UseBuilder::directory().name("foobar_data").path("/data/hippo").build();
-        let a_offer_decl = OfferDecl::Directory(OfferDirectoryDecl {
-            source: OfferSource::static_child("b".to_string()),
-            source_name: "baz_data".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "foobar_data".parse().unwrap(),
-            target: OfferTarget::static_child("c".to_string()),
-            rights: Some(fio::R_STAR_DIR),
-            subdir: None,
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let a_offer_decl = OfferBuilder::directory()
+            .name("baz_data")
+            .target_name("foobar_data")
+            .source(OfferSource::static_child("b".to_string()))
+            .target(OfferTarget::static_child("c".to_string()))
+            .rights(fio::R_STAR_DIR)
+            .build();
         let b_expose_decl = ExposeBuilder::directory()
             .name("bar_data")
             .target_name("baz_data")
@@ -1425,13 +1415,11 @@ mod tests {
             .backing_dir("data")
             .source(StorageDirectorySource::Self_)
             .build();
-        let offer_storage_decl = OfferDecl::Storage(OfferStorageDecl {
-            source: OfferSource::Self_,
-            target: OfferTarget::static_child("b".to_string()),
-            source_name: "cache".parse().unwrap(),
-            target_name: "cache".parse().unwrap(),
-            availability: Availability::Required,
-        });
+        let offer_storage_decl = OfferBuilder::storage()
+            .name("cache")
+            .source(OfferSource::Self_)
+            .target(OfferTarget::static_child("b".to_string()))
+            .build();
         let use_storage_decl = UseBuilder::storage().name("cache").path("/storage").build();
         let components = vec![
             (
@@ -1495,15 +1483,11 @@ mod tests {
     /// b: uses protocol "fuchsia.component.Realm"
     #[fuchsia::test]
     async fn route_map_use_from_framework_and_builtin() {
-        let offer_realm_decl = OfferDecl::Protocol(OfferProtocolDecl {
-            source: OfferSource::Framework,
-            source_name: "fuchsia.component.Realm".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "fuchsia.component.Realm".parse().unwrap(),
-            target: OfferTarget::static_child("b".to_string()),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let offer_realm_decl = OfferBuilder::protocol()
+            .name("fuchsia.component.Realm")
+            .source(OfferSource::Framework)
+            .target(OfferTarget::static_child("b".to_string()))
+            .build();
         let use_realm_decl = UseBuilder::protocol().name("fuchsia.component.Realm").build();
 
         let components = vec![
@@ -1553,15 +1537,12 @@ mod tests {
     /// b: uses protocol bar as /svc/hippo
     #[fuchsia::test]
     async fn route_map_offer_from_component_manager_namespace() {
-        let offer_decl = OfferDecl::Protocol(OfferProtocolDecl {
-            source: OfferSource::Parent,
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "bar".parse().unwrap(),
-            target: OfferTarget::static_child("b".to_string()),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let offer_decl = OfferBuilder::protocol()
+            .name("foo")
+            .target_name("bar")
+            .source(OfferSource::Parent)
+            .target(OfferTarget::static_child("b".to_string()))
+            .build();
         let use_decl = UseBuilder::protocol().name("bar").path("/svc/hippo").build();
         let capability_decl = CapabilityBuilder::protocol()
             .name("foo")
@@ -1902,17 +1883,13 @@ mod tests {
         let runner_decl = CapabilityBuilder::runner().name("hobbit").build();
         let use_directory_decl =
             UseBuilder::directory().name("bar_data").path("/data/hippo").build();
-        let offer_directory_decl = OfferDecl::Directory(OfferDirectoryDecl {
-            source: OfferSource::Self_,
-            source_name: "foo_data".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "bar_data".parse().unwrap(),
-            target: OfferTarget::static_child("b".to_string()),
-            rights: Some(fio::R_STAR_DIR),
-            subdir: None,
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let offer_directory_decl = OfferBuilder::directory()
+            .name("foo_data")
+            .target_name("bar_data")
+            .source(OfferSource::Self_)
+            .target(OfferTarget::static_child("b".to_string()))
+            .rights(fio::R_STAR_DIR)
+            .build();
         let directory_decl =
             CapabilityBuilder::directory().name("foo_data").path("/foo/data").build();
         let expose_protocol_decl = ExposeBuilder::protocol()
@@ -2066,15 +2043,12 @@ mod tests {
             .name("fuchsia.examples.Echo")
             .availability(Availability::Optional)
             .build();
-        let offer_protocol_decl = OfferDecl::Protocol(OfferProtocolDecl {
-            source: OfferSource::Void,
-            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "fuchsia.examples.Echo".parse().unwrap(),
-            target: OfferTarget::static_child("b".to_string()),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Optional,
-        });
+        let offer_protocol_decl = OfferBuilder::protocol()
+            .name("fuchsia.examples.Echo")
+            .source(OfferSource::Void)
+            .target(OfferTarget::static_child("b".to_string()))
+            .availability(Availability::Optional)
+            .build();
 
         let components = vec![
             (
@@ -2118,15 +2092,11 @@ mod tests {
         let a_url = make_test_url("a");
         let b_url = "base://b/".to_string();
 
-        let offer_protocol_decl = OfferDecl::Protocol(OfferProtocolDecl {
-            source: OfferSource::static_child("c".to_string()),
-            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "fuchsia.examples.Echo".parse().unwrap(),
-            target: OfferTarget::static_child("b".to_string()),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let offer_protocol_decl = OfferBuilder::protocol()
+            .name("fuchsia.examples.Echo")
+            .source(OfferSource::static_child("c".to_string()))
+            .target(OfferTarget::static_child("b".to_string()))
+            .build();
 
         let components = vec![
             (

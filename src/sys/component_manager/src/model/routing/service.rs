@@ -1014,16 +1014,13 @@ mod tests {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::Self_,
-                        source_name: "my.service.Service".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "my.service.Service".parse().unwrap(),
-                        target: OfferTarget::static_child("container".into()),
-                        availability: cm_rust::Availability::Required,
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("my.service.Service")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("container".into()))
+                            .availability(cm_rust::Availability::Required),
+                    )
                     .child_default("container")
                     .build(),
             ),
@@ -1035,36 +1032,27 @@ mod tests {
                             .source(UseSource::Framework)
                             .name("fuchsia.component.Realm"),
                     )
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::Collection("coll".parse().unwrap()),
-                        source_name: "my.service.Service".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "my.service.Service".parse().unwrap(),
-                        target: OfferTarget::static_child("target".into()),
-                        availability: cm_rust::Availability::Required,
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                    }))
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::Parent,
-                        source_name: "my.service.Service".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "my.service.Service".parse().unwrap(),
-                        target: OfferTarget::static_child("target".into()),
-                        availability: cm_rust::Availability::Required,
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                    }))
-                    .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::Self_,
-                        source_name: "my.service.Service".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "my.service.Service".parse().unwrap(),
-                        target: OfferTarget::static_child("target".into()),
-                        availability: cm_rust::Availability::Required,
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                    }))
+                    .offer(
+                        OfferBuilder::service()
+                            .name("my.service.Service")
+                            .source(OfferSource::Collection("coll".parse().unwrap()))
+                            .target(OfferTarget::static_child("target".into()))
+                            .availability(cm_rust::Availability::Required),
+                    )
+                    .offer(
+                        OfferBuilder::service()
+                            .name("my.service.Service")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("target".into()))
+                            .availability(cm_rust::Availability::Required),
+                    )
+                    .offer(
+                        OfferBuilder::service()
+                            .name("my.service.Service")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("target".into()))
+                            .availability(cm_rust::Availability::Required),
+                    )
                     .collection_default("coll")
                     .child_default("target")
                     .build(),

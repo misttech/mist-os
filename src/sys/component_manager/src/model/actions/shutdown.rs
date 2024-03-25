@@ -1522,17 +1522,15 @@ mod tests {
         let decl = ComponentDeclBuilder::new()
             .child_default("childA")
             .collection_default("coll")
-            .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                source: OfferSource::Child(ChildRef { name: "childA".into(), collection: None }),
-                target: OfferTarget::Collection("coll".parse().unwrap()),
-                source_name: "some_dir".parse().unwrap(),
-                source_dictionary: None,
-                target_name: "some_dir".parse().unwrap(),
-                dependency_type: DependencyType::Strong,
-                rights: None,
-                subdir: None,
-                availability: Availability::Required,
-            }))
+            .offer(
+                OfferBuilder::directory()
+                    .name("some_dir")
+                    .source(OfferSource::Child(ChildRef {
+                        name: "childA".into(),
+                        collection: None,
+                    }))
+                    .target(OfferTarget::Collection("coll".parse().unwrap())),
+            )
             .build();
 
         let instance = FakeComponent {
@@ -3026,15 +3024,16 @@ mod tests {
                             .allowed_offers(AllowedOffers::StaticAndDynamic),
                     )
                     .child_default("c")
-                    .offer(cm_rust::OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Child(ChildRef { name: "c".into(), collection: None }),
-                        source_name: "static_offer_source".parse().unwrap(),
-                        source_dictionary: None,
-                        target: OfferTarget::Collection("coll".parse().unwrap()),
-                        target_name: "static_offer_target".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("static_offer_source")
+                            .target_name("static_offer_target")
+                            .source(OfferSource::Child(ChildRef {
+                                name: "c".into(),
+                                collection: None,
+                            }))
+                            .target(OfferTarget::Collection("coll".parse().unwrap())),
+                    )
                     .build(),
             ),
             ("a", component_decl_with_test_runner()),
@@ -3347,24 +3346,18 @@ mod tests {
                     .child(ChildBuilder::new().name("c").eager().build())
                     .child(ChildBuilder::new().name("d").eager().build())
                     .child(ChildBuilder::new().name("e").eager().build())
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceD".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceD".parse().unwrap(),
-                        target: OfferTarget::static_child("e".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("serviceD")
+                            .source(OfferSource::static_child("d".to_string()))
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("serviceD")
+                            .source(OfferSource::static_child("d".to_string()))
+                            .target(OfferTarget::static_child("e".to_string())),
+                    )
                     .build(),
             ),
             (
@@ -3481,33 +3474,24 @@ mod tests {
                     .child(ChildBuilder::new().name("d").eager().build())
                     .child(ChildBuilder::new().name("e").eager().build())
                     .child(ChildBuilder::new().name("f").eager().build())
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceD".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceD".parse().unwrap(),
-                        target: OfferTarget::static_child("e".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("e".to_string()),
-                        source_name: "serviceE".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceE".parse().unwrap(),
-                        target: OfferTarget::static_child("f".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("serviceD")
+                            .source(OfferSource::static_child("d".to_string()))
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("serviceD")
+                            .source(OfferSource::static_child("d".to_string()))
+                            .target(OfferTarget::static_child("e".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("serviceE")
+                            .source(OfferSource::static_child("e".to_string()))
+                            .target(OfferTarget::static_child("f".to_string())),
+                    )
                     .build(),
             ),
             (
@@ -3661,42 +3645,30 @@ mod tests {
                     .child(ChildBuilder::new().name("d").eager().build())
                     .child(ChildBuilder::new().name("e").eager().build())
                     .child(ChildBuilder::new().name("f").eager().build())
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceD".parse().unwrap(),
-                        target: OfferTarget::static_child("c".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceD".parse().unwrap(),
-                        target: OfferTarget::static_child("e".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceD".parse().unwrap(),
-                        target: OfferTarget::static_child("f".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("e".to_string()),
-                        source_name: "serviceE".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceE".parse().unwrap(),
-                        target: OfferTarget::static_child("f".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("serviceD")
+                            .source(OfferSource::static_child("d".to_string()))
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("serviceD")
+                            .source(OfferSource::static_child("d".to_string()))
+                            .target(OfferTarget::static_child("e".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("serviceD")
+                            .source(OfferSource::static_child("d".to_string()))
+                            .target(OfferTarget::static_child("f".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("serviceE")
+                            .source(OfferSource::static_child("e".to_string()))
+                            .target(OfferTarget::static_child("f".to_string())),
+                    )
                     .build(),
             ),
             (
@@ -3843,15 +3815,12 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(ChildBuilder::new().name("c").eager().build())
                     .child(ChildBuilder::new().name("d").eager().build())
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("c".to_string()),
-                        source_name: "serviceC".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceC".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("serviceC")
+                            .source(OfferSource::static_child("c".to_string()))
+                            .target(OfferTarget::static_child("d".to_string())),
+                    )
                     .build(),
             ),
             (
@@ -4086,15 +4055,13 @@ mod tests {
                             .source(UseSource::Child("b".to_string()))
                             .name("serviceB"),
                     )
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("c".to_string()),
-                        source_name: "serviceC".parse().unwrap(),
-                        source_dictionary: None,
-                        target: OfferTarget::static_child("b".to_string()),
-                        target_name: "serviceB".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("serviceC")
+                            .target_name("serviceB")
+                            .source(OfferSource::static_child("c".to_string()))
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .build(),
             ),
             (

@@ -110,17 +110,14 @@ async fn use_in_collection_from_parent() {
                         .path("/data")
                         .rights(fio::RW_STAR_DIR),
                 )
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "minfs".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    rights: Some(fio::RW_STAR_DIR),
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::directory()
+                        .name("data")
+                        .target_name("minfs")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string()))
+                        .rights(fio::RW_STAR_DIR),
+                )
                 .child_default("b")
                 .build(),
         ),
@@ -132,20 +129,18 @@ async fn use_in_collection_from_parent() {
                         .source(UseSource::Framework)
                         .name("fuchsia.component.Realm"),
                 )
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    target: OfferTarget::Collection("coll".parse().unwrap()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    target: OfferTarget::Collection("coll".parse().unwrap()),
-                    source_name: "cache".parse().unwrap(),
-                    target_name: "cache".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Collection("coll".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::storage()
+                        .name("cache")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Collection("coll".parse().unwrap())),
+                )
                 .capability(
                     CapabilityBuilder::storage()
                         .name("data")
@@ -256,20 +251,18 @@ async fn use_in_collection_from_grandparent() {
                         .path("/data")
                         .rights(fio::RW_STAR_DIR),
                 )
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    target: OfferTarget::static_child("b".to_string()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    target: OfferTarget::static_child("b".to_string()),
-                    source_name: "cache".parse().unwrap(),
-                    target_name: "cache".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
+                .offer(
+                    OfferBuilder::storage()
+                        .name("cache")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
                 .child_default("b")
                 .capability(
                     CapabilityBuilder::storage()
@@ -295,20 +288,18 @@ async fn use_in_collection_from_grandparent() {
                         .source(UseSource::Framework)
                         .name("fuchsia.component.Realm"),
                 )
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Parent,
-                    target: OfferTarget::Collection("coll".parse().unwrap()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Parent,
-                    target: OfferTarget::Collection("coll".parse().unwrap()),
-                    source_name: "cache".parse().unwrap(),
-                    target_name: "cache".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Collection("coll".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::storage()
+                        .name("cache")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Collection("coll".parse().unwrap())),
+                )
                 .collection_default("coll")
                 .build(),
         ),
@@ -481,13 +472,12 @@ async fn use_restricted_storage_start_failure() {
                         .source(StorageDirectorySource::Self_)
                         .storage_id(fdecl::StorageId::StaticInstanceId),
                 )
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    target: OfferTarget::static_child("parent_consumer".to_string()),
-                    source_name: "cache".parse().unwrap(),
-                    target_name: "cache".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("cache")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("parent_consumer".to_string())),
+                )
                 .child_default("parent_consumer")
                 .build(),
         ),
@@ -495,13 +485,12 @@ async fn use_restricted_storage_start_failure() {
             "parent_consumer",
             ComponentDeclBuilder::new()
                 .use_(UseBuilder::storage().name("cache").path("/storage"))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Parent,
-                    target: OfferTarget::static_child("child_consumer".to_string()),
-                    source_name: "cache".parse().unwrap(),
-                    target_name: "cache".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("cache")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("child_consumer".to_string())),
+                )
                 .child_default("child_consumer")
                 .build(),
         ),
@@ -576,13 +565,12 @@ async fn use_restricted_storage_open_failure() {
                         .backing_dir("data")
                         .source(StorageDirectorySource::Self_),
                 )
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    target: OfferTarget::static_child("parent_consumer".to_string()),
-                    source_name: "cache".parse().unwrap(),
-                    target_name: "cache".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("cache")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("parent_consumer".to_string())),
+                )
                 .child_default("parent_consumer")
                 .build(),
         ),
@@ -706,13 +694,12 @@ async fn open_storage_subdirectory() {
                         .backing_dir("data")
                         .source(StorageDirectorySource::Self_),
                 )
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    target: OfferTarget::static_child("consumer".to_string()),
-                    source_name: "cache".parse().unwrap(),
-                    target_name: "cache".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("cache")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("consumer".to_string())),
+                )
                 .child_default("consumer")
                 .build(),
         ),
@@ -822,22 +809,18 @@ async fn storage_persistence_moniker_path() {
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_),
                 )
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    target: OfferTarget::static_child("b".to_string()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Capability("data".parse().unwrap()),
-                    source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.sys2.StorageAdmin")
+                        .source(OfferSource::Capability("data".parse().unwrap()))
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
                 .child_default("b")
                 .build(),
         ),
@@ -851,13 +834,12 @@ async fn storage_persistence_moniker_path() {
                 )
                 .use_(UseBuilder::protocol().name("fuchsia.sys2.StorageAdmin"))
                 .use_(UseBuilder::storage().name("data").path("/data"))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Parent,
-                    target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Collection("persistent_coll".parse().unwrap())),
+                )
                 .collection(
                     CollectionBuilder::new().name("persistent_coll").persistent_storage(true),
                 )
@@ -990,22 +972,18 @@ async fn storage_persistence_instance_id_path() {
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_),
                 )
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    target: OfferTarget::static_child("b".to_string()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Capability("data".parse().unwrap()),
-                    source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.sys2.StorageAdmin")
+                        .source(OfferSource::Capability("data".parse().unwrap()))
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
                 .child_default("b")
                 .build(),
         ),
@@ -1019,13 +997,12 @@ async fn storage_persistence_instance_id_path() {
                 )
                 .use_(UseBuilder::protocol().name("fuchsia.sys2.StorageAdmin"))
                 .use_(UseBuilder::storage().name("data").path("/data"))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Parent,
-                    target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Collection("persistent_coll".parse().unwrap())),
+                )
                 .collection(
                     CollectionBuilder::new().name("persistent_coll").persistent_storage(true),
                 )
@@ -1162,13 +1139,12 @@ async fn storage_persistence_inheritance() {
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_),
                 )
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    target: OfferTarget::static_child("b".to_string()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
                 .child_default("b")
                 .build(),
         ),
@@ -1181,13 +1157,12 @@ async fn storage_persistence_inheritance() {
                         .name("fuchsia.component.Realm"),
                 )
                 .use_(UseBuilder::storage().name("data").path("/data"))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Parent,
-                    target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Collection("persistent_coll".parse().unwrap())),
+                )
                 .collection(
                     CollectionBuilder::new().name("persistent_coll").persistent_storage(true),
                 )
@@ -1202,20 +1177,18 @@ async fn storage_persistence_inheritance() {
                         .name("fuchsia.component.Realm"),
                 )
                 .use_(UseBuilder::storage().name("data").path("/data"))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Parent,
-                    target: OfferTarget::static_child("d".to_string()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Parent,
-                    target: OfferTarget::Collection("lower_coll".parse().unwrap()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("d".to_string())),
+                )
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Collection("lower_coll".parse().unwrap())),
+                )
                 .child_default("d")
                 .collection_default("lower_coll")
                 .build(),
@@ -1393,13 +1366,12 @@ async fn storage_persistence_disablement() {
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_),
                 )
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    target: OfferTarget::static_child("b".to_string()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("b".to_string())),
+                )
                 .child_default("b")
                 .build(),
         ),
@@ -1412,13 +1384,12 @@ async fn storage_persistence_disablement() {
                         .name("fuchsia.component.Realm"),
                 )
                 .use_(UseBuilder::storage().name("data").path("/data"))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Parent,
-                    target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Collection("persistent_coll".parse().unwrap())),
+                )
                 .collection(
                     CollectionBuilder::new().name("persistent_coll").persistent_storage(true),
                 )
@@ -1433,20 +1404,18 @@ async fn storage_persistence_disablement() {
                         .name("fuchsia.component.Realm"),
                 )
                 .use_(UseBuilder::storage().name("data").path("/data"))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Parent,
-                    target: OfferTarget::static_child("d".to_string()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Parent,
-                    target: OfferTarget::Collection("non_persistent_coll".parse().unwrap()),
-                    source_name: "data".parse().unwrap(),
-                    target_name: "data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("d".to_string())),
+                )
+                .offer(
+                    OfferBuilder::storage()
+                        .name("data")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Collection("non_persistent_coll".parse().unwrap())),
+                )
                 .child_default("d")
                 .collection(
                     CollectionBuilder::new().name("non_persistent_coll").persistent_storage(false),

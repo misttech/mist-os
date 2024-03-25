@@ -949,16 +949,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn route_service() {
-        let offer_from_collection_decl = OfferDecl::Service(OfferServiceDecl {
-            source: OfferSource::Collection("coll".parse().unwrap()),
-            source_name: "my_service".parse().unwrap(),
-            source_dictionary: None,
-            target: OfferTarget::static_child("target".into()),
-            target_name: "my_service".parse().unwrap(),
-            availability: Availability::Required,
-            source_instance_filter: None,
-            renamed_instances: None,
-        });
+        let offer_from_collection_decl = OfferBuilder::service()
+            .name("my_service")
+            .source(OfferSource::Collection("coll".parse().unwrap()))
+            .target(OfferTarget::static_child("target".into()))
+            .build();
         let expose_from_self_decl =
             ExposeBuilder::service().name("my_service").source(ExposeSource::Self_).build();
         let use_decl = UseBuilder::service().name("my_service").path("/svc/foo.bar").build();

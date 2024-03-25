@@ -8,9 +8,7 @@ mod tests {
         cm_fidl_analyzer::route::VerifyRouteResult,
         cm_moniker::InstancedMoniker,
         cm_rust::{
-            Availability, CapabilityDecl, CapabilityTypeName, DependencyType, OfferDecl,
-            OfferDirectoryDecl, OfferSource, OfferStorageDecl, OfferTarget, StorageDecl,
-            StorageDirectorySource,
+            CapabilityDecl, CapabilityTypeName, OfferSource, OfferTarget, StorageDirectorySource,
         },
         cm_rust_testing::*,
         component_id_index::InstanceId,
@@ -187,13 +185,12 @@ mod tests {
                             .source(StorageDirectorySource::Self_)
                             .storage_id(fdecl::StorageId::StaticInstanceId),
                     )
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("consumer".to_string()),
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("consumer".to_string())),
+                    )
                     .child_default("consumer")
                     .build(),
             ),
@@ -250,32 +247,23 @@ mod tests {
             .path("/data")
             .rights(fio::RW_STAR_DIR)
             .build();
-        let offer_directory_decl = OfferDecl::Directory(OfferDirectoryDecl {
-            source: OfferSource::Self_,
-            source_name: "data".parse().unwrap(),
-            source_dictionary: None,
-            target: OfferTarget::static_child("storage_provider".to_string()),
-            target_name: "data".parse().unwrap(),
-            rights: Some(fio::RW_STAR_DIR),
-            subdir: None,
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
-        let inner_storage_decl = StorageDecl {
-            name: "cache".parse().unwrap(),
-            backing_dir: "data".parse().unwrap(),
-            subdir: None,
-            storage_id: fdecl::StorageId::StaticInstanceId,
-            source: StorageDirectorySource::Parent,
-        };
-        let storage_decl = CapabilityDecl::Storage(inner_storage_decl.clone());
-        let offer_storage_decl = OfferDecl::Storage(OfferStorageDecl {
-            source: OfferSource::Self_,
-            target: OfferTarget::static_child("not_consumer".to_string()),
-            source_name: "cache".parse().unwrap(),
-            target_name: "cache".parse().unwrap(),
-            availability: Availability::Required,
-        });
+        let offer_directory_decl = OfferBuilder::directory()
+            .name("data")
+            .source(OfferSource::Self_)
+            .target(OfferTarget::static_child("storage_provider".to_string()))
+            .rights(fio::RW_STAR_DIR)
+            .build();
+        let storage_decl = CapabilityBuilder::storage()
+            .name("cache")
+            .backing_dir("data")
+            .source(StorageDirectorySource::Parent)
+            .storage_id(fdecl::StorageId::StaticInstanceId)
+            .build();
+        let offer_storage_decl = OfferBuilder::storage()
+            .name("cache")
+            .source(OfferSource::Self_)
+            .target(OfferTarget::static_child("not_consumer".to_string()))
+            .build();
         let components = vec![
             (
                 "directory_provider",
@@ -311,6 +299,9 @@ mod tests {
         let storage = route_maps
             .get(&CapabilityTypeName::Storage)
             .expect("expected a storage capability route");
+        let CapabilityDecl::Storage(inner_storage_decl) = storage_decl.clone() else {
+            unreachable!()
+        };
 
         assert_eq!(
             storage,
@@ -326,7 +317,7 @@ mod tests {
                         },
                         RouteSegment::DeclareBy {
                             moniker: Moniker::parse_str("/storage_provider").unwrap(),
-                            capability: storage_decl.clone(),
+                            capability: storage_decl
                         }
                     ]
                 },

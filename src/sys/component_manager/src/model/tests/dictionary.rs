@@ -17,24 +17,19 @@ async fn use_protocol_from_dictionary() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("parent_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("parent_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "parent_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "parent_dict".parse().unwrap(),
-                    target: OfferTarget::static_child("mid".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("parent_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("parent_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("mid".into())),
+                )
                 .child_default("mid")
                 .build(),
         ),
@@ -43,15 +38,13 @@ async fn use_protocol_from_dictionary() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("self_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap())),
+                )
                 .use_(
                     UseBuilder::protocol()
                         .source(UseSource::Self_)
@@ -73,15 +66,13 @@ async fn use_protocol_from_dictionary() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("child_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "C".parse().unwrap(),
-                    target: OfferTarget::Capability("child_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("C")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("child_dict".parse().unwrap())),
+                )
                 .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
@@ -107,24 +98,19 @@ async fn use_protocol_from_dictionary_not_found() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "dict".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into())),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -155,24 +141,20 @@ async fn use_protocol_from_dictionary_not_found() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "other_dict".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("dict")
+                        .target_name("other_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into())),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -205,26 +187,20 @@ async fn use_directory_from_dictionary_not_supported() {
             ComponentDeclBuilder::new()
                 .capability(CapabilityBuilder::directory().name("bar_data").path("/data/bar"))
                 .dictionary_default("parent_dict")
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "parent_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target: OfferTarget::static_child("leaf".into()),
-                    target_name: "parent_dict".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "bar_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("parent_dict".parse().unwrap()),
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("parent_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into())),
+                )
+                .offer(
+                    OfferBuilder::directory()
+                        .name("bar_data")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("parent_dict".parse().unwrap()))
+                        .rights(fio::R_STAR_DIR),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -233,17 +209,14 @@ async fn use_directory_from_dictionary_not_supported() {
             ComponentDeclBuilder::new()
                 .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                 .dictionary_default("self_dict")
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::directory()
+                        .name("foo_data")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap()))
+                        .rights(fio::R_STAR_DIR),
+                )
                 .use_(
                     UseBuilder::directory()
                         .source(UseSource::Self_)
@@ -304,17 +277,14 @@ async fn expose_directory_from_dictionary_not_supported() {
             ComponentDeclBuilder::new()
                 .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                 .dictionary_default("self_dict")
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::directory()
+                        .name("foo_data")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap()))
+                        .rights(fio::R_STAR_DIR),
+                )
                 .expose(
                     ExposeBuilder::directory()
                         .name("A")
@@ -335,23 +305,15 @@ async fn expose_directory_from_dictionary_not_supported() {
             ComponentDeclBuilder::new()
                 .capability(CapabilityBuilder::directory().name("bar_data").path("/data/bar"))
                 .dictionary_default("child_dict")
-                .expose(
-                    ExposeBuilder::dictionary()
-                        .name("child_dict")
-                        .source(ExposeSource::Self_)
-                        .availability(Availability::Required),
+                .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
+                .offer(
+                    OfferBuilder::directory()
+                        .name("bar_data")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("child_dict".parse().unwrap()))
+                        .rights(fio::R_STAR_DIR),
                 )
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "bar_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("child_dict".parse().unwrap()),
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
                 .build(),
         ),
     ];
@@ -388,33 +350,25 @@ async fn use_protocol_from_nested_dictionary() {
                 .protocol_default("foo")
                 .dictionary_default("nested")
                 .dictionary_default("parent_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("parent_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "parent_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "parent_dict".parse().unwrap(),
-                    target: OfferTarget::static_child("mid".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("parent_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("parent_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("mid".into())),
+                )
                 .child_default("mid")
                 .build(),
         ),
@@ -424,24 +378,19 @@ async fn use_protocol_from_nested_dictionary() {
                 .protocol_default("foo")
                 .dictionary_default("nested")
                 .dictionary_default("self_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap())),
+                )
                 .use_(
                     UseBuilder::protocol()
                         .source(UseSource::Self_)
@@ -464,24 +413,19 @@ async fn use_protocol_from_nested_dictionary() {
                 .protocol_default("foo")
                 .dictionary_default("nested")
                 .dictionary_default("child_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "C".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("child_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("C")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("child_dict".parse().unwrap())),
+                )
                 .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
@@ -506,24 +450,19 @@ async fn offer_protocol_from_dictionary() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("parent_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("parent_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "parent_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "parent_dict".parse().unwrap(),
-                    target: OfferTarget::static_child("mid".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("parent_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("parent_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("mid".into())),
+                )
                 .child_default("mid")
                 .build(),
         ),
@@ -532,42 +471,37 @@ async fn offer_protocol_from_dictionary() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("self_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("self_dict".parse().unwrap()),
-                    target_name: "A_svc".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Parent,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("parent_dict".parse().unwrap()),
-                    target_name: "B_svc".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::static_child("provider".into()),
-                    source_name: "C".parse().unwrap(),
-                    source_dictionary: Some("child_dict".parse().unwrap()),
-                    target_name: "C_svc".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("A")
+                        .target_name("A_svc")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("self_dict"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("B")
+                        .target_name("B_svc")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("parent_dict"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("C")
+                        .target_name("C_svc")
+                        .source(OfferSource::static_child("provider".into()))
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("child_dict"),
+                )
                 .child_default("provider")
                 .child_default("leaf")
                 .build(),
@@ -577,15 +511,13 @@ async fn offer_protocol_from_dictionary() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("child_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "C".parse().unwrap(),
-                    target: OfferTarget::Capability("child_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("C")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("child_dict".parse().unwrap())),
+                )
                 .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
@@ -619,39 +551,33 @@ async fn offer_protocol_from_dictionary_not_found() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "dict".parse().unwrap(),
-                    target: OfferTarget::static_child("mid".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("mid".into())),
+                )
                 .child_default("mid")
                 .build(),
         ),
         (
             "mid",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Parent,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("dict".parse().unwrap()),
-                    target_name: "A_svc".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("A")
+                        .target_name("A_svc")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("dict"),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -685,33 +611,25 @@ async fn offer_protocol_from_nested_dictionary() {
                 .protocol_default("foo")
                 .dictionary_default("nested")
                 .dictionary_default("parent_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("parent_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "parent_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "parent_dict".parse().unwrap(),
-                    target: OfferTarget::static_child("mid".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("parent_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("parent_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("mid".into())),
+                )
                 .child_default("mid")
                 .build(),
         ),
@@ -721,51 +639,43 @@ async fn offer_protocol_from_nested_dictionary() {
                 .protocol_default("foo")
                 .dictionary_default("self_dict")
                 .dictionary_default("nested")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("self_dict/nested".parse().unwrap()),
-                    target_name: "A_svc".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Parent,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("parent_dict/nested".parse().unwrap()),
-                    target_name: "B_svc".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::static_child("provider".into()),
-                    source_name: "C".parse().unwrap(),
-                    source_dictionary: Some("child_dict/nested".parse().unwrap()),
-                    target_name: "C_svc".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("A")
+                        .target_name("A_svc")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("self_dict/nested"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("B")
+                        .target_name("B_svc")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("parent_dict/nested"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("C")
+                        .target_name("C_svc")
+                        .source(OfferSource::static_child("provider".into()))
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("child_dict/nested"),
+                )
                 .child_default("provider")
                 .child_default("leaf")
                 .build(),
@@ -776,24 +686,19 @@ async fn offer_protocol_from_nested_dictionary() {
                 .protocol_default("foo")
                 .dictionary_default("child_dict")
                 .dictionary_default("nested")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "C".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("child_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("C")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("child_dict".parse().unwrap())),
+                )
                 .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
@@ -858,15 +763,13 @@ async fn expose_protocol_from_dictionary() {
                         .from_dictionary("child_dict")
                         .source(ExposeSource::Child("leaf".into())),
                 )
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap())),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -875,15 +778,13 @@ async fn expose_protocol_from_dictionary() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("child_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("child_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("child_dict".parse().unwrap())),
+                )
                 .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
@@ -934,15 +835,13 @@ async fn expose_protocol_from_dictionary_not_found() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap())),
+                )
                 .expose(ExposeBuilder::dictionary().name("dict").source(ExposeSource::Self_))
                 .build(),
         ),
@@ -1002,24 +901,19 @@ async fn expose_protocol_from_nested_dictionary() {
                         .from_dictionary("child_dict/nested")
                         .source(ExposeSource::Child("leaf".into())),
                 )
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap())),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -1029,24 +923,19 @@ async fn expose_protocol_from_nested_dictionary() {
                 .protocol_default("foo")
                 .dictionary_default("child_dict")
                 .dictionary_default("nested")
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("child_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("child_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
                 .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
@@ -1077,15 +966,13 @@ async fn dictionary_in_exposed_dir() {
                         .name("child_dict")
                         .source(ExposeSource::Child("leaf".into())),
                 )
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap())),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -1095,24 +982,19 @@ async fn dictionary_in_exposed_dir() {
                 .protocol_default("foo")
                 .dictionary_default("nested")
                 .dictionary_default("child_dict")
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("child_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("child_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
                 .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
@@ -1138,24 +1020,19 @@ async fn offer_dictionary_to_dictionary() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("parent_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("parent_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "parent_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "parent_dict".parse().unwrap(),
-                    target: OfferTarget::static_child("mid".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("parent_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("parent_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("mid".into())),
+                )
                 .child_default("mid")
                 .build(),
         ),
@@ -1165,42 +1042,31 @@ async fn offer_dictionary_to_dictionary() {
                 .protocol_default("foo")
                 .dictionary_default("self_dict")
                 .dictionary_default("root_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "self_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "self_dict".parse().unwrap(),
-                    target: OfferTarget::Capability("root_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Parent,
-                    source_name: "parent_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "parent_dict".parse().unwrap(),
-                    target: OfferTarget::Capability("root_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::static_child("leaf".into()),
-                    source_name: "child_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "child_dict".parse().unwrap(),
-                    target: OfferTarget::Capability("root_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("self_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("root_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("parent_dict")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Capability("root_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("child_dict")
+                        .source(OfferSource::static_child("leaf".into()))
+                        .target(OfferTarget::Capability("root_dict".parse().unwrap())),
+                )
                 .use_(
                     UseBuilder::protocol()
                         .source(UseSource::Self_)
@@ -1227,15 +1093,13 @@ async fn offer_dictionary_to_dictionary() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("child_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "C".parse().unwrap(),
-                    target: OfferTarget::Capability("child_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("C")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("child_dict".parse().unwrap())),
+                )
                 .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
@@ -1259,15 +1123,12 @@ async fn extend_from_self() {
             "root",
             ComponentDeclBuilder::new()
                 .protocol_default("bar")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "bar".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into())),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -1282,24 +1143,20 @@ async fn extend_from_self() {
                         .source_dictionary(DictionarySource::Self_, "origin_dict")
                         .build(),
                 )
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Parent,
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("origin_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .target_name("B")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::Capability("origin_dict".parse().unwrap())),
+                )
                 .use_(
                     UseBuilder::protocol()
                         .source(UseSource::Self_)
@@ -1341,24 +1198,19 @@ async fn extend_from_parent() {
             ComponentDeclBuilder::new()
                 .protocol_default("bar")
                 .dictionary_default("origin_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("origin_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "origin_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "origin_dict".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("origin_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("origin_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into())),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -1372,15 +1224,13 @@ async fn extend_from_parent() {
                         .source_dictionary(DictionarySource::Parent, "origin_dict")
                         .build(),
                 )
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap())),
+                )
                 .use_(
                     UseBuilder::protocol()
                         .source(UseSource::Self_)
@@ -1433,15 +1283,13 @@ async fn extend_from_child() {
                         )
                         .build(),
                 )
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("self_dict".parse().unwrap())),
+                )
                 .use_(
                     UseBuilder::protocol()
                         .source(UseSource::Self_)
@@ -1462,15 +1310,13 @@ async fn extend_from_child() {
             ComponentDeclBuilder::new()
                 .protocol_default("bar")
                 .dictionary_default("origin_dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("origin_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("origin_dict".parse().unwrap())),
+                )
                 .expose(ExposeBuilder::dictionary().name("origin_dict").source(ExposeSource::Self_))
                 .build(),
         ),
@@ -1505,42 +1351,32 @@ async fn use_from_dictionary_availability_attenuated() {
                 .protocol_default("bar")
                 .dictionary_default("nested")
                 .dictionary_default("dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "dict".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into())),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -1593,69 +1429,56 @@ async fn use_from_dictionary_availability_invalid() {
                 .dictionary_default("optional_dict")
                 .dictionary_default("nested")
                 .dictionary_default("dict_with_optional_nested")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Optional,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("optional_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "qux".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "C".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("dict_with_optional_nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Optional,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "required_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "required_dict".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "optional_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "optional_dict".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Optional,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "dict_with_optional_nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "dict_with_optional_nested".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap()))
+                        .availability(Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("optional_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("qux")
+                        .target_name("C")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability(
+                            "dict_with_optional_nested".parse().unwrap(),
+                        ))
+                        .availability(Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("required_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("optional_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .availability(Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("dict_with_optional_nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into())),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -1713,51 +1536,40 @@ async fn offer_from_dictionary_availability_attenuated() {
                 .protocol_default("bar")
                 .dictionary_default("nested")
                 .dictionary_default("dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("dict".parse().unwrap()),
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("dict/nested".parse().unwrap()),
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("dict"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("dict/nested"),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -1800,102 +1612,83 @@ async fn offer_from_dictionary_availability_invalid() {
                 .dictionary_default("optional_dict")
                 .dictionary_default("nested")
                 .dictionary_default("dict_with_optional_nested")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Optional,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("optional_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "qux".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "C".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("dict_with_optional_nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Optional,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "required_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "required_dict".parse().unwrap(),
-                    target: OfferTarget::static_child("mid".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "optional_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "optional_dict".parse().unwrap(),
-                    target: OfferTarget::static_child("mid".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Optional,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "dict_with_optional_nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "dict_with_optional_nested".parse().unwrap(),
-                    target: OfferTarget::static_child("mid".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap()))
+                        .availability(Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("optional_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("qux")
+                        .target_name("C")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability(
+                            "dict_with_optional_nested".parse().unwrap(),
+                        ))
+                        .availability(Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("required_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("mid".into())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("optional_dict")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("mid".into()))
+                        .availability(Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("dict_with_optional_nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::static_child("mid".into())),
+                )
                 .child_default("mid")
                 .build(),
         ),
         (
             "mid",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: OfferSource::Parent,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("required_dict".parse().unwrap()),
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: OfferSource::Parent,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("optional_dict".parse().unwrap()),
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: OfferSource::Parent,
-                    source_name: "C".parse().unwrap(),
-                    source_dictionary: Some("dict_with_optional_nested/nested".parse().unwrap()),
-                    target_name: "C".parse().unwrap(),
-                    target: OfferTarget::static_child("leaf".into()),
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("A")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("required_dict"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("B")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("optional_dict"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("C")
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("leaf".into()))
+                        .from_dictionary("dict_with_optional_nested/nested"),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -1967,46 +1760,37 @@ async fn expose_from_dictionary_availability_attenuated() {
                 .protocol_default("bar")
                 .dictionary_default("nested")
                 .dictionary_default("dict")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap())),
+                )
                 .expose(
                     ExposeBuilder::protocol()
                         .name("A")
                         .from_dictionary("dict")
-                        .source(ExposeSource::Self_)
-                        .availability(Availability::Required),
+                        .source(ExposeSource::Self_),
                 )
                 .expose(
                     ExposeBuilder::protocol()
                         .name("B")
                         .from_dictionary("dict/nested")
-                        .source(ExposeSource::Self_)
-                        .availability(Availability::Required),
+                        .source(ExposeSource::Self_),
                 )
                 .build(),
         ),
@@ -2048,22 +1832,19 @@ async fn expose_from_dictionary_availability_invalid() {
                     ExposeBuilder::protocol()
                         .name("A")
                         .from_dictionary("required_dict")
-                        .source(ExposeSource::Child("leaf".into()))
-                        .availability(Availability::Required),
+                        .source(ExposeSource::Child("leaf".into())),
                 )
                 .expose(
                     ExposeBuilder::protocol()
                         .name("B")
                         .from_dictionary("optional_dict")
-                        .source(ExposeSource::Child("leaf".into()))
-                        .availability(Availability::Required),
+                        .source(ExposeSource::Child("leaf".into())),
                 )
                 .expose(
                     ExposeBuilder::protocol()
                         .name("C")
                         .from_dictionary("dict_with_optional_nested/nested")
-                        .source(ExposeSource::Child("leaf".into()))
-                        .availability(Availability::Required),
+                        .source(ExposeSource::Child("leaf".into())),
                 )
                 .child_default("leaf")
                 .build(),
@@ -2078,47 +1859,39 @@ async fn expose_from_dictionary_availability_invalid() {
                 .dictionary_default("optional_dict")
                 .dictionary_default("nested")
                 .dictionary_default("dict_with_optional_nested")
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "A".parse().unwrap(),
-                    target: OfferTarget::Capability("dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Optional,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "B".parse().unwrap(),
-                    target: OfferTarget::Capability("optional_dict".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "qux".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "C".parse().unwrap(),
-                    target: OfferTarget::Capability("nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                    source: OfferSource::Self_,
-                    source_name: "nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "nested".parse().unwrap(),
-                    target: OfferTarget::Capability("dict_with_optional_nested".parse().unwrap()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Optional,
-                }))
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("dict".parse().unwrap()))
+                        .availability(Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("optional_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("qux")
+                        .target_name("C")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("nested".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("nested")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability(
+                            "dict_with_optional_nested".parse().unwrap(),
+                        ))
+                        .availability(Availability::Optional),
+                )
                 .expose(
-                    ExposeBuilder::dictionary()
-                        .name("required_dict")
-                        .source(ExposeSource::Self_)
-                        .availability(Availability::Required),
+                    ExposeBuilder::dictionary().name("required_dict").source(ExposeSource::Self_),
                 )
                 .expose(
                     ExposeBuilder::dictionary()
@@ -2129,8 +1902,7 @@ async fn expose_from_dictionary_availability_invalid() {
                 .expose(
                     ExposeBuilder::dictionary()
                         .name("dict_with_optional_nested")
-                        .source(ExposeSource::Self_)
-                        .availability(Availability::Required),
+                        .source(ExposeSource::Self_),
                 )
                 .build(),
         ),

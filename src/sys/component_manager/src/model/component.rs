@@ -2549,9 +2549,8 @@ pub mod tests {
         },
         assert_matches::assert_matches,
         cm_rust::{
-            Availability, ChildRef, DependencyType, ExposeSource, OfferDecl, OfferDirectoryDecl,
-            OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferTarget, UseEventStreamDecl,
-            UseSource,
+            Availability, ChildRef, DependencyType, ExposeSource, OfferDecl, OfferProtocolDecl,
+            OfferSource, OfferTarget, UseEventStreamDecl, UseSource,
         },
         cm_rust_testing::*,
         fasync::TestExecutor,
@@ -2798,17 +2797,11 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn shutdown_component_interface_no_dynamic() {
-        let example_offer = OfferDecl::Directory(OfferDirectoryDecl {
-            source: OfferSource::static_child("a".to_string()),
-            target: OfferTarget::static_child("b".to_string()),
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "foo".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            rights: None,
-            subdir: None,
-            availability: Availability::Required,
-        });
+        let example_offer = OfferBuilder::directory()
+            .name("foo")
+            .source(OfferSource::static_child("a".to_string()))
+            .target(OfferTarget::static_child("b".to_string()))
+            .build();
         let example_capability = CapabilityBuilder::protocol().name("bar").build();
         let example_expose =
             ExposeBuilder::protocol().name("bar").source(ExposeSource::Self_).build();
@@ -2872,17 +2865,11 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn shutdown_component_interface_dynamic_children_and_offers() {
-        let example_offer = OfferDecl::Directory(OfferDirectoryDecl {
-            source: OfferSource::static_child("a".to_string()),
-            target: OfferTarget::static_child("b".to_string()),
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "foo".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            rights: None,
-            subdir: None,
-            availability: Availability::Required,
-        });
+        let example_offer = OfferBuilder::directory()
+            .name("foo")
+            .source(OfferSource::static_child("a".to_string()))
+            .target(OfferTarget::static_child("b".to_string()))
+            .build();
 
         let components = vec![
             (
@@ -3098,16 +3085,11 @@ pub mod tests {
     #[ignore]
     #[fuchsia::test]
     async fn creating_dynamic_child_with_offer_cycle_fails() {
-        let example_offer = OfferDecl::Service(OfferServiceDecl {
-            source: OfferSource::Collection("coll".parse().unwrap()),
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            source_instance_filter: None,
-            renamed_instances: None,
-            target: OfferTarget::static_child("static_child".to_string()),
-            target_name: "foo".parse().unwrap(),
-            availability: Availability::Required,
-        });
+        let example_offer = OfferBuilder::service()
+            .name("foo")
+            .source(OfferSource::Collection("coll".parse().unwrap()))
+            .target(OfferTarget::static_child("static_child".to_string()))
+            .build();
 
         let components = vec![
             (
@@ -3153,16 +3135,11 @@ pub mod tests {
     #[ignore]
     #[fuchsia::test]
     async fn creating_cycle_between_collections_fails() {
-        let static_collection_offer = OfferDecl::Service(OfferServiceDecl {
-            source: OfferSource::Collection("coll1".parse().unwrap()),
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            source_instance_filter: None,
-            renamed_instances: None,
-            target: OfferTarget::Collection("coll2".parse().unwrap()),
-            target_name: "foo".parse().unwrap(),
-            availability: Availability::Required,
-        });
+        let static_collection_offer = OfferBuilder::service()
+            .name("foo")
+            .source(OfferSource::Collection("coll1".parse().unwrap()))
+            .target(OfferTarget::Collection("coll2".parse().unwrap()))
+            .build();
 
         let components = vec![(
             "root",
@@ -3641,15 +3618,12 @@ pub mod tests {
                 "root",
                 ComponentDeclBuilder::new()
                     .protocol_default(flogger::LogSinkMarker::PROTOCOL_NAME)
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Self_,
-                        source_name: flogger::LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: flogger::LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        target: OfferTarget::static_child(TEST_CHILD_NAME.to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name(flogger::LogSinkMarker::PROTOCOL_NAME)
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child(TEST_CHILD_NAME.to_string())),
+                    )
                     .child_default(TEST_CHILD_NAME)
                     .build(),
             ),

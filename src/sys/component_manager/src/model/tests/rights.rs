@@ -107,17 +107,13 @@ async fn framework_directory_rights() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source: OfferSource::Framework,
-                    source_name: "foo_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo_data".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    rights: None,
-                    subdir: Some("foo".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::directory()
+                        .name("foo_data")
+                        .source(OfferSource::Framework)
+                        .target(OfferTarget::static_child("b".to_string()))
+                        .subdir("foo"),
+                )
                 .child_default("b")
                 .build(),
         ),
@@ -143,17 +139,13 @@ async fn framework_directory_incompatible_rights() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source: OfferSource::Framework,
-                    source_name: "foo_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo_data".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    rights: None,
-                    subdir: Some("foo".into()),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::directory()
+                        .name("foo_data")
+                        .source(OfferSource::Framework)
+                        .target(OfferTarget::static_child("b".to_string()))
+                        .subdir("foo"),
+                )
                 .child_default("b")
                 .build(),
         ),

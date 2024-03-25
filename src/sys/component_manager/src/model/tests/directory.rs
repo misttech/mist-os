@@ -39,17 +39,13 @@ async fn build_realm() -> RoutingTest {
         (
             "a",
             ComponentDeclBuilder::new()
-                .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                    source_name: "data".parse().unwrap(),
-                    source: OfferSource::static_child("c".to_string()),
-                    source_dictionary: None,
-                    target_name: "data".parse().unwrap(),
-                    target: OfferTarget::static_child("b".to_string()),
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .offer(
+                    OfferBuilder::directory()
+                        .name("data")
+                        .source(OfferSource::static_child("c".to_string()))
+                        .target(OfferTarget::static_child("b".to_string()))
+                        .rights(fio::R_STAR_DIR),
+                )
                 .child_default("b")
                 .child_default("c")
                 .build(),

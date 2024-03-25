@@ -40,13 +40,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("b".to_string()),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .capability(
                         CapabilityBuilder::storage()
@@ -107,13 +106,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("b".to_string()),
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .capability(
                         CapabilityBuilder::storage()
@@ -165,13 +163,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("b".to_string()),
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .capability(
                         CapabilityBuilder::storage()
@@ -219,13 +216,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("data").path("/data"))
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("b".to_string()),
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .capability(
                         CapabilityBuilder::storage()
@@ -278,30 +274,26 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Self_,
-                        source_name: "data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "minfs".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("data")
+                            .target_name("minfs")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".parse().unwrap(),
-                        target_name: "data".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("c")
                     .capability(
                         CapabilityBuilder::storage()
@@ -355,30 +347,27 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Self_,
-                        source_name: "data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "minfs".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: Some("subdir_1".parse().unwrap()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("data")
+                            .target_name("minfs")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .rights(fio::RW_STAR_DIR)
+                            .subdir("subdir_1"),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".parse().unwrap(),
-                        target_name: "data".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("c")
                     .capability(
                         CapabilityBuilder::storage()
@@ -440,30 +429,26 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Self_,
-                        source_name: "data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "minfs".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("data")
+                            .target_name("minfs")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".parse().unwrap(),
-                        target_name: "data".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("c")
                     .capability(
                         CapabilityBuilder::storage()
@@ -518,13 +503,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("b".to_string()),
-                        source_name: "data".parse().unwrap(),
-                        target_name: "data".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .capability(
                         CapabilityBuilder::storage()
@@ -537,13 +521,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Parent,
-                        target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".parse().unwrap(),
-                        target_name: "data".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("data")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("c")
                     .build(),
             ),
@@ -588,13 +571,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Child("b".into())),
                     )
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("c".to_string()),
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -660,13 +642,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .source(StorageDirectorySource::Child("b".into()))
                             .subdir("subdir_2"),
                     )
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("c".to_string()),
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -749,20 +730,18 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .source(StorageDirectorySource::Child("b".into()))
                             .subdir("cache"),
                     )
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("c".to_string()),
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".parse().unwrap(),
-                        target_name: "data".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("b")
                     .child_default("c")
                     .build(),
@@ -788,20 +767,18 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Parent,
-                        target: OfferTarget::static_child("d".to_string()),
-                        source_name: "data".parse().unwrap(),
-                        target_name: "data".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Parent,
-                        target: OfferTarget::static_child("d".to_string()),
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("data")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("d".to_string())),
+                    )
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("d".to_string())),
+                    )
                     .use_(UseBuilder::storage().name("data").path("/storage"))
                     .use_(UseBuilder::storage().name("cache").path("/cache"))
                     .child_default("d")
@@ -885,13 +862,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("b".to_string()),
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .capability(
                         CapabilityBuilder::storage()
@@ -940,17 +916,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Self_,
-                        source_name: "data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "data".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .child_default("b")
                     .build(),
             ),
@@ -1046,30 +1018,26 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source: OfferSource::Self_,
-                        source_name: "data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "minfs".parse().unwrap(),
-                        target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::directory()
+                            .name("data")
+                            .target_name("minfs")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string()))
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".parse().unwrap(),
-                        target_name: "data".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("data")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("c")
                     .capability(
                         CapabilityBuilder::storage()
@@ -1116,13 +1084,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("b".to_string()),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .capability(
                         CapabilityBuilder::storage()
@@ -1200,13 +1167,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Self_,
-                        target: OfferTarget::static_child("b".to_string()),
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::static_child("b".to_string())),
+                    )
                     .child_default("b")
                     .capability(
                         CapabilityBuilder::storage()
@@ -1220,13 +1186,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseBuilder::storage().name("cache").path("/storage"))
-                    .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source: OfferSource::Parent,
-                        target: OfferTarget::static_child("c".to_string()),
-                        source_name: "cache".parse().unwrap(),
-                        target_name: "cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("c".to_string())),
+                    )
                     .child_default("c")
                     .build(),
             ),
