@@ -15,15 +15,6 @@ class TraceUtilsTest(unittest.TestCase):
     """Trace utils tests"""
 
     def test_compute_stats(self) -> None:
-        self.assertAlmostEqual(trace_utils.mean([1.0, 2.0, 3.0]), 2.0)
-        self.assertAlmostEqual(
-            trace_utils.variance([1.0, 2.0, 3.0]), 0.6666666666666666
-        )
-        self.assertAlmostEqual(
-            trace_utils.standard_deviation([1.0, 2.0, 3.0]),
-            0.816496580927726,
-        )
-
         self.assertAlmostEqual(
             trace_utils.percentile(
                 [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], 25

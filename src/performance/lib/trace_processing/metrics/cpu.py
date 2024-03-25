@@ -7,11 +7,11 @@
 import logging
 from typing import Any, Iterable, Iterator
 
+import statistics
 import trace_processing.trace_metrics as trace_metrics
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
 import trace_processing.trace_utils as trace_utils
-
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 _CPU_USAGE_EVENT_NAME: str = "cpu_usage"
@@ -96,7 +96,7 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
             )
             return []
 
-        cpu_mean: float = trace_utils.mean(cpu_percentages)
+        cpu_mean: float = statistics.mean(cpu_percentages)
         _LOGGER.info(f"Average CPU Load: {cpu_mean}")
 
         if self.aggregates_only:

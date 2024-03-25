@@ -5,6 +5,7 @@
 """Scenic trace metrics."""
 
 import logging
+import statistics
 from typing import Any, Dict, Iterable, Iterator, List, Tuple
 
 import trace_processing.trace_metrics as trace_metrics
@@ -106,7 +107,7 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
                 ).to_milliseconds_f()
             )
 
-        cpu_render_mean: float = trace_utils.mean(cpu_render_times)
+        cpu_render_mean: float = statistics.mean(cpu_render_times)
         _LOGGER.info(f"Average CPU render time: {cpu_render_mean} ms")
 
         total_render_times: List[float] = []
@@ -119,7 +120,7 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
                 (vsync_event.start - start_event.start).to_milliseconds_f()
             )
 
-        total_render_mean: float = trace_utils.mean(total_render_times)
+        total_render_mean: float = statistics.mean(total_render_times)
         _LOGGER.info(f"Average Total render time: {total_render_mean} ms")
 
         metrics_list: List[Tuple[str, List[float]]] = [

@@ -5,13 +5,13 @@
 """FPS trace metrics."""
 
 import logging
+import statistics
 from typing import Any, Dict, Iterable, Iterator, List
 
 import trace_processing.trace_metrics as trace_metrics
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
 import trace_processing.trace_utils as trace_utils
-
 
 _LOGGER: logging.Logger = logging.getLogger("FPSMetricsProcessor")
 _AGGREGATE_METRICS_ONLY: str = "aggregateMetricsOnly"
@@ -102,7 +102,7 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
             _LOGGER.info(f"Not enough valid vsyncs")
             return []
 
-        fps_mean: float = trace_utils.mean(fps_values)
+        fps_mean: float = statistics.mean(fps_values)
         _LOGGER.info(f"Average FPS: {fps_mean}")
 
         if self.aggregates_only:

@@ -4,31 +4,10 @@
 """Utilities to filter and extract events and statistics from a trace Model."""
 
 import math
+import statistics
 from typing import Any, Iterable, List, Optional, Set, Tuple, Type
 
 from trace_processing import trace_model, trace_metrics, trace_time
-
-
-# Compute the mean (https://en.wikipedia.org/wiki/Arithmetic_mean#Definition)
-# of [values].
-def mean(values: Iterable[int | float]) -> float:
-    if not values:
-        raise TypeError("[values] must not be empty in order to compute mean")
-
-    return sum(values) / len(values)
-
-
-# Compute the population variance (https://en.wikipedia.org/wiki/Variance#Population_variance)
-# of [values].
-def variance(values: Iterable[int | float]) -> float:
-    vales_mean: float = mean(values)
-    return sum(((v - vales_mean) ** 2.0 for v in values)) / len(values)
-
-
-# Compute the population standard deviation (https://en.wikipedia.org/wiki/Standard_deviation#Uncorrected_sample_standard_deviation)
-# of [values].
-def standard_deviation(values: Iterable[int | float]) -> float:
-    return math.sqrt(variance(values))
 
 
 # Compute the linear interpolated [percentile]th percentile
@@ -58,7 +37,7 @@ def filter_events(
     events: Iterable[trace_model.Event],
     category: Optional[str] = None,
     name: Optional[str] = None,
-    type: Type = object,
+    type: type = object,
 ) -> Iterable[trace_model.Event]:
     """Filter |events| based on category, name, or type.
 
@@ -98,7 +77,10 @@ def total_event_duration(
         e: trace_model.Event,
     ) -> Tuple[trace_time.TimePoint, trace_time.TimePoint]:
         end: trace_time.TimePoint = e.start
-        if isinstance(e, (trace_model.AsyncEvent, trace_model.DurationEvent)):
+        if (
+            isinstance(e, trace_model.AsyncEvent | trace_model.DurationEvent)
+            and e.duration
+        ):
             end = e.start + e.duration
         return (e.start, end)
 
@@ -116,7 +98,7 @@ def total_event_duration(
 def get_arg_values_from_events(
     events: Iterable[trace_model.Event],
     arg_key: str,
-    arg_types: Type | Tuple[Type, ...] = object,
+    arg_types: type | Tuple[type, ...] = object,
 ) -> Iterable[Any]:
     """Collect values from the |args| maps in |events|.
 
@@ -169,8 +151,6 @@ def get_following_events(
 
     while frontier:
         current: trace_model.Event = frontier.pop()
-        if current is None:
-            continue
         added = set_add(visited, current)
         if not added:
             continue
@@ -178,8 +158,10 @@ def get_following_events(
             frontier.extend(current.child_durations)
             frontier.extend(current.child_flows)
         elif isinstance(current, trace_model.FlowEvent):
-            frontier.append(current.enclosing_duration)
-            frontier.append(current.next_flow)
+            if current.enclosing_duration:
+                frontier.append(current.enclosing_duration)
+            if current.next_flow:
+                frontier.append(current.next_flow)
 
     def by_start_time(event: trace_model.Event) -> trace_time.TimePoint:
         return event.start
@@ -192,7 +174,7 @@ def get_nearest_following_event(
     event: trace_model.Event,
     following_event_category: str,
     following_event_name: str,
-) -> trace_model.Event:
+) -> trace_model.Event | None:
     """Find the nearest target event that is flow connected and follow |event|.
 
     Args:
@@ -209,7 +191,7 @@ def get_nearest_following_event(
         name=following_event_name,
         type=trace_model.DurationEvent,
     )
-    return next(filtered_following_events, None)
+    return next(iter(filtered_following_events), None)
 
 
 # This method looks for a possible race between trace event start in Scenic and magma.
@@ -238,7 +220,7 @@ def standard_metrics_set(
     values: List[float],
     label_prefix: str,
     unit: trace_metrics.Unit,
-    percentiles: tuple[int] = (5, 25, 50, 75, 95),
+    percentiles: tuple[int, int, int, int, int] = (5, 25, 50, 75, 95),
 ) -> list[trace_metrics.TestCaseResult]:
     """Generates min, max, average and percentiles metrics for the given values.
 
@@ -266,7 +248,7 @@ def standard_metrics_set(
         trace_metrics.TestCaseResult(f"{label_prefix}Min", unit, [min(values)]),
         trace_metrics.TestCaseResult(f"{label_prefix}Max", unit, [max(values)]),
         trace_metrics.TestCaseResult(
-            f"{label_prefix}Average", unit, [mean(values)]
+            f"{label_prefix}Average", unit, [statistics.mean(values)]
         ),
     ]
 

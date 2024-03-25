@@ -308,7 +308,7 @@ class MetricProcessorsTest(unittest.TestCase):
                     TCR(
                         label="RenderCpuAverage",
                         unit=U.milliseconds,
-                        values=[0.09000000000000001],
+                        values=[0.09],
                     ),
                     TCR(
                         label="RenderTotalP5",

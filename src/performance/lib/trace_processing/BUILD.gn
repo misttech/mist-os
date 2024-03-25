@@ -13,7 +13,6 @@ python_library("trace_processing") {
     "metrics/cpu.py",
     "metrics/fps.py",
     "metrics/scenic.py",
-    "trace_utils.py",
   ]
   library_deps = [
     ":trace_processing_type_checked",
@@ -31,6 +30,7 @@ python_library("trace_processing_type_checked") {
     "trace_metrics.py",
     "trace_model.py",
     "trace_time.py",
+    "trace_utils.py",
   ]
 }
 
