@@ -32,7 +32,6 @@
         },
         {
             protocol: [
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.vulkan.loader.Loader",

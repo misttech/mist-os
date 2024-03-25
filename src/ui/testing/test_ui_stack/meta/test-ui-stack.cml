@@ -38,7 +38,6 @@
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
                 "fuchsia.logger.LogSink",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.tracing.provider.Registry",
