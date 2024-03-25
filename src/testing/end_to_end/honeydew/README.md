@@ -58,10 +58,16 @@ to Honeydew:
   * follow [how to add a new test to run in infra]
 * Ensure code is meeting all the [Honeydew code guidelines]
 * Before merging the CL, ensure CL does not introduce any regressions by
-  successfully running **all** of the Honeydew builders using try-jobs which
-  can be found by looking for `pye2e` in the try-job name reg-ex filter field.
-  While selecting these `pye2e`, do not select builders with `-subbuild` suffix.
-  To know how to run try jobs refer to [sample Honeydew builders using try-jobs]
+  successfully running **all** of the Lacewing self tests staging builders using
+  try-jobs
+  * To find these builders, look for `lacewing-self-staging` in the try-job name
+    reg-ex filter field.
+  * While selecting these `lacewing-self-staging` builders, do not select the
+    ones with `-subbuild` suffix.
+  * To know how to run try jobs refer to
+    [example Lacewing self tests staging builders using try-jobs]. Please note
+    that this screenshot is just for demonstration purpose. Actual builders may
+    be different from the time this screenshot was taken.
 * At least one of the [Honeydew OWNERS] should be added as a reviewer
 * If CL touches an existing affordance, then corresponding [Affordance OWNER]
   should be added as a reviewer
@@ -164,7 +170,7 @@ If you like to use Honeydew in an interactive Python terminal refer to
 
 [top level Honeydew functional tests BUILD]: tests/functional_tests/BUILD.gn
 
-[sample Honeydew builders using try-jobs]: images/pye2e_builders.png
+[example Lacewing self tests staging builders using try-jobs]: images/lacewing_self_staging_builders.png
 
 [instructions on how to submit contributions to the Fuchsia project]: https://fuchsia.dev/fuchsia-src/development/source_code/contribute_changes
 
