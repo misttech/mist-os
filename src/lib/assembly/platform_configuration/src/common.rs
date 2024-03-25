@@ -169,7 +169,6 @@ pub(crate) trait ConfigurationBuilder {
 
     /// Add a kernel command line arg that should be included in the
     /// assembled platform.
-    #[allow(dead_code)]
     fn kernel_arg(&mut self, arg: String);
 }
 

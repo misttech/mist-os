@@ -246,8 +246,8 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         if let Some(netsvc_interface) =
             &context.board_info.platform.connectivity.network.netsvc_interface
         {
-            let _arg = format!("netsvc.interface={}", netsvc_interface);
-            // builder.kernel_arg(arg);
+            let arg = format!("netsvc.interface={}", netsvc_interface);
+            builder.kernel_arg(arg);
         }
 
         Ok(())
