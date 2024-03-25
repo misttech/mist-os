@@ -17,6 +17,7 @@ load(
     "FuchsiaProductImageInfo",
     "FuchsiaRepositoryKeysInfo",
     "FuchsiaScrutinyConfigInfo",
+    "FuchsiaSizeCheckerInfo",
     "FuchsiaVirtualDeviceInfo",
 )
 
@@ -555,6 +556,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
     ffx_tool = fuchsia_toolchain.ffx
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
+    size_report = ctx.actions.declare_file(ctx.label.name + "_size_report.json")
     product_name = "{}.{}".format(ctx.attr.product_bundle_name, ctx.attr.board_name)
     delivery_blob_type = ctx.attr.delivery_blob_type
 
@@ -578,6 +580,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         "--partitions $PARTITIONS_PATH",
         "--system-a $SYSTEM_A_MANIFEST",
         "--out-dir $OUTDIR",
+        "--gerrit-size-report $SIZE_REPORT",
     ]
 
     if delivery_blob_type:
@@ -591,6 +594,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         "SYSTEM_A_MANIFEST": system_a_out.path + "/images.json",
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "SDK_ROOT": ctx.attr._sdk_manifest.label.workspace_root,
+        "SIZE_REPORT": size_report.path,
     }
 
     # Gather all the inputs.
@@ -638,12 +642,12 @@ def _build_fuchsia_product_bundle_impl(ctx):
     script = "\n".join(script_lines)
     ctx.actions.run_shell(
         inputs = inputs,
-        outputs = [pb_out_dir, ffx_isolate_dir],
+        outputs = [pb_out_dir, ffx_isolate_dir, size_report],
         command = script,
         env = env,
         progress_message = "Creating product bundle for %s" % ctx.label.name,
     )
-    deps = [pb_out_dir] + ctx.files.partitions_config + ctx.files.main
+    deps = [pb_out_dir, size_report] + ctx.files.partitions_config + ctx.files.main
 
     # Scrutiny Validation
     if ctx.attr.main_scrutiny_config:
@@ -679,6 +683,9 @@ def _build_fuchsia_product_bundle_impl(ctx):
             product_bundle = pb_out_dir,
             product_name = product_name,
             product_version = product_version,
+        ),
+        FuchsiaSizeCheckerInfo(
+            size_report = size_report,
         ),
     ]
 

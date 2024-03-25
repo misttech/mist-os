@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 use crate::{Partition, PartitionsConfig, Slot};
+use anyhow::{Context, Result};
 use assembly_manifest::Image;
+use assembly_util::write_json_file;
 use camino::Utf8PathBuf;
 use std::collections::BTreeMap;
+use url::Url;
 
 /// The type of the image used to correlate a partition with an image in the
 /// assembly manifest.
@@ -118,13 +121,43 @@ impl PartitionImageMapper {
 
         mapped_partitions
     }
+
+    /// Generate a size report that indicates the partition size and the size of the image mapped
+    /// to it.
+    pub fn generate_gerrit_size_report(
+        &self,
+        report_path: &Utf8PathBuf,
+        prefix: &String,
+    ) -> Result<()> {
+        let mut report = BTreeMap::new();
+
+        let mappings = self.map();
+        for mapping in mappings {
+            let PartitionAndImage { partition, path } = mapping;
+            if let (Some(size), name) = (partition.size(), partition.name()) {
+                let metadata = std::fs::metadata(path).context("Getting image metadata")?;
+                let measured_size = metadata.len();
+                report.insert(format!("{}-{}", prefix, name), format!("{}", measured_size));
+                report.insert(format!("{}-{}.budget", prefix, name), format!("{}", size));
+                let url = Url::parse_with_params(
+                    "http://go/fuchsia-size-stats/single_component/",
+                    &[("f", format!("component:in:{}-{}", prefix, name))],
+                )?;
+                report.insert(format!("{}-{}.owner", prefix, name), url.to_string());
+            }
+        }
+
+        write_json_file(&report_path, &report).context("Writing gerrit size report")
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use assembly_manifest::{AssemblyManifest, BlobfsContents};
+    use assembly_util::read_config;
     use pretty_assertions::assert_eq;
+    use tempfile::TempDir;
 
     #[test]
     fn test_map_fvm() {
@@ -488,5 +521,56 @@ mod tests {
             },
         ];
         assert_eq!(expected, mapper.map());
+    }
+
+    #[test]
+    fn test_size_report() {
+        let temp_dir = TempDir::new().unwrap();
+        let temp_dir_path = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
+        let zbi_path = temp_dir_path.join("zbi");
+        let vbmeta_path = temp_dir_path.join("vbmeta");
+        let size_report_path = temp_dir_path.join("report.json");
+
+        std::fs::write(&zbi_path, "zbi").unwrap();
+        std::fs::write(&vbmeta_path, "vbmeta").unwrap();
+
+        let partitions = PartitionsConfig {
+            partitions: vec![
+                Partition::ZBI { name: "zbi_a".into(), slot: Slot::A, size: Some(100) },
+                Partition::VBMeta { name: "vbmeta_a".into(), slot: Slot::A, size: Some(200) },
+                Partition::FVM { name: "fvm".into(), size: None },
+            ],
+            ..Default::default()
+        };
+        let images_a = AssemblyManifest {
+            images: vec![
+                Image::ZBI { path: zbi_path, signed: false },
+                Image::VBMeta(vbmeta_path),
+                Image::FVM("path/to/a/fvm.blk".into()),
+                Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
+            ],
+        };
+        let mut mapper = PartitionImageMapper::new(partitions);
+        mapper.map_images_to_slot(&images_a.images, Slot::A);
+        mapper.generate_gerrit_size_report(&size_report_path, &"prefix".to_string()).unwrap();
+
+        let result: BTreeMap<String, String> = read_config(&size_report_path).unwrap();
+        let expected = BTreeMap::from([
+            ("prefix-vbmeta_a".into(), "6".into()),
+            ("prefix-vbmeta_a.budget".into(), "200".into()),
+            (
+                "prefix-vbmeta_a.owner".into(),
+                "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3Aprefix-vbmeta_a"
+                    .into(),
+            ),
+            ("prefix-zbi_a".into(), "3".into()),
+            ("prefix-zbi_a.budget".into(), "100".into()),
+            (
+                "prefix-zbi_a.owner".into(),
+                "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3Aprefix-zbi_a"
+                    .into(),
+            ),
+        ]);
+        assert_eq!(expected, result);
     }
 }

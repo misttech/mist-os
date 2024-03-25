@@ -71,4 +71,9 @@ pub struct CreateCommand {
     /// create a deprecated flash manifest for backward compatibility.
     #[argh(switch)]
     pub with_deprecated_flash_manifest: bool,
+
+    /// an optional image size report to generate that indicates the sizes of the images when
+    /// mapped to partitions.
+    #[argh(option)]
+    pub gerrit_size_report: Option<Utf8PathBuf>,
 }

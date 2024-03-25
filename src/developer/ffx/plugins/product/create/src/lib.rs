@@ -7,7 +7,9 @@
 
 use anyhow::{bail, Context, Result};
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image, PackagesMetadata};
-use assembly_partitions_config::{Partition, PartitionsConfig};
+use assembly_partitions_config::{
+    Partition, PartitionImageMapper, PartitionsConfig, Slot as PartitionSlot,
+};
 use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
@@ -101,6 +103,23 @@ pub async fn pb_create_with_sdk_version(
         load_assembly_manifest(&cmd.system_b, &cmd.out_dir.join("system_b"))?;
     let (system_r, packages_r) =
         load_assembly_manifest(&cmd.system_r, &cmd.out_dir.join("system_r"))?;
+
+    // Generate a size report for the images after mapping them to partitions.
+    if let Some(size_report) = cmd.gerrit_size_report {
+        let mut mapper = PartitionImageMapper::new(partitions.clone());
+        if let Some(system) = &system_a {
+            mapper.map_images_to_slot(&system.images, PartitionSlot::A);
+        }
+        if let Some(system) = &system_b {
+            mapper.map_images_to_slot(&system.images, PartitionSlot::B);
+        }
+        if let Some(system) = &system_r {
+            mapper.map_images_to_slot(&system.images, PartitionSlot::R);
+        }
+        mapper
+            .generate_gerrit_size_report(&size_report, &cmd.product_name)
+            .context("Generating image size report")?;
+    }
 
     // Generate the update packages if necessary.
     let (_gen_dir, update_package_hash, update_packages) =
@@ -493,6 +512,7 @@ mod test {
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: None,
                 with_deprecated_flash_manifest: false,
+                gerrit_size_report: None,
             },
             /*sdk_version=*/ "",
             tool_provider,
@@ -549,6 +569,7 @@ mod test {
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: None,
                 with_deprecated_flash_manifest: false,
+                gerrit_size_report: None,
             },
             /*sdk_version=*/ "",
             tool_provider,
@@ -610,6 +631,7 @@ mod test {
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: None,
                 with_deprecated_flash_manifest: false,
+                gerrit_size_report: None,
             },
             /*sdk_version=*/ "",
             tool_provider,
@@ -652,6 +674,7 @@ mod test {
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: Some(1),
                 with_deprecated_flash_manifest: false,
+                gerrit_size_report: None,
             },
             /*sdk_version=*/ "",
             tool_provider,
@@ -721,6 +744,7 @@ mod test {
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: None,
                 with_deprecated_flash_manifest: false,
+                gerrit_size_report: None,
             },
             /*sdk_version=*/ "",
             tool_provider,
@@ -795,6 +819,7 @@ mod test {
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: None,
                 with_deprecated_flash_manifest: true,
+                gerrit_size_report: None,
             },
             /*sdk_version=*/ "",
             tool_provider,
@@ -885,6 +910,7 @@ mod test {
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: None,
                 with_deprecated_flash_manifest: false,
+                gerrit_size_report: None,
             },
             /*sdk_version=*/ "",
             tool_provider,
