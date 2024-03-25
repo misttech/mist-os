@@ -136,6 +136,7 @@ func (f *FFXTool) runFFXCmd(ctx context.Context, args ...string) ([]byte, error)
 	// in the same directory as ffx itself.
 	args = append(
 		[]string{
+			"--log-level", "trace",
 			"--isolate-dir", f.isolateDir.path,
 			"--config", fmt.Sprintf("ffx.subtool-search-paths=%s", filepath.Dir(path)),
 		},
