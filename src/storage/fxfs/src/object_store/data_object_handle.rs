@@ -371,9 +371,9 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 let mut builder = MerkleTreeBuilder::new(hasher);
                 let mut offset = 0;
                 let size = self.get_size();
-                // TODO(b/314836822): Consider reading more than 4k bytes into memory at a time
-                // for a potential performance boost.
-                let mut buf = self.allocate_buffer(self.block_size() as usize).await;
+                // TODO(b/314836822): Consider further tuning the buffer size to optimize
+                // performance. Experimentally, most verity-enabled files are <256K.
+                let mut buf = self.allocate_buffer(64 * self.block_size() as usize).await;
                 while offset < size {
                     // TODO(b/314842875): Consider optimizations for sparse files.
                     let read = self.read(offset, buf.as_mut()).await? as u64;
@@ -406,9 +406,9 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 let mut builder = MerkleTreeBuilder::new(hasher);
                 let mut offset = 0;
                 let size = self.get_size();
-                // TODO(b/314836822): Consider reading more than 4k bytes into memory at a time
-                // for a potential performance boost.
-                let mut buf = self.allocate_buffer(self.block_size() as usize).await;
+                // TODO(b/314836822): Consider further tuning the buffer size to optimize
+                // performance. Experimentally, most verity-enabled files are <256K.
+                let mut buf = self.allocate_buffer(64 * self.block_size() as usize).await;
                 while offset < size {
                     // TODO(b/314842875): Consider optimizations for sparse files.
                     let read = self.read(offset, buf.as_mut()).await? as u64;
