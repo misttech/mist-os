@@ -458,58 +458,6 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		ID:     "char0",
 		Signal: false,
 	}
-	if t.config.Logfile != "" {
-		logfile, err := filepath.Abs(t.config.Logfile)
-		if err != nil {
-			return fmt.Errorf("cannot get absolute path for %q: %w", t.config.Logfile, err)
-		}
-		if err := os.MkdirAll(filepath.Dir(logfile), os.ModePerm); err != nil {
-			return fmt.Errorf("failed to make parent dirs of %q: %w", logfile, err)
-		}
-		// Have the emulator write the serial output to a temp file, which we will
-		// read through a TimestampWriter into the actual designated log file.
-		tempLogfile := filepath.Join(os.TempDir(), "temp_logfile.txt")
-		chardev.Logfile = tempLogfile
-		f, err := os.Create(tempLogfile)
-		if err != nil {
-			return fmt.Errorf("failed to create %s", tempLogfile)
-		}
-		cleanupTempLogfile := func() {
-			if err := f.Close(); err != nil {
-				logger.Warningf(t.targetCtx, "failed to close %s", tempLogfile)
-			}
-			if err := os.Remove(tempLogfile); err != nil {
-				logger.Warningf(t.targetCtx, "failed to remove %s", tempLogfile)
-			}
-		}
-		g, err := os.Create(logfile)
-		if err != nil {
-			cleanupTempLogfile()
-			return fmt.Errorf("failed to create %s", logfile)
-		}
-		if err := os.Setenv(constants.SerialLogEnvKey, logfile); err != nil {
-			logger.Debugf(ctx, "failed to set %s to %s", constants.SerialLogEnvKey, logfile)
-		}
-		serialWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(g), "")
-		go func() {
-			for {
-				if t.targetCtx.Err() != nil {
-					logger.Debugf(t.targetCtx, "target context finished: %s", t.targetCtx.Err())
-					break
-				}
-
-				if _, err := io.Copy(serialWriter, f); err != nil {
-					logger.Errorf(t.targetCtx, "failed to copy serial: %s", err)
-					break
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-			if err := g.Close(); err != nil {
-				logger.Warningf(t.targetCtx, "failed to close %s", logfile)
-			}
-			cleanupTempLogfile()
-		}()
-	}
 	qemuCmd.AddSerial(chardev)
 
 	// Manually set nodename, since MAC is randomly generated.
@@ -589,6 +537,36 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 
 	cmd.Dir = workdir
 	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "qemu")
+	// Since serial is already printed to stdout, we can copy it to the
+	// serial logfile as well.
+	var serialLog *os.File
+	closeSerialLog := func() {
+		if serialLog == nil {
+			return
+		}
+		if err := serialLog.Close(); err != nil {
+			logger.Debugf(ctx, "failed to close %s", serialLog.Name())
+		}
+	}
+	if t.config.Logfile != "" {
+		logfile, err := filepath.Abs(t.config.Logfile)
+		if err != nil {
+			return fmt.Errorf("cannot get absolute path for %q: %w", t.config.Logfile, err)
+		}
+		if err := os.MkdirAll(filepath.Dir(logfile), os.ModePerm); err != nil {
+			return fmt.Errorf("failed to make parent dirs of %q: %w", logfile, err)
+		}
+		serialLog, err := os.Create(logfile)
+		if err != nil {
+			return fmt.Errorf("failed to create %s", logfile)
+		}
+		if err := os.Setenv(constants.SerialLogEnvKey, logfile); err != nil {
+			logger.Debugf(ctx, "failed to set %s to %s", constants.SerialLogEnvKey, logfile)
+		}
+		serialWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(serialLog), "")
+		stdout = io.MultiWriter(stdout, serialWriter)
+		stderr = io.MultiWriter(stderr, serialWriter)
+	}
 	if t.ptm != nil {
 		cmd.Stdin = t.ptm
 		cmd.Stdout = io.MultiWriter(t.ptm, stdout)
@@ -610,6 +588,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 
 	if err := cmd.Start(); err != nil {
 		flush()
+		closeSerialLog()
 		return fmt.Errorf("failed to start: %w", err)
 	}
 	t.process = cmd.Process
@@ -617,6 +596,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	go func() {
 		err := cmd.Wait()
 		flush()
+		closeSerialLog()
 		if err != nil {
 			err = fmt.Errorf("%s: %w", constants.QEMUInvocationErrorMsg, err)
 		}
