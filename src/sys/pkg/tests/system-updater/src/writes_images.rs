@@ -72,7 +72,7 @@ async fn fails_on_image_write_error() {
             .fuchsia_package(
                 ::update_package::ImageMetadata::new(
                     5,
-                    hash(8),
+                    sha256(8),
                     image_package_resource_url("update-images-fuchsia", 9, "zbi"),
                 ),
                 None,
@@ -143,7 +143,7 @@ async fn skip_recovery_does_not_write_recovery_or_vbmeta() {
             .fuchsia_package(
                 ::update_package::ImageMetadata::new(
                     0,
-                    Hash::from_str(EMPTY_HASH).unwrap(),
+                    EMPTY_SHA256.parse().unwrap(),
                     image_package_resource_url("update-images-fuchsia", 9, "zbi"),
                 ),
                 None,
@@ -151,7 +151,7 @@ async fn skip_recovery_does_not_write_recovery_or_vbmeta() {
             .recovery_package(
                 ::update_package::ImageMetadata::new(
                     2,
-                    hash(4),
+                    sha256(4),
                     image_package_resource_url("update-images-recovery", 9, "rzbi"),
                 ),
                 None,
@@ -199,7 +199,7 @@ async fn writes_to_both_configs_if_abr_not_supported() {
             .fuchsia_package(
                 ::update_package::ImageMetadata::new(
                     5,
-                    hash(8),
+                    sha256(8),
                     image_package_resource_url("update-images-fuchsia", 9, "zbi"),
                 ),
                 None,
@@ -382,7 +382,7 @@ async fn update_with_current_config(
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(2),
+                sha256(2),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -482,7 +482,7 @@ async fn assert_stage_resolve_failure_reason(
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(2),
+                sha256(2),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -579,7 +579,7 @@ async fn retry_image_package_resolve_once() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(2),
+                sha256(2),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -657,7 +657,7 @@ async fn retry_image_package_resolve_twice_fails_update() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(2),
+                sha256(2),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -757,7 +757,7 @@ async fn writes_fuchsia() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(2),
+                sha256(2),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -831,12 +831,12 @@ async fn writes_fuchsia_vbmeta() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(2),
+                sha256(2),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             Some(::update_package::ImageMetadata::new(
                 5,
-                hash(1),
+                sha256(1),
                 image_package_resource_url("update-images-fuchsia", 9, "vbmeta"),
             )),
         )
@@ -911,7 +911,7 @@ async fn zbi_match_in_desired_config() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 8,
-                Hash::from_str(MATCHING_HASH).unwrap(),
+                MATCHING_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -954,7 +954,7 @@ async fn zbi_match_in_active_config() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 8,
-                Hash::from_str(MATCHING_HASH).unwrap(),
+                MATCHING_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -1011,7 +1011,7 @@ async fn zbi_match_in_active_config_error_in_desired_config() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 8,
-                Hash::from_str(MATCHING_HASH).unwrap(),
+                MATCHING_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -1069,7 +1069,7 @@ async fn asset_comparing_respects_fuchsia_mem_buffer_size() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 8,
-                Hash::from_str(MATCHING_HASH).unwrap(),
+                MATCHING_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -1144,7 +1144,7 @@ async fn asset_copying_sets_fuchsia_mem_buffer_size() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 8,
-                Hash::from_str(MATCHING_HASH).unwrap(),
+                MATCHING_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -1206,7 +1206,7 @@ async fn recovery_already_present() {
         .recovery_package(
             ::update_package::ImageMetadata::new(
                 8,
-                Hash::from_str(MATCHING_HASH).unwrap(),
+                MATCHING_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -1214,7 +1214,7 @@ async fn recovery_already_present() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 0,
-                Hash::from_str(EMPTY_HASH).unwrap(),
+                EMPTY_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -1274,7 +1274,7 @@ async fn writes_recovery() {
         .recovery_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(2),
+                sha256(2),
                 image_package_resource_url("update-images-recovery", 9, "recovery"),
             ),
             None,
@@ -1282,7 +1282,7 @@ async fn writes_recovery() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 0,
-                Hash::from_str(EMPTY_HASH).unwrap(),
+                EMPTY_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -1342,19 +1342,19 @@ async fn writes_recovery_vbmeta() {
         .recovery_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(2),
+                sha256(2),
                 image_package_resource_url("update-images-recovery", 9, "recovery"),
             ),
             Some(::update_package::ImageMetadata::new(
                 1,
-                hash(1),
+                sha256(1),
                 image_package_resource_url("update-images-recovery", 9, "recovery_vbmeta"),
             )),
         )
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 0,
-                Hash::from_str(EMPTY_HASH).unwrap(),
+                EMPTY_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 3, "zbi"),
             ),
             None,
@@ -1426,7 +1426,7 @@ async fn recovery_present_but_should_write_recovery_is_false() {
         .recovery_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(2),
+                sha256(2),
                 image_package_resource_url("update-images-recovery", 3, "zbi"),
             ),
             None,
@@ -1434,7 +1434,7 @@ async fn recovery_present_but_should_write_recovery_is_false() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(1),
+                sha256(1),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,

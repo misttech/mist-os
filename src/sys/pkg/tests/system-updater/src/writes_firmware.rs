@@ -18,14 +18,14 @@ async fn images_manifest_update_package_firmware_no_match() {
             "".to_owned() =>
                 ::update_package::ImageMetadata::new(
                     5,
-                    hash(5),
+                    sha256(5),
                     image_package_resource_url("update-images-firmware", 5, "a")
                 ),
         })
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 0,
-                Hash::from_str(EMPTY_HASH).unwrap(),
+                EMPTY_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -90,19 +90,21 @@ async fn images_manifest_update_package_firmware_no_match() {
 #[fasync::run_singlethreaded(test)]
 async fn images_manifest_update_package_firmware_match_desired_config() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
-        .firmware_package(
-                btreemap! {
-                    "".to_owned() => ::update_package::ImageMetadata::new(8, Hash::from_str(MATCHING_HASH).unwrap(), image_package_resource_url("update-images-firmware", 6, "a")
-                ),
-                },
-            ).fuchsia_package(
-                ::update_package::ImageMetadata::new(
+        .firmware_package(btreemap! {
+            "".to_owned() => ::update_package::ImageMetadata::new(
+                8,
+                MATCHING_SHA256.parse().unwrap(),
+                image_package_resource_url("update-images-firmware", 6, "a")
+            ),
+        })
+        .fuchsia_package(
+            ::update_package::ImageMetadata::new(
                 0,
-                Hash::from_str(EMPTY_HASH)
-                    .unwrap(),
+                EMPTY_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
-            None,)
+            None,
+        )
         .clone()
         .build();
 
@@ -148,20 +150,21 @@ async fn images_manifest_update_package_firmware_match_desired_config() {
 #[fasync::run_singlethreaded(test)]
 async fn images_manifest_update_package_firmware_match_active_config() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
-        .firmware_package(
-                btreemap! {
-                    "".to_owned() => ::update_package::ImageMetadata::new(8, Hash::from_str(MATCHING_HASH).unwrap(), image_package_resource_url("update-images-firmware", 6, "a")
-                ),
-                },
-        )
+        .firmware_package(btreemap! {
+            "".to_owned() => ::update_package::ImageMetadata::new(
+                8,
+                MATCHING_SHA256.parse().unwrap(),
+                image_package_resource_url("update-images-firmware", 6, "a")
+            ),
+        })
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
-            0,
-            Hash::from_str(EMPTY_HASH)
-                .unwrap(),
-            image_package_resource_url("update-images-fuchsia", 9, "zbi"),
-        ),
-        None,)
+                0,
+                EMPTY_SHA256.parse().unwrap(),
+                image_package_resource_url("update-images-fuchsia", 9, "zbi"),
+            ),
+            None,
+        )
         .clone()
         .build();
 
@@ -222,14 +225,14 @@ async fn firmware_comparing_respects_fuchsia_mem_buffer_size() {
         .firmware_package(btreemap! {
             "".to_owned() => ::update_package::ImageMetadata::new(
                 8,
-                Hash::from_str(MATCHING_HASH).unwrap(),
+                MATCHING_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-firmware", 6, "a")
             ),
         })
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 0,
-                Hash::from_str(EMPTY_HASH).unwrap(),
+                EMPTY_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -306,14 +309,14 @@ async fn firmware_copying_sets_fuchsia_mem_buffer_size() {
         .firmware_package(btreemap! {
             "".to_owned() => ::update_package::ImageMetadata::new(
                 8,
-                Hash::from_str(MATCHING_HASH).unwrap(),
+                MATCHING_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-firmware", 6, "a")
             ),
         })
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 0,
-                Hash::from_str(EMPTY_HASH).unwrap(),
+                EMPTY_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,
@@ -378,22 +381,24 @@ async fn firmware_copying_sets_fuchsia_mem_buffer_size() {
 #[fasync::run_singlethreaded(test)]
 async fn writes_multiple_firmware_types() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
-    .firmware_package(
-            btreemap! {
-                "a".to_owned() => ::update_package::ImageMetadata::new(5, hash(5), image_package_resource_url("update-images-firmware", 5, "A")),
-                "b".to_owned() => ::update_package::ImageMetadata::new(5, hash(5), image_package_resource_url("update-images-firmware", 5, "B")),
-            },
-        )
-    .fuchsia_package(
+        .firmware_package(btreemap! {
+            "a".to_owned() => ::update_package::ImageMetadata::new(
+                5, sha256(5), image_package_resource_url("update-images-firmware", 5, "A")
+            ),
+            "b".to_owned() => ::update_package::ImageMetadata::new(
+                5, sha256(5), image_package_resource_url("update-images-firmware", 5, "B")
+            ),
+        })
+        .fuchsia_package(
             ::update_package::ImageMetadata::new(
-            0,
-            Hash::from_str(EMPTY_HASH)
-                .unwrap(),
-            image_package_resource_url("update-images-fuchsia", 9, "zbi"),
-        ),
-        None,)
-    .clone()
-    .build();
+                0,
+                EMPTY_SHA256.parse().unwrap(),
+                image_package_resource_url("update-images-fuchsia", 9, "zbi"),
+            ),
+            None,
+        )
+        .clone()
+        .build();
     let env = TestEnv::builder().build().await;
 
     env.resolver
@@ -459,19 +464,18 @@ async fn writes_multiple_firmware_types() {
 #[fasync::run_singlethreaded(test)]
 async fn skips_unsupported_firmware_type() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
-        .firmware_package(
-            btreemap! {
-                "a".to_owned() => ::update_package::ImageMetadata::new(5, hash(5), image_package_resource_url("update-images-firmware", 5, "A")),
-            },
-        )
+        .firmware_package(btreemap! {
+            "a".to_owned() => ::update_package::ImageMetadata::new(
+                5, sha256(5), image_package_resource_url("update-images-firmware", 5, "A")
+            ),
+        })
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 0,
-                Hash::from_str(EMPTY_HASH)
-                    .unwrap(),
+                EMPTY_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
-            None
+            None,
         )
         .clone()
         .build();
@@ -535,13 +539,13 @@ async fn fails_on_firmware_write_error() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
         .firmware_package(btreemap! {
             "a".to_owned() => ::update_package::ImageMetadata::new(
-                5, hash(5), image_package_resource_url("update-images-firmware", 5, "A")
+                5, sha256(5), image_package_resource_url("update-images-firmware", 5, "A")
             ),
         })
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 0,
-                Hash::from_str(EMPTY_HASH).unwrap(),
+                EMPTY_SHA256.parse().unwrap(),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             None,

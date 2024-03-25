@@ -108,12 +108,12 @@ async fn writes_history() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 8,
-                hash(6),
+                sha256(6),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             Some(::update_package::ImageMetadata::new(
                 6,
-                hash(3),
+                sha256(3),
                 image_package_resource_url("update-images-fuchsia", 9, "vbmeta"),
             )),
         )
@@ -239,7 +239,7 @@ async fn replaces_bogus_history() {
                     "update_hash": UPDATE_HASH,
                     "system_image_hash": "",
                     "vbmeta_hash": "",
-                    "zbi_hash": EMPTY_HASH,
+                    "zbi_hash": EMPTY_SHA256,
                     "build_version": "",
                     "epoch": SOURCE_EPOCH.to_string()
                 },
@@ -270,12 +270,12 @@ async fn increments_attempts_counter_on_retry() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 8,
-                hash(6),
+                sha256(6),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             Some(::update_package::ImageMetadata::new(
                 6,
-                hash(3),
+                sha256(3),
                 image_package_resource_url("update-images-fuchsia", 9, "vbmeta"),
             )),
         )

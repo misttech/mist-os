@@ -88,8 +88,11 @@ impl Version {
             Ok(metadata) => {
                 if let Some(fuchsia) = metadata.fuchsia() {
                     (
-                        fuchsia.vbmeta().map(|v| v.hash().to_string()).unwrap_or_else(|| "".into()),
-                        fuchsia.zbi().hash().to_string(),
+                        fuchsia
+                            .vbmeta()
+                            .map(|v| v.sha256().to_string())
+                            .unwrap_or_else(|| "".into()),
+                        fuchsia.zbi().sha256().to_string(),
                     )
                 } else {
                     ("".into(), "".into())
@@ -278,8 +281,8 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn version_for_valid_update_package() {
-        let zbi_hash = Hash::from([5; 32]);
-        let vbmeta_hash = Hash::from([3; 32]);
+        let zbi_hash = [5; 32].into();
+        let vbmeta_hash = [3; 32].into();
         let images_json = update_package::ImagePackagesManifest::builder()
             .fuchsia_package(
                 update_package::ImageMetadata::new(
@@ -333,7 +336,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn version_for_valid_update_package_no_vbmeta() {
-        let zbi_hash = Hash::from([5; 32]);
+        let zbi_hash = [5; 32].into();
         let images_json = update_package::ImagePackagesManifest::builder()
             .fuchsia_package(
                 update_package::ImageMetadata::new(
@@ -378,7 +381,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn version_for_valid_update_package_no_fuchsia_package() {
-        let hash = Hash::from([5; 32]);
+        let hash = [5; 32].into();
         let images_json = update_package::ImagePackagesManifest::builder()
             .recovery_package(
                 update_package::ImageMetadata::new(
@@ -423,8 +426,8 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn version_for_valid_update_package_uses_images_json_if_present_v1() {
-        let zbi_hash = Hash::from([5; 32]);
-        let vbmeta_hash = Hash::from([3; 32]);
+        let zbi_hash = [5; 32].into();
+        let vbmeta_hash = [3; 32].into();
         let images_json = update_package::ImagePackagesManifest::builder()
             .fuchsia_package(
                 update_package::ImageMetadata::new(

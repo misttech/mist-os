@@ -256,10 +256,13 @@ async fn is_image_up_to_date(
         current_image.size.min(latest.size()),
     )
     .context("hashing current")?;
-    Ok(current_hash == latest.hash())
+    Ok(current_hash == latest.sha256())
 }
 
-fn sha256_buffer(buffer: &fmem::Buffer, mut remaining: u64) -> Result<Hash, anyhow::Error> {
+fn sha256_buffer(
+    buffer: &fmem::Buffer,
+    mut remaining: u64,
+) -> Result<fuchsia_hash::Sha256, anyhow::Error> {
     let mut hasher = sha2::Sha256::new();
     let mut offset = 0;
     let mut tmp = vec![0u8; 32 * 1024];
@@ -271,7 +274,7 @@ fn sha256_buffer(buffer: &fmem::Buffer, mut remaining: u64) -> Result<Hash, anyh
         offset += chunk_len as u64;
         remaining -= chunk_len as u64;
     }
-    Ok(Hash::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize())))
+    Ok(fuchsia_hash::Sha256::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize())))
 }
 
 #[cfg(test)]
@@ -301,19 +304,19 @@ pub mod test_check_for_system_update_impl {
         "1111111111111111111111111111111111111111111111111111111111111111";
     const TEST_UPDATE_PACKAGE_URL: &str = "fuchsia-pkg://fuchsia.test/update";
     const ACTIVE_VBMETA_CONTENTS: [u8; 1] = [1];
-    const ACTIVE_VBMETA_HASH: Hash = Hash::from_array([
+    const ACTIVE_VBMETA_HASH: fuchsia_hash::Sha256 = fuchsia_hash::Sha256::from_array([
         0x4b, 0xf5, 0x12, 0x2f, 0x34, 0x45, 0x54, 0xc5, 0x3b, 0xde, 0x2e, 0xbb, 0x8c, 0xd2, 0xb7,
         0xe3, 0xd1, 0x60, 0x0a, 0xd6, 0x31, 0xc3, 0x85, 0xa5, 0xd7, 0xcc, 0xe2, 0x3c, 0x77, 0x85,
         0x45, 0x9a,
     ]);
-    const NEW_VBMETA_HASH: Hash = Hash::from_array([4u8; 32]);
+    const NEW_VBMETA_HASH: fuchsia_hash::Sha256 = fuchsia_hash::Sha256::from_array([4u8; 32]);
     const ACTIVE_ZBI_CONTENTS: [u8; 1] = [0];
-    const ACTIVE_ZBI_HASH: Hash = Hash::from_array([
+    const ACTIVE_ZBI_HASH: fuchsia_hash::Sha256 = fuchsia_hash::Sha256::from_array([
         0x6e, 0x34, 0x0b, 0x9c, 0xff, 0xb3, 0x7a, 0x98, 0x9c, 0xa5, 0x44, 0xe6, 0xbb, 0x78, 0x0a,
         0x2c, 0x78, 0x90, 0x1d, 0x3f, 0xb3, 0x37, 0x38, 0x76, 0x85, 0x11, 0xa3, 0x06, 0x17, 0xaf,
         0xa0, 0x1d,
     ]);
-    const NEW_ZBI_HASH: Hash = Hash::from_array([6u8; 32]);
+    const NEW_ZBI_HASH: fuchsia_hash::Sha256 = fuchsia_hash::Sha256::from_array([6u8; 32]);
 
     lazy_static! {
         static ref UPDATE_PACKAGE_MERKLE: Hash = [0x22; 32].into();
@@ -350,8 +353,8 @@ pub mod test_check_for_system_update_impl {
         expected_package_url: String,
         write_packages_json: bool,
         packages: Vec<String>,
-        zbi: Option<Hash>,
-        vbmeta: Option<Hash>,
+        zbi: Option<fuchsia_hash::Sha256>,
+        vbmeta: Option<fuchsia_hash::Sha256>,
     }
 
     impl PackageResolverProxyTempDirBuilder {
@@ -377,12 +380,12 @@ pub mod test_check_for_system_update_impl {
             self
         }
 
-        fn with_zbi(mut self, zbi: Hash) -> Self {
+        fn with_zbi(mut self, zbi: fuchsia_hash::Sha256) -> Self {
             self.zbi = Some(zbi);
             self
         }
 
-        fn with_vbmeta(mut self, vbmeta: Hash) -> Self {
+        fn with_vbmeta(mut self, vbmeta: fuchsia_hash::Sha256) -> Self {
             self.vbmeta = Some(vbmeta);
             self
         }
@@ -458,7 +461,7 @@ pub mod test_check_for_system_update_impl {
                 .build()
         }
 
-        fn new_with_vbmeta(vbmeta: Hash) -> PackageResolverProxyTempDir {
+        fn new_with_vbmeta(vbmeta: fuchsia_hash::Sha256) -> PackageResolverProxyTempDir {
             PackageResolverProxyTempDirBuilder::new()
                 .with_packages_json()
                 .with_system_image_merkle(ACTIVE_SYSTEM_IMAGE_MERKLE)
@@ -466,7 +469,7 @@ pub mod test_check_for_system_update_impl {
                 .build()
         }
 
-        fn new_with_zbi(zbi: Hash) -> PackageResolverProxyTempDir {
+        fn new_with_zbi(zbi: fuchsia_hash::Sha256) -> PackageResolverProxyTempDir {
             PackageResolverProxyTempDirBuilder::new()
                 .with_packages_json()
                 .with_system_image_merkle(ACTIVE_SYSTEM_IMAGE_MERKLE)

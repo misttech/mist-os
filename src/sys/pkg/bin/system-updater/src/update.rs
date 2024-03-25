@@ -803,7 +803,7 @@ impl<'a> Attempt<'a> {
         let mut images_to_write = ImagesToWrite::new();
 
         if let Some(fuchsia) = images_metadata.fuchsia() {
-            target_version.zbi_hash = fuchsia.zbi().hash().to_string();
+            target_version.zbi_hash = fuchsia.zbi().sha256().to_string();
 
             // Determine if the fuchsia zbi has changed in this update. If an error is raised, do
             // not fail the update.
@@ -828,7 +828,7 @@ impl<'a> Attempt<'a> {
             };
 
             if let Some(vbmeta) = fuchsia.vbmeta() {
-                target_version.vbmeta_hash = vbmeta.hash().to_string();
+                target_version.vbmeta_hash = vbmeta.sha256().to_string();
                 // Determine if the vbmeta has changed in this update. If an error is raised, do
                 // not fail the update.
                 match image_to_write(
@@ -1218,14 +1218,16 @@ async fn get_image_buffer_if_hash_and_size_match(
             return None;
         }
     };
-    if buffer_hash == image_metadata.hash() {
+    if buffer_hash == image_metadata.sha256() {
         Some(buffer)
     } else {
         None
     }
 }
 
-fn sha256_buffer(fmem::Buffer { vmo, size }: &fmem::Buffer) -> anyhow::Result<Hash> {
+fn sha256_buffer(
+    fmem::Buffer { vmo, size }: &fmem::Buffer,
+) -> anyhow::Result<fuchsia_hash::Sha256> {
     let mut hasher = sha2::Sha256::new();
     const SCRATCH_SIZE: usize = 1024 * 16;
     // Guaranteeing SCRATCH_SIZE is a valid u64 means all the following `as` casts never truncate.
@@ -1242,7 +1244,7 @@ fn sha256_buffer(fmem::Buffer { vmo, size }: &fmem::Buffer) -> anyhow::Result<Ha
         let () = hasher.update(slice);
         offset += n as u64;
     }
-    Ok(Hash::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize())))
+    Ok(fuchsia_hash::Sha256::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize())))
 }
 
 async fn sync_package_cache(pkg_cache: &fpkg::PackageCacheProxy) -> Result<(), Error> {

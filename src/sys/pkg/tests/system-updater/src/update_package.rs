@@ -265,33 +265,35 @@ async fn fully_populated_images_manifest() {
         .recovery_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(1),
+                sha256(1),
                 image_package_resource_url("update-images-recovery", 3, "rzbi"),
             ),
             Some(::update_package::ImageMetadata::new(
                 5,
-                hash(2),
+                sha256(2),
                 image_package_resource_url("update-images-recovery", 3, "rvbmeta"),
             )),
         )
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(3),
+                sha256(3),
                 image_package_resource_url("update-images-fuchsia", 9, "zbi"),
             ),
             Some(::update_package::ImageMetadata::new(
                 5,
-                hash(4),
+                sha256(4),
                 image_package_resource_url("update-images-fuchsia", 9, "vbmeta"),
             )),
         )
-        .firmware_package(
-            btreemap! {
-                "".to_owned() => ::update_package::ImageMetadata::new(5, hash(5), image_package_resource_url("update-images-firmware", 5, "a")),
-                "bl2".to_owned() => ::update_package::ImageMetadata::new(5, hash(6), image_package_resource_url("update-images-firmware", 5, "bl2")),
-            },
-        )
+        .firmware_package(btreemap! {
+            "".to_owned() => ::update_package::ImageMetadata::new(
+                5, sha256(5), image_package_resource_url("update-images-firmware", 5, "a")
+            ),
+            "bl2".to_owned() => ::update_package::ImageMetadata::new(
+                5, sha256(6), image_package_resource_url("update-images-firmware", 5, "bl2")
+            ),
+        })
         .clone()
         .build();
 

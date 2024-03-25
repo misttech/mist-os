@@ -5,8 +5,6 @@
 use hex::{FromHex, FromHexError, ToHex as _};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
-use std::ops::Deref;
-use std::str;
 use thiserror::Error;
 
 mod iter;
@@ -15,68 +13,83 @@ pub use iter::*;
 /// The size of a hash in bytes.
 pub const HASH_SIZE: usize = 32;
 
-/// A 32 byte hash.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Hash([u8; HASH_SIZE]);
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct FuchsiaMerkleMarker;
+/// A digest created by the Fuchsia Merkle Tree hashing algorithm.
+/// https://fuchsia.dev/fuchsia-src/concepts/packages/merkleroot
+pub type Hash = GenericDigest<FuchsiaMerkleMarker>;
 
-impl Hash {
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Sha256Marker;
+/// A digest created by the Sha256 hashing algorithm.
+pub type Sha256 = GenericDigest<Sha256Marker>;
+
+/// The 32 byte digest of a hash function. The type parameter indicates the hash algorithm that was
+/// used to compute the digest.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct GenericDigest<T> {
+    digest: [u8; HASH_SIZE],
+    type_: std::marker::PhantomData<T>,
+}
+
+impl<T> GenericDigest<T> {
     /// Obtain a slice of the bytes representing the hash.
     pub fn as_bytes(&self) -> &[u8] {
-        &self.0[..]
+        &self.digest[..]
     }
 
     pub const fn from_array(arr: [u8; HASH_SIZE]) -> Self {
-        Self(arr)
+        Self { digest: arr, type_: std::marker::PhantomData::<T> }
     }
 }
 
-impl str::FromStr for Hash {
+impl<T> std::str::FromStr for GenericDigest<T> {
     type Err = ParseHashError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(FromHex::from_hex(s)?))
+        Ok(Self { digest: FromHex::from_hex(s)?, type_: std::marker::PhantomData::<T> })
     }
 }
 
-impl<'de> Deserialize<'de> for Hash {
+impl<'de, T> Deserialize<'de> for GenericDigest<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        str::FromStr::from_str(&s).map_err(serde::de::Error::custom)
+        std::str::FromStr::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 
-impl From<[u8; HASH_SIZE]> for Hash {
+impl<T> From<[u8; HASH_SIZE]> for GenericDigest<T> {
     fn from(bytes: [u8; HASH_SIZE]) -> Self {
-        Hash(bytes)
+        GenericDigest { digest: bytes, type_: std::marker::PhantomData::<T> }
     }
 }
 
-impl From<Hash> for [u8; HASH_SIZE] {
-    fn from(hash: Hash) -> Self {
-        hash.0
+impl<T> From<GenericDigest<T>> for [u8; HASH_SIZE] {
+    fn from(hash: GenericDigest<T>) -> Self {
+        hash.digest
     }
 }
 
-impl TryFrom<&[u8]> for Hash {
+impl<T> TryFrom<&[u8]> for GenericDigest<T> {
     type Error = std::array::TryFromSliceError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        Ok(Self(bytes.try_into()?))
+        Ok(Self { digest: bytes.try_into()?, type_: std::marker::PhantomData::<T> })
     }
 }
 
-impl TryFrom<&str> for Hash {
+impl<T> TryFrom<&str> for GenericDigest<T> {
     type Error = ParseHashError;
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        Ok(Self(FromHex::from_hex(s)?))
+        Ok(Self { digest: FromHex::from_hex(s)?, type_: std::marker::PhantomData::<T> })
     }
 }
 
-impl TryFrom<String> for Hash {
+impl<T> TryFrom<String> for GenericDigest<T> {
     type Error = ParseHashError;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
@@ -84,19 +97,19 @@ impl TryFrom<String> for Hash {
     }
 }
 
-impl From<Hash> for String {
-    fn from(h: Hash) -> Self {
-        hex::encode(&h.0)
+impl<T> From<GenericDigest<T>> for String {
+    fn from(h: GenericDigest<T>) -> Self {
+        hex::encode(&h.digest)
     }
 }
 
-impl fmt::Display for Hash {
+impl<T> fmt::Display for GenericDigest<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.write_hex(f)
+        self.digest.write_hex(f)
     }
 }
 
-impl Serialize for Hash {
+impl<T> Serialize for GenericDigest<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -105,17 +118,17 @@ impl Serialize for Hash {
     }
 }
 
-impl fmt::Debug for Hash {
+impl<T> fmt::Debug for GenericDigest<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Hash").field(&self.to_string()).finish()
     }
 }
 
-impl Deref for Hash {
+impl<T> std::ops::Deref for GenericDigest<T> {
     type Target = [u8; HASH_SIZE];
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.digest
     }
 }
 

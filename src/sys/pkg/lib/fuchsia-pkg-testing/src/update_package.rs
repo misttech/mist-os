@@ -317,7 +317,7 @@ fn image_metadata(
     let () = hasher.update(image);
     update_package::ImageMetadata::new(
         image.len().try_into().unwrap(),
-        fuchsia_hash::Hash::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize())),
+        fuchsia_hash::Sha256::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize())),
         url,
     )
 }

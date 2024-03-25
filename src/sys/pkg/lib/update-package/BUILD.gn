@@ -35,7 +35,6 @@ rustc_library("update-package") {
     "//src/lib/fuchsia-async",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:proptest",
     "//third_party/rust_crates:tempfile",
   ]

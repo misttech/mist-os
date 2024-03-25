@@ -37,7 +37,6 @@ use {
         fs::{create_dir, File},
         io::Write,
         path::PathBuf,
-        str::FromStr,
         sync::Arc,
     },
     tempfile::TempDir,
@@ -59,8 +58,8 @@ mod update_package;
 mod writes_firmware;
 mod writes_images;
 
-const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-const MATCHING_HASH: &str = "e0705e68b0468289858b543f8a57f375a3b4f46391a72f94a28d82d6a3dacaa7";
+const EMPTY_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+const MATCHING_SHA256: &str = "e0705e68b0468289858b543f8a57f375a3b4f46391a72f94a28d82d6a3dacaa7";
 
 pub fn make_images_json_zbi() -> String {
     serde_json::to_string(
@@ -68,7 +67,7 @@ pub fn make_images_json_zbi() -> String {
             .fuchsia_package(
                 ::update_package::ImageMetadata::new(
                     0,
-                    Hash::from_str(EMPTY_HASH).unwrap(),
+                    EMPTY_SHA256.parse().unwrap(),
                     image_package_resource_url("update-images-fuchsia", 9, "zbi"),
                 ),
                 None,
@@ -85,7 +84,7 @@ pub fn make_images_json_recovery() -> String {
             .recovery_package(
                 ::update_package::ImageMetadata::new(
                     0,
-                    Hash::from_str(EMPTY_HASH).unwrap(),
+                    EMPTY_SHA256.parse().unwrap(),
                     image_package_resource_url("update-images-recovery", 9, "zbi"),
                 ),
                 None,
@@ -805,6 +804,10 @@ fn image_package_resource_url(name: &str, hash: u8, resource: &str) -> AbsoluteC
 
 fn image_package_url_to_string(name: &str, hash: u8) -> String {
     format!("fuchsia-pkg://fuchsia.com/{name}/0?hash={}", hashstr(hash)).parse().unwrap()
+}
+
+fn sha256(n: u8) -> fuchsia_hash::Sha256 {
+    fuchsia_hash::Sha256::from([n; 32])
 }
 
 fn hash(n: u8) -> Hash {

@@ -8,7 +8,6 @@ use {
     crate::update_mode::UpdateMode,
     camino::Utf8Path,
     fidl_fuchsia_io as fio,
-    fuchsia_hash::Hash,
     fuchsia_url::{AbsoluteComponentUrl, ParseError, PinnedAbsolutePackageUrl},
     fuchsia_zircon_status::Status,
     serde::{Deserialize, Serialize},
@@ -91,9 +90,11 @@ pub struct ImagePackagesManifest {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FirmwareMetadata {
-    r#type: String,
+    #[serde(rename = "type")]
+    type_: String,
     size: u64,
-    hash: Hash,
+    #[serde(rename = "hash")]
+    sha256: fuchsia_hash::Sha256,
     url: AbsoluteComponentUrl,
 }
 
@@ -103,9 +104,11 @@ pub struct FirmwareMetadata {
 #[serde(deny_unknown_fields)]
 pub struct AssetMetadata {
     slot: Slot,
-    r#type: AssetType,
+    #[serde(rename = "type")]
+    type_: AssetType,
     size: u64,
-    hash: Hash,
+    #[serde(rename = "hash")]
+    sha256: fuchsia_hash::Sha256,
     url: AbsoluteComponentUrl,
 }
 
@@ -182,7 +185,7 @@ pub struct ImageMetadata {
 
     /// The sha256 hash of the image. Note this is not the merkle root of a
     /// `fuchsia_merkle::MerkleTree`. It is the content hash of the image.
-    hash: Hash,
+    sha256: fuchsia_hash::Sha256,
 
     /// The URL of the image in its package.
     url: AbsoluteComponentUrl,
@@ -191,32 +194,37 @@ pub struct ImageMetadata {
 impl FirmwareMetadata {
     /// Creates a new [`FirmwareMetadata`] from the given image metadata and firmware type.
     pub fn new_from_metadata(type_: impl Into<String>, metadata: ImageMetadata) -> Self {
-        Self { r#type: type_.into(), size: metadata.size, hash: metadata.hash, url: metadata.url }
+        Self {
+            type_: type_.into(),
+            size: metadata.size,
+            sha256: metadata.sha256,
+            url: metadata.url,
+        }
     }
 
     fn key(&self) -> &str {
-        &self.r#type
+        &self.type_
     }
 
     /// Returns the [`ImageMetadata`] for this image.
     pub fn metadata(&self) -> ImageMetadata {
-        ImageMetadata { size: self.size, hash: self.hash, url: self.url.clone() }
+        ImageMetadata { size: self.size, sha256: self.sha256, url: self.url.clone() }
     }
 }
 
 impl AssetMetadata {
     /// Creates a new [`AssetMetadata`] from the given image metadata and target slot/type.
-    pub fn new_from_metadata(slot: Slot, kind: AssetType, metadata: ImageMetadata) -> Self {
-        Self { slot, r#type: kind, size: metadata.size, hash: metadata.hash, url: metadata.url }
+    pub fn new_from_metadata(slot: Slot, type_: AssetType, metadata: ImageMetadata) -> Self {
+        Self { slot, type_, size: metadata.size, sha256: metadata.sha256, url: metadata.url }
     }
 
     fn key(&self) -> (Slot, AssetType) {
-        (self.slot, self.r#type)
+        (self.slot, self.type_)
     }
 
     /// Returns the [`ImageMetadata`] for this image.
     pub fn metadata(&self) -> ImageMetadata {
-        ImageMetadata { size: self.size, hash: self.hash, url: self.url.clone() }
+        ImageMetadata { size: self.size, sha256: self.sha256, url: self.url.clone() }
     }
 }
 
@@ -228,12 +236,12 @@ impl ImagePackagesManifest {
         }
     }
 
-    fn image(&self, slot: Slot, kind: AssetType) -> Option<&AssetMetadata> {
-        self.assets.iter().find(|image| image.slot == slot && image.r#type == kind)
+    fn image(&self, slot: Slot, type_: AssetType) -> Option<&AssetMetadata> {
+        self.assets.iter().find(|image| image.slot == slot && image.type_ == type_)
     }
 
-    fn image_metadata(&self, slot: Slot, kind: AssetType) -> Option<ImageMetadata> {
-        self.image(slot, kind).map(|image| image.metadata())
+    fn image_metadata(&self, slot: Slot, type_: AssetType) -> Option<ImageMetadata> {
+        self.image(slot, type_).map(|image| image.metadata())
     }
 
     fn slot_metadata(&self, slot: Slot) -> Option<ZbiAndOptionalVbmetaMetadata> {
@@ -255,15 +263,15 @@ impl ImagePackagesManifest {
 
     /// Returns metadata for the firmware images.
     pub fn firmware(&self) -> BTreeMap<String, ImageMetadata> {
-        self.firmware.iter().map(|image| (image.r#type.to_owned(), image.metadata())).collect()
+        self.firmware.iter().map(|image| (image.type_.to_owned(), image.metadata())).collect()
     }
 }
 
 impl ImageMetadata {
     /// Returns new image metadata that designates the given `size` and `hash`, which can be found
     /// at the given `url`.
-    pub fn new(size: u64, hash: Hash, url: AbsoluteComponentUrl) -> Self {
-        Self { size, hash, url }
+    pub fn new(size: u64, sha256: fuchsia_hash::Sha256, url: AbsoluteComponentUrl) -> Self {
+        Self { size, sha256, url }
     }
 
     /// Returns the size of the image, in bytes.
@@ -272,8 +280,8 @@ impl ImageMetadata {
     }
 
     /// Returns the sha256 hash of the image.
-    pub fn hash(&self) -> Hash {
-        self.hash
+    pub fn sha256(&self) -> fuchsia_hash::Sha256 {
+        self.sha256
     }
 
     /// Returns the url of the image.
@@ -293,12 +301,12 @@ impl ImageMetadata {
         let mut hasher = sha2::Sha256::new();
         let mut file = std::fs::File::open(path).map_err(ImageMetadataError::Io)?;
         let size = std::io::copy(&mut file, &mut hasher).map_err(ImageMetadataError::Io)?;
-        let hash = Hash::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize()));
+        let sha256 = fuchsia_hash::Sha256::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize()));
 
         let url = AbsoluteComponentUrl::from_package_url_and_resource(url.into(), resource)
             .map_err(ImageMetadataError::InvalidResourcePath)?;
 
-        Ok(Self { size, hash, url })
+        Ok(Self { size, sha256, url })
     }
 }
 
@@ -508,18 +516,21 @@ mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
-        maplit::btreemap,
         serde_json::json,
         std::{fs::File, io::Write},
         vfs::{file::vmo::read_only, pseudo_directory},
     };
 
-    fn hash(n: u8) -> Hash {
-        Hash::from([n; 32])
+    fn sha256(n: u8) -> fuchsia_hash::Sha256 {
+        [n; 32].into()
+    }
+
+    fn sha256str(n: u8) -> String {
+        sha256(n).to_string()
     }
 
     fn hashstr(n: u8) -> String {
-        hash(n).to_string()
+        fuchsia_hash::Hash::from([n; 32]).to_string()
     }
 
     fn test_url(data: &str) -> AbsoluteComponentUrl {
@@ -606,21 +617,43 @@ mod tests {
     fn builder_builds_populated_manifest() {
         let actual = ImagePackagesManifest::builder()
             .fuchsia_package(
-                ImageMetadata::new(1, hash(1),  image_package_resource_url("update-images-fuchsia", 9, "zbi")),
-                Some(ImageMetadata::new(2, hash(2), image_package_resource_url("update-images-fuchsia", 8, "vbmeta"))),
+                ImageMetadata::new(
+                    1,
+                    sha256(1),
+                    image_package_resource_url("update-images-fuchsia", 9, "zbi"),
+                ),
+                Some(ImageMetadata::new(
+                    2,
+                    sha256(2),
+                    image_package_resource_url("update-images-fuchsia", 8, "vbmeta"),
+                )),
             )
             .recovery_package(
-                ImageMetadata::new(3, hash(3),  image_package_resource_url("update-images-recovery", 7, "zbi")),
+                ImageMetadata::new(
+                    3,
+                    sha256(3),
+                    image_package_resource_url("update-images-recovery", 7, "zbi"),
+                ),
                 None,
             )
-            .firmware_package(
-                    btreemap! {
-                        "".to_owned() => ImageMetadata::new(5, hash(5), image_package_resource_url("update-images-firmware", 6, "a")
+            .firmware_package(BTreeMap::from([
+                (
+                    "".into(),
+                    ImageMetadata::new(
+                        5,
+                        sha256(5),
+                        image_package_resource_url("update-images-firmware", 6, "a"),
                     ),
-                        "bl2".to_owned() => ImageMetadata::new(6, hash(6), image_package_resource_url("update-images-firmware", 5, "b")
+                ),
+                (
+                    "bl2".into(),
+                    ImageMetadata::new(
+                        6,
+                        sha256(6),
+                        image_package_resource_url("update-images-firmware", 5, "b"),
                     ),
-                    },
-                )
+                ),
+            ]))
             .clone()
             .build();
         assert_eq!(
@@ -629,37 +662,37 @@ mod tests {
                 assets: vec![
                     AssetMetadata {
                         slot: Slot::Fuchsia,
-                        r#type: AssetType::Zbi,
+                        type_: AssetType::Zbi,
                         size: 1,
-                        hash: hash(1),
+                        sha256: sha256(1),
                         url: image_package_resource_url("update-images-fuchsia", 9, "zbi"),
                     },
                     AssetMetadata {
                         slot: Slot::Fuchsia,
-                        r#type: AssetType::Vbmeta,
+                        type_: AssetType::Vbmeta,
                         size: 2,
-                        hash: hash(2),
+                        sha256: sha256(2),
                         url: image_package_resource_url("update-images-fuchsia", 8, "vbmeta"),
                     },
                     AssetMetadata {
                         slot: Slot::Recovery,
-                        r#type: AssetType::Zbi,
+                        type_: AssetType::Zbi,
                         size: 3,
-                        hash: hash(3),
+                        sha256: sha256(3),
                         url: image_package_resource_url("update-images-recovery", 7, "zbi"),
                     },
                 ],
                 firmware: vec![
                     FirmwareMetadata {
-                        r#type: "".to_owned(),
+                        type_: "".to_owned(),
                         size: 5,
-                        hash: hash(5),
+                        sha256: sha256(5),
                         url: image_package_resource_url("update-images-firmware", 6, "a"),
                     },
                     FirmwareMetadata {
-                        r#type: "bl2".to_owned(),
+                        type_: "bl2".to_owned(),
                         size: 6,
-                        hash: hash(6),
+                        sha256: sha256(6),
                         url: image_package_resource_url("update-images-firmware", 5, "b"),
                     },
                 ],
@@ -677,26 +710,26 @@ mod tests {
                     "slot" : "fuchsia",
                     "type" : "zbi",
                     "size" : 1,
-                    "hash" : hashstr(1),
+                    "hash" : sha256str(1),
                     "url" : image_package_resource_url("package", 1, "zbi")
                 }, {
                     "slot" : "fuchsia",
                     "type" : "vbmeta",
                     "size" : 2,
-                    "hash" : hashstr(2),
+                    "hash" : sha256str(2),
                     "url" : image_package_resource_url("package", 1, "vbmeta")
                 },
                 {
                     "slot" : "recovery",
                     "type" : "zbi",
                     "size" : 3,
-                    "hash" : hashstr(3),
+                    "hash" : sha256str(3),
                     "url" : image_package_resource_url("package", 1, "rzbi")
                 }, {
                     "slot" : "recovery",
                     "type" : "vbmeta",
                     "size" : 3,
-                    "hash" : hashstr(3),
+                    "hash" : sha256str(3),
                     "url" : image_package_resource_url("package", 1, "rvbmeta")
                     },
                 ],
@@ -704,12 +737,12 @@ mod tests {
                     {
                         "type" : "",
                         "size" : 5,
-                        "hash" : hashstr(5),
+                        "hash" : sha256str(5),
                         "url" : image_package_resource_url("package", 1, "firmware")
                     }, {
                         "type" : "bl2",
                         "size" : 6,
-                        "hash" : hashstr(6),
+                        "hash" : sha256str(6),
                         "url" : image_package_resource_url("package", 1, "firmware")
                     },
                 ],
@@ -727,31 +760,45 @@ mod tests {
                 fuchsia: Some(ZbiAndOptionalVbmetaMetadata {
                     zbi: ImageMetadata::new(
                         1,
-                        hash(1),
+                        sha256(1),
                         image_package_resource_url("package", 1, "zbi")
                     ),
                     vbmeta: Some(ImageMetadata::new(
                         2,
-                        hash(2),
+                        sha256(2),
                         image_package_resource_url("package", 1, "vbmeta")
                     )),
                 },),
                 recovery: Some(ZbiAndOptionalVbmetaMetadata {
                     zbi: ImageMetadata::new(
                         3,
-                        hash(3),
+                        sha256(3),
                         image_package_resource_url("package", 1, "rzbi")
                     ),
                     vbmeta: Some(ImageMetadata::new(
                         3,
-                        hash(3),
+                        sha256(3),
                         image_package_resource_url("package", 1, "rvbmeta")
                     )),
                 }),
-                firmware: btreemap! {
-                    "".to_owned() => ImageMetadata::new(5, hash(5),  image_package_resource_url("package", 1, "firmware")),
-                    "bl2".to_owned() => ImageMetadata::new(6, hash(6),  image_package_resource_url("package", 1, "firmware")),
-                },
+                firmware: BTreeMap::from([
+                    (
+                        "".into(),
+                        ImageMetadata::new(
+                            5,
+                            sha256(5),
+                            image_package_resource_url("package", 1, "firmware")
+                        )
+                    ),
+                    (
+                        "bl2".into(),
+                        ImageMetadata::new(
+                            6,
+                            sha256(6),
+                            image_package_resource_url("package", 1, "firmware")
+                        )
+                    ),
+                ])
             }
         );
     }
@@ -765,13 +812,13 @@ mod tests {
                     "slot" : "fuchsia",
                     "type" : "zbi",
                     "size" : 1,
-                    "hash" : hashstr(1),
+                    "hash" : sha256str(1),
                     "url" : image_package_resource_url("package", 1, "zbi")
                 }, {
                     "slot" : "fuchsia",
                     "type" : "zbi",
                     "size" : 1,
-                    "hash" : hashstr(1),
+                    "hash" : sha256str(1),
                     "url" : image_package_resource_url("package", 1, "zbi")
                 },
                 ],
@@ -797,12 +844,12 @@ mod tests {
                     {
                         "type" : "",
                         "size" : 5,
-                        "hash" : hashstr(5),
+                        "hash" : sha256str(5),
                         "url" : image_package_resource_url("package", 1, "firmware")
                     }, {
                         "type" : "",
                         "size" : 5,
-                        "hash" : hashstr(5),
+                        "hash" : sha256str(5),
                         "url" : image_package_resource_url("package", 1, "firmware")
                     },
                 ],
@@ -826,7 +873,7 @@ mod tests {
                     "slot" : "fuchsia",
                     "type" : "vbmeta",
                     "size" : 1,
-                    "hash" : hashstr(1),
+                    "hash" : sha256str(1),
                     "url" : image_package_resource_url("package", 1, "vbmeta")
                 }],
                 "firmware": [],
@@ -850,7 +897,7 @@ mod tests {
                     "slot" : "fuchsia",
                     "type" : "zbi",
                     "size" : 1,
-                    "hash" : hashstr(1),
+                    "hash" : sha256str(1),
                     "url" : "fuchsia-pkg://fuchsia.com/package/0#zbi"
                 }],
                 "firmware": [],
@@ -873,7 +920,7 @@ mod tests {
                 "firmware": [{
                     "type" : "",
                     "size" : 5,
-                    "hash" : hashstr(5),
+                    "hash" : sha256str(5),
                     "url" : "fuchsia-pkg://fuchsia.com/package/0#firmware"
                 }],
             }
@@ -890,16 +937,17 @@ mod tests {
     fn verify_mode_normal_requires_zbi() {
         let with_zbi = ImagesMetadata {
             fuchsia: Some(ZbiAndOptionalVbmetaMetadata {
-                zbi: ImageMetadata::new(1, hash(1), test_url("zbi")),
+                zbi: ImageMetadata::new(1, sha256(1), test_url("zbi")),
                 vbmeta: None,
             }),
             recovery: None,
-            firmware: btreemap! {},
+            firmware: BTreeMap::new(),
         };
 
         assert_eq!(with_zbi.verify(UpdateMode::Normal), Ok(()));
 
-        let without_zbi = ImagesMetadata { fuchsia: None, recovery: None, firmware: btreemap! {} };
+        let without_zbi =
+            ImagesMetadata { fuchsia: None, recovery: None, firmware: BTreeMap::new() };
 
         assert_eq!(without_zbi.verify(UpdateMode::Normal), Err(VerifyError::MissingZbi));
     }
@@ -908,16 +956,17 @@ mod tests {
     fn verify_mode_force_recovery_requires_no_zbi() {
         let with_zbi = ImagesMetadata {
             fuchsia: Some(ZbiAndOptionalVbmetaMetadata {
-                zbi: ImageMetadata::new(1, hash(1), test_url("zbi")),
+                zbi: ImageMetadata::new(1, sha256(1), test_url("zbi")),
                 vbmeta: None,
             }),
             recovery: None,
-            firmware: btreemap! {},
+            firmware: BTreeMap::new(),
         };
 
         assert_eq!(with_zbi.verify(UpdateMode::ForceRecovery), Err(VerifyError::UnexpectedZbi));
 
-        let without_zbi = ImagesMetadata { fuchsia: None, recovery: None, firmware: btreemap! {} };
+        let without_zbi =
+            ImagesMetadata { fuchsia: None, recovery: None, firmware: BTreeMap::new() };
 
         assert_eq!(without_zbi.verify(UpdateMode::ForceRecovery), Ok(()));
     }
@@ -956,15 +1005,15 @@ mod tests {
     #[fuchsia::test]
     fn boot_slot_accessors() {
         let slot = ZbiAndOptionalVbmetaMetadata {
-            zbi: ImageMetadata::new(1, hash(1), test_url("zbi")),
-            vbmeta: Some(ImageMetadata::new(2, hash(2), test_url("vbmeta"))),
+            zbi: ImageMetadata::new(1, sha256(1), test_url("zbi")),
+            vbmeta: Some(ImageMetadata::new(2, sha256(2), test_url("vbmeta"))),
         };
 
-        assert_eq!(slot.zbi(), &ImageMetadata::new(1, hash(1), test_url("zbi")));
-        assert_eq!(slot.vbmeta(), Some(&ImageMetadata::new(2, hash(2), test_url("vbmeta"))));
+        assert_eq!(slot.zbi(), &ImageMetadata::new(1, sha256(1), test_url("zbi")));
+        assert_eq!(slot.vbmeta(), Some(&ImageMetadata::new(2, sha256(2), test_url("vbmeta"))));
 
         let slot = ZbiAndOptionalVbmetaMetadata {
-            zbi: ImageMetadata::new(1, hash(1), test_url("zbi")),
+            zbi: ImageMetadata::new(1, sha256(1), test_url("zbi")),
             vbmeta: None,
         };
         assert_eq!(slot.vbmeta(), None);
@@ -973,57 +1022,69 @@ mod tests {
     #[fuchsia::test]
     fn image_packages_manifest_accessors() {
         let slot = ZbiAndOptionalVbmetaMetadata {
-            zbi: ImageMetadata::new(1, hash(1), test_url("zbi")),
-            vbmeta: Some(ImageMetadata::new(2, hash(2), test_url("vbmeta"))),
+            zbi: ImageMetadata::new(1, sha256(1), test_url("zbi")),
+            vbmeta: Some(ImageMetadata::new(2, sha256(2), test_url("vbmeta"))),
         };
 
         let mut builder = ImagePackagesManifest::builder();
         builder.fuchsia_package(
-            ImageMetadata::new(1, hash(1), test_url("zbi")),
-            Some(ImageMetadata::new(2, hash(2), test_url("vbmeta"))),
+            ImageMetadata::new(1, sha256(1), test_url("zbi")),
+            Some(ImageMetadata::new(2, sha256(2), test_url("vbmeta"))),
         );
         let VersionedImagePackagesManifest::Version1(manifest) = builder.build();
 
         assert_eq!(manifest.fuchsia(), Some(slot.clone()));
         assert_eq!(manifest.recovery(), None);
-        assert_eq!(manifest.firmware(), btreemap! {});
+        assert_eq!(manifest.firmware(), BTreeMap::new());
 
         let mut builder = ImagePackagesManifest::builder();
         builder.recovery_package(
-            ImageMetadata::new(1, hash(1), test_url("zbi")),
-            Some(ImageMetadata::new(2, hash(2), test_url("vbmeta"))),
+            ImageMetadata::new(1, sha256(1), test_url("zbi")),
+            Some(ImageMetadata::new(2, sha256(2), test_url("vbmeta"))),
         );
         let VersionedImagePackagesManifest::Version1(manifest) = builder.build();
 
         assert_eq!(manifest.fuchsia(), None);
         assert_eq!(manifest.recovery(), Some(slot));
-        assert_eq!(manifest.firmware(), btreemap! {});
+        assert_eq!(manifest.firmware(), BTreeMap::new());
 
         let mut builder = ImagePackagesManifest::builder();
-        builder.firmware_package(btreemap! {
-            "".to_owned() => ImageMetadata::new(5, hash(5), image_package_resource_url("update-images-firmware", 6, "a")) }
-        );
+        builder.firmware_package(BTreeMap::from([(
+            "".into(),
+            ImageMetadata::new(
+                5,
+                sha256(5),
+                image_package_resource_url("update-images-firmware", 6, "a"),
+            ),
+        )]));
         let VersionedImagePackagesManifest::Version1(manifest) = builder.build();
         assert_eq!(manifest.fuchsia(), None);
         assert_eq!(manifest.recovery(), None);
         assert_eq!(
             manifest.firmware(),
-            btreemap! {"".to_owned() => ImageMetadata::new(5, hash(5), image_package_resource_url("update-images-firmware", 6, "a"))}
+            BTreeMap::from([(
+                "".into(),
+                ImageMetadata::new(
+                    5,
+                    sha256(5),
+                    image_package_resource_url("update-images-firmware", 6, "a")
+                )
+            )])
         )
     }
 
     #[fuchsia::test]
     fn firmware_image_format_to_image_metadata() {
         let assembly_firmware = FirmwareMetadata {
-            r#type: "".to_string(),
+            type_: "".to_string(),
             size: 1,
-            hash: hash(1),
+            sha256: sha256(1),
             url: image_package_resource_url("package", 1, "firmware"),
         };
 
         let image_meta_data = ImageMetadata {
             size: 1,
-            hash: hash(1),
+            sha256: sha256(1),
             url: image_package_resource_url("package", 1, "firmware"),
         };
 
@@ -1036,15 +1097,15 @@ mod tests {
     fn assembly_image_format_to_image_metadata() {
         let assembly_image = AssetMetadata {
             slot: Slot::Fuchsia,
-            r#type: AssetType::Zbi,
+            type_: AssetType::Zbi,
             size: 1,
-            hash: hash(1),
+            sha256: sha256(1),
             url: image_package_resource_url("package", 1, "image"),
         };
 
         let image_meta_data = ImageMetadata {
             size: 1,
-            hash: hash(1),
+            sha256: sha256(1),
             url: image_package_resource_url("package", 1, "image"),
         };
 
@@ -1057,7 +1118,7 @@ mod tests {
     fn manifest_conversion_minimal() {
         let manifest = ImagePackagesManifest { assets: vec![], firmware: vec![] };
 
-        let slots = ImagesMetadata { fuchsia: None, recovery: None, firmware: btreemap! {} };
+        let slots = ImagesMetadata { fuchsia: None, recovery: None, firmware: BTreeMap::new() };
 
         let translated_manifest: ImagesMetadata = manifest.into();
         assert_eq!(translated_manifest, slots);
@@ -1069,44 +1130,44 @@ mod tests {
             assets: vec![
                 AssetMetadata {
                     slot: Slot::Fuchsia,
-                    r#type: AssetType::Zbi,
+                    type_: AssetType::Zbi,
                     size: 1,
-                    hash: hash(1),
+                    sha256: sha256(1),
                     url: test_url("1"),
                 },
                 AssetMetadata {
                     slot: Slot::Fuchsia,
-                    r#type: AssetType::Vbmeta,
+                    type_: AssetType::Vbmeta,
                     size: 2,
-                    hash: hash(2),
+                    sha256: sha256(2),
                     url: test_url("2"),
                 },
                 AssetMetadata {
                     slot: Slot::Recovery,
-                    r#type: AssetType::Zbi,
+                    type_: AssetType::Zbi,
                     size: 3,
-                    hash: hash(3),
+                    sha256: sha256(3),
                     url: test_url("3"),
                 },
                 AssetMetadata {
                     slot: Slot::Recovery,
-                    r#type: AssetType::Vbmeta,
+                    type_: AssetType::Vbmeta,
                     size: 4,
-                    hash: hash(4),
+                    sha256: sha256(4),
                     url: test_url("4"),
                 },
             ],
             firmware: vec![
                 FirmwareMetadata {
-                    r#type: "".to_string(),
+                    type_: "".to_string(),
                     size: 5,
-                    hash: hash(5),
+                    sha256: sha256(5),
                     url: test_url("5"),
                 },
                 FirmwareMetadata {
-                    r#type: "bl2".to_string(),
+                    type_: "bl2".to_string(),
                     size: 6,
-                    hash: hash(6),
+                    sha256: sha256(6),
                     url: test_url("6"),
                 },
             ],
@@ -1114,17 +1175,17 @@ mod tests {
 
         let slots = ImagesMetadata {
             fuchsia: Some(ZbiAndOptionalVbmetaMetadata {
-                zbi: ImageMetadata::new(1, hash(1), test_url("1")),
-                vbmeta: Some(ImageMetadata::new(2, hash(2), test_url("2"))),
+                zbi: ImageMetadata::new(1, sha256(1), test_url("1")),
+                vbmeta: Some(ImageMetadata::new(2, sha256(2), test_url("2"))),
             }),
             recovery: Some(ZbiAndOptionalVbmetaMetadata {
-                zbi: ImageMetadata::new(3, hash(3), test_url("3")),
-                vbmeta: Some(ImageMetadata::new(4, hash(4), test_url("4"))),
+                zbi: ImageMetadata::new(3, sha256(3), test_url("3")),
+                vbmeta: Some(ImageMetadata::new(4, sha256(4), test_url("4"))),
             }),
-            firmware: btreemap! {
-                "".to_owned() => ImageMetadata::new(5, hash(5), test_url("5")),
-                "bl2".to_owned() => ImageMetadata::new(6, hash(6), test_url("6")),
-            },
+            firmware: BTreeMap::from([
+                ("".into(), ImageMetadata::new(5, sha256(5), test_url("5"))),
+                ("bl2".into(), ImageMetadata::new(6, sha256(6), test_url("6"))),
+            ]),
         };
 
         let translated_manifest: ImagesMetadata = manifest.into();

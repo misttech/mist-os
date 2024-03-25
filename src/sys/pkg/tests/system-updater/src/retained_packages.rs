@@ -189,7 +189,7 @@ async fn unpinned_url_and_resolved_image_package_and_non_empty_packages_json() {
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
                 5,
-                hash(zbi_hash_seed),
+                sha256(zbi_hash_seed),
                 image_package_resource_url("zbi", zbi_hash_seed, "zbi"),
             ),
             None,
