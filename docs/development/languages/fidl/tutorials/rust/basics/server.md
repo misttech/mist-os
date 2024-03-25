@@ -233,12 +233,8 @@ connect to a protocol matching the specified name.
 ```
 
 The main function is async since it consists of listening for incoming connections to the
-Echo server. The `run_singlethreaded` attribute tells the fuchsia async runtime to run
+Echo server. The [`fuchsia::main`][fuchsia-main] attribute tells the fuchsia async runtime to run
 the `main` future to completion on a single thread.
-
-The `run_singlethreaded`, `run`, and `run_until_stalled` macros from
-the `fuchsia_async` crate can be used to run asynchronous `main` or test
-functions to completion using the `fuchsia_async::Executor`.
 
 `main` also returns `Result<(), Error>`. If an `Error` is returned from `main`
 as a result of one of the `?` lines, the error will be `Debug` printed and
@@ -370,6 +366,7 @@ the [component instance tree][glossary.component-instance-tree]
 [glossary.moniker]: /docs/glossary/README.md#moniker
 [concepts]: /docs/concepts/fidl/overview.md
 [fidl-crates]: /docs/development/languages/fidl/tutorials/rust/basics/using-fidl.md
+[fuchsia-main]: /src/lib/fuchsia/macro/src/lib.rs#23
 [building-components]: /docs/development/components/build.md
 [products]: /docs/development/build/build_system/boards_and_products.md
 [control-handle]: /docs/reference/fidl/bindings/rust-bindings.md#protocol-control-handle
