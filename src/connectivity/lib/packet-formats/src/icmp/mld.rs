@@ -223,10 +223,16 @@ pub struct MulticastListenerReport;
 pub struct MulticastListenerDone;
 
 /// MLD Errors.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum MldError {
     /// Raised when `MaxRespCode` cannot fit in `u16`.
     MaxRespCodeOverflow,
+    /// Raised when a duration cannot be exactly expressed with a MaxRespCode. This can happen when
+    /// the exponential mapping from MLDv2 is used. For an example see [RFC 3810 section 5.1].
+    /// This error is not used for MLDv1.
+    ///
+    /// [RFC 3810 section 5.1]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1
+    MaxRespCodeLossyConversion,
 }
 
 /// The trait for all MLDv1 Messages.
@@ -416,6 +422,119 @@ impl<M: Mldv1MessageType> InnerPacketBuilder for Mldv1MessageBuilder<M> {
     }
 }
 
+const FLOATING_POINT_SWITCH_POINT: u16 = 32768;
+const FLOATING_POINT_MAX_VALUE: u32 = (0x0FFF | 0x1000) << (7 + 3);
+
+/// Maximum Response Delay used in Queryv2 messages, defined in [RFC 3810 section 5.1.3]
+/// [RFC 3810 section 5.1.3]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.3
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub struct Mldv2ResponseDelay(u16);
+
+impl Mldv2ResponseDelay {
+    /// Parses a code that may be representing a floating point value.
+    ///
+    /// Defined in [RFC 3810 section 5.1] and used in MLDv2 multicast listener queries and multicast
+    /// listener reports.
+    ///
+    /// The floating point format is as follows:
+    ///
+    ///   If Maximum Response Code < 32768,
+    ///      Maximum Response Delay = Maximum Response Code
+
+    ///   If Maximum Response Code >=32768, Maximum Response Code represents a
+    ///   floating-point value as follows:
+
+    ///       0 1 2 3 4 5 6 7 8 9 A B C D E F
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |1| exp |          mant         |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///
+    ///   Maximum Response Delay = (mant | 0x1000) << (exp+3)
+    ///
+    /// Which yields the maximum representable value as:
+    ///   8387584 = (0x0FFF | 0x1000) << (7 + 3)
+    ///
+    /// [RFC 3810 section 5.1]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1
+    fn as_millis(&self) -> u64 {
+        if self.0 < FLOATING_POINT_SWITCH_POINT {
+            self.0.into()
+        } else {
+            let code: u64 = self.0.into();
+            let mant = code & 0x0FFF;
+            let exp = (code >> 12) & 0x07;
+            (mant | 0x1000) << (3 + exp)
+        }
+    }
+
+    /// Makes an `u16` code out of an `u32` value that can be represented as
+    /// a floating point.
+    ///
+    /// The function will always succeed for values within the valid range. However, the code might
+    /// not exactly represent the provided input. E.g. a value of FLOATING_POINT_MAX_VALUE - 1
+    /// cannot be exactly represented with a corresponding code, due the exponential
+    /// representation. However, the function will be able to provide a code representing a value
+    /// close to the provided one.
+    ///
+    /// If stronger guarantees are needed consider using [try_from_millis_exact].
+    ///
+    /// For the conversion definition see [as_millis].
+    // u32 is used as input as is it the first type that fits 8387584.
+    pub fn try_from_millis_lossy(val: u32) -> Result<Self, MldError> {
+        // The max value for [Mldv2ResponseDelay] is 8387584 which smaller than [std::u32::MAX], if
+        // [period] does not fit in u32 it won't fit in [Mldv2ResponseDelay].
+        if val > FLOATING_POINT_MAX_VALUE {
+            Err(MldError::MaxRespCodeOverflow)
+        } else if val < FLOATING_POINT_SWITCH_POINT.into() {
+            // Value is < 32768, unwrapping here is safe.
+            let code = val.try_into().unwrap();
+            Ok(Self(code))
+        } else {
+            let msb = (32 - val.leading_zeros()) - 1;
+            let exp = msb - 12;
+            let mant = (val >> exp) & 0x0FFF;
+            // Unwrap guaranteed by the structure of the built int:
+            let code = (0x8000 | ((exp - 3) << 12) | mant).try_into().unwrap();
+            Ok(Self(code))
+        }
+    }
+
+    /// Makes an `u16` code out of an `u32` value that can be represented as
+    /// a floating point.
+    ///
+    /// The function will succeed only for values within the valid range that can be exactly
+    /// represented by the produced code. E.g. a value of FLOATING_POINT_MAX_VALUE - 1 cannot be
+    /// exactly represented with a corresponding, code due the exponential representation. In
+    /// this case, the function will return an error.
+    ///
+    /// If a lossy conversion can be tolerated consider using [try_from_millis_lossy].
+    ///
+    /// For the conversion definition see [as_millis].
+    pub fn try_from_millis_exact(val: u32) -> Result<Self, MldError> {
+        let res = Self::try_from_millis_lossy(val)?;
+        if res.as_millis() == val.into() {
+            Ok(res)
+        } else {
+            Err(MldError::MaxRespCodeLossyConversion)
+        }
+    }
+}
+
+impl MaxRespCode for Mldv2ResponseDelay {
+    fn as_code(self) -> U16 {
+        U16::new(self.0)
+    }
+
+    fn from_code(code: U16) -> Self {
+        Mldv2ResponseDelay(code.get())
+    }
+}
+
+impl From<Mldv2ResponseDelay> for Duration {
+    fn from(code: Mldv2ResponseDelay) -> Self {
+        Duration::from_millis(code.as_millis())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -428,6 +547,7 @@ mod tests {
         ExtensionHeaderOptionAction, HopByHopOption, HopByHopOptionData, Ipv6ExtensionHeaderData,
     };
     use crate::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder, Ipv6PacketBuilderWithHbhOptions};
+    use test_case::test_case;
 
     fn serialize_to_bytes<B: ByteSlice + Debug, M: IcmpMessage<Ipv6> + Mldv1MessageType + Debug>(
         src_ip: Ipv6Addr,
@@ -684,6 +804,68 @@ mod tests {
                 })
                 .collect::<Vec<_>>()[..],
             RECORDS,
+        );
+    }
+
+    #[test]
+    fn test_mld_parse_and_serialize_response_delay_v2_linear() {
+        // Linear code:duration mapping
+        for code in 0..FLOATING_POINT_SWITCH_POINT {
+            let response_delay = Mldv2ResponseDelay::from_code(U16::from(code));
+            let duration = Duration::from(response_delay);
+            assert_eq!(duration.as_millis(), code.into());
+
+            let response_delay_code: u16 =
+                Mldv2ResponseDelay::try_from_millis_lossy(code.into()).unwrap().as_code().into();
+            assert_eq!(response_delay_code, code);
+
+            let response_delay_code: u16 =
+                Mldv2ResponseDelay::try_from_millis_exact(code.into()).unwrap().as_code().into();
+            assert_eq!(response_delay_code, code);
+        }
+    }
+
+    #[test_case(FLOATING_POINT_SWITCH_POINT.into(), 0x8000; "min exponential value")]
+    #[test_case(32784,                              0x8002; "exponental value 32784")]
+    #[test_case(227744,                             0xABCD; "exponental value 227744")]
+    #[test_case(1821184,                            0xDBCA; "exponental value 1821184")]
+    #[test_case(8385536,                            0xFFFD; "exponental value 8385536")]
+    #[test_case(FLOATING_POINT_MAX_VALUE.into(),    0xFFFF; "max exponential value")]
+    fn test_mld_parse_and_serialize_response_delay_v2_exponential_exact(
+        duration_millis: u32,
+        resp_code: u16,
+    ) {
+        let response_delay = Mldv2ResponseDelay::from_code(resp_code.into());
+        let duration = Duration::from(response_delay);
+        assert_eq!(duration.as_millis(), duration_millis.into());
+
+        let response_delay_code: u16 =
+            Mldv2ResponseDelay::try_from_millis_lossy(duration_millis).unwrap().as_code().into();
+        assert_eq!(response_delay_code, resp_code);
+
+        let response_delay_code: u16 =
+            Mldv2ResponseDelay::try_from_millis_exact(duration_millis).unwrap().as_code().into();
+        assert_eq!(response_delay_code, resp_code);
+    }
+
+    #[test]
+    fn test_mld_parse_and_serialize_response_delay_v2_errors() {
+        let duration_millis = FLOATING_POINT_MAX_VALUE + 1;
+        assert_eq!(
+            Mldv2ResponseDelay::try_from_millis_lossy(duration_millis),
+            Err(MldError::MaxRespCodeOverflow)
+        );
+
+        let duration_millis = FLOATING_POINT_MAX_VALUE + 1;
+        assert_eq!(
+            Mldv2ResponseDelay::try_from_millis_exact(duration_millis),
+            Err(MldError::MaxRespCodeOverflow)
+        );
+
+        let duration_millis = FLOATING_POINT_MAX_VALUE - 1;
+        assert_eq!(
+            Mldv2ResponseDelay::try_from_millis_exact(duration_millis),
+            Err(MldError::MaxRespCodeLossyConversion)
         );
     }
 }
