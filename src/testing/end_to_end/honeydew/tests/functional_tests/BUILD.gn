@@ -194,7 +194,7 @@ if (is_host) {
 
   group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
     testonly = true
-    public_deps = [ "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix_fc($host_toolchain)" ]
+    public_deps = [ "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_starnix_fc($host_toolchain)" ]
   }
 }
 
