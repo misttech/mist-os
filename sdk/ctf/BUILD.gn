@@ -62,6 +62,7 @@ generate_ctf_tests("check_test_templates") {
   api_level = "_in_development"
   manifest = "//sdk/ctf/goldens/package_archives.json"
   use_prebuilts_from_current_build = true
+  deps = [ ":package_archive_manifest" ]
 }
 
 golden_files("golden_files") {

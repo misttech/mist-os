@@ -491,7 +491,11 @@ template("generate_ctf_tests") {
   }
 
   group(target_name) {
+    forward_variables_from(invoker, [ "deps" ])
+    if (!defined(deps)) {
+      deps = []
+    }
     testonly = true
-    deps = tests
+    deps += tests
   }
 }
