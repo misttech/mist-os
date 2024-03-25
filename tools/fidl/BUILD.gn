@@ -56,5 +56,6 @@ group("tests") {
     "gidl-format:tests",
     "lib:tests",
     "measure-tape:tests",
+    "runtime-compat:tests",
   ]
 }

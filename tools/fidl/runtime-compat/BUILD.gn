@@ -1,0 +1,106 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/compiled_action.gni")
+import("//build/config/fuchsia/platform_version.gni")
+import("//build/host.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_test.gni")
+import("//build/testing/host_test_data.gni")
+
+if (is_host) {
+  runtime_compat_deps = [
+    "//src/lib/flyweights",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:maplit",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+  ]
+  runtime_compat_sources = [
+    "src/compare/handle.rs",
+    "src/compare/mod.rs",
+    "src/compare/path.rs",
+    "src/compare/primitive.rs",
+    "src/compare/problems.rs",
+    "src/compare/test.rs",
+    "src/convert.rs",
+    "src/ir.rs",
+    "src/main.rs",
+  ]
+  rustc_binary("runtime_compat") {
+    name = "runtime_compat"
+    edition = "2021"
+    deps = runtime_compat_deps
+    sources = runtime_compat_sources
+  }
+
+  host_test_data("runtime_compat_test_data") {
+    sources = [ "$root_out_dir/fidlc" ]
+    deps = [ "//tools/fidl/fidlc" ]
+  }
+
+  rustc_test("runtime_compat_test") {
+    edition = "2021"
+    deps = runtime_compat_deps + [ "//third_party/rust_crates:tempfile" ]
+    sources = runtime_compat_sources
+    source_root = "src/main.rs"
+    data_deps = [ ":runtime_compat_test_data" ]
+  }
+
+  reports = []
+  foreach(api_level, platform_version.frozen_api_levels) {
+    label = "report_${api_level}"
+    reports += [ ":${label}" ]
+
+    compiled_action(label) {
+      tool = ":runtime_compat"
+      tool_output_name = "runtime_compat"
+      mnemonic = "ABI"
+
+      platform_ir = "${root_build_dir}/platform-ir-HEAD.json"
+      external_ir = "${root_build_dir}/platform-ir-${api_level}.json"
+      report = "${root_build_dir}/compatibility-report-${api_level}.txt"
+
+      inputs = [
+        platform_ir,
+        external_ir,
+      ]
+      outputs = [ report ]
+
+      args = [
+        "--platform",
+        rebase_path(platform_ir, root_build_dir),
+        "--external",
+        rebase_path(external_ir, root_build_dir),
+        "--out",
+        rebase_path(report, root_build_dir),
+      ]
+
+      deps = [
+        "//tools/fidl/platform-ir:platform_ir_${api_level}(${default_toolchain})",
+        "//tools/fidl/platform-ir:platform_ir_head(${default_toolchain})",
+      ]
+    }
+  }
+
+  group("generate-reports") {
+    deps = reports
+  }
+} else {
+  group("generate-reports") {
+    deps = [ ":generate-reports($host_toolchain)" ]
+  }
+}
+
+group("runtime-compat") {
+  deps = [ ":runtime_compat($host_toolchain)" ]
+}
+
+group("tests") {
+  deps = [ ":runtime_compat_test($host_toolchain)" ]
+  testonly = true
+}

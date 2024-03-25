@@ -49,8 +49,6 @@ template("platform_ir") {
       "//build/fidl:sdk_fidl",
       "//sdk/fidl:sdk_partner_libs",
     ]
-
-    visibility = [ ":generate-platform-ir" ]
   }
 }
 
@@ -62,7 +60,7 @@ platform_ir_deps = [ ":platform_ir_head" ]
 foreach(supported_level, platform_version.frozen_api_levels) {
   label = "platform_ir_${supported_level}"
   platform_ir_deps += [ ":${label}" ]
-  platform_ir("platform_ir_${supported_level}") {
+  platform_ir(label) {
     api_level = supported_level
   }
 }
