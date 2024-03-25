@@ -64,6 +64,7 @@ sdk_shared_library("instrumentation") {
   ]
 
   runtime_deps = [ "//sdk/lib/fdio:fdio_sdk" ]
+  libcxx_linkage = "static"
 
   # For each symbol that we want to export, tell the linker that:
   #  - It must not be hidden (--retain-symbols-file)
