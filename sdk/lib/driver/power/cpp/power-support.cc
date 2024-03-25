@@ -428,7 +428,8 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
     const zx::unowned_event& active_token, const zx::unowned_event& passive_token,
     std::optional<std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
                             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>
-        level_control) {
+        level_control,
+    std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor) {
   // Get the power levels we should have
   std::vector<fuchsia_power_broker::PowerLevel> levels = PowerLevelsFromConfig(config);
   if (levels.size() == 0) {
@@ -510,14 +511,18 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
     level_control = std::nullopt;
   }
 
-  fuchsia_power_broker::ElementSchema schema{
-      {.element_name = std::string(config.element().name().data(), config.element().name().size()),
-       .initial_current_level = static_cast<uint8_t>(0),
-       .valid_levels = std::move(levels),
-       .dependencies = std::move(level_deps),
-       .active_dependency_tokens_to_register = std::move(active_tokens),
-       .passive_dependency_tokens_to_register = std::move(passive_tokens),
-       .level_control_channels = std::move(lvl_ctrl)}};
+  fuchsia_power_broker::ElementSchema schema{{
+      .element_name = std::string(config.element().name().data(), config.element().name().size()),
+      .initial_current_level = static_cast<uint8_t>(0),
+      .valid_levels = std::move(levels),
+      .dependencies = std::move(level_deps),
+      .active_dependency_tokens_to_register = std::move(active_tokens),
+      .passive_dependency_tokens_to_register = std::move(passive_tokens),
+      .level_control_channels = std::move(lvl_ctrl),
+  }};
+  if (lessor.has_value()) {
+    schema.lessor_channel() = std::move(lessor.value());
+  }
 
   // Steal the underlying channel
   fidl::WireSyncClient<fuchsia_power_broker::Topology> pb(

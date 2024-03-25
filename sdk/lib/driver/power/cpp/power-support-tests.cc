@@ -199,7 +199,7 @@ TEST_F(PowerLibTest, AddElementNoDep) {
   zx::event invalid, invalid2;
   auto call_result =
       fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config), std::move(tokens),
-                            invalid.borrow(), invalid2.borrow(), std::nullopt);
+                            invalid.borrow(), invalid2.borrow(), std::nullopt, std::nullopt);
   ASSERT_TRUE(call_result.is_ok());
   loop.Shutdown();
   loop.JoinThreads();
@@ -295,7 +295,7 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
   zx::event invalid1, invalid2;
   auto call_result =
       fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config), std::move(tokens),
-                            invalid1.borrow(), invalid2.borrow(), std::nullopt);
+                            invalid1.borrow(), invalid2.borrow(), std::nullopt, std::nullopt);
 
   ASSERT_TRUE(call_result.is_ok());
 
@@ -425,7 +425,7 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
   zx::event invalid1, invalid2;
   auto call_result =
       fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config), std::move(tokens),
-                            invalid1.borrow(), invalid2.borrow(), std::nullopt);
+                            invalid1.borrow(), invalid2.borrow(), std::nullopt, std::nullopt);
 
   ASSERT_TRUE(call_result.is_ok());
 
