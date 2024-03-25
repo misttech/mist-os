@@ -21,6 +21,7 @@ _tools = [
   "//src/developer/ffx/plugins/test",
   "//src/developer/ffx/plugins/wlan",
   "auth",
+  "bluetooth",
   "echo",
   "efi",
   "power",

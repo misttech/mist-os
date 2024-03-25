@@ -48,5 +48,19 @@
             from: "parent",
             to: "#toolbox",
         },
+        {
+            protocol: "fuchsia.bluetooth.pandora.GrpcServerController",
+            from: "#bt-pandora-server",
+            to: "#toolbox",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.bluetooth.pandora.RootcanalClientController",
+            from: "#bt-rootcanal",
+            to: "#toolbox",
+            availability: "optional",
+            source_availability: "unknown",
+        },
     ],
 }

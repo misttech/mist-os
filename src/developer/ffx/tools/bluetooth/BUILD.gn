@@ -1,0 +1,50 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
+
+assert(is_host, "FFX tools can only be compiled in the host toolchain")
+
+ffx_plugin("ffx_bluetooth") {
+  version = "0.1.0"
+  edition = "2021"
+
+  with_unit_tests = false
+
+  plugin_deps = [ "src/pandora:ffx_bluetooth_pandora" ]
+  args_sources = [ "src/args.rs" ]
+
+  deps = [ "//src/developer/ffx/lib/errors:lib" ]
+}
+
+ffx_tool("ffx_bluetooth_tool") {
+  edition = "2021"
+  output_name = "ffx-bluetooth"
+  deps = [
+    ":ffx_bluetooth_suite",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
+
+  sdk_category = "partner"
+  sdk_target_name = "ffx_bluetooth_sdk"
+}
+
+group("bluetooth") {
+  deps = [
+    ":ffx_bluetooth_sdk",
+    ":ffx_bluetooth_tool",
+    ":ffx_bluetooth_tool_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_bluetooth_tool_versioned" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":ffx_bluetooth_tests" ]
+}

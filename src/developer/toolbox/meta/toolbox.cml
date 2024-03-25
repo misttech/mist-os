@@ -9,6 +9,8 @@
     use: [
         {
             protocol: [
+                "fuchsia.bluetooth.pandora.GrpcServerController",
+                "fuchsia.bluetooth.pandora.RootcanalClientController",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.process.explorer.ProcessExplorer",
                 "fuchsia.process.explorer.Query",
