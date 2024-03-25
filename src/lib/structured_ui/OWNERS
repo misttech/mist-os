@@ -1,5 +1,10 @@
-# Preferred reviewer.
+
+# Preferred reviewers.
+lijiaming@google.com
 dschuyler@google.com
 
-# In case dschuyler is unavailable.
+# Reviewers of last resort
 etryzelaar@google.com
+chaselatta@google.com
+wilkinsonclay@google.com
+
