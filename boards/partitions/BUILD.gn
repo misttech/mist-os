@@ -17,16 +17,6 @@ _standard_names = {
   fvm = "fvm"
 }
 
-_vim3_boot = {
-  bootloader_partitions = [
-    {
-      image = "//prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned"
-      type = ""
-      name = "bootloader"
-    },
-  ]
-}
-
 _gigaboot = {
   testonly = true
   bootloader_partitions = [
@@ -71,26 +61,16 @@ generated_partitions_config("riscv64") {
   hw_revision = "riscv64"
 }
 
-# NOTE: if you touch this target, please add this line to your commit
-# description so that the vim3 tests are run as we do not run vim3 tests in CQ
-# by default.
-# Cq-Include-Trybots: luci.turquoise.global.try:bringup.vim3-debug,core.vim3-debug,core.vim3-vg-debug
-generated_partitions_config("vim3") {
-  forward_variables_from(_vim3_boot, "*")
-  forward_variables_from(_standard_names, "*")
-  hw_revision = "vim3"
-
-  # At most one of either a fvm or fxfs will be generated, but the board
-  # supports either configuration.
-  fvm = "fvm"
-  fxfs = "fvm"
-}
-
 group("partitions") {
   testonly = true
   public_deps = [
     ":arm64",
-    ":vim3",
     ":x64",
+    "vim3",
   ]
+}
+
+group("verifications") {
+  testonly = true
+  deps = [ "vim3:verify" ]
 }

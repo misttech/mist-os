@@ -146,13 +146,6 @@ fuchsia_partitions_configuration(
     ],
 )
 
-fuchsia_bootloader_partition(
-    name = "u_boot",
-    image = "//:prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned",
-    partition_name = "bootloader",
-    type = "",
-)
-
 fuchsia_partitions_configuration(
     name = "arm64",
     bootloader_partitions = [
@@ -162,13 +155,9 @@ fuchsia_partitions_configuration(
     partitions = standard_partitions,
 )
 
-fuchsia_partitions_configuration(
+alias(
     name = "vim3",
-    bootloader_partitions = [
-        ":u_boot",
-    ],
-    hardware_revision = "vim3",
-    partitions = standard_partitions,
+    actual = "//boards/partitions/vim3",
 )
 
 fuchsia_partitions_configuration(

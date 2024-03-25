@@ -31,7 +31,7 @@ board_configuration_label = "//boards/vim3"
 board_name = "vim3"
 board_description = "A generic vim3 device"
 
-partitions_config_label = "//boards/partitions:vim3"
+partitions_config_label = "//boards/partitions/vim3:vim3"
 partitions_config_contents =
     [ "//prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned" ]
 
