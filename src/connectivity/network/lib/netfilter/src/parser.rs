@@ -207,6 +207,12 @@ pub struct FilterRoutines {
     pub local_egress: Option<filter_ext::RoutineId>,
 }
 
+// A container for `filter_ext::Routine`s that back the
+// `filter_ext::NatInstallationHook`s currently supported
+// by the parser.
+#[derive(Debug, Default)]
+pub struct NatRoutines {}
+
 fn validate_rule(rule: &filter_ext::Rule) -> Result<(), Error> {
     if let (Some(src_subnet), Some(dst_subnet)) = (&rule.matchers.src_addr, &rule.matchers.dst_addr)
     {
@@ -242,6 +248,24 @@ pub fn parse_str_to_rules(
         }
     }
     Ok(rules)
+}
+
+pub fn parse_str_to_nat_rules(
+    _line: &str,
+    _routines: &NatRoutines,
+) -> Result<Vec<filter_ext::Rule>, Error> {
+    // TODO(https://fxbug.dev/323950204): Parse NAT rules once
+    // supported in filter2
+    todo!("not yet supported in the filter2 API")
+}
+
+pub fn parse_str_to_rdr_rules(
+    _line: &str,
+    _routines: &NatRoutines,
+) -> Result<Vec<filter_ext::Rule>, Error> {
+    // TODO(https://fxbug.dev/323949893): Parse NAT RDR rules once
+    // supported in filter2
+    todo!("not yet supported in the filter2 API")
 }
 
 #[cfg(test)]
