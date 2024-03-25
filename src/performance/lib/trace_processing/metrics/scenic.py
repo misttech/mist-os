@@ -66,18 +66,21 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
                 type=trace_model.DurationEvent,
             )
         )
-        scenic_render_events: List[trace_model.Event] = [
-            trace_utils.get_nearest_following_event(
+        scenic_render_events: List[trace_model.Event] = []
+        for e in scenic_start_events:
+            following = trace_utils.get_nearest_following_event(
                 e, _EVENT_CATEGORY, _SCENIC_RENDER_EVENT_NAME
             )
-            for e in scenic_start_events
-        ]
-        vsync_ready_events: List[trace_model.Event] = [
-            trace_utils.get_nearest_following_event(
+            if following is not None:
+                scenic_render_events.append(following)
+
+        vsync_ready_events: List[trace_model.Event] = []
+        for e in scenic_start_events:
+            following = trace_utils.get_nearest_following_event(
                 e, _EVENT_CATEGORY, _DISPLAY_VSYNC_READY_EVENT_NAME
             )
-            for e in scenic_start_events
-        ]
+            if following is not None:
+                vsync_ready_events.append(following)
 
         valid_vsync_start_index = trace_utils.find_valid_vsync_start_index(
             vsync_ready_events
@@ -98,6 +101,9 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
             scenic_start_events, scenic_render_events
         ):
             if render_event is None:
+                continue
+            assert isinstance(render_event, trace_model.DurationEvent)
+            if not render_event.duration:
                 continue
             cpu_render_times.append(
                 (

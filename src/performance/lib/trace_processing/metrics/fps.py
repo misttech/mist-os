@@ -64,17 +64,14 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
             type=trace_model.DurationEvent,
         )
 
-        vsync_events: List[trace_model.Event] = list(
-            filter(
-                lambda item: item is not None,
-                map(
-                    lambda e: trace_utils.get_nearest_following_event(
-                        e, _EVENT_CATEGORY, _DISPLAY_VSYNC_EVENT_NAME
-                    ),
-                    cpu_render_start_events,
-                ),
+        vsync_events = []
+        for start in cpu_render_start_events:
+            next_event = trace_utils.get_nearest_following_event(
+                start, _EVENT_CATEGORY, _DISPLAY_VSYNC_EVENT_NAME
             )
-        )
+            if next_event is not None:
+                vsync_events.append(next_event)
+
         # This method looks for a possible race between trace event start in Scenic and magma.
         # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
         vsync_events = vsync_events[

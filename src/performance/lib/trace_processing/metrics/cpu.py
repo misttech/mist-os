@@ -88,11 +88,9 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
             )
 
         if len(cpu_percentages) == 0:
-            duration: trace_time.TimeDelta = model.total_duration()
             _LOGGER.info(
-                f"No cpu usage measurements are present. Perhaps the trace duration"
-                f"{duration.to_milliseconds()} milliseconds) is too short to provide"
-                f"cpu usage information"
+                f"No cpu usage measurements are present. Perhaps the trace duration "
+                f"is too short to provide cpu usage information"
             )
             return []
 
