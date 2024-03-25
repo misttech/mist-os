@@ -30,7 +30,7 @@ class BtHciBroadcom : public fdf::DriverBase,
   explicit BtHciBroadcom(fdf::DriverStartArgs start_args,
                          fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  zx::result<> Start() override;
+  void Start(fdf::StartCompleter completer) override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   void handle_unknown_event(
@@ -97,9 +97,13 @@ class BtHciBroadcom : public fdf::DriverBase,
 
   fpromise::promise<void, zx_status_t> SendVmoAsCommands(zx::vmo vmo, size_t size, size_t offset);
 
-  fpromise::promise<> Initialize();
+  fpromise::promise<void, zx_status_t> Initialize();
 
-  void OnInitializeComplete(zx_status_t status);
+  fpromise::promise<void, zx_status_t> OnInitializeComplete(zx_status_t status);
+
+  fpromise::promise<void, zx_status_t> AddNode();
+
+  void CompleteStart(zx_status_t status);
 
   zx_status_t Bind();
 
@@ -108,22 +112,8 @@ class BtHciBroadcom : public fdf::DriverBase,
   // true if underlying transport is UART
   bool is_uart_;
 
-  class InitializeCompleter {
-   public:
-    void Reply(zx_status_t status) {
-      init_status_ = status;
-      driver_initialized_.Signal();
-    }
+  std::optional<fdf::StartCompleter> start_completer_;
 
-    void Wait() { driver_initialized_.Wait(); }
-
-    libsync::Completion driver_initialized_;
-    zx_status_t init_status_;
-  } init_completer_;
-
-  // // The executor dispatcher.
-  fdf::Dispatcher exec_dispatcher_;
-  // The executor for |dispatcher_|, created during initialization.
   std::optional<async::Executor> executor_;
 
   fidl::WireClient<fuchsia_hardware_bluetooth::Hci> hci_client_;
@@ -133,6 +123,7 @@ class BtHciBroadcom : public fdf::DriverBase,
   fidl::WireClient<fuchsia_driver_framework::NodeController> node_controller_;
   fidl::WireClient<fuchsia_driver_framework::Node> child_node_;
 
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Hci> hci_server_bindings_;
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Vendor> vendor_binding_group_;
   driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor> devfs_connector_;
 };
