@@ -119,6 +119,12 @@ py_binary(
 )
 
 py_binary(
+    name = "run_lacewing_test",
+    srcs = ["run_lacewing_test.py"],
+    python_version = "PY3",
+)
+
+py_binary(
     name = "clean_repo",
     srcs = ["clean_repo.py"],
     python_version = "PY3",

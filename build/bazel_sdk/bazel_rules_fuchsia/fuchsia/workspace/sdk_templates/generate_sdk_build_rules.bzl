@@ -45,6 +45,7 @@ _SDK_TEMPLATES = {
     "loadable_module": "//fuchsia/workspace/sdk_templates:loadable_module.BUILD.template",
     "loadable_module_sub": "//fuchsia/workspace/sdk_templates:loadable_module_sub.BUILD.template",
     "package": "//fuchsia/workspace/sdk_templates:package.BUILD.template",
+    "prebuilt_lacewing_test": "//fuchsia/workspace/sdk_templates:prebuilt_lacewing_test.BUILD.template",
     "repository": "//fuchsia/workspace/sdk_templates:repository.BUILD.template",
     "select_alias": "//fuchsia/workspace/sdk_templates:select_alias.BUILD.template",
     "sysroot": "//fuchsia/workspace/sdk_templates:sysroot.BUILD.template",
@@ -523,7 +524,7 @@ def _fuchsia_api_level_constraint(api_level):
     return "//fuchsia/constraints:api_level_%s" % _to_fuchsia_api_level_name(api_level)
 
 def _to_fuchsia_api_level_name(api_level):
-    return "unspecified" if api_level == -1 else api_level
+    return "unspecified" if api_level in (-1, "unversioned") else api_level
 
 # We can't just do f"//:{file}" for file srcs, since the relative dir may have a
 # BUILD.bazel file, making that subdir its own Bazel package.
@@ -651,6 +652,42 @@ def _generate_config_build_rules(ctx, meta, relative_dir, build_file, process_co
     })
 
 # buildifier: disable=unused-variable
+def _generate_python_e2e_test_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
+    process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["files"])
+
+    # Seggregate data files based on api level from metadata.
+    files_for_api_level = {}
+    for file in meta["files"]:
+        if not file.startswith(meta["root"]):
+            # buildifier: disable=print
+            print("WARNING: Ignoring file %s that is outside of %s" % (file, meta["root"]))
+            continue
+        file = file[len(meta["root"]):].lstrip("/")
+        api_level, _, file = file.partition("/")
+        if api_level not in files_for_api_level:
+            files_for_api_level[api_level] = []
+        files_for_api_level[api_level].append(file)
+
+    # Write api level specific targets.
+    name = _get_target_name(meta["name"])
+    for api_level, files in files_for_api_level.items():
+        subpackage_build_file = "%s/%s/BUILD.bazel" % (relative_dir, api_level)
+        ctx.file(subpackage_build_file, content = _header())
+        _merge_template(ctx, subpackage_build_file, _sdk_template_path(ctx, "prebuilt_lacewing_test"), {
+            "{{name}}": name,
+            "{{test_pyz}}": "%s.pyz" % name,
+            "{{data}}": _get_starlark_list(files),
+        })
+
+    _merge_template(ctx, build_file, _sdk_template_path(ctx, "select_alias"), {
+        "{{name}}": name,
+        "{{select_map}}": _get_starlark_dict({
+            _fuchsia_api_level_constraint(api_level): "//%s/%s:%s" % (relative_dir, api_level, name)
+            for api_level in files_for_api_level
+        }),
+    })
+
+# buildifier: disable=unused-variable
 def _generate_loadable_module_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     arch_list = process_context.constants.target_cpus
     files = []
@@ -706,19 +743,20 @@ def _merge_template(ctx, target_build_file, template_file, subs = {}):
 
 def _process_dir(ctx, relative_dir, libraries, process_context, parent_sdk_contents):
     generators = {
-        "config": _generate_config_build_rules,
-        "sysroot": _generate_sysroot_build_rules,
-        "fidl_library": _generate_fidl_library_build_rules,
-        "companion_host_tool": _generate_companion_host_tool_build_rules,
-        "host_tool": _generate_host_tool_build_rules,
-        "ffx_tool": _generate_ffx_subtool_build_rules,
-        "cc_source_library": _generate_cc_source_library_build_rules,
-        "cc_prebuilt_library": _generate_cc_prebuilt_library_build_rules,
         "bind_library": _generate_bind_library_build_rules,
+        "cc_prebuilt_library": _generate_cc_prebuilt_library_build_rules,
+        "cc_source_library": _generate_cc_source_library_build_rules,
+        "companion_host_tool": _generate_companion_host_tool_build_rules,
         "component_manifest": _generate_component_manifest_rules,
-        "version_history": _generate_api_version_rules,
-        "package": _generate_package_build_rules,
+        "config": _generate_config_build_rules,
+        "experimental_python_e2e_test": _generate_python_e2e_test_rules,
+        "ffx_tool": _generate_ffx_subtool_build_rules,
+        "fidl_library": _generate_fidl_library_build_rules,
+        "host_tool": _generate_host_tool_build_rules,
         "loadable_module": _generate_loadable_module_build_rules,
+        "package": _generate_package_build_rules,
+        "sysroot": _generate_sysroot_build_rules,
+        "version_history": _generate_api_version_rules,
     }
 
     build_file = ctx.path(relative_dir).get_child("BUILD.bazel")
