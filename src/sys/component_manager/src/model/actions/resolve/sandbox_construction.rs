@@ -253,11 +253,8 @@ fn extend_dict_with_capability(
 ) {
     match capability {
         cm_rust::CapabilityDecl::Protocol(p) => {
-            let router = ResolvedInstanceState::start_component_on_request(
-                component,
-                decl,
-                capability.name().clone(),
-            );
+            let router =
+                ResolvedInstanceState::start_component_on_request(component, decl, capability);
             let router = router.with_policy_check(
                 CapabilitySource::Component {
                     capability: ComponentCapability::Protocol(p.clone()),

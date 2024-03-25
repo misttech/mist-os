@@ -1708,79 +1708,45 @@ impl ResolvedInstanceState {
     pub fn start_component_on_request(
         component: &Arc<ComponentInstance>,
         decl: &ComponentDecl,
-        capability_name: Name,
+        capability: &cm_rust::CapabilityDecl,
     ) -> Router {
         if decl.program.is_none() {
             return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable);
         }
-        let outgoing_dict = Self::build_program_outgoing_dict(component, &decl.capabilities);
-        let weak_component = WeakComponentInstance::new(component);
-        let route_fn = move |request: Request| {
-            let weak_component = weak_component.clone();
-            let outgoing_dict = outgoing_dict.clone();
-            let capability_name = capability_name.clone();
-            let target_moniker = request.target.moniker.clone();
-            async move {
-                // If the component is already started, this will be a no-op.
-                weak_component
-                    .ensure_started(&StartReason::AccessCapability {
-                        target: target_moniker,
-                        name: capability_name.clone(),
-                    })
-                    .await?;
-                let cap = outgoing_dict.get_capability(iter::once(capability_name.as_str()));
-                match cap {
-                    Some(cap) => cap.route(request).await,
-                    None => Err(RoutingError::BedrockNotPresentInDictionary {
-                        name: capability_name.into(),
-                    }
-                    .into()),
-                }
-            }
-            .boxed()
+        let capability_name = capability.name().clone();
+        let Some(router) = Self::make_program_outgoing_router(component, capability) else {
+            return Router::new_error(RoutingError::BedrockNotPresentInDictionary {
+                name: capability_name.into(),
+            });
         };
-        Router::new(route_fn)
+        router
     }
 
-    /// Builds the program outgoing dict such that most work is done once and cached even if
-    /// the underlying outgoing directory FIDL endpoint changes across restarts.
-    ///
-    /// The program outgoing dict is a dict of routers. For each capability declared by a
-    /// program that is published at some path in the outgoing directory, there will be a
-    /// [`Router`] that requests that capability, keyed by capability name.
-    fn build_program_outgoing_dict(
+    /// Creates a `Router` that requests the given capability from the component.
+    fn make_program_outgoing_router(
         component: &Arc<ComponentInstance>,
-        capabilities: &Vec<CapabilityDecl>,
-    ) -> Dict {
-        let outgoing_dir = component.get_outgoing();
-        let weak_component = WeakComponentInstance::from(component);
-        let dict = Dict::new();
-        for capability in capabilities {
-            let Some(path) = capability.path() else {
-                continue;
-            };
-            let name = capability.name().as_str();
-            let path = fuchsia_fs::canonicalize_path(path.as_str());
-            let Some(open) = outgoing_dir.clone().downscope_path(
-                Path::validate_and_split(path).unwrap(),
-                CapabilityTypeName::from(capability).into(),
-            ) else {
-                warn!(
-                    moniker = %component.moniker,
-                    "Dropping non-directory like capability `{name}` for outgoing program \
-                     dictionary"
-                );
-                continue;
-            };
-            let sender = sandbox::Sender::new_sendable(open);
-            let router = Router::new(CapabilityRequestedHook {
-                source: weak_component.clone(),
-                name: capability.name().clone(),
-                sender,
-            });
-            dict.insert_capability(iter::once(name), router.into());
-        }
-        dict
+        capability: &CapabilityDecl,
+    ) -> Option<Router> {
+        let path = capability.path()?;
+        let name = capability.name().as_str();
+        let path = fuchsia_fs::canonicalize_path(path.as_str());
+        let Some(open) = component.get_outgoing().downscope_path(
+            Path::validate_and_split(path).unwrap(),
+            ComponentCapability::from(capability.clone()).type_name().into(),
+        ) else {
+            warn!(
+                moniker = %component.moniker,
+                "Dropping non-directory like capability `{name}` for outgoing program \
+                 dictionary"
+            );
+            return None;
+        };
+        let sender = sandbox::Sender::new_sendable(open);
+        Some(Router::new(CapabilityRequestedHook {
+            source: component.as_weak(),
+            name: capability.name().clone(),
+            sender,
+        }))
     }
 
     /// Returns a reference to the component's validated declaration.
@@ -2538,6 +2504,13 @@ struct CapabilityRequestedHook {
 #[async_trait]
 impl Routable for CapabilityRequestedHook {
     async fn route(&self, request: Request) -> Result<Capability, bedrock_error::BedrockError> {
+        // If the component is already started, this will be a no-op.
+        self.source
+            .ensure_started(&StartReason::AccessCapability {
+                target: request.target.moniker.clone(),
+                name: self.name.clone(),
+            })
+            .await?;
         let source = self.source.upgrade().map_err(RoutingError::from)?;
         let target = request.target.upgrade().map_err(RoutingError::from)?;
         let (receiver, sender) = CapabilityReceiver::new();
