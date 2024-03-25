@@ -12,7 +12,6 @@ group("non_hermetic_tests") {
     "bootfs:tests",
     "capability_provider_vfs_compliance:tests",
     "fuchsia_boot_resolver:tests($default_toolchain)",
-    "fuchsia_io:tests",
     "job_with_available_exception_channel:tests",
     "security_policy:tests",
     "structured_config:tests",
