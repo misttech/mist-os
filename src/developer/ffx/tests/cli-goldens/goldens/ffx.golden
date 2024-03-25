@@ -20,7 +20,7 @@
       "optionality": "repeating",
       "long": "--config",
       "short": "c",
-      "description": "override configuration values (key=value or json)",
+      "description": "override configuration values (key=value, JSON string, or path to a JSON config file)",
       "hidden": false
     },
     {

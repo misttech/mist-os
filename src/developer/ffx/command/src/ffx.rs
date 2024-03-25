@@ -182,7 +182,8 @@ impl FfxCommandLine {
 /// Fuchsia's developer tool
 pub struct Ffx {
     #[argh(option, short = 'c')]
-    /// override configuration values (key=value or json)
+    /// override configuration values (key=value, JSON string, or path
+    /// to a JSON config file)
     pub config: Vec<String>,
 
     #[argh(option, short = 'e')]
