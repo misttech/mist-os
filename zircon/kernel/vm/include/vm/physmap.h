@@ -28,8 +28,6 @@
 #include <lib/fit/function.h>
 #include <zircon/compiler.h>
 
-#include <vm/vm.h>
-
 __BEGIN_CDECLS
 
 // check to see if an address is in the physmap virtually and physically

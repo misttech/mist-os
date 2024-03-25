@@ -16,6 +16,7 @@
 #include <pretty/hexdump.h>
 #include <vm/physmap.h>
 
+#include "arch/vm.h"
 #include "debug.h"
 
 namespace {

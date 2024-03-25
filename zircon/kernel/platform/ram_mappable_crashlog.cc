@@ -5,6 +5,8 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/persistent-debuglog.h>
+#include <lib/zbi-format/reboot.h>
+#include <platform.h>
 #include <stdio.h>
 
 #include <kernel/timer.h>
@@ -23,7 +25,7 @@ FILE NULL_FILE = FILE{[](void*, ktl::string_view str) -> int {
                         return static_cast<int>(str.size());
                       },
                       nullptr};
-}
+}  // namespace
 
 RamMappableCrashlog::RamMappableCrashlog(paddr_t phys, size_t len)
     : crashlog_buffer_(phys && len
