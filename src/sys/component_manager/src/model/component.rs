@@ -23,6 +23,7 @@ use {
                 OpenOutgoingDirError, RebootError, ResolveActionError, StartActionError,
                 StopActionError, StructuredConfigError,
             },
+            escrow::{self, EscrowedState},
             hooks::{CapabilityReceiver, Event, EventPayload, Hooks},
             namespace::create_namespace,
             routing::{
@@ -54,6 +55,7 @@ use {
     },
     async_trait::async_trait,
     async_utils::async_once::Once,
+    bedrock_error::Explain,
     clonable_error::ClonableError,
     cm_fidl_validator::error::DeclType,
     cm_logger::scoped::ScopedLogger,
@@ -89,9 +91,16 @@ use {
     tracing::{debug, warn},
     version_history::AbiRevision,
     vfs::{
-        directory::immutable::simple as pfs, execution_scope::ExecutionScope, path::Path,
-        remote::GetRemoteDir,
+        directory::{
+            entry::{DirectoryEntry, EntryInfo, OpenRequest},
+            immutable::simple as pfs,
+        },
+        execution_scope::ExecutionScope,
+        path::Path,
+        remote::RemoteLike,
+        ToObjectRequest,
     },
+    zx::HandleBased,
 };
 
 pub type WeakComponentInstance = WeakComponentInstanceInterface<ComponentInstance>;
@@ -104,6 +113,9 @@ pub enum StartReason {
     /// Indicates that the target is starting the component because it wishes to access
     /// the capability at path.
     AccessCapability { target: Moniker, name: Name },
+    /// Indicates that the component is starting because of a request to its outgoing
+    /// directory.
+    OutgoingDirectory,
     /// Indicates that the component is starting because it is in a single-run collection.
     SingleRun,
     /// Indicates that the component was explicitly started for debugging purposes.
@@ -130,6 +142,9 @@ impl fmt::Display for StartReason {
             match self {
                 StartReason::AccessCapability { target, name } => {
                     format!("'{}' requested capability '{}'", target, name)
+                }
+                StartReason::OutgoingDirectory => {
+                    "Instance started due to a request to its outgoing directory".to_string()
                 }
                 StartReason::SingleRun => "Instance is in a single_run collection".to_string(),
                 StartReason::Debug => "Instance was started from debugging workflow".to_string(),
@@ -782,8 +797,8 @@ impl ComponentInstance {
                     .stop_program(stop_timer, kill_timer)
                     .await
                     .map_err(StopActionError::ProgramStopError)?;
-                if ret.request == StopRequestSuccess::KilledAfterTimeout
-                    || ret.request == StopRequestSuccess::Killed
+                if ret.outcome.request == StopRequestSuccess::KilledAfterTimeout
+                    || ret.outcome.request == StopRequestSuccess::Killed
                 {
                     warn!(
                         "component {} did not stop in {:?}. Killed it.",
@@ -806,9 +821,9 @@ impl ComponentInstance {
 
                 if let Some(execution_controller_task) = runtime.execution_controller_task.as_mut()
                 {
-                    execution_controller_task.set_stop_status(ret.component_exit_status);
+                    execution_controller_task.set_stop_status(ret.outcome.component_exit_status);
                 }
-                Some(ret.component_exit_status)
+                Some(ret)
             } else {
                 None
             }
@@ -826,10 +841,23 @@ impl ComponentInstance {
         self.destroy_dynamic_children()
             .await
             .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(err) })?;
-        if let Some(stop_result) = stop_result {
-            let event = Event::new(self, EventPayload::Stopped { status: stop_result });
+
+        if let Some(StopOutcomeWithEscrow { outcome, escrow_request }) = stop_result {
+            // Store any escrowed state.
+            {
+                let mut state = self.lock_state().await;
+                if let InstanceState::Resolved(resolved_state) = &mut *state {
+                    if let Some(program_escrow) = resolved_state.program_escrow() {
+                        program_escrow.did_stop(escrow_request);
+                    }
+                };
+            }
+
+            let event =
+                Event::new(self, EventPayload::Stopped { status: outcome.component_exit_status });
             self.hooks.dispatch(&event).await;
         }
+
         if let ExtendedInstance::Component(parent) =
             self.try_get_parent().map_err(|_| StopActionError::GetParentFailed)?
         {
@@ -994,21 +1022,28 @@ impl ComponentInstance {
     }
 
     /// Opens an object referenced by `path` from the outgoing directory of the component.
-    /// The component must have a program and must be started, or this method will fail.
-    pub fn open_outgoing(
+    /// The component must have a program, or this method will fail.
+    /// Starts the component if necessary.
+    pub async fn open_outgoing(
         &self,
         flags: fio::OpenFlags,
         path: &str,
         server_chan: &mut zx::Channel,
     ) -> Result<(), OpenOutgoingDirError> {
-        let execution = self.lock_execution();
-        let runtime = execution.runtime.as_ref().ok_or(OpenOutgoingDirError::InstanceNotRunning)?;
-        let out_dir = runtime.outgoing_dir().ok_or(OpenOutgoingDirError::InstanceNonExecutable)?;
-        let path = fuchsia_fs::canonicalize_path(&path);
-        let server_chan = channel::take_channel(server_chan);
-        let server_end = ServerEnd::new(server_chan);
-        out_dir.open(flags, fio::ModeType::empty(), path, server_end)?;
-        Ok(())
+        let open_rx = match *self.lock_state().await {
+            InstanceState::Resolved(ref mut resolved) => {
+                let program_escrow =
+                    resolved.program_escrow().ok_or(OpenOutgoingDirError::InstanceNonExecutable)?;
+                let path = fuchsia_fs::canonicalize_path(&path);
+                let server_end = channel::take_channel(server_chan);
+                program_escrow.open_outgoing(flags, path.to_string(), server_end)
+            }
+            _ => return Err(OpenOutgoingDirError::InstanceNotResolved),
+        };
+        open_rx
+            .await
+            .map(|v| v.map_err(OpenOutgoingDirError::from))
+            .unwrap_or(Err(OpenOutgoingDirError::InstanceNotResolved))
     }
 
     /// Returns an [`Open`] representation of the outgoing directory of the component. It performs
@@ -1018,18 +1053,14 @@ impl ComponentInstance {
             component: WeakComponentInstance,
         }
 
-        impl GetRemoteDir for GetOutgoing {
-            fn get_remote_dir(&self) -> Result<fio::DirectoryProxy, zx::Status> {
+        impl DirectoryEntry for GetOutgoing {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+            }
+
+            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
                 let component = self.component.upgrade().map_err(|e| e.as_zx_status())?;
-                let outgoing_dir = Clone::clone(
-                    component
-                        .lock_execution()
-                        .runtime
-                        .as_ref()
-                        .and_then(|r| r.outgoing_dir())
-                        .ok_or(zx::Status::NOT_FOUND)?,
-                );
-                Ok(outgoing_dir)
+                component.open_entry(request)
             }
         }
 
@@ -1289,6 +1320,39 @@ impl ComponentInstance {
     }
 }
 
+/// Represent the outgoing directory of the component as a fuchsia.io remote node.
+impl RemoteLike for ComponentInstance {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        scope.spawn(async move {
+            let mut channel = server_end.into_channel();
+            match self.open_outgoing(flags, path.as_ref(), &mut channel).await {
+                Ok(()) => {}
+                Err(err) => {
+                    if !channel.is_invalid_handle() {
+                        flags.to_object_request(channel).shutdown(err.as_zx_status());
+                    }
+                }
+            }
+        });
+    }
+}
+
+impl DirectoryEntry for ComponentInstance {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        request.open_remote(self)
+    }
+}
+
 /// Extracts a mutable reference to the `target` field of an `OfferDecl`, or
 /// `None` if the offer type is unknown.
 fn offer_target_mut(offer: &mut fdecl::Offer) -> Option<&mut Option<fdecl::Ref>> {
@@ -1464,6 +1528,17 @@ impl InstanceState {
             InstanceState::Destroyed => None,
         }
     }
+
+    /// Removes any escrowed state such that they can be passed back to the component
+    /// as it is started.
+    pub async fn reap_escrowed_state_during_start(&mut self) -> Option<EscrowedState> {
+        match self {
+            InstanceState::New => None,
+            InstanceState::Unresolved(_) => None,
+            InstanceState::Resolved(resolved) => resolved.program_escrow()?.will_start().await,
+            InstanceState::Destroyed => None,
+        }
+    }
 }
 
 impl fmt::Debug for InstanceState {
@@ -1625,6 +1700,11 @@ pub struct ResolvedInstanceState {
 
     /// The environments declared by this component.
     bedrock_environments: HashMap<Name, ComponentEnvironment>,
+
+    /// State held by the framework on behalf of the component's program, including
+    /// its outgoing directory server endpoint. Present if and only if the component
+    /// has a program.
+    program_escrow: Option<escrow::Actor>,
 }
 
 impl ResolvedInstanceState {
@@ -1662,6 +1742,14 @@ impl ResolvedInstanceState {
             }
         }
 
+        let program_escrow = if decl.program.is_some() {
+            let (escrow, escrow_task) = escrow::Actor::new(component.as_weak());
+            component.nonblocking_task_group().spawn(escrow_task);
+            Some(escrow)
+        } else {
+            None
+        };
+
         let mut state = Self {
             weak_component,
             instance_token_state,
@@ -1683,6 +1771,7 @@ impl ResolvedInstanceState {
             program_input_dict_additions: None,
             collection_inputs: HashMap::new(),
             bedrock_environments: HashMap::new(),
+            program_escrow,
         };
         state.add_static_children(component).await?;
 
@@ -1773,6 +1862,10 @@ impl ResolvedInstanceState {
 
     fn instance_token(&mut self, moniker: &Moniker, context: &Arc<ModelContext>) -> InstanceToken {
         self.instance_token_state.set(moniker, context)
+    }
+
+    fn program_escrow(&self) -> Option<&escrow::Actor> {
+        self.program_escrow.as_ref()
     }
 
     /// This component's `ExecutionScope`.
@@ -2352,6 +2445,11 @@ struct ProgramRuntime {
     exit_listener: fasync::Task<()>,
 }
 
+pub struct StopOutcomeWithEscrow {
+    pub outcome: ComponentStopOutcome,
+    pub escrow_request: Option<program::EscrowRequest>,
+}
+
 impl ProgramRuntime {
     pub fn new(program: Program, component: WeakComponentInstance) -> Self {
         let terminated_fut = program.on_terminate();
@@ -2375,8 +2473,8 @@ impl ProgramRuntime {
         self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
-    ) -> Result<ComponentStopOutcome, program::StopError> {
-        let stop_result = self.program.stop_or_kill_with_timeout(stop_timer, kill_timer).await;
+    ) -> Result<StopOutcomeWithEscrow, program::StopError> {
+        let outcome = self.program.stop_or_kill_with_timeout(stop_timer, kill_timer).await;
         // Drop the program and join on the exit listener. Dropping the program
         // should cause the exit listener to stop waiting for the channel epitaph and
         // exit.
@@ -2385,11 +2483,10 @@ impl ProgramRuntime {
         // even after cancellation future may still run for a short period of time
         // before getting dropped. If that happens there is a chance of scheduling a
         // duplicate Stop action.
-        //
-        // TODO(https://fxbug.dev/326626515): Start using `_escrow_request`.
-        let _escrow_request = self.program.finalize();
+        let escrow_request = self.program.finalize();
         self.exit_listener.await;
-        stop_result
+        let outcome = outcome?;
+        Ok(StopOutcomeWithEscrow { outcome, escrow_request })
     }
 }
 
@@ -2439,12 +2536,6 @@ impl ComponentRuntime {
     }
 
     /// If this component is associated with a running [Program], obtain a capability
-    /// representing its outgoing directory.
-    pub fn outgoing_dir(&self) -> Option<&fio::DirectoryProxy> {
-        self.program.as_ref().map(|program_runtime| program_runtime.program.outgoing())
-    }
-
-    /// If this component is associated with a running [Program], obtain a capability
     /// representing its runtime directory.
     pub fn runtime_dir(&self) -> Option<&fio::DirectoryProxy> {
         self.program.as_ref().map(|program_runtime| program_runtime.program.runtime())
@@ -2467,16 +2558,19 @@ impl ComponentRuntime {
         &'a mut self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
-    ) -> Result<ComponentStopOutcome, program::StopError> {
+    ) -> Result<StopOutcomeWithEscrow, program::StopError> {
         let program = self.program.take();
         // Potentially there is no program, perhaps because the component
         // has no running code. In this case this is a no-op.
         if let Some(program) = program {
             program.stop(stop_timer, kill_timer).await
         } else {
-            Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::NoController,
-                component_exit_status: zx::Status::OK,
+            Ok(StopOutcomeWithEscrow {
+                outcome: ComponentStopOutcome {
+                    request: StopRequestSuccess::NoController,
+                    component_exit_status: zx::Status::OK,
+                },
+                escrow_request: None,
             })
         }
     }
@@ -2556,6 +2650,7 @@ pub mod tests {
         fasync::TestExecutor,
         fidl::endpoints::DiscoverableProtocolMarker,
         fidl_fuchsia_logger as flogger, fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_zircon::AsHandleRef,
         futures::{channel::mpsc, StreamExt, TryStreamExt},
         routing_test_helpers::component_id_index::make_index_file,
         std::{panic, task::Poll},
@@ -3754,6 +3849,67 @@ pub mod tests {
         assert_matches!(root.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await, None);
     }
 
+    /// If a component is not started, a call to `open_outgoing` should start the component
+    /// and deliver the open request there.
+    #[fuchsia::test]
+    async fn open_outgoing_starts_component() {
+        let components = vec![("root", ComponentDeclBuilder::new().build())];
+        let test_topology = ActionsTest::new(components[0].0, components, None).await;
+        let (open_request_tx, mut open_request_rx) = mpsc::unbounded();
+
+        let mut root_out_dir = OutDir::new();
+        root_out_dir.add_entry(
+            "/svc/foo".parse().unwrap(),
+            vfs::service::endpoint(move |_scope, channel| {
+                open_request_tx.unbounded_send(channel).unwrap();
+            }),
+        );
+        test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+
+        let root = test_topology.look_up(Moniker::default()).await;
+        assert!(!root.is_started());
+
+        let (client_end, mut server_end) = zx::Channel::create();
+        root.open_outgoing(fio::OpenFlags::empty(), "svc/foo", &mut server_end).await.unwrap();
+        let server_end = open_request_rx.next().await.unwrap();
+        assert!(root.is_started());
+        assert_eq!(
+            client_end.basic_info().unwrap().related_koid,
+            server_end.basic_info().unwrap().koid
+        );
+    }
+
+    /// If a component is not started and is configured incorrectly to not be able to start,
+    /// `open_outgoing` should fail and the channel is closed.
+    #[fuchsia::test]
+    async fn open_outgoing_failed_to_start_component() {
+        let components = vec![(
+            "root",
+            ComponentDeclBuilder::new_empty_component().add_program("invalid").build(),
+        )];
+        let test_topology = ActionsTest::new(components[0].0, components, None).await;
+
+        let mut root_out_dir = OutDir::new();
+        root_out_dir.add_entry(
+            "/svc/foo".parse().unwrap(),
+            vfs::service::endpoint(move |_scope, _channel| {
+                unreachable!();
+            }),
+        );
+        test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+
+        let root = test_topology.look_up(Moniker::default()).await;
+        assert!(!root.is_started());
+
+        let (client_end, mut server_end) = zx::Channel::create();
+        let open_rx = root.open_outgoing(fio::OpenFlags::empty(), "svc/foo", &mut server_end);
+        assert!(!root.is_started());
+
+        assert_matches!(open_rx.await, Err(OpenOutgoingDirError::InstanceFailedToStart(_)));
+        fasync::OnSignals::new(&client_end, zx::Signals::CHANNEL_PEER_CLOSED).await.unwrap();
+        assert!(!root.is_started());
+    }
+
     /// While the provider component is stopping, opening its outgoing directory should not block.
     /// This is important to not cause deadlocks if we are draining the provider component's
     /// namespace.
@@ -3797,12 +3953,9 @@ pub mod tests {
 
         // Open the outgoing directory. This should not block.
         let (_, mut server_end) = zx::Channel::create();
-        // Note: if the behavior of `open_outgoing` changes to start the component, we can simply
-        // update the `Err` here accordingly.
-        assert_matches!(
-            root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end),
-            Err(OpenOutgoingDirError::InstanceNotRunning)
-        );
+        let open_fut = root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end);
+        futures::pin_mut!(open_fut);
+        assert_matches!(TestExecutor::poll_until_stalled(open_fut).await, Poll::Ready(Ok(())));
 
         // Let the timer advance. The component should be stopped now.
         TestExecutor::advance_to(initial + response_delay).await;
@@ -3811,8 +3964,8 @@ pub mod tests {
         // Open the outgoing directory. This should still not block.
         let (_, mut server_end) = zx::Channel::create();
         assert_matches!(
-            root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end),
-            Err(OpenOutgoingDirError::InstanceNotRunning)
+            root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end).await,
+            Ok(())
         );
     }
 }

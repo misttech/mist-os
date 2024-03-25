@@ -275,10 +275,12 @@ async fn start_component(
 
     {
         let mut state = component.lock_state().await;
-        let mut execution = component.lock_execution();
 
-        if let Some(r) = should_return_early(&state, &execution, &component.moniker) {
-            return r;
+        {
+            let execution = component.lock_execution();
+            if let Some(r) = should_return_early(&state, &execution, &component.moniker) {
+                return r;
+            }
         }
 
         let (diagnostics_sender, diagnostics_receiver) = oneshot::channel();
@@ -299,6 +301,10 @@ async fn start_component(
             let component_instance = state
                 .instance_token(moniker, &component.context)
                 .ok_or(StartActionError::InstanceDestroyed { moniker: moniker.clone() })?;
+            let escrowed_state = state
+                .reap_escrowed_state_during_start()
+                .await
+                .ok_or(StartActionError::InstanceDestroyed { moniker: moniker.clone() })?;
 
             let start_info = StartInfo {
                 resolved_url: url,
@@ -315,18 +321,26 @@ async fn start_component(
             };
 
             pending_runtime.set_program(
-                Program::start(&runner, start_info, diagnostics_sender, namespace_scope).map_err(
-                    |err| StartActionError::StartProgramError { moniker: moniker.clone(), err },
-                )?,
+                Program::start(
+                    &runner,
+                    start_info,
+                    escrowed_state,
+                    diagnostics_sender,
+                    namespace_scope,
+                )
+                .map_err(|err| StartActionError::StartProgramError {
+                    moniker: moniker.clone(),
+                    err,
+                })?,
                 component.as_weak(),
             );
         }
 
-        runtime_info = RuntimeInfo::from_runtime(&pending_runtime, diagnostics_receiver);
-        runtime_dir = pending_runtime.runtime_dir().cloned();
         timestamp = pending_runtime.timestamp;
+        runtime_info = RuntimeInfo::new(timestamp, diagnostics_receiver);
+        runtime_dir = pending_runtime.runtime_dir().cloned();
 
-        execution.runtime = Some(pending_runtime);
+        component.lock_execution().runtime = Some(pending_runtime);
 
         // TODO(b/322564390): Move program_input_dict_additions into `ExecutionState`.
         {
@@ -338,13 +352,12 @@ async fn start_component(
         }
     }
 
-    // Dispatch Started and DebugStarted events outside of the execution lock and state
-    // lock, but under the actions lock, so that:
+    // Dispatch Started and DebugStarted events outside of the state lock, but under the
+    // actions lock, so that:
     //
-    // - Hooks implementations can use the execution state (such as re-entrantly ensuring
-    //   the component is started).
-    // - The Started events will be ordered before any stop events that may happen if the
-    //   program terminated in the meantime.
+    // - Hooks implementations can use the state (such as re-entrantly ensuring the component is
+    //   started).
+    // - The Started events will be ordered before any other component lifecycle transitions.
     //
     component
         .hooks

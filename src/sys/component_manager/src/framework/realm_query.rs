@@ -475,14 +475,8 @@ async fn open(
 
     match dir_type {
         fsys::OpenDirType::OutgoingDir => {
-            let execution = instance.lock_execution();
-            let dir = execution
-                .runtime
-                .as_ref()
-                .ok_or(fsys::OpenError::InstanceNotRunning)?
-                .outgoing_dir()
-                .ok_or(fsys::OpenError::NoSuchDir)?;
-            dir.open(flags, mode, path, object).map_err(|_| fsys::OpenError::FidlError)
+            instance.open_outgoing(flags, path, &mut object.into_channel()).await?;
+            Ok(())
         }
         fsys::OpenDirType::RuntimeDir => {
             let execution = instance.lock_execution();

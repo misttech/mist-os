@@ -85,6 +85,10 @@ type OpenError = flexible enum {
     INSTANCE_NOT_RESOLVED = 3;
 
     /// The requested directory is available when the instance is running.
+    ///
+    /// Deprecation: the platform will stop emitting this error from version 19.
+    /// The component will always be started if not already.
+    @available(deprecated=19)
     INSTANCE_NOT_RUNNING = 4;
 
     /// Component manager's open request on the directory returned a FIDL error.
@@ -98,6 +102,11 @@ type OpenError = flexible enum {
 
     /// The given path could not be parsed by component manager.
     BAD_PATH = 8;
+
+    /// Serving the requested directory requires starting the instance, but the
+    /// instance failed to start.
+    @available(added=19)
+    INSTANCE_FAILED_TO_START = 9;
 };
 
 /// Errors that can be returned by the ConstructNamespace call.

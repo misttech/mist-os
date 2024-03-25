@@ -34,6 +34,12 @@ impl EscrowedState {
         _ = fasync::OnSignals::new(self.outgoing_dir.channel(), zx::Signals::CHANNEL_READABLE)
             .await;
     }
+
+    #[cfg(test)]
+    pub fn outgoing_dir_closed() -> Self {
+        let (_, outgoing_dir) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
+        Self { outgoing_dir, escrowed_dictionary: None }
+    }
 }
 
 impl Debug for EscrowedState {
@@ -206,7 +212,7 @@ impl ActorImpl {
                     // If the escrow needs attention, schedule a start action.
                     let starter = self.starter.clone();
                     let start_task = fasync::Task::spawn(async move {
-                        starter.ensure_started(&StartReason::Debug).await
+                        starter.ensure_started(&StartReason::OutgoingDirectory).await
                     });
                     return State::Starting{escrow, start_task};
                 },
@@ -431,7 +437,7 @@ mod tests {
         let (_, server_end) = zx::Channel::create();
         let open_rx = actor.open_outgoing(fio::OpenFlags::empty(), "foo".to_string(), server_end);
         let (reason, escrow) = start_rx.next().await.unwrap();
-        assert_eq!(reason, StartReason::Debug);
+        assert_eq!(reason, StartReason::OutgoingDirectory);
 
         let mut outgoing = escrow.outgoing_dir.into_stream().unwrap();
         let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();

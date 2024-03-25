@@ -18,8 +18,10 @@ use {
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::stream::StreamExt,
     moniker::Moniker,
+    sandbox::Open,
     std::sync::{Arc, Weak},
     thiserror::Error,
+    vfs::execution_scope::ExecutionScope,
 };
 
 /// Awaits for `Started` events and for each capability exposed to framework, dispatches a
@@ -44,13 +46,12 @@ impl DirectoryReadyNotifier {
     async fn on_component_started(
         self: &Arc<Self>,
         target_moniker: &Moniker,
-        outgoing_dir: &fio::DirectoryProxy,
+        outgoing_dir: Open,
         decl: ComponentDecl,
     ) -> Result<(), ModelError> {
         // Don't block the handling on the event on the exposed capabilities being ready
         let this = self.clone();
         let target_moniker = target_moniker.clone();
-        let outgoing_dir = Clone::clone(outgoing_dir);
         fasync::Task::spawn(async move {
             // If we can't find the component then we can't dispatch any DirectoryReady event,
             // error or otherwise. This isn't necessarily an error as the model or component might've been
@@ -79,7 +80,7 @@ impl DirectoryReadyNotifier {
     /// inside it that were exposed to the framework by the component.
     async fn dispatch_capabilities_ready(
         &self,
-        outgoing_dir: fio::DirectoryProxy,
+        outgoing_dir: Open,
         decl: &ComponentDecl,
         matching_exposes: Vec<&ExposeDecl>,
         target: &Arc<ComponentInstance>,
@@ -93,7 +94,7 @@ impl DirectoryReadyNotifier {
 
     async fn create_events(
         &self,
-        outgoing_dir: Option<fio::DirectoryProxy>,
+        outgoing_dir: Option<Open>,
         decl: &ComponentDecl,
         matching_exposes: Vec<&ExposeDecl>,
         target: &Arc<ComponentInstance>,
@@ -106,8 +107,8 @@ impl DirectoryReadyNotifier {
             let (outgoing_dir_proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().ok()?;
             _ = outgoing_dir.open(
+                ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                fio::ModeType::empty(),
                 ".",
                 server_end.into_channel().into(),
             );
@@ -274,11 +275,10 @@ impl EventSynthesisProvider for DirectoryReadyNotifier {
         }
 
         let outgoing_dir = {
-            let execution = component.lock_execution();
-            match execution.runtime.as_ref() {
-                Some(runtime) => runtime.outgoing_dir().cloned(),
-                None => return vec![],
+            if !component.lock_execution().is_started() {
+                return vec![];
             }
+            Some(component.get_outgoing())
         };
         self.create_events(outgoing_dir, &decl, matching_exposes, &component).await
     }
@@ -301,20 +301,22 @@ impl Hook for DirectoryReadyNotifier {
             .target_moniker
             .unwrap_instance_moniker_or(ModelError::UnexpectedComponentManagerMoniker)?;
         match &event.payload {
-            EventPayload::Started { runtime, component_decl, .. } => {
+            EventPayload::Started { component_decl, .. } => {
                 if filter_matching_exposes(&component_decl, None).is_empty() {
                     // Short-circuit if there are no matching exposes so we don't spawn a task
                     // if there's nothing to do. In particular, don't wait for the component's
                     // outgoing directory if there are no DirectoryReady events to send.
                     return Ok(());
                 }
-                if let Some(outgoing_dir) = &runtime.outgoing_dir {
-                    self.on_component_started(
-                        &target_moniker,
-                        outgoing_dir,
-                        component_decl.clone(),
-                    )
-                    .await?;
+                if let Some(model) = self.model.upgrade() {
+                    if let Some(component) = model.root().find(&target_moniker).await {
+                        self.on_component_started(
+                            &target_moniker,
+                            component.get_outgoing(),
+                            component_decl.clone(),
+                        )
+                        .await?;
+                    }
                 }
             }
             _ => {}

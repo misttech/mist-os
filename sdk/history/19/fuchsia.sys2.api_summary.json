@@ -649,6 +649,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.sys2/OpenError.INSTANCE_FAILED_TO_START",
+        "value": "9"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.sys2/OpenError.INSTANCE_NOT_FOUND",
         "value": "1"
     },

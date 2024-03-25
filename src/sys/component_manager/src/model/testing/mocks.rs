@@ -14,10 +14,10 @@ use {
     anyhow::format_err,
     async_trait::async_trait,
     cm_rust::{ComponentDecl, ConfigValuesData},
-    fidl::prelude::*,
     fidl::{
         endpoints::{create_endpoints, ClientEnd, ServerEnd},
         epitaph::ChannelEpitaphExt,
+        prelude::*,
     },
     fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_diagnostics_types::{
@@ -188,7 +188,9 @@ struct MockRunnerInner {
     /// the messages received by that controller.
     runner_requests: Arc<Mutex<HashMap<Koid, Vec<ControlMessage>>>>,
 
-    controllers: HashMap<Koid, AbortHandle>,
+    controller_abort_handles: HashMap<Koid, AbortHandle>,
+
+    controller_control_handles: HashMap<Koid, fcrunner::ComponentControllerControlHandle>,
 
     last_checker: Option<ScopedPolicyChecker>,
 }
@@ -214,7 +216,8 @@ impl MockRunner {
                 runtime_host_fns: HashMap::new(),
                 failing_urls: HashSet::new(),
                 runner_requests: Arc::new(Mutex::new(HashMap::new())),
-                controllers: HashMap::new(),
+                controller_abort_handles: HashMap::new(),
+                controller_control_handles: HashMap::new(),
                 last_checker: None,
                 controller_response_fns: HashMap::new(),
             }),
@@ -287,9 +290,21 @@ impl MockRunner {
     }
 
     pub fn abort_controller(&self, koid: &Koid) {
+        let mut state = self.inner.lock().unwrap();
+        state.controller_control_handles.remove(koid).expect("koid was not available");
+        let handle = state.controller_abort_handles.get(koid).expect("koid was not available");
+        handle.abort();
+    }
+
+    /// Sends a `OnEscrow` event on the controller channel identified by `koid`.
+    pub fn send_on_escrow(
+        &self,
+        koid: &Koid,
+        request: fcrunner::ComponentControllerOnEscrowRequest,
+    ) {
         let state = self.inner.lock().unwrap();
-        let controller = state.controllers.get(koid).expect("koid was not available");
-        controller.abort();
+        let handle = state.controller_control_handles.get(koid).expect("koid was not available");
+        handle.send_on_escrow(request).unwrap();
     }
 
     async fn start(
@@ -344,8 +359,10 @@ impl MockRunner {
                 ),
                 None => MockController::new(server_end, runner_requests, channel_koid),
             };
+            let control_handle = controller.request_stream.control_handle();
             let abort_handle = controller.serve();
-            state.controllers.insert(channel_koid, abort_handle);
+            state.controller_abort_handles.insert(channel_koid, abort_handle);
+            state.controller_control_handles.insert(channel_koid, control_handle);
 
             // Start serving the outgoing/runtime directories.
             if let Some(outgoing_host_fn) = outgoing_host_fn {

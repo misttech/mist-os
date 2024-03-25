@@ -118,6 +118,7 @@ fn namespace_teardown_processes_final_request() {
         .unwrap();
 
         let resolved_url = RoutingTest::resolved_url("root");
+        test.mock_runner.wait_for_url(&resolved_url).await;
         let root_namespace = test.mock_runner.get_namespace(&resolved_url).unwrap();
         let echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
             &root_namespace,
@@ -3354,7 +3355,7 @@ async fn use_anonymized_aggregate_service() {
 /// While the provider component is stopping (waiting on stop timeout), a routing request should
 /// still be handled.
 #[fuchsia::test(allow_stalls = false)]
-async fn route_from_while_component_is_stopping() {
+async fn source_component_stopping_when_routing() {
     // Use mock time in this test.
     let initial = fasync::Time::from_nanos(0);
     TestExecutor::advance_to(initial).await;
@@ -3441,4 +3442,133 @@ async fn route_from_while_component_is_stopping() {
         server_end.basic_info().unwrap().koid
     );
     assert!(root.is_started());
+}
+
+/// If the provider component of a capability is stopped before the open request is
+/// sent, it should be started again.
+#[fuchsia::test]
+async fn source_component_stopped_after_routing_before_open() {
+    let components = vec![(
+        "root",
+        ComponentDeclBuilder::new()
+            .capability(CapabilityBuilder::protocol().name("foo").path("/svc/foo").build())
+            .expose(ExposeBuilder::protocol().name("foo").source(ExposeSource::Self_))
+            .build(),
+    )];
+    let test_topology = ActionsTest::new(components[0].0, components, None).await;
+    let (open_request_tx, mut open_request_rx) = mpsc::unbounded();
+
+    let mut root_out_dir = OutDir::new();
+    root_out_dir.add_entry(
+        "/svc/foo".parse().unwrap(),
+        vfs::service::endpoint(move |_scope, channel| {
+            open_request_tx.unbounded_send(channel).unwrap();
+        }),
+    );
+    test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+
+    let root = test_topology.look_up(Moniker::default()).await;
+    assert!(!root.is_started());
+
+    // Request a capability from the component.
+    let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
+    let open: Open = Open::new(
+        output
+            .get_capability(iter::once(&"foo".parse().unwrap()))
+            .unwrap()
+            .route(crate::model::routing::router::Request {
+                availability: Availability::Required,
+                target: root.as_weak().into(),
+            })
+            .await
+            .unwrap()
+            .try_into_directory_entry()
+            .unwrap(),
+    );
+
+    // It should be started with the capability access start reason.
+    assert!(root.is_started());
+    assert_matches!(
+        root.lock_execution().runtime.as_ref().unwrap().start_reason,
+        StartReason::AccessCapability { .. }
+    );
+
+    // Stop the component.
+    root.stop().await.expect("failed to stop");
+    assert!(!root.is_started());
+
+    // Connect to the capability. The component should be started again.
+    let (client_end, server_end) = zx::Channel::create();
+    open.open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
+
+    let server_end = open_request_rx.next().await.unwrap();
+    assert_eq!(
+        client_end.basic_info().unwrap().related_koid,
+        server_end.basic_info().unwrap().koid
+    );
+
+    assert!(root.is_started());
+    assert_matches!(
+        root.lock_execution().runtime.as_ref().unwrap().start_reason,
+        StartReason::OutgoingDirectory
+    );
+}
+
+/// If the provider component of a capability is shutdown before the open request is
+/// sent, it should not be started again, and the open request should also be closed.
+#[fuchsia::test]
+async fn source_component_shutdown_after_routing_before_open() {
+    let components = vec![(
+        "root",
+        ComponentDeclBuilder::new()
+            .capability(CapabilityBuilder::protocol().name("foo").path("/svc/foo").build())
+            .expose(ExposeBuilder::protocol().name("foo").source(ExposeSource::Self_))
+            .build(),
+    )];
+    let test_topology = ActionsTest::new(components[0].0, components, None).await;
+
+    let mut root_out_dir = OutDir::new();
+    root_out_dir.add_entry(
+        "/svc/foo".parse().unwrap(),
+        vfs::service::endpoint(move |_scope, _channel| {
+            unreachable!();
+        }),
+    );
+    test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+
+    let root = test_topology.look_up(Moniker::default()).await;
+    assert!(!root.is_started());
+
+    // Request a capability from the component.
+    let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
+    let open: Open = Open::new(
+        output
+            .get_capability(iter::once(&"foo".parse().unwrap()))
+            .unwrap()
+            .route(crate::model::routing::router::Request {
+                availability: Availability::Required,
+                target: root.as_weak().into(),
+            })
+            .await
+            .unwrap()
+            .try_into_directory_entry()
+            .unwrap(),
+    );
+
+    // It should be started with the capability access start reason.
+    assert!(root.is_started());
+    assert_matches!(
+        root.lock_execution().runtime.as_ref().unwrap().start_reason,
+        StartReason::AccessCapability { .. }
+    );
+
+    // Shutdown the component.
+    root.shutdown(ShutdownType::Instance).await.expect("failed to stop");
+    assert!(!root.is_started());
+
+    // Connect to the capability. The request will fail and the component is not started.
+    let (client_end, server_end) = zx::Channel::create();
+    open.open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
+    fasync::OnSignals::new(&client_end, zx::Signals::CHANNEL_PEER_CLOSED).await.unwrap();
+    assert!(!root.is_started());
 }

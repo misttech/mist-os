@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{model::token::InstanceToken, runner::RemoteRunner};
+use crate::{
+    model::{escrow::EscrowedState, token::InstanceToken},
+    runner::RemoteRunner,
+};
 use fidl::endpoints;
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl_fuchsia_component_runner as fcrunner;
@@ -31,12 +34,6 @@ use component_controller::ComponentController;
 /// and may eventually terminate.
 pub struct Program {
     controller: ComponentController,
-
-    /// The outgoing directory of the program.
-    ///
-    /// The framework only calls `Open` on the directory so that the directory
-    /// connection does not accrete state, such as a different seek pointer.
-    outgoing_dir: fio::DirectoryProxy,
 
     /// The directory that presents runtime information about the component. The
     /// runner must either serve the server endpoint, or drop it to avoid
@@ -67,25 +64,19 @@ impl Program {
     pub fn start(
         runner: &RemoteRunner,
         start_info: StartInfo,
+        escrowed_state: EscrowedState,
         diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
         namespace_scope: ExecutionScope,
     ) -> Result<Program, StartError> {
         let (controller, server_end) =
             endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
-        let (outgoing_dir, outgoing_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let (runtime_dir, runtime_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let start_info = start_info.into_fidl(outgoing_server, runtime_server)?;
+        let start_info = start_info.into_fidl(escrowed_state.outgoing_dir, runtime_server)?;
 
         runner.start(start_info, server_end);
         let controller = ComponentController::new(controller, Some(diagnostics_sender));
-        Ok(Program { controller, outgoing_dir, runtime_dir, namespace_scope })
-    }
-
-    /// Gets the outgoing directory of the program.
-    pub fn outgoing(&self) -> &fio::DirectoryProxy {
-        &self.outgoing_dir
+        Ok(Program { controller, runtime_dir, namespace_scope })
     }
 
     /// Gets the runtime directory of the program.
@@ -205,11 +196,9 @@ impl Program {
         controller: endpoints::ClientEnd<fcrunner::ComponentControllerMarker>,
     ) -> Program {
         let controller = ComponentController::new(controller.into_proxy().unwrap(), None);
-        let (outgoing_dir, _outgoing_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let (runtime_dir, _runtime_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        Program { controller, outgoing_dir, runtime_dir, namespace_scope: ExecutionScope::new() }
+        Program { controller, runtime_dir, namespace_scope: ExecutionScope::new() }
     }
 }
 

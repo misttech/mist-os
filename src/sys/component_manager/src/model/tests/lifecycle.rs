@@ -15,9 +15,13 @@ use {
             events::registry::EventSubscription,
             hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
+            start::Start,
             testing::{
-                mocks::*, out_dir::OutDir, routing_test_helpers::RoutingTestBuilder,
-                test_helpers::*, test_hook::TestHook,
+                mocks::*,
+                out_dir::OutDir,
+                routing_test_helpers::RoutingTestBuilder,
+                test_helpers::*,
+                test_hook::{Lifecycle, TestHook},
             },
         },
     },
@@ -31,14 +35,17 @@ use {
     },
     cm_rust_testing::*,
     cm_types::Name,
-    fidl::endpoints::ProtocolMarker,
+    fidl::endpoints::{create_endpoints, ProtocolMarker, ServerEnd},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
+    fuchsia_async as fasync, fuchsia_sync as fsync, fuchsia_zircon as zx,
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
     moniker::{ChildName, Moniker, MonikerBase},
-    std::collections::HashSet,
-    std::sync::{Arc, Weak},
+    std::{
+        collections::HashSet,
+        sync::{Arc, Weak},
+    },
+    zx::AsHandleRef,
 };
 
 async fn new_model(
@@ -716,4 +723,85 @@ async fn on_terminate_with_failed_reboot_panics() {
         _ => panic!("unexpected request"),
     };
     let () = pending().await;
+}
+
+/// If a component escrows its outgoing directory and stops, it should be started again,
+/// and it should get back the queued open requests.
+#[fuchsia::test(allow_stalls = false)]
+async fn open_then_stop_with_escrow() {
+    let (out_dir_tx, mut out_dir_rx) = mpsc::channel(1);
+    let out_dir_tx = fsync::Mutex::new(out_dir_tx);
+
+    // Create and start a component.
+    let components = vec![("root", ComponentDeclBuilder::new().build())];
+    let url = "test:///root_resolved";
+    let test = ActionsTest::new(components[0].0, components, None).await;
+    test.runner.add_host_fn(
+        url,
+        Box::new(move |server_end: ServerEnd<fio::DirectoryMarker>| {
+            out_dir_tx.lock().try_send(server_end).unwrap();
+        }),
+    );
+    let root = test.model.root();
+    root.ensure_started(&StartReason::Debug).await.unwrap();
+    test.runner.wait_for_url(url).await;
+
+    // Queue an open request.
+    let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
+    let mut server_chan = server_end.into_channel();
+    root.open_outgoing(fio::OpenFlags::empty(), "echo", &mut server_chan).await.unwrap();
+
+    // Get a hold of the outgoing directory server endpoint.
+    let outgoing_server_end = out_dir_rx.next().await.unwrap();
+
+    // Escrow the outgoing directory, then have the program stop itself.
+    let info = ComponentInfo::new(root.clone()).await;
+    test.runner.send_on_escrow(
+        &info.channel_id,
+        fcrunner::ComponentControllerOnEscrowRequest {
+            outgoing_dir: Some(outgoing_server_end),
+            ..Default::default()
+        },
+    );
+    test.runner.reset_wait_for_url(url);
+    test.runner.abort_controller(&info.channel_id);
+
+    // We should observe the program getting started again.
+    test.runner.wait_for_url(url).await;
+    _ = fasync::TestExecutor::poll_until_stalled(future::pending::<()>()).await;
+    let events: Vec<_> = test
+        .test_hook
+        .lifecycle()
+        .into_iter()
+        .filter(|event| match event {
+            Lifecycle::Start(_) | Lifecycle::Stop(_) => true,
+            _ => false,
+        })
+        .collect();
+    assert_eq!(
+        events,
+        vec![
+            Lifecycle::Start(vec![].try_into().unwrap()),
+            Lifecycle::Stop(vec![].try_into().unwrap()),
+            Lifecycle::Start(vec![].try_into().unwrap()),
+        ]
+    );
+
+    // And we should get back the same outgoing directory, with that earlier request in it.
+    let outgoing_server_end = out_dir_rx.next().await.unwrap();
+    let mut out_dir = OutDir::new();
+    let (request_tx, mut request_rx) = mpsc::channel(1);
+    let request_tx = fsync::Mutex::new(request_tx);
+    out_dir.add_entry(
+        "/echo".parse().unwrap(),
+        vfs::service::endpoint(move |_scope, server_end| {
+            request_tx.lock().try_send(server_end).unwrap();
+        }),
+    );
+    out_dir.host_fn()(outgoing_server_end);
+    let server_end = request_rx.next().await.unwrap();
+    assert_eq!(
+        client_end.basic_info().unwrap().related_koid,
+        server_end.basic_info().unwrap().koid
+    );
 }

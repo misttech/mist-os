@@ -200,20 +200,32 @@ pub enum OpenExposedDirError {
 
 #[derive(Clone, Debug, Error)]
 pub enum OpenOutgoingDirError {
-    #[error("instance is not running")]
-    InstanceNotRunning,
+    #[error("instance is not resolved")]
+    InstanceNotResolved,
     #[error("instance is non-executable")]
     InstanceNonExecutable,
-    #[error("open call FIDL error: {0}")]
-    Fidl(#[from] fidl::Error),
+    #[error("instance failed to start: {0}")]
+    InstanceFailedToStart(#[from] ActionError),
 }
 
 impl Explain for OpenOutgoingDirError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
-            Self::InstanceNotRunning => zx::Status::NOT_FOUND,
+            Self::InstanceNotResolved => zx::Status::NOT_FOUND,
             Self::InstanceNonExecutable => zx::Status::NOT_FOUND,
-            Self::Fidl(_) => zx::Status::INTERNAL,
+            Self::InstanceFailedToStart(err) => err.as_zx_status(),
+        }
+    }
+}
+
+impl From<OpenOutgoingDirError> for fsys::OpenError {
+    fn from(value: OpenOutgoingDirError) -> Self {
+        match value {
+            OpenOutgoingDirError::InstanceNotResolved => fsys::OpenError::InstanceNotResolved,
+            OpenOutgoingDirError::InstanceNonExecutable => fsys::OpenError::NoSuchDir,
+            OpenOutgoingDirError::InstanceFailedToStart(_) => {
+                fsys::OpenError::InstanceFailedToStart
+            }
         }
     }
 }

@@ -4,7 +4,7 @@
 
 use {
     crate::model::{
-        component::{ComponentInstance, ComponentRuntime, WeakComponentInstance},
+        component::{ComponentInstance, WeakComponentInstance},
         error::ModelError,
     },
     anyhow::format_err,
@@ -273,23 +273,18 @@ pub enum EventPayload {
 /// Information about a component's runtime provided to `Started`.
 #[derive(Clone)]
 pub struct RuntimeInfo {
-    pub outgoing_dir: Option<fio::DirectoryProxy>,
     pub diagnostics_receiver:
         Arc<Mutex<Option<oneshot::Receiver<fdiagnostics::ComponentDiagnostics>>>>,
     pub start_time: zx::Time,
 }
 
 impl RuntimeInfo {
-    pub fn from_runtime(
-        runtime: &ComponentRuntime,
+    pub fn new(
+        timestamp: zx::Time,
         diagnostics_receiver: oneshot::Receiver<fdiagnostics::ComponentDiagnostics>,
     ) -> Self {
         let diagnostics_receiver = Arc::new(Mutex::new(Some(diagnostics_receiver)));
-        Self {
-            outgoing_dir: runtime.outgoing_dir().cloned(),
-            diagnostics_receiver,
-            start_time: runtime.timestamp,
-        }
+        Self { diagnostics_receiver, start_time: timestamp }
     }
 }
 

@@ -362,6 +362,7 @@ mod tests {
 
     use crate::{
         bedrock::program::{Program, StartInfo},
+        model::escrow::EscrowedState,
         runner::RemoteRunner,
     };
 
@@ -495,9 +496,14 @@ mod tests {
 
         let elf_runner = RemoteRunner::new(component_runner);
         let (diagnostics_sender, _) = oneshot::channel();
-        let program =
-            Program::start(&elf_runner, start_info, diagnostics_sender, ExecutionScope::new())
-                .unwrap();
+        let program = Program::start(
+            &elf_runner,
+            start_info,
+            EscrowedState::outgoing_dir_closed(),
+            diagnostics_sender,
+            ExecutionScope::new(),
+        )
+        .unwrap();
 
         // Wait for the ELF component to signal on the channel.
         let signals = fasync::OnSignals::new(&ch2, zx::Signals::USER_0).await.unwrap();
