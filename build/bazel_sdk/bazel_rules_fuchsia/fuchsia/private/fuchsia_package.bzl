@@ -142,6 +142,7 @@ def _fuchsia_test_package(
         subpackages = [],
         subpackages_to_flatten = [],
         test_realm = None,
+        tags = [],
         **kwargs):
     """Defines test variants of fuchsia_package.
 
@@ -164,6 +165,7 @@ def _fuchsia_test_package(
         fuchsia_api_level = fuchsia_api_level,
         platform = platform,
         target_compatible_with = target_compat,
+        tags = tags + ["manual"],
         **kwargs
     )
 
@@ -173,6 +175,7 @@ def _fuchsia_test_package(
         component_run_tags = _test_component_mapping.keys(),
         is_test = True,
         test_realm = test_realm,
+        tags = tags,
         **kwargs
     )
 

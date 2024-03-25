@@ -154,17 +154,27 @@ def fuchsia_package_tasks(
         component_run_tags,
         tools = {},
         is_test = False,
-        tags = [],
         package_repository_name = None,
         disable_repository_name = None,
         test_realm = None,
+        tags = [],
         **kwargs):
-    # TODO(https://fxbug.dev/42181390): Use ffx isolation. ffx test run currently needs
-    # to access ~/.local/share/Fuchsia/ffx/ or else it crashes.
-    top_level_tags = tags + (["no-sandbox", "no-cache"] if is_test else [])
+    # Disable Bazel sandboxing when running tests to allow ffx run without
+    # isolation.
+    # This is preferred over using ffx isolation as isolation would cause
+    # unfavorable interaction with existing daemons.
+    # Examples:
+    #  - Port :8083 collisions when a package server is already running under a
+    #    different deamon.
+    #  - Emulators running under --net user are not visible to ffx daemons
+    #    running within an isolate dir.
+    if is_test:
+        tags = tags + ["no-sandbox", "no-cache"]
 
-    # Mark test children as manual.
-    manual_test = ["manual"] if is_test else []
+    # Every target beside the default target should be marked as manual,
+    # as they are irrelevant to `bazel build //...` and incompatible with
+    # `bazel test //...`.
+    intermediate_target_tags = tags + ["manual"]
 
     # Override testonly since it's used to determine test vs non-test rule
     # variant selection for workflows.
@@ -175,7 +185,7 @@ def fuchsia_package_tasks(
     fuchsia_task_register_debug_symbols(
         name = debug_symbols_task,
         deps = [package],
-        tags = top_level_tags,
+        tags = intermediate_target_tags,
         **kwargs
     )
 
@@ -187,7 +197,7 @@ def fuchsia_package_tasks(
         name = anonymous_publish_task,
         packages = [package],
         package_repository_name = package_repository_name or anonymous_repo_name,
-        tags = tags + ["manual"],
+        tags = intermediate_target_tags,
         **kwargs
     )
     fuchsia_task_ffx(
@@ -198,7 +208,7 @@ def fuchsia_package_tasks(
             anonymous_repo_name,
         ],
         default_argument_scope = "explicit",
-        tags = tags + ["manual"],
+        tags = intermediate_target_tags,
         **kwargs
     )
     publish_only_task = "%s_only" % publish_task
@@ -206,7 +216,7 @@ def fuchsia_package_tasks(
         name = publish_only_task,
         packages = [package],
         package_repository_name = package_repository_name,
-        tags = tags + ["manual"],
+        tags = intermediate_target_tags,
         **kwargs
     )
     fuchsia_workflow(
@@ -215,7 +225,7 @@ def fuchsia_package_tasks(
             debug_symbols_task,
             publish_only_task,
         ],
-        tags = top_level_tags,
+        tags = intermediate_target_tags,
         **kwargs
     )
 
@@ -229,7 +239,7 @@ def fuchsia_package_tasks(
         publish_task = publish_task,
         top_level_name = name,
         is_test = is_test,
-        tags = top_level_tags,
+        tags = intermediate_target_tags,
         **kwargs
     )
 
@@ -244,7 +254,7 @@ def fuchsia_package_tasks(
             repository = package_repository_name or anonymous_repo_name,
             package = package,
             run_tag = run_tag,
-            tags = tags + ["manual"],
+            tags = intermediate_target_tags,
             disable_repository = disable_repository_name,
             test_realm = test_realm,
             **kwargs
@@ -259,7 +269,7 @@ def fuchsia_package_tasks(
             ] + ([] if package_repository_name else [
                 verbs.delete_repo(anonymous_publish_task),
             ]),
-            tags = top_level_tags + manual_test,
+            tags = intermediate_target_tags,
             **kwargs
         )
 
@@ -272,7 +282,7 @@ def fuchsia_package_tasks(
             repository = package_repository_name or anonymous_repo_name,
             package = package,
             tool = tool,
-            tags = tags + ["manual"],
+            tags = intermediate_target_tags,
             **kwargs
         )
 
@@ -285,7 +295,7 @@ def fuchsia_package_tasks(
             ] + ([] if package_repository_name else [
                 verbs.delete_repo(anonymous_publish_task),
             ]),
-            tags = top_level_tags,
+            tags = intermediate_target_tags,
             **kwargs
         )
 
@@ -301,6 +311,6 @@ def fuchsia_package_tasks(
         component_run_tasks = component_run_tasks,
         is_test = is_test,
         package = package,
-        tags = top_level_tags,
+        tags = tags,
         **kwargs
     )
