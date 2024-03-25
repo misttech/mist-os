@@ -21,10 +21,7 @@ group("profile") {
 }
 
 group("hci") {
-  deps = [
-    "bt-hci-tool",
-    "bt-intel-tool",
-  ]
+  deps = [ "bt-intel-tool" ]
 }
 
 group("audio") {
@@ -34,7 +31,6 @@ group("audio") {
 group("fct") {
   deps = [
     "bt-fct-hci",
-    "bt-hci-tool",
     "bt-snoop-cli",
   ]
 }
