@@ -13,7 +13,6 @@ from mobly import asserts
 from mobly import test_runner
 
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.interfaces.device_classes import transports_capable
 
 # Required fastboot variables.
 # - key: variable name
@@ -74,11 +73,6 @@ class FastbootTest(fuchsia_base_test.FuchsiaBaseTest):
         """Initializes all DUT(s)"""
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
-        asserts.assert_true(
-            isinstance(self.device, transports_capable.FastbootCapableDevice),
-            "Fastboot tests require a FastbootCapableDevice",
-            extras={"type": type(self.device)},
-        )
 
         # TODO(http://b/276740268#comment33): add support for rebooting into
         # fastboot here and leaving the device in fastboot mode for the entire
