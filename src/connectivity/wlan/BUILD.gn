@@ -69,7 +69,6 @@ group("tests") {
     "lib/frame_writer:wlan-frame-writer-tests",
     "lib/ieee80211:ieee80211-tests",
     "lib/ieee80211-testutils:ieee80211-testutils-tests",
-    "lib/inspect:wlan-inspect-tests",
     "lib/mlme/fullmac:wlan-fullmac-mlme-tests",
     "lib/mlme/fullmac/c-binding:wlan-fullmac-mlme-c-tests",
     "lib/mlme/rust:wlan-mlme-tests",

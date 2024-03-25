@@ -20,7 +20,6 @@ rustc_library("wlan-sme") {
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/lib/eapol",
     "//src/connectivity/wlan/lib/ieee80211",
-    "//src/connectivity/wlan/lib/inspect:wlan-inspect",
     "//src/connectivity/wlan/lib/rsn:wlan-rsn",
     "//src/connectivity/wlan/lib/statemachine:wlan-statemachine",
     "//src/lib/diagnostics/inspect/contrib/rust",

@@ -17,7 +17,6 @@ use {
     fuchsia_zircon as zx,
     ieee80211::Ssid,
     wlan_common::ie::{self, wsc},
-    wlan_inspect::IfaceTree,
 };
 
 /// These limits are set to capture roughly 5 to 10 recent connection attempts. An average
@@ -107,8 +106,6 @@ impl SmeTree {
         self.last_pulse.lock().update(new_status)
     }
 }
-
-impl IfaceTree for SmeTree {}
 
 pub struct PulseNode {
     node: Node,
