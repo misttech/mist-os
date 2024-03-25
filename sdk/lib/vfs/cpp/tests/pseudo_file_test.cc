@@ -54,8 +54,11 @@ class PseudoFileTest : public ::gtest::RealLoopFixture {
 
     auto file = std::make_unique<vfs::PseudoFile>(kMaxFileSize, std::move(read_handler),
                                                   std::move(write_handler));
-
     root_->AddEntry("file", std::move(file));
+
+    auto read_only_file =
+        std::make_unique<vfs::PseudoFile>(kMaxFileSize, std::move(read_handler), nullptr);
+    root_->AddEntry("read_only_file", std::move(read_only_file));
 
     zx::channel root_server;
     ASSERT_EQ(zx::channel::create(0, &root_client_, &root_server), ZX_OK);
@@ -116,6 +119,32 @@ TEST_F(PseudoFileTest, ReadWrite) {
     ASSERT_EQ(read(file.get(), buffer.data(), buffer.size()), static_cast<ssize_t>(buffer.size()));
     ASSERT_EQ(lseek(file.get(), 0, SEEK_SET), 0) << strerror(errno);
     ASSERT_EQ(contents.substr(0, kMaxFileSize), buffer);
+  });
+}
+
+TEST_F(PseudoFileTest, ReadOnly) {
+  PerformBlockingWork([this] {
+    auto root = open_root_fd();
+    fbl::unique_fd file(openat(root.get(), "read_only_file", O_RDWR));
+    ASSERT_FALSE(file) << "Should fail to open read-only PseudoFile as writable!";
+    ASSERT_EQ(errno, EACCES);
+
+    file = fbl::unique_fd(openat(root.get(), "read_only_file", O_RDONLY));
+    ASSERT_TRUE(file) << "Failed to open read-only PseudoFile: " << strerror(errno);
+
+    std::string contents(kFileContents);
+    contents.resize(kMaxFileSize, 0);
+    std::string buffer(kMaxFileSize, 0);
+    ASSERT_EQ(read(file.get(), buffer.data(), buffer.size()),
+              static_cast<ssize_t>(kFileContents.size()));
+    ASSERT_EQ(lseek(file.get(), 0, SEEK_SET), 0) << strerror(errno);
+    ASSERT_EQ(contents, buffer);
+
+    // Writes should fail.
+    contents = kNewContents;
+    contents.resize(kMaxFileSize + 100);
+    ASSERT_LT(write(file.get(), contents.data(), contents.size()), 0);
+    ASSERT_EQ(errno, EBADF) << strerror(errno);
   });
 }
 

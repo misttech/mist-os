@@ -43,8 +43,8 @@ class PseudoFile final : public internal::Node {
   // `read_handler` cannot be null. If the `write_handler` is null, then the pseudo-file is
   // considered not writable. `max_file_size` determines the maximum number of bytes which can be
   // written to and read from the pseudo-file's input buffer when it it opened for writing/reading.
-  explicit PseudoFile(size_t max_file_size, ReadHandler read_handler = ReadHandler(),
-                      WriteHandler write_handler = WriteHandler())
+  explicit PseudoFile(size_t max_file_size, ReadHandler read_handler = nullptr,
+                      WriteHandler write_handler = nullptr)
       : Node(MakePseudoFile(max_file_size, std::move(read_handler), std::move(write_handler))) {}
 
   using internal::Node::Serve;
@@ -70,7 +70,7 @@ class PseudoFile final : public internal::Node {
         .cookie = cookie,
         .read = &ReadCallback,
         .release = &ReleaseCallback,
-        .write = &WriteCallback,
+        .write = cookie->write_handler ? &WriteCallback : nullptr,
         .destroy = &DestroyCookie,
     };
 
