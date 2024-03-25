@@ -40,9 +40,6 @@ pub fn construct_zbi(
     // If a base merkle is supplied, then add the boot arguments for starting up pkgfs with the
     // merkle of the Base Package.
     if let Some(base_package) = &base_package {
-        // Indicate the clock UTC backstop.
-        zbi_builder.add_boot_arg(&format!("clock.backstop={}", product.kernel.clock_backstop));
-
         // Specify how to launch pkgfs: bin/pkgsvr <base-merkle>
         // This is still needed even though pkgfs has been removed because pkg-cache uses it to
         // obtain the base_package hash.
@@ -210,7 +207,7 @@ mod tests {
 
         // Create fake product/board definitions.
         let kernel_path = dir.join("kernel");
-        let mut product_config = ImageAssemblyConfig::new_for_testing(&kernel_path, 0);
+        let mut product_config = ImageAssemblyConfig::new_for_testing(&kernel_path);
 
         let zbi_config = Zbi {
             name: "fuchsia".into(),

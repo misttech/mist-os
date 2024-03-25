@@ -78,7 +78,6 @@ pub struct ImageAssemblyConfigBuilder {
 
     kernel_path: Option<Utf8PathBuf>,
     kernel_args: BTreeSet<String>,
-    kernel_clock_backstop: Option<u64>,
 
     qemu_kernel: Option<Utf8PathBuf>,
     shell_commands: ShellCommands,
@@ -120,7 +119,6 @@ impl ImageAssemblyConfigBuilder {
             domain_configs: DomainConfigs::new("domain configs"),
             kernel_path: None,
             kernel_args: BTreeSet::default(),
-            kernel_clock_backstop: None,
             qemu_kernel: None,
             package_urls: BTreeSet::default(),
             packages_to_compile: BTreeMap::default(),
@@ -235,12 +233,6 @@ impl ImageAssemblyConfigBuilder {
             self.kernel_args
                 .try_insert_all_unique(kernel.args)
                 .map_err(|arg| anyhow!("duplicate kernel arg found: {}", arg))?;
-
-            assembly_util::set_option_once_or(
-                &mut self.kernel_clock_backstop,
-                kernel.clock_backstop,
-                anyhow!("Only one input bundle can specify a kernel clock backstop"),
-            )?;
         }
 
         for (package, entries) in config_data {
@@ -716,7 +708,6 @@ impl ImageAssemblyConfigBuilder {
             bootfs_structured_config,
             kernel_path,
             kernel_args,
-            kernel_clock_backstop,
             qemu_kernel,
             shell_commands,
             package_urls: _,
@@ -925,8 +916,6 @@ impl ImageAssemblyConfigBuilder {
             kernel: KernelConfig {
                 path: kernel_path.context("A kernel path must be specified")?,
                 args: kernel_args.into_iter().collect(),
-                clock_backstop: kernel_clock_backstop
-                    .context("A kernel clock backstop time must be specified")?,
             },
             qemu_kernel: qemu_kernel.context("A qemu kernel configuration must be specified")?,
             boot_args: boot_args.into_iter().collect(),
@@ -1069,7 +1058,6 @@ mod tests {
             kernel: Some(PartialKernelConfig {
                 path: Some("kernel/path".into()),
                 args: vec!["kernel_arg0".into()],
-                clock_backstop: Some(56244),
             }),
             qemu_kernel: Some("path/to/qemu/kernel".into()),
             boot_args: vec!["boot_arg0".into()],
@@ -1135,7 +1123,6 @@ mod tests {
             kernel: Some(PartialKernelConfig {
                 path: Some("kernel/path".into()),
                 args: Vec::default(),
-                clock_backstop: Some(0),
             }),
             qemu_kernel: Some("kernel/qemu/path".into()),
             packages: package_names
@@ -1209,7 +1196,6 @@ mod tests {
 
         assert_eq!(result.kernel.path, vars.outdir.join("kernel/path"));
         assert_eq!(result.kernel.args, vec!("kernel_arg0".to_string()));
-        assert_eq!(result.kernel.clock_backstop, 56244);
         assert_eq!(result.qemu_kernel, vars.outdir.join("path/to/qemu/kernel"));
     }
 
@@ -1256,7 +1242,6 @@ mod tests {
 
         assert_eq!(result.kernel.path, vars.outdir.join("kernel/path"));
         assert_eq!(result.kernel.args, vec!("kernel_arg0".to_string()));
-        assert_eq!(result.kernel.clock_backstop, 56244);
         assert_eq!(result.qemu_kernel, vars.outdir.join("path/to/qemu/kernel"));
     }
 
@@ -1303,7 +1288,6 @@ mod tests {
 
         assert_eq!(result.kernel.path, vars.outdir.join("kernel/path"));
         assert_eq!(result.kernel.args, vec!("kernel_arg0".to_string()));
-        assert_eq!(result.kernel.clock_backstop, 56244);
         assert_eq!(result.qemu_kernel, vars.outdir.join("path/to/qemu/kernel"));
     }
 

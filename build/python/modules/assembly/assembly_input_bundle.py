@@ -238,7 +238,6 @@ class AssemblyInputBundle:
             "kernel": {
                 "path": "kernel/kernel.zbi",
                 "args": [ "arg1", "arg2", ... ],
-                "clock_backstop": 01234
             },
             "qemu_kernel": "kernel/multiboot.bin",
             "boot_args": [ "arg1", "arg2", ... ],
@@ -489,9 +488,6 @@ class AIBCreator:
         kernel_args = self.kernel.args
         if kernel_args:
             result.kernel.args = kernel_args
-        kernel_backstop = self.kernel.clock_backstop
-        if kernel_backstop:
-            result.kernel.clock_backstop = kernel_backstop
 
         # Copy the manifests for the base package set into the assembly bundle
         (base_pkgs, base_blobs, base_deps) = self._copy_packages("base")
