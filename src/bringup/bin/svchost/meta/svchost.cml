@@ -25,9 +25,10 @@
         },
         {
             protocol: [
-                "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.exception.Handler",
+                "fuchsia.kernel.DebugResource",
+                "fuchsia.kernel.ProfileResource",
                 "fuchsia.kernel.RootJob",
                 "fuchsia.logger.LogSink",
             ],

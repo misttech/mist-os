@@ -54,7 +54,6 @@ executable("svchost") {
   deps = [
     ":crashsvc",
     ":svchost_config",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp",
     "//sdk/lib/component/incoming/cpp",

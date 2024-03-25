@@ -20,7 +20,6 @@
                     "/bootstrap",
                     "/bootstrap/console-launcher",
                     "/bootstrap/netsvc",
-                    "/bootstrap/svchost",
                 ],
             },
             {
@@ -43,6 +42,7 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/console",
+                    "/bootstrap/svchost",
                 ],
             },
             {
@@ -157,6 +157,18 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/boot-drivers:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.ProfileResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/svchost",
+                    "/bootstrap/console-launcher",
+                    "/bootstrap/role_manager",
                 ],
             },
             {

@@ -25,8 +25,8 @@ class KTrace : public fuchsia::tracing::kernel::Controller,
  public:
   using BufferingMode = fuchsia::tracing::BufferingMode;
 
-  explicit KTrace(zx::resource root_resource)
-      : controller_(this), reader_(this), root_resource_(std::move(root_resource)) {}
+  explicit KTrace(zx::resource debug_resource)
+      : controller_(this), reader_(this), debug_resource_(std::move(debug_resource)) {}
 
   // fuchsia.tracing.kernel.Controller methods
   void Start(uint32_t group_mask, BufferingMode buffering_mode, StartCallback callback) override;
@@ -47,7 +47,7 @@ class KTrace : public fuchsia::tracing::kernel::Controller,
   fidl::Binding<fuchsia::tracing::kernel::Controller> controller_;
   fidl::Binding<fuchsia::tracing::kernel::Reader> reader_;
 
-  zx::resource root_resource_;
+  zx::resource debug_resource_;
   internal::KTraceSysCalls sys_calls_ = kKTraceSysCalls;
 };
 
@@ -58,12 +58,12 @@ void KTrace::Start(uint32_t group_mask, BufferingMode buffering_mode, StartCallb
     // legacy behavior of falling back on one-shot mode.
     case BufferingMode::STREAMING:
     case BufferingMode::ONESHOT:
-      status =
-          sys_calls_.ktrace_control(root_resource_.get(), KTRACE_ACTION_START, group_mask, nullptr);
+      status = sys_calls_.ktrace_control(debug_resource_.get(), KTRACE_ACTION_START, group_mask,
+                                         nullptr);
       break;
 
     case BufferingMode::CIRCULAR:
-      status = sys_calls_.ktrace_control(root_resource_.get(), KTRACE_ACTION_START_CIRCULAR,
+      status = sys_calls_.ktrace_control(debug_resource_.get(), KTRACE_ACTION_START_CIRCULAR,
                                          group_mask, nullptr);
       break;
 
@@ -76,12 +76,12 @@ void KTrace::Start(uint32_t group_mask, BufferingMode buffering_mode, StartCallb
 }
 
 void KTrace::Stop(StopCallback callback) {
-  auto status = sys_calls_.ktrace_control(root_resource_.get(), KTRACE_ACTION_STOP, 0, nullptr);
+  auto status = sys_calls_.ktrace_control(debug_resource_.get(), KTRACE_ACTION_STOP, 0, nullptr);
   callback(status);
 }
 
 void KTrace::Rewind(RewindCallback callback) {
-  auto status = sys_calls_.ktrace_control(root_resource_.get(), KTRACE_ACTION_REWIND, 0, nullptr);
+  auto status = sys_calls_.ktrace_control(debug_resource_.get(), KTRACE_ACTION_REWIND, 0, nullptr);
   callback(status);
 }
 
@@ -91,7 +91,7 @@ zx_status_t KTrace::BindController(zx::channel channel, async_dispatcher_t* disp
 
 void KTrace::GetBytesWritten(GetBytesWrittenCallback callback) {
   size_t size = 0;
-  auto status = sys_calls_.ktrace_read(root_resource_.get(), nullptr, 0, 0, &size);
+  auto status = sys_calls_.ktrace_read(debug_resource_.get(), nullptr, 0, 0, &size);
   callback(status, size);
 }
 
@@ -99,7 +99,7 @@ void KTrace::ReadAt(uint64_t count, uint64_t offset, ReadAtCallback callback) {
   size_t length;
   std::vector<uint8_t> buf(count);
   zx_status_t status =
-      sys_calls_.ktrace_read(root_resource_.get(), buf.data(), offset, count, &length);
+      sys_calls_.ktrace_read(debug_resource_.get(), buf.data(), offset, count, &length);
   buf.resize(length);
   callback(status, std::move(buf));
 }
@@ -123,8 +123,8 @@ zx_status_t internal::OverrideKTraceSysCall(void* ctx, KTraceSysCalls sys_calls)
 namespace {
 
 zx_status_t Init(void** out_ctx) {
-  zx::resource root_resource(static_cast<zx_handle_t>(reinterpret_cast<uintptr_t>(*out_ctx)));
-  *out_ctx = new ktrace::KTrace(std::move(root_resource));
+  zx::resource debug_resource(static_cast<zx_handle_t>(reinterpret_cast<uintptr_t>(*out_ctx)));
+  *out_ctx = new ktrace::KTrace(std::move(debug_resource));
   return ZX_OK;
 }
 

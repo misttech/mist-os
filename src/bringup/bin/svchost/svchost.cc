@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-#include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -148,13 +147,14 @@ int main(int argc, char** argv) {
     root_job = std::move(response.job);
   }
 
-  // Get the root resource.
-  zx::resource root_resource;
+  // Get the debug resource.
+  zx::resource debug_resource;
   {
-    zx::result client = component::ConnectAt<fuchsia_boot::RootResource>(svc);
+    zx::result client = component::ConnectAt<fuchsia_kernel::DebugResource>(svc);
     if (client.is_error()) {
       fprintf(stderr, "svchost: unable to connect to %s: %s\n",
-              fidl::DiscoverableProtocolName<fuchsia_boot::RootResource>, client.status_string());
+              fidl::DiscoverableProtocolName<fuchsia_kernel::DebugResource>,
+              client.status_string());
       return 1;
     }
 
@@ -164,7 +164,27 @@ int main(int argc, char** argv) {
       return 1;
     }
     auto& response = result.value();
-    root_resource = std::move(response.resource);
+    debug_resource = std::move(response.resource);
+  }
+
+  // Get the profile resource.
+  zx::resource profile_resource;
+  {
+    zx::result client = component::ConnectAt<fuchsia_kernel::ProfileResource>(svc);
+    if (client.is_error()) {
+      fprintf(stderr, "svchost: unable to connect to %s: %s\n",
+              fidl::DiscoverableProtocolName<fuchsia_kernel::ProfileResource>,
+              client.status_string());
+      return 1;
+    }
+
+    fidl::WireResult result = fidl::WireCall(client.value())->Get();
+    if (!result.ok()) {
+      fprintf(stderr, "svchost: unable to get root resource: %s\n", result.status_string());
+      return 1;
+    }
+    auto& response = result.value();
+    profile_resource = std::move(response.resource);
   }
 
   if (zx_status_t status = outgoing.ServeFromStartupInfo(); status != ZX_OK) {
@@ -176,15 +196,15 @@ int main(int argc, char** argv) {
   zx_service_provider_instance_t service_providers[] = {
       {
           .provider = kernel_debug_get_service_provider(),
-          .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(root_resource.get())),
+          .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(debug_resource.get())),
       },
       {
           .provider = profile_get_service_provider(),
-          .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(root_resource.get())),
+          .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(profile_resource.get())),
       },
       {
           .provider = ktrace_get_service_provider(),
-          .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(root_resource.release())),
+          .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(debug_resource.release())),
       },
   };
 
