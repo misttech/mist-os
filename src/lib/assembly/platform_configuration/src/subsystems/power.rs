@@ -4,6 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{ensure, Context};
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::power_config::PowerConfig;
 use assembly_util::{BootfsDestination, FileEntry};
 
@@ -54,6 +55,10 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             );
             builder.platform_bundle("power_framework");
         }
+        builder.set_config_capability(
+            "fuchsia.power.SuspendEnabled",
+            Config::new(ConfigValueType::Bool, config.suspend_enabled.into()),
+        )?;
 
         match (&context.board_info.configuration.power_metrics_recorder, &context.feature_set_level)
         {

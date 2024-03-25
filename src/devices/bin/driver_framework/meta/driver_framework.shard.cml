@@ -82,6 +82,15 @@
             ],
         },
         {
+            from: "parent",
+            to: [
+                "#boot-drivers",
+                "#full-pkg-drivers",
+                "#pkg-drivers",
+            ],
+            config: [ "fuchsia.power.SuspendEnabled" ],
+        },
+        {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: [
