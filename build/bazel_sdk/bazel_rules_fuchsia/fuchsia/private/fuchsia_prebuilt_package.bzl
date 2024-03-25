@@ -6,6 +6,7 @@
 
 load("//fuchsia/private/workflows:fuchsia_task_publish.bzl", "fuchsia_task_publish")
 load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
+load("@bazel_skylib//rules:select_file.bzl", "select_file")
 
 def _relative_file_name(ctx, filename):
     return ctx.label.name + "_expanded/" + filename
@@ -259,6 +260,12 @@ def fuchsia_prebuilt_package(*, name, archive = None, manifest = None, files = [
             components = components,
             drivers = drivers,
             **kwargs
+        )
+
+        select_file(
+            name = name + ".far",
+            srcs = ":" + name,
+            subpath = name + ".far",
         )
 
     fuchsia_task_publish(
