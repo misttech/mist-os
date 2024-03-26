@@ -49,6 +49,11 @@ performance_testing_environments = [
 #   timeout_secs (optional)
 #     See test_spec in build/testing/test_spec.gni
 #
+#   enable_mypy (optional)
+#     If true, enable MyPy type checking on the target and respective deps.
+#     Type: boolean
+#     Default: false
+#
 #   local_config_source (optional)
 #     See python_mobly_test in build/python/python_mobly_test.gni
 template("python_perf_test") {
@@ -98,6 +103,12 @@ template("python_perf_test") {
 
     python_mobly_test("${_test_target_name}") {
       test_name = "${target_name}"
+
+      enable_mypy = false
+      if (defined(invoker.enable_mypy)) {
+        enable_mypy = invoker.enable_mypy
+      }
+
       forward_variables_from(invoker,
                              [
                                "local_config_source",
@@ -202,6 +213,11 @@ template("python_perf_test") {
 #     test_component_args and results_path_test_arg will be ignored.
 #     Default: False
 #
+#   enable_mypy (optional)
+#     If true, enable MyPy type checking on the target and respective deps.
+#     Type: boolean
+#     Default: false
+#
 template("fuchsia_component_perf_test") {
   assert(defined(invoker.component_name), "component_name is required")
   assert(defined(invoker.expected_metric_names_filepath),
@@ -250,7 +266,11 @@ template("fuchsia_component_perf_test") {
   }
 
   python_perf_test(target_name) {
-    forward_variables_from(invoker, [ "environments" ])
+    forward_variables_from(invoker,
+                           [
+                             "environments",
+                             "enable_mypy",
+                           ])
 
     expected_metric_names_filepaths = [ invoker.expected_metric_names_filepath ]
     main_source =
