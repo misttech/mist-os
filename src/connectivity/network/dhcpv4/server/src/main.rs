@@ -370,7 +370,7 @@ impl<'a, S: SocketServerDispatcher> MessageHandler<'a, S> {
         let result = self.server.borrow_mut().dispatch_message(msg);
         match result {
             Err(e) => {
-                error!("error processing client message: {:?}", e);
+                warn!("error processing client message: {:?}", e);
                 Ok(None)
             }
             Ok(ServerAction::AddressRelease(addr)) => {
