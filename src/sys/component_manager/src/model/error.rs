@@ -693,6 +693,11 @@ pub enum CapabilityProviderError {
         #[from]
         err: ClonableError,
     },
+    #[error(transparent)]
+    BedrockError {
+        #[from]
+        err: BedrockError,
+    },
 }
 
 impl CapabilityProviderError {
@@ -704,6 +709,7 @@ impl CapabilityProviderError {
             Self::PkgDirError { err } => err.as_zx_status(),
             Self::EventSourceError { err } => err.as_zx_status(),
             Self::ComponentProviderError { err } => err.as_zx_status(),
+            Self::BedrockError { err } => err.as_zx_status(),
         }
     }
 }

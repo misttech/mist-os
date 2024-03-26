@@ -2,25 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
+    super::router::Request,
     crate::{
         capability::CapabilityProvider,
         model::{
-            component::{StartReason, WeakComponentInstance},
-            error::{CapabilityProviderError, ComponentProviderError},
-            hooks::{CapabilityReceiver, Event, EventPayload},
-            start::Start,
+            component::WeakComponentInstance,
+            error::{CapabilityProviderError, OpenError},
         },
+        sandbox_util::DictExt,
     },
-    ::routing::path::PathBufExt,
+    ::routing::{error::RoutingError, path::PathBufExt},
     async_trait::async_trait,
+    bedrock_error::BedrockError,
     clonable_error::ClonableError,
-    cm_types::{Name, Path},
+    cm_rust::Availability,
+    cm_types::Name,
     cm_util::{channel, TaskGroup},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    sandbox::Open,
-    std::{path::PathBuf, sync::Arc},
-    vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope},
+    std::{iter, path::PathBuf, sync::Arc},
+    vfs::{
+        directory::{entry::OpenRequest, entry_container::Directory},
+        execution_scope::ExecutionScope,
+        ToObjectRequest,
+    },
 };
 
 /// The default provider for a ComponentCapability.
@@ -30,17 +35,11 @@ pub struct DefaultComponentCapabilityProvider {
     target: WeakComponentInstance,
     source: WeakComponentInstance,
     name: Name,
-    path: Path,
 }
 
 impl DefaultComponentCapabilityProvider {
-    pub fn new(
-        target: WeakComponentInstance,
-        source: WeakComponentInstance,
-        name: Name,
-        path: Path,
-    ) -> Self {
-        DefaultComponentCapabilityProvider { target, source, name, path }
+    pub fn new(target: WeakComponentInstance, source: WeakComponentInstance, name: Name) -> Self {
+        DefaultComponentCapabilityProvider { target, source, name }
     }
 }
 
@@ -53,48 +52,36 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), CapabilityProviderError> {
-        // Start the source component, if necessary.
         let source = self.source.upgrade()?;
-        source
-            .ensure_started(&StartReason::AccessCapability {
-                target: self.target.moniker.clone(),
-                name: self.name.clone(),
-            })
-            .await
-            .map_err(Into::<ComponentProviderError>::into)?;
-
-        // Send a CapabilityRequested event.
-        let (receiver, sender) = CapabilityReceiver::new();
-        let event = Event::new(
-            &self.target.upgrade()?,
-            EventPayload::CapabilityRequested {
-                source_moniker: source.moniker.clone(),
+        let path = cm_util::io::path_buf_to_vfs_path(relative_path)
+            .ok_or(CapabilityProviderError::BadPath)?;
+        let capability = source
+            .get_program_output_dict()
+            .await?
+            .get_with_request(
+                iter::once(&self.name),
+                // Routers in `program_output_dict` do not check availability but we need a
+                // request to run hooks.
+                Request { availability: Availability::Transitional, target: self.target.clone() },
+            )
+            .await?
+            .ok_or_else(|| RoutingError::BedrockNotPresentInDictionary {
                 name: self.name.to_string(),
-                receiver: receiver.clone(),
-            },
-        );
-        source.hooks.dispatch(&event).await;
-
-        // If a component intercepts the capability request through hooks, then
-        // send them the channel.
-        if receiver.is_taken() {
-            let open: Open = sender.into();
-            open.open(
+            })
+            .map_err(BedrockError::from)?;
+        let entry = capability
+            .try_into_directory_entry()
+            .map_err(OpenError::DoesNotSupportOpen)
+            .map_err(BedrockError::from)?;
+        let server_end = cm_util::channel::take_channel(server_end);
+        flags.to_object_request(server_end).handle(|object_request| {
+            entry.clone().open_entry(OpenRequest::new(
                 ExecutionScope::new(),
                 flags,
-                vfs::path::Path::dot(),
-                channel::take_channel(server_end),
-            );
-            return Ok(());
-        }
-
-        // No request hooks, so lets send to the outgoing directory.
-        let path = self.path.to_path_buf().attach(relative_path);
-        let path = path.to_str().ok_or(CapabilityProviderError::BadPath)?;
-        source
-            .open_outgoing(flags, path, server_end)
-            .await
-            .map_err(|e| CapabilityProviderError::ComponentProviderError { err: e.into() })?;
+                path,
+                object_request,
+            ))
+        });
         Ok(())
     }
 }

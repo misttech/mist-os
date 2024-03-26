@@ -17,7 +17,9 @@ use {
         error::{ComponentInstanceError, RoutingError},
     },
     bedrock_error::BedrockError,
-    cm_rust::{ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
+    cm_rust::{
+        CapabilityDecl, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
+    },
     cm_types::{IterablePath, Name, SeparatedPath},
     fidl_fuchsia_component_decl as fdecl,
     futures::FutureExt,
@@ -252,12 +254,18 @@ fn extend_dict_with_capability(
     declared_dictionaries: &Dict,
 ) {
     match capability {
-        cm_rust::CapabilityDecl::Protocol(p) => {
-            let router =
-                ResolvedInstanceState::start_component_on_request(component, decl, capability);
+        CapabilityDecl::Service(_)
+        | CapabilityDecl::Protocol(_)
+        | CapabilityDecl::Directory(_)
+        | CapabilityDecl::Runner(_)
+        | CapabilityDecl::Resolver(_) => {
+            let path = capability.path().expect("must have path");
+            let router = ResolvedInstanceState::make_program_outgoing_router(
+                component, decl, capability, path,
+            );
             let router = router.with_policy_check(
                 CapabilitySource::Component {
-                    capability: ComponentCapability::Protocol(p.clone()),
+                    capability: ComponentCapability::from(capability.clone()),
                     component: component.as_weak(),
                 },
                 component.policy_checker().clone(),
@@ -274,8 +282,9 @@ fn extend_dict_with_capability(
                 declared_dictionaries,
             );
         }
-        _ => {
-            // Capabilities not supported in bedrock yet.
+        CapabilityDecl::EventStream(_) | CapabilityDecl::Config(_) | CapabilityDecl::Storage(_) => {
+            // Capabilities not supported in bedrock program output dict yet.
+            return;
         }
     }
 }

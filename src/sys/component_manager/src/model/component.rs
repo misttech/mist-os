@@ -55,7 +55,7 @@ use {
     },
     async_trait::async_trait,
     async_utils::async_once::Once,
-    bedrock_error::Explain,
+    bedrock_error::{BedrockError, Explain},
     clonable_error::ClonableError,
     cm_fidl_validator::error::DeclType,
     cm_logger::scoped::ScopedLogger,
@@ -1068,6 +1068,11 @@ impl ComponentInstance {
         Open::new(get_remote_dir)
     }
 
+    /// Obtains the program output dict.
+    pub async fn get_program_output_dict(self: &Arc<Self>) -> Result<Dict, BedrockError> {
+        Ok(self.lock_resolved_state().await?.program_output_dict.clone())
+    }
+
     /// Connects `server_chan` to this instance's exposed directory if it has
     /// been resolved. Component must be resolved or destroyed before using
     /// this function, otherwise it will panic.
@@ -1792,51 +1797,36 @@ impl ResolvedInstanceState {
         Ok(state)
     }
 
-    /// Returns a router that starts the component upon a capability request,
-    /// then delegates the request to the program outgoing dict of the component.
-    pub fn start_component_on_request(
+    /// Creates a `Router` that requests the specified capability from the
+    /// program's outgoing directory.
+    pub fn make_program_outgoing_router(
         component: &Arc<ComponentInstance>,
-        decl: &ComponentDecl,
-        capability: &cm_rust::CapabilityDecl,
+        component_decl: &ComponentDecl,
+        capability_decl: &cm_rust::CapabilityDecl,
+        path: &cm_types::Path,
     ) -> Router {
-        if decl.program.is_none() {
+        if component_decl.program.is_none() {
             return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable);
         }
-        let capability_name = capability.name().clone();
-        let Some(router) = Self::make_program_outgoing_router(component, capability) else {
-            return Router::new_error(RoutingError::BedrockNotPresentInDictionary {
-                name: capability_name.into(),
-            });
-        };
-        router
-    }
-
-    /// Creates a `Router` that requests the given capability from the component.
-    fn make_program_outgoing_router(
-        component: &Arc<ComponentInstance>,
-        capability: &CapabilityDecl,
-    ) -> Option<Router> {
-        let path = capability.path()?;
-        let name = capability.name();
         let path = path.to_string();
+        let name = capability_decl.name();
         let path = fuchsia_fs::canonicalize_path(&path);
-        let Some(open) = component.get_outgoing().downscope_path(
-            Path::validate_and_split(path).unwrap(),
-            ComponentCapability::from(capability.clone()).type_name().into(),
-        ) else {
-            warn!(
-                moniker = %component.moniker,
-                "Dropping non-directory like capability `{name}` for outgoing program \
-                 dictionary"
-            );
-            return None;
+        let open = component
+            .get_outgoing()
+            .downscope_path(
+                Path::validate_and_split(path).unwrap(),
+                ComponentCapability::from(capability_decl.clone()).type_name().into(),
+            )
+            .expect("get_outgoing must return a directory node");
+        let capability: Capability = match capability_decl {
+            CapabilityDecl::Protocol(_) => sandbox::Sender::new_sendable(open).into(),
+            _ => open.into(),
         };
-        let sender = sandbox::Sender::new_sendable(open);
-        Some(Router::new(CapabilityRequestedHook {
+        Router::new(CapabilityRequestedHook {
             source: component.as_weak(),
             name: name.clone(),
-            sender,
-        }))
+            capability,
+        })
     }
 
     /// Returns a reference to the component's validated declaration.
@@ -2588,12 +2578,12 @@ impl ComponentRuntime {
 }
 
 /// This delegates to the event system if the capability request is
-/// intercepted by some hook, and delegates to the current sender otherwise.
+/// intercepted by some hook, and delegates to the current capability otherwise.
 #[derive(Debug)]
 struct CapabilityRequestedHook {
     source: WeakComponentInstance,
     name: Name,
-    sender: sandbox::Sender,
+    capability: Capability,
 }
 
 #[async_trait]
@@ -2621,7 +2611,7 @@ impl Routable for CapabilityRequestedHook {
         if receiver.is_taken() {
             Ok(sender.into())
         } else {
-            Ok(self.sender.clone().into())
+            Ok(self.capability.clone().into())
         }
     }
 }

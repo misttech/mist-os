@@ -187,14 +187,13 @@ impl<'a> CapabilityOpenRequest<'a> {
             CapabilitySource::Component { capability, component } => {
                 // Route normally for a component capability with a source path
                 Ok(match capability.source_path() {
-                    Some(path) => Some(Box::new(DefaultComponentCapabilityProvider::new(
+                    Some(_) => Some(Box::new(DefaultComponentCapabilityProvider::new(
                         target,
                         component.clone(),
                         capability
                             .source_name()
                             .expect("capability with source path should have a name")
                             .clone(),
-                        path.clone(),
                     ))),
                     _ => None,
                 })
