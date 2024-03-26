@@ -10,18 +10,20 @@ use {
     },
     async_trait::async_trait,
     cm_rust::{
-        CapabilityDecl, ChildRef, CollectionDecl, DependencyType, EnvironmentDecl, ExposeDecl,
-        OfferConfigurationDecl, OfferDecl, OfferDictionaryDecl, OfferDirectoryDecl,
-        OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource,
-        OfferStorageDecl, OfferTarget, RegistrationDeclCommon, RegistrationSource,
-        StorageDirectorySource, UseConfigurationDecl, UseDecl, UseDirectoryDecl,
-        UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource,
+        CapabilityDecl, ChildRef, CollectionDecl, DependencyType, DictionaryDecl, DictionarySource,
+        EnvironmentDecl, ExposeDecl, OfferConfigurationDecl, OfferDecl, OfferDictionaryDecl,
+        OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
+        OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget, RegistrationDeclCommon,
+        RegistrationSource, SourcePath, StorageDecl, StorageDirectorySource, UseConfigurationDecl,
+        UseDecl, UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl,
+        UseServiceDecl, UseSource, UseStorageDecl,
     },
-    cm_types::Name,
+    cm_types::{IterablePath, Name},
     futures::future::select_all,
     moniker::{ChildName, ChildNameBase},
     std::collections::{HashMap, HashSet},
     std::fmt,
+    std::iter,
     std::sync::Arc,
     tracing::*,
 };
@@ -80,6 +82,11 @@ async fn shutdown_component(
         ComponentRef::Child(_) => {
             ActionSet::register(target.component, ShutdownAction::new(shutdown_type)).await?;
         }
+        ComponentRef::Capability(_) => {
+            // This is just an intermediate node that exists to track dependencies on storage
+            // and dictionary capabilities from Self, which aren't associated with the running
+            // program. Nothing to do.
+        }
     }
 
     Ok(target.ref_.clone())
@@ -121,6 +128,7 @@ impl ShutdownJob {
                 ComponentRef::Child(moniker) => {
                     state.get_child(&moniker).expect("component not found in children").clone()
                 }
+                ComponentRef::Capability(_) => instance.clone(),
             };
 
             source_to_targets.insert(
@@ -310,16 +318,19 @@ async fn do_shutdown(
 }
 
 /// Identifies a component in this realm. This can either be the component
-/// itself, or one of its children.
+/// itself, one of its children, or a capability (used only as an intermediate node for dependency
+/// tracking).
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum ComponentRef {
     Self_,
     Child(ChildName),
+    // A capability defined by this component (this is either a dictionary or storage capability).
+    Capability(Name),
 }
 
 impl From<ChildName> for ComponentRef {
     fn from(moniker: ChildName) -> Self {
-        ComponentRef::Child(moniker)
+        Self::Child(moniker)
     }
 }
 
@@ -414,10 +425,11 @@ pub fn process_component_dependencies(
 ) -> HashMap<ComponentRef, HashSet<ComponentRef>> {
     // We build up the set of (source, target) dependency edges from a variety
     // of sources.
-    let mut edges = HashSet::new();
-    edges.extend(get_dependencies_from_offers(instance).into_iter());
-    edges.extend(get_dependencies_from_environments(instance).into_iter());
-    edges.extend(get_dependencies_from_uses(instance).into_iter());
+    let mut dependencies = Dependencies::new();
+    dependencies.extend(get_dependencies_from_offers(instance).into_iter());
+    dependencies.extend(get_dependencies_from_environments(instance).into_iter());
+    dependencies.extend(get_dependencies_from_uses(instance).into_iter());
+    dependencies.extend(get_dependencies_from_capabilities(instance).into_iter());
 
     // Next, we want to find any children that `self` transitively depends on,
     // either directly or through other children. Any child that `self` doesn't
@@ -425,7 +437,7 @@ pub fn process_component_dependencies(
     //
     // TODO(82689): This logic is likely unnecessary, as it deals with children
     // that have no direct dependency links with their parent.
-    let self_dependencies_closure = dependency_closure(&edges, ComponentRef::Self_);
+    let self_dependencies_closure = dependency_closure(&dependencies, ComponentRef::Self_);
     let implicit_edges = instance.children().into_iter().filter_map(|child| {
         let component_ref = child.moniker.into();
         if self_dependencies_closure.contains(&component_ref) {
@@ -434,46 +446,21 @@ pub fn process_component_dependencies(
             Some((ComponentRef::Self_, component_ref))
         }
     });
+    dependencies.extend(implicit_edges);
 
-    edges.extend(implicit_edges);
-
-    let mut dependency_map = HashMap::new();
-    dependency_map.insert(ComponentRef::Self_, HashSet::new());
-
-    for child in instance.children() {
-        dependency_map.insert(child.moniker.into(), HashSet::new());
-    }
-
-    for (source, target) in edges {
-        match dependency_map.get_mut(&source) {
-            Some(targets) => {
-                targets.insert(target);
-            }
-            None => {
-                error!(
-                    "ignoring dependency edge from {:?} to {:?}, where source doesn't exist",
-                    source, target
-                );
-            }
-        }
-    }
-
-    dependency_map
+    dependencies.finalize(instance)
 }
 
 /// Given a dependency graph represented as a set of `edges`, find the set of
 /// all nodes that the `start` node depends on, directly or indirectly. This
 /// includes `start` itself.
-fn dependency_closure(
-    edges: &HashSet<(ComponentRef, ComponentRef)>,
-    start: ComponentRef,
-) -> HashSet<ComponentRef> {
+fn dependency_closure(edges: &Dependencies, start: ComponentRef) -> HashSet<ComponentRef> {
     let mut res = HashSet::new();
     res.insert(start);
     loop {
         let mut entries_added = false;
 
-        for (source, target) in edges {
+        for (source, target) in edges.iter() {
             if !res.contains(target) {
                 continue;
             }
@@ -487,30 +474,75 @@ fn dependency_closure(
     }
 }
 
+/// Data structure used to represent the shutdown dependency graph.
+///
+/// Once fully constructed, call [Dependencies::normalize] to get the list of shutdown dependency
+/// edges as `(ComponentRef, ComponentRef)` pairs.
+struct Dependencies {
+    inner: HashMap<ComponentRef, HashSet<ComponentRef>>,
+}
+
+impl fmt::Debug for Dependencies {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.inner)
+    }
+}
+
+impl Dependencies {
+    fn new() -> Self {
+        Self { inner: HashMap::new() }
+    }
+
+    fn insert(&mut self, k: ComponentRef, v: ComponentRef) {
+        self.inner.entry(k).or_insert(HashSet::new()).insert(v);
+    }
+
+    fn extend(&mut self, edges: impl Iterator<Item = (ComponentRef, ComponentRef)>) {
+        for (k, v) in edges {
+            self.insert(k, v);
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (&ComponentRef, &ComponentRef)> {
+        self.inner.iter().map(|(k, v)| iter::zip(iter::repeat(k), v.iter())).flatten()
+    }
+
+    fn into_iter(self) -> impl Iterator<Item = (ComponentRef, ComponentRef)> {
+        self.inner.into_iter().map(|(k, v)| iter::zip(iter::repeat(k), v.into_iter())).flatten()
+    }
+
+    fn finalize(
+        mut self,
+        instance: &impl Component,
+    ) -> HashMap<ComponentRef, HashSet<ComponentRef>> {
+        // To ensure the shutdown job visits all the components in this realm, we need to make sure
+        // that every node is in the dependency list even if there were no routes into them.
+        self.inner.entry(ComponentRef::Self_).or_insert(HashSet::new());
+        for child in instance.children() {
+            self.inner.entry(child.moniker.into()).or_insert(HashSet::new());
+        }
+        for c in instance.capabilities() {
+            match c {
+                CapabilityDecl::Dictionary(d) => {
+                    self.inner.entry(ComponentRef::Capability(d.name)).or_insert(HashSet::new());
+                }
+                CapabilityDecl::Storage(s) => {
+                    self.inner.entry(ComponentRef::Capability(s.name)).or_insert(HashSet::new());
+                }
+                _ => {}
+            }
+        }
+
+        self.inner
+    }
+}
+
 /// Return the set of dependency relationships that can be derived from the
 /// component's use declarations. For use declarations, `self` is always the
 /// target.
-fn get_dependencies_from_uses(instance: &impl Component) -> HashSet<(ComponentRef, ComponentRef)> {
-    let mut edges = HashSet::new();
+fn get_dependencies_from_uses(instance: &impl Component) -> Dependencies {
+    let mut edges = Dependencies::new();
     for use_ in &instance.uses() {
-        let child_name = match use_ {
-            UseDecl::Service(UseServiceDecl { source: UseSource::Child(name), .. })
-            | UseDecl::Protocol(UseProtocolDecl { source: UseSource::Child(name), .. })
-            | UseDecl::Directory(UseDirectoryDecl { source: UseSource::Child(name), .. })
-            | UseDecl::EventStream(UseEventStreamDecl { source: UseSource::Child(name), .. })
-            | UseDecl::Config(UseConfigurationDecl { source: UseSource::Child(name), .. })
-            | UseDecl::Runner(UseRunnerDecl { source: UseSource::Child(name), .. }) => name,
-            UseDecl::Service(_)
-            | UseDecl::Protocol(_)
-            | UseDecl::Directory(_)
-            | UseDecl::Storage(_)
-            | UseDecl::EventStream(_)
-            | UseDecl::Config(_)
-            | UseDecl::Runner(_) => {
-                // capabilities which cannot or are not used from a child can be ignored.
-                continue;
-            }
-        };
         match use_ {
             UseDecl::Protocol(UseProtocolDecl { dependency_type, .. })
             | UseDecl::Service(UseServiceDecl { dependency_type, .. })
@@ -527,32 +559,50 @@ fn get_dependencies_from_uses(instance: &impl Component) -> HashSet<(ComponentRe
                 // Any other capability type cannot be marked as weak, so we can proceed
             }
         }
-
-        let child = match instance.find_child(child_name, None) {
-            Some(child) => child.moniker.clone().into(),
-            None => {
-                error!(name=?child_name, "use source doesn't exist");
-                continue;
+        let dep = match use_ {
+            UseDecl::Service(UseServiceDecl { source, .. })
+            | UseDecl::Protocol(UseProtocolDecl { source, .. })
+            | UseDecl::Directory(UseDirectoryDecl { source, .. })
+            | UseDecl::EventStream(UseEventStreamDecl { source, .. })
+            | UseDecl::Config(UseConfigurationDecl { source, .. })
+            | UseDecl::Runner(UseRunnerDecl { source, .. }) => match source {
+                UseSource::Child(name) => instance
+                    .find_child(name, None)
+                    .map(|child| ComponentRef::from(child.moniker.clone())),
+                UseSource::Self_ => {
+                    if use_.is_from_dictionary() {
+                        let path = use_.source_path();
+                        let dictionary =
+                            path.iter_segments().next().expect("must contain at least one segment");
+                        Some(ComponentRef::Capability(dictionary.clone()))
+                    } else {
+                        // Self is the other node, no need to add a loop.
+                        None
+                    }
+                }
+                _ => None,
+            },
+            UseDecl::Storage(UseStorageDecl { .. }) => {
+                // source is always parent.
+                None
             }
         };
-
-        edges.insert((child, ComponentRef::Self_));
+        if let Some(dep) = dep {
+            edges.insert(dep, ComponentRef::Self_);
+        }
     }
     edges
 }
 
 /// Return the set of dependency relationships that can be derived from the
 /// component's offer declarations. This includes both static and dynamic offers.
-fn get_dependencies_from_offers(
-    instance: &impl Component,
-) -> HashSet<(ComponentRef, ComponentRef)> {
-    let mut edges = HashSet::new();
-
+fn get_dependencies_from_offers(instance: &impl Component) -> Dependencies {
+    let mut edges = Dependencies::new();
     for offer_decl in instance.offers() {
         if let Some((sources, targets)) = get_dependency_from_offer(instance, &offer_decl) {
             for source in sources.iter() {
                 for target in targets.iter() {
-                    edges.insert((source.clone(), target.clone()));
+                    edges.insert(source.clone(), target.clone());
                 }
             }
         }
@@ -590,15 +640,19 @@ fn get_dependency_from_offer(
         | OfferDecl::Config(OfferConfigurationDecl { source, target, .. })
         | OfferDecl::Runner(OfferRunnerDecl { source, target, .. })
         | OfferDecl::Resolver(OfferResolverDecl { source, target, .. })
+        | OfferDecl::Storage(OfferStorageDecl { source, target, .. })
         | OfferDecl::Dictionary(OfferDictionaryDecl {
             dependency_type: DependencyType::Strong,
             source,
             target,
             ..
-        }) => Some((find_offer_sources(instance, source), find_offer_targets(instance, target))),
+        }) => Some((
+            find_offer_sources(offer_decl, instance, source),
+            find_offer_targets(instance, target),
+        )),
 
         OfferDecl::Service(OfferServiceDecl { source, target, .. }) => Some((
-            find_service_offer_sources(instance, source),
+            find_service_offer_sources(offer_decl, instance, source),
             find_offer_targets(instance, target),
         )),
 
@@ -619,37 +673,6 @@ fn get_dependency_from_offer(
             None
         }
 
-        // Storage is special.
-        OfferDecl::Storage(OfferStorageDecl {
-            source: OfferSource::Self_,
-            source_name,
-            target,
-            ..
-        }) => {
-            Some((find_storage_source(instance, source_name), find_offer_targets(instance, target)))
-        }
-        OfferDecl::Storage(OfferStorageDecl {
-            source:
-                OfferSource::Child(_)
-                | OfferSource::Parent
-                | OfferSource::Capability(_)
-                | OfferSource::Collection(_)
-                | OfferSource::Framework
-                | OfferSource::Void,
-            ..
-        }) => {
-            // The storage offer is not from `self`, so it can be ignored.
-            //
-            // NOTE: It may seem weird that storage offers from "child" are
-            // ignored, but storage offers that come from children work
-            // differently than other kinds of offers. A Storage offer always
-            // comes from either `parent` or `self`, but the storage capability
-            // _itself_ (see `StorageDecl`) may reference a child. But in that
-            // case, the `OfferSource` is still listed as `self`, in which case
-            // it is handled above.
-            None
-        }
-
         OfferDecl::EventStream(_) => {
             // Event streams aren't tracked as dependencies for shutdown.
             None
@@ -658,6 +681,7 @@ fn get_dependency_from_offer(
 }
 
 fn find_service_offer_sources(
+    offer: &OfferDecl,
     instance: &impl Component,
     source: &OfferSource,
 ) -> Vec<ComponentRef> {
@@ -679,13 +703,17 @@ fn find_service_offer_sources(
                 }
             })
             .collect(),
-        _ => find_offer_sources(instance, source),
+        _ => find_offer_sources(offer, instance, source),
     }
 }
 
 /// Given a `Component` instance and an `OfferSource`, return the names of
 /// components that match that `source`.
-fn find_offer_sources(instance: &impl Component, source: &OfferSource) -> Vec<ComponentRef> {
+fn find_offer_sources(
+    offer: &OfferDecl,
+    instance: &impl Component,
+    source: &OfferSource,
+) -> Vec<ComponentRef> {
     match source {
         OfferSource::Child(ChildRef { name, collection }) => {
             match instance.find_child(name, collection.as_ref()) {
@@ -699,7 +727,18 @@ fn find_offer_sources(instance: &impl Component, source: &OfferSource) -> Vec<Co
                 }
             }
         }
-        OfferSource::Self_ => vec![ComponentRef::Self_],
+        OfferSource::Self_ => {
+            if offer.is_from_dictionary()
+                || matches!(offer, OfferDecl::Dictionary(_))
+                || matches!(offer, OfferDecl::Storage(_))
+            {
+                let path = offer.source_path();
+                let name = path.iter_segments().next().expect("must contain at least one segment");
+                vec![ComponentRef::Capability(name.clone())]
+            } else {
+                vec![ComponentRef::Self_]
+            }
+        }
         OfferSource::Collection(_) => {
             // TODO(https://fxbug.dev/42165590): Consider services routed from collections
             // in shutdown order.
@@ -729,43 +768,6 @@ fn find_offer_sources(instance: &impl Component, source: &OfferSource) -> Vec<Co
     }
 }
 
-/// Given a `Component` and the name of a storage capability, return the names
-/// of components that act as a source for that storage.
-///
-/// The return value will have at most one entry in it, but it is returned in a
-/// Vec for consistency with the other `find_*` methods.
-fn find_storage_source(instance: &impl Component, name: &Name) -> Vec<ComponentRef> {
-    let decl = instance.capabilities().into_iter().find_map(|decl| match decl {
-        CapabilityDecl::Storage(decl) if &decl.name == name => Some(decl),
-        _ => None,
-    });
-
-    let decl = match decl {
-        Some(d) => d,
-        None => {
-            error!(?name, "could not find storage capability");
-            return vec![];
-        }
-    };
-
-    match decl.source {
-        StorageDirectorySource::Child(child_name) => match instance.find_child(&child_name, None) {
-            Some(child) => vec![child.moniker.clone().into()],
-            None => {
-                error!(
-                    "source for storage capability {:?} doesn't exist: (name: {:?})",
-                    name, child_name,
-                );
-                vec![]
-            }
-        },
-        StorageDirectorySource::Self_ => vec![ComponentRef::Self_],
-
-        // Storage from the parent is not relevant to shutdown order.
-        StorageDirectorySource::Parent => vec![],
-    }
-}
-
 /// Given a `Component` instance and an `OfferTarget`, return the names of
 /// components that match that `target`.
 fn find_offer_targets(instance: &impl Component, target: &OfferTarget) -> Vec<ComponentRef> {
@@ -788,9 +790,9 @@ fn find_offer_targets(instance: &impl Component, target: &OfferTarget) -> Vec<Co
             .filter(|child| child.moniker.collection() == Some(collection))
             .map(|child| child.moniker.into())
             .collect(),
-        OfferTarget::Capability(_capability) => {
-            // TODO(https://fxbug.dev/301674053): Support dictionary routing.
-            vec![]
+        OfferTarget::Capability(capability) => {
+            // `capability` must be a dictionary.
+            vec![ComponentRef::Capability(capability.clone())]
         }
     }
 }
@@ -798,9 +800,7 @@ fn find_offer_targets(instance: &impl Component, target: &OfferTarget) -> Vec<Co
 /// Return the set of dependency relationships that can be derived from the
 /// component's environment configuration. Children assigned to an environment
 /// depend on components that contribute to that environment.
-fn get_dependencies_from_environments(
-    instance: &impl Component,
-) -> HashSet<(ComponentRef, ComponentRef)> {
+fn get_dependencies_from_environments(instance: &impl Component) -> Dependencies {
     let env_to_sources: HashMap<String, HashSet<ComponentRef>> = instance
         .environments()
         .into_iter()
@@ -810,12 +810,12 @@ fn get_dependencies_from_environments(
         })
         .collect();
 
-    let mut res = HashSet::new();
+    let mut edges = Dependencies::new();
     for child in &instance.children() {
         if let Some(env_name) = &child.environment_name {
             if let Some(source_children) = env_to_sources.get(env_name) {
                 for source in source_children {
-                    res.insert((source.clone(), child.moniker.clone().into()));
+                    edges.insert(source.clone(), child.moniker.clone().into());
                 }
             } else {
                 error!(
@@ -825,7 +825,68 @@ fn get_dependencies_from_environments(
             }
         }
     }
-    res
+    edges
+}
+
+/// Return the set of dependency relationships that can be derived from the
+/// component's capabilities declarations. For use declarations, `self` is always the
+/// target.
+fn get_dependencies_from_capabilities(instance: &impl Component) -> Dependencies {
+    let mut edges = Dependencies::new();
+    for capability in &instance.capabilities() {
+        match capability {
+            CapabilityDecl::Dictionary(DictionaryDecl {
+                name,
+                source: Some(source),
+                source_dictionary: Some(source_dictionary),
+                ..
+            }) => {
+                let source = match source {
+                    DictionarySource::Parent => None,
+                    DictionarySource::Child(ChildRef { name, collection }) => {
+                        match instance.find_child(name, collection.as_ref()) {
+                            Some(child) => Some(child.moniker.clone().into()),
+                            None => {
+                                error!(
+                                    "dictionary source doesn't exist: (name: {:?}, collection: {:?})",
+                                    name, collection
+                                );
+                                None
+                            }
+                        }
+                    }
+                    DictionarySource::Self_ => {
+                        let dictionary = source_dictionary
+                            .iter_segments()
+                            .next()
+                            .expect("must contain at least one segment");
+                        Some(ComponentRef::Capability(dictionary.clone()))
+                    }
+                };
+                if let Some(source) = source {
+                    edges.insert(source, ComponentRef::Capability(name.clone()));
+                }
+            }
+            CapabilityDecl::Storage(StorageDecl { name, source, .. }) => {
+                let source = match source {
+                    StorageDirectorySource::Parent => None,
+                    StorageDirectorySource::Child(name) => match instance.find_child(name, None) {
+                        Some(child) => Some(child.moniker.clone().into()),
+                        None => {
+                            error!("storage source doesn't exist: (name: {:?})", name);
+                            None
+                        }
+                    },
+                    StorageDirectorySource::Self_ => Some(ComponentRef::Self_),
+                };
+                if let Some(source) = source {
+                    edges.insert(source, ComponentRef::Capability(name.clone()));
+                }
+            }
+            _ => {}
+        }
+    }
+    edges
 }
 
 /// Given a `Component` instance and an environment, return the names of
@@ -881,7 +942,7 @@ mod tests {
         },
         cm_rust::{
             Availability, ChildDecl, ComponentDecl, DependencyType, ExposeProtocolDecl,
-            ExposeSource, ExposeTarget, StorageDecl,
+            ExposeSource, ExposeTarget,
         },
         cm_rust_testing::*,
         cm_types::AllowedOffers,
@@ -952,6 +1013,10 @@ mod tests {
     /// the moniker is malformed.
     fn child(moniker: &str) -> ComponentRef {
         ChildName::try_from(moniker).unwrap().into()
+    }
+
+    fn capability(name: &str) -> ComponentRef {
+        ComponentRef::Capability(name.parse().unwrap())
     }
 
     #[fuchsia::test]
@@ -1097,6 +1162,102 @@ mod tests {
                 ComponentRef::Self_ => hashset![child("childA"), child("childB")],
                 child("childA") => hashset![],
                 child("childB") => hashset![child("childA")],
+            },
+            process_component_dependencies(&FakeComponent::from_decl(decl))
+        )
+    }
+
+    #[fuchsia::test]
+    fn test_dictionary_dependency() {
+        let decl = ComponentDeclBuilder::new()
+            .dictionary_default("dict")
+            .protocol_default("serviceA")
+            .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                source: OfferSource::Self_,
+                source_name: "serviceA".parse().unwrap(),
+                source_dictionary: None,
+                target_name: "serviceA".parse().unwrap(),
+                target: OfferTarget::Capability("dict".parse().unwrap()),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            }))
+            .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                source: OfferSource::static_child("childA".to_string()),
+                source_name: "serviceB".parse().unwrap(),
+                source_dictionary: None,
+                target_name: "serviceB".parse().unwrap(),
+                target: OfferTarget::Capability("dict".parse().unwrap()),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            }))
+            .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                source: OfferSource::Self_,
+                source_name: "serviceB".parse().unwrap(),
+                source_dictionary: Some("dict".parse().unwrap()),
+                target_name: "serviceB".parse().unwrap(),
+                target: OfferTarget::static_child("childB".to_string()),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            }))
+            .child_default("childA")
+            .child_default("childB")
+            .build();
+
+        pretty_assertions::assert_eq!(
+            hashmap! {
+                ComponentRef::Self_ => hashset![child("childA"), child("childB"), capability("dict")],
+                child("childA") => hashset![capability("dict")],
+                capability("dict") => hashset![child("childB")],
+                child("childB") => hashset![],
+            },
+            process_component_dependencies(&FakeComponent::from_decl(decl))
+        )
+    }
+
+    #[fuchsia::test]
+    fn test_dictionary_dependency_with_extension() {
+        let decl = ComponentDeclBuilder::new()
+            // Chain together two dictionaries with extension.
+            .capability(
+                CapabilityBuilder::dictionary()
+                    .name("dict")
+                    .source_dictionary(DictionarySource::Self_, "other_dict"),
+            )
+            .capability(CapabilityBuilder::dictionary().name("other_dict").source_dictionary(
+                DictionarySource::Child(ChildRef { name: "childA".into(), collection: None }),
+                "remote/dict",
+            ))
+            .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                source: OfferSource::static_child("childB".into()),
+                source_name: "serviceA".parse().unwrap(),
+                source_dictionary: None,
+                target_name: "serviceA".parse().unwrap(),
+                target: OfferTarget::Capability("other_dict".parse().unwrap()),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            }))
+            .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                source: OfferSource::Self_,
+                source_name: "dict".parse().unwrap(),
+                source_dictionary: None,
+                target_name: "dict".parse().unwrap(),
+                target: OfferTarget::static_child("childC".into()),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            }))
+            .child_default("childA")
+            .child_default("childB")
+            .child_default("childC")
+            .build();
+
+        pretty_assertions::assert_eq!(
+            hashmap! {
+                ComponentRef::Self_ => hashset![child("childA"), child("childB"), child("childC")],
+                child("childA") => hashset![capability("other_dict")],
+                child("childB") => hashset![capability("other_dict")],
+                capability("other_dict") => hashset![capability("dict")],
+                capability("dict") => hashset![child("childC")],
+                child("childC") => hashset![],
             },
             process_component_dependencies(&FakeComponent::from_decl(decl))
         )
@@ -2527,6 +2688,47 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_use_from_dictionary() {
+        let decl = ComponentDeclBuilder::new()
+            .dictionary_default("dict")
+            .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                source: OfferSource::Self_,
+                source_name: "weakService".parse().unwrap(),
+                source_dictionary: None,
+                target_name: "weakService".parse().unwrap(),
+                target: OfferTarget::static_child("childA".into()),
+                dependency_type: DependencyType::Weak,
+                availability: Availability::Required,
+            }))
+            .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                source: OfferSource::static_child("childA".into()),
+                source_name: "serviceA".parse().unwrap(),
+                source_dictionary: None,
+                target_name: "serviceA".parse().unwrap(),
+                target: OfferTarget::Capability("dict".parse().unwrap()),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            }))
+            .child_default("childA")
+            .use_(
+                UseBuilder::protocol()
+                    .name("serviceA")
+                    .source(UseSource::Self_)
+                    .from_dictionary("dict"),
+            )
+            .build();
+
+        pretty_assertions::assert_eq!(
+            hashmap! {
+                ComponentRef::Self_ => hashset![],
+                child("childA") => hashset![capability("dict")],
+                capability("dict") => hashset![ComponentRef::Self_],
+            },
+            process_component_dependencies(&FakeComponent::from_decl(decl))
+        );
+    }
+
+    #[fuchsia::test]
     fn test_use_runner_from_child() {
         let decl = ComponentDecl {
             children: vec![ChildDecl {
@@ -2676,7 +2878,9 @@ mod tests {
             hashmap! {
                 ComponentRef::Self_ => hashset![],
                 child("childA") => hashset![ComponentRef::Self_],
-                child("childB") => hashset![child("childA")],
+                child("childB") => hashset![capability("cdata")],
+                capability("pdata") => hashset![child("childA")],
+                capability("cdata") => hashset![child("childA")],
             },
             process_component_dependencies(&FakeComponent::from_decl(decl))
         )
@@ -3821,6 +4025,111 @@ mod tests {
                             .source(OfferSource::static_child("c".to_string()))
                             .target(OfferTarget::static_child("d".to_string())),
                     )
+                    .build(),
+            ),
+            (
+                "c",
+                ComponentDeclBuilder::new()
+                    .protocol_default("serviceC")
+                    .expose(ExposeBuilder::protocol().name("serviceC").source(ExposeSource::Self_))
+                    .build(),
+            ),
+            (
+                "d",
+                ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("serviceC")).build(),
+            ),
+        ];
+        let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+
+        // Component startup was eager, so they should all have an `Execution`.
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
+            .await
+            .expect("could not start a");
+
+        let component_a_info = ComponentInfo::new(component_a).await;
+        let component_b_info = ComponentInfo::new(component_b).await;
+        let component_c_info = ComponentInfo::new(component_c).await;
+        let component_d_info = ComponentInfo::new(component_d).await;
+
+        // Register shutdown action on "a", and wait for it. This should cause all components
+        // to shut down, in bottom-up and dependency order.
+        ActionSet::register(
+            component_a_info.component.clone(),
+            ShutdownAction::new(ShutdownType::Instance),
+        )
+        .await
+        .expect("shutdown failed");
+        component_a_info.check_is_shut_down(&test.runner).await;
+        component_b_info.check_is_shut_down(&test.runner).await;
+        component_c_info.check_is_shut_down(&test.runner).await;
+        component_d_info.check_is_shut_down(&test.runner).await;
+
+        {
+            let events: Vec<_> = test
+                .test_hook
+                .lifecycle()
+                .into_iter()
+                .filter(|e| match e {
+                    Lifecycle::Stop(_) => true,
+                    _ => false,
+                })
+                .collect();
+            let expected: Vec<_> = vec![
+                Lifecycle::Stop(vec!["a", "b", "d"].try_into().unwrap()),
+                Lifecycle::Stop(vec!["a", "b", "c"].try_into().unwrap()),
+                Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
+                Lifecycle::Stop(vec!["a"].try_into().unwrap()),
+            ];
+            assert_eq!(events, expected);
+        }
+    }
+
+    /// Shut down `a`:
+    ///  a
+    ///   \
+    ///    b
+    ///   / \
+    ///  c-->d
+    /// In this case D uses a resource exposed by C, routed through a dictionary defined by B
+    #[fuchsia::test]
+    async fn shutdown_with_dictionary_dependency() {
+        let components = vec![
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .dictionary_default("dict")
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                        source: OfferSource::static_child("c".to_string()),
+                        source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: None,
+                        target_name: "serviceC".parse().unwrap(),
+                        target: OfferTarget::Capability("dict".parse().unwrap()),
+                        dependency_type: DependencyType::Strong,
+                        availability: Availability::Required,
+                    }))
+                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                        source: OfferSource::Self_,
+                        source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: Some("dict".parse().unwrap()),
+                        target_name: "serviceC".parse().unwrap(),
+                        target: OfferTarget::static_child("d".to_string()),
+                        dependency_type: DependencyType::Strong,
+                        availability: Availability::Required,
+                    }))
                     .build(),
             ),
             (
