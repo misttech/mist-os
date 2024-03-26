@@ -835,11 +835,27 @@ async fn reset_fvm_partitions() {
     .await
     .expect("Failed to open the fvm");
 
-    // Ensure that the account and virtualization partitions
-    // were successfully destroyed
-    let dir_entries = fuchsia_fs::directory::readdir(&fvm_proxy)
+    // Ensure that the account and virtualization partitions were successfully destroyed. The
+    // partitions are removed from devfs asynchronously, so use a timeout.
+    let start_time = std::time::Instant::now();
+    let mut dir_entries = fuchsia_fs::directory::readdir(&fvm_proxy)
         .await
         .expect("Failed to readdir the fvm DirectoryProxy");
+    while dir_entries
+        .iter()
+        .find(|x| x.name.contains("account") || x.name.contains("virtualization"))
+        .is_some()
+    {
+        let elapsed = start_time.elapsed().as_secs() as u64;
+        if elapsed >= 30 {
+            panic!("The account or virtualization partition still exists in devfs after 30 secs");
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        dir_entries = fuchsia_fs::directory::readdir(&fvm_proxy)
+            .await
+            .expect("Failed to readdir the fvm DirectoryProxy");
+    }
+
     let mut count = 0;
     let mut data_name = "".to_string();
     for entry in dir_entries {
@@ -913,11 +929,26 @@ async fn reset_fvm_partitions_no_existing_data_partition() {
     .await
     .expect("Failed to open the fvm");
 
-    // Ensure that the account and virtualization partitions
-    // were successfully destroyed
-    let dir_entries = fuchsia_fs::directory::readdir(&fvm_proxy)
+    // Ensure that the account and virtualization partitions were successfully destroyed. The
+    // partitions are removed from devfs asynchronously, so use a timeout.
+    let start_time = std::time::Instant::now();
+    let mut dir_entries = fuchsia_fs::directory::readdir(&fvm_proxy)
         .await
         .expect("Failed to readdir the fvm DirectoryProxy");
+    while dir_entries
+        .iter()
+        .find(|x| x.name.contains("account") || x.name.contains("virtualization"))
+        .is_some()
+    {
+        let elapsed = start_time.elapsed().as_secs() as u64;
+        if elapsed >= 30 {
+            panic!("The account or virtualization partition still exists in devfs after 30 secs");
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        dir_entries = fuchsia_fs::directory::readdir(&fvm_proxy)
+            .await
+            .expect("Failed to readdir the fvm DirectoryProxy");
+    }
     let mut count = 0;
     let mut data_name = "".to_string();
     for entry in dir_entries {
