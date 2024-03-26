@@ -520,11 +520,18 @@ _FUCHSIA_CLANG_VARIANT_MAP = {
 
 # Maps a Fuchsia API level to the corresponding config_setting() label in
 # @fuchsia_sdk//fuchsia/constraints
-def _fuchsia_api_level_constraint(api_level):
-    return "//fuchsia/constraints:api_level_%s" % _to_fuchsia_api_level_name(api_level)
+def _fuchsia_api_level_constraint(api_level, default = "//conditions:default"):
+    if _is_undefined_api_level(api_level):
+        return default
+    return "//fuchsia/constraints:api_level_%s" % api_level
 
-def _to_fuchsia_api_level_name(api_level):
-    return "unspecified" if api_level in (-1, "unversioned") else api_level
+def _is_undefined_api_level(api_level):
+    return api_level in (-1, "unversioned")
+
+def _api_level_deprecation_message(api_level):
+    if _is_undefined_api_level(api_level):
+        return "\"Warning: Dependencies with unspecified API levels are being used, incompatibility may occur.\""
+    return "None"
 
 # We can't just do f"//:{file}" for file srcs, since the relative dir may have a
 # BUILD.bazel file, making that subdir its own Bazel package.
@@ -604,13 +611,14 @@ def _generate_package_build_rules(ctx, meta, relative_dir, build_file, process_c
     name = _get_target_name(meta["name"])
     package_variants = [
         struct(
-            name = "%s_%s_api_%s" % (name, variant["arch"], _to_fuchsia_api_level_name(variant["api_level"])),
+            name = "%s_%s_api_%s" % (name, variant["arch"], variant["api_level"]),
             files = variant["files"],
             manifest = variant["manifest_file"],
-            constraint = "is_%s_api_%s" % (variant["arch"], _to_fuchsia_api_level_name(variant["api_level"])),
+            deprecation = _api_level_deprecation_message(variant["api_level"]),
+            constraint = "is_%s_api_%s" % (variant["arch"], variant["api_level"]),
             os = "@platforms//os:fuchsia",
             cpu = _FUCHSIA_CPU_CONSTRAINT_MAP[variant["arch"]],
-            api_level = _fuchsia_api_level_constraint(variant["api_level"]),
+            api_level = _fuchsia_api_level_constraint(variant["api_level"], None),
         )
         for variant in meta["variants"]
     ]
@@ -621,6 +629,7 @@ def _generate_package_build_rules(ctx, meta, relative_dir, build_file, process_c
             "{{name}}": variant.name,
             "{{files}}": _get_starlark_list([_bazel_file_path(relative_dir, file) for file in variant.files]),
             "{{manifest}}": _bazel_file_path(relative_dir, variant.manifest),
+            "{{deprecation}}": variant.deprecation,
         })
         process_context.files_to_copy[meta["_meta_sdk_root"]].extend(variant.files)
 
@@ -630,8 +639,7 @@ def _generate_package_build_rules(ctx, meta, relative_dir, build_file, process_c
             "{{match_all}}": _get_starlark_list([
                 variant.os,
                 variant.cpu,
-                variant.api_level,
-            ]),
+            ] + ([variant.api_level] if variant.api_level else [])),
         })
 
     _merge_template(ctx, build_file, _sdk_template_path(ctx, "select_alias"), {
@@ -677,6 +685,7 @@ def _generate_python_e2e_test_rules(ctx, meta, relative_dir, build_file, process
             "{{name}}": name,
             "{{test_pyz}}": "%s.pyz" % name,
             "{{data}}": _get_starlark_list(files),
+            "{{deprecation}}": _api_level_deprecation_message(api_level),
         })
 
     _merge_template(ctx, build_file, _sdk_template_path(ctx, "select_alias"), {

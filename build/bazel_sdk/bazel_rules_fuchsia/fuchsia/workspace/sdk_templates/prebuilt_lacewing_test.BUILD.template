@@ -8,4 +8,5 @@ fuchsia_prebuilt_lacewing_test(
     name = "{{name}}",
     test_pyz = "{{test_pyz}}",
     data = [{{data}}],
+    deprecation = {{deprecation}},
 )

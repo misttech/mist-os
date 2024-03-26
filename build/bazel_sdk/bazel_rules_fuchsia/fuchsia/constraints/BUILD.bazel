@@ -19,14 +19,6 @@ constraint_setting(
 )
 
 # Target API level constraints.
-config_setting(
-    name = "api_level_unspecified",
-    deprecation = "Warning: Dependencies with unspecified API levels are being used, incompatibility may occur.",
-    flag_values = {
-        "//fuchsia:fuchsia_api_level": "",
-    },
-)
-
 [
     config_setting(
         name = "api_level_%s" % target_api.api_level,
