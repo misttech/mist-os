@@ -89,6 +89,28 @@ pub async fn start_session(
         .attach(port, &[fidl_fuchsia_hardware_network::FrameType::Ethernet])
         .await
         .expect("attach port");
+
+    let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy().unwrap();
+    client
+        .connect_port(port)
+        .expect("Failed to connect to port")
+        // Using `MAX_STATUS_BUFFER` is overly conservative, but, since this is a test, there is no
+        // real downside.
+        .get_status_watcher(watcher_server, fidl_fuchsia_hardware_network::MAX_STATUS_BUFFER)
+        .unwrap();
+
+    // Wait for the port to come online. Otherwise, tests may attempt to use the data path before
+    // the network device is ready to handle frames.
+    loop {
+        if let Some(flags) = watcher_proxy.watch_status().await.unwrap().flags {
+            if flags == fidl_fuchsia_hardware_network::StatusFlags::ONLINE {
+                tracing::info!("Network device port online!");
+                break;
+            }
+            tracing::info!("Waiting for network device port to come online...");
+        }
+    }
+
     (session, task_handle)
 }
 
