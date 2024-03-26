@@ -112,11 +112,14 @@ class PowerMetricSample:
       timestamp: timestamp of sample in nanoseconds since epoch.
       voltage: voltage in Volts.
       current: current in milliAmpere.
+      raw_aux: (optional) The raw 16 bit fine aux channel reading from a Monsoon power monitor.  Can
+               optionally be used for log synchronization and alignment
     """
 
     timestamp: int
     voltage: float
     current: float
+    raw_aux: int
 
     def compute_power(self) -> float:
         """Compute the power in Watts from sample.
@@ -184,13 +187,34 @@ class AggregatePowerMetrics:
 
 
 # Constants class
+#
+# One of two formats for the CSV data is expected.  If the first column is named
+# simply "Timestamp", where the scripts are expected to synthesize nominal
+# timestamps for the samples.  If it is named "Mandatory Timestamp" instead,
+# then it is data captured from a script which has already synthesized its own
+# timestamps, accounting for dropped samples, calibration samples, and the power
+# monitor deviations from nominal.  These timestamps should be simply taken and
+# used as is.
+#
+# In the second case, the script can (if asked to) also capture a 4th column of
+# data representing the raw 16 bit readings from the fine auxiliary current
+# channel.  When present, these readings provide an alternative method for
+# aligning the timelines of the power monitor data with the trace data.
+#
 class _PowerCsvHeaders(enum.StrEnum):
+    MANDATORY_TIMESTAMP = "Mandatory Timestamp"
     TIMESTAMP = "Timestamp"
     CURRENT = "Current"
     VOLTAGE = "Voltage"
+    AUX_CURRENT = "Raw Aux"
 
-    def all():
-        return list(_PowerCsvHeaders)
+    def assert_header(header):
+        assert header[1] == _PowerCsvHeaders.CURRENT
+        assert header[2] == _PowerCsvHeaders.VOLTAGE
+        if header[0] == _PowerCsvHeaders.MANDATORY_TIMESTAMP:
+            assert len(header) == 3 or header[3] == _PowerCsvHeaders.AUX_CURRENT
+        else:
+            assert header[0] == _PowerCsvHeaders.TIMESTAMP
 
 
 # TODO(b/320778225): Make this class private and stateless by changing all callers to use
@@ -215,12 +239,13 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
         with open(self._power_samples_path, "r") as f:
             reader = csv.reader(f)
             header = next(reader)
-            assert header[0:3] == _PowerCsvHeaders.all()
+            _PowerCsvHeaders.assert_header(header)
             for row in reader:
                 sample = PowerMetricSample(
                     timestamp=int(row[0]),
                     voltage=float(row[1]),
                     current=float(row[2]),
+                    raw_aux=int(row[3]) if len(row) >= 4 else None,
                 )
                 self._power_metrics.process_sample(sample)
         return self._power_metrics.to_fuchsiaperf_results()
@@ -540,24 +565,48 @@ def read_fuchsia_trace_cpu_usage(
     return scheduling_intervals
 
 
+class Sample:
+    def __init__(self, timestamp, current, voltage, aux_current):
+        self.timestamp = float(timestamp)
+        self.current = float(current)
+        self.voltage = float(voltage)
+        self.aux_current = (
+            float(aux_current) if aux_current is not None else None
+        )
+
+
 def read_power_samples(power_trace_path):
     """Return a tuple of the current and power samples from the power csv"""
-    current_samples = []
-    voltage_samples = []
+    samples = []
     with open(power_trace_path, "r") as power_csv:
         reader = csv.reader(power_csv)
-        next(reader)
-        for _, current, voltage in reader:
-            current_samples.append(float(current))
-            voltage_samples.append(float(voltage))
+        header = next(reader)
+        sample_count = 0
 
-    return (current_samples, voltage_samples)
+        if header[0] == "Mandatory Timestamp":
+            if len(header) < 4:
+                create_sample = lambda line, count: Sample(
+                    line[0], line[1], line[2], None
+                )
+            else:
+                create_sample = lambda line, count: Sample(
+                    line[0], line[1], line[2], line[3]
+                )
+        else:
+            create_sample = lambda line, count: Sample(
+                count * SAMPLE_INTERVAL_NS, line[1], line[2], None
+            )
+
+        for line in reader:
+            samples.append(create_sample(line, sample_count))
+            sample_count += 1
+
+    return samples
 
 
 def append_power_data(
     fxt_path: str,
-    current_samples: List[float],
-    voltage_samples: List[float],
+    power_samples: List[Sample],
     starting_ticks: int,
 ):
     """
@@ -566,8 +615,7 @@ def append_power_data(
 
     Args:
         fxt_path: the fxt file to write to
-        current_samples: the current samples to append
-        voltage_samples: the voltage samples to append
+        power_samples: the samples to append
         starting_ticks: offset from the beginning of the trace in "ticks"
     """
     with open(fxt_path, "ab") as merged_trace:
@@ -637,8 +685,6 @@ def append_power_data(
         merged_trace.write(fake_thread_koid.to_bytes(8, "little"))
         merged_trace.write(b"Power Measurements\0\0\0\0\0\0")
 
-        timestamp = starting_ticks
-
         def counter_event_header(
             name_id,
             category_id,
@@ -662,21 +708,32 @@ def append_power_data(
         COUNTER_ID = 0x000_0000_0000_0001
 
         # Now write our sample data as counter events into the trace
-        for current, voltage in zip(current_samples, voltage_samples):
+        for sample in power_samples:
+            # We will be providing either 3 or 4 arguments, depending on whether
+            # or not this sample has raw aux current data in it.  Each argument
+            # takes 3 words of storage.
+            has_raw_aux = sample.aux_current is not None
+            arg_count = 4 if has_raw_aux else 3
+            arg_words = arg_count * 3
+
             # Emit the counter track
             merged_trace.write(
                 counter_event_header(
                     inline_string_ref("Metrics"),
                     inline_string_ref("Metrics"),
                     0xFF,
-                    3,
+                    arg_count,
                     # 1 word counter, 1 word ts,
-                    # 2 words inline strings, 9 words arguments,
-                    # 1 word counter id = 14
-                    14,
+                    # 2 words inline strings
+                    # |arg_words| words of arguments,
+                    # 1 word counter id = 5 + |arg_words|
+                    5 + arg_words,
                 ).to_bytes(8, "little")
             )
-            merged_trace.write(timestamp.to_bytes(8, "little"))
+            timestamp_ticks = int(
+                (sample.timestamp * TICKS_PER_NS) + starting_ticks
+            )
+            merged_trace.write(timestamp_ticks.to_bytes(8, "little"))
             # Inline strings need to be 0 padded to a multiple of 8 bytes.
             merged_trace.write(b"Metrics\0")
             merged_trace.write(b"Metrics\0")
@@ -692,7 +749,7 @@ def append_power_data(
                 ).to_bytes(8, "little")
             )
             merged_trace.write(b"Voltage\0")
-            data = [float(voltage)]
+            data = [sample.voltage]
             s = struct.pack("d" * len(data), *data)
             merged_trace.write(s)
 
@@ -703,7 +760,7 @@ def append_power_data(
                 ).to_bytes(8, "little")
             )
             merged_trace.write(b"Current\0")
-            data = [float(current)]
+            data = [sample.current]
             s = struct.pack("d" * len(data), *data)
             merged_trace.write(s)
 
@@ -714,14 +771,24 @@ def append_power_data(
                 )
             )
             merged_trace.write(b"Power\0\0\0")
-            data = [float(current) * float(voltage)]
+            data = [sample.current * sample.voltage]
             s = struct.pack("d" * len(data), *data)
             merged_trace.write(s)
 
+            # Write the raw aux current, if present.
+            if has_raw_aux:
+                merged_trace.write(
+                    double_argument_header(
+                        inline_string_ref("Raw Aux"), 3
+                    ).to_bytes(8, "little")
+                )
+                merged_trace.write(b"Raw Aux\0")
+                data = [float(sample.aux_current)]
+                s = struct.pack("d" * len(data), *data)
+                merged_trace.write(s)
+
             # Write the counter_id
             merged_trace.write(COUNTER_ID.to_bytes(8, "little"))
-
-            timestamp += int(SAMPLE_INTERVAL_NS * TICKS_PER_NS)
 
 
 def build_usage_samples(
@@ -812,7 +879,7 @@ def merge_power_data(
 ):
     # We'll start by reading in the fuchsia cpu data from the trace model
     scheduling_intervals = read_fuchsia_trace_cpu_usage(model)
-    current_samples, voltage_samples = read_power_samples(power_trace_path)
+    power_samples = read_power_samples(power_trace_path)
 
     # We can't just append the power data to the beginning of the trace. The
     # trace starts before the power collection starts at some unknown offset.
@@ -856,9 +923,9 @@ def merge_power_data(
         strongest_correlation,
         strongest_correlation_idx,
     ) = cross_correlate_arg_max(
-        avg_cpu_combined[0:25000], current_samples[0:20000]
+        avg_cpu_combined[0:25000], [s.current for s in power_samples[0:20000]]
     )
-    offset_ns = strongest_correlation_idx * SAMPLE_INTERVAL_NS
+    offset_ns = power_samples[strongest_correlation_idx].timestamp
 
     print(f"Delaying power readings by {offset_ns/1000/1000}ms")
     starting_ticks = int(
@@ -869,6 +936,4 @@ def merge_power_data(
     )
     print(f"Aligning Power Trace to start at {starting_ticks} ticks")
 
-    append_power_data(
-        fxt_path, current_samples, voltage_samples, starting_ticks
-    )
+    append_power_data(fxt_path, power_samples, starting_ticks)
