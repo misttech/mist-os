@@ -13,6 +13,8 @@ toc:
   - include: /docs/development/drivers/migration/_toc.yaml
 - title: "DFv2 driver development"
   section:
+  - title: "Write a minimal DFv2 driver"
+    path: /docs/development/drivers/developer_guide/write-a-minimal-dfv2-driver.md
   - title: "Composite nodes"
     path: /docs/development/drivers/developer_guide/composite-node.md
   - title: "Driver stack performance"

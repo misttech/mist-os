@@ -36,14 +36,15 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 ### DFv1 to DFv2 driver migration
 
 - [Overview][dfv1-to-dfv2-driver-migration-overview]
-- [1. Migrate from Banjo to FIDL][migrate-from-banjo-to-fidl]
-- [2. Migrate from DFv1 to DFv2][migrate-from-dfv1-to-dfv2]
+- [1. Migrate from DFv1 to DFv2][migrate-from-dfv1-to-dfv2]
+- [2. Migrate from Banjo to FIDL][migrate-from-banjo-to-fidl]
 - Extension
 
   - [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
 
 ### DFv2 driver development
 
+- [Write a minimal DFv2 driver][write-a-minimal-driver]
 - [Composite nodes][composite-nodes]
 - [Driver stack performance][driver-stack-performance]
 - [VMO Registration Pattern][vmo-registration-pattern]
@@ -195,3 +196,4 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 [dma]: concepts/driver_development/dma.md
 [gpio-init]: concepts/driver_development/gpio-initialization.md
 [set-up-compat-device-server]: migration/set-up-compat-device-server.md
+[write-a-minimal-driver]: developer_guide/write-a-minimal-dfv2-driver.md
