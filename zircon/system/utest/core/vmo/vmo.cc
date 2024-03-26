@@ -2342,4 +2342,95 @@ TEST(VmoTestCase, CachePolicyRace) {
   }
 }
 
+TEST(VmoTestCase, VmoUnbounded) {
+  zx::vmo vmo;
+  zx_info_handle_basic_t info;
+
+  // Can't create a VMO that's both unbounded and resizable.
+  EXPECT_EQ(zx::vmo::create(0, ZX_VMO_UNBOUNDED | ZX_VMO_RESIZABLE, &vmo), ZX_ERR_INVALID_ARGS);
+
+  // Size argument must be set to 0 with unbounded flag.
+  EXPECT_EQ(zx::vmo::create(42, ZX_VMO_UNBOUNDED, &vmo), ZX_ERR_INVALID_ARGS);
+
+  // Make a a vmo with ZX_VMO_UNBOUNDED option.
+  ASSERT_OK(zx::vmo::create(0, ZX_VMO_UNBOUNDED, &vmo));
+
+  uint64_t size = 0;
+  vmo.get_size(&size);
+
+  // Can't call set_size
+  ASSERT_EQ(vmo.set_size(zx_system_get_page_size()), ZX_ERR_UNAVAILABLE);
+
+  // Buffer to test read/writes
+  const size_t len = zx_system_get_page_size() * 4;
+  char buf[len];
+
+  // Can read up to end of VMO.
+  EXPECT_OK(vmo.read(buf, size - len, sizeof(buf)));
+
+  // Can't read off end of VMO (unbounded is a lie).
+  EXPECT_EQ(vmo.read(buf, size, sizeof(buf)), ZX_ERR_OUT_OF_RANGE);
+
+  // Zero buffer for writes
+  memset(buf, 0, sizeof(buf));
+
+  // Can write up to end of VMO
+  EXPECT_OK(vmo.write(buf, size - len, len));
+
+  // Can't write off end of VMO
+  EXPECT_EQ(vmo.write(buf, size, len), ZX_ERR_OUT_OF_RANGE);
+
+  // Check contents
+  char check[len];
+  EXPECT_OK(vmo.read(check, size - len, sizeof(buf)));
+  EXPECT_EQ(std::strcmp(buf, check), 0);
+
+  // Unbounded clones are not supported, but large clones can be made.
+  zx::vmo clone;
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, size, &clone));
+
+  // Clone should not have resize right.
+  ASSERT_OK(clone.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(info.rights & ZX_RIGHT_RESIZE, 0);
+
+  // Clone can read pages form parent
+  EXPECT_OK(clone.read(check, size - len, sizeof(buf)));
+  EXPECT_EQ(std::strcmp(buf, check), 0);
+
+  ASSERT_OK(clone.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(info.rights & ZX_RIGHT_RESIZE, 0);
+  EXPECT_EQ(ZX_ERR_UNAVAILABLE, clone.set_size(zx_system_get_page_size()));
+
+  // Test the flag on a pager-backed VMO
+  zx::vmo pvmo;
+  zx::pager pager;
+  ASSERT_OK(zx::pager::create(0, &pager));
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+
+  // Can't create a VMO that's both unbounded and resizable.
+  EXPECT_EQ(pager.create_vmo(ZX_VMO_UNBOUNDED | ZX_VMO_RESIZABLE, port, 0, 0, &pvmo),
+            ZX_ERR_INVALID_ARGS);
+
+  // Size argument must be set to 0 with unbounded flag.
+  EXPECT_EQ(pager.create_vmo(ZX_VMO_UNBOUNDED, port, 0, 42, &pvmo), ZX_ERR_INVALID_ARGS);
+
+  ASSERT_OK(pager.create_vmo(ZX_VMO_UNBOUNDED, port, 0, 0, &pvmo));
+
+  // Unbounded VMO does not get the RESIZE right, or be able to be resized.
+  ASSERT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(info.rights & ZX_RIGHT_RESIZE, 0);
+  EXPECT_EQ(ZX_ERR_UNAVAILABLE, vmo.set_size(len + zx_system_get_page_size()));
+
+  // Create a clone, which should not be resizable.
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0, len, &clone));
+
+  ASSERT_OK(clone.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(info.rights & ZX_RIGHT_RESIZE, 0);
+  EXPECT_EQ(ZX_ERR_UNAVAILABLE, clone.set_size(zx_system_get_page_size()));
+
+  vmo.reset();
+  clone.reset();
+}
+
 }  // namespace

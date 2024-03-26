@@ -114,8 +114,8 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
  private:
   bool running_delete_ TA_GUARDED(lock_) = false;
   mutable DECLARE_CRITICAL_MUTEX(VmHierarchyState) lock_;
-  fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<VmHierarchyBase>,
-                                    internal::DeferredDeleteTraits> delete_list_ TA_GUARDED(lock_);
+  fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<VmHierarchyBase>, internal::DeferredDeleteTraits>
+      delete_list_ TA_GUARDED(lock_);
 
   // Each VMO hierarchy has a generation count, which is incremented on any change to the hierarchy
   // - either in the VMO tree, or the page lists of VMO's.
@@ -571,6 +571,9 @@ class VmObject : public VmHierarchyBase,
   //
   // Derived types overriding this method are expected to call it from their override.
   virtual void set_user_id(uint64_t user_id);
+
+  // Returns the maximum possible size of a VMO.
+  static size_t max_size() { return MAX_SIZE; }
 
   virtual void Dump(uint depth, bool verbose) = 0;
 

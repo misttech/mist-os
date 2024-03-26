@@ -201,6 +201,7 @@ typedef struct zx_wait_item {
 #define ZX_VMO_RESIZABLE                 ((uint32_t)1u << 1)
 #define ZX_VMO_DISCARDABLE               ((uint32_t)1u << 2)
 #define ZX_VMO_TRAP_DIRTY                ((uint32_t)1u << 3)
+#define ZX_VMO_UNBOUNDED                 ((uint32_t)1u << 4)
 
 // VM Object opcodes
 #define ZX_VMO_OP_COMMIT                 ((uint32_t)1u)

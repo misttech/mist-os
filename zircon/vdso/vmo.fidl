@@ -65,6 +65,10 @@ closed protocol Vmo {
     ///     use, and unlock them when done with `ZX_VMO_OP_UNLOCK` making them eligible for reclamation by
     ///     the kernel. A newly created discardable VMO is initially unlocked.
     ///
+    ///   - `ZX_VMO_UNBOUNDED` to create a VMO that is initialized to the largest possible size. Cannot be
+    ///     used in conjunction with `ZX_VMO_RESIZABLE`. Passed in size argument is not used and must be
+    ///     set to 0.
+    ///
     /// The `ZX_VMO_ZERO_CHILDREN` signal is active on a newly created VMO. It becomes
     /// inactive whenever a child of the VMO is created and becomes active again when
     /// all children have been destroyed and no mappings of those children into address
@@ -81,8 +85,8 @@ closed protocol Vmo {
     ///
     /// ## Errors
     ///
-    /// `ZX_ERR_INVALID_ARGS`  *out* is an invalid pointer or NULL or *options* is
-    /// any value other than 0.
+    /// `ZX_ERR_INVALID_ARGS` *out* is an invalid pointer or NULL, *options* contains an unsupported
+    /// combination of flags, or`ZX_VMO_UNBOUNDED` is used with a size other than 0.
     ///
     /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     /// There is no good way for userspace to handle this (unlikely) error.

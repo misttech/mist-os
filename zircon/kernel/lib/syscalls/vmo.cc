@@ -330,7 +330,8 @@ zx_status_t sys_vmo_create_child(zx_handle_t handle, uint32_t options, uint64_t 
   // expense of executability.
   if (no_write) {
     rights &= ~ZX_RIGHT_WRITE;
-    // NO_WRITE and RESIZABLE cannot be specified together, so we should not have the RESIZE right.
+    // NO_WRITE and RESIZABLE cannot be specified together, so we should not have the RESIZE
+    // right.
     DEBUG_ASSERT((rights & ZX_RIGHT_RESIZE) == 0);
   } else if (options & (ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE |
                         ZX_VMO_CHILD_SNAPSHOT_MODIFIED)) {

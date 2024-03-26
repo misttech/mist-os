@@ -35,12 +35,22 @@ zx::result<VmObjectDispatcher::CreateStats> VmObjectDispatcher::parse_create_sys
   CreateStats res = {0, size};
 
   if (flags & ZX_VMO_RESIZABLE) {
+    if (flags & ZX_VMO_UNBOUNDED) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
     res.flags |= VmObjectPaged::kResizable;
     flags &= ~ZX_VMO_RESIZABLE;
   }
   if (flags & ZX_VMO_DISCARDABLE) {
     res.flags |= VmObjectPaged::kDiscardable;
     flags &= ~ZX_VMO_DISCARDABLE;
+  }
+  if (flags & ZX_VMO_UNBOUNDED) {
+    if (size != 0) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    flags &= ~ZX_VMO_UNBOUNDED;
+    res.size = VmObjectPaged::max_size();
   }
 
   if (flags) {

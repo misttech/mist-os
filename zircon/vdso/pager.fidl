@@ -87,12 +87,15 @@ closed protocol Pager {
     /// ## Description
     ///
     /// Creates a VMO owned by a pager object. *size* will be rounded up to the next page size
-    /// boundary, and *options* must be zero or any combination of the following flags:
+    /// boundary, and *options* must be zero or a combination of the following flags:
     ///
     /// `ZX_VMO_RESIZABLE` - if the VMO can be resized.
     ///
     /// `ZX_VMO_TRAP_DIRTY` - if writes to clean pages in the VMO should be trapped by the kernel and
     /// forwarded to the pager service for acknowledgement before proceeding with the write.
+    ///
+    /// `ZX_VMO_UNBOUNDED` to create a VMO that is initialized to the largest possible size. Cannot be used
+    /// in conjunction with `ZX_VMO_RESIZABLE`. Passed in size argument is not used and must be set to 0.
     ///
     /// On success, the returned VMO has the same rights as a VMO created with [`zx_vmo_create()`], as well
     /// as having the same behavior with respect to `ZX_VMO_ZERO_CHILDREN`. Syscalls that operate on VMOs
@@ -148,8 +151,8 @@ closed protocol Pager {
     ///
     /// ## Errors
     ///
-    /// `ZX_ERR_INVALID_ARGS` *out* is an invalid pointer or NULL, or *options* is any value other than
-    /// 0 or `ZX_VMO_RESIZABLE`.
+    /// `ZX_ERR_INVALID_ARGS` *out* is an invalid pointer or NULL, *options* contains an unsupported
+    /// combination of flags, or`ZX_VMO_UNBOUNDED` is used with a size other than 0.
     ///
     /// `ZX_ERR_BAD_HANDLE` *pager* or *port* is not a valid handle.
     ///

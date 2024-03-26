@@ -88,8 +88,9 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegion>> IoBufferDispatcher::Create
       return zx::error(status);
     }
 
-    // VmObjectPaged::Create will round up the size to the nearest page. We need to know the actual
-    // size of the vmo to later return if asked.
+    // VmObjectPaged::Create will round up the size to the nearest page, or set the size to the
+    // maximum possible VMO size if ZX_VMO_UNBOUNDED is used. We need to know the actual size of the
+    // vmo to later return if asked.
     region_config.size = vmo->size();
     zx_koid_t koid = KernelObjectId::Generate();
     vmo->set_user_id(koid);
