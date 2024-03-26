@@ -140,6 +140,7 @@ impl PartitionImageMapper {
                 let measured_size = metadata.len();
                 report.insert(format!("{}-{}", prefix, name), json!(measured_size));
                 report.insert(format!("{}-{}.budget", prefix, name), json!(size));
+                report.insert(format!("{}-{}.creepBudget", prefix, name), json!(200 * 1024));
                 let url = Url::parse_with_params(
                     "http://go/fuchsia-size-stats/single_component/",
                     &[("f", format!("component:in:{}-{}", prefix, name))],
@@ -559,9 +560,11 @@ mod tests {
         let expected = serde_json::json!({
             "prefix-vbmeta_a": 6,
             "prefix-vbmeta_a.budget": 200,
+            "prefix-vbmeta_a.creepBudget": 200 * 1024,
             "prefix-vbmeta_a.owner": "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3Aprefix-vbmeta_a",
             "prefix-zbi_a": 3,
             "prefix-zbi_a.budget": 100,
+            "prefix-zbi_a.creepBudget": 200 * 1024,
             "prefix-zbi_a.owner": "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3Aprefix-zbi_a",
         });
         assert_eq!(expected, result);
