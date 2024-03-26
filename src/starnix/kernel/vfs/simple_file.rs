@@ -11,7 +11,10 @@ use crate::{
 };
 
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
-use starnix_uapi::{as_any::AsAny, errno, error, errors::Errno, open_flags::OpenFlags};
+use starnix_uapi::{
+    as_any::AsAny, auth::Capabilities, errno, error, errors::Errno, file_mode::Access,
+    open_flags::OpenFlags,
+};
 use std::{
     borrow::Cow,
     sync::{Arc, Weak},
@@ -23,6 +26,9 @@ where
     O: FileOps,
 {
     create_file_ops: F,
+
+    /// Capabilities that should cause `check_access` to always pass.
+    capabilities: Capabilities,
 }
 
 impl<F, O> SimpleFileNode<F, O>
@@ -31,7 +37,14 @@ where
     O: FileOps,
 {
     pub fn new(create_file_ops: F) -> SimpleFileNode<F, O> {
-        SimpleFileNode { create_file_ops }
+        SimpleFileNode { create_file_ops, capabilities: Capabilities::empty() }
+    }
+
+    pub fn new_with_capabilities(
+        create_file_ops: F,
+        capabilities: Capabilities,
+    ) -> SimpleFileNode<F, O> {
+        SimpleFileNode { create_file_ops, capabilities }
     }
 }
 
@@ -41,6 +54,21 @@ where
     O: FileOps,
 {
     fs_node_impl_not_dir!();
+
+    fn check_access(
+        &self,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        _access: Access,
+    ) -> Result<(), Errno> {
+        if self.capabilities != Capabilities::empty()
+            && current_task.creds().has_capability(self.capabilities)
+        {
+            Ok(())
+        } else {
+            error!(ENOSYS)
+        }
+    }
 
     fn create_file_ops(
         &self,

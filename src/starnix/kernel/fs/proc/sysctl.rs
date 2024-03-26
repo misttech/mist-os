@@ -15,7 +15,7 @@ use crate::{
 use starnix_logging::bug_ref;
 use starnix_sync::Mutex;
 use starnix_uapi::{
-    auth::{FsCred, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
+    auth::{Capabilities, FsCred, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
     error,
     errors::Errno,
     file_mode::mode,
@@ -534,6 +534,23 @@ impl StubSysctl {
             Ok(file.clone())
         })
     }
+
+    #[track_caller]
+    fn new_node_with_capabilities(
+        message: &'static str,
+        bug: starnix_logging::BugRef,
+        capabilities: Capabilities,
+    ) -> impl FsNodeOps {
+        let location = std::panic::Location::caller();
+        let file = BytesFile::new(Self::default());
+        SimpleFileNode::new_with_capabilities(
+            move || {
+                starnix_logging::__track_stub_inner(bug, message, None, location);
+                Ok(file.clone())
+            },
+            capabilities,
+        )
+    }
 }
 
 impl BytesFileOps for StubSysctl {
@@ -893,18 +910,20 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
         dir.entry(
             current_task,
             "bpf_jit_enable",
-            StubSysctl::new_node(
+            StubSysctl::new_node_with_capabilities(
                 "/proc/sys/net/core/bpf_jit_enable",
                 bug_ref!("https://fxbug.dev/322874627"),
+                CAP_NET_ADMIN,
             ),
             file_mode,
         );
         dir.entry(
             current_task,
             "bpf_jit_kallsyms",
-            StubSysctl::new_node(
+            StubSysctl::new_node_with_capabilities(
                 "/proc/sys/net/core/bpf_jit_kallsyms",
                 bug_ref!("https://fxbug.dev/322874163"),
+                CAP_NET_ADMIN,
             ),
             file_mode,
         );
