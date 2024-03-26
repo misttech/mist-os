@@ -16,6 +16,7 @@
 #include <gtest/gtest.h>
 #include <vulkan/vulkan.h>
 
+#include "config_query.h"
 #include "src/graphics/tests/common/utils.h"
 #include "src/graphics/tests/common/vulkan_context.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -42,7 +43,7 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionNV12_1026) {
   // supported on emulators.
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
-  if (UseVirtualGpu() || UseCpuGpu())
+  if (!SupportsSysmemYuv())
     GTEST_SKIP();
 
   ASSERT_TRUE(Exec(VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, 1026, 64, GetParam(), false));
@@ -64,7 +65,7 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionNV12) {
   // supported on emulators.
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
-  if (UseVirtualGpu() || UseCpuGpu())
+  if (!SupportsSysmemYuv())
     GTEST_SKIP();
 
   ASSERT_TRUE(Exec(VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, 64, 64, GetParam(), false));
@@ -76,7 +77,7 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionI420) {
   // supported on emulators.
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
-  if (UseVirtualGpu() || UseCpuGpu())
+  if (!SupportsSysmemYuv())
     GTEST_SKIP();
 
   ASSERT_TRUE(Exec(VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM, 64, 64, GetParam(), false));
@@ -88,7 +89,7 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionNV12_1280_546) {
   // supported on emulators.
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
-  if (UseVirtualGpu() || UseCpuGpu())
+  if (!SupportsSysmemYuv())
     GTEST_SKIP();
 
   ASSERT_TRUE(Exec(VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, 8192, 546, GetParam(), false));
@@ -119,10 +120,7 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionMultipleFormats) {
 
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
-  if (UseCpuGpu())
-    GTEST_SKIP();
-
-  if (!UseVirtualGpu()) {
+  if (SupportsSysmemYuv()) {
     ASSERT_TRUE(
         Exec(VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, 64, 64, GetParam(), false, all_constraints));
   }
@@ -159,7 +157,7 @@ TEST_P(VulkanImageExtensionTest, R8) {
   bool linear = GetParam();
   // TODO(https://fxbug.dev/42137913): Enable the test on emulators when goldfish host-visible heap
   // supports R8 linear images.
-  if (linear && UseVirtualGpu())
+  if (linear && !SupportsSysmemLinearNonRgba())
     GTEST_SKIP();
 
   auto image_create_info = GetDefaultImageCreateInfo(use_protected_memory_, VK_FORMAT_R8_UNORM,
@@ -195,7 +193,7 @@ TEST_P(VulkanImageExtensionTest, R8G8) {
   bool linear = GetParam();
   // TODO(https://fxbug.dev/42137913): Enable the test on emulators when goldfish host-visible heap
   // supports R8G8 linear images.
-  if (linear && UseVirtualGpu())
+  if (linear && !SupportsSysmemLinearNonRgba())
     GTEST_SKIP();
 
   auto image_create_info = GetDefaultImageCreateInfo(use_protected_memory_, VK_FORMAT_R8G8_UNORM,
@@ -221,7 +219,7 @@ TEST_P(VulkanImageExtensionTest, R8ToL8) {
   bool linear = GetParam();
   // TODO(https://fxbug.dev/42137913): Enable the test on emulators when goldfish host-visible heap
   // supports R8/L8 linear images.
-  if (linear && UseVirtualGpu())
+  if (linear && !SupportsSysmemLinearNonRgba())
     GTEST_SKIP();
 
   auto image_create_info = GetDefaultImageCreateInfo(use_protected_memory_, VK_FORMAT_R8_UNORM,
@@ -411,7 +409,7 @@ TEST_P(VulkanImageExtensionTest, YUVProperties) {
   // supported on emulators.
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
-  if (UseVirtualGpu() || UseCpuGpu())
+  if (!SupportsSysmemYuv())
     GTEST_SKIP();
   auto [vulkan_token] = MakeSharedCollection<1>();
 
@@ -463,7 +461,7 @@ TEST_P(VulkanImageExtensionTest, MultiFormat) {
   // supported on emulators.
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
-  if (UseVirtualGpu() || UseCpuGpu())
+  if (!SupportsSysmemYuv())
     GTEST_SKIP();
   auto tokens = MakeSharedCollection(2u);
 
@@ -540,7 +538,7 @@ TEST_P(VulkanImageExtensionTest, MaxBufferCountCheck) {
   // supported on emulators.
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
-  if (UseVirtualGpu() || UseCpuGpu())
+  if (!device_supports_protected_memory_)
     GTEST_SKIP();
   auto tokens = MakeSharedCollection(2u);
 
@@ -587,7 +585,7 @@ TEST_P(VulkanImageExtensionTest, ManyIdenticalFormats) {
   // supported on emulators.
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
-  if (UseVirtualGpu() || UseCpuGpu())
+  if (!SupportsSysmemYuv())
     GTEST_SKIP();
   auto [token] = MakeSharedCollection<1>();
 
@@ -628,7 +626,7 @@ TEST_P(VulkanImageExtensionTest, ColorSpaceSubset) {
   // supported on emulators.
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
-  if (UseVirtualGpu() || UseCpuGpu())
+  if (!SupportsSysmemYuv())
     GTEST_SKIP();
   auto tokens = MakeSharedCollection(2u);
 
@@ -692,7 +690,7 @@ TEST_P(VulkanImageExtensionTest, WeirdFormat) {
   // supported on emulators.
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
-  if (UseVirtualGpu() || UseCpuGpu())
+  if (!SupportsSysmemYuv())
     GTEST_SKIP();
   auto [token] = MakeSharedCollection<1>();
 
@@ -866,8 +864,8 @@ TEST_F(VulkanExtensionTest, BadRequiredFormatFeatures2) {
 
   // TODO(fxbug.dev/321072153): Lavapipe doesn't support `VK_FORMAT_G8_B8R8_2PLANE_420_UNORM`, so
   // we use RGBA when Lavapipe is detected via `UseCpuGpu()`.
-  const VkFormat kFormat = UseVirtualGpu() || UseCpuGpu() ? VK_FORMAT_R8G8B8A8_UNORM
-                                                          : VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+  const VkFormat kFormat =
+      !SupportsSysmemYuv() ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
   bool is_yuv = kFormat == VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
   constexpr bool kLinear = false;
   auto image_create_info =
@@ -1175,7 +1173,7 @@ TEST_P(VulkanFormatTest, FastClear) {
   // the sysmem clients. Sysmem should send better error messages and we could
   // use this to determine if the test should be skipped due to unsupported
   // platforms.
-  if (UseVirtualGpu()) {
+  if (!SupportsSysmemRenderableLinear()) {
     GTEST_SKIP();
   }
 

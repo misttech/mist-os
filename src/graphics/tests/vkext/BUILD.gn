@@ -23,17 +23,29 @@ source_set("vulkan_extension_test") {
   ]
 }
 
-executable("vkext_unprotected_bin") {
+fuchsia_component_manifest("child-manifest") {
+  component_name = "vkext-test"
+  manifest = "meta/vkext_child.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("config") {
+  cm_label = ":child-manifest"
+}
+
+executable("vkext_bin") {
   testonly = true
-  output_name = "vkext_unprotected"
+  output_name = "vkext"
 
   sources = [
+    "config_query.cc",
     "vk_ext_buffer_collection.cc",
+    "vk_ext_protected.cc",
     "vk_fuchsia_external_memory.cc",
     "vk_fuchsia_external_semaphore.cc",
   ]
 
   deps = [
+    ":config",
     ":vulkan_extension_test",
     "../vkreadback:helper",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
@@ -47,28 +59,6 @@ executable("vkext_unprotected_bin") {
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",
-  ]
-}
-
-executable("vkext_protected_bin") {
-  testonly = true
-  output_name = "vkext_protected"
-
-  sources = [ "vk_ext_protected.cc" ]
-
-  deps = [
-    ":vulkan_extension_test",
-    "../vkreadback:helper",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
-    "//sdk/lib/fdio",
-    "//src/graphics/magma/lib/magma/platform:logger_impl",
-    "//src/graphics/magma/lib/magma/platform:semaphore",
-    "//src/graphics/tests/common",
-    "//src/lib/fsl",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/vulkan",
-    "//third_party/googletest:gtest",
-    "//zircon/system/ulib/fbl",
   ]
 }
 
@@ -88,25 +78,37 @@ group("vkext_linux_x64") {
   public_deps = [ ":vkext_linux(//build/toolchain:linux_x64)" ]
 }
 
-fuchsia_test_component("vkext_unprotected_cmp") {
-  component_name = "vkext_unprotected_test"
+fuchsia_component("vkext_cmp") {
+  component_name = "vkext-test"
   deps = [
-    ":vkext_unprotected_bin",
+    ":vkext_bin",
     "//src/lib/vulkan/validation_layers",
   ]
-  manifest = "meta/vkext_unprotected.cml"
-  test_type = "vulkan"
+  cm_label = ":child-manifest"
+  testonly = true
 }
 
-fuchsia_test_package("vkext-unprotected-package") {
-  package_name = "vkext_unprotected_test"
-  test_components = [ ":vkext_unprotected_cmp" ]
-  test_specs = {
-    environments = magma_libvulkan_hardware_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
+fuchsia_structured_config_values("default_config") {
+  cm_label = ":child-manifest"
+  values = {
+    gpu_vendor_id = ""
+    support_sysmem_yuv = true
+    support_sysmem_linear_nonrgba = true
+    support_sysmem_renderable_linear = true
+    support_protected_memory = false
   }
+}
+
+fuchsia_package("vkext-child-package") {
+  package_name = "vkext-test"
+  testonly = true
+  deps = [
+    ":default_config",
+    ":vkext_cmp",
+  ]
+
+  # Structured config validation complains about the gtest runner, but in practice it works fine.
+  validate_structured_config = false
 }
 
 protected_libvulkan_envs = []
@@ -118,20 +120,54 @@ foreach(env, magma_libvulkan_hardware_envs) {
   }
 }
 
-fuchsia_test_component("vkext_protected_cmp") {
-  testonly = true
-  component_name = "vkext_protected_test"
-  deps = [
-    ":vkext_protected_bin",
-    "//src/lib/vulkan/validation_layers",
-  ]
+fuchsia_test_component("vkext-unprotected-test-component") {
+  component_name = "vkext-unprotected"
+  manifest = "meta/vkext_unprotected.cml"
+  test_type = "vulkan"
+}
+
+fuchsia_test_package("vkext-unprotected-package") {
+  package_name = "vkext_unprotected_test"
+  test_components = [ ":vkext-unprotected-test-component" ]
+  subpackages = [ ":vkext-child-package" ]
+  test_specs = {
+    environments = magma_libvulkan_hardware_envs - protected_libvulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_test_component("vkext-unprotected-lavapipe-test-component") {
+  component_name = "vkext-unprotected-lavapipe"
+  manifest = "meta/vkext_unprotected_lavapipe.cml"
+  test_type = "vulkan"
+  restricted_features = [ "config_capabilities" ]
+}
+
+fuchsia_test_package("vkext-unprotected-lavapipe-package") {
+  package_name = "vkext_unprotected_lavapipe_test"
+  test_components = [ ":vkext-unprotected-lavapipe-test-component" ]
+  subpackages = [ ":vkext-child-package" ]
+  test_specs = {
+    environments = []
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_test_component("vkext-protected-test-component") {
+  component_name = "vkext-protected-test"
   manifest = "meta/vkext_protected.cml"
   test_type = "vulkan"
+  restricted_features = [ "config_capabilities" ]
 }
 
 fuchsia_test_package("vkext-protected-package") {
   package_name = "vkext_protected_test"
-  test_components = [ ":vkext_protected_cmp" ]
+  test_components = [ ":vkext-protected-test-component" ]
+  subpackages = [ ":vkext-child-package" ]
   test_specs = {
     environments = protected_libvulkan_envs
     log_settings = {
@@ -144,6 +180,7 @@ group("vkext") {
   testonly = true
   deps = [
     ":vkext-protected-package",
+    ":vkext-unprotected-lavapipe-package",
     ":vkext-unprotected-package",
   ]
 }

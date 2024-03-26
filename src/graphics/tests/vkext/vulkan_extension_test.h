@@ -38,16 +38,6 @@ class VulkanExtensionTest : public testing::Test {
   void set_use_protected_memory(bool use) { use_protected_memory_ = use; }
   bool device_supports_protected_memory() const { return device_supports_protected_memory_; }
 
-  bool UseVirtualGpu() {
-    auto properties = ctx_->physical_device().getProperties();
-    return properties.deviceType == vk::PhysicalDeviceType::eVirtualGpu;
-  }
-
-  bool UseCpuGpu() {
-    auto properties = ctx_->physical_device().getProperties();
-    return properties.deviceType == vk::PhysicalDeviceType::eCpu;
-  }
-
   VulkanContext &vulkan_context() { return *ctx_; }
 
   bool IsMemoryTypeCoherent(uint32_t memoryTypeIndex);

@@ -3,11 +3,19 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/test_runners/gtest/default.shard.cml",
+        "//src/graphics/tests/common/meta/vulkan.offer.shard.cml",
         "syslog/client.shard.cml",
-        "vulkan/client.shard.cml",
     ],
-    program: {
-        binary: "bin/vkext_unprotected",
-    },
+    children: [
+        {
+            name: "test",
+            url: "vkext-test#meta/vkext-test.cm",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test",
+        },
+    ],
 }

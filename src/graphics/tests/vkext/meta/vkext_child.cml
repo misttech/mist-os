@@ -1,0 +1,67 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/sys/test_runners/gtest/default.shard.cml",
+        "syslog/client.shard.cml",
+        "vulkan/client.shard.cml",
+    ],
+    program: {
+        binary: "bin/vkext",
+    },
+    use: [
+        {
+            from: "parent",
+            config: "fuchsia.gpu.test.GpuVendorId",
+            key: "gpu_vendor_id",
+            availability: "transitional",
+            type: "string",
+            max_size: 128,
+        },
+        {
+            from: "parent",
+            config: "fuchsia.gpu.test.SupportSysmemYuv",
+            key: "support_sysmem_yuv",
+            availability: "transitional",
+
+            // True if the GPU can import NV12 textures from sysmem.
+            type: "bool",
+        },
+        {
+            from: "parent",
+            config: "fuchsia.gpu.test.SupportSysmemRenderableLinear",
+            key: "support_sysmem_renderable_linear",
+            availability: "transitional",
+
+            // True if the GPU can import linear textures from sysmem and render to them.
+            type: "bool",
+        },
+        {
+            from: "parent",
+            config: "fuchsia.gpu.test.SupportSysmemLinearNonRGBA",
+            key: "support_sysmem_linear_nonrgba",
+            availability: "transitional",
+
+            // True if the GPU can import linear non-RGBA (e.g. R or RG) textures from sysmem.
+            type: "bool",
+        },
+        {
+            from: "parent",
+            config: "fuchsia.gpu.test.SupportProtectedMemory",
+            key: "support_protected_memory",
+            availability: "transitional",
+            type: "bool",
+        },
+    ],
+    config: {
+        gpu_vendor_id: {
+            type: "string",
+            max_size: 128,
+        },
+        support_sysmem_yuv: { type: "bool" },
+        support_sysmem_renderable_linear: { type: "bool" },
+        support_sysmem_linear_nonrgba: { type: "bool" },
+        support_protected_memory: { type: "bool" },
+    },
+}

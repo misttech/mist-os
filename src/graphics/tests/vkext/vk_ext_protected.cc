@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 #include <vulkan/vulkan.h>
 
+#include "config_query.h"
 #include "src/graphics/tests/common/utils.h"
 #include "src/graphics/tests/common/vulkan_context.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -30,24 +31,33 @@ constexpr uint32_t kDefaultHeight = 64;
 constexpr VkFormat kDefaultFormat = VK_FORMAT_R8G8B8A8_UNORM;
 
 // Parameter is true if the image should be linear.
-class VulkanImageExtensionTest : public VulkanExtensionTest,
-                                 public ::testing::WithParamInterface<bool> {};
+class VulkanProtectedImageExtensionTest : public VulkanExtensionTest,
+                                          public ::testing::WithParamInterface<bool> {};
 
-TEST_P(VulkanImageExtensionTest, BufferCollectionProtectedRGBA) {
+TEST_P(VulkanProtectedImageExtensionTest, BufferCollectionProtectedRGBA) {
+  if (!SupportsProtectedMemory()) {
+    GTEST_SKIP();
+  }
   set_use_protected_memory(true);
   ASSERT_TRUE(Initialize());
   ASSERT_TRUE(device_supports_protected_memory());
   ASSERT_TRUE(Exec(VK_FORMAT_R8G8B8A8_UNORM, 64, 64, GetParam(), false));
 }
 
-TEST_P(VulkanImageExtensionTest, ProtectedAndNonprotectedConstraints) {
+TEST_P(VulkanProtectedImageExtensionTest, ProtectedAndNonprotectedConstraints) {
+  if (!SupportsProtectedMemory()) {
+    GTEST_SKIP();
+  }
   set_use_protected_memory(true);
   ASSERT_TRUE(Initialize());
   ASSERT_TRUE(device_supports_protected_memory());
   ASSERT_TRUE(Exec(VK_FORMAT_R8G8B8A8_UNORM, 64, 64, GetParam(), true));
 }
 
-TEST_P(VulkanImageExtensionTest, ProtectedCpuAccessible) {
+TEST_P(VulkanProtectedImageExtensionTest, ProtectedCpuAccessible) {
+  if (!SupportsProtectedMemory()) {
+    GTEST_SKIP();
+  }
   ASSERT_TRUE(Initialize());
   ASSERT_TRUE(device_supports_protected_memory());
   auto [vulkan_token] = MakeSharedCollection<1>();
@@ -75,7 +85,10 @@ TEST_P(VulkanImageExtensionTest, ProtectedCpuAccessible) {
                                       *collection, constraints_info, loader_));
 }
 
-TEST_P(VulkanImageExtensionTest, ProtectedOptionalCompatible) {
+TEST_P(VulkanProtectedImageExtensionTest, ProtectedOptionalCompatible) {
+  if (!SupportsProtectedMemory()) {
+    GTEST_SKIP();
+  }
   ASSERT_TRUE(Initialize());
   ASSERT_TRUE(device_supports_protected_memory());
   for (uint32_t i = 0; i < 2; i++) {
@@ -130,7 +143,10 @@ TEST_P(VulkanImageExtensionTest, ProtectedOptionalCompatible) {
   }
 }
 
-TEST_P(VulkanImageExtensionTest, ProtectedUnprotectedIncompatible) {
+TEST_P(VulkanProtectedImageExtensionTest, ProtectedUnprotectedIncompatible) {
+  if (!SupportsProtectedMemory()) {
+    GTEST_SKIP();
+  }
   ASSERT_TRUE(Initialize());
   ASSERT_TRUE(device_supports_protected_memory());
   auto tokens = MakeSharedCollection(2u);
@@ -157,13 +173,16 @@ TEST_P(VulkanImageExtensionTest, ProtectedUnprotectedIncompatible) {
 }
 
 TEST_F(VulkanExtensionTest, BufferCollectionProtectedBuffer) {
+  if (!SupportsProtectedMemory()) {
+    GTEST_SKIP();
+  }
   set_use_protected_memory(true);
   ASSERT_TRUE(Initialize());
   ASSERT_TRUE(device_supports_protected_memory());
   ASSERT_TRUE(ExecBuffer(16384));
 }
 
-INSTANTIATE_TEST_SUITE_P(, VulkanImageExtensionTest, ::testing::Bool(),
+INSTANTIATE_TEST_SUITE_P(, VulkanProtectedImageExtensionTest, ::testing::Bool(),
                          [](testing::TestParamInfo<bool> info) {
                            return info.param ? "Linear" : "Tiled";
                          });
