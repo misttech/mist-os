@@ -91,6 +91,18 @@ TYPED_TEST(LdLoadTests, PartialPageBss) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, PartialPageBssGarbageAtEof) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("partial-page-bss-garbage-at-eof"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 TYPED_TEST(LdLoadTests, Relative) {
   constexpr int64_t kReturnValue = 17;
 
