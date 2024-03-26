@@ -243,11 +243,9 @@ zx_status_t SetupBlockFifo(const std::string& path, BlockDevice* device) {
   return ZX_OK;
 }
 
-std::unique_ptr<TemporaryFvmPartition> TemporaryFvmPartition::Create(int fvm_fd,
-                                                                     uint64_t slices_requested) {
-  fdio_cpp::UnownedFdioCaller caller(fvm_fd);
-  fidl::UnownedClientEnd client_end =
-      caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>();
+std::unique_ptr<TemporaryFvmPartition> TemporaryFvmPartition::Create(
+    fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> client_end,
+    uint64_t slices_requested) {
   uuid::Uuid unique_guid = uuid::Uuid::Generate();
 
   // Create a new partition.
@@ -294,14 +292,7 @@ std::string TemporaryFvmPartition::GetPartitionPath() { return partition_path_; 
 
 // Start a stress test.
 bool StressFlash(StatusLine* logger, const CommandLineArgs& args, zx::duration duration) {
-  // Access the FVM.
-  fbl::unique_fd fvm_fd;
-  if (zx_status_t status = fdio_open_fd(args.fvm_path.c_str(), 0, fvm_fd.reset_and_get_address());
-      status != ZX_OK) {
-    logger->Log("Error: Could not open FVM: %s\n", zx_status_get_string(status));
-    return false;
-  }
-
+  // Connect to FVM.
   zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager>> volume_manager =
       component::Connect<fuchsia_hardware_block_volume::VolumeManager>(args.fvm_path);
   if (volume_manager.is_error()) {
@@ -338,7 +329,7 @@ bool StressFlash(StatusLine* logger, const CommandLineArgs& args, zx::duration d
       RoundUp(bytes_to_test, fvm_info_or->slice_size) / fvm_info_or->slice_size;
 
   std::unique_ptr<TemporaryFvmPartition> fvm_partition =
-      TemporaryFvmPartition::Create(fvm_fd.get(), slices_requested);
+      TemporaryFvmPartition::Create(volume_manager->borrow(), slices_requested);
 
   if (fvm_partition == nullptr) {
     logger->Log("Failed to create FVM partition");

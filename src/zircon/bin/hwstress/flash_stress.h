@@ -5,6 +5,7 @@
 #ifndef SRC_ZIRCON_BIN_HWSTRESS_FLASH_STRESS_H_
 #define SRC_ZIRCON_BIN_HWSTRESS_FLASH_STRESS_H_
 
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fuchsia/hardware/block/cpp/fidl.h>
 #include <lib/zx/fifo.h>
 #include <lib/zx/time.h>
@@ -29,18 +30,12 @@ class TemporaryFvmPartition {
  public:
   ~TemporaryFvmPartition();
 
-  // Create a new partition.
-  //
-  // |fvm_path| should be the path to an FVM instance, such as
-  // "/dev/sys/platform/pci/00:00.0/ahci/sata0/block/fvm".
-  //
-  // |bytes_requested| is the maximum number of bytes callers will be able to use on the partition.
-  // The returned partition may have greater than the requested number of bytes due to rounding and
-  // overheads, or it may have less as space is lazily allocated by FVM, so the requested number of
-  // bytes may not actually be available.
+  // Create a new partition with the number of slices indicated in |slices_requested|.
   //
   // Returns nullptr on failure.
-  static std::unique_ptr<TemporaryFvmPartition> Create(int fvm_fd, uint64_t slices_requested);
+  static std::unique_ptr<TemporaryFvmPartition> Create(
+      fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> client_end,
+      uint64_t slices_requested);
 
   // Get the path to the created partition.
   std::string GetPartitionPath();
