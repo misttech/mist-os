@@ -8,6 +8,8 @@
 
 #include <lib/ddk/platform-defs.h>
 
+#include "src/devices/lib/amlogic/include/soc/aml-a311d/a311d-gpio.h"
+
 / {
 	compatible = "khadas,vim3", "amlogic,a311d";
 	model = "Khadas Vim3";
@@ -47,5 +49,29 @@
 			size = <0x00 (200*1024*1024)>;
 		};
 	};
+};
 
+&gpio {
+	i2c_AO_pins: i2c-AO-pins {
+		pins = <A311D_GPIOAO(2) A311D_GPIOAO(2)>;
+		function = <0 A311D_GPIOAO_2_M0_SCL_FN>;
+	};
+
+	i2c3_pins: i2c3-pins {
+		pins = <A311D_GPIOA(15) A311D_GPIOA(14)>;
+		function = <0 A311D_GPIOA_15_I2C_EE_M3_SCL_FN>;
+	};
+};
+
+&i2c_AO {
+	pinctrl-0 = <&i2c_AO_pins>;
+
+	khadas-mcu@18 {
+		compatible = "khadas,vim3-mcu";
+		reg = <0x18>;
+	};
+};
+
+&i2c3 {
+	pinctrl-0 = <&i2c3_pins>;
 };

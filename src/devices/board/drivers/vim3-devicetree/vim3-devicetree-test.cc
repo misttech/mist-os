@@ -59,6 +59,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/mmc-ffe05000",
       "sys/platform/mmc-ffe07000",
       "sys/platform/pwm-ffd1b000",
+      "sys/platform/khadas-mcu-18",
   };
   ASSERT_TRUE(board_test_.StartRealm().is_ok());
   ASSERT_TRUE(board_test_.WaitOnDevices(device_node_paths).is_ok());
