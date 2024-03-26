@@ -116,6 +116,27 @@ if (is_host) {
       ":workbench_nuc_unstable_tests",
     ]
   }
+
+  # minimal.vim3
+  # Note - minimal does not support SL4F
+  group_with_no_dir_target_deps("minimal_vim3_stable_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group_with_no_dir_target_deps("minimal_vim3_unstable_tests") {
+    testonly = true
+    public_deps =
+        [ "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)" ]
+  }
+
+  group("minimal_vim3_staging_tests") {
+    testonly = true
+    public_deps = [
+      ":minimal_vim3_stable_tests",
+      ":minimal_vim3_unstable_tests",
+    ]
+  }
 }
 
 ############################## Test groups - End ###############################
@@ -178,6 +199,26 @@ group("workbench_nuc_staging_packages") {
   public_deps = [
     ":workbench_nuc_stable_packages",
     ":workbench_nuc_unstable_packages",
+  ]
+}
+
+# minimal.vim3
+# Note - minimal does not support SL4F
+group_with_no_dir_target_deps("minimal_vim3_stable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group_with_no_dir_target_deps("minimal_vim3_unstable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group("minimal_vim3_staging_packages") {
+  testonly = true
+  public_deps = [
+    ":minimal_vim3_stable_packages",
+    ":minimal_vim3_unstable_packages",
   ]
 }
 ############################ Package groups - End ##############################
