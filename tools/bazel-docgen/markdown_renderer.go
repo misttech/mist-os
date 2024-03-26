@@ -8,6 +8,7 @@ import (
 	tmpls "go.fuchsia.dev/fuchsia/tools/bazel-docgen/templates"
 	pb "go.fuchsia.dev/fuchsia/tools/bazel-docgen/third_party/stardoc"
 	"io"
+	"text/template"
 )
 
 type MarkdownRenderer struct{}
@@ -17,9 +18,25 @@ func NewMarkdownRenderer() MarkdownRenderer {
 }
 
 func (r *MarkdownRenderer) RenderRuleInfo(rule *pb.RuleInfo, out io.Writer) error {
-	template, err := tmpls.NewRuleTemplate()
+	return render(rule, out, tmpls.NewRuleTemplate)
+}
+
+func (r *MarkdownRenderer) RenderProviderInfo(rule *pb.ProviderInfo, out io.Writer) error {
+	return render(rule, out, tmpls.NewProviderTemplate)
+}
+
+func (r *MarkdownRenderer) RenderStarlarkFunctionInfo(rule *pb.StarlarkFunctionInfo, out io.Writer) error {
+	return render(rule, out, tmpls.NewStarlarkFunctionTemplate)
+}
+
+func (r *MarkdownRenderer) RenderRepositoryRuleInfo(rule *pb.RepositoryRuleInfo, out io.Writer) error {
+	return render(rule, out, tmpls.NewRepositoryRuleTemplate)
+}
+
+func render(v interface{}, out io.Writer, templateFunc func() (*template.Template, error)) error {
+	t, err := templateFunc()
 	if err == nil {
-		err = template.Execute(out, rule)
+		err = t.Execute(out, v)
 	}
 	return err
 }

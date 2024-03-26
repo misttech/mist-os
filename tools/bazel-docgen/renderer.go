@@ -11,4 +11,7 @@ import (
 
 type Renderer interface {
 	RenderRuleInfo(*pb.RuleInfo, io.Writer) error
+	RenderProviderInfo(*pb.ProviderInfo, io.Writer) error
+	RenderStarlarkFunctionInfo(*pb.StarlarkFunctionInfo, io.Writer) error
+	RenderRepositoryRuleInfo(*pb.RepositoryRuleInfo, io.Writer) error
 }

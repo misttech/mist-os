@@ -95,6 +95,18 @@ if (is_host) {
         golden = "goldens/rule_empty.md.golden"
         candidate = "$target_gen_dir/goldens/rule_empty.md"
       },
+      {
+        golden = "goldens/func_some_function.md.golden"
+        candidate = "$target_gen_dir/goldens/func_some_function.md"
+      },
+      {
+        golden = "goldens/provider_FooInfo.md.golden"
+        candidate = "$target_gen_dir/goldens/provider_FooInfo.md"
+      },
+      {
+        golden = "goldens/repo_rule_empty_repo.md.golden"
+        candidate = "$target_gen_dir/goldens/repo_rule_empty_repo.md"
+      },
     ]
   }
 }

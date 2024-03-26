@@ -20,8 +20,25 @@ const ruleTemplate = `
 {{ end }}
 `
 
+// TODO: these are all just stubs, need actual implementation
+const providerTemplate = ""
+const starlarkFunctionTemplate = ""
+const repositoryRuleTemplate = ""
+
 func NewRuleTemplate() (*template.Template, error) {
 	return makeTemplate("rule", ruleTemplate)
+}
+
+func NewProviderTemplate() (*template.Template, error) {
+	return makeTemplate("provider", providerTemplate)
+}
+
+func NewStarlarkFunctionTemplate() (*template.Template, error) {
+	return makeTemplate("starlark_function", starlarkFunctionTemplate)
+}
+
+func NewRepositoryRuleTemplate() (*template.Template, error) {
+	return makeTemplate("repository_rule", repositoryRuleTemplate)
 }
 
 func makeTemplate(name string, templateString string) (*template.Template, error) {

@@ -1,7 +1,21 @@
 toc:
 - title: Overview
   path: /README.md
-- title: API
-  section:
-  - title: empty
-    path: rule_empty.md
+- heading: API
+- section:
+  - title: Rules
+    section:
+    - title: empty
+      path: rule_empty.md
+  - title: Providers
+    section:
+    - title: FooInfo
+      path: provider_FooInfo.md
+  - title: Starlark Functions
+    section:
+    - title: some_function
+      path: func_some_function.md
+  - title: Repository Rules
+    section:
+    - title: empty_repo
+      path: repo_rule_empty_repo.md

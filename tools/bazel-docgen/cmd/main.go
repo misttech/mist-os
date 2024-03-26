@@ -51,7 +51,7 @@ func main() {
 	// future it will be easier to use the zip writer to create one zip file and
 	// then unzip into the outDir for testing if it is specified.
 	makeFileFn := func(s string) io.Writer {
-		f, err := os.OpenFile(filepath.Join(flags.outDir, s), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		f, err := os.Create(filepath.Join(flags.outDir, s))
 		if err != nil {
 			log.Fatalln("Failed to create new file:", err)
 		}
