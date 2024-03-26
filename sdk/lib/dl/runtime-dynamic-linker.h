@@ -11,6 +11,7 @@
 
 #include <fbl/intrusive_double_list.h>
 
+#include "diagnostics.h"
 #include "error.h"
 #include "module.h"
 
@@ -75,11 +76,17 @@ class RuntimeDynamicLinker {
     }
 
     // TODO(https://fxbug.dev/324650368): implement file retrieval interfaces.
-    if (auto lookup = OSImpl::RetrieveFile(module.value()->name().str()); lookup.is_error()) {
-      return lookup.take_error();
+    // Use a non-scoped diagnostics object for the main module. Because errors
+    // are generated on this module directly, its name does not need to be
+    // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
+    dl::Diagnostics diag;
+    auto lookup = OSImpl::RetrieveFile(diag, module.value()->name().str());
+    if (!lookup) [[unlikely]] {
+      return diag.take_error();
     }
 
-    return fit::ok(&module);
+    loaded_modules_.push_back(*std::move(module));
+    return diag.ok(&loaded_modules_.back());
   }
 
  private:

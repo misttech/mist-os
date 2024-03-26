@@ -13,24 +13,28 @@ namespace dl::testing {
 
 #ifdef __Fuchsia__
 
-fit::result<Error, TestFuchsia::File> TestFuchsia::RetrieveFile(std::string_view filename) {
+std::optional<TestFuchsia::File> TestFuchsia::RetrieveFile(Diagnostics& diag,
+                                                           std::string_view filename) {
   // Use the lib prefix for library paths to the same prefix used in libld,
   // which generates the testing modules used by libdl.
   std::filesystem::path path = std::filesystem::path("test") / "lib" / LD_TEST_LIBPREFIX / filename;
   if (auto vmo = elfldltl::testing::TryGetTestLibVmo(path.c_str())) {
-    return fit::ok(std::move(vmo));
+    return File{std::move(vmo), diag};
   }
-  return fit::error{Error{"cannot open %.*s", static_cast<int>(filename.size()), filename.data()}};
+  diag.SystemError("cannot open ", filename);
+  return std::nullopt;
 }
 
 #endif
 
-fit::result<Error, TestPosix::File> TestPosix::RetrieveFile(std::string_view filename) {
+std::optional<TestPosix::File> TestPosix::RetrieveFile(Diagnostics& diag,
+                                                       std::string_view filename) {
   std::filesystem::path path = elfldltl::testing::GetTestDataPath(filename);
   if (fbl::unique_fd fd{open(path.c_str(), O_RDONLY)}) {
-    return fit::ok(std::move(fd));
+    return File{std::move(fd), diag};
   }
-  return fit::error{Error{"cannot open %.*s", static_cast<int>(filename.size()), filename.data()}};
+  diag.SystemError("cannot open ", filename);
+  return std::nullopt;
 }
 
 }  // namespace dl::testing

@@ -5,13 +5,16 @@
 #ifndef LIB_DL_TEST_DL_IMPL_TESTS_H_
 #define LIB_DL_TEST_DL_IMPL_TESTS_H_
 
+#include <lib/elfldltl/fd.h>
+
 #include <fbl/unique_fd.h>
 
+#include "../diagnostics.h"
 #include "../runtime-dynamic-linker.h"
 #include "dl-tests-base.h"
 
 #ifdef __Fuchsia__
-#include <lib/zx/vmo.h>
+#include <lib/elfldltl/vmo.h>
 #endif
 
 namespace dl::testing {
@@ -19,21 +22,17 @@ namespace dl::testing {
 #ifdef __Fuchsia__
 class TestFuchsia {
  public:
-  // TODO(https://fxbug.dev/328490762): alias to elfldltl::VmoFile<Diagnostics>
-  // when we add Diagnostics support.
-  using File = zx::vmo;
+  using File = elfldltl::VmoFile<Diagnostics>;
 
-  static fit::result<Error, File> RetrieveFile(std::string_view filename);
+  static std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
 };
 #endif
 
 class TestPosix {
  public:
-  // TODO(https://fxbug.dev/328490762): alias to elfldltl::UniqueFdFile<Diagnostics>
-  // when we add Diagnostics support.
-  using File = fbl::unique_fd;
+  using File = elfldltl::UniqueFdFile<Diagnostics>;
 
-  static fit::result<Error, File> RetrieveFile(std::string_view filename);
+  static std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
 };
 
 template <class TestOS>
