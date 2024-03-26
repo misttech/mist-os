@@ -13,6 +13,8 @@ group("fidl") {
   deps = [
     ":test.time.realm_cpp",
     ":test.time.realm_rust",
+    ":test.time_cpp",
+    ":test.time_rust",
   ]
 }
 
@@ -26,4 +28,10 @@ fidl("test.time.realm") {
     "//sdk/fidl/fuchsia.testing.harness",
     "//sdk/fidl/fuchsia.time.external",
   ]
+}
+
+fidl("test.time") {
+  testonly = true
+  sources = [ "time_source_control.test.fidl" ]
+  public_deps = [ "//sdk/fidl/fuchsia.time.external" ]
 }

@@ -33,44 +33,6 @@ group("timekeeper_integration") {
   deps = [
     ":faketime-integration-test-root",
     ":timekeeper-integration-test-root",
-    ":timekeeper_integration_lib",
-  ]
-}
-
-rustc_library("timekeeper_integration_lib") {
-  testonly = true
-  name = "timekeeper_integration_lib"
-  edition = "2021"
-
-  sources = [ "tests/lib/lib.rs" ]
-
-  source_root = "tests/lib/lib.rs"
-
-  deps = [
-    ":test.time_rust",
-    "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
-    "//sdk/fidl/fuchsia.metrics.test:fuchsia.metrics.test_rust",
-    "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
-    "//sdk/fidl/fuchsia.time.external:fuchsia.time.external_rust",
-    "//src/lib/async-utils",
-    "//src/lib/fake-clock/fidl:fidl_rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-component-test",
-    "//src/lib/fuchsia-sync",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/storage/lib/vfs/rust:vfs",
-    "//src/sys/time/lib/push-source",
-    "//src/sys/time/lib/time_metrics_registry",
-    "//src/sys/time/testing/fidl:test.time.realm_rust",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:chrono",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:tracing",
   ]
 }
 
@@ -110,12 +72,6 @@ fuchsia_structured_config_values("config-values-integration") {
   values_source = "config/values.json5"
 }
 
-fidl("test.time") {
-  testonly = true
-  sources = [ "fidl/test.fidl" ]
-  public_deps = [ "//sdk/fidl/fuchsia.time.external" ]
-}
-
 rustc_test("integration_test_bin") {
   name = "timekeeper_integration_test"
   edition = "2021"
@@ -125,7 +81,6 @@ rustc_test("integration_test_bin") {
   source_root = "tests/timekeeper/integration.rs"
 
   deps = [
-    ":timekeeper_integration_lib",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.metrics.test:fuchsia.metrics.test_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
@@ -139,6 +94,7 @@ rustc_test("integration_test_bin") {
     "//src/lib/test_util",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/time/lib/time_metrics_registry",
+    "//src/sys/time/testing:timekeeper_integration",
     "//src/sys/time/testing/fidl:test.time.realm_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
@@ -200,7 +156,6 @@ rustc_test("faketime_integration_test_bin") {
   source_root = "tests/faketime/integration.rs"
 
   deps = [
-    ":timekeeper_integration_lib",
     "//sdk/fidl/fuchsia.metrics.test:fuchsia.metrics.test_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
@@ -213,6 +168,7 @@ rustc_test("faketime_integration_test_bin") {
     "//src/lib/test_util",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/time/lib/time_metrics_registry",
+    "//src/sys/time/testing:timekeeper_integration",
     "//src/sys/time/testing/fidl:test.time.realm_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
