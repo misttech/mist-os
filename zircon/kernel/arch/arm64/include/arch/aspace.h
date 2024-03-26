@@ -57,7 +57,13 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
                     size_t* unmapped) override;
 
-  zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags) override;
+  // ARM states that we must perform a break-before-make when changing the block size used by the
+  // translation system (unless ARMv8.4-TTRem is supported) and so an unmap that needs to split a
+  // large page must break-before-make, counting as an enlargement.
+  bool UnmapOnlyEnlargeOnOom() const override { return false; }
+
+  zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
+                      EnlargeOperation enlarge) override;
 
   zx_status_t Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) override;
 
@@ -110,8 +116,8 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
                          Reclaim reclaim = Reclaim::No) TA_REQ(lock_);
 
   zx_status_t ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, size_t size_in, pte_t attrs,
-                               uint index_shift, volatile pte_t* page_table, ConsistencyManager& cm)
-      TA_REQ(lock_);
+                               EnlargeOperation enlarge, uint index_shift,
+                               volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
 
   size_t HarvestAccessedPageTable(size_t* entry_limit, vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
                                   size_t size_in, uint index_shift,
@@ -138,8 +144,8 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   ssize_t UnmapPages(vaddr_t vaddr, size_t size, EnlargeOperation enlarge, vaddr_t vaddr_base,
                      ConsistencyManager& cm) TA_REQ(lock_);
 
-  zx_status_t ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs, vaddr_t vaddr_base,
-                           ConsistencyManager& cm) TA_REQ(lock_);
+  zx_status_t ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs, EnlargeOperation enlarge,
+                           vaddr_t vaddr_base, ConsistencyManager& cm) TA_REQ(lock_);
   zx_status_t QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) TA_REQ(lock_);
 
   // Walks the aspace and finds the first leaf mapping that it can, return the virtual address (in
@@ -194,7 +200,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   // data fields
   fbl::Canary<fbl::magic("VAAS")> canary_;
 
-  DECLARE_CRITICAL_MUTEX(ArmArchVmAspace) lock_;
+  mutable DECLARE_CRITICAL_MUTEX(ArmArchVmAspace) lock_;
 
   // Tracks the number of pending access faults. A non-zero value informs the access harvester to
   // back off to avoid contention with access faults.

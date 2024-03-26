@@ -1243,7 +1243,8 @@ zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOpera
   return result.status_value();
 }
 
-zx_status_t Riscv64ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags) {
+zx_status_t Riscv64ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
+                                         EnlargeOperation enlarge) {
   canary_.Assert();
 
   if (!IsValidVaddr(vaddr)) {

@@ -529,6 +529,9 @@ class ArmArchVmAspace::ConsistencyManager {
   // flush has occurred.
   void FreePage(vm_page_t* page) { list_add_tail(&to_free_, &page->queue_node); }
 
+  Lock<CriticalMutex>* lock() const TA_RET_CAP(aspace_.lock_) { return &aspace_.lock_; }
+  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(aspace_.lock_) { return aspace_.lock_; }
+
  private:
   // Maximum number of TLB entries we will queue before switching to ASID invalidation.
   static constexpr size_t kMaxPendingTlbs = 16;
@@ -711,8 +714,14 @@ zx_status_t ArmArchVmAspace::SplitLargePage(vaddr_t vaddr, const uint index_shif
     new_page_table[i] = mapped_paddr | attrs;
   }
 
-  // Ensure all new entries of the table becomes visible prior to page table installation.
-  __dsb(ARM_MB_ISHST);
+  // As we are changing the block size of a translation we must do a break-before-make in accordance
+  // with ARM requirements to avoid TLB and other inconsistency.
+  update_pte(&page_table[pt_index], MMU_PTE_DESCRIPTOR_INVALID);
+  cm.FlushEntry(vaddr, true);
+  AssertHeld(cm.lock_ref());
+  // Must force the flush to happen now before installing the new entry. This will also ensure the
+  // page table entries we wrote will be visible before we install it.
+  cm.Flush();
 
   update_pte(&page_table[pt_index], paddr | MMU_PTE_L012_DESCRIPTOR_TABLE);
   LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, pt_index, page_table[pt_index]);
@@ -828,13 +837,15 @@ ssize_t ArmArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t
     if (index_shift > page_size_shift_ &&
         (pte & MMU_PTE_DESCRIPTOR_MASK) == MMU_PTE_L012_DESCRIPTOR_BLOCK &&
         chunk_size != block_size) {
+      // Splitting a large page may perform break-before-make, and during that window we will have
+      // temporarily unmapped beyond our range, so make sure we are permitted to do that.
+      if (enlarge != EnlargeOperation::Yes) {
+        return ZX_ERR_NOT_SUPPORTED;
+      }
       zx_status_t s = SplitLargePage(vaddr, index_shift, index, page_table, cm);
-      // If the split failed then check if we are allowed to unmap extra, and if so just fall
-      // through and unmap the entire large page.
+      // If the split failed then fall through and unmap the entire large page.
       if (likely(s == ZX_OK)) {
         pte = page_table[index];
-      } else if (enlarge == EnlargeOperation::No) {
-        return s;
       }
     }
     if (index_shift > page_size_shift_ &&
@@ -1024,8 +1035,9 @@ ssize_t ArmArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, pa
 }
 
 zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
-                                              size_t size_in, pte_t attrs, const uint index_shift,
-                                              volatile pte_t* page_table, ConsistencyManager& cm) {
+                                              size_t size_in, pte_t attrs, EnlargeOperation enlarge,
+                                              const uint index_shift, volatile pte_t* page_table,
+                                              ConsistencyManager& cm) {
   vaddr_t vaddr = vaddr_in;
   vaddr_t vaddr_rel = vaddr_rel_in;
   size_t size = size_in;
@@ -1051,6 +1063,11 @@ zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_re
     if (index_shift > page_size_shift_ &&
         (pte & MMU_PTE_DESCRIPTOR_MASK) == MMU_PTE_L012_DESCRIPTOR_BLOCK &&
         chunk_size != block_size) {
+      // Splitting a large page may perform break-before-make, and during that window we will have
+      // temporarily unmapped beyond our range, so make sure that is permitted.
+      if (enlarge != EnlargeOperation::Yes) {
+        return ZX_ERR_NOT_SUPPORTED;
+      }
       zx_status_t s = SplitLargePage(vaddr, index_shift, index, page_table, cm);
       if (unlikely(s != ZX_OK)) {
         return s;
@@ -1066,7 +1083,7 @@ zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_re
 
       // Recurse a level.
       zx_status_t status =
-          ProtectPageTable(vaddr, vaddr_rem, chunk_size, attrs,
+          ProtectPageTable(vaddr, vaddr_rem, chunk_size, attrs, enlarge,
                            index_shift - (page_size_shift_ - 3), next_page_table, cm);
       if (unlikely(status != ZX_OK)) {
         return status;
@@ -1302,7 +1319,8 @@ ssize_t ArmArchVmAspace::UnmapPages(vaddr_t vaddr, size_t size, EnlargeOperation
 }
 
 zx_status_t ArmArchVmAspace::ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs,
-                                          vaddr_t vaddr_base, ConsistencyManager& cm) {
+                                          EnlargeOperation enlarge, vaddr_t vaddr_base,
+                                          ConsistencyManager& cm) {
   vaddr_t vaddr_rel = vaddr - vaddr_base;
   vaddr_t vaddr_rel_max = 1UL << top_size_shift_;
 
@@ -1318,7 +1336,8 @@ zx_status_t ArmArchVmAspace::ProtectPages(vaddr_t vaddr, size_t size, pte_t attr
 
   LOCAL_KTRACE("mmu protect", ("vaddr", vaddr), ("size", size));
 
-  zx_status_t ret = ProtectPageTable(vaddr, vaddr_rel, size, attrs, top_index_shift_, tt_virt_, cm);
+  zx_status_t ret =
+      ProtectPageTable(vaddr, vaddr_rel, size, attrs, enlarge, top_index_shift_, tt_virt_, cm);
   return ret;
 }
 
@@ -1541,7 +1560,8 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOperation
   return (ret < 0) ? (zx_status_t)ret : 0;
 }
 
-zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags) {
+zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
+                                     EnlargeOperation enlarge) {
   canary_.Assert();
 
   if (!IsValidVaddr(vaddr)) {
@@ -1593,7 +1613,7 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
     pte_t attrs = MmuParamsFromFlags(mmu_flags);
 
     ConsistencyManager cm(*this);
-    ret = ProtectPages(vaddr, count * PAGE_SIZE, attrs, vaddr_base_, cm);
+    ret = ProtectPages(vaddr, count * PAGE_SIZE, attrs, enlarge, vaddr_base_, cm);
     MarkAspaceModified();
   }
 

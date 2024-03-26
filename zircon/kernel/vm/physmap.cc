@@ -37,8 +37,10 @@ void physmap_protect_region(vaddr_t base, size_t size, uint mmu_flags) {
   const size_t page_count = size / PAGE_SIZE;
   LTRACEF("base=0x%" PRIx64 "; page_count=0x%" PRIx64 "\n", base, page_count);
 
-  zx_status_t status =
-      VmAspace::kernel_aspace()->arch_aspace().Protect(base, page_count, mmu_flags);
+  // This code only runs during the init stages before other CPUs are brought only, and so we are
+  // safe to allow temporary enlargement of the operation.
+  zx_status_t status = VmAspace::kernel_aspace()->arch_aspace().Protect(
+      base, page_count, mmu_flags, ArchVmAspace::EnlargeOperation::Yes);
   ASSERT(status == ZX_OK);
 }
 

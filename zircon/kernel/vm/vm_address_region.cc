@@ -16,6 +16,7 @@
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
+#include <kernel/mp.h>
 #include <ktl/algorithm.h>
 #include <ktl/limits.h>
 #include <vm/fault.h>
@@ -1102,7 +1103,14 @@ zx_status_t VmAddressRegion::ReserveSpace(const char* name, vaddr_t base, size_t
     return aspace_->arch_aspace().Unmap(base, size / PAGE_SIZE, ArchVmAspace::EnlargeOperation::No,
                                         nullptr);
   } else {
-    return aspace_->arch_aspace().Protect(base, size / PAGE_SIZE, arch_mmu_flags);
+    // This method should only be called during early system init prior to the bringup of other
+    // CPUs. In this case it is safe to allow the Protect operations to temporarily enlarge.
+    const cpu_mask_t online = mp_get_online_mask();
+    const cpu_num_t curr = arch_curr_cpu_num();
+    DEBUG_ASSERT_MSG((online & ~cpu_num_to_mask(curr)) == 0,
+                     "Online mask %u has more than current cpu %u", online, curr);
+    return aspace_->arch_aspace().Protect(base, size / PAGE_SIZE, arch_mmu_flags,
+                                          ArchVmAspace::EnlargeOperation::Yes);
   }
 }
 

@@ -260,6 +260,8 @@ void VirtualAlloc::UnmapFreePages(vaddr_t vaddr, size_t pages) {
     list_add_tail(&free_list, &page->queue_node);
   }
   size_t unmapped = 0;
+  // As this is the kernel aspace we cannot tolerate enlarging the operation, as other CPUs may be
+  // accessing the nearby portions and we cannot trigger faults.
   zx_status_t status = VmAspace::kernel_aspace()->arch_aspace().Unmap(
       vaddr, pages, ArchVmAspace::EnlargeOperation::No, &unmapped);
   ZX_ASSERT_MSG(status == ZX_OK, "Failed to unmap %zu pages at %" PRIxPTR "", pages, vaddr);
@@ -294,39 +296,44 @@ zx_status_t VirtualAlloc::AllocMapPages(vaddr_t vaddr, size_t num_pages) {
     pmm_free(&alloc_pages);
   });
 
-  const size_t align_pages = 1ul << (align_log2_ - PAGE_SIZE_SHIFT);
-  if (align_pages > 1) {
-    while (mapped_count + align_pages <= num_pages) {
-      paddr_t paddr;
-      list_node_t contiguous_pages = LIST_INITIAL_VALUE(contiguous_pages);
-      // Being in this path we know that align_pages is >1, which can only happen if our align_log_2
-      // is greater than the system PAGE_SIZE_SHIFT. As such we need to allocate multiple contiguous
-      // pages at a greater than system page size alignment, and so we must use the general
-      // pmm_alloc_contiguous.
-      zx_status_t status =
-          pmm_alloc_contiguous(align_pages, 0, (uint8_t)align_log2_, &paddr, &contiguous_pages);
-      if (status != ZX_OK) {
-        // Failing to allocate a contiguous block isn't an error, as the pmm could just be
-        // fragmented. Drop out of this loop and attempt to finish with the single page mappings.
-        break;
+  // Ideally we would like to create the chance of using large pages with aligned allocations and
+  // MapContiguous, but we can only do this if we can later safely unmap without enlarging the
+  // range.
+  if (VmAspace::kernel_aspace()->arch_aspace().UnmapOnlyEnlargeOnOom()) {
+    const size_t align_pages = 1ul << (align_log2_ - PAGE_SIZE_SHIFT);
+    if (align_pages > 1) {
+      while (mapped_count + align_pages <= num_pages) {
+        paddr_t paddr;
+        list_node_t contiguous_pages = LIST_INITIAL_VALUE(contiguous_pages);
+        // Being in this path we know that align_pages is >1, which can only happen if our
+        // align_log_2 is greater than the system PAGE_SIZE_SHIFT. As such we need to allocate
+        // multiple contiguous pages at a greater than system page size alignment, and so we must
+        // use the general pmm_alloc_contiguous.
+        zx_status_t status =
+            pmm_alloc_contiguous(align_pages, 0, (uint8_t)align_log2_, &paddr, &contiguous_pages);
+        if (status != ZX_OK) {
+          // Failing to allocate a contiguous block isn't an error, as the pmm could just be
+          // fragmented. Drop out of this loop and attempt to finish with the single page mappings.
+          break;
+        }
+        vm_page_t *p, *temp;
+        list_for_every_entry_safe (&contiguous_pages, p, temp, vm_page_t, queue_node) {
+          p->set_state(allocated_page_state_);
+        }
+        list_splice_after(&contiguous_pages, &alloc_pages);
+        size_t mapped = 0;
+        status = VmAspace::kernel_aspace()->arch_aspace().MapContiguous(
+            vaddr + mapped_count * PAGE_SIZE, paddr, align_pages, kMmuFlags, &mapped);
+        if (status != ZX_OK) {
+          return status;
+        }
+        ZX_ASSERT(mapped == align_pages);
+        mapped_count += align_pages;
       }
-      vm_page_t *p, *temp;
-      list_for_every_entry_safe (&contiguous_pages, p, temp, vm_page_t, queue_node) {
-        p->set_state(allocated_page_state_);
+      if (mapped_count == num_pages) {
+        cleanup.cancel();
+        return ZX_OK;
       }
-      list_splice_after(&contiguous_pages, &alloc_pages);
-      size_t mapped = 0;
-      status = VmAspace::kernel_aspace()->arch_aspace().MapContiguous(
-          vaddr + mapped_count * PAGE_SIZE, paddr, align_pages, kMmuFlags, &mapped);
-      if (status != ZX_OK) {
-        return status;
-      }
-      ZX_ASSERT(mapped == align_pages);
-      mapped_count += align_pages;
-    }
-    if (mapped_count == num_pages) {
-      cleanup.cancel();
-      return ZX_OK;
     }
   }
 

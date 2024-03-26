@@ -111,7 +111,8 @@ class ArchVmAspaceInterface {
   virtual zx_status_t Destroy() = 0;
 
   // main methods
-  // Map a physically contiguous region into the virtual address space
+  // Map a physically contiguous region into the virtual address space. This is allowed to use any
+  // page size the architecture allows given the from the input parameters.
   virtual zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags,
                                     size_t* mapped) = 0;
 
@@ -139,7 +140,7 @@ class ArchVmAspaceInterface {
 
   // Unmap the given virtual address range.
   // EnlargeOperation controls whether the unmap region can be extended to be larger, or if only the
-  // exact region may be unmapped. The unmap region might be extended in out of memory scenarios if
+  // exact region may be unmapped. The unmap region might be extended, even if only temporarily, if
   // large pages need to be split.
   enum EnlargeOperation : bool {
     Yes = true,
@@ -148,13 +149,22 @@ class ArchVmAspaceInterface {
   virtual zx_status_t Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
                             size_t* unmapped) = 0;
 
+  // Returns whether or not an unmap might need to enlarge an operation for reasons other than being
+  // out of memory. If this returns true, then unmapping a partial large page will fail always
+  // require an enlarged operation.
+  virtual bool UnmapOnlyEnlargeOnOom() const = 0;
+
   // Change the page protections on the given virtual address range
   //
   // May return ZX_ERR_NO_MEMORY if the operation requires splitting
   // a large page and the next level page table allocation fails. In
   // this case, mappings in the input range may be a mix of the old and
   // new flags.
-  virtual zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags) = 0;
+  // EnlargeOperation controls whether the a larger range than requested is permitted to experience
+  // a temporary permissions change. A temporary change may be required if a break-before-make style
+  // unmap -> remap of the large page is required.
+  virtual zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
+                              EnlargeOperation enlarge) = 0;
 
   virtual zx_status_t Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) = 0;
 
