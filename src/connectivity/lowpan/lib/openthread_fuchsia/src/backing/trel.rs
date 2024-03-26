@@ -339,9 +339,11 @@ impl TrelInstance {
                 Poll::Ready(Ok((len, sockaddr))) => {
                     let sockaddr: ot::SockAddr = sockaddr.as_socket_ipv6().unwrap().into();
                     debug!(tag = "trel", "Incoming {} byte TREL packet from {:?}", len, sockaddr);
-                    let mut counters = self.counters.borrow_mut();
-                    counters.update_rx_bytes(len.try_into().unwrap());
-                    counters.update_rx_packets(1);
+                    {
+                        let mut counters = self.counters.borrow_mut();
+                        counters.update_rx_bytes(len.try_into().unwrap());
+                        counters.update_rx_packets(1);
+                    }
                     instance.plat_trel_handle_received(&buffer[..len])
                 }
                 Poll::Ready(Err(err)) => {
