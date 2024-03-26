@@ -110,7 +110,6 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
-                "fuchsia.tpm.cr50.Cr50",
                 "fuchsia.tracing.kernel.Controller",
             ],
         },
@@ -140,6 +139,13 @@
             protocol: "fuchsia.dash.Launcher",
 
             // The source of this protocol, debug-dash-launcher,
+            // may not be available on all products.
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.tpm.cr50.Cr50",
+
+            // The source of this protocol, cr50,
             // may not be available on all products.
             availability: "optional",
         },

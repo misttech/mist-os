@@ -122,13 +122,18 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.thermal.ClientStateConnector",
                 "fuchsia.time.Maintenance",
-                "fuchsia.tpm.cr50.Cr50",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
                 "fuchsia.virtualconsole.SessionManager",
             ],
             from: "parent",
             to: "#sshd-host",
+        },
+        {
+            protocol: "fuchsia.tpm.cr50.Cr50",
+            from: "parent",
+            to: "#sshd-host",
+            availability: "optional",
         },
 
         // SWD

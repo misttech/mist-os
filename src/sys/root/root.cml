@@ -265,8 +265,6 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.thermal.ClientStateConnector",
-                "fuchsia.tpm.cr50.Cr50",
-                "fuchsia.tpm.cr50.PinWeaver",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
                 "fuchsia.update.verify.BlobfsVerifier",
@@ -274,6 +272,12 @@
             ],
             from: "#bootstrap",
             to: "#core",
+        },
+        {
+            protocol: [ "fuchsia.tpm.cr50.Cr50" ],
+            from: "#bootstrap",
+            to: "#core",
+            availability: "optional",
         },
 
         // Non-zircon services for archivist, svchost, and console.

@@ -73,10 +73,6 @@
             url: "fuchsia-boot:///sysinfo#meta/sysinfo.cm",
         },
         {
-            name: "cr50_agent",
-            url: "fuchsia-boot:///#meta/cr50_agent.cm",
-        },
-        {
             // pkg-cache is present on all product configurations except
             // bringup builds, as its dependency pkgfs is not available on
             // bringup builds either.
@@ -552,13 +548,6 @@
         {
             directory: "dev-class",
             from: "#devfs-with-pkg",
-            as: "dev-class-tpm",
-            to: "#cr50_agent",
-            subdir: "tpm",
-        },
-        {
-            directory: "dev-class",
-            from: "#devfs-with-pkg",
             as: "input-report",
             to: "#virtual_console",
             subdir: "input-report",
@@ -722,7 +711,6 @@
                 "#console",
                 "#console-launcher",
                 "#cpu_manager",
-                "#cr50_agent",
                 "#device_name_provider",
                 "#fshost",
                 "#miscsvc",
@@ -745,11 +733,6 @@
             to: [ "#pwrbtn-monitor" ],
         },
         {
-            protocol: [ "fuchsia.power.button.Monitor" ],
-            from: "#pwrbtn-monitor",
-            to: "#cr50_agent",
-        },
-        {
             protocol: [
                 "fuchsia.fshost.Admin",
                 "fuchsia.fshost.BlockWatcher",
@@ -764,6 +747,7 @@
             protocol: [ "fuchsia.tpm.cr50.Cr50" ],
             from: "#cr50_agent",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             directory: "dev-class",
@@ -950,13 +934,6 @@
             from: "#virtual_console",
         },
         {
-            protocol: [
-                "fuchsia.tpm.cr50.Cr50",
-                "fuchsia.tpm.cr50.PinWeaver",
-            ],
-            from: "#cr50_agent",
-        },
-        {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
         },
@@ -991,6 +968,11 @@
                 "fuchsia.thermal.ClientStateConnector",
             ],
             from: "#power_manager",
+        },
+        {
+            protocol: "fuchsia.tpm.cr50.Cr50",
+            from: "#cr50_agent",
+            source_availability: "unknown",
         },
         {
             protocol: [
