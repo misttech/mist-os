@@ -114,6 +114,11 @@ into the images.
 
     // The arguments to pass to the kernel on boot.
     args: [ "arg1", "arg2" ],
+
+    // The minimum clock time.
+    // See https://fuchsia.dev/fuchsia-src/concepts/time/utc/behavior for more information.
+    // The backstop is called out as a required argument to prevent mistakes.
+    clock_backstop: 10,
   },
 
   // Arguments available in the boot service for userspace programs.

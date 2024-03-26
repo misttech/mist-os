@@ -98,7 +98,7 @@ mod tests {
         let system_manifest = generate_test_manifest_file(dir, "extra_base");
         let base_manifest = generate_test_manifest_file(dir, "test_static");
         let cache_manifest = generate_test_manifest_file(dir, "test_cache");
-        let mut product_config = ImageAssemblyConfig::new_for_testing("kernel");
+        let mut product_config = ImageAssemblyConfig::new_for_testing("kernel", 0);
         product_config.system.push(system_manifest);
         product_config.base.push(base_manifest);
         product_config.cache.push(cache_manifest);
@@ -142,7 +142,7 @@ mod tests {
         let system_manifest = generate_test_manifest_file(dir, "extra_base");
         let base_manifest = generate_test_manifest_file(dir, "test_static");
         let cache_manifest = generate_test_manifest_file(dir, "test_cache");
-        let mut product_config = ImageAssemblyConfig::new_for_testing("kernel");
+        let mut product_config = ImageAssemblyConfig::new_for_testing("kernel", 0);
         product_config.system.push(system_manifest);
         product_config.base.push(base_manifest);
         product_config.cache.push(cache_manifest);

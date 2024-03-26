@@ -66,7 +66,7 @@ pub struct ImageAssemblyConfig {
 impl ImageAssemblyConfig {
     /// Helper function for constructing a ImageAssemblyConfig in tests in this
     /// and other modules within the crate.
-    pub fn new_for_testing(kernel_path: impl AsRef<Utf8Path>) -> Self {
+    pub fn new_for_testing(kernel_path: impl AsRef<Utf8Path>, clock_backstop: u64) -> Self {
         Self {
             system: Vec::default(),
             base: Vec::default(),
@@ -74,7 +74,11 @@ impl ImageAssemblyConfig {
             boot_args: Vec::default(),
             bootfs_files: Vec::default(),
             bootfs_packages: Vec::default(),
-            kernel: KernelConfig { path: kernel_path.as_ref().into(), args: Vec::default() },
+            kernel: KernelConfig {
+                path: kernel_path.as_ref().into(),
+                args: Vec::default(),
+                clock_backstop,
+            },
             qemu_kernel: "path/to/qemu/kernel".into(),
             images_config: ImagesConfig::default(),
             board_driver_arguments: None,
@@ -94,6 +98,9 @@ pub struct PartialKernelConfig {
     /// The list of command line arguments to pass to the kernel on startup.
     #[serde(default)]
     pub args: Vec<String>,
+
+    /// The backstop UTC time for the clock.
+    pub clock_backstop: Option<u64>,
 }
 
 /// The information required to specify a kernel and its arguments.
@@ -106,6 +113,10 @@ pub struct KernelConfig {
     /// The list of command line arguments to pass to the kernel on startup.
     #[serde(default)]
     pub args: Vec<String>,
+
+    /// The backstop UTC time for the clock.
+    /// This is kept separate from the `args` to make it clear that this is a required argument.
+    pub clock_backstop: u64,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -148,6 +159,7 @@ mod tests {
               "kernel": {
                 "path": "path/to/kernel",
                 "args": ["arg1", "arg2"],
+                "clock_backstop": 0
               },
               "qemu_kernel": "path/to/qemu/kernel",
               "bootfs_files": [
@@ -166,6 +178,7 @@ mod tests {
             KernelConfig {
                 path: "path/to/kernel".into(),
                 args: vec!["arg1".into(), "arg2".into()],
+                clock_backstop: 0
             }
         );
     }
@@ -181,6 +194,7 @@ mod tests {
               kernel: {
                 path: "path/to/kernel",
                 args: ["arg1", "arg2"],
+                clock_backstop: 0,
               },
               qemu_kernel: "path/to/qemu/kernel",
               // and lists can have trailing commas
@@ -201,6 +215,7 @@ mod tests {
             KernelConfig {
                 path: "path/to/kernel".into(),
                 args: vec!["arg1".into(), "arg2".into()],
+                clock_backstop: 0
             }
         );
     }

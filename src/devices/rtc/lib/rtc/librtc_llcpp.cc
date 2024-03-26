@@ -58,6 +58,15 @@ uint64_t DaysInMonth(uint64_t month, uint64_t year) {
   return days;
 }
 
+uint64_t RtcBackstopSeconds(zx_device_t* device) {
+  char str[32];
+  zx_status_t status = device_get_variable(device, "clock.backstop", str, sizeof(str), nullptr);
+  if (status != ZX_OK) {
+    return 0;
+  }
+  return strtoll(str, NULL, 10);
+}
+
 }  // namespace
 
 bool IsRtcValid(FidlRtc::wire::Time rtc) {
@@ -149,7 +158,14 @@ uint64_t SecondsSinceEpoch(FidlRtc::wire::Time rtc) {
 }
 
 FidlRtc::wire::Time SanitizeRtc(zx_device_t* device, FidlRtc::wire::Time rtc) {
-  if (!IsRtcValid(rtc) || rtc.year < kDefaultYear) {
+  const uint64_t kBackstop = RtcBackstopSeconds(device);
+  if (!IsRtcValid(rtc) || rtc.year < kDefaultYear || SecondsSinceEpoch(rtc) < kBackstop) {
+    // Return a backstop value read from the environment.
+    if (kBackstop > 0) {
+      fprintf(stderr, "RTC is sanitized to clock.backstop=%ld\n", kBackstop);
+      return SecondsToRtc(kBackstop);
+    }
+
     fprintf(stderr, "RTC is sanitized to constant default\n");
     return kDefaultRtc;
   }

@@ -331,6 +331,7 @@ mod tests {
               kernel: {
                 path: "path/to/kernel",
                 args: ["arg1", "arg2"],
+                clock_backstop: 0,
               },
               // and lists can have trailing commas
               boot_args: ["arg1", "arg2", ],
@@ -402,6 +403,7 @@ mod tests {
         let expected_kernel = PartialKernelConfig {
             path: Some(Utf8PathBuf::from("path/to/kernel")),
             args: vec!["arg1".to_string(), "arg2".to_string()],
+            clock_backstop: Some(0),
         };
         assert_eq!(bundle.kernel, Some(expected_kernel));
         assert_eq!(bundle.boot_args, vec!("arg1".to_string(), "arg2".to_string()));

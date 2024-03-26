@@ -159,6 +159,7 @@ def setup_temp_dir(*args, **kwargs):
         kernel = KernelInfo()
         kernel.path = os.path.join(SOURCE_DIR, "kernel.bin")
         kernel.args.update(["arg1", "arg2"])
+        kernel.clock_backstop = 123456
 
         # Add the bootfs files that are listed in package manifests.
         package_name = "bootfs"
@@ -248,6 +249,7 @@ class MakeLegacyConfig(unittest.TestCase):
             self.assertEqual(aib.boot_args, set(["boot-arg-1", "boot-arg-2"]))
             self.assertEqual(aib.kernel.path, "kernel/kernel.bin")
             self.assertEqual(aib.kernel.args, set(["arg1", "arg2"]))
+            self.assertEqual(aib.kernel.clock_backstop, 123456)
             self.assertEqual(
                 aib.bootfs_files_package,
                 "packages/bootfs_packages/bootfs_files_package",

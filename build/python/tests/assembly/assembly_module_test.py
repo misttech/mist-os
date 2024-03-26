@@ -165,7 +165,8 @@ raw_assembly_input_bundle_json = """{
     "args": [
       "arg1",
       "arg2"
-    ]
+    ],
+    "clock_backstop": 1234
   },
   "boot_args": [
     "arg3",
@@ -275,6 +276,7 @@ class AssemblyInputBundleTest(unittest.TestCase):
         )
         aib.kernel.path = "path/to/kernel"
         aib.kernel.args.update(["arg1", "arg2"])
+        aib.kernel.clock_backstop = 1234
         aib.boot_args.update(["arg3", "arg4"])
         aib.bootfs_files.add(FileEntry("path/to/source", "path/to/destination"))
         aib.config_data["package1"] = set(
@@ -323,6 +325,7 @@ class AssemblyInputBundleTest(unittest.TestCase):
         )
         aib.kernel.path = "path/to/kernel"
         aib.kernel.args.update(["arg1", "arg2"])
+        aib.kernel.clock_backstop = 1234
         aib.boot_args.update(["arg3", "arg4"])
         aib.bootfs_files.add(FileEntry("path/to/source", "path/to/destination"))
         aib.config_data["package1"] = set(

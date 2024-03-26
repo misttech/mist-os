@@ -170,7 +170,8 @@ __EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, 
     return ZX_OK;
   }
 
-  if (strncmp(name, "driver.", strlen("driver.")) == 0) {
+  if (strncmp(name, "driver.", strlen("driver.")) == 0 ||
+      strncmp(name, "clock.backstop", strlen("clock.backstop")) == 0) {
     auto variable = device->driver()->GetVariable(name);
     if (variable.is_error()) {
       return variable.status_value();
