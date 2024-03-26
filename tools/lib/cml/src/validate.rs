@@ -12,6 +12,7 @@ use {
         Offer, OfferFromRef, OfferToRef, OneOrMany, Program, RegistrationRef, Rights,
         RootDictionaryRef, SourceAvailability, Use, UseFromRef,
     },
+    cm_types::IterablePath,
     directed_graph::DirectedGraph,
     std::{
         collections::{BTreeMap, HashMap, HashSet},
@@ -60,6 +61,7 @@ struct ValidationContext<'a> {
     all_dictionaries: HashMap<&'a Name, Option<&'a DictionaryRef>>,
     all_environment_names: HashSet<&'a Name>,
     all_capability_names: HashSet<&'a Name>,
+    strong_dependencies: DirectedGraph<DependencyNode<'a>>,
 }
 
 // Facet key for fuchsia.test
@@ -92,6 +94,7 @@ impl<'a> ValidationContext<'a> {
             all_dictionaries: HashMap::new(),
             all_environment_names: HashSet::new(),
             all_capability_names: HashSet::new(),
+            strong_dependencies: DirectedGraph::new(),
         }
     }
 
@@ -142,17 +145,16 @@ impl<'a> ValidationContext<'a> {
         self.all_capability_names = self.document.all_capability_names();
 
         // Validate "children".
-        let mut strong_dependencies = DirectedGraph::new();
         if let Some(children) = &self.document.children {
             for child in children {
-                self.validate_child(&child, &mut strong_dependencies)?;
+                self.validate_child(&child)?;
             }
         }
 
         // Validate "collections".
         if let Some(collections) = &self.document.collections {
             for collection in collections {
-                self.validate_collection(&collection, &mut strong_dependencies)?;
+                self.validate_collection(&collection)?;
             }
         }
 
@@ -169,7 +171,7 @@ impl<'a> ValidationContext<'a> {
         if let Some(uses) = self.document.r#use.as_ref() {
             let mut used_ids = HashMap::new();
             for use_ in uses.iter() {
-                self.validate_use(&use_, &mut used_ids, &mut strong_dependencies)?;
+                self.validate_use(&use_, &mut used_ids)?;
                 if use_.runner.is_some() {
                     uses_runner = true;
                 }
@@ -216,12 +218,7 @@ impl<'a> ValidationContext<'a> {
             }
 
             for offer in offers.iter() {
-                self.validate_offer(
-                    &offer,
-                    &mut used_ids,
-                    &mut strong_dependencies,
-                    &offered_to_all,
-                )?;
+                self.validate_offer(&offer, &mut used_ids, &offered_to_all)?;
             }
         }
 
@@ -238,7 +235,7 @@ impl<'a> ValidationContext<'a> {
         // Validate "environments".
         if let Some(environments) = &self.document.environments {
             for env in environments {
-                self.validate_environment(&env, &mut strong_dependencies)?;
+                self.validate_environment(&env)?;
             }
         }
 
@@ -246,7 +243,7 @@ impl<'a> ValidationContext<'a> {
         self.validate_config(&self.document.config)?;
 
         // Check for dependency cycles
-        match strong_dependencies.topological_sort() {
+        match self.strong_dependencies.topological_sort() {
             Ok(_) => {}
             Err(e) => {
                 return Err(Error::validate(format!(
@@ -322,11 +319,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         Ok(())
     }
 
-    fn validate_child(
-        &self,
-        child: &'a Child,
-        strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
-    ) -> Result<(), Error> {
+    fn validate_child(&mut self, child: &'a Child) -> Result<(), Error> {
         if let Some(environment_ref) = &child.environment {
             match environment_ref {
                 EnvironmentRef::Named(environment_name) => {
@@ -338,18 +331,14 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     }
                     let source = DependencyNode::Named(&environment_name);
                     let target = DependencyNode::Named(&child.name);
-                    self.add_strong_dep(None, source, target, strong_dependencies);
+                    self.add_strong_dep(source, target);
                 }
             }
         }
         Ok(())
     }
 
-    fn validate_collection(
-        &self,
-        collection: &'a Collection,
-        strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
-    ) -> Result<(), Error> {
+    fn validate_collection(&mut self, collection: &'a Collection) -> Result<(), Error> {
         if collection.allow_long_names.is_some() {
             self.features.check(Feature::AllowLongNames)?;
         }
@@ -364,7 +353,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     }
                     let source = DependencyNode::Named(&environment_name);
                     let target = DependencyNode::Named(&collection.name);
-                    self.add_strong_dep(None, source, target, strong_dependencies);
+                    self.add_strong_dep(source, target);
                 }
             }
         }
@@ -372,7 +361,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
     }
 
     fn validate_capability(
-        &self,
+        &mut self,
         capability: &'a Capability,
         used_ids: &mut HashMap<String, CapabilityId<'a>>,
     ) -> Result<(), Error> {
@@ -382,7 +371,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         if capability.directory.is_some() && capability.rights.is_none() {
             return Err(Error::validate("\"rights\" should be present with \"directory\""));
         }
-        if capability.storage.is_some() {
+        if let Some(name) = capability.storage.as_ref() {
             if capability.from.is_none() {
                 return Err(Error::validate("\"from\" should be present with \"storage\""));
             }
@@ -396,6 +385,14 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
             if capability.storage_id.is_none() {
                 return Err(Error::validate("\"storage_id\" should be present with \"storage\""));
+            }
+
+            // The storage capability depends on its backing dir.
+            let target = DependencyNode::Named(name);
+            let source = capability.from.as_ref().unwrap();
+            let names = vec![capability.backing_dir.as_ref().unwrap()];
+            for source in self.expand_source_dependencies(names, &source.into()) {
+                self.add_strong_dep(source, target);
             }
         }
         if capability.runner.is_some() && capability.from.is_some() {
@@ -413,8 +410,18 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         if capability.config.is_some() {
             self.features.check(Feature::ConfigCapabilities)?;
         }
-        if capability.dictionary.is_some() {
+
+        if let Some(name) = capability.dictionary.as_ref() {
             self.features.check(Feature::Dictionaries)?;
+
+            // The dictionary capability may depend on a dictionary it extends.
+            if let Some(extends) = capability.extends.as_ref() {
+                let target = DependencyNode::Named(name);
+                let names = vec![extends.path.iter_segments().next().unwrap()];
+                for source in self.expand_source_dependencies(names, &extends.into()) {
+                    self.add_strong_dep(source, target);
+                }
+            }
         }
         if capability.delivery.is_some() {
             self.features.check(Feature::DeliveryType)?;
@@ -438,10 +445,9 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
     }
 
     fn validate_use(
-        &self,
+        &mut self,
         use_: &'a Use,
         used_ids: &mut HashMap<String, CapabilityId<'a>>,
-        strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
     ) -> Result<(), Error> {
         if use_.from == Some(UseFromRef::Debug) && use_.protocol.is_none() {
             return Err(Error::validate("only \"protocol\" supports source from \"debug\""));
@@ -494,13 +500,13 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             let _ = use_config_to_value_type(use_)?;
         }
 
-        if let Some(source) = DependencyNode::use_from_ref(use_.from.as_ref()) {
-            for name in &use_.names() {
+        if let Some(source) = use_.from.as_ref() {
+            for source in self.expand_source_dependencies(use_.names(), &source.into()) {
                 let target = DependencyNode::Self_;
                 if use_.dependency.as_ref().unwrap_or(&DependencyType::Strong)
                     == &DependencyType::Strong
                 {
-                    self.add_strong_dep(Some(name), source, target, strong_dependencies);
+                    self.add_strong_dep(source, target);
                 }
             }
         }
@@ -798,10 +804,9 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
     }
 
     fn validate_offer(
-        &self,
+        &mut self,
         offer: &'a Offer,
         used_ids: &mut HashMap<Name, HashMap<String, CapabilityId<'a>>>,
-        strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
         protocols_offered_to_all: &[&'a Offer],
     ) -> Result<(), Error> {
         // TODO: Many of these checks are repititious, see if we can unify them
@@ -1071,18 +1076,9 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     true
                 };
                 if is_strong {
-                    if let Some(source) = DependencyNode::offer_from_ref(from) {
-                        for name in &offer.names() {
-                            let target = DependencyNode::offer_to_ref(to);
-                            self.add_strong_dep(Some(name), source, target, strong_dependencies);
-                        }
-                    }
-                    if let OfferFromRef::Named(from) = from {
-                        let source = DependencyNode::Named(from);
-                        let target = DependencyNode::Named(to_target);
-                        for name in &offer.names() {
-                            self.add_strong_dep(Some(name), source, target, strong_dependencies);
-                        }
+                    for source in self.expand_source_dependencies(offer.names(), &from.into()) {
+                        let target = DependencyNode::offer_to_ref(to);
+                        self.add_strong_dep(source, target);
                     }
                 }
             }
@@ -1207,69 +1203,67 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         Ok(())
     }
 
+    fn expand_source_dependencies(
+        &self,
+        names: Vec<&'a Name>,
+        source: &AnyRef<'a>,
+    ) -> Vec<DependencyNode<'a>> {
+        let mut sources = vec![];
+        match source {
+            AnyRef::Self_ => {
+                let mut has_named = false;
+                for name in names {
+                    if self.all_dictionaries.contains_key(name)
+                        || self.all_storages.contains_key(name)
+                    {
+                        sources.push(DependencyNode::Named(name));
+                        has_named = true;
+                    }
+                }
+                if !has_named {
+                    sources.push(DependencyNode::Self_);
+                }
+            }
+            AnyRef::Dictionary(d) => {
+                let mut has_named = false;
+                match d.root {
+                    RootDictionaryRef::Self_ => {
+                        let dictionary_name = d.path.iter_segments().next().unwrap();
+                        if self.all_dictionaries.contains_key(dictionary_name) {
+                            // This should be true, if the cml didn't contain a syntax error that
+                            // omitted the definition for `dictionary_name`.
+                            sources.push(DependencyNode::Named(dictionary_name));
+                            has_named = true;
+                        }
+                    }
+                    _ => {}
+                }
+                if !has_named {
+                    if let Some(s) = DependencyNode::from_dictionary_ref(d) {
+                        sources.push(s);
+                    }
+                }
+            }
+            AnyRef::Named(n) => {
+                sources.push(DependencyNode::Named(n));
+            }
+            AnyRef::Parent | AnyRef::Void | AnyRef::Framework | AnyRef::Debug => {}
+            AnyRef::OwnDictionary(_) => unreachable!("can't be a source"),
+        }
+        sources
+    }
+
     /// Adds a strong dependency between two nodes in the dependency graph between `source` and
     /// `target`.
     ///
     /// `name` is the name of the capability being routed (if applicable).
-    fn add_strong_dep(
-        &self,
-        source_name: Option<&'a Name>,
-        source: DependencyNode<'a>,
-        target: DependencyNode<'a>,
-        strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
-    ) {
-        let source = self.normalize_dep(source, source_name, strong_dependencies);
-        let target = self.normalize_dep(target, None, strong_dependencies);
-        Self::add_edge(source, target, strong_dependencies);
-    }
-
-    // A dependency on a storage capability from `self` transitively depends on the source in that
-    // capability's `from`. In this case, do the following:
-    //
-    // - Transform the dependency to a "named capability" node.
-    // - On this "name capability" node, add a dep on the source.
-    // Return that additional dep, if it exists.
-    fn normalize_dep(
-        &self,
-        dep: DependencyNode<'a>,
-        source_name: Option<&'a Name>,
-        strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
-    ) -> DependencyNode<'a> {
-        let name = match (dep, source_name) {
-            (DependencyNode::Named(name), _) => name,
-            (DependencyNode::Self_, Some(name)) => name,
-            _ => return dep,
-        };
-        if let Some(source) = self.all_storages.get(&name) {
-            let dep = DependencyNode::Named(name);
-            let other_dep = DependencyNode::capability_from_ref(source);
-            if let Some(other_dep) = other_dep {
-                Self::add_edge(other_dep, dep, strong_dependencies);
-            }
-            return dep;
-        }
-        if let Some(source) = self.all_dictionaries.get(&name) {
-            let dep = DependencyNode::Named(name);
-            let other_dep = source.as_ref().and_then(|s| DependencyNode::from_dictionary_ref(s));
-            if let Some(other_dep) = other_dep {
-                Self::add_edge(other_dep, dep, strong_dependencies);
-            }
-            return dep;
-        }
-        dep
-    }
-
-    fn add_edge<'b>(
-        source: DependencyNode<'b>,
-        target: DependencyNode<'b>,
-        strong_dependencies: &mut DirectedGraph<DependencyNode<'b>>,
-    ) {
+    fn add_strong_dep(&mut self, source: DependencyNode<'a>, target: DependencyNode<'a>) {
         match (source, target) {
             (DependencyNode::Self_, DependencyNode::Self_) => {
                 // `self` dependencies (e.g. `use from self`) are allowed.
             }
             (source, target) => {
-                strong_dependencies.add_edge(source, target);
+                self.strong_dependencies.add_edge(source, target);
             }
         }
     }
@@ -1561,11 +1555,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         Ok(())
     }
 
-    fn validate_environment(
-        &self,
-        environment: &'a Environment,
-        strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
-    ) -> Result<(), Error> {
+    fn validate_environment(&mut self, environment: &'a Environment) -> Result<(), Error> {
         match &environment.extends {
             Some(EnvironmentExtends::None) => {
                 if environment.stop_timeout_ms.is_none() {
@@ -1609,7 +1599,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 // to a child which the resolver depends on.
                 if let Some(source) = DependencyNode::registration_ref(&registration.from) {
                     let target = DependencyNode::Named(&environment.name);
-                    self.add_strong_dep(None, source, target, strong_dependencies);
+                    self.add_strong_dep(source, target);
                 }
             }
         }
@@ -1636,7 +1626,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 // to a child which the resolver depends on.
                 if let Some(source) = DependencyNode::registration_ref(&registration.from) {
                     let target = DependencyNode::Named(&environment.name);
-                    self.add_strong_dep(None, source, target, strong_dependencies);
+                    self.add_strong_dep(source, target);
                 }
             }
         }
@@ -1658,9 +1648,10 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 self.validate_from_clause("debug", debug, &None, &None)?;
                 // Ensure there are no cycles, such as a debug capability in an environment being
                 // assigned to the child which is providing the capability.
-                if let Some(source) = DependencyNode::offer_from_ref(&debug.from) {
+                for source in self.expand_source_dependencies(debug.names(), &(&debug.from).into())
+                {
                     let target = DependencyNode::Named(&environment.name);
-                    self.add_strong_dep(None, source, target, strong_dependencies);
+                    self.add_strong_dep(source, target);
                 }
             }
         }
@@ -1760,60 +1751,6 @@ enum DependencyNode<'a> {
 }
 
 impl<'a> DependencyNode<'a> {
-    fn capability_from_ref(ref_: &'a CapabilityFromRef) -> Option<DependencyNode<'a>> {
-        match ref_ {
-            CapabilityFromRef::Named(name) => Some(DependencyNode::Named(name)),
-            CapabilityFromRef::Self_ => Some(DependencyNode::Self_),
-            // We don't care about cycles with the parent, because those will be resolved when the
-            // parent manifest is validated.
-            CapabilityFromRef::Parent => None,
-        }
-    }
-
-    fn use_from_ref(ref_: Option<&'a UseFromRef>) -> Option<DependencyNode<'a>> {
-        match ref_ {
-            Some(UseFromRef::Named(name)) => Some(DependencyNode::Named(name)),
-            Some(UseFromRef::Self_) => Some(DependencyNode::Self_),
-
-            // We don't care about cycles with the parent, because those will be resolved when the
-            // parent manifest is validated.
-            Some(UseFromRef::Parent) => None,
-
-            // We don't care about cycles with the framework, because the framework always outlives
-            // a component
-            Some(UseFromRef::Framework) => None,
-
-            // We don't care about cycles with debug, because our environment is controlled by our
-            // parent
-            Some(UseFromRef::Debug) => None,
-
-            Some(UseFromRef::Dictionary(d)) => Self::from_dictionary_ref(d),
-
-            None => None,
-        }
-    }
-
-    fn offer_from_ref(ref_: &'a OfferFromRef) -> Option<DependencyNode<'a>> {
-        match ref_ {
-            OfferFromRef::Named(name) => Some(DependencyNode::Named(name)),
-            OfferFromRef::Self_ => Some(DependencyNode::Self_),
-
-            // We don't care about cycles with the parent, because those will be resolved when the
-            // parent manifest is validated.
-            OfferFromRef::Parent => None,
-
-            // We don't care about cycles with the framework, because the framework always outlives
-            // a component
-            OfferFromRef::Framework => None,
-
-            // If the offer source is intentionally omitted, then definitionally this offer does
-            // not cause an edge in our dependency graph.
-            OfferFromRef::Void => None,
-
-            OfferFromRef::Dictionary(d) => Self::from_dictionary_ref(d),
-        }
-    }
-
     fn from_dictionary_ref(d: &'a DictionaryRef) -> Option<DependencyNode<'a>> {
         match &d.root {
             RootDictionaryRef::Named(name) => Some(DependencyNode::Named(name)),
@@ -7106,6 +7043,48 @@ mod tests {
                     {
                         "dictionary": "dict",
                         "from": "self",
+                        "to": "#a",
+                    },
+                    {
+                        "protocol": "1",
+                        "from": "#b",
+                        "to": "self/dict",
+                    },
+                    {
+                        "protocol": "2",
+                        "from": "#a",
+                        "to": "#b",
+                    },
+                ],
+            }),
+            Err(Error::Validate {
+                err,
+                ..
+            }) if &err ==
+                "Strong dependency cycles were found. Break the cycle by removing a \
+                dependency or marking an offer as weak. Cycles: {{#a -> #b -> #dict -> #a}}"
+        ),
+        test_cml_offer_dependency_cycle_with_dictionary_indirect(
+            json!({
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "a",
+                        "url": "#meta/a.cm",
+                    },
+                    {
+                        "name": "b",
+                        "url": "#meta/b.cm",
+                    },
+                ],
+                "offer": [
+                    {
+                        "protocol": "3",
+                        "from": "self/dict",
                         "to": "#a",
                     },
                     {

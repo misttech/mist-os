@@ -304,47 +304,6 @@ enum DependencyNode<'a> {
     Capability(&'a str),
 }
 
-impl<'a> DependencyNode<'a> {
-    fn try_from_ref(ref_: Option<&'a fdecl::Ref>) -> Option<DependencyNode<'a>> {
-        if ref_.is_none() {
-            return None;
-        }
-        match ref_.unwrap() {
-            fdecl::Ref::Child(fdecl::ChildRef { name, collection }) => {
-                Some(DependencyNode::Child(name.as_str(), collection.as_ref().map(|s| s.as_str())))
-            }
-            fdecl::Ref::Collection(fdecl::CollectionRef { name, .. }) => {
-                Some(DependencyNode::Collection(name.as_str()))
-            }
-            fdecl::Ref::Capability(fdecl::CapabilityRef { name, .. }) => {
-                Some(DependencyNode::Capability(name.as_str()))
-            }
-            fdecl::Ref::Self_(_) => Some(DependencyNode::Self_),
-            fdecl::Ref::Parent(_) => {
-                // We don't care about dependency cycles with the parent, as any potential issues
-                // with that are resolved by cycle detection in the parent's manifest.
-                None
-            }
-            fdecl::Ref::Framework(_) => {
-                // We don't care about dependency cycles with the framework, as the framework
-                // always outlives the component.
-                None
-            }
-            fdecl::Ref::Debug(_) => {
-                // We don't care about dependency cycles with any debug capabilities from the
-                // environment, as those are put there by our parent, and any potential cycles with
-                // our parent are handled by cycle detection in the parent's manifest.
-                None
-            }
-            fdecl::Ref::VoidType(_) => None,
-            fdecl::RefUnknown!() => {
-                // We were unable to understand this FIDL value
-                None
-            }
-        }
-    }
-}
-
 impl<'a> fmt::Display for DependencyNode<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -962,8 +921,7 @@ impl<'a> ValidationContext<'a> {
                     && dependency_type == Some(&fdecl::DependencyType::Strong)
                 {
                     self.add_strong_dep(
-                        source_name,
-                        DependencyNode::try_from_ref(source),
+                        self.source_dependency_from_ref(source_name, source_dictionary, source),
                         Some(DependencyNode::Self_),
                     );
                 }
@@ -973,8 +931,7 @@ impl<'a> ValidationContext<'a> {
                     && dependency_type == Some(&fdecl::DependencyType::Strong)
                 {
                     self.add_strong_dep(
-                        source_name,
-                        DependencyNode::try_from_ref(source),
+                        self.source_dependency_from_ref(source_name, source_dictionary, source),
                         Some(DependencyNode::Self_),
                     );
                 }
@@ -1020,7 +977,7 @@ impl<'a> ValidationContext<'a> {
             if let Some(env) = child.environment.as_ref() {
                 let source = DependencyNode::Environment(env.as_str());
                 let target = DependencyNode::Child(name, None);
-                self.add_strong_dep(None, Some(source), Some(target));
+                self.add_strong_dep(Some(source), Some(target));
             }
         }
         if let Some(environment) = child.environment.as_ref() {
@@ -1056,7 +1013,7 @@ impl<'a> ValidationContext<'a> {
             if let Some(name) = collection.name.as_ref() {
                 let source = DependencyNode::Environment(environment.as_str());
                 let target = DependencyNode::Collection(name.as_str());
-                self.add_strong_dep(None, Some(source), Some(target));
+                self.add_strong_dep(Some(source), Some(target));
             }
         }
         // Allow `allowed_offers` & `allow_long_names` to be unset/unvalidated, for backwards compatibility.
@@ -1204,7 +1161,7 @@ impl<'a> ValidationContext<'a> {
             }
         }
 
-        let source = DependencyNode::try_from_ref(source);
+        let source = self.source_dependency_from_ref(None, None, source);
         if let Some(source) = source {
             if let Some(env_name) = &environment_name {
                 let target = DependencyNode::Environment(env_name);
@@ -1333,6 +1290,15 @@ impl<'a> ValidationContext<'a> {
             "backing_dir",
             &mut self.errors,
         );
+
+        // The storage capability depends on its backing dir.
+        if let (Some(name), Some(backing_dir), Some(source)) =
+            (storage.name.as_ref(), storage.backing_dir.as_ref(), storage.source.as_ref())
+        {
+            let source = self.source_dependency_from_ref(Some(backing_dir), None, Some(source));
+            let target = Some(DependencyNode::Capability(name));
+            self.add_strong_dep(source, target);
+        }
     }
 
     fn validate_runner_decl(&mut self, runner: &'a fdecl::Runner, as_builtin: bool) {
@@ -1422,6 +1388,18 @@ impl<'a> ValidationContext<'a> {
                 }
             }
         };
+
+        // The dictionary capability may depend on a dictionary it extends.
+        if let (Some(name), Some(source_dictionary), Some(source)) = (
+            dictionary.name.as_ref(),
+            dictionary.source_dictionary.as_ref(),
+            dictionary.source.as_ref(),
+        ) {
+            let source =
+                self.source_dependency_from_ref(None, Some(source_dictionary), Some(source));
+            let target = Some(DependencyNode::Capability(name));
+            self.add_strong_dep(source, target);
+        }
     }
 
     #[cfg(feature = "target_api_level_head")]
@@ -1458,9 +1436,13 @@ impl<'a> ValidationContext<'a> {
                 }
 
                 if let Some(env_name) = &environment_name {
-                    let source = DependencyNode::try_from_ref(o.source.as_ref());
+                    let source = self.source_dependency_from_ref(
+                        o.source_name.as_ref(),
+                        None,
+                        o.source.as_ref(),
+                    );
                     let target = Some(DependencyNode::Environment(env_name));
-                    self.add_strong_dep(None, source, target);
+                    self.add_strong_dep(source, target);
                 }
             }
             _ => {
@@ -1899,7 +1881,6 @@ impl<'a> ValidationContext<'a> {
     /// caller can directly pass the result of `DependencyNode::try_from_ref`.
     fn add_strong_dep(
         &mut self,
-        source_name: Option<&'a String>,
         source: Option<DependencyNode<'a>>,
         target: Option<DependencyNode<'a>>,
     ) {
@@ -1908,52 +1889,12 @@ impl<'a> ValidationContext<'a> {
         }
         let source = source.unwrap();
         let target = target.unwrap();
-
-        let source = self.normalize_dep(source, source_name);
-        let target = self.normalize_dep(target, None);
-        Self::add_edge(source, target, &mut self.strong_dependencies);
-    }
-
-    // A dependency on a storage capability from `self` transitively depends on the source in that
-    // capability's `from`. In this case, do the following:
-    //
-    // - Transform the dependency to a "named capability" node.
-    // - On this "name capability" node, add a dep on the source.
-    // Return that additional dep, if it exists.
-    fn normalize_dep(
-        &mut self,
-        dep: DependencyNode<'a>,
-        source_name: Option<&'a String>,
-    ) -> DependencyNode<'a> {
-        let name = match (dep, source_name) {
-            (DependencyNode::Capability(name), _) => name,
-            (DependencyNode::Self_, Some(name)) => name,
-            _ => return dep,
-        };
-        for m in [&self.all_storages, &self.all_dictionaries] {
-            if let Some(source) = m.get(&name) {
-                let dep = DependencyNode::Capability(name);
-                let other_dep = DependencyNode::try_from_ref(*source);
-                if let Some(other_dep) = other_dep {
-                    Self::add_edge(other_dep, dep, &mut self.strong_dependencies);
-                }
-                return dep;
-            }
-        }
-        dep
-    }
-
-    fn add_edge<'b>(
-        source: DependencyNode<'b>,
-        target: DependencyNode<'b>,
-        strong_dependencies: &mut DirectedGraph<DependencyNode<'b>>,
-    ) {
         match (source, target) {
             (DependencyNode::Self_, DependencyNode::Self_) => {
                 // `self` dependencies (e.g. `use from self`) are allowed.
             }
             (source, target) => {
-                strong_dependencies.add_edge(source, target);
+                self.strong_dependencies.add_edge(source, target);
             }
         }
     }
@@ -2026,13 +1967,14 @@ impl<'a> ValidationContext<'a> {
         match offer {
             fdecl::Offer::Service(o) => {
                 let decl = DeclType::OfferService;
+                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::Many,
                     CollectionSource::Allow,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    get_source_dictionary!(o),
+                    source_dictionary,
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.availability.as_ref(),
@@ -2046,25 +1988,29 @@ impl<'a> ValidationContext<'a> {
                 // If the offer source is `self`, ensure we have a corresponding Service.
                 // TODO: Consider bringing this bit into validate_offer_fields
                 if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_services.contains(&name as &str) {
+                    if !self.all_services.contains(&name as &str) && source_dictionary.is_none() {
                         self.errors.push(Error::invalid_field(decl, "source"));
                     }
                 }
                 self.add_strong_dep(
-                    o.source_name.as_ref(),
-                    DependencyNode::try_from_ref(o.source.as_ref()),
-                    DependencyNode::try_from_ref(o.target.as_ref()),
+                    self.source_dependency_from_ref(
+                        o.source_name.as_ref(),
+                        source_dictionary,
+                        o.source.as_ref(),
+                    ),
+                    self.target_dependency_from_ref(o.target.as_ref()),
                 );
             }
             fdecl::Offer::Protocol(o) => {
                 let decl = DeclType::OfferProtocol;
+                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    get_source_dictionary!(o),
+                    source_dictionary,
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.availability.as_ref(),
@@ -2074,29 +2020,33 @@ impl<'a> ValidationContext<'a> {
                     self.errors.push(Error::missing_field(decl, "dependency_type"));
                 } else if o.dependency_type == Some(fdecl::DependencyType::Strong) {
                     self.add_strong_dep(
-                        o.source_name.as_ref(),
-                        DependencyNode::try_from_ref(o.source.as_ref()),
-                        DependencyNode::try_from_ref(o.target.as_ref()),
+                        self.source_dependency_from_ref(
+                            o.source_name.as_ref(),
+                            source_dictionary,
+                            o.source.as_ref(),
+                        ),
+                        self.target_dependency_from_ref(o.target.as_ref()),
                     );
                 }
                 // If the offer source is `self`, ensure we have a
                 // corresponding Protocol.
                 // TODO: Consider bringing this bit into validate_offer_fields.
                 if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_protocols.contains(&name as &str) {
+                    if !self.all_protocols.contains(&name as &str) && source_dictionary.is_none() {
                         self.errors.push(Error::invalid_capability(decl, "source", name));
                     }
                 }
             }
             fdecl::Offer::Directory(o) => {
                 let decl = DeclType::OfferDirectory;
+                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    get_source_dictionary!(o),
+                    source_dictionary,
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.availability.as_ref(),
@@ -2106,9 +2056,12 @@ impl<'a> ValidationContext<'a> {
                     self.errors.push(Error::missing_field(decl, "dependency_type"));
                 } else if o.dependency_type == Some(fdecl::DependencyType::Strong) {
                     self.add_strong_dep(
-                        o.source_name.as_ref(),
-                        DependencyNode::try_from_ref(o.source.as_ref()),
-                        DependencyNode::try_from_ref(o.target.as_ref()),
+                        self.source_dependency_from_ref(
+                            o.source_name.as_ref(),
+                            source_dictionary,
+                            o.source.as_ref(),
+                        ),
+                        self.target_dependency_from_ref(o.target.as_ref()),
                     );
                 }
                 // If the offer source is `self`, ensure we have a corresponding
@@ -2116,7 +2069,8 @@ impl<'a> ValidationContext<'a> {
                 //
                 // TODO: Consider bringing this bit into validate_offer_fields.
                 if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_directories.contains(&name as &str) {
+                    if !self.all_directories.contains(&name as &str) && source_dictionary.is_none()
+                    {
                         self.errors.push(Error::invalid_capability(decl, "source", name));
                     }
                 }
@@ -2139,38 +2093,25 @@ impl<'a> ValidationContext<'a> {
                     o.availability.as_ref(),
                     offer_type,
                 );
-
-                // Storage capabilities with a source of `Ref::Self_`
-                // don't interact with the component's runtime in any
-                // way, they're actually synthesized by the framework
-                // out of a pre-existing directory capability. Thus, its
-                // actual source is the backing directory capability.
-                match (o.source.as_ref(), o.source_name.as_ref()) {
-                    (Some(fdecl::Ref::Self_ { .. }), Some(source_name)) => {
-                        if let Some(source) = DependencyNode::try_from_ref(
-                            *self.all_storages.get(source_name.as_str()).unwrap_or(&None),
-                        ) {
-                            if let Some(target) = DependencyNode::try_from_ref(o.target.as_ref()) {
-                                self.strong_dependencies.add_edge(source, target);
-                            }
-                        }
-                    }
-                    _ => self.add_strong_dep(
+                self.add_strong_dep(
+                    self.source_dependency_from_ref(
                         o.source_name.as_ref(),
-                        DependencyNode::try_from_ref(o.source.as_ref()),
-                        DependencyNode::try_from_ref(o.target.as_ref()),
+                        None,
+                        o.source.as_ref(),
                     ),
-                }
+                    self.target_dependency_from_ref(o.target.as_ref()),
+                );
             }
             fdecl::Offer::Runner(o) => {
                 let decl = DeclType::OfferRunner;
+                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    get_source_dictionary!(o),
+                    source_dictionary,
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
@@ -2178,25 +2119,29 @@ impl<'a> ValidationContext<'a> {
                 );
                 // If the offer source is `self`, ensure we have a corresponding Runner.
                 if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_runners.contains(&name as &str) {
+                    if !self.all_runners.contains(&name as &str) && source_dictionary.is_none() {
                         self.errors.push(Error::invalid_capability(decl, "source", name));
                     }
                 }
                 self.add_strong_dep(
-                    o.source_name.as_ref(),
-                    DependencyNode::try_from_ref(o.source.as_ref()),
-                    DependencyNode::try_from_ref(o.target.as_ref()),
+                    self.source_dependency_from_ref(
+                        o.source_name.as_ref(),
+                        source_dictionary,
+                        o.source.as_ref(),
+                    ),
+                    self.target_dependency_from_ref(o.target.as_ref()),
                 );
             }
             fdecl::Offer::Resolver(o) => {
                 let decl = DeclType::OfferResolver;
+                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    get_source_dictionary!(o),
+                    source_dictionary,
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
@@ -2206,14 +2151,17 @@ impl<'a> ValidationContext<'a> {
                 // If the offer source is `self`, ensure we have a
                 // corresponding Resolver.
                 if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_resolvers.contains(&name as &str) {
+                    if !self.all_resolvers.contains(&name as &str) && source_dictionary.is_none() {
                         self.errors.push(Error::invalid_capability(decl, "source", name));
                     }
                 }
                 self.add_strong_dep(
-                    o.source_name.as_ref(),
-                    DependencyNode::try_from_ref(o.source.as_ref()),
-                    DependencyNode::try_from_ref(o.target.as_ref()),
+                    self.source_dependency_from_ref(
+                        o.source_name.as_ref(),
+                        get_source_dictionary!(o),
+                        o.source.as_ref(),
+                    ),
+                    self.target_dependency_from_ref(o.target.as_ref()),
                 );
             }
             fdecl::Offer::EventStream(e) => {
@@ -2222,13 +2170,14 @@ impl<'a> ValidationContext<'a> {
             #[cfg(feature = "target_api_level_head")]
             fdecl::Offer::Dictionary(o) => {
                 let decl = DeclType::OfferDictionary;
+                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    get_source_dictionary!(o),
+                    source_dictionary,
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
@@ -2238,14 +2187,19 @@ impl<'a> ValidationContext<'a> {
                 // If the offer source is `self`, ensure we have a
                 // corresponding Dictionary.
                 if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_dictionaries.contains_key(&name as &str) {
+                    if !self.all_dictionaries.contains_key(&name as &str)
+                        && source_dictionary.is_none()
+                    {
                         self.errors.push(Error::invalid_capability(decl, "source", name));
                     }
                 }
                 self.add_strong_dep(
-                    o.source_name.as_ref(),
-                    DependencyNode::try_from_ref(o.source.as_ref()),
-                    DependencyNode::try_from_ref(o.target.as_ref()),
+                    self.source_dependency_from_ref(
+                        o.source_name.as_ref(),
+                        source_dictionary,
+                        o.source.as_ref(),
+                    ),
+                    self.target_dependency_from_ref(o.target.as_ref()),
                 );
             }
             #[cfg(feature = "target_api_level_head")]
@@ -2270,9 +2224,12 @@ impl<'a> ValidationContext<'a> {
                     }
                 }
                 self.add_strong_dep(
-                    o.source_name.as_ref(),
-                    DependencyNode::try_from_ref(o.source.as_ref()),
-                    DependencyNode::try_from_ref(o.target.as_ref()),
+                    self.source_dependency_from_ref(
+                        o.source_name.as_ref(),
+                        None,
+                        o.source.as_ref(),
+                    ),
+                    self.target_dependency_from_ref(o.target.as_ref()),
                 );
             }
             fdecl::OfferUnknown!() => {
@@ -2621,6 +2578,76 @@ impl<'a> ValidationContext<'a> {
                 }
             }
         }
+    }
+
+    fn source_dependency_from_ref(
+        &self,
+        source_name: Option<&'a String>,
+        source_dictionary: Option<&'a String>,
+        ref_: Option<&'a fdecl::Ref>,
+    ) -> Option<DependencyNode<'a>> {
+        if ref_.is_none() {
+            return None;
+        }
+        match ref_.unwrap() {
+            fdecl::Ref::Child(fdecl::ChildRef { name, collection }) => {
+                Some(DependencyNode::Child(name.as_str(), collection.as_ref().map(|s| s.as_str())))
+            }
+            fdecl::Ref::Collection(fdecl::CollectionRef { name, .. }) => {
+                Some(DependencyNode::Collection(name.as_str()))
+            }
+            fdecl::Ref::Capability(fdecl::CapabilityRef { name, .. }) => {
+                Some(DependencyNode::Capability(name.as_str()))
+            }
+            fdecl::Ref::Self_(_) => {
+                if let Some(source_dictionary) = source_dictionary {
+                    let root_dict = source_dictionary.split('/').next().unwrap();
+                    if self.all_dictionaries.contains_key(root_dict) {
+                        Some(DependencyNode::Capability(root_dict))
+                    } else {
+                        Some(DependencyNode::Self_)
+                    }
+                } else if let Some(source_name) = source_name {
+                    if self.all_storages.contains_key(source_name.as_str())
+                        || self.all_dictionaries.contains_key(source_name.as_str())
+                    {
+                        Some(DependencyNode::Capability(source_name))
+                    } else {
+                        Some(DependencyNode::Self_)
+                    }
+                } else {
+                    Some(DependencyNode::Self_)
+                }
+            }
+            fdecl::Ref::Parent(_) => {
+                // We don't care about dependency cycles with the parent, as any potential issues
+                // with that are resolved by cycle detection in the parent's manifest.
+                None
+            }
+            fdecl::Ref::Framework(_) => {
+                // We don't care about dependency cycles with the framework, as the framework
+                // always outlives the component.
+                None
+            }
+            fdecl::Ref::Debug(_) => {
+                // We don't care about dependency cycles with any debug capabilities from the
+                // environment, as those are put there by our parent, and any potential cycles with
+                // our parent are handled by cycle detection in the parent's manifest.
+                None
+            }
+            fdecl::Ref::VoidType(_) => None,
+            fdecl::RefUnknown!() => {
+                // We were unable to understand this FIDL value
+                None
+            }
+        }
+    }
+
+    fn target_dependency_from_ref(
+        &self,
+        ref_: Option<&'a fdecl::Ref>,
+    ) -> Option<DependencyNode<'a>> {
+        self.source_dependency_from_ref(None, None, ref_)
     }
 }
 
@@ -3583,7 +3610,7 @@ mod tests {
                 }
             },
             result = Err(ErrorList::new(vec![
-                Error::dependency_cycle("{{self -> child child -> self}}".to_string()),
+                Error::dependency_cycle("{{self -> capability data -> child child -> self}}".to_string()),
             ])),
         },
         test_validate_storage_strong_cycle_between_children => {
@@ -3634,7 +3661,7 @@ mod tests {
                 }
             },
             result = Err(ErrorList::new(vec![
-                Error::dependency_cycle("{{child child1 -> child child2 -> child child1}}".to_string()),
+                Error::dependency_cycle("{{child child1 -> capability data -> child child2 -> child child1}}".to_string()),
             ])),
         },
         test_validate_strong_cycle_between_children_through_environment_debug => {
@@ -3898,7 +3925,7 @@ mod tests {
                 }
             },
             result = Err(ErrorList::new(vec![
-                Error::dependency_cycle("{{self -> child child -> self}}".to_string()),
+                Error::dependency_cycle("{{self -> capability data -> child child -> self}}".to_string()),
             ])),
         },
         test_validate_strong_cycle_with_self_storage_admin_protocol => {
@@ -3964,6 +3991,75 @@ mod tests {
                             collection: None,
                         })),
                         target_name: Some("dict".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "b".into(),
+                            collection: None,
+                        })),
+                        source_name: Some("1".into()),
+                        target: Some(fdecl::Ref::Capability(fdecl::CapabilityRef {
+                            name: "dict".into(),
+                        })),
+                        target_name: Some("1".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "a".into(),
+                            collection: None,
+                        })),
+                        source_name: Some("2".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "b".into(),
+                            collection: None,
+                        })),
+                        target_name: Some("2".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..Default::default()
+                    }),
+                ]),
+                children: Some(vec![
+                    fdecl::Child {
+                        name: Some("a".into()),
+                        url: Some("fuchsia-pkg://child".into()),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        ..Default::default()
+                    },
+                    fdecl::Child {
+                        name: Some("b".into()),
+                        url: Some("fuchsia-pkg://child".into()),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        ..Default::default()
+                    },
+                ]),
+                capabilities: Some(vec![
+                    fdecl::Capability::Dictionary(fdecl::Dictionary {
+                        name: Some("dict".into()),
+                        ..Default::default()
+                    }),
+                ]),
+                ..Default::default()
+            },
+            result = Err(ErrorList::new(vec![
+                Error::dependency_cycle("{{child a -> child b -> capability dict -> child a}}".to_string()),
+            ])),
+        },
+        test_validate_strong_cycle_with_dictionary_indirect => {
+            input = fdecl::Component {
+                offers: Some(vec![
+                    fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                        source_name: Some("3".into()),
+                        source_dictionary: Some("dict".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "a".into(),
+                            collection: None,
+                        })),
+                        target_name: Some("3".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
                     }),
@@ -6584,7 +6680,7 @@ mod tests {
                 ..new_component_decl()
             },
             result = Err(ErrorList::new(vec![
-                Error::dependency_cycle("{{child logger -> child logger}}".to_string()),
+                Error::dependency_cycle("{{child logger -> capability data -> child logger}}".to_string()),
             ])),
         },
         test_validate_offers_invalid_child => {
