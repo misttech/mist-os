@@ -16,7 +16,11 @@
 //!
 //! Strategies should be concerned only with selecting which free regions of disk to hand out.
 
-use std::{collections::BTreeSet, fmt::Debug, ops::Range};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Debug,
+    ops::Range,
+};
 
 /// An allocation strategy that returns the smallest extent that is large enough to hold the
 /// requested allocation, or the next best if no extent is big enough.
@@ -30,7 +34,7 @@ use std::{collections::BTreeSet, fmt::Debug, ops::Range};
 #[derive(Debug, Default)]
 pub struct BestFit {
     /// Holds free storage ranges for the filesystem ordered by length, then offset.
-    ranges: BTreeSet<(u64, u64)>,
+    ranges: BTreeMap<u64, BTreeSet<u64>>,
 }
 
 impl BestFit {
@@ -43,65 +47,64 @@ impl BestFit {
     /// There are no special requirements on alignment of `bytes` but the caller is generally
     /// encouraged to align to device block size.
     pub fn allocate(&mut self, bytes: u64) -> Option<Range<u64>> {
-        if let Some(&(size, offset)) = self.ranges.range((bytes, 0)..).next() {
-            assert!(size >= bytes);
-            self.ranges.remove(&(size, offset));
-            if size > bytes {
-                self.free(offset + bytes..offset + size);
+        for (&size, offsets) in self.ranges.range_mut(bytes..) {
+            debug_assert!(size >= bytes);
+            if let Some(offset) = offsets.pop_first() {
+                if size > bytes {
+                    self.free(offset + bytes..offset + size);
+                }
+                return Some(offset..offset + bytes);
             }
-            return Some(offset..offset + bytes);
         }
         // Insufficient space. Return the biggest space we have.
-        if let Some(&(size, _)) = self.ranges.iter().rev().next() {
-            // Nb: We reversed the iterator to get the biggest size, but we
-            // generally want to serve the smallest offset so we do a second
-            // lookup here to find the smallest offset with the largest size.
-            let &(size, offset) = self.ranges.range((size, 0)..).next().unwrap();
-            self.ranges.remove(&(size, offset));
-            Some(offset..offset + size)
-        } else {
-            None
+        for (size, offsets) in self.ranges.iter_mut().rev() {
+            if let Some(offset) = offsets.pop_first() {
+                return Some(offset..offset + size);
+            }
         }
+        None
     }
 
     pub fn allocate_fixed_offset(&mut self, start: u64, bytes: u64) -> Option<Range<u64>> {
         let end = start + bytes;
-        for &(size, offset) in self.ranges.range((bytes, 0)..) {
-            assert!(size >= bytes);
-            let range = offset..offset + size;
-            if range.start > start || range.end < end {
-                // Not a sub-range.
-                continue;
+        // The requested range may be in several of our size pools...
+        for (&size, offsets) in self.ranges.range_mut(bytes..) {
+            debug_assert!(size >= bytes);
+            for &offset in offsets.range(..start + 1) {
+                let range = offset..offset + size;
+                if range.start > start || range.end < end {
+                    // Not a sub-range.
+                    continue;
+                }
+                offsets.remove(&offset);
+                if range.start < start {
+                    self.free(range.start..start);
+                }
+                if range.end > end {
+                    self.free(end..range.end);
+                }
+                return Some(start..end);
             }
-            self.ranges.remove(&(size, offset));
-            if range.start < start {
-                self.free(range.start..start);
-            }
-            if range.end > end {
-                self.free(end..range.end);
-            }
-            return Some(start..end);
         }
         None
     }
 
     pub fn allocate_next_available(&mut self, start: u64, bytes: u64) -> Option<Range<u64>> {
         let mut best = None;
-        for &(size, offset) in &self.ranges {
-            if offset + size <= start {
-                continue;
-            }
-            if let Some((best_size, best_offset)) = &mut best {
-                if offset < *best_offset {
-                    *best_size = size;
-                    *best_offset = offset;
+        for (&size, offsets) in &self.ranges {
+            if let Some(&offset) = offsets.range(start.saturating_sub(size - 1)..).next() {
+                if let Some((best_size, best_offset)) = &mut best {
+                    if offset < *best_offset {
+                        *best_size = size;
+                        *best_offset = offset;
+                    }
+                } else {
+                    best = Some((size, offset));
                 }
-            } else {
-                best = Some((size, offset));
             }
         }
         if let Some((size, offset)) = best {
-            self.ranges.remove(&(size, offset));
+            self.ranges.entry(size).or_default().remove(&offset);
             let mut range = offset..offset + size;
             if range.start < start {
                 self.free(range.start..start);
@@ -125,23 +128,25 @@ impl BestFit {
         let mut prior_range = None;
         let mut post_range = None;
         // Look for ranges immediately before and after 'range' for coalescing.
-        for (size, offset) in &self.ranges {
-            if *offset + *size == range.start {
-                prior_range = Some((*size, *offset));
-            }
-            if *offset == range.end {
-                post_range = Some((*size, *offset));
+        for (&size, offsets) in &self.ranges {
+            for &offset in offsets {
+                if offset + size == range.start {
+                    prior_range = Some((size, offset));
+                }
+                if offset == range.end {
+                    post_range = Some((size, offset));
+                }
             }
         }
         if let Some(prior_range) = prior_range {
-            self.ranges.remove(&prior_range);
+            self.ranges.entry(prior_range.0).or_default().remove(&prior_range.1);
             range.start = prior_range.1;
         }
         if let Some(post_range) = post_range {
-            self.ranges.remove(&post_range);
+            self.ranges.entry(post_range.0).or_default().remove(&post_range.1);
             range.end = post_range.0 + post_range.1;
         }
-        self.ranges.insert((range.end - range.start, range.start));
+        self.ranges.entry(range.end - range.start).or_default().insert(range.start);
     }
 }
 
