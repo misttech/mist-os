@@ -248,7 +248,9 @@ void ProfileServer::L2capParametersExt::RequestParameters(
           // Return the current parameters even if the request failed.
           // TODO(https://fxbug.dev/42152567): set current security requirements in returned channel
           // parameters
-          cb(ChannelInfoToFidlChannelParameters(chan->info()));
+          cb(fidlbredr::L2capParametersExt_RequestParameters_Result::WithResponse(
+              fidlbredr::L2capParametersExt_RequestParameters_Response(
+                  ChannelInfoToFidlChannelParameters(chan->info()))));
         });
     return;
   }
@@ -256,7 +258,9 @@ void ProfileServer::L2capParametersExt::RequestParameters(
   // No other channel parameters are  supported, so just return the current parameters.
   // TODO(https://fxbug.dev/42152567): set current security requirements in returned channel
   // parameters
-  callback(ChannelInfoToFidlChannelParameters(channel_->info()));
+  callback(fidlbredr::L2capParametersExt_RequestParameters_Result::WithResponse(
+      fidlbredr::L2capParametersExt_RequestParameters_Response(
+          ChannelInfoToFidlChannelParameters(channel_->info()))));
 }
 
 void ProfileServer::L2capParametersExt::handle_unknown_method(uint64_t ordinal,
@@ -265,13 +269,14 @@ void ProfileServer::L2capParametersExt::handle_unknown_method(uint64_t ordinal,
 }
 
 void ProfileServer::AudioOffloadExt::GetSupportedFeatures(GetSupportedFeaturesCallback callback) {
-  fidlbredr::AudioOffloadExtGetSupportedFeaturesResponse response;
+  fidlbredr::AudioOffloadExt_GetSupportedFeatures_Response response;
   std::vector<fidlbredr::AudioOffloadFeatures>* mutable_audio_offload_features =
       response.mutable_audio_offload_features();
   const bt::gap::AdapterState& adapter_state = adapter_->state();
 
   if (!adapter_state.IsControllerFeatureSupported(FeaturesBits::kAndroidVendorExtensions)) {
-    callback(std::move(response));
+    callback(
+        fidlbredr::AudioOffloadExt_GetSupportedFeatures_Result::WithResponse(std::move(response)));
     return;
   }
 
@@ -291,7 +296,8 @@ void ProfileServer::AudioOffloadExt::GetSupportedFeatures(GetSupportedFeaturesCa
         fidlbredr::AudioOffloadFeatures::WithAac(std::move(audio_aac_support)));
   }
 
-  callback(std::move(response));
+  callback(
+      fidlbredr::AudioOffloadExt_GetSupportedFeatures_Result::WithResponse(std::move(response)));
 }
 
 void ProfileServer::AudioOffloadExt::StartAudioOffload(
@@ -808,7 +814,7 @@ void ProfileServer::OnServiceFound(
   fuchsia::bluetooth::PeerId fidl_peer_id{peer_id.value()};
 
   search_it->second.results->ServiceFound(fidl_peer_id, std::move(descriptor_list),
-                                          std::move(fidl_attrs), []() {});
+                                          std::move(fidl_attrs), [](auto) {});
 }
 
 void ProfileServer::OnScoConnectionResult(

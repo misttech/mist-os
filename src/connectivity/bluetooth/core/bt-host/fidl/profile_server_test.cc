@@ -254,7 +254,8 @@ class FakeSearchResults : public fidlbredr::testing::SearchResults_TestBase {
                     ServiceFoundCallback callback) override {
     peer_id_ = peer_id;
     attributes_ = std::move(attributes);
-    callback();
+    callback(fidlbredr::SearchResults_ServiceFound_Result::WithResponse(
+        fidlbredr::SearchResults_ServiceFound_Response()));
     service_found_count_++;
   }
 
@@ -1222,7 +1223,9 @@ TEST_F(ProfileServerTestFakeAdapter, L2capParametersExtRequestParametersSucceeds
   fidlbredr::L2capParametersExtPtr l2cap_client = response_channel->mutable_ext_l2cap()->Bind();
   l2cap_client->RequestParameters(
       std::move(request_chan_params),
-      [&](fidlbredr::ChannelParameters new_params) { result_chan_params = std::move(new_params); });
+      [&](fidlbredr::L2capParametersExt_RequestParameters_Result new_params) {
+        result_chan_params = new_params.response().ResultValue_();
+      });
   RunLoopUntilIdle();
   ASSERT_TRUE(result_chan_params.has_value());
   ASSERT_TRUE(result_chan_params->has_channel_mode());
@@ -1274,7 +1277,9 @@ TEST_F(ProfileServerTestFakeAdapter, L2capParametersExtRequestParametersFails) {
   fidlbredr::L2capParametersExtPtr l2cap_client = response_channel->mutable_ext_l2cap()->Bind();
   l2cap_client->RequestParameters(
       std::move(request_chan_params),
-      [&](fidlbredr::ChannelParameters new_params) { result_chan_params = std::move(new_params); });
+      [&](fidlbredr::L2capParametersExt_RequestParameters_Result new_params) {
+        result_chan_params = new_params.response().ResultValue_();
+      });
   RunLoopUntilIdle();
   ASSERT_TRUE(result_chan_params.has_value());
   EXPECT_FALSE(result_chan_params->has_flush_timeout());
@@ -1321,7 +1326,9 @@ TEST_F(ProfileServerTestFakeAdapter, L2capParametersExtRequestParametersClosedOn
   std::optional<fidlbredr::ChannelParameters> result_chan_params;
   l2cap_client->RequestParameters(
       std::move(request_chan_params),
-      [&](fidlbredr::ChannelParameters new_params) { result_chan_params = std::move(new_params); });
+      [&](fidlbredr::L2capParametersExt_RequestParameters_Result new_params) {
+        result_chan_params = new_params.response().ResultValue_();
+      });
   RunLoopUntilIdle();
   EXPECT_TRUE(l2cap_client_closed);
   EXPECT_FALSE(result_chan_params.has_value());
@@ -1424,10 +1431,10 @@ TEST_F(ProfileServerTestFakeAdapter, AudioOffloadExtRequestParametersClosedOnCha
   EXPECT_TRUE(adapter()->fake_bredr()->DestroyChannel(last_channel->id()));
 
   // Any request for the closed channel should be ignored.
-  std::optional<fidlbredr::AudioOffloadExtGetSupportedFeaturesResponse> result_features;
+  std::optional<fidlbredr::AudioOffloadExt_GetSupportedFeatures_Response> result_features;
   audio_client->GetSupportedFeatures(
-      [&result_features](fidlbredr::AudioOffloadExtGetSupportedFeaturesResponse features) {
-        result_features = std::move(features);
+      [&result_features](fidlbredr::AudioOffloadExt_GetSupportedFeatures_Result features) {
+        result_features = std::move(features.response());
       });
 
   RunLoopUntilIdle();
@@ -1578,12 +1585,12 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtGetSupportedFeatures) {
   }
   ASSERT_TRUE(response_channel->has_ext_audio_offload());
 
-  std::optional<fidlbredr::AudioOffloadExtGetSupportedFeaturesResponse> result_features;
+  std::optional<fidlbredr::AudioOffloadExt_GetSupportedFeatures_Response> result_features;
   fidlbredr::AudioOffloadExtPtr audio_offload_ext_client =
       response_channel->mutable_ext_audio_offload()->Bind();
   audio_offload_ext_client->GetSupportedFeatures(
-      [&result_features](fidlbredr::AudioOffloadExtGetSupportedFeaturesResponse features) {
-        result_features = std::move(features);
+      [&result_features](fidlbredr::AudioOffloadExt_GetSupportedFeatures_Result features) {
+        result_features = std::move(features.response());
       });
   RunLoopUntilIdle();
 

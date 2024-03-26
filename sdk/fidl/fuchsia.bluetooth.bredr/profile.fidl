@@ -113,7 +113,7 @@ type A2dpDirectionPriority = strict enum {
 /// Audio Priority Direction extension. Used to put the channel in a mode where A2DP packets are
 /// prioritized over other packets in the source or sink direction.
 open protocol AudioDirectionExt {
-    strict SetPriority(struct {
+    flexible SetPriority(struct {
         priority A2dpDirectionPriority;
     }) -> () error fuchsia.bluetooth.ErrorCode;
 };
@@ -126,7 +126,7 @@ open protocol L2capParametersExt {
     /// rejected/modified).
     /// Currently only the following parameters can be changed:
     /// - flush_timeout
-    strict RequestParameters(struct {
+    flexible RequestParameters(struct {
         request ChannelParameters;
     }) -> (struct {
         new ChannelParameters;
@@ -195,22 +195,22 @@ type AudioOffloadConfiguration = table {
 open protocol AudioOffloadController {
     /// Sent from the server when the audio offloading is started successfully.
     /// Only sent once per protocol.
-    strict -> OnStarted();
+    flexible -> OnStarted();
 
     /// Request the audio offloading be stopped.
     /// This call will be responded to before the protocol is closed on the server side.
-    strict Stop() -> ();
+    flexible Stop() -> ();
 };
 
 /// Audio Offload Extension. Used to retrieve offloading capability and supported features.
 open protocol AudioOffloadExt {
     /// Returns the vendor features supported on this chipset
-    strict GetSupportedFeatures() -> (table {
+    flexible GetSupportedFeatures() -> (table {
         1: audio_offload_features vector<AudioOffloadFeatures>:MAX;
     });
 
     /// Begin the audio encoding hardware offloading process
-    strict StartAudioOffload(resource struct {
+    flexible StartAudioOffload(resource struct {
         configuration AudioOffloadConfiguration;
         controller server_end:AudioOffloadController;
     });
@@ -223,7 +223,7 @@ open protocol ConnectionReceiver {
     /// with parameters in `channel`.
     /// `protocol` will contain a protocol list up to the point connected (for example, if
     /// L2CAP is connected, it will contain the L2CAP protocol and specify the PSM connected)
-    strict Connected(resource struct {
+    flexible Connected(resource struct {
         peer_id fuchsia.bluetooth.PeerId;
         channel Channel;
         protocol ProtocolDescriptorList;
@@ -245,7 +245,7 @@ open protocol SearchResults {
     /// Each ServiceFound call should be acknowledged by replying.
     /// A limited amount of unacknowledged results will be sent on the channel. Results may be
     /// dropped if results are received while too many results are unacknowledged.
-    strict ServiceFound(struct {
+    flexible ServiceFound(struct {
         peer_id fuchsia.bluetooth.PeerId;
         protocol ProtocolDescriptorList:optional;
         attributes vector<Attribute>:MAX_ATTRIBUTES;
@@ -275,7 +275,7 @@ open protocol Profile {
     ///
     /// If the advertisement cannot be made for any reason, an error of `INVALID_ARGUMENTS`
     /// will be returned and the receiver will be closed with a suitable epitaph.
-    strict Advertise(resource struct {
+    flexible Advertise(resource struct {
         services vector<ServiceDefinition>:MAX_SERVICES_PER_ADVERTISEMENT;
         parameters ChannelParameters;
         receiver client_end:ConnectionReceiver;
@@ -287,7 +287,7 @@ open protocol Profile {
     /// is empty, all attributes will be requested.  The additional attribute
     /// BLUETOOTH_PROTOCOL_DESCRIPTOR_LIST is always requested.  See the Bluetooth Spec v5.2, Vol 3,
     /// Part B, Section 5) and relevant profile specification documents.
-    strict Search(resource struct {
+    flexible Search(resource struct {
         service_uuid ServiceClassProfileIdentifier;
         attr_ids vector<uint16>:MAX_ATTRIBUTES;
         results client_end:SearchResults;
@@ -298,7 +298,7 @@ open protocol Profile {
     ///
     /// Returns the channel connected once established, or an error code if the channel could not
     /// be connected.
-    strict Connect(struct {
+    flexible Connect(struct {
         peer_id fuchsia.bluetooth.PeerId;
         connection ConnectParameters;
     }) -> (resource struct {
@@ -320,7 +320,7 @@ open protocol Profile {
     /// The result of the connection attempt and the parameters used for the
     /// connection will be returned with `receiver`.  Dropping `receiver` will
     /// cancel the request.
-    strict ConnectSco(resource struct {
+    flexible ConnectSco(resource struct {
         peer_id fuchsia.bluetooth.PeerId;
         initiator bool;
         params vector<ScoConnectionParameters>:MAX;
