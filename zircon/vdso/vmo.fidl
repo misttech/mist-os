@@ -705,6 +705,16 @@ closed protocol Vmo {
     /// [`zx_vmo_create_contiguous()`] or descendants of such VMOs.
     /// For information on VMO syscall interactions with children, see [Notes](#notes).
     ///
+    /// `ZX_VMO_CHILD_SNAPSHOT_MODIFIED` - Create a child that behaves as though an eager copy was
+    /// performed on any pages in the parent not backed by a pager, i.e. pages that have been modified by a
+    /// child of a pager-backed VMO. Pager-backed pages will have at least copy-on-write semantics. This
+    /// flag may not be used for VMOs created with [`zx_vmo_create_physical()`], [`zx_vmo_create_contiguous()`],
+    /// VMOs containing pinned pages, or descendants of such VMOs. This flag is also not supported for any
+    /// VMOs created with `SNAPSHOT_AT_LEAST_ON_WRITE` that have non-slice children or are not the child of
+    /// a pager-backed VMO.
+    /// For information on VMO syscall interactions with children, see [Notes](#notes).
+    ///
+    ///
     /// - `ZX_VMO_CHILD_SLICE` - Create a slice that has direct read/write access into
     /// a section of the parent. All operations on the slice VMO behave as if they were done on the parent.
     /// A slice differs from a duplicate handle to the parent by allowing access to only a subrange of the
@@ -757,9 +767,9 @@ closed protocol Vmo {
     ///
     /// In all cases if `ZX_VMO_NO_WRITE` is set then `ZX_RIGHT_WRITE` will be removed.
     ///
-    /// If *options* is `ZX_VMO_CHILD_SNAPSHOT` or `ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE` and
-    /// `ZX_VMO_CHILD_NO_WRITE` is not set then `ZX_RIGHT_WRITE` will be added and `ZX_RIGHT_EXECUTE`
-    /// will be removed.
+    /// If *options* is `ZX_VMO_CHILD_SNAPSHOT`, `ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE` or
+    /// `ZX_VMO_CHILD_SNAPSHOT_MODIFIED` and `ZX_VMO_CHILD_NO_WRITE` is not set then `ZX_RIGHT_WRITE` will
+    /// be added and `ZX_RIGHT_EXECUTE` will be removed.
     ///
     /// ## Notes
     ///
