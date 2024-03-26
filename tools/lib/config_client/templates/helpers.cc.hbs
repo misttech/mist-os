@@ -1,4 +1,4 @@
-void Config::RecordInspect(inspect::Node* node) {
+void Config::RecordInspect(inspect::Node* node) const {
   {{#each fields}}
     {{#if (is_string_vector type_)}}
       auto {{ident}}_array_ = node->CreateStringArray("{{ident}}", this->{{ident}}().size());
@@ -22,7 +22,7 @@ void Config::RecordInspect(inspect::Node* node) {
   {{/each}}
 }
 
-const std::string Config::ToString() noexcept {
+std::string Config::ToString() const noexcept {
   std::string str;
   str.reserve(4096); // minimize reallocations
 

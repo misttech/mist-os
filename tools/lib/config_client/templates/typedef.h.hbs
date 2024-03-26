@@ -8,7 +8,7 @@ public:
   Config() = default;
 #pragma clang diagnostic pop
 
-  void RecordInspect(inspect::Node* node);
+  void RecordInspect(inspect::Node* node) const;
 
   {{#each fields}}
     const {{(cpp_type type_)}}& {{ident}}() const { return storage_.{{ident}}; }

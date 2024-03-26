@@ -18,7 +18,7 @@
 
 namespace cpp_elf_config_lib {
 
-void Config::RecordInspect(inspect::Node* node) {
+void Config::RecordInspect(inspect::Node* node) const {
   node->RecordBool("my_flag", this->my_flag());
   node->RecordInt("my_int16", this->my_int16());
   node->RecordInt("my_int32", this->my_int32());
@@ -92,7 +92,7 @@ void Config::RecordInspect(inspect::Node* node) {
   node->Record(std::move(my_vector_of_uint8_array_));
 }
 
-const std::string Config::ToString() noexcept {
+std::string Config::ToString() const noexcept {
   std::string str;
   str.reserve(4096);  // minimize reallocations
 
