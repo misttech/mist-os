@@ -78,12 +78,8 @@ async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitComm
         _ => async_io::Timer::at(Duration::from_secs(cmd.timeout as u64).into_time()),
     };
 
-    let is_default_target = ffx.target.is_none();
-    let timeout_err = FfxError::DaemonError {
-        err: DaemonError::Timeout,
-        target: ffx.target.clone(),
-        is_default_target,
-    };
+    let timeout_err =
+        FfxError::DaemonError { err: DaemonError::Timeout, target: ffx.target.clone() };
     match futures::future::select(knock_fut, timeout_fut).await {
         Either::Left((left, _)) => left,
         Either::Right(_) => Err(timeout_err.into()),

@@ -142,7 +142,6 @@ async fn connect_to_rcs(
     let daemon_task = fasync::Task::spawn(daemon_fut);
     let rcs_proxy = ffx_target::get_remote_proxy(
         Some(nodename.to_string()),
-        false,
         daemon_proxy,
         TARGET_TIMEOUT,
         None,

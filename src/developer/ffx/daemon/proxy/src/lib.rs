@@ -138,10 +138,6 @@ impl Injection {
         Ok(Injection::new(env_context, daemon_check, node, format, target_spec))
     }
 
-    fn is_default_target(&self) -> bool {
-        self.target_spec.is_none()
-    }
-
     #[tracing::instrument]
     async fn init_remote_proxy(
         &self,
@@ -152,7 +148,6 @@ impl Injection {
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         get_remote_proxy(
             target_spec,
-            self.is_default_target(),
             daemon_proxy,
             proxy_timeout,
             Some(target_info),
@@ -167,7 +162,6 @@ impl Injection {
         let daemon_proxy = self.daemon_factory().await?;
         let (target_proxy, target_proxy_fut) = open_target_with_fut(
             target_spec,
-            self.is_default_target(),
             daemon_proxy.clone(),
             self.env_context.get_proxy_timeout().await?,
             &self.env_context,
@@ -177,11 +171,7 @@ impl Injection {
     }
 
     fn daemon_timeout_error(&self) -> FfxError {
-        FfxError::DaemonError {
-            err: DaemonError::Timeout,
-            target: self.target_spec.clone(),
-            is_default_target: self.is_default_target(),
-        }
+        FfxError::DaemonError { err: DaemonError::Timeout, target: self.target_spec.clone() }
     }
 }
 
@@ -251,11 +241,9 @@ impl Injector for Injection {
         .map_err(|_| {
             tracing::warn!("Timed out getting remote control proxy for: {:?}", self.target_spec);
             match target_info.lock().unwrap().take() {
-                Some(TargetInfo { nodename: Some(name), .. }) => FfxError::DaemonError {
-                    err: DaemonError::Timeout,
-                    target: Some(name),
-                    is_default_target: self.is_default_target(),
-                },
+                Some(TargetInfo { nodename: Some(name), .. }) => {
+                    FfxError::DaemonError { err: DaemonError::Timeout, target: Some(name) }
+                }
                 _ => timeout_error,
             }
         })?;
@@ -794,7 +782,7 @@ mod test {
         let error = injection.remote_factory().await.unwrap_err();
 
         match error.downcast::<FfxError>().unwrap() {
-            FfxError::DaemonError { err: DaemonError::Timeout, target, is_default_target: _ } => {
+            FfxError::DaemonError { err: DaemonError::Timeout, target } => {
                 assert_eq!(target.as_deref(), Some("target_name"));
             }
             err => panic!("Unexpected: {err}"),

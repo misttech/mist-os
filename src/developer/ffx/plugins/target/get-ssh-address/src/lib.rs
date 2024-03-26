@@ -48,8 +48,6 @@ async fn get_ssh_address_impl<W: Write>(
     let timeout_dur = Duration::from_secs_f64(cmd.timeout().await?);
     let (proxy, handle) = fidl::endpoints::create_proxy::<TargetMarker>()?;
     let target_spec: Option<String> = ffx_target::get_target_specifier(&context).await?;
-    let ffx: ffx_command::Ffx = argh::from_env();
-    let is_default_target = ffx.target.is_none();
     let ts_clone = target_spec.clone();
     let ts_clone_2 = target_spec.clone();
     let res = timeout(timeout_dur, async {
@@ -57,20 +55,12 @@ async fn get_ssh_address_impl<W: Write>(
             .open_target(&TargetQuery { string_matcher: target_spec, ..Default::default() }, handle)
             .await?
             .map_err(|err| {
-                anyhow::Error::from(FfxError::OpenTargetError {
-                    err,
-                    target: ts_clone_2,
-                    is_default_target,
-                })
+                anyhow::Error::from(FfxError::OpenTargetError { err, target: ts_clone_2 })
             })?;
         proxy.get_ssh_address().await.map_err(anyhow::Error::from)
     })
     .await
-    .map_err(|_| FfxError::DaemonError {
-        err: DaemonError::Timeout,
-        target: ts_clone,
-        is_default_target,
-    })??;
+    .map_err(|_| FfxError::DaemonError { err: DaemonError::Timeout, target: ts_clone })??;
 
     let (addr, port) = match res {
         TargetAddrInfo::Ip(ref _info) => {

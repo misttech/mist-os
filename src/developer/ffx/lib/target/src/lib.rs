@@ -53,19 +53,13 @@ const DISCOVERY_TIMEOUT: &str = "discovery.timeout";
 #[tracing::instrument]
 pub async fn get_remote_proxy(
     target: Option<String>,
-    is_default_target: bool,
     daemon_proxy: DaemonProxy,
     proxy_timeout: Duration,
     mut target_info: Option<&mut Option<TargetInfo>>,
     env_context: &EnvironmentContext,
 ) -> Result<RemoteControlProxy> {
-    let (target_proxy, target_proxy_fut) = open_target_with_fut(
-        target.clone(),
-        is_default_target,
-        daemon_proxy,
-        proxy_timeout,
-        env_context,
-    )?;
+    let (target_proxy, target_proxy_fut) =
+        open_target_with_fut(target.clone(), daemon_proxy, proxy_timeout, env_context)?;
     let mut target_proxy_fut = target_proxy_fut.boxed_local().fuse();
     let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()?;
     let mut open_remote_control_fut =
@@ -100,7 +94,6 @@ pub async fn get_remote_proxy(
         Err(err) => Err(anyhow::Error::new(FfxError::TargetConnectionError {
             err,
             target,
-            is_default_target,
             logs: Some(target_proxy.get_ssh_logs().await?),
         })),
     }
@@ -117,7 +110,6 @@ pub async fn get_remote_proxy(
 #[tracing::instrument]
 pub fn open_target_with_fut<'a, 'b: 'a>(
     target: Option<String>,
-    is_default_target: bool,
     daemon_proxy: DaemonProxy,
     target_timeout: Duration,
     env_context: &'b EnvironmentContext,
@@ -132,7 +124,7 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
                 tc_server_end.into_channel(),
             )
             .await?
-            .map_err(|err| FfxError::DaemonError { err, target: t_clone, is_default_target })?;
+            .map_err(|err| FfxError::DaemonError { err, target: t_clone })?;
         Result::<()>::Ok(())
     };
     let t_clone = target.clone();
@@ -153,12 +145,8 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
             ),
         )
         .await
-        .map_err(|_| FfxError::DaemonError {
-            err: DaemonError::Timeout,
-            target: t_clone,
-            is_default_target,
-        })??
-        .map_err(|err| FfxError::OpenTargetError { err, target, is_default_target })?;
+        .map_err(|_| FfxError::DaemonError { err: DaemonError::Timeout, target: t_clone })??
+        .map_err(|err| FfxError::OpenTargetError { err, target })?;
         Result::<()>::Ok(())
     };
     let fut = async move {
@@ -476,9 +464,8 @@ pub async fn add_manual_target(
     res.map_err(|e| {
         let err = e.connection_error.unwrap();
         let logs = e.connection_error_logs.map(|v| v.join("\n"));
-        let is_default_target = false;
         let target = Some(format!("{addr:?}"));
-        FfxError::TargetConnectionError { err, target, is_default_target, logs }.into()
+        FfxError::TargetConnectionError { err, target, logs }.into()
     })
 }
 

@@ -31,73 +31,61 @@ pub enum FfxError {
 
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", match .err {
-        DaemonError::TargetCacheError => format!("Target {} could not be looked up in the cache due to an unspecified error. Retry your request, and if that fails run `ffx doctor`.", target_string(.target, .is_default_target)),
-        DaemonError::TargetStateError => format!("Target {} is not in a state capable of the requested operation. Inspect `ffx target list` to determine if it is in the expected state.", target_string(.target, .is_default_target)),
-        DaemonError::RcsConnectionError => format!("Target {} was not reachable. Run `ffx doctor` for diagnostic information.", target_string(.target, .is_default_target)),
-        DaemonError::Timeout => format!("Timeout attempting to reach target {}", target_string(.target, .is_default_target)),
+        DaemonError::Timeout => format!("Timeout attempting to reach target {}", target_string(.target)),
         DaemonError::TargetCacheEmpty => format!("No devices found."),
-        DaemonError::TargetAmbiguous => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific matcher.", target_string(.target, .is_default_target)),
-        DaemonError::TargetNotFound => format!("Target {} was not found.", target_string(.target, .is_default_target)),
-        DaemonError::TargetInFastboot => format!("Target {} was found in Fastboot. Reboot or flash the target to continue.", target_string(.target, .is_default_target)),
-        DaemonError::NonFastbootDevice => format!("Target {} was found, but is not in Fastboot, please boot the target into Fastboot to continue.", target_string(.target, .is_default_target)),
+        DaemonError::TargetAmbiguous => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific matcher.", target_string(.target)),
+        DaemonError::TargetNotFound => format!("Target {} was not found.", target_string(.target)),
         DaemonError::ProtocolNotFound => "The requested ffx service was not found. Run `ffx doctor --restart-daemon`.".to_string(),
         DaemonError::ProtocolOpenError => "The requested ffx service failed to open. Run `ffx doctor --restart-daemon`.".to_string(),
         DaemonError::BadProtocolRegisterState => "The requested service could not be registered. Run `ffx doctor --restart-daemon`.".to_string(),
-        DaemonError::TargetInZedboot => format!("Target {} was found in Zedboot. Reboot the target to continue.", target_string(.target, .is_default_target)),
     })]
-    DaemonError { err: DaemonError, target: Option<String>, is_default_target: bool },
+    DaemonError { err: DaemonError, target: Option<String> },
 
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", match .err {
-        OpenTargetError::QueryAmbiguous => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific matcher.", target_string(.target, .is_default_target)),
-        OpenTargetError::TargetNotFound => format!("Target specification {} was not found. Use `ffx target list` to list known targets, and use a different matcher.", target_string(.target, .is_default_target))
+        OpenTargetError::QueryAmbiguous => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific matcher.", target_string(.target)),
+        OpenTargetError::TargetNotFound => format!("Target specification {} was not found. Use `ffx target list` to list known targets, and use a different matcher.", target_string(.target))
     })]
-    OpenTargetError { err: OpenTargetError, target: Option<String>, is_default_target: bool },
+    OpenTargetError { err: OpenTargetError, target: Option<String> },
 
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", match .err {
         TunnelError::CouldNotListen => "Could not establish a host-side TCP listen socket".to_string(),
         TunnelError::TargetConnectFailed => "Couldn not connect to target to establish a tunnel".to_string(),
     })]
-    TunnelError { err: TunnelError, target: Option<String>, is_default_target: bool },
+    TunnelError { err: TunnelError, target: Option<String> },
 
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", match .err {
-        TargetConnectionError::PermissionDenied => format!("Could not establish SSH connection to the target {}: Permission denied.", target_string(.target, .is_default_target)),
-        TargetConnectionError::ConnectionRefused => format!("Could not establish SSH connection to the target {}: Connection refused.", target_string(.target, .is_default_target)),
-        TargetConnectionError::UnknownNameOrService => format!("Could not establish SSH connection to the target {}: Unknown name or service.", target_string(.target, .is_default_target)),
-        TargetConnectionError::Timeout => format!("Could not establish SSH connection to the target {}: Timed out awaiting connection.", target_string(.target, .is_default_target)),
-        TargetConnectionError::KeyVerificationFailure => format!("Could not establish SSH connection to the target {}: Key verification failed.", target_string(.target, .is_default_target)),
-        TargetConnectionError::NoRouteToHost => format!("Could not establish SSH connection to the target {}: No route to host.", target_string(.target, .is_default_target)),
-        TargetConnectionError::NetworkUnreachable => format!("Could not establish SSH connection to the target {}: Network unreachable.", target_string(.target, .is_default_target)),
-        TargetConnectionError::InvalidArgument => format!("Could not establish SSH connection to the target {}: Invalid argument. Please check the address of the target you are attempting to add.", target_string(.target, .is_default_target)),
-        TargetConnectionError::UnknownError => format!("Could not establish SSH connection to the target {}. {}. Report the error to the FFX team at https://fxbug.dev/new/ffx+User+Bug", target_string(.target, .is_default_target), .logs.as_ref().map(|s| s.as_str()).unwrap_or("As-yet unknown error. Please refer to the logs at `ffx config get log.dir` and look for 'Unknown host-pipe error received'")),
-        TargetConnectionError::FidlCommunicationError => format!("Connection was established to {}, but FIDL communication to the Remote Control Service failed. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target, .is_default_target)),
-        TargetConnectionError::RcsConnectionError => format!("Connection was established to {}, but the Remote Control Service failed initiating a test connection. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target, .is_default_target)),
-        TargetConnectionError::FailedToKnockService => format!("Connection was established to {}, but the Remote Control Service test connection was dropped prematurely. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target, .is_default_target)),
+        TargetConnectionError::PermissionDenied => format!("Could not establish SSH connection to the target {}: Permission denied.", target_string(.target)),
+        TargetConnectionError::ConnectionRefused => format!("Could not establish SSH connection to the target {}: Connection refused.", target_string(.target)),
+        TargetConnectionError::UnknownNameOrService => format!("Could not establish SSH connection to the target {}: Unknown name or service.", target_string(.target)),
+        TargetConnectionError::Timeout => format!("Could not establish SSH connection to the target {}: Timed out awaiting connection.", target_string(.target)),
+        TargetConnectionError::KeyVerificationFailure => format!("Could not establish SSH connection to the target {}: Key verification failed.", target_string(.target)),
+        TargetConnectionError::NoRouteToHost => format!("Could not establish SSH connection to the target {}: No route to host.", target_string(.target)),
+        TargetConnectionError::NetworkUnreachable => format!("Could not establish SSH connection to the target {}: Network unreachable.", target_string(.target)),
+        TargetConnectionError::InvalidArgument => format!("Could not establish SSH connection to the target {}: Invalid argument. Please check the address of the target you are attempting to add.", target_string(.target)),
+        TargetConnectionError::UnknownError => format!("Could not establish SSH connection to the target {}. {}. Report the error to the FFX team at https://fxbug.dev/new/ffx+User+Bug", target_string(.target), .logs.as_ref().map(|s| s.as_str()).unwrap_or("As-yet unknown error. Please refer to the logs at `ffx config get log.dir` and look for 'Unknown host-pipe error received'")),
+        TargetConnectionError::FidlCommunicationError => format!("Connection was established to {}, but FIDL communication to the Remote Control Service failed. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target)),
+        TargetConnectionError::RcsConnectionError => format!("Connection was established to {}, but the Remote Control Service failed initiating a test connection. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target)),
+        TargetConnectionError::FailedToKnockService => format!("Connection was established to {}, but the Remote Control Service test connection was dropped prematurely. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target)),
         TargetConnectionError::TargetIncompatible => format!("{}.", .logs.as_ref().map(|s| s.as_str()).unwrap_or(format!("ffx revision {:#X} is not compatible with the target. Unable to determine target ABI revision", version_history::HISTORY.get_misleading_version_for_ffx().abi_revision.as_u64()).as_str())),
     })]
     TargetConnectionError {
         err: TargetConnectionError,
         target: Option<String>,
-        is_default_target: bool,
         logs: Option<String>,
     },
     #[error("Testing Error")]
     TestingError, // this is here to be used in tests for verifying errors are translated properly.
 }
 
-pub fn target_string(matcher: &Option<String>, is_default: &bool) -> String {
-    let non_empty_matcher = matcher.as_ref().filter(|s| !s.is_empty());
-    format!(
-        "\"{}{}\"",
-        non_empty_matcher.unwrap_or(&"unspecified".to_string()),
-        if *is_default && !non_empty_matcher.is_none() {
-            " (default)".to_string()
-        } else {
-            "".to_string()
-        },
-    )
+pub fn target_string(matcher: &Option<String>) -> String {
+    match matcher {
+        &None => "\"unspecified\"".to_string(),
+        &Some(ref s) if s.is_empty() => "\"unspecified\"".to_string(),
+        &Some(ref s) => format!("\"{s}\""),
+    }
 }
 
 /// Convenience function for converting protocol connection requests into more
@@ -204,15 +192,13 @@ impl IntoExitCode for FfxError {
             FfxError::Error(_, code) => *code,
             FfxError::TestingError => 254,
             #[cfg(not(target_os = "fuchsia"))]
-            FfxError::DaemonError { err, target: _, is_default_target: _ } => err.exit_code(),
+            FfxError::DaemonError { err, target: _ } => err.exit_code(),
             #[cfg(not(target_os = "fuchsia"))]
-            FfxError::OpenTargetError { err, target: _, is_default_target: _ } => err.exit_code(),
+            FfxError::OpenTargetError { err, target: _ } => err.exit_code(),
             #[cfg(not(target_os = "fuchsia"))]
-            FfxError::TunnelError { err, target: _, is_default_target: _ } => err.exit_code(),
+            FfxError::TunnelError { err, target: _ } => err.exit_code(),
             #[cfg(not(target_os = "fuchsia"))]
-            FfxError::TargetConnectionError { err, target: _, is_default_target: _, logs: _ } => {
-                err.exit_code()
-            }
+            FfxError::TargetConnectionError { err, target: _, logs: _ } => err.exit_code(),
         }
     }
 }
@@ -221,19 +207,13 @@ impl IntoExitCode for FfxError {
 impl IntoExitCode for DaemonError {
     fn exit_code(&self) -> i32 {
         match self {
-            DaemonError::TargetCacheError => 11,
-            DaemonError::TargetStateError => 12,
-            DaemonError::RcsConnectionError => 13,
             DaemonError::Timeout => 14,
             DaemonError::TargetCacheEmpty => 15,
             DaemonError::TargetAmbiguous => 16,
             DaemonError::TargetNotFound => 17,
-            DaemonError::TargetInFastboot => 18,
-            DaemonError::NonFastbootDevice => 19,
             DaemonError::ProtocolNotFound => 20,
             DaemonError::ProtocolOpenError => 21,
             DaemonError::BadProtocolRegisterState => 22,
-            DaemonError::TargetInZedboot => 23,
         }
     }
 }
@@ -346,28 +326,18 @@ mod test {
     fn test_daemon_error_strings_containing_target_name() {
         fn assert_contains_target_name(err: DaemonError) {
             let name: Option<String> = Some("fuchsia-f00d".to_string());
-            assert!(format!(
-                "{}",
-                FfxError::DaemonError { err, target: name.clone(), is_default_target: false }
-            )
-            .contains(name.as_ref().unwrap()));
+            assert!(format!("{}", FfxError::DaemonError { err, target: name.clone() })
+                .contains(name.as_ref().unwrap()));
         }
-        assert_contains_target_name(DaemonError::TargetCacheError);
-        assert_contains_target_name(DaemonError::TargetStateError);
-        assert_contains_target_name(DaemonError::RcsConnectionError);
         assert_contains_target_name(DaemonError::Timeout);
         assert_contains_target_name(DaemonError::TargetAmbiguous);
         assert_contains_target_name(DaemonError::TargetNotFound);
-        assert_contains_target_name(DaemonError::TargetInFastboot);
-        assert_contains_target_name(DaemonError::NonFastbootDevice);
-        assert_contains_target_name(DaemonError::TargetInZedboot);
     }
 
     #[test]
     fn test_target_string() {
-        assert_eq!(target_string(&None, &false), "\"unspecified\"");
-        assert_eq!(target_string(&Some("".to_string()), &false), "\"unspecified\"");
-        assert_eq!(target_string(&Some("kittens".to_string()), &false), "\"kittens\"");
-        assert_eq!(target_string(&Some("kittens".to_string()), &true), "\"kittens (default)\"");
+        assert_eq!(target_string(&None), "\"unspecified\"");
+        assert_eq!(target_string(&Some("".to_string())), "\"unspecified\"");
+        assert_eq!(target_string(&Some("kittens".to_string())), "\"kittens\"");
     }
 }

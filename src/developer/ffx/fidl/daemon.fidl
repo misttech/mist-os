@@ -9,9 +9,6 @@ using fuchsia.developer.ffxdaemonlifecycle;
 alias VersionInfo = fuchsia.developer.ffxdaemonlifecycle.VersionInfo;
 
 type DaemonError = strict enum {
-    TARGET_CACHE_ERROR = 1;
-    TARGET_STATE_ERROR = 2;
-    RCS_CONNECTION_ERROR = 3;
     /// A generic timeout error.
     TIMEOUT = 4;
 
@@ -23,10 +20,6 @@ type DaemonError = strict enum {
     TARGET_AMBIGUOUS = 6;
     /// When querying for a target, no matches were found.
     TARGET_NOT_FOUND = 7;
-    /// When attempting to connect to RCS on a Fastboot device.
-    TARGET_IN_FASTBOOT = 8;
-    /// Fastboot device expected.
-    NON_FASTBOOT_DEVICE = 9;
     /// When attempting to use a protocol that is not supported on the daemon.
     PROTOCOL_NOT_FOUND = 10;
     /// An error was encountered when attempting to open a protocol stream.
@@ -36,8 +29,6 @@ type DaemonError = strict enum {
     /// while the daaemon is actively shutting down, and should be extremely
     /// rare.
     BAD_PROTOCOL_REGISTER_STATE = 12;
-    /// When attempting to connect to RCS on a Fastboot device.
-    TARGET_IN_ZEDBOOT = 13;
 };
 
 @discoverable
