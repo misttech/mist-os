@@ -754,7 +754,8 @@ impl Allocator {
     pub async fn open(&self) -> Result<(), Error> {
         let filesystem = self.filesystem.upgrade().unwrap();
         let root_store = filesystem.root_store();
-        let mut strategy: Box<dyn AllocatorStrategy>;
+        let mut strategy: Box<dyn AllocatorStrategy> =
+            Box::new(strategy::best_fit::BestFit::default());
 
         let handle =
             ObjectStore::open_object(&root_store, self.object_id, HandleOptions::default(), None)
@@ -831,13 +832,6 @@ impl Allocator {
                 self.object_id,
                 tree::reservation_amount_from_layer_size(total_size),
             );
-            // Use FirstFit for existing filesystems to minimise fragmentation in the face of heavy
-            // filesystem churn.
-            strategy = Box::new(strategy::first_fit::FirstFit::default());
-        } else {
-            // Use BestFit for new filesystems so we pack files together without creating gaps.
-            // This can help us produce minimal sized filesystem images.
-            strategy = Box::new(strategy::best_fit::BestFit::default());
         }
         // Walk all allocations to generate the set of free regions between allocations.
         // This may take some time and consume a potentially large chunk of RAM on on very large,
