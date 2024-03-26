@@ -10,6 +10,9 @@ scriptdir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${scriptdir}"/lib/vars.sh || exit $?
 fx-config-read
 
+# Make sure the ssh config is present and has the expected private key
+check-ssh-config
+
 # Export a variable to detect if we've called ourselves.
 if [[ ${_FX_SSH_ACTIVE-0} -eq 0 ]]; then
   export _FX_SSH_ACTIVE=1

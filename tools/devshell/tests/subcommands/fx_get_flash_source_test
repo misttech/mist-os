@@ -17,6 +17,7 @@ BT_FILE_DEPS=(
   "tools/devshell/lib/fx-cmd-locator.sh"
   "tools/devshell/lib/vars.sh"
   "tools/devshell/lib/platform.sh"
+  "tools/devshell/lib/generate-ssh-config.sh"
 )
 
 BT_MKDIR_DEPS=(

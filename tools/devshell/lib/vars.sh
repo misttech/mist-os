@@ -31,6 +31,7 @@ export FUCHSIA_OUT_DIR="${FUCHSIA_OUT_DIR:-${FUCHSIA_DIR}/out}"
 source "${devshell_lib_dir}/platform.sh"
 source "${devshell_lib_dir}/fx-cmd-locator.sh"
 source "${devshell_lib_dir}/fx-optional-features.sh"
+source "${devshell_lib_dir}/generate-ssh-config.sh"
 unset devshell_lib_dir
 
 # Subcommands can use this directory to cache artifacts and state that should
@@ -624,6 +625,20 @@ function get-ssh-privkey {
 # Prints path to the default authorized_keys to include on Fuchsia devices.
 function get-ssh-authkeys {
   _get-ssh-key auth
+}
+
+# Checks the ssh_config file exists and references the private key, otherwise
+# (re)creates it
+function check-ssh-config {
+  privkey="$(get-ssh-privkey)"
+  conffile="${FUCHSIA_BUILD_DIR}/ssh-keys/ssh_config"
+  if [[ ! -f "${conffile}" ]] || ! grep -q "IdentityFile\s*$privkey" "$conffile"; then
+    generate-ssh-config "$privkey" "$conffile"
+    if [[ $? -ne 0 || ! -f "${conffile}" ]] || ! grep -q "IdentityFile\s*$privkey" "$conffile"; then
+      fx-error "Unexpected error, cannot generate ssh_config: ${conffile}"
+      exit 1
+    fi
+  fi
 }
 
 function fx-target-finder-resolve {

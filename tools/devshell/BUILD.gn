@@ -20,7 +20,6 @@ if (!is_host) {
     deps = [
       "//src/developer/ffx:ffx_tool",
       "//src/sys/pkg/bin/pm:host",
-      "//third_party/openssh-portable/fuchsia/developer-keys:ssh_config($default_toolchain)",
       "//tools/bootserver_old:host",
       "//tools/net/device-finder:host",
       "//tools/symbolizer",
@@ -181,6 +180,7 @@ host_script_test_data("fx_bash_tests") {
         "//tools/devshell/lib/fx-mkzedboot.sh",
         "//tools/devshell/lib/fx-optional-features.sh",
         "//tools/devshell/lib/fx-remote.sh",
+        "//tools/devshell/lib/generate-ssh-config.sh",
         "//tools/devshell/lib/host_symbolizer.sh",
         "//tools/devshell/lib/metrics.sh",
         "//tools/devshell/lib/platform.sh",

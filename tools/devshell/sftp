@@ -26,4 +26,7 @@ case $1 in
   ;;
 esac
 
+# Make sure the ssh config is present and has the expected private key
+check-ssh-config
+
 sftp -F "${FUCHSIA_BUILD_DIR}/ssh-keys/ssh_config" "$@"
