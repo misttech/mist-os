@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
+use fasync::OnSignals;
 use fidl::{
     endpoints::{ControlHandle, RequestStream},
     AsyncChannel,
@@ -25,7 +26,7 @@ use fuchsia_component::{client::connect_to_protocol_sync, server::ServiceFs};
 use fuchsia_inspect as inspect;
 use fuchsia_runtime as fruntime;
 use fuchsia_zircon::{
-    Task as _, {self as zx},
+    AsHandleRef, Signals, Task as _, {self as zx},
 };
 use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
@@ -292,13 +293,20 @@ pub async fn create_component_from_stream(
                         || format!("creating container \"{}\"", &config.config.name),
                     )?;
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
-                let kernel = &container.kernel;
-                let vvar = kernel.vdso.vvar_writeable.clone();
-                kernel.kthreads.spawner().spawn(move |_, _| loop {
-                    // TODO(https://fxbug.dev/42079789): Replace polling for the clock transformation with having
-                    // some sort of a wait for a clock transform update notification.
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                    update_utc_clock(&vvar);
+
+                container.kernel.kthreads.spawn_future({
+                    let vvar = container.kernel.vdso.vvar_writeable.clone();
+                    let utc_clock =
+                        fruntime::duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS).unwrap();
+                    async move {
+                        loop {
+                            let waitable =
+                                OnSignals::new(utc_clock.as_handle_ref(), Signals::CLOCK_UPDATED);
+                            update_utc_clock(&vvar);
+                            waitable.await.expect("async_wait should always succeed");
+                            log_info!("Received a UTC update");
+                        }
+                    }
                 });
                 return Ok((container, service_config));
             }
