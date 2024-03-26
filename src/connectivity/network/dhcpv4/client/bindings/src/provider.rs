@@ -149,7 +149,10 @@ pub(crate) async fn serve_client_provider(
                     .await
                     .unwrap_or_else(|error| match error {
                         crate::client::Error::Exit(reason) => {
-                            tracing::info!("client exiting: {:?}", reason);
+                            tracing::info!(
+                                "(interface_id = {interface_id}) client exiting: {:?}",
+                                reason
+                            );
                             control_handle.send_on_exit(reason).unwrap_or_else(|e| {
                                 tracing::error!("FIDL error while sending on_exit event: {:?}", e);
                             });
