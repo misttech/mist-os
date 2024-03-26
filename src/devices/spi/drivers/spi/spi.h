@@ -8,14 +8,11 @@
 #include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
 #include <fidl/fuchsia.hardware.spi/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.spiimpl/cpp/driver/wire.h>
-#include <fuchsia/hardware/spiimpl/cpp/banjo.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <optional>
 
 #include <ddktl/device.h>
-
-#include "src/devices/spi/drivers/spi/spi-impl-client.h"
 
 namespace spi {
 
@@ -37,11 +34,9 @@ class SpiDevice : public SpiDeviceType {
 
  private:
   using FidlClientType = fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl>;
-  using BanjoClientType = BanjoSpiImplClient;
 
-  template <typename T>
   void AddChildren(const fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata,
-                   typename T::ClientType client);
+                   fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> client);
 
   void FidlClientTeardownHandler();
   void DispatcherShutdownHandler(fdf_dispatcher_t* dispatcher);
@@ -56,7 +51,7 @@ class SpiDevice : public SpiDeviceType {
   const uint32_t bus_id_;
   const fdf::UnownedDispatcher driver_dispatcher_;
   std::optional<fdf::SynchronizedDispatcher> fidl_dispatcher_;
-  std::variant<std::nullopt_t, FidlClientType, BanjoClientType> spi_impl_ = std::nullopt;
+  fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> spi_impl_;
   std::optional<ddk::UnbindTxn> unbind_txn_;
   bool fidl_client_teardown_complete_ = false;
   bool dispatcher_shutdown_complete_ = false;

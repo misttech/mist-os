@@ -13,7 +13,6 @@
 
 #include <fbl/alloc_checker.h>
 
-#include "spi-banjo-child.h"
 #include "spi-child.h"
 
 namespace spi {
@@ -55,21 +54,10 @@ zx_status_t SpiDevice::Create(void* ctx, zx_device_t* parent) {
   } else {
     zxlogf(INFO, "%zu channels supplied.", metadata.channels().count());
 
-    if (std::holds_alternative<FidlClientType>(device->spi_impl_)) {
-      async::PostTask(device->fidl_dispatcher()->async_dispatcher(),
-                      [device = device.get(), metadata = *std::move(decoded)]() mutable {
-                        device->AddChildren<SpiChild>(
-                            *metadata, std::get<FidlClientType>(device->spi_impl_).Clone());
-                      });
-    } else if (std::holds_alternative<BanjoClientType>(device->spi_impl_)) {
-      async::PostTask(device->fidl_dispatcher()->async_dispatcher(),
-                      [device = device.get(), metadata = *std::move(decoded)]() mutable {
-                        device->AddChildren<SpiBanjoChild>(
-                            *metadata, &std::get<BanjoClientType>(device->spi_impl_));
-                      });
-    } else {
-      ZX_DEBUG_ASSERT_MSG(false, "Banjo and FIDL clients are both invalid");
-    }
+    async::PostTask(device->fidl_dispatcher()->async_dispatcher(),
+                    [device = device.get(), metadata = *std::move(decoded)]() mutable {
+                      device->AddChildren(*metadata, device->spi_impl_.Clone());
+                    });
   }
 
   [[maybe_unused]] auto* dummy = device.release();
@@ -97,39 +85,19 @@ zx_status_t SpiDevice::Init() {
     zxlogf(DEBUG, "Using dispatcher with role \"%s\"", role_name.c_str());
   }
 
-  /// NOTE: This driver is able to bind against both of the following protocols:
-  ///
-  ///  Fidl: //sdk/fidl/fuchsia.hardware.spiimpl
-  /// Banjo: //sdk/banjo/fuchsia.hardware.spiimpl
-  ///
-  /// The driver will attempt to connect to both parent protocols and use
-  /// whichever protocol is available from its parent.
-
-  // Right now there isn't a way to detect if our FIDL connection was
-  // successful.
-  // We attempt to get the Banjo protocol from the parent and if that succeeds
-  // we assume that we're operating in Banjo mode. If it fails we default to
-  // FIDL.
-  ddk::SpiImplProtocolClient spi(parent());
-  if (spi.is_valid()) {
-    spi_impl_ = BanjoSpiImplClient(spi);
-    return ZX_OK;
-  }
-
   auto client_end = DdkConnectRuntimeProtocol<fuchsia_hardware_spiimpl::Service::Device>();
   if (client_end.is_error()) {
     return client_end.error_value();
   }
 
-  spi_impl_ = fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl>(
+  spi_impl_.Bind(
       *std::move(client_end), fidl_dispatcher()->get(),
       fidl::ObserveTeardown(fit::bind_member<&SpiDevice::FidlClientTeardownHandler>(this)));
   return ZX_OK;
 }
 
-template <typename T>
 void SpiDevice::AddChildren(const fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata,
-                            typename T::ClientType client) {
+                            fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> client) {
   bool has_siblings = metadata.channels().count() > 1;
   for (auto& channel : metadata.channels()) {
     const auto cs = channel.has_cs() ? channel.cs() : 0;
@@ -139,12 +107,8 @@ void SpiDevice::AddChildren(const fuchsia_hardware_spi_businfo::wire::SpiBusMeta
 
     fbl::AllocChecker ac;
 
-    std::unique_ptr<T> dev;
-    if constexpr (std::is_same_v<decltype(client), FidlClientType>) {
-      dev.reset(new (&ac) T(zxdev(), client.Clone(), cs, has_siblings, fidl_dispatcher()));
-    } else {
-      dev.reset(new (&ac) T(zxdev(), client, cs, has_siblings, fidl_dispatcher()));
-    }
+    std::unique_ptr<SpiChild> dev(
+        new (&ac) SpiChild(zxdev(), client.Clone(), cs, has_siblings, fidl_dispatcher()));
 
     if (!ac.check()) {
       zxlogf(ERROR, "Out of memory");
@@ -203,9 +167,6 @@ void SpiDevice::AddChildren(const fuchsia_hardware_spi_businfo::wire::SpiBusMeta
 void SpiDevice::DdkUnbind(ddk::UnbindTxn txn) {
   ZX_DEBUG_ASSERT_MSG(!unbind_txn_, "Unbind txn already set");
 
-  if (!std::holds_alternative<FidlClientType>(spi_impl_)) {
-    fidl_client_teardown_complete_ = true;
-  }
   if (!fidl_dispatcher_) {
     dispatcher_shutdown_complete_ = true;
   }
@@ -217,9 +178,7 @@ void SpiDevice::DdkUnbind(ddk::UnbindTxn txn) {
   }
 
   unbind_txn_ = std::move(txn);
-  if (std::holds_alternative<FidlClientType>(spi_impl_)) {
-    std::get<FidlClientType>(spi_impl_).AsyncTeardown();
-  }
+  spi_impl_.AsyncTeardown();
   if (fidl_dispatcher_) {
     // Post a task to the FIDL dispatcher to start shutting itself down. If run on this thread
     // instead, the dispatcher could change states while a task on it is running, potentially

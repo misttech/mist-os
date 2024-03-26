@@ -8,7 +8,7 @@
     },
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.spi.BIND_PROTOCOL.IMPL"
+            "fuchsia.hardware.spiimpl.Service": "fuchsia.hardware.spiimpl.Service.DriverTransport"
         },
         "expected": "match",
         "name": "spi"

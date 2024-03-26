@@ -25,8 +25,6 @@ class SpiChild : public SpiChildType,
                  public ddk::SpiProtocol<SpiChild, ddk::base_protocol>,
                  public fidl::WireServer<fuchsia_hardware_spi::Device> {
  public:
-  using ClientType = fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl>;
-
   SpiChild(zx_device_t* parent, fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> spi,
            uint32_t chip_select, bool has_siblings, fdf::UnownedDispatcher fidl_dispatcher)
       : SpiChildType(parent),

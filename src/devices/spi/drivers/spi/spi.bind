@@ -2,13 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.spi;
 using fuchsia.hardware.spiimpl;
 
-if fuchsia.BIND_PROTOCOL == fuchsia.spi.BIND_PROTOCOL.IMPL {
-    true;
-} else if fuchsia.hardware.spiimpl.Service == fuchsia.hardware.spiimpl.Service.DriverTransport {
-    true;
-} else {
-    false;
-}
+fuchsia.hardware.spiimpl.Service == fuchsia.hardware.spiimpl.Service.DriverTransport;

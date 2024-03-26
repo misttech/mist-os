@@ -11,10 +11,8 @@ driver_bind_rules("spi_bind") {
   rules = "spi.bind"
   bind_output = "spi.bindbc"
   tests = "tests.json"
-  deps = [
-    "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_bindlib",
-    "//src/devices/bind/fuchsia.spi",
-  ]
+  deps =
+      [ "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_bindlib" ]
 }
 
 group("tests") {
@@ -29,7 +27,6 @@ group("common") {
   public_deps = [
     ":spi_bind",
     "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
     "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
     "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_cpp",
@@ -53,9 +50,7 @@ fuchsia_driver("spi-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
-    "spi-banjo-child.cc",
     "spi-child.cc",
-    "spi-impl-client.cc",
     "spi.cc",
   ]
   deps = [
@@ -80,9 +75,7 @@ fuchsia_driver_package("package") {
 test("spi-test-bin") {
   output_name = "spi-test"
   sources = [
-    "spi-banjo-child.cc",
     "spi-child.cc",
-    "spi-impl-client.cc",
     "spi-test.cc",
     "spi.cc",
   ]
