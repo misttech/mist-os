@@ -108,7 +108,7 @@ use {
         },
         object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
-            allocator::strategy::{AllocatorStrategy, LocationHint},
+            allocator::strategy::LocationHint,
             object_manager::ReservationUpdate,
             transaction::{
                 lock_keys, AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction,
@@ -516,7 +516,7 @@ struct Inner {
     /// This should only be listened to while the allocation_mutex is held.
     trim_listener: Option<EventListener>,
     /// This controls how we allocate our free space to manage fragmentation.
-    strategy: Box<dyn strategy::AllocatorStrategy>,
+    strategy: Box<strategy::BestFit>,
     /// Tracks the number of allocations of size 1,2,...63,>=64.
     histogram: [u64; 64],
 }
@@ -666,8 +666,7 @@ impl Allocator {
         let max_extent_size_bytes = max_extent_size_for_block_size(filesystem.block_size());
         // Note that we use BestFit strategy for new filesystems to favour dense packing of
         // data and 'FirstFit' for existing filesystems for better fragmentation.
-        let mut strategy: Box<dyn strategy::AllocatorStrategy> =
-            Box::new(strategy::best_fit::BestFit::default());
+        let mut strategy = Box::new(strategy::BestFit::default());
         strategy.free(0..filesystem.device().size());
         Allocator {
             filesystem: Arc::downgrade(&filesystem),
@@ -754,8 +753,7 @@ impl Allocator {
     pub async fn open(&self) -> Result<(), Error> {
         let filesystem = self.filesystem.upgrade().unwrap();
         let root_store = filesystem.root_store();
-        let mut strategy: Box<dyn AllocatorStrategy> =
-            Box::new(strategy::best_fit::BestFit::default());
+        let mut strategy = Box::new(strategy::BestFit::default());
 
         let handle =
             ObjectStore::open_object(&root_store, self.object_id, HandleOptions::default(), None)

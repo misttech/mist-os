@@ -77,7 +77,6 @@ fxfs_sources = [
   "src/object_store/allocator.rs",
   "src/object_store/allocator/merge.rs",
   "src/object_store/allocator/strategy.rs",
-  "src/object_store/allocator/strategy/best_fit.rs",
   "src/object_store/caching_object_handle.rs",
   "src/object_store/data_object_handle.rs",
   "src/object_store/directory.rs",
