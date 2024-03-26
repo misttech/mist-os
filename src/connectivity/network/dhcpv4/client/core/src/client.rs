@@ -888,7 +888,7 @@ fn build_discover(
 fn parse_incoming_dhcp_message_from_ip_packet(
     packet: &[u8],
     debug_log_prefix: DebugLogPrefix,
-) -> Result<Option<dhcp_protocol::Message>, anyhow::Error> {
+) -> Result<Option<(net_types::ip::Ipv4Addr, dhcp_protocol::Message)>, anyhow::Error> {
     match crate::parse::parse_dhcp_message_from_ip_packet(packet, CLIENT_PORT) {
         Ok(message) => Ok(Some(message)),
         Err(err) => match err {
@@ -987,7 +987,7 @@ impl<I: deps::Instant> Selecting<I> {
                 // identify DHCP servers via the Server Identifier option.
                 let _: Mac = src_addr;
 
-                let message =
+                let (src_addr, message) =
                     match parse_incoming_dhcp_message_from_ip_packet(packet, *debug_log_prefix)? {
                         Some(message) => message,
                         None => return Ok(None),
@@ -998,7 +998,7 @@ impl<I: deps::Instant> Selecting<I> {
                     .context(
                         "error while retrieving fields to use in DHCPREQUEST from DHCP message",
                     )
-                    .map(Some)
+                    .map(|fields| Some((src_addr, fields)))
             },
             *debug_log_prefix,
         )
@@ -1024,7 +1024,14 @@ impl<I: deps::Instant> Selecting<I> {
                 Ok(SelectingOutcome::GracefulShutdown)
             },
             fields_to_use_in_request_result = offer_fields_stream.select_next_some() => {
-                let fields_from_offer_to_use_in_request = fields_to_use_in_request_result?;
+                let (src_addr, fields_from_offer_to_use_in_request) =
+                    fields_to_use_in_request_result?;
+
+                if src_addr != fields_from_offer_to_use_in_request.server_identifier.get() {
+                    tracing::warn!("{debug_log_prefix} received offer from {src_addr} with \
+                        differing server_identifier = {}",
+                        fields_from_offer_to_use_in_request.server_identifier);
+                }
 
                 // Currently, we take the naive approach of accepting the first
                 // DHCPOFFER we see without doing any special selection logic.
@@ -1165,7 +1172,7 @@ impl<I: deps::Instant> Requesting<I> {
                 // We don't care about the src addr of incoming messages, because we
                 // identify DHCP servers via the Server Identifier option.
                 let _: Mac = src_addr;
-                let message =
+                let (src_addr, message) =
                     match parse_incoming_dhcp_message_from_ip_packet(packet, *debug_log_prefix)? {
                         Some(message) => message,
                         None => return Ok(None),
@@ -1178,7 +1185,7 @@ impl<I: deps::Instant> Requesting<I> {
                     message,
                 )
                 .context("error extracting needed fields from DHCP message during Requesting")
-                .map(Some)
+                .map(|fields| Some((src_addr, fields)))
             },
             *debug_log_prefix,
         )
@@ -1194,7 +1201,7 @@ impl<I: deps::Instant> Requesting<I> {
         .fuse();
 
         pin_mut!(send_fut, ack_or_nak_stream);
-        let fields_to_retain = select! {
+        let (src_addr, fields_to_retain) = select! {
             send_requests_result = send_fut => {
                 send_requests_result?;
                 return Ok(RequestingOutcome::RanOutOfRetransmits)
@@ -1217,18 +1224,27 @@ impl<I: deps::Instant> Requesting<I> {
                     rebinding_time_value_secs,
                     parameters,
                 } = ack;
+
+                let server_identifier = server_identifier.unwrap_or({
+                    let crate::parse::FieldsFromOfferToUseInRequest {
+                        server_identifier,
+                        ip_address_lease_time_secs: _,
+                        ip_address_to_request: _,
+                    } = fields_from_offer_to_use_in_request;
+                    *server_identifier
+                });
+
+                if src_addr != server_identifier.get() {
+                    tracing::warn!(
+                        "{debug_log_prefix} accepting DHCPACK from {src_addr} \
+                        with differing server_identifier = {server_identifier}"
+                    );
+                }
                 Ok(RequestingOutcome::Bound(
                     Bound {
                         discover_options: discover_options.clone(),
                         yiaddr,
-                        server_identifier: server_identifier.unwrap_or({
-                            let crate::parse::FieldsFromOfferToUseInRequest {
-                                server_identifier,
-                                ip_address_lease_time_secs: _,
-                                ip_address_to_request: _,
-                            } = fields_from_offer_to_use_in_request;
-                            *server_identifier
-                        }),
+                        server_identifier,
                         ip_address_lease_time: Duration::from_secs(
                             ip_address_lease_time_secs.get().into(),
                         ),
@@ -1333,7 +1349,7 @@ impl<I: deps::Instant> Bound<I> {
         let Self {
             discover_options: _,
             yiaddr: _,
-            server_identifier: _,
+            server_identifier,
             ip_address_lease_time,
             start_time,
             renewal_time,
@@ -1345,8 +1361,9 @@ impl<I: deps::Instant> Bound<I> {
         let renewal_time = renewal_time.unwrap_or(*ip_address_lease_time / 2);
 
         let debug_log_prefix = &client_config.debug_log_prefix;
-        tracing::debug!(
-            "{debug_log_prefix} In Bound state; ip_address_lease_time = {}, renewal_time = {}",
+        tracing::info!(
+            "{debug_log_prefix} In Bound state; ip_address_lease_time = {}, renewal_time = {}, \
+             server_identifier = {server_identifier}",
             ip_address_lease_time.as_secs(),
             renewal_time.as_secs(),
         );
@@ -2041,7 +2058,7 @@ mod test {
 
                 assert_eq!(address, Mac::BROADCAST);
 
-                let msg = crate::parse::parse_dhcp_message_from_ip_packet(
+                let (_src_addr, msg) = crate::parse::parse_dhcp_message_from_ip_packet(
                     &recv_buf[..length],
                     dhcp_protocol::SERVER_PORT,
                 )
@@ -2191,11 +2208,12 @@ mod test {
             // `dhcp_protocol::Message` intentionally doesn't implement `Clone`,
             // so we re-parse instead for testing purposes.
             let parse_msg = || {
-                crate::parse::parse_dhcp_message_from_ip_packet(
+                let (_src_addr, msg) = crate::parse::parse_dhcp_message_from_ip_packet(
                     &recv_buf[..length],
                     dhcp_protocol::SERVER_PORT,
                 )
-                .expect("received packet on test socket should parse as DHCP message")
+                .expect("received packet on test socket should parse as DHCP message");
+                msg
             };
 
             let msg = parse_msg();
@@ -2446,7 +2464,7 @@ mod test {
 
                 assert_eq!(address, Mac::BROADCAST);
 
-                let msg = crate::parse::parse_dhcp_message_from_ip_packet(
+                let (_src_addr, msg) = crate::parse::parse_dhcp_message_from_ip_packet(
                     &recv_buf[..length],
                     dhcp_protocol::SERVER_PORT,
                 )
@@ -2624,7 +2642,7 @@ mod test {
                 .expect("recv_from on test socket should succeed");
             assert_eq!(address, Mac::BROADCAST);
 
-            let msg = crate::parse::parse_dhcp_message_from_ip_packet(
+            let (_src_addr, msg) = crate::parse::parse_dhcp_message_from_ip_packet(
                 &recv_buf[..length],
                 dhcp_protocol::SERVER_PORT,
             )
@@ -2807,7 +2825,7 @@ mod test {
                 .expect("should succeed");
             assert_eq!(address, Mac::BROADCAST);
 
-            let message =
+            let (_src_addr, message) =
                 crate::parse::parse_dhcp_message_from_ip_packet(&buf[..length], SERVER_PORT)
                     .expect("should succeed");
 

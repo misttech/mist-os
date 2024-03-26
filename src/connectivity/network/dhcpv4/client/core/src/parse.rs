@@ -35,9 +35,12 @@ pub(crate) enum ParseError {
 pub(crate) fn parse_dhcp_message_from_ip_packet(
     mut bytes: &[u8],
     expected_dst_port: NonZeroU16,
-) -> Result<dhcp_protocol::Message, ParseError> {
+) -> Result<(net_types::ip::Ipv4Addr, dhcp_protocol::Message), ParseError> {
     let ip_packet =
         bytes.parse::<packet_formats::ipv4::Ipv4Packet<_>>().map_err(ParseError::Ipv4)?;
+
+    let src_addr = ip_packet.src_ip();
+
     match ip_packet.proto() {
         packet_formats::ip::Ipv4Proto::Proto(packet_formats::ip::IpProto::Udp) => (),
         packet_formats::ip::Ipv4Proto::Proto(packet_formats::ip::IpProto::Tcp)
@@ -57,7 +60,9 @@ pub(crate) fn parse_dhcp_message_from_ip_packet(
     if dst_port != expected_dst_port {
         return Err(ParseError::WrongPort(dst_port));
     }
-    dhcp_protocol::Message::from_buffer(udp_packet.body()).map_err(ParseError::Dhcp)
+    dhcp_protocol::Message::from_buffer(udp_packet.body())
+        .map(|msg| (src_addr, msg))
+        .map_err(ParseError::Dhcp)
 }
 
 const DEFAULT_TTL: u8 = 64;
@@ -695,7 +700,7 @@ mod test {
     use const_unwrap::const_unwrap_option;
     use dhcp_protocol::{CLIENT_PORT, SERVER_PORT};
     use net_declare::{net::prefix_length_v4, net_ip_v4, net_mac, std_ip_v4};
-    use net_types::ip::{Ipv4, PrefixLength};
+    use net_types::ip::{Ip, Ipv4, PrefixLength};
     use std::net::Ipv4Addr;
     use test_case::test_case;
 
@@ -727,9 +732,11 @@ mod test {
             Ipv4Addr::BROADCAST,
             SERVER_PORT,
         );
-        let parsed_message = parse_dhcp_message_from_ip_packet(packet.as_ref(), SERVER_PORT);
+        let (src_addr, parsed_message) =
+            parse_dhcp_message_from_ip_packet(packet.as_ref(), SERVER_PORT).unwrap();
 
-        assert_eq!(make_message(), parsed_message.unwrap());
+        assert_eq!(net_types::ip::Ipv4::UNSPECIFIED_ADDRESS, src_addr);
+        assert_eq!(make_message(), parsed_message);
     }
 
     #[test]
