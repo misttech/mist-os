@@ -18,21 +18,6 @@
 
 use std::{collections::BTreeSet, fmt::Debug, ops::Range};
 
-/// Hints provided to the `AllocatorStrategy::allocate()` call about where the allocation should
-/// start.
-#[derive(Debug)]
-pub enum LocationHint {
-    /// The allocation can be anywhere.
-    None,
-    /// The allocation MUST start at the provided offset and be the requested length or fail.
-    /// This is only for allocating the super-block at a fixed device offset.
-    Require(u64),
-    /// Returns the next free space at or after the provided offset (even if it is smaller than
-    /// requested). This is used when TRIMing to enumerate all free space.
-    /// Note that this hint ignores the strategy being used.
-    NextAvailable(u64),
-}
-
 /// An allocation strategy that returns the smallest extent that is large enough to hold the
 /// requested allocation, or the next best if no extent is big enough.
 ///
@@ -55,85 +40,80 @@ impl BestFit {
     /// If insufficient contiguous space is available, the largest available range will
     /// be returned. If no bytes are available, None will be returned.
     ///
-    /// LocationHint provides limited control over the range in which an allocation should be
-    /// made.
-    ///
     /// There are no special requirements on alignment of `bytes` but the caller is generally
-    /// encouraged to align to device block size..
-    pub fn allocate(&mut self, bytes: u64, hint: LocationHint) -> Option<Range<u64>> {
-        match hint {
-            LocationHint::None => {
-                if let Some(&(size, offset)) = self.ranges.range((bytes, 0)..).next() {
-                    assert!(size >= bytes);
-                    self.ranges.remove(&(size, offset));
-                    if size > bytes {
-                        self.free(offset + bytes..offset + size);
-                    }
-                    return Some(offset..offset + bytes);
-                }
-                // Insufficient space. Return the biggest space we have.
-                if let Some(&(size, _)) = self.ranges.iter().rev().next() {
-                    // Nb: We reversed the iterator to get the biggest size, but we
-                    // generally want to serve the smallest offset so we do a second
-                    // lookup here to find the smallest offset with the largest size.
-                    let &(size, offset) = self.ranges.range((size, 0)..).next().unwrap();
-                    self.ranges.remove(&(size, offset));
-                    Some(offset..offset + size)
-                } else {
-                    None
-                }
+    /// encouraged to align to device block size.
+    pub fn allocate(&mut self, bytes: u64) -> Option<Range<u64>> {
+        if let Some(&(size, offset)) = self.ranges.range((bytes, 0)..).next() {
+            assert!(size >= bytes);
+            self.ranges.remove(&(size, offset));
+            if size > bytes {
+                self.free(offset + bytes..offset + size);
             }
-            LocationHint::Require(start) => {
-                let end = start + bytes;
-                for &(size, offset) in self.ranges.range((bytes, 0)..) {
-                    assert!(size >= bytes);
-                    let range = offset..offset + size;
-                    if range.start > start || range.end < end {
-                        // Not a sub-range.
-                        continue;
-                    }
-                    self.ranges.remove(&(size, offset));
-                    if range.start < start {
-                        self.free(range.start..start);
-                    }
-                    if range.end > end {
-                        self.free(end..range.end);
-                    }
-                    return Some(start..end);
-                }
-                None
+            return Some(offset..offset + bytes);
+        }
+        // Insufficient space. Return the biggest space we have.
+        if let Some(&(size, _)) = self.ranges.iter().rev().next() {
+            // Nb: We reversed the iterator to get the biggest size, but we
+            // generally want to serve the smallest offset so we do a second
+            // lookup here to find the smallest offset with the largest size.
+            let &(size, offset) = self.ranges.range((size, 0)..).next().unwrap();
+            self.ranges.remove(&(size, offset));
+            Some(offset..offset + size)
+        } else {
+            None
+        }
+    }
+
+    pub fn allocate_fixed_offset(&mut self, start: u64, bytes: u64) -> Option<Range<u64>> {
+        let end = start + bytes;
+        for &(size, offset) in self.ranges.range((bytes, 0)..) {
+            assert!(size >= bytes);
+            let range = offset..offset + size;
+            if range.start > start || range.end < end {
+                // Not a sub-range.
+                continue;
             }
-            LocationHint::NextAvailable(start) => {
-                let mut best = None;
-                for &(size, offset) in &self.ranges {
-                    if offset + size <= start {
-                        continue;
-                    }
-                    if let Some((best_size, best_offset)) = &mut best {
-                        if offset < *best_offset {
-                            *best_size = size;
-                            *best_offset = offset;
-                        }
-                    } else {
-                        best = Some((size, offset));
-                    }
-                }
-                if let Some((size, offset)) = best {
-                    self.ranges.remove(&(size, offset));
-                    let mut range = offset..offset + size;
-                    if range.start < start {
-                        self.free(range.start..start);
-                        range.start = start;
-                    }
-                    if range.start + bytes < range.end {
-                        self.free(range.start + bytes..range.end);
-                        range.end = range.start + bytes;
-                    }
-                    Some(range)
-                } else {
-                    None
-                }
+            self.ranges.remove(&(size, offset));
+            if range.start < start {
+                self.free(range.start..start);
             }
+            if range.end > end {
+                self.free(end..range.end);
+            }
+            return Some(start..end);
+        }
+        None
+    }
+
+    pub fn allocate_next_available(&mut self, start: u64, bytes: u64) -> Option<Range<u64>> {
+        let mut best = None;
+        for &(size, offset) in &self.ranges {
+            if offset + size <= start {
+                continue;
+            }
+            if let Some((best_size, best_offset)) = &mut best {
+                if offset < *best_offset {
+                    *best_size = size;
+                    *best_offset = offset;
+                }
+            } else {
+                best = Some((size, offset));
+            }
+        }
+        if let Some((size, offset)) = best {
+            self.ranges.remove(&(size, offset));
+            let mut range = offset..offset + size;
+            if range.start < start {
+                self.free(range.start..start);
+                range.start = start;
+            }
+            if range.start + bytes < range.end {
+                self.free(range.start + bytes..range.end);
+                range.end = range.start + bytes;
+            }
+            Some(range)
+        } else {
+            None
         }
     }
 
@@ -174,52 +154,52 @@ mod test {
         let mut bestfit = BestFit::default();
         bestfit.free(0..0); // NOOP
         bestfit.free(0..100);
-        assert_eq!(bestfit.allocate(10, LocationHint::None), Some(0..10));
-        assert_eq!(bestfit.allocate(10, LocationHint::None), Some(10..20));
-        assert_eq!(bestfit.allocate(10, LocationHint::None), Some(20..30));
-        assert_eq!(bestfit.allocate(10, LocationHint::None), Some(30..40));
-        assert_eq!(bestfit.allocate(10, LocationHint::None), Some(40..50));
+        assert_eq!(bestfit.allocate(10), Some(0..10));
+        assert_eq!(bestfit.allocate(10), Some(10..20));
+        assert_eq!(bestfit.allocate(10), Some(20..30));
+        assert_eq!(bestfit.allocate(10), Some(30..40));
+        assert_eq!(bestfit.allocate(10), Some(40..50));
         // Make some holes.
         bestfit.free(30..40);
         bestfit.free(10..20);
         // Holes get filled first.
-        assert_eq!(bestfit.allocate(10, LocationHint::None), Some(10..20));
-        assert_eq!(bestfit.allocate(10, LocationHint::None), Some(30..40));
-        assert_eq!(bestfit.allocate(10, LocationHint::None), Some(50..60));
+        assert_eq!(bestfit.allocate(10), Some(10..20));
+        assert_eq!(bestfit.allocate(10), Some(30..40));
+        assert_eq!(bestfit.allocate(10), Some(50..60));
         // Free a contiguous bunch of allocations at once.
         bestfit.free(0..50);
         // Return less than requested.
-        assert_eq!(bestfit.allocate(100, LocationHint::None), Some(0..50));
+        assert_eq!(bestfit.allocate(100), Some(0..50));
         // Return all remaining space.
-        assert_eq!(bestfit.allocate(100, LocationHint::None), Some(60..100));
+        assert_eq!(bestfit.allocate(100), Some(60..100));
         // No space left. Return None.
-        assert_eq!(bestfit.allocate(100, LocationHint::None), None);
+        assert_eq!(bestfit.allocate(100), None);
         // Now we have some more back.
         bestfit.free(50..100);
-        assert_eq!(bestfit.allocate(100, LocationHint::None), Some(50..100));
+        assert_eq!(bestfit.allocate(100), Some(50..100));
     }
 
     #[test]
     fn hint_require() {
         let mut bestfit = BestFit::default();
         bestfit.free(0..100);
-        assert_eq!(bestfit.allocate(50, LocationHint::Require(25)), Some(25..75));
-        assert_eq!(bestfit.allocate(10, LocationHint::Require(25)), None);
+        assert_eq!(bestfit.allocate_fixed_offset(25, 50), Some(25..75));
+        assert_eq!(bestfit.allocate_fixed_offset(25, 10), None);
     }
 
     #[test]
     fn hint_next_available() {
         let mut bestfit = BestFit::default();
         bestfit.free(0..96);
-        assert_eq!(bestfit.allocate(1, LocationHint::None), Some(0..1));
-        assert_eq!(bestfit.allocate(15, LocationHint::NextAvailable(15)), Some(15..30));
-        assert_eq!(bestfit.allocate(15, LocationHint::NextAvailable(15)), Some(30..45));
-        assert_eq!(bestfit.allocate(15, LocationHint::NextAvailable(15)), Some(45..60));
-        assert_eq!(bestfit.allocate(96, LocationHint::NextAvailable(15)), Some(60..96));
-        assert_eq!(bestfit.allocate(96, LocationHint::NextAvailable(15)), None);
-        assert_eq!(bestfit.allocate(5, LocationHint::NextAvailable(0)), Some(1..6));
-        assert_eq!(bestfit.allocate(9, LocationHint::NextAvailable(0)), Some(6..15));
-        assert_eq!(bestfit.allocate(96, LocationHint::NextAvailable(0)), None);
+        assert_eq!(bestfit.allocate(1), Some(0..1));
+        assert_eq!(bestfit.allocate_next_available(15, 15), Some(15..30));
+        assert_eq!(bestfit.allocate_next_available(15, 15), Some(30..45));
+        assert_eq!(bestfit.allocate_next_available(15, 15), Some(45..60));
+        assert_eq!(bestfit.allocate_next_available(15, 96), Some(60..96));
+        assert_eq!(bestfit.allocate_next_available(15, 96), None);
+        assert_eq!(bestfit.allocate_next_available(0, 5), Some(1..6));
+        assert_eq!(bestfit.allocate_next_available(0, 9), Some(6..15));
+        assert_eq!(bestfit.allocate_next_available(0, 96), None);
     }
 
     #[test]
@@ -232,6 +212,6 @@ mod test {
         bestfit.free(10..20);
         // Confirm that we can allocate one block of 32 bytes. This will fail if coalescing
         // didn't occur.
-        assert_eq!(bestfit.allocate(32, LocationHint::Require(0)), Some(0..32));
+        assert_eq!(bestfit.allocate_fixed_offset(0, 32), Some(0..32));
     }
 }

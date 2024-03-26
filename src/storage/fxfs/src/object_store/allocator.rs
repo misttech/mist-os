@@ -65,7 +65,7 @@
 //! the operation completes.
 //!
 //! We allocate these free ranges using a monotonically increasing
-//! `LocationHint::NextAvailable(range)` hint to allocate(). When the trim completes, we free the
+//! `allocate_next_available(offset, length)`. When the trim completes, we free the
 //! range, returning it to the pool of available storage.
 //!
 //! ## Volume deletion
@@ -108,7 +108,6 @@ use {
         },
         object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
-            allocator::strategy::LocationHint,
             object_manager::ReservationUpdate,
             transaction::{
                 lock_keys, AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction,
@@ -879,9 +878,8 @@ impl Allocator {
         {
             let mut inner = self.inner.lock().unwrap();
             for _ in 0..extents_per_batch {
-                if let Some(range) = inner
-                    .strategy
-                    .allocate(max_extent_size as u64, LocationHint::NextAvailable(offset))
+                if let Some(range) =
+                    inner.strategy.allocate_next_available(offset, max_extent_size as u64)
                 {
                     result.add_extent(range.clone());
                     bytes += range.length()?;
@@ -1160,15 +1158,12 @@ impl Allocator {
             listener.await;
         }
 
-        let result =
-            self.inner.lock().unwrap().strategy.allocate(len, LocationHint::None).ok_or_else(
-                || {
-                    let err = anyhow!(FxfsError::NoSpace)
-                        .context("Unexpectedly found no space after search");
-                    tracing::error!(%err, "Likely filesystem corruption.");
-                    err
-                },
-            )?;
+        let result = self.inner.lock().unwrap().strategy.allocate(len).ok_or_else(|| {
+            let err =
+                anyhow!(FxfsError::NoSpace).context("Unexpectedly found no space after search");
+            tracing::error!(%err, "Likely filesystem corruption.");
+            err
+        })?;
 
         debug!(device_range = ?result, "allocate");
 
@@ -1233,9 +1228,9 @@ impl Allocator {
             ensure!(
                 inner
                     .strategy
-                    .allocate(
-                        device_range.end - device_range.start,
-                        LocationHint::Require(device_range.start),
+                    .allocate_fixed_offset(
+                        device_range.start,
+                        device_range.end - device_range.start
                     )
                     .ok_or(FxfsError::NoSpace)?
                     == device_range,
