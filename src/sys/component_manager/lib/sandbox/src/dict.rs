@@ -23,7 +23,7 @@ use vfs::{
 
 use crate::{registry, Capability, CapabilityTrait, ConversionError};
 
-pub type Key = String;
+pub type Key = cm_types::Name;
 
 /// A capability that represents a dictionary of capabilities.
 #[derive(Derivative)]
@@ -34,7 +34,7 @@ pub struct Dict {
     /// When an external request tries to access a non-existent entry,
     /// this closure will be invoked with the name of the entry.
     #[derivative(Debug = "ignore")]
-    not_found: Arc<dyn Fn(Key) -> () + 'static + Send + Sync>,
+    not_found: Arc<dyn Fn(&str) -> () + 'static + Send + Sync>,
 
     /// Tasks that serve [DictionaryIterator]s.
     #[derivative(Debug = "ignore")]
@@ -51,7 +51,7 @@ impl Default for Dict {
     fn default() -> Self {
         Self {
             entries: Arc::new(Mutex::new(BTreeMap::new())),
-            not_found: Arc::new(|_key: Key| {}),
+            not_found: Arc::new(|_key: &str| {}),
             iterator_tasks: fasync::TaskGroup::new(),
             client_end: None,
         }
@@ -77,7 +77,7 @@ impl Dict {
 
     /// Creates an empty dictionary. When an external request tries to access a non-existent entry,
     /// the name of the entry will be sent using `not_found`.
-    pub fn new_with_not_found(not_found: impl Fn(Key) -> () + 'static + Send + Sync) -> Self {
+    pub fn new_with_not_found(not_found: impl Fn(&str) -> () + 'static + Send + Sync) -> Self {
         Self {
             entries: Arc::new(Mutex::new(BTreeMap::new())),
             not_found: Arc::new(not_found),
@@ -108,36 +108,39 @@ impl Dict {
         while let Some(request) = stream.try_next().await? {
             match request {
                 fsandbox::DictionaryRequest::Insert { key, value, responder, .. } => {
-                    let result = match self.lock_entries().entry(key) {
-                        Entry::Occupied(_) => Err(fsandbox::DictionaryError::AlreadyExists),
-                        Entry::Vacant(entry) => match Capability::try_from(value) {
-                            Ok(cap) => {
-                                entry.insert(cap);
-                                Ok(())
-                            }
-                            Err(_) => Err(fsandbox::DictionaryError::BadCapability),
-                        },
-                    };
+                    let result = (|| {
+                        let key = key.parse().map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
+                        match self.lock_entries().entry(key) {
+                            Entry::Occupied(_) => Err(fsandbox::DictionaryError::AlreadyExists),
+                            Entry::Vacant(entry) => match Capability::try_from(value) {
+                                Ok(cap) => {
+                                    entry.insert(cap);
+                                    Ok(())
+                                }
+                                Err(_) => Err(fsandbox::DictionaryError::BadCapability),
+                            },
+                        }
+                    })();
                     responder.send(result)?;
                 }
                 fsandbox::DictionaryRequest::Get { key, responder } => {
-                    let result = match self.entries.lock().unwrap().get(&key) {
+                    let result = (|| match self.entries.lock().unwrap().get(key.as_str()) {
                         Some(cap) => Ok(cap.clone().into_fidl()),
                         None => {
-                            (self.not_found)(key);
+                            (self.not_found)(key.as_str());
                             Err(fsandbox::DictionaryError::NotFound)
                         }
-                    };
+                    })();
                     responder.send(result)?;
                 }
                 fsandbox::DictionaryRequest::Remove { key, responder } => {
-                    let result = match self.entries.lock().unwrap().remove(&key) {
+                    let result = (|| match self.entries.lock().unwrap().remove(key.as_str()) {
                         Some(cap) => Ok(cap.into_fidl()),
                         None => {
-                            (self.not_found)(key);
+                            (self.not_found)(key.as_str());
                             Err(fsandbox::DictionaryError::NotFound)
                         }
-                    };
+                    })();
                     responder.send(result)?;
                 }
                 fsandbox::DictionaryRequest::Read { responder } => {
@@ -146,7 +149,7 @@ impl Dict {
                         .iter()
                         .map(|(key, value)| {
                             let value = value.clone().into_fidl();
-                            fsandbox::DictionaryItem { key: key.clone(), value }
+                            fsandbox::DictionaryItem { key: key.to_string(), value }
                         })
                         .collect();
                     responder.send(items)?;
@@ -242,10 +245,10 @@ impl CapabilityTrait for Dict {
             let remote: Arc<dyn DirectoryEntry> = match value {
                 Capability::Directory(d) => d.clone().into_remote(),
                 value => value.clone().try_into_directory_entry().map_err(|err| {
-                    ConversionError::Nested { key: key.clone(), err: Box::new(err) }
+                    ConversionError::Nested { key: key.to_string(), err: Box::new(err) }
                 })?,
             };
-            let key: Name = key.clone().try_into()?;
+            let key: Name = key.to_string().try_into()?;
             match dir.add_entry_impl(key, remote, false) {
                 Ok(()) => {}
                 Err(AlreadyExists) => {
@@ -255,7 +258,7 @@ impl CapabilityTrait for Dict {
         }
         let not_found = self.not_found.clone();
         dir.clone().set_not_found_handler(Box::new(move |path| {
-            not_found(path.to_owned());
+            not_found(path);
         }));
         Ok(dir)
     }
@@ -308,6 +311,7 @@ mod tests {
     use fidl_fuchsia_unknown as funknown;
     use fuchsia_fs::directory::DirEntry;
     use futures::try_join;
+    use lazy_static::lazy_static;
     use test_util::Counter;
     use vfs::{
         directory::{
@@ -317,11 +321,13 @@ mod tests {
         execution_scope::ExecutionScope,
         path::Path,
         pseudo_directory,
-        remote::{remote_dir, RemoteLike},
+        remote::RemoteLike,
         service::endpoint,
     };
 
-    const CAP_KEY: &str = "cap";
+    lazy_static! {
+        static ref CAP_KEY: Key = "cap".parse().unwrap();
+    }
 
     /// Tests that the `Dict` contains an entry for a capability inserted via `Dict.Insert`,
     /// and that the value is the same capability.
@@ -335,7 +341,7 @@ mod tests {
         let client = async move {
             let value = Unit::default().into_fidl();
             dict_proxy
-                .insert(CAP_KEY, value)
+                .insert(CAP_KEY.as_str(), value)
                 .await
                 .expect("failed to call Insert")
                 .expect("failed to insert");
@@ -350,7 +356,7 @@ mod tests {
         assert_eq!(entries.len(), 1);
 
         // The entry that was inserted should now be in `entries`.
-        let cap = entries.remove(CAP_KEY).expect("not in entries after insert");
+        let cap = entries.remove(&*CAP_KEY).expect("not in entries after insert");
         let Capability::Unit(unit) = cap else { panic!("Bad capability type: {:#?}", cap) };
         assert_eq!(unit, Unit::default());
 
@@ -366,7 +372,7 @@ mod tests {
         // Insert a Unit into the Dict.
         {
             let mut entries = dict.lock_entries();
-            entries.insert(CAP_KEY.to_string(), Capability::Unit(Unit::default()));
+            entries.insert(CAP_KEY.clone(), Capability::Unit(Unit::default()));
             assert_eq!(entries.len(), 1);
         }
 
@@ -375,7 +381,7 @@ mod tests {
 
         let client = async move {
             let cap = dict_proxy
-                .remove(CAP_KEY)
+                .remove(CAP_KEY.as_str())
                 .await
                 .expect("failed to call Remove")
                 .expect("failed to remove");
@@ -402,7 +408,7 @@ mod tests {
         // Insert a Unit into the Dict.
         {
             let mut entries = dict.lock_entries();
-            entries.insert(CAP_KEY.to_string(), Capability::Unit(Unit::default()));
+            entries.insert(CAP_KEY.clone(), Capability::Unit(Unit::default()));
             assert_eq!(entries.len(), 1);
         }
 
@@ -410,8 +416,11 @@ mod tests {
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
-            let cap =
-                dict_proxy.get(CAP_KEY).await.expect("failed to call Get").expect("failed to get");
+            let cap = dict_proxy
+                .get(CAP_KEY.as_str())
+                .await
+                .expect("failed to call Get")
+                .expect("failed to get");
 
             // The value should be the same one that was previously inserted.
             assert_eq!(cap, Unit::default().into_fidl());
@@ -439,14 +448,14 @@ mod tests {
         let client = async move {
             // Insert an entry.
             dict_proxy
-                .insert(CAP_KEY, Unit::default().into_fidl())
+                .insert(CAP_KEY.as_str(), Unit::default().into_fidl())
                 .await
                 .expect("failed to call Insert")
                 .expect("failed to insert");
 
             // Inserting again should return an error.
             let result = dict_proxy
-                .insert(CAP_KEY, Unit::default().into_fidl())
+                .insert(CAP_KEY.as_str(), Unit::default().into_fidl())
                 .await
                 .expect("failed to call Insert");
             assert_matches!(result, Err(fsandbox::DictionaryError::AlreadyExists));
@@ -468,7 +477,7 @@ mod tests {
 
         let client = async move {
             // Removing an item from an empty dict should fail.
-            let result = dict_proxy.remove(CAP_KEY).await.expect("failed to call Remove");
+            let result = dict_proxy.remove(CAP_KEY.as_str()).await.expect("failed to call Remove");
             assert_matches!(result, Err(fsandbox::DictionaryError::NotFound));
 
             Ok(())
@@ -530,12 +539,12 @@ mod tests {
     async fn copy() -> Result<()> {
         // Create a Dict with a Unit inside, and copy the Dict.
         let dict = Dict::new();
-        dict.lock_entries().insert("unit1".to_string(), Capability::Unit(Unit::default()));
+        dict.lock_entries().insert("unit1".parse().unwrap(), Capability::Unit(Unit::default()));
 
         let copy = dict.copy();
 
         // Insert a Unit into the copy.
-        copy.lock_entries().insert("unit2".to_string(), Capability::Unit(Unit::default()));
+        copy.lock_entries().insert("unit2".parse().unwrap(), Capability::Unit(Unit::default()));
 
         // The copy should have two Units.
         let copy_entries = copy.lock_entries();
@@ -559,7 +568,7 @@ mod tests {
         // Add a Unit into the clone.
         {
             let mut clone_entries = dict_clone.lock_entries();
-            clone_entries.insert(CAP_KEY.to_string(), Capability::Unit(Unit::default()));
+            clone_entries.insert(CAP_KEY.clone(), Capability::Unit(Unit::default()));
             assert_eq!(clone_entries.len(), 1);
         }
 
@@ -574,7 +583,7 @@ mod tests {
     #[fuchsia::test]
     async fn fidl_clone() -> Result<()> {
         let dict = Dict::new();
-        dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Unit(Unit::default()));
+        dict.lock_entries().insert(CAP_KEY.clone(), Capability::Unit(Unit::default()));
 
         let client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
         let dict_proxy = client_end.into_proxy().unwrap();
@@ -588,7 +597,7 @@ mod tests {
 
         // Remove the `Unit` from the clone.
         let cap = clone_proxy
-            .remove(CAP_KEY)
+            .remove(CAP_KEY.as_str())
             .await
             .expect("failed to call Remove")
             .expect("failed to remove");
@@ -628,7 +637,8 @@ mod tests {
         {
             let mut entries = dict.lock_entries();
             for i in 0..NUM_ENTRIES {
-                entries.insert(format!("{}", i), Capability::Unit(Unit::default()));
+                entries
+                    .insert(format!("{}", i).parse().unwrap(), Capability::Unit(Unit::default()));
             }
         }
 
@@ -665,22 +675,11 @@ mod tests {
     #[fuchsia::test]
     async fn try_into_open_error_not_supported() {
         let dict = Dict::new();
-        dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Unit(Unit::default()));
+        dict.lock_entries().insert(CAP_KEY.clone(), Capability::Unit(Unit::default()));
         assert_matches!(
             dict.try_into_directory_entry().err(),
             Some(ConversionError::Nested { .. })
         );
-    }
-
-    #[fuchsia::test]
-    async fn try_into_open_error_invalid_name() {
-        let (proxy, _server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-        let placeholder_open = Open::new(remote_dir(proxy));
-        let dict = Dict::new();
-        // This string is too long to be a valid fuchsia.io name.
-        let bad_name = "a".repeat(10000);
-        dict.lock_entries().insert(bad_name, Capability::Open(placeholder_open));
-        assert_matches!(dict.try_into_directory_entry().err(), Some(ConversionError::ParseName(_)));
     }
 
     struct MockDir(Counter);
@@ -711,8 +710,7 @@ mod tests {
     async fn try_into_open_success() {
         let dict = Dict::new();
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
-        dict.lock_entries()
-            .insert(CAP_KEY.to_string(), Capability::Open(Open::new(mock_dir.clone())));
+        dict.lock_entries().insert(CAP_KEY.clone(), Capability::Open(Open::new(mock_dir.clone())));
         let remote = dict.try_into_directory_entry().expect("convert dict into Open capability");
         let scope = ExecutionScope::new();
 
@@ -722,7 +720,7 @@ mod tests {
         assert_eq!(mock_dir.0.get(), 0);
         let (client_end, server_end) = zx::Channel::create();
         let dir = dir_client_end.channel();
-        fdio::service_connect_at(dir, &format!("{CAP_KEY}/bar"), server_end).unwrap();
+        fdio::service_connect_at(dir, &format!("{}/bar", *CAP_KEY), server_end).unwrap();
         fasync::Channel::from_channel(client_end).on_closed().await.unwrap();
         assert_eq!(mock_dir.0.get(), 1);
     }
@@ -734,9 +732,9 @@ mod tests {
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
         inner_dict
             .lock_entries()
-            .insert(CAP_KEY.to_string(), Capability::Open(Open::new(mock_dir.clone())));
+            .insert(CAP_KEY.clone(), Capability::Open(Open::new(mock_dir.clone())));
         let dict = Dict::new();
-        dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Dictionary(inner_dict));
+        dict.lock_entries().insert(CAP_KEY.clone(), Capability::Dictionary(inner_dict));
 
         let remote = dict.try_into_directory_entry().expect("convert dict into Open capability");
         let scope = ExecutionScope::new();
@@ -755,7 +753,8 @@ mod tests {
         assert_eq!(mock_dir.0.get(), 0);
         let (client_end, server_end) = zx::Channel::create();
         let dir = dir.into_channel().unwrap().into_zx_channel();
-        fdio::service_connect_at(&dir, &format!("{CAP_KEY}/{CAP_KEY}/bar"), server_end).unwrap();
+        fdio::service_connect_at(&dir, &format!("{}/{}/bar", *CAP_KEY, *CAP_KEY), server_end)
+            .unwrap();
         fasync::Channel::from_channel(client_end).on_closed().await.unwrap();
         assert_eq!(mock_dir.0.get(), 1)
     }
@@ -782,7 +781,7 @@ mod tests {
         };
         let directory = Directory::from(serve_vfs_dir(fs));
         let dict = Dict::new();
-        dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Directory(directory));
+        dict.lock_entries().insert(CAP_KEY.clone(), Capability::Directory(directory));
 
         let remote = dict.try_into_directory_entry().unwrap();
 
@@ -802,7 +801,7 @@ mod tests {
             let dir_proxy = serve_directory(
                 Arc::new(SubNode::new(
                     remote,
-                    CAP_KEY.try_into().unwrap(),
+                    CAP_KEY.to_string().try_into().unwrap(),
                     fio::DirentType::Directory,
                 )),
                 &scope,

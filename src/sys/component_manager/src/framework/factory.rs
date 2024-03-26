@@ -142,9 +142,10 @@ impl FactoryCapabilityHost {
         let dict = Dict::new();
         let mut entries = dict.lock_entries();
         for item in items {
+            let key = item.key.parse().map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
             let cap = Capability::try_from(item.value)
                 .map_err(|_| fsandbox::DictionaryError::BadCapability)?;
-            if entries.insert(item.key, cap).is_some() {
+            if entries.insert(key, cap).is_some() {
                 return Err(fsandbox::DictionaryError::AlreadyExists);
             }
         }

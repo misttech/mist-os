@@ -258,7 +258,7 @@ pub enum AddDynamicChildError {
     #[error(
         "dictionary entry for capability '{capability_name}' conflicts with existing static route"
     )]
-    StaticRouteConflict { capability_name: String },
+    StaticRouteConflict { capability_name: Name },
     #[error("failed to add child to parent: {}", err)]
     AddChildError {
         #[from]

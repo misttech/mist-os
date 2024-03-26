@@ -208,7 +208,7 @@ pub fn build_component_sandbox(
                 let mut entries = declared_dictionaries.lock_entries();
                 _placeholder_dict = Some(
                     entries
-                        .entry(name.to_string())
+                        .entry(name.clone())
                         .or_insert_with(|| Capability::Dictionary(Dict::new()))
                         .clone(),
                 );

@@ -75,7 +75,7 @@ impl DictExt for Dict {
         let Some(next_name) = path.next() else { return self.clone() };
         let sub_dict: Dict = self
             .lock_entries()
-            .entry(next_name.to_string())
+            .entry(next_name.clone())
             .or_insert(Capability::Dictionary(Dict::new()))
             .clone()
             .to_dictionary()
@@ -136,7 +136,7 @@ impl DictExt for Dict {
                     // Lifetimes are weird here with the MutexGuard, so we do this in two steps
                     let sub_dict = current_dict
                         .lock_entries()
-                        .entry(current_name.to_string())
+                        .entry(current_name.clone())
                         .or_insert(Capability::Dictionary(Dict::new()))
                         .clone()
                         .to_dictionary()
@@ -146,7 +146,7 @@ impl DictExt for Dict {
                     current_name = next_name;
                 }
                 None => {
-                    current_dict.lock_entries().insert(current_name.to_string(), capability);
+                    current_dict.lock_entries().insert(current_name.clone(), capability);
                     return;
                 }
             }
@@ -330,12 +330,12 @@ pub mod tests {
     #[fuchsia::test]
     async fn get_capability() {
         let sub_dict = Dict::new();
-        sub_dict.lock_entries().insert("bar".to_string(), Capability::Dictionary(Dict::new()));
+        sub_dict.lock_entries().insert("bar".parse().unwrap(), Capability::Dictionary(Dict::new()));
         let (_, sender) = Receiver::new();
-        sub_dict.lock_entries().insert("baz".to_string(), sender.into());
+        sub_dict.lock_entries().insert("baz".parse().unwrap(), sender.into());
 
         let test_dict = Dict::new();
-        test_dict.lock_entries().insert("foo".to_string(), Capability::Dictionary(sub_dict));
+        test_dict.lock_entries().insert("foo".parse().unwrap(), Capability::Dictionary(sub_dict));
 
         assert!(test_dict.get_capability(iter::empty()).is_some());
         assert!(test_dict.get_capability(iter::once(&"nonexistent".parse().unwrap())).is_none());

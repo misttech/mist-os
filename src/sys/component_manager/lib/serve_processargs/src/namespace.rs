@@ -84,7 +84,7 @@ impl NamespaceBuilder {
             if entries.contains_key(path.basename().as_str()) {
                 return Err(NamespaceError::Duplicate(path.clone().into()).into());
             }
-            entries.insert(path.basename().to_string(), cap);
+            entries.insert(path.basename().clone(), cap);
         }
         Ok(())
     }

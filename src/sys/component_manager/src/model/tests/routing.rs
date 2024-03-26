@@ -1081,7 +1081,7 @@ async fn create_child_with_dict() {
     // CreateChild dictionary entries must be Open capabilities.
     // TODO(https://fxbug.dev/319542502): Insert the external Router type, once it exists
     let open: sandbox::Open = sender.into();
-    dict.lock_entries().insert("hippo".to_string(), sandbox::Capability::Open(open));
+    dict.lock_entries().insert("hippo".parse().unwrap(), sandbox::Capability::Open(open));
 
     let dictionary_client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
 

@@ -40,8 +40,13 @@ type Capability = flexible resource union {
     8: directory client_end:fuchsia.io.Directory;
 };
 
-/// The key of a [`DictionaryItem`].
-alias DictionaryKey = string:MAX;
+/// The maximum length of a dictionary key. This should coincide with
+/// fuchsia.component.MAX_NAME_LENGTH.
+const MAX_NAME_LENGTH uint64 = fuchsia.io.MAX_NAME_LENGTH;
+
+/// The key of a [`DictionaryItem`]. The constraints for valid keys are documented at
+/// https://fuchsia.dev/reference/cml#names.
+alias DictionaryKey = string:MAX_NAME_LENGTH;
 
 /// A key-value pair in a [`Dictionary`].
 type DictionaryItem = resource struct {
@@ -63,6 +68,10 @@ type DictionaryError = flexible enum {
     /// `fuchsia.component.sandbox.Factory` or returned from other
     /// Component Framework APIs.
     BAD_CAPABILITY = 3;
+
+    /// The key is invalid. The constraints for valid keys are documented at
+    /// https://fuchsia.dev/reference/cml#names.
+    INVALID_KEY = 4;
 };
 
 @discoverable

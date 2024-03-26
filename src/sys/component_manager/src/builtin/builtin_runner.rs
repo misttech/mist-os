@@ -259,15 +259,15 @@ impl ElfRunnerProgram {
         {
             let mut entries = svc.lock_entries();
             entries.insert(
-                fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.to_string(),
+                fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.parse().unwrap(),
                 Capability::Open(elf_runner.into_open(WeakComponentInstance::invalid())),
             );
             entries.insert(
-                freport::SnapshotProviderMarker::PROTOCOL_NAME.to_string(),
+                freport::SnapshotProviderMarker::PROTOCOL_NAME.parse().unwrap(),
                 Capability::Open(snapshot_provider.into_open(WeakComponentInstance::invalid())),
             );
         }
-        output.lock_entries().insert(SVC.to_string(), Capability::Dictionary(svc));
+        output.lock_entries().insert(SVC.parse().unwrap(), Capability::Dictionary(svc));
 
         let this = Self { task_group, execution_scope: ExecutionScope::new(), output, job };
         this

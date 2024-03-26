@@ -397,7 +397,7 @@ mod tests {
     async fn test_sender_into_open_via_dict() {
         let dict = Dict::new();
         let (receiver, sender) = Receiver::new();
-        dict.lock_entries().insert("echo".to_owned(), Capability::Sender(sender));
+        dict.lock_entries().insert("echo".parse().unwrap(), Capability::Sender(sender));
 
         let open = Open::new(dict.try_into_directory_entry().unwrap());
         let (client_end, server_end) = zx::Channel::create();
@@ -417,7 +417,7 @@ mod tests {
 
         let dict = Dict::new();
         let (receiver, sender) = Receiver::new();
-        dict.lock_entries().insert("echo".to_owned(), Capability::Sender(sender));
+        dict.lock_entries().insert("echo".parse().unwrap(), Capability::Sender(sender));
 
         let open = Open::new(dict.try_into_directory_entry().unwrap());
         let (client_end, server_end) = zx::Channel::create();

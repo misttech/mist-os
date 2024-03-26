@@ -517,7 +517,7 @@ mod tests {
     async fn with_path() {
         let source = Capability::Data(Data::String("hello".to_string()));
         let dict1 = Dict::new();
-        dict1.lock_entries().insert("source".to_owned(), source);
+        dict1.lock_entries().insert("source".parse().unwrap(), source);
 
         let base_router = Router::new_ok(dict1);
         let downscoped_router = base_router.with_path(iter::once(&"source".parse().unwrap()));
@@ -540,13 +540,13 @@ mod tests {
     async fn with_path_deep() {
         let source = Capability::Data(Data::String("hello".to_string()));
         let dict1 = Dict::new();
-        dict1.lock_entries().insert("source".to_owned(), source);
+        dict1.lock_entries().insert("source".parse().unwrap(), source);
         let dict2 = Dict::new();
-        dict2.lock_entries().insert("dict1".to_owned(), Capability::Dictionary(dict1));
+        dict2.lock_entries().insert("dict1".parse().unwrap(), Capability::Dictionary(dict1));
         let dict3 = Dict::new();
-        dict3.lock_entries().insert("dict2".to_owned(), Capability::Dictionary(dict2));
+        dict3.lock_entries().insert("dict2".parse().unwrap(), Capability::Dictionary(dict2));
         let dict4 = Dict::new();
-        dict4.lock_entries().insert("dict3".to_owned(), Capability::Dictionary(dict3));
+        dict4.lock_entries().insert("dict3".parse().unwrap(), Capability::Dictionary(dict3));
 
         let base_router = Router::new_ok(dict4);
         let downscoped_router = base_router.with_path(
