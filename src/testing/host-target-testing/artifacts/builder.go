@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"strings"
 
-	"golang.org/x/crypto/ssh"
-
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 )
 
@@ -33,7 +31,6 @@ func (b *Builder) GetLatestBuildID(ctx context.Context) (string, error) {
 func (b *Builder) GetLatestBuild(
 	ctx context.Context,
 	dir string,
-	publicKey ssh.PublicKey,
 	ffxPath string,
 ) (*ArtifactsBuild, error) {
 	id, err := b.GetLatestBuildID(ctx)
@@ -41,7 +38,7 @@ func (b *Builder) GetLatestBuild(
 		return nil, err
 	}
 
-	return b.archive.GetBuildByID(ctx, id, dir, publicKey, ffxPath)
+	return b.archive.GetBuildByID(ctx, id, dir, ffxPath)
 }
 
 func (b *Builder) String() string {

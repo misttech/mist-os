@@ -659,8 +659,12 @@ func (c *Client) StartRpcSession(ctx context.Context, repo *packages.Repository)
 // Pave paves the device to the specified build. It assumes the device is
 // already in recovery, since there are multiple ways to get a device into
 // recovery. Does not reconnect to the device.
-func (c *Client) Pave(ctx context.Context, build artifacts.Build) error {
-	p, err := build.GetPaver(ctx)
+func (c *Client) Pave(
+	ctx context.Context,
+	build artifacts.Build,
+	sshPublicKey ssh.PublicKey,
+) error {
+	p, err := build.GetPaver(ctx, sshPublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to get paver to pave device: %w", err)
 	}

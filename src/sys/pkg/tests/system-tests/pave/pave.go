@@ -12,17 +12,19 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+	"golang.org/x/crypto/ssh"
 )
 
 func PaveDevice(
 	ctx context.Context,
 	d *device.Client,
 	build artifacts.Build,
+	sshPublicKey ssh.PublicKey,
 ) error {
 	logger.Infof(ctx, "Starting to pave device")
 	startTime := time.Now()
 
-	if err := d.Pave(ctx, build); err != nil {
+	if err := d.Pave(ctx, build, sshPublicKey); err != nil {
 		return fmt.Errorf("device failed to pave: %w", err)
 	}
 

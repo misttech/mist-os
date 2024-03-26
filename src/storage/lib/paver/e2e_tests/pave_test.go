@@ -101,12 +101,17 @@ func doTest(ctx context.Context) error {
 		return fmt.Errorf("failed to get upgrade build: %w", err)
 	}
 
-	downgradePaver, err := downgradeBuild.GetPaver(ctx)
+	sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
+	if err != nil {
+		return fmt.Errorf("failed to get ssh key: %w", err)
+	}
+
+	downgradePaver, err := downgradeBuild.GetPaver(ctx, sshPrivateKey.PublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to get paver to pave device: %w", err)
 	}
 
-	upgradePaver, err := upgradeBuild.GetPaver(ctx)
+	upgradePaver, err := upgradeBuild.GetPaver(ctx, sshPrivateKey.PublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to get paver to pave device: %w", err)
 	}

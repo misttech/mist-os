@@ -256,17 +256,17 @@ func initializeDevice(
 	if upToDate {
 		logger.Infof(ctx, "device already up to date")
 	} else {
-		if c.useFlash {
-			sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
-			if err != nil {
-				return fmt.Errorf("failed to get ssh key: %w", err)
-			}
+		sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
+		if err != nil {
+			return fmt.Errorf("failed to get ssh key: %w", err)
+		}
 
+		if c.useFlash {
 			if err := flash.FlashDevice(ctx, device, build, sshPrivateKey.PublicKey()); err != nil {
 				return fmt.Errorf("failed to flash device during initialization: %w", err)
 			}
 		} else {
-			if err := pave.PaveDevice(ctx, device, build); err != nil {
+			if err := pave.PaveDevice(ctx, device, build, sshPrivateKey.PublicKey()); err != nil {
 				return fmt.Errorf("failed to pave device during initialization: %w", err)
 			}
 		}

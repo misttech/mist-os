@@ -120,11 +120,6 @@ func (c *BuildConfig) GetBuild(
 	deviceClient *device.Client,
 	outputDir string,
 ) (artifacts.Build, error) {
-	sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get ssh key: %w", err)
-	}
-
 	buildID, err := c.getBuildID(ctx)
 	if err != nil {
 		return nil, err
@@ -140,19 +135,12 @@ func (c *BuildConfig) GetBuild(
 			ctx,
 			buildID,
 			outputDir,
-			sshPrivateKey.PublicKey(),
 			ffxPath,
 		)
 	} else if c.fuchsiaBuildDir != "" {
-		build, err = artifacts.NewFuchsiaDirBuild(
-			c.fuchsiaBuildDir,
-			sshPrivateKey.PublicKey(),
-		), nil
+		build, err = artifacts.NewFuchsiaDirBuild(c.fuchsiaBuildDir), nil
 	} else if c.productBundleDir != "" {
-		build, err = artifacts.NewProductBundleDirBuild(
-			c.productBundleDir,
-			sshPrivateKey.PublicKey(),
-		), nil
+		build, err = artifacts.NewProductBundleDirBuild(c.productBundleDir), nil
 	}
 
 	if err != nil {
@@ -211,11 +199,6 @@ func (c *RepeatableBuildConfig) GetBuilds(
 	deviceClient *device.Client,
 	outputDir string,
 ) ([]artifacts.Build, error) {
-	sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get ssh key: %w", err)
-	}
-
 	var builds []artifacts.Build
 	for _, b := range c.builds {
 		switch b.kind {
@@ -230,7 +213,6 @@ func (c *RepeatableBuildConfig) GetBuilds(
 				ctx,
 				buildID,
 				outputDir,
-				sshPrivateKey.PublicKey(),
 				c.deviceConfig.ffxPath,
 			)
 			if err != nil {
@@ -243,7 +225,6 @@ func (c *RepeatableBuildConfig) GetBuilds(
 				ctx,
 				b.value,
 				outputDir,
-				sshPrivateKey.PublicKey(),
 				c.deviceConfig.ffxPath,
 			)
 			if err != nil {
@@ -252,16 +233,10 @@ func (c *RepeatableBuildConfig) GetBuilds(
 
 			builds = append(builds, build)
 		case fuchsiaBuildDirKind:
-			build := artifacts.NewFuchsiaDirBuild(
-				b.value,
-				sshPrivateKey.PublicKey(),
-			)
+			build := artifacts.NewFuchsiaDirBuild(b.value)
 			builds = append(builds, build)
 		case productBundleDirKind:
-			build := artifacts.NewProductBundleDirBuild(
-				b.value,
-				sshPrivateKey.PublicKey(),
-			)
+			build := artifacts.NewProductBundleDirBuild(b.value)
 			builds = append(builds, build)
 		}
 	}
@@ -272,7 +247,6 @@ func (c *RepeatableBuildConfig) GetBuilds(
 			ctx,
 			c.defaultBuildID,
 			outputDir,
-			sshPrivateKey.PublicKey(),
 			c.deviceConfig.ffxPath,
 		)
 		if err != nil {

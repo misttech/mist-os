@@ -65,10 +65,10 @@ type Build interface {
 	GetPaverDir(ctx context.Context) (string, error)
 
 	// GetPaver downloads and returns a paver for the build.
-	GetPaver(ctx context.Context) (paver.Paver, error)
-
-	// GetSshPublicKey returns the SSH public key used by this build's paver.
-	GetSshPublicKey() ssh.PublicKey
+	GetPaver(
+		ctx context.Context,
+		sshPublicKey ssh.PublicKey,
+	) (paver.Paver, error)
 
 	// GetVbmetaPath downloads and returns a path to the zircon-a vbmeta image.
 	GetVbmetaPath(ctx context.Context) (string, error)
@@ -81,17 +81,33 @@ type ArtifactsBuild struct {
 	dir           string
 	packages      *packages.Repository
 	buildImageDir string
-	sshPublicKey  ssh.PublicKey
 	srcs          map[string]struct{}
 	ffxPath       string
 }
 
 func (b *ArtifactsBuild) GetBootserver(ctx context.Context) (string, error) {
-	buildPaver, err := b.getPaver(ctx)
+	buildImageDir, err := b.GetBuildImages(ctx)
 	if err != nil {
 		return "", err
 	}
-	return buildPaver.BootserverPath, nil
+
+	// Use the latest bootserver if possible because the one uploaded with the artifacts may not include bug fixes.
+	currentBuildId := os.Getenv("BUILDBUCKET_ID")
+	if currentBuildId == "" {
+		currentBuildId = b.id
+	}
+
+	bootserverPath := filepath.Join(buildImageDir, "bootserver")
+	if err := b.archive.download(ctx, currentBuildId, false, bootserverPath, []string{"tools/linux-x64/bootserver"}); err != nil {
+		return "", fmt.Errorf("failed to download bootserver: %w", err)
+	}
+
+	// Make bootserver executable.
+	if err := os.Chmod(bootserverPath, os.ModePerm); err != nil {
+		return "", fmt.Errorf("failed to make bootserver executable: %w", err)
+	}
+
+	return bootserverPath, nil
 }
 
 func (b *ArtifactsBuild) GetFfx(
@@ -347,35 +363,28 @@ func (b *ArtifactsBuild) GetPaverDir(ctx context.Context) (string, error) {
 }
 
 // GetPaver downloads and returns a paver for the build.
-func (b *ArtifactsBuild) GetPaver(ctx context.Context) (paver.Paver, error) {
-	return b.getPaver(ctx)
+func (b *ArtifactsBuild) GetPaver(
+	ctx context.Context,
+	sshPublicKey ssh.PublicKey,
+) (paver.Paver, error) {
+	return b.getPaver(ctx, sshPublicKey)
 }
 
-func (b *ArtifactsBuild) getPaver(ctx context.Context) (*paver.BuildPaver, error) {
-	buildImageDir, err := b.GetBuildImages(ctx)
+func (b *ArtifactsBuild) getPaver(
+	ctx context.Context,
+	sshPublicKey ssh.PublicKey,
+) (*paver.BuildPaver, error) {
+	buildImageDir, err := b.GetPaverDir(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	currentBuildId := os.Getenv("BUILDBUCKET_ID")
-	if currentBuildId == "" {
-		currentBuildId = b.id
-	}
-	// Use the latest bootserver if possible because the one uploaded with the artifacts may not include bug fixes.
-	bootserverPath := filepath.Join(buildImageDir, "bootserver")
-	if err := b.archive.download(ctx, currentBuildId, false, bootserverPath, []string{"tools/linux-x64/bootserver"}); err != nil {
-		return nil, fmt.Errorf("failed to download bootserver: %w", err)
-	}
-	// Make bootserver executable.
-	if err := os.Chmod(bootserverPath, os.ModePerm); err != nil {
-		return nil, fmt.Errorf("failed to make bootserver executable: %w", err)
+	bootserverPath, err := b.GetBootserver(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	return paver.NewBuildPaver(bootserverPath, buildImageDir, paver.SSHPublicKey(b.sshPublicKey))
-}
-
-func (b *ArtifactsBuild) GetSshPublicKey() ssh.PublicKey {
-	return b.sshPublicKey
+	return paver.NewBuildPaver(bootserverPath, buildImageDir, paver.SSHPublicKey(sshPublicKey))
 }
 
 func (b *ArtifactsBuild) GetVbmetaPath(ctx context.Context) (string, error) {
@@ -408,31 +417,19 @@ func (b *ArtifactsBuild) GetVbmetaPath(ctx context.Context) (string, error) {
 	return "", fmt.Errorf("failed to file zircon-a vbmeta in %q", imagesJSON)
 }
 
-func (b *ArtifactsBuild) Pave(ctx context.Context, deviceName string) error {
-	paver, err := b.GetPaver(ctx)
-	if err != nil {
-		return err
-	}
-
-	return paver.Pave(ctx, deviceName)
-}
-
 func (b *ArtifactsBuild) String() string {
 	return b.id
 }
 
 type FuchsiaDirBuild struct {
-	dir          string
-	sshPublicKey ssh.PublicKey
+	dir string
 }
 
 func NewFuchsiaDirBuild(
 	dir string,
-	publicKey ssh.PublicKey,
 ) *FuchsiaDirBuild {
 	return &FuchsiaDirBuild{
-		dir:          dir,
-		sshPublicKey: publicKey,
+		dir: dir,
 	}
 }
 
@@ -478,16 +475,16 @@ func (b *FuchsiaDirBuild) GetPaverDir(ctx context.Context) (string, error) {
 	return b.dir, nil
 }
 
-func (b *FuchsiaDirBuild) GetPaver(ctx context.Context) (paver.Paver, error) {
-	return paver.NewBuildPaver(
-		filepath.Join(b.dir, "host_x64/bootserver_new"),
-		b.dir,
-		paver.SSHPublicKey(b.sshPublicKey),
-	)
-}
+func (b *FuchsiaDirBuild) GetPaver(
+	ctx context.Context,
+	sshPublicKey ssh.PublicKey,
+) (paver.Paver, error) {
+	bootserverPath, err := b.GetBootserver(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-func (b *FuchsiaDirBuild) GetSshPublicKey() ssh.PublicKey {
-	return b.sshPublicKey
+	return paver.NewBuildPaver(bootserverPath, b.dir, paver.SSHPublicKey(sshPublicKey))
 }
 
 func (b *FuchsiaDirBuild) GetVbmetaPath(ctx context.Context) (string, error) {
@@ -513,17 +510,14 @@ func (b *FuchsiaDirBuild) GetVbmetaPath(ctx context.Context) (string, error) {
 }
 
 type ProductBundleDirBuild struct {
-	dir          string
-	sshPublicKey ssh.PublicKey
+	dir string
 }
 
 func NewProductBundleDirBuild(
 	dir string,
-	publicKey ssh.PublicKey,
 ) *ProductBundleDirBuild {
 	return &ProductBundleDirBuild{
-		dir:          dir,
-		sshPublicKey: publicKey,
+		dir: dir,
 	}
 }
 
@@ -581,17 +575,16 @@ func (b *ProductBundleDirBuild) GetPackageRepository(
 }
 
 func (b *ProductBundleDirBuild) GetPaverDir(ctx context.Context) (string, error) {
-	// Only flashing is supported for ProductBundle
-	return "", nil
+	// Only flashing is supported for product bundles
+	return "", fmt.Errorf("paving is not supported with product bundles")
 }
 
-func (b *ProductBundleDirBuild) GetPaver(ctx context.Context) (paver.Paver, error) {
-	// Only flashing is supported for ProductBundle
-	return nil, nil
-}
-
-func (b *ProductBundleDirBuild) GetSshPublicKey() ssh.PublicKey {
-	return b.sshPublicKey
+func (b *ProductBundleDirBuild) GetPaver(
+	ctx context.Context,
+	sshPublicKey ssh.PublicKey,
+) (paver.Paver, error) {
+	// Only flashing is supported for product bundles
+	return nil, fmt.Errorf("paving is not supported with product bundles")
 }
 
 type ProductBundle struct {
@@ -796,7 +789,10 @@ func (b *OmahaBuild) GetPaverDir(ctx context.Context) (string, error) {
 }
 
 // GetPaver downloads and returns a paver for the build.
-func (b *OmahaBuild) GetPaver(ctx context.Context) (paver.Paver, error) {
+func (b *OmahaBuild) GetPaver(
+	ctx context.Context,
+	sshPublicKey ssh.PublicKey,
+) (paver.Paver, error) {
 	paverDir, err := b.GetPaverDir(ctx)
 	if err != nil {
 		return nil, err
@@ -844,13 +840,9 @@ func (b *OmahaBuild) GetPaver(ctx context.Context) (paver.Paver, error) {
 	return paver.NewBuildPaver(
 		bootserverPath,
 		paverDir,
-		paver.SSHPublicKey(b.GetSshPublicKey()),
+		paver.SSHPublicKey(sshPublicKey),
 		paver.OverrideVBMetaA(destVbmetaPath),
 	)
-}
-
-func (b *OmahaBuild) GetSshPublicKey() ssh.PublicKey {
-	return b.build.GetSshPublicKey()
 }
 
 func (b *OmahaBuild) GetVbmetaPath(ctx context.Context) (string, error) {

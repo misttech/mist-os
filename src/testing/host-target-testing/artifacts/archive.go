@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/ssh"
-
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
@@ -51,7 +49,6 @@ func (a *Archive) GetBuildByID(
 	ctx context.Context,
 	id string,
 	dir string,
-	publicKey ssh.PublicKey,
 	ffxPath string,
 ) (*ArtifactsBuild, error) {
 	// Make sure the build exists.
@@ -66,12 +63,11 @@ func (a *Archive) GetBuildByID(
 	}
 
 	return &ArtifactsBuild{
-		id:           id,
-		archive:      a,
-		dir:          dir,
-		sshPublicKey: publicKey,
-		srcs:         srcsMap,
-		ffxPath:      ffxPath,
+		id:      id,
+		archive: a,
+		dir:     dir,
+		srcs:    srcsMap,
+		ffxPath: ffxPath,
 	}, nil
 }
 
