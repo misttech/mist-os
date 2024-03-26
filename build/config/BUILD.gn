@@ -658,9 +658,11 @@ config("default_warnings") {
     "-Wno-extra-qualification",
 
     # TODO(https://fxbug.dev/330769701): Disable "-Wcast-fuction-type-strict"
-    # which enforce an exact type match between a function pointer and the
-    # target function.
+    # and "-Wcast-function-type-mismatch"  which enforce an exact type match
+    # between a function pointer and the target function.
     "-Wno-cast-function-type-strict",
+    "-Wno-cast-function-type-mismatch",
+    "-Wno-unknown-warning-option",
   ]
 
   cflags_cc = []
