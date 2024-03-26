@@ -8,7 +8,7 @@
 use alloc::collections::hash_map;
 use assert_matches::assert_matches;
 use core::{fmt::Debug, num::NonZeroU16};
-use tracing::{error, trace};
+use tracing::{debug, error};
 
 use net_types::{ip::IpAddress, SpecifiedAddr};
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
@@ -122,7 +122,7 @@ where
         let remote_ip = match SpecifiedAddr::new(remote_ip.into()) {
             None => {
                 // TODO(https://fxbug.dev/42052879): Increment the counter.
-                trace!("tcp: source address unspecified, dropping the packet");
+                debug!("tcp: source address unspecified, dropping the packet");
                 return Ok(());
             }
             Some(src_ip) => src_ip,
@@ -131,7 +131,7 @@ where
             Ok(remote_ip) => remote_ip,
             Err(AddrIsMappedError {}) => {
                 // TODO(https://fxbug.dev/42052879): Increment the counter.
-                trace!("tcp: source address is mapped (ipv4-mapped-ipv6), dropping the packet");
+                debug!("tcp: source address is mapped (ipv4-mapped-ipv6), dropping the packet");
                 return Ok(());
             }
         };
@@ -139,7 +139,7 @@ where
             Ok(local_ip) => local_ip,
             Err(AddrIsMappedError {}) => {
                 // TODO(https://fxbug.dev/42052879): Increment the counter.
-                trace!("tcp: local address is mapped (ipv4-mapped-ipv6), dropping the packet");
+                debug!("tcp: local address is mapped (ipv4-mapped-ipv6), dropping the packet");
                 return Ok(());
             }
         };
@@ -149,7 +149,7 @@ where
             Ok(packet) => packet,
             Err(err) => {
                 // TODO(https://fxbug.dev/42052879): Increment the counter.
-                trace!("tcp: failed parsing incoming packet {:?}", err);
+                debug!("tcp: failed parsing incoming packet {:?}", err);
                 return Ok(());
             }
         };
@@ -159,7 +159,7 @@ where
             Ok(segment) => segment,
             Err(err) => {
                 // TODO(https://fxbug.dev/42052879): Increment the counter.
-                trace!("tcp: malformed segment {:?}", err);
+                debug!("tcp: malformed segment {:?}", err);
                 return Ok(());
             }
         };
@@ -366,7 +366,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                 Ok(()) => {}
                 Err((err, DefaultSendOptions)) => {
                     // TODO(https://fxbug.dev/42052879): Increment the counter.
-                    trace!("cannot construct an ip socket to respond RST: {:?}, ignoring", err);
+                    debug!("cannot construct an ip socket to respond RST: {:?}, ignoring", err);
                 }
             }
         }
@@ -659,7 +659,7 @@ where
             Ok(()) => {}
             Err((body, err)) => {
                 // TODO(https://fxbug.dev/42052879): Increment the counter.
-                trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
+                debug!("tcp: failed to send ip packet {:?}: {:?}", body, err)
             }
         }
     }
@@ -834,7 +834,7 @@ where
     // reused connection in the accept queue so we have to respect its limit.
     if accept_queue.len() == backlog.get() {
         // TODO(https://fxbug.dev/42052879): Increment the counter.
-        trace!("incoming SYN dropped because of the full backlog of the listener");
+        debug!("incoming SYN dropped because of the full backlog of the listener");
         return ListenerIncomingSegmentDisposition::FoundSocket;
     }
 
@@ -859,7 +859,7 @@ where
         Ok(ip_sock) => ip_sock,
         Err(err) => {
             // TODO(https://fxbug.dev/42052879): Increment the counter.
-            trace!("cannot construct an ip socket to the SYN originator: {:?}, ignoring", err);
+            debug!("cannot construct an ip socket to the SYN originator: {:?}, ignoring", err);
             return ListenerIncomingSegmentDisposition::NoMatchingSocket;
         }
     };
@@ -1015,7 +1015,7 @@ where
             Ok(()) => {}
             Err((body, err)) => {
                 // TODO(https://fxbug.dev/42052879): Increment the counter.
-                trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
+                debug!("tcp: failed to send ip packet {:?}: {:?}", body, err)
             }
         }
     }
