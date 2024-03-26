@@ -4,6 +4,7 @@
 
 use fuchsia_zircon as zx;
 
+use bstr::ByteSlice;
 use fidl_fuchsia_buildinfo as buildinfo;
 use fidl_fuchsia_hardware_power_statecontrol as fpower;
 use fuchsia_component::client::connect_to_protocol_sync;
@@ -225,7 +226,7 @@ pub fn sys_reboot(
             let arg_bytes = current_task
                 .read_c_string_to_vec(UserCString::new(arg), MAX_REBOOT_ARG_LEN)
                 .unwrap_or_default();
-            let reboot_args: Vec<_> = arg_bytes.split(|byte| byte == &b',').collect();
+            let reboot_args: Vec<_> = arg_bytes.split_str(b",").collect();
 
             let proxy = connect_to_protocol_sync::<fpower::AdminMarker>()
                 .expect("couldn't connect to fuchsia.hardware.power.statecontrol.Admin");
@@ -245,13 +246,14 @@ pub fn sys_reboot(
                 || reboot_args.contains(&&b"System update during setup"[..])
             {
                 fpower::RebootReason::SystemUpdate
-            } else if reboot_args.is_empty()
+            } else if reboot_args == [b""] // args empty? splitting "" returns [""], not []
+
                 || reboot_args.contains(&&b"shell"[..])
                 || reboot_args.contains(&&b"userrequested"[..])
             {
                 fpower::RebootReason::UserRequest
             } else {
-                log_warn!("Unknown reboot args: {arg_bytes}");
+                log_warn!("Unknown reboot args: {arg_bytes:?}");
                 track_stub!(
                     TODO("https://fxbug.dev/322874610"),
                     "unknown reboot args, see logs for strings"
