@@ -15,6 +15,7 @@
 //! used by netstack itself.
 
 use cstr::cstr;
+use either::Either;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
 use fuchsia_async as fasync;
@@ -25,13 +26,21 @@ use vfs::directory::{entry_container::Directory, helper::DirectlyMutable};
 #[fasync::run_singlethreaded]
 pub async fn main() {
     // Start by getting the Netstack version we should use.
-    let current_boot_version = {
+    let (current_boot_version, enable_ns3_debug_logs) = {
         let migration =
             fuchsia_component::client::connect_to_protocol::<fnet_migration::StateMarker>()
                 .expect("connect to protocol");
-        let fnet_migration::InEffectVersion { current_boot, .. } =
+        let fnet_migration::InEffectVersion { current_boot, user, automated: _ } =
             migration.get_netstack_version().await.expect("failed to read netstack version");
-        current_boot
+        // If the current boot is Netstack3, and Netstack3 was explicitly
+        // opted into by a user, enable debug logs. Any user that explicitly
+        // requests Netstack3 is either testing or participating in a dogfood
+        // program; debug logs are valuable in either case.
+        // TODO(https://fxbug.dev/330568199): Remove once the bug has been root
+        // caused.
+        let enable_ns3_debug_logs = current_boot == fnet_migration::NetstackVersion::Netstack3
+            && user.is_some_and(|v| v.version == fnet_migration::NetstackVersion::Netstack3);
+        (current_boot, enable_ns3_debug_logs)
     };
 
     println!("netstack migration proxy using version {current_boot_version:?}");
@@ -120,11 +129,17 @@ pub async fn main() {
     actions
         .push(fdio::SpawnAction::add_namespace_entry(cstr!("/svc"), svc_dir.into_channel().into()));
 
+    let argv = if enable_ns3_debug_logs {
+        Either::Left([bin_path, cstr!("--debug")])
+    } else {
+        Either::Right([bin_path])
+    };
+
     let proc = fdio::spawn_etc(
         &fuchsia_runtime::job_default(),
         fdio::SpawnOptions::CLONE_ALL - fdio::SpawnOptions::CLONE_NAMESPACE,
         bin_path,
-        &[bin_path],
+        either::for_both!(argv.as_ref(), argv => argv),
         None,
         &mut actions[..],
     )
