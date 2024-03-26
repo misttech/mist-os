@@ -2228,7 +2228,7 @@ dependencies = [
 
 [[package]]
 name = "memchr"
-version = "2.6.3"
+version = "2.7.1"
 
 [[package]]
 name = "memoffset"
