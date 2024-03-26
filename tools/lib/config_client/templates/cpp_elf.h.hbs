@@ -14,6 +14,7 @@ public:
   static Config TakeFromStartupHandle() noexcept;
   static Config CreateFromVmo(zx::vmo config_vmo) noexcept;
   const std::string ToString() noexcept;
+  zx::vmo ToVmo() const noexcept;
 
   {{> typedef }}
 };

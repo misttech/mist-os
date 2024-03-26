@@ -13,6 +13,7 @@ static H_ELF_SOURCE_TEMPLATE: &str = include_str!("../templates/cpp_elf.h.hbs");
 
 static HELPERS_SOURCE_TEMPLATE: &str = include_str!("../templates/helpers.cc.hbs");
 static TYPEDEF_SOURCE_TEMPLATE: &str = include_str!("../templates/typedef.h.hbs");
+static VMO_CREATE_SOURCE_TEMPLATE: &str = include_str!("../templates/vmo_create.cc.hbs");
 static VMO_PARSE_SOURCE_TEMPLATE: &str = include_str!("../templates/vmo_parse.cc.hbs");
 static VMO_PARSE_HELPERS_SOURCE_TEMPLATE: &str =
     include_str!("../templates/vmo_parse_helpers.cc.hbs");
@@ -73,6 +74,7 @@ pub fn create_cpp_wrapper(
     hbars.register_template_string("helpers", HELPERS_SOURCE_TEMPLATE).pretty_unwrap();
     hbars.register_template_string("typedef", TYPEDEF_SOURCE_TEMPLATE).pretty_unwrap();
     hbars.register_template_string("vmo_parse", VMO_PARSE_SOURCE_TEMPLATE).pretty_unwrap();
+    hbars.register_template_string("vmo_create", VMO_CREATE_SOURCE_TEMPLATE).pretty_unwrap();
     hbars
         .register_template_string("vmo_parse_helpers", VMO_PARSE_HELPERS_SOURCE_TEMPLATE)
         .pretty_unwrap();

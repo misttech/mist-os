@@ -1,3 +1,4 @@
+#include <fidl/{{fidl_library_name}}/cpp/fidl.h>
 #include <fidl/{{fidl_library_name}}/cpp/wire.h>
 #include <fidl/{{fidl_library_name}}/cpp/wire_types.h>
 #include <lib/fidl/cpp/wire/message.h>
@@ -33,6 +34,10 @@ Config Config::TakeFromStartupHandle() noexcept {
 
 Config Config::CreateFromVmo(zx::vmo config_vmo) noexcept {
   {{> vmo_parse }}
+}
+
+zx::vmo Config::ToVmo() const noexcept {
+  {{> vmo_create }}
 }
 
 }

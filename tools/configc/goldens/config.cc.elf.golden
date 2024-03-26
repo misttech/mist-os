@@ -1,3 +1,4 @@
+#include <fidl/my.config.lib/cpp/fidl.h>
 #include <fidl/my.config.lib/cpp/wire.h>
 #include <fidl/my.config.lib/cpp/wire_types.h>
 #include <lib/fidl/cpp/wire/message.h>
@@ -297,6 +298,72 @@ Config Config::CreateFromVmo(zx::vmo config_vmo) noexcept {
        .my_vector_of_uint8 = from_vector_view(fidl_config.my_vector_of_uint8)}};
 
   return c;
+}
+
+zx::vmo Config::ToVmo() const noexcept {
+  // Create the FIDL object.
+  my_config_lib::Config fidl_config;
+  fidl_config.my_flag(this->my_flag());
+  fidl_config.my_int16(this->my_int16());
+  fidl_config.my_int32(this->my_int32());
+  fidl_config.my_int64(this->my_int64());
+  fidl_config.my_int8(this->my_int8());
+  fidl_config.my_string(this->my_string());
+  fidl_config.my_uint16(this->my_uint16());
+  fidl_config.my_uint32(this->my_uint32());
+  fidl_config.my_uint64(this->my_uint64());
+  fidl_config.my_uint8(this->my_uint8());
+  fidl_config.my_vector_of_flag(this->my_vector_of_flag());
+  fidl_config.my_vector_of_int16(this->my_vector_of_int16());
+  fidl_config.my_vector_of_int32(this->my_vector_of_int32());
+  fidl_config.my_vector_of_int64(this->my_vector_of_int64());
+  fidl_config.my_vector_of_int8(this->my_vector_of_int8());
+  fidl_config.my_vector_of_string(this->my_vector_of_string());
+  fidl_config.my_vector_of_uint16(this->my_vector_of_uint16());
+  fidl_config.my_vector_of_uint32(this->my_vector_of_uint32());
+  fidl_config.my_vector_of_uint64(this->my_vector_of_uint64());
+  fidl_config.my_vector_of_uint8(
+      this->my_vector_of_uint8());  // Persist the FIDL object.
+  fit::result persist_result = fidl::Persist(fidl_config);
+  ZX_ASSERT(persist_result.is_ok());
+  std::vector fidl_bytes = std::move(persist_result.value());
+
+  // Create the checksum.
+  std::vector<uint8_t> checksum{0xcd, 0x57, 0xb2, 0xa2, 0x89, 0xbb, 0xb6, 0x11,
+                                0xcf, 0x81, 0x50, 0xec, 0x06, 0xc5, 0x06, 0x4c,
+                                0x7c, 0xae, 0x79, 0x0f, 0xaa, 0x73, 0x0b, 0x6f,
+                                0xa1, 0x02, 0xc3, 0x53, 0x7b, 0x94, 0xee, 0x1a};
+
+  // Calculate the VMO size.
+  uint64_t vmo_content_size = 2 + checksum.size() + fidl_bytes.size();
+
+  zx_status_t status;
+  zx::vmo config_vmo;
+
+  status = zx::vmo::create(vmo_content_size, 0, &config_vmo);
+  ZX_ASSERT_MSG(status == ZX_OK, "Failed to create vmo: %s",
+                zx_status_get_string(status));
+
+  // Write the checksum length
+  uint16_t checksum_length = static_cast<uint16_t>(checksum.size());
+  status = config_vmo.write(&checksum_length, 0, 2);
+  ZX_ASSERT_MSG(status == ZX_OK, "Failed to write checksum length: %s",
+                zx_status_get_string(status));
+
+  // Write the checksum.
+  status = config_vmo.write(checksum.data(), 2, checksum.size());
+  ZX_ASSERT_MSG(status == ZX_OK, "Failed to write checksum: %s",
+                zx_status_get_string(status));
+
+  // Write the FIDL data.
+  size_t header = 2 + checksum_length;
+  status = config_vmo.write(fidl_bytes.data(), header, fidl_bytes.size());
+  ZX_ASSERT_MSG(status == ZX_OK,
+                "Could not write FIDL struct to config VMO: %s",
+                zx_status_get_string(status));
+
+  // Finished!
+  return config_vmo;
 }
 
 }  // namespace cpp_elf_config_lib

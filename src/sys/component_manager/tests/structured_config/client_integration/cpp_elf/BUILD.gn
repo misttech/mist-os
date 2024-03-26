@@ -6,24 +6,19 @@ import("//build/components.gni")
 
 executable("bin") {
   testonly = true
-  output_name = "structured_config_cpp_elf_receiver"
-  sources = [ "src/main.cc" ]
+  output_name = "structured_config_cpp_elf"
+  sources = [ "test.cc" ]
   deps = [
     ":config_lib",
     "//sdk/lib/inspect/component/cpp",
-    "//sdk/lib/sys/cpp:cpp",
-    "//sdk/lib/syslog/cpp",
-    "//src/sys/component_manager/tests/structured_config/fidl:test.structuredconfig.receiver_hlcpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//src/lib/fxl/test:gtest_main",
   ]
 }
 
 fuchsia_component_manifest("manifest") {
   testonly = true
   component_name = "cpp_elf_receiver"
-  manifest = "meta/receiver.cml"
+  manifest = "meta/test.cml"
 }
 
 fuchsia_structured_config_cpp_elf_lib("config_lib") {
@@ -32,38 +27,22 @@ fuchsia_structured_config_cpp_elf_lib("config_lib") {
   cm_label = ":manifest"
 }
 
-fuchsia_component("component") {
-  testonly = true
-  cm_label = ":manifest"
-  deps = [ ":bin" ]
-}
-
 fuchsia_structured_config_values("values") {
   testonly = true
   cm_label = ":manifest"
   values_source = "../config/values.json5"
 }
 
-rustc_test("cpp_elf_sc_client_test_bin") {
-  edition = "2021"
-  source_root = "src/test.rs"
-  sources = [ "src/test.rs" ]
-  deps = [
-    "..:sc_client_integration_support",
-    "//src/lib/fuchsia",
-  ]
-}
-
-fuchsia_test_component("test_component") {
-  manifest = "meta/test.cml"
-  deps = [ ":cpp_elf_sc_client_test_bin" ]
+fuchsia_component("test_component") {
+  testonly = true
+  cm_label = ":manifest"
+  deps = [ ":bin" ]
 }
 
 fuchsia_test_package("cpp_elf") {
   package_name = "sc_cpp_elf_client_integration_test"
   test_components = [ ":test_component" ]
   deps = [
-    ":component",
     ":values",
 
     # https://fxbug.dev/42052321: Dep included for affected tests presubmit
