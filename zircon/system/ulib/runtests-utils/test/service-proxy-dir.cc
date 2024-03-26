@@ -86,29 +86,8 @@ TEST(ServiceProxyDirTest, Simple) {
     auto& [client, server] = endpoints.value();
 
     ASSERT_OK(fidl::WireCall(proxy_client)
-                  ->Open(fio::wire::OpenFlags::kDescribe, {}, fidl::StringView(kProxyEchoString),
-                         std::move(server))
+                  ->Open({}, {}, fidl::StringView(kProxyEchoString), std::move(server))
                   .status());
-
-    class EventHandler : public fidl::WireSyncEventHandler<fio::Node> {
-     public:
-      EventHandler() = default;
-
-      zx_status_t status() const { return status_; }
-
-      void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) override { status_ = event->s; }
-
-      void OnRepresentation(fidl::WireEvent<fio::Node::OnRepresentation>* event) override {
-        ADD_FAILURE("OnRepresentation is not supported");
-      }
-
-     private:
-      zx_status_t status_ = ZX_ERR_NOT_SUPPORTED;
-    };
-
-    EventHandler event_handler;
-    ASSERT_OK(event_handler.HandleOneEvent(client));
-    ASSERT_OK(event_handler.status());
 
     const fidl::WireResult result =
         fidl::WireCall(fidl::UnownedClientEnd<fidl_test_echo::Echo>{client.channel().borrow()})
@@ -125,29 +104,8 @@ TEST(ServiceProxyDirTest, Simple) {
     auto& [client, server] = endpoints.value();
 
     ASSERT_OK(fidl::WireCall(proxy_client)
-                  ->Open(fio::wire::OpenFlags::kDescribe, {}, fidl::StringView(kEchoString),
-                         std::move(server))
+                  ->Open({}, {}, fidl::StringView(kEchoString), std::move(server))
                   .status());
-
-    class EventHandler : public fidl::WireSyncEventHandler<fio::Node> {
-     public:
-      EventHandler() = default;
-
-      zx_status_t status() const { return status_; }
-
-      void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) override { status_ = event->s; }
-
-      void OnRepresentation(fidl::WireEvent<fio::Node::OnRepresentation>* event) override {
-        ADD_FAILURE("OnRepresentation is not supported");
-      }
-
-     private:
-      zx_status_t status_ = ZX_ERR_NOT_SUPPORTED;
-    };
-
-    EventHandler event_handler;
-    ASSERT_OK(event_handler.HandleOneEvent(client));
-    ASSERT_OK(event_handler.status());
 
     const fidl::WireResult result =
         fidl::WireCall(fidl::UnownedClientEnd<fidl_test_echo::Echo>{client.channel().borrow()})
