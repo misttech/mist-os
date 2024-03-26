@@ -51,6 +51,8 @@ async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace
     Ok(ns)
 }
 
+// TODO(b/324834340): Re-enable once no longer flaky
+#[ignore]
 #[fuchsia::test]
 async fn test_basic_driver() -> Result<()> {
     let (pkg_client, pkg_server) = create_endpoints();
