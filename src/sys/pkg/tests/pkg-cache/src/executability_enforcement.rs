@@ -13,7 +13,7 @@ use {
 /// handle to the package directory has RIGHT_EXECUTABLE.
 ///
 /// If executability enforcement is enabled (the default), the handle should have RIGHT_EXECUTABLE
-/// if and only if the package is a base package (e.g. being in the dynamic or retained indices
+/// if and only if the package is a base package (e.g. being in the cache or retained indices
 /// should not affect executability).
 ///
 /// If executability enforcement is disabled (by the presence of file
@@ -96,7 +96,7 @@ async fn base_package_executable() {
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
-async fn dynamic_index_active_package_not_executable() {
+async fn cache_package_not_executable() {
     let pkg = PackageBuilder::new("cache-package").build().await.unwrap();
     let superpkg =
         PackageBuilder::new("super").add_subpackage("my-subpackage", &pkg).build().await.unwrap();
@@ -132,7 +132,7 @@ async fn retained_index_package_not_executable() {
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
-async fn enforcement_disabled_dynamic_index_active_package_executable() {
+async fn enforcement_disabled_cache_package_executable() {
     let pkg = PackageBuilder::new("cache-package").build().await.unwrap();
     let superpkg =
         PackageBuilder::new("super").add_subpackage("my-subpackage", &pkg).build().await.unwrap();

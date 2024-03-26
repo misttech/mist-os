@@ -100,6 +100,13 @@ impl WritingIndex {
         }
     }
 
+    /// The blobs (content and subpackage) known to be required by `package`. Not guaranteed to be
+    /// complete (more required blobs are discovered as the meta.far and subpackage meta.fars are
+    /// written).
+    pub fn get_required_blobs(&self, package: &Hash) -> Option<&HashSet<Hash>> {
+        self.pkg_to_refcount_and_blobs.get(package).map(|(_, bs)| bs)
+    }
+
     #[cfg(test)]
     pub fn packages(&self) -> HashMap<Hash, HashSet<Hash>> {
         self.pkg_to_refcount_and_blobs.iter().map(|(p, (_, bs))| (*p, bs.clone())).collect()

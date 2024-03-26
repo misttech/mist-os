@@ -235,8 +235,7 @@ async fn get_and_verify_packages(proxy: &fpkg::PackageCacheProxy, packages: &[Pa
 //   1. `pkg` can be opened via PackageCache.Get without needing to write any blobs.
 //   2. `pkg` matches the package directory obtained from PackageCache.Get.
 //
-// Does *not* verify that `pkg`'s subpackages were cached, as this would requiring using
-// PackageCache.Get on them which would activate them in the dynamic index.
+// Does *not* verify that `pkg`'s subpackages were cached.
 //
 // Returns the package directory obtained from PackageCache.Get.
 async fn verify_package_cached(
@@ -260,11 +259,12 @@ async fn verify_package_cached(
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
-    // If the package is active in the dynamic index, the server will send a `ZX_OK` epitaph then
-    // close the channel.
-    // If all the blobs are cached but the package is not active in the dynamic index the server
-    // will reply with `Ok(None)`, meaning that the metadata blob is cached and GetMissingBlobs
-    // needs to be performed (but the iterator obtained with GetMissingBlobs should be empty).
+    // If the package is in base, cache, or currently open, the server will send a `ZX_OK` epitaph
+    // and then close the channel.
+    // If all the blobs are cached but the package is not in base, cache, or already open, then the
+    // server will reply with `Ok(None)`, meaning that the metadata blob is cached and
+    // GetMissingBlobs needs to be performed (but the iterator obtained with GetMissingBlobs should
+    // be empty).
     let epitaph_received = match needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await {
         Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. }) => true,
         Ok(Ok(None)) => false,
@@ -376,7 +376,6 @@ struct TestEnvBuilder<BlobfsAndSystemImageFut> {
         Box<dyn FnOnce(blobfs_ramdisk::Implementation) -> BlobfsAndSystemImageFut>,
     ignore_system_image: bool,
     blob_implementation: Option<blobfs_ramdisk::Implementation>,
-    protect_dynamic_packages: Option<bool>,
 }
 
 impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
@@ -396,7 +395,6 @@ impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
             paver_service_builder: None,
             ignore_system_image: false,
             blob_implementation: None,
-            protect_dynamic_packages: None,
         }
     }
 }
@@ -423,7 +421,6 @@ where
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
             blob_implementation: self.blob_implementation,
-            protect_dynamic_packages: self.protect_dynamic_packages,
         }
     }
 
@@ -458,7 +455,6 @@ where
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
             blob_implementation: Some(blobfs_ramdisk::Implementation::from_env()),
-            protect_dynamic_packages: self.protect_dynamic_packages,
         }
     }
 
@@ -480,11 +476,6 @@ where
     fn blobfs_impl(self, impl_: blobfs_ramdisk::Implementation) -> Self {
         assert_eq!(self.blob_implementation, None);
         Self { blob_implementation: Some(impl_), ..self }
-    }
-
-    fn protect_dynamic_packages(self, protect_dynamic_packages: bool) -> Self {
-        assert_eq!(self.protect_dynamic_packages, None);
-        Self { protect_dynamic_packages: Some(protect_dynamic_packages), ..self }
     }
 
     async fn build(self) -> TestEnv<ConcreteBlobfs> {
@@ -611,10 +602,7 @@ where
             .add_child("pkg_cache", "#meta/pkg-cache.cm", ChildOptions::new())
             .await
             .unwrap();
-        if self.ignore_system_image
-            || blob_implementation_overridden
-            || self.protect_dynamic_packages.is_some()
-        {
+        if self.ignore_system_image || blob_implementation_overridden {
             builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
             if self.ignore_system_image {
                 builder
@@ -629,16 +617,6 @@ where
                         "use_fxblob",
                         matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob)
                             .into(),
-                    )
-                    .await
-                    .unwrap();
-            }
-            if let Some(protect_dynamic_packages) = self.protect_dynamic_packages {
-                builder
-                    .set_config_value(
-                        &pkg_cache,
-                        "protect_dynamic_packages",
-                        protect_dynamic_packages.into(),
                     )
                     .await
                     .unwrap();

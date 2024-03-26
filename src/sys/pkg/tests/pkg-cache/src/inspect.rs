@@ -4,8 +4,8 @@
 
 use {
     crate::{
-        blob_written, compress_and_write_blob, get_and_verify_packages, get_missing_blobs,
-        replace_retained_packages, write_meta_far, write_needed_blobs, TestEnv,
+        blob_written, compress_and_write_blob, get_missing_blobs, replace_retained_packages,
+        write_meta_far, write_needed_blobs, TestEnv,
     },
     assert_matches::assert_matches,
     diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty},
@@ -15,7 +15,6 @@ use {
     fidl_fuchsia_pkg_ext::BlobId,
     fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder},
     fuchsia_zircon as zx,
-    fuchsia_zircon::Status,
     futures::prelude::*,
     std::collections::HashMap,
 };
@@ -130,233 +129,6 @@ async fn executability_restrictions_disabled() {
         hierarchy,
         root: contains {
             "executability-restrictions": "DoNotEnforce".to_string(),
-        }
-    );
-    env.stop().await;
-}
-
-#[fuchsia::test]
-async fn dynamic_index_inital_state() {
-    let system_image_package = SystemImageBuilder::new().build().await;
-    let env =
-        TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
-    env.block_until_started().await;
-
-    let hierarchy = env.inspect_hierarchy().await;
-
-    assert_data_tree!(
-        hierarchy,
-        root: contains {
-            "index": contains {
-                "dynamic" : {}
-            }
-        }
-    );
-    env.stop().await;
-}
-
-#[fuchsia::test]
-async fn dynamic_index_with_cache_packages() {
-    let cache_package = PackageBuilder::new("a-cache-package")
-        .add_resource_at("some-cached-blob", &b"unique contents"[..])
-        .build()
-        .await
-        .unwrap();
-
-    let system_image_package =
-        SystemImageBuilder::new().cache_packages(&[&cache_package]).build().await;
-
-    let env = TestEnv::builder()
-        .blobfs_from_system_image_and_extra_packages(&system_image_package, &[&cache_package])
-        .await
-        .protect_dynamic_packages(true)
-        .build()
-        .await;
-    env.block_until_started().await;
-
-    let hierarchy = env.inspect_hierarchy().await;
-
-    assert_data_tree!(
-        hierarchy,
-        root: contains {
-            "index": contains {
-                "dynamic": {
-                    cache_package.hash().to_string() => {
-                        "state" : "Active",
-                        "required_blobs": 1u64,
-                        "path": "a-cache-package/0",
-                    },
-                }
-            }
-        }
-    );
-    env.stop().await;
-}
-
-#[fuchsia::test]
-async fn dynamic_index_needed_blobs() {
-    let env = TestEnv::builder().protect_dynamic_packages(true).build().await;
-    let pkg = PackageBuilder::new("single-blob").build().await.unwrap();
-
-    let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
-
-    let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
-    let (_dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    let get_fut = env
-        .proxies
-        .package_cache
-        .get(
-            &meta_blob_info,
-            fpkg::GcProtection::OpenPackageTracking,
-            needed_blobs_server_end,
-            dir_server_end,
-        )
-        .map_ok(|res| res.map_err(Status::from_raw));
-
-    let (meta_far, _) = pkg.contents();
-
-    let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
-
-    let hierarchy = env.inspect_hierarchy().await;
-
-    assert_data_tree!(
-        hierarchy,
-        root: contains {
-            "index": contains {
-                "dynamic": {
-                    pkg.hash().to_string() => {
-                        "state": "Pending",
-                    }
-                }
-            }
-        }
-    );
-
-    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
-    let () = blob_written(&needed_blobs, BlobId::from(meta_far.merkle).into()).await;
-    env.wait_for_and_return_inspect_state(tree_assertion!(
-        "root": contains {
-            "index": contains {
-                "dynamic": contains {
-                    pkg.hash().to_string() => {
-                        "state": "WithMetaFar",
-                        "path": AnyProperty,
-                        "required_blobs": AnyProperty,
-                    }
-                }
-            }
-        }
-    ))
-    .await;
-
-    let hierarchy = env.inspect_hierarchy().await;
-    assert_data_tree!(
-        hierarchy,
-        root: contains {
-            "index": contains {
-                "dynamic": {
-                    pkg.hash().to_string() => {
-                        "state": "WithMetaFar",
-                        "path": "single-blob/0",
-                        "required_blobs": 0u64,
-                    }
-
-                }
-            }
-        }
-    );
-
-    assert_eq!(get_missing_blobs(&needed_blobs).await, vec![]);
-    let () = get_fut.await.unwrap().unwrap();
-    let hierarchy = env.inspect_hierarchy().await;
-
-    assert_data_tree!(
-        hierarchy,
-        root: contains {
-            "index": contains {
-                "dynamic": {
-                    pkg.hash().to_string() => {
-                        "state": "Active",
-                        "path": "single-blob/0",
-                        "required_blobs": 0u64,
-                    }
-
-                }
-            }
-        }
-    );
-
-    env.stop().await;
-}
-
-#[fuchsia::test]
-async fn dynamic_index_package_hash_update() {
-    let env = TestEnv::builder().protect_dynamic_packages(true).build().await;
-    let pkg = PackageBuilder::new("single-blob").build().await.unwrap();
-
-    let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
-
-    let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
-    let (_, dir) = fidl::endpoints::create_endpoints();
-    let get_fut = env
-        .proxies
-        .package_cache
-        .get(&meta_blob_info, fpkg::GcProtection::OpenPackageTracking, needed_blobs_server_end, dir)
-        .map_ok(|res| res.map_err(Status::from_raw));
-
-    let (meta_far, _) = pkg.contents();
-
-    let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
-    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
-    let () = blob_written(&needed_blobs, meta_far.merkle).await;
-
-    assert_eq!(get_missing_blobs(&needed_blobs).await, vec![]);
-    let () = get_fut.await.unwrap().unwrap();
-    let hierarchy = env.inspect_hierarchy().await;
-
-    assert_data_tree!(
-        hierarchy,
-        root: contains {
-            "index": contains {
-                "dynamic": {
-                    pkg.hash().to_string() => {
-                        "state": "Active",
-                        "path": "single-blob/0",
-                        "required_blobs": 0u64,
-                    }
-                }
-            }
-        }
-    );
-
-    let updated_pkg = PackageBuilder::new("single-blob")
-        .add_resource_at("some-cached-blob", &b"updated contents"[..])
-        .build()
-        .await
-        .unwrap();
-
-    let updated_hash = updated_pkg.hash().to_string();
-    assert_ne!(pkg.hash().to_string(), updated_hash);
-
-    let () = get_and_verify_packages(&env.proxies.package_cache, &[updated_pkg]).await;
-    let hierarchy = env.inspect_hierarchy().await;
-
-    assert_data_tree!(
-        hierarchy,
-        root: contains {
-            "index": contains {
-                "dynamic": {
-                    updated_hash => {
-                        "state": "Active",
-                        "path": "single-blob/0",
-                        "required_blobs": 1u64,
-                    }
-                }
-            }
         }
     );
     env.stop().await;
@@ -794,7 +566,7 @@ async fn retained_index_updated_and_persisted() {
 
 #[fuchsia::test]
 async fn index_updated_mid_package_write() {
-    let env = TestEnv::builder().protect_dynamic_packages(true).build().await;
+    let env = TestEnv::builder().build().await;
     let package = PackageBuilder::new("multi-pkg-a")
         .add_resource_at("bin/foo", "a-bin-foo".as_bytes())
         .add_resource_at("data/content", "a-data-content".as_bytes())
@@ -836,7 +608,7 @@ async fn index_updated_mid_package_write() {
                             "blobs-count": 2u64,
                         },
                     },
-                }
+                },
             }
         }
     ))
@@ -851,13 +623,6 @@ async fn index_updated_mid_package_write() {
         hierarchy,
         root: contains {
             "index": {
-                "dynamic": {
-                    blob_id.to_string() => {
-                        "state" : "Active",
-                        "path": "multi-pkg-a/0",
-                        "required_blobs": 2u64,
-                    },
-                },
                 "retained" : {
                     "entries" : {
                         blob_id.to_string() => {

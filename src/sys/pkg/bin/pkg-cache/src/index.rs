@@ -4,12 +4,8 @@
 
 //! Types to track and manage indices of packages.
 
-mod dynamic;
 mod package;
 mod retained;
 mod writing;
 
-pub use package::{
-    fulfill_meta_far_blob, load_cache_packages, set_retained_index, CompleteInstallError,
-    FulfillMetaFarError, PackageIndex,
-};
+pub use package::{set_retained_index, PackageIndex};

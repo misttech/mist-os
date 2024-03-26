@@ -684,8 +684,8 @@ async fn get_with_retained_protection_refetches_blobs() {
     assert!(!blobfs.has_blob(&blob_hash).await);
 
     // Get with OpenPackageTracking protection, package should *not* validate because the package
-    // was in the dynamic index which short-circuits the fetch, so the deleted content blob should
-    // still be missing.
+    // is in the cache packages manifest which short-circuits the fetch, so the deleted content
+    // blob should still be missing.
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let get_fut = env
@@ -768,7 +768,7 @@ async fn get_subpackage_fails_if_superpackage_closed() {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn get_uses_open_packages_to_short_circuit() {
-    let env = TestEnv::builder().protect_dynamic_packages(false).build().await;
+    let env = TestEnv::builder().build().await;
     let blob_content = &b"some-content"[..];
     let pkg = PackageBuilder::new("ephemeral")
         .add_resource_at("content-blob", blob_content)

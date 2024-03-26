@@ -4,9 +4,7 @@
 
 use {
     crate::base_packages::{BasePackages, CachePackages},
-    crate::index::{
-        fulfill_meta_far_blob, CompleteInstallError, FulfillMetaFarError, PackageIndex,
-    },
+    crate::index::PackageIndex,
     anyhow::{anyhow, Error},
     cobalt_sw_delivery_registry as metrics,
     fidl::endpoints::ServerEnd,
@@ -55,7 +53,6 @@ pub(crate) async fn serve(
     cobalt_sender: ProtocolSender<MetricEvent>,
     serve_id: Arc<AtomicU32>,
     get_node: Arc<finspect::Node>,
-    protect_dynamic_packages: crate::DynamicProtection,
 ) -> Result<(), Error> {
     stream
         .map_err(anyhow::Error::new)
@@ -98,7 +95,6 @@ pub(crate) async fn serve(
                         scope.clone(),
                         cobalt_sender,
                         &node,
-                        protect_dynamic_packages,
                     )
                     .await;
                     guard.map(|o| {
@@ -181,28 +177,6 @@ impl PackageAvailability {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
-enum PackageStatus {
-    Base,
-    Active,
-    Other,
-}
-
-async fn get_package_status(
-    base_packages: &BasePackages,
-    package_index: &async_lock::RwLock<PackageIndex>,
-    package: &fuchsia_hash::Hash,
-) -> PackageStatus {
-    if base_packages.is_package(*package) {
-        return PackageStatus::Base;
-    }
-
-    match package_index.read().await.is_active(package) {
-        true => PackageStatus::Active,
-        false => PackageStatus::Other,
-    }
-}
-
 enum ExecutabilityStatus {
     Allowed,
     Forbidden,
@@ -247,7 +221,6 @@ async fn get(
     scope: package_directory::ExecutionScope,
     cobalt_sender: ProtocolSender<MetricEvent>,
     node: &finspect::Node,
-    protect_dynamic_packages: crate::DynamicProtection,
 ) -> Result<(), Status> {
     let guard =
         package_index.write().await.start_writing(meta_far_blob.blob_id.into(), gc_protection);
@@ -265,7 +238,6 @@ async fn get(
         scope,
         cobalt_sender,
         node,
-        protect_dynamic_packages,
     )
     .await;
     let stop_ret = package_index.write().await.stop_writing(guard);
@@ -302,7 +274,6 @@ async fn get_impl(
     scope: package_directory::ExecutionScope,
     mut cobalt_sender: ProtocolSender<MetricEvent>,
     node: &finspect::Node,
-    protect_dynamic_packages: crate::DynamicProtection,
 ) -> Result<(), Status> {
     let () = node.record_int("started-time", zx::Time::get_monotonic().into_nanos());
     let () = node.record_string("meta-far-id", meta_far_blob.blob_id.to_string());
@@ -334,102 +305,39 @@ async fn get_impl(
             Arc::new(root_dir)
         }
         fpkg::GcProtection::OpenPackageTracking => {
-            // If the dynamic index is active, use it to short-ciruit resolves. Otherwise, use the
-            // open package cache.
-            match protect_dynamic_packages {
-                crate::DynamicProtection::Enabled => {
-                    match get_package_status(base_packages, package_index, &pkg).await {
-                        PackageStatus::Other => {
-                            let root_dir = serve_needed_blobs(
-                                needed_blobs,
-                                meta_far_blob,
-                                gc_protection,
-                                package_index,
-                                blobfs,
-                                node,
-                            )
-                            .await
-                            .map_err(|e| {
-                                error!("error while caching package {}: {:#}", pkg, anyhow!(e));
-                                cobalt_sender.open_io_error();
-                                Status::UNAVAILABLE
-                            })?;
-                            open_packages.get_or_insert(pkg, Some(root_dir)).await.map_err(|e| {
-                                error!(
-                                    "get: open_packages.get_or_insert {}: {:#}",
-                                    pkg,
-                                    anyhow!(e)
-                                );
-                                cobalt_sender.open_io_error();
-                                Status::INTERNAL
-                            })?
-                        }
-                        PackageStatus::Base | PackageStatus::Active => {
-                            let () =
-                                needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
-                            open_packages.get_or_insert(pkg, None).await.map_err(|e| {
-                                error!(
-                                    "get: open_packages.get_or_insert {}: {:#}",
-                                    pkg,
-                                    anyhow!(e)
-                                );
-                                cobalt_sender.open_io_error();
-                                Status::INTERNAL
-                            })?
-                        }
-                    }
+            match PackageAvailability::get(base_packages, cache_packages, open_packages, &pkg) {
+                PackageAvailability::Unknown => {
+                    let root_dir = serve_needed_blobs(
+                        needed_blobs,
+                        meta_far_blob,
+                        gc_protection,
+                        package_index,
+                        blobfs,
+                        node,
+                    )
+                    .await
+                    .map_err(|e| {
+                        error!("error while caching package {}: {:#}", pkg, anyhow!(e));
+                        cobalt_sender.open_io_error();
+                        Status::UNAVAILABLE
+                    })?;
+                    open_packages.get_or_insert(pkg, Some(root_dir)).await.map_err(|e| {
+                        error!("get: open_packages.get_or_insert {}: {:#}", pkg, anyhow!(e));
+                        cobalt_sender.open_io_error();
+                        Status::INTERNAL
+                    })?
                 }
-                crate::DynamicProtection::Disabled => {
-                    match PackageAvailability::get(
-                        base_packages,
-                        cache_packages,
-                        open_packages,
-                        &pkg,
-                    ) {
-                        PackageAvailability::Unknown => {
-                            let root_dir = serve_needed_blobs(
-                                needed_blobs,
-                                meta_far_blob,
-                                gc_protection,
-                                package_index,
-                                blobfs,
-                                node,
-                            )
-                            .await
-                            .map_err(|e| {
-                                error!("error while caching package {}: {:#}", pkg, anyhow!(e));
-                                cobalt_sender.open_io_error();
-                                Status::UNAVAILABLE
-                            })?;
-                            open_packages.get_or_insert(pkg, Some(root_dir)).await.map_err(|e| {
-                                error!(
-                                    "get: open_packages.get_or_insert {}: {:#}",
-                                    pkg,
-                                    anyhow!(e)
-                                );
-                                cobalt_sender.open_io_error();
-                                Status::INTERNAL
-                            })?
-                        }
-                        PackageAvailability::Open(root_dir) => {
-                            let () =
-                                needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
-                            root_dir
-                        }
-                        PackageAvailability::Always => {
-                            let () =
-                                needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
-                            open_packages.get_or_insert(pkg, None).await.map_err(|e| {
-                                error!(
-                                    "get: open_packages.get_or_insert {}: {:#}",
-                                    pkg,
-                                    anyhow!(e)
-                                );
-                                cobalt_sender.open_io_error();
-                                Status::INTERNAL
-                            })?
-                        }
-                    }
+                PackageAvailability::Open(root_dir) => {
+                    let () = needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
+                    root_dir
+                }
+                PackageAvailability::Always => {
+                    let () = needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
+                    open_packages.get_or_insert(pkg, None).await.map_err(|e| {
+                        error!("get: open_packages.get_or_insert {}: {:#}", pkg, anyhow!(e));
+                        cobalt_sender.open_io_error();
+                        Status::INTERNAL
+                    })?
                 }
             }
         }
@@ -463,12 +371,6 @@ enum ServeNeededBlobsError {
     #[error("the operation was aborted by the caller")]
     Aborted,
 
-    #[error("while updating package index install state")]
-    CompleteInstall(#[from] CompleteInstallError),
-
-    #[error("while updating package index with meta far info")]
-    FulfillMetaFar(#[from] FulfillMetaFarError),
-
     #[error("while adding needed content blobs to the iterator")]
     SendNeededContentBlobs(#[source] futures::channel::mpsc::SendError),
 
@@ -501,6 +403,9 @@ enum ServeNeededBlobsError {
 
     #[error("client signaled blob {wrong_blob} was written but meta.far was {meta_far}")]
     WrongMetaFarBlobWritten { wrong_blob: BlobId, meta_far: BlobId },
+
+    #[error("while creating a RootDir for the package")]
+    CreatePackageRootDir(#[source] package_directory::Error),
 }
 
 /// Adds all of a package's content and subpackage blobs (discovered during the caching process by
@@ -544,8 +449,6 @@ impl<'a> missing_blobs::BlobRecorder for IndexBlobRecorder<'a> {
 ///
 /// Once all needed blobs are written by the client, the package cache will complete the pending
 /// [`PackageCache.Get`] request and close this channel with a `ZX_OK` epitaph.
-///
-/// Returns the package's name if the package was activated in the dynamic index.
 async fn serve_needed_blobs(
     mut stream: NeededBlobsRequestStream,
     meta_far_info: BlobInfo,
@@ -557,15 +460,7 @@ async fn serve_needed_blobs(
     let state = node.create_string("state", "need-meta-far");
     let res = async {
         // Step 1: Open and write the meta.far, or determine it is not needed.
-        let root_dir = handle_open_meta_blob(
-            &mut stream,
-            meta_far_info,
-            gc_protection,
-            blobfs,
-            package_index,
-            &state,
-        )
-        .await?;
+        let root_dir = handle_open_meta_blob(&mut stream, meta_far_info, blobfs, &state).await?;
 
         let (missing_blobs, missing_blobs_recv) = missing_blobs::MissingBlobs::new(
             blobfs.clone(),
@@ -591,16 +486,6 @@ async fn serve_needed_blobs(
     }
     .await;
 
-    let () = match &res {
-        Ok(_) => package_index
-            .write()
-            .await
-            .complete_install(meta_far_info.blob_id.into(), gc_protection)?,
-        Err(_) => {
-            package_index.write().await.cancel_install(&meta_far_info.blob_id.into(), gc_protection)
-        }
-    };
-
     // TODO in the Err(_) case, a responder was likely dropped, which would have already shutdown
     // the stream without our custom epitaph value.  Need to find a nice way to always shutdown
     // with a custom epitaph without copy/pasting something to every return site.
@@ -617,13 +502,10 @@ async fn serve_needed_blobs(
 async fn handle_open_meta_blob(
     stream: &mut NeededBlobsRequestStream,
     meta_far_info: BlobInfo,
-    gc_protection: fpkg::GcProtection,
     blobfs: &blobfs::Client,
-    package_index: &async_lock::RwLock<PackageIndex>,
     state: &StringProperty,
 ) -> Result<package_directory::RootDir<blobfs::Client>, ServeNeededBlobsError> {
     let hash = meta_far_info.blob_id.into();
-    package_index.write().await.start_install(hash, gc_protection);
     let mut opened = false;
 
     loop {
@@ -673,7 +555,9 @@ async fn handle_open_meta_blob(
 
     state.set("enumerate-missing-blobs");
 
-    Ok(fulfill_meta_far_blob(package_index, blobfs, hash, gc_protection).await?)
+    package_directory::RootDir::new_raw(blobfs.clone(), hash, None)
+        .await
+        .map_err(ServeNeededBlobsError::CreatePackageRootDir)
 }
 
 async fn handle_get_missing_blobs(
@@ -1713,9 +1597,9 @@ mod serve_needed_blobs_tests {
         drop(proxy);
         assert_matches!(
             task.await,
-            Err(ServeNeededBlobsError::FulfillMetaFar(FulfillMetaFarError::CreateRootDir(
+            Err(ServeNeededBlobsError::CreatePackageRootDir(
                 package_directory::Error::ArchiveReader(fuchsia_archive::Error::InvalidMagic(_))
-            )))
+            ))
         );
         blobfs.expect_done().await;
     }
@@ -2443,7 +2327,6 @@ mod get_handler_tests {
                 .serve_and_log_errors()
                 .0,
                 &inspector.root().create_child("get"),
-                crate::DynamicProtection::Enabled,
             )
             .await,
             Err(Status::UNAVAILABLE)

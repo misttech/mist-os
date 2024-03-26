@@ -120,9 +120,6 @@
         },
     ],
     config: {
-        // If true, then pkg-cache will not garbage collect active dynamic index packages.
-        protect_dynamic_packages: { type: "bool" },
-
         // If true, then pkg-cache will use the fuchsia.fxfs.BlobCreator capability from its
         // environment to write blobs and the BlobReader to read and execute blobs.
         // Otherwise, pkg-cache will use the /blob directory to read and write blobs.

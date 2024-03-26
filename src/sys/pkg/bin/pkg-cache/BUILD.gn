@@ -92,7 +92,6 @@ rustc_binary("bin") {
     "src/compat/pkgfs/validation.rs",
     "src/gc_service.rs",
     "src/index.rs",
-    "src/index/dynamic.rs",
     "src/index/package.rs",
     "src/index/retained.rs",
     "src/index/writing.rs",
@@ -134,8 +133,6 @@ fuchsia_structured_config_rust_lib("config_lib") {
 fuchsia_structured_config_values("config_values_from_gn") {
   cm_label = ":manifest"
   values = {
-    protect_dynamic_packages = false
-
     # LINT.IfChange
     use_fxblob = fxfs_blob
 
@@ -148,8 +145,6 @@ fuchsia_structured_config_values("config_values_from_gn") {
 fuchsia_structured_config_values("config_values_from_gn-ignore-system-image") {
   cm_label = ":manifest"
   values = {
-    protect_dynamic_packages = false
-
     # TODO(https://fxbug.dev/42081210) Recovery should use fxblob if available.
     use_fxblob = false
     use_system_image = false
@@ -160,7 +155,6 @@ fuchsia_structured_config_values("config_values_from_gn-ignore-system-image") {
 fuchsia_structured_config_values("config_values_from_gn-cpp-blobfs") {
   cm_label = ":manifest"
   values = {
-    protect_dynamic_packages = false
     use_fxblob = false
     use_system_image = true
   }
@@ -170,7 +164,6 @@ fuchsia_structured_config_values("config_values_from_gn-cpp-blobfs") {
 fuchsia_structured_config_values("config_values_from_gn-fxblob") {
   cm_label = ":manifest"
   values = {
-    protect_dynamic_packages = false
     use_fxblob = true
     use_system_image = true
   }

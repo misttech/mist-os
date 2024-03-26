@@ -117,13 +117,7 @@ async fn main_inner() -> Result<(), Error> {
     inspector
         .root()
         .record_child("structured_config", |config_node| config.record_inspect(config_node));
-    let pkg_cache_config::Config { protect_dynamic_packages, use_fxblob, use_system_image } =
-        config;
-    let protect_dynamic_packages = match protect_dynamic_packages {
-        true => DynamicProtection::Enabled,
-        false => DynamicProtection::Disabled,
-    };
-    let mut package_index = PackageIndex::from_config(protect_dynamic_packages);
+    let pkg_cache_config::Config { use_fxblob, use_system_image } = config;
     let builder = blobfs::Client::builder().readable().writable().executable();
     let blobfs = if use_fxblob { builder.use_creator().use_reader() } else { builder }
         .build()
@@ -145,7 +139,6 @@ async fn main_inner() -> Result<(), Error> {
                 join!(BasePackages::new(&blobfs, &system_image), async {
                     let cache_packages =
                         system_image.cache_packages().await.context("reading cache_packages")?;
-                    index::load_cache_packages(&mut package_index, &cache_packages, &blobfs).await;
                     Ok(CachePackages::new(&blobfs, &cache_packages)
                         .await
                         .context("creating CachePackages index")?)
@@ -178,7 +171,7 @@ async fn main_inner() -> Result<(), Error> {
     let cache_packages = Arc::new(cache_packages);
     inspector.root().record_lazy_child("base-packages", base_packages.record_lazy_inspect());
     inspector.root().record_lazy_child("cache-packages", cache_packages.record_lazy_inspect());
-    let package_index = Arc::new(async_lock::RwLock::new(package_index));
+    let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new()));
     inspector.root().record_lazy_child("index", PackageIndex::record_lazy_inspect(&package_index));
     let scope = vfs::execution_scope::ExecutionScope::new();
     let (cobalt_sender, cobalt_fut) = ProtocolConnector::new_with_buffer_size(
@@ -221,7 +214,6 @@ async fn main_inner() -> Result<(), Error> {
                         cobalt_sender.clone(),
                         Arc::clone(&cache_inspect_id),
                         Arc::clone(&cache_get_node),
-                        protect_dynamic_packages,
                     )
                     .unwrap_or_else(|e| {
                         error!(
@@ -398,10 +390,4 @@ async fn shell_commands_bin_dir(
     .await
     .context("serving shell-commands bin dir")?;
     Ok(client)
-}
-
-#[derive(Debug, Clone, Copy)]
-enum DynamicProtection {
-    Enabled,
-    Disabled,
 }
