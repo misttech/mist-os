@@ -18,6 +18,11 @@ There are two parts to each metric name:
     the parameter value can be included as a slash-separated
     component. e.g. "Memcpy/100000bytes".
 
+    For multi-step tests using the [perftest C++ library], metric
+    names will contain a step name that follows a period,
+    e.g. "Event/Replace.replace_handle".  For these, the step name
+    should be in snake case (lower case with underscores).
+
 This two-part namespace structure is inherited from Chromeperf.
 
 Avoid adding "benchmarks" or "test" as a suffix in names, because it
@@ -37,6 +42,7 @@ the [`performance.dart`][performance.dart] library or in Python by the
 
 [performance.dart]: /sdk/testing/sl4f/client/lib/src/performance.dart
 [perf_publish]: /src/performance/lib/perf_publish
+[perftest C++ library]: /zircon/system/ulib/perftest/
 
 
 ## Current list of metric names
