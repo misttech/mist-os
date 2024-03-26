@@ -183,15 +183,17 @@
             ],
         },
         {
-            protocol: [
-                "fuchsia.scheduler.ProfileProvider",
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "parent",
             to: [
                 "#fshost",
                 "#netstack",
             ],
+        },
+        {
+            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
+            from: "parent",
+            to: [ "#netstack" ],
         },
         {
             directory: "pkgfs",

@@ -434,11 +434,6 @@
             to: [ "#role_manager" ],
         },
         {
-            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
-            from: "#svchost",
-            to: [ "#fshost" ],
-        },
-        {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "#role_manager",
             to: [ "#fshost" ],
@@ -471,10 +466,12 @@
             ],
         },
         {
-            protocol: [
-                "fuchsia.kernel.DebugBroker",
-                "fuchsia.scheduler.ProfileProvider",
-            ],
+            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
+            from: "#svchost",
+            to: [ "#console-launcher" ],
+        },
+        {
+            protocol: [ "fuchsia.kernel.DebugBroker" ],
             from: "#svchost",
             to: [
                 "#console-launcher",

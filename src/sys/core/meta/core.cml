@@ -507,7 +507,6 @@
         },
         {
             protocol: [
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
             ],

@@ -231,16 +231,6 @@
             ],
         },
         {
-            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
-            from: "#svchost",
-            to: [
-                "#boot-drivers",
-                "#driver-hosts",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
-            ],
-        },
-        {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "#role_manager",
             to: [
@@ -307,12 +297,6 @@
             service: [ "bootstrap.full-pkg-drivers" ],
             from: "#full-pkg-drivers",
             to: [ "#devfs-with-pkg" ],
-        },
-        {
-            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
-            from: "#svchost",
-            to: "#driver_manager",
-            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
