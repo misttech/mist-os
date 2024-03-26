@@ -8,7 +8,11 @@
 //! Panics if operations fail.
 
 use {
-    rand::{distributions::WeightedIndex, prelude::*, seq::SliceRandom},
+    rand::{
+        distributions::{Distribution, WeightedIndex},
+        seq::SliceRandom,
+        Rng,
+    },
     std::{
         fs::File,
         io::ErrorKind,
