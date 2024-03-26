@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use assembly_manifest::Image;
 use assembly_util::write_json_file;
 use camino::Utf8PathBuf;
+use serde_json::json;
 use std::collections::BTreeMap;
 use url::Url;
 
@@ -137,13 +138,13 @@ impl PartitionImageMapper {
             if let (Some(size), name) = (partition.size(), partition.name()) {
                 let metadata = std::fs::metadata(path).context("Getting image metadata")?;
                 let measured_size = metadata.len();
-                report.insert(format!("{}-{}", prefix, name), format!("{}", measured_size));
-                report.insert(format!("{}-{}.budget", prefix, name), format!("{}", size));
+                report.insert(format!("{}-{}", prefix, name), json!(measured_size));
+                report.insert(format!("{}-{}.budget", prefix, name), json!(size));
                 let url = Url::parse_with_params(
                     "http://go/fuchsia-size-stats/single_component/",
                     &[("f", format!("component:in:{}-{}", prefix, name))],
                 )?;
-                report.insert(format!("{}-{}.owner", prefix, name), url.to_string());
+                report.insert(format!("{}-{}.owner", prefix, name), json!(url.as_str()));
             }
         }
 
@@ -554,23 +555,15 @@ mod tests {
         mapper.map_images_to_slot(&images_a.images, Slot::A);
         mapper.generate_gerrit_size_report(&size_report_path, &"prefix".to_string()).unwrap();
 
-        let result: BTreeMap<String, String> = read_config(&size_report_path).unwrap();
-        let expected = BTreeMap::from([
-            ("prefix-vbmeta_a".into(), "6".into()),
-            ("prefix-vbmeta_a.budget".into(), "200".into()),
-            (
-                "prefix-vbmeta_a.owner".into(),
-                "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3Aprefix-vbmeta_a"
-                    .into(),
-            ),
-            ("prefix-zbi_a".into(), "3".into()),
-            ("prefix-zbi_a.budget".into(), "100".into()),
-            (
-                "prefix-zbi_a.owner".into(),
-                "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3Aprefix-zbi_a"
-                    .into(),
-            ),
-        ]);
+        let result: serde_json::Value = read_config(&size_report_path).unwrap();
+        let expected = serde_json::json!({
+            "prefix-vbmeta_a": 6,
+            "prefix-vbmeta_a.budget": 200,
+            "prefix-vbmeta_a.owner": "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3Aprefix-vbmeta_a",
+            "prefix-zbi_a": 3,
+            "prefix-zbi_a.budget": 100,
+            "prefix-zbi_a.owner": "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3Aprefix-zbi_a",
+        });
         assert_eq!(expected, result);
     }
 }
