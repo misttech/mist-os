@@ -117,7 +117,6 @@ where
         device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
         addr: SpecifiedAddr<I::Addr>,
     ) -> Result<(), NotFoundError> {
-        trace!("del_ip_addr: removing addr {addr:?} from device {device:?}");
         let (core_ctx, bindings_ctx) = self.contexts();
         ip::device::del_ip_addr(
             core_ctx,

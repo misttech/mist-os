@@ -1584,6 +1584,15 @@ pub(crate) enum DelIpAddr<Id, A> {
     AddressId(Id),
 }
 
+impl<Id: IpAddressId<A>, A: IpAddress> Display for DelIpAddr<Id, A> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            DelIpAddr::SpecifiedAddr(addr) => write!(f, "{}", *addr),
+            DelIpAddr::AddressId(id) => write!(f, "{}", id.addr()),
+        }
+    }
+}
+
 // Deletes an IP address from a device, returning the address and its
 // configuration if it was removed.
 fn del_ip_addr_inner<
@@ -1630,6 +1639,7 @@ fn del_ip_addr<
     addr: DelIpAddr<CC::AddressId, I::Addr>,
     reason: AddressRemovedReason,
 ) -> Result<(), NotFoundError> {
+    info!("removing addr {addr} from device {device_id:?}");
     core_ctx.with_ip_device_configuration(device_id, |config, mut core_ctx| {
         del_ip_addr_inner_and_notify_handler(
             &mut core_ctx,
