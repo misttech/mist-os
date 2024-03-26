@@ -304,8 +304,8 @@ checkout_dir: \"${FUCHSIA_DIR}\"
 build_dir: \"${FUCHSIA_BUILD_DIR}\"
 ")
   else
-    # If FX_BUILD_WITH_LABELS is set to 1, support GN labels directly.
-    if [[ "${FX_BUILD_WITH_LABELS:-0}" == 1 && "${#fuchsia_targets[@]}" -gt 0 ]]; then
+    # Set FX_BUILD_WITH_LABELS to 0 to disable building with GN labels directly.
+    if [[ "${FX_BUILD_WITH_LABELS:-1}" == 1 && "${#fuchsia_targets[@]}" -gt 0 ]]; then
       # A common mistake is to place a toolchain option after the GN label, thinking it
       # applies to all labels. For example `fx build //src:foo --host` instead of
       # `fx build --host //src:foo`.
