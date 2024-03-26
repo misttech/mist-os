@@ -74,15 +74,16 @@ zx_status_t Nelson::NnaInit() {
           {
               fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
                                       bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME,
-                                      aml_registers::REGISTER_NNA_RESET_LEVEL2),
+              fdf::MakeAcceptBindRule(
+                  bind_fuchsia_register::NAME,
+                  bind_fuchsia_amlogic_platform::NAME_REGISTER_NNA_RESET_LEVEL2),
           },
       .properties =
           {
               fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
                                 bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeProperty(bind_fuchsia_register::NAME,
-                                aml_registers::REGISTER_NNA_RESET_LEVEL2),
+                                bind_fuchsia_amlogic_platform::NAME_REGISTER_NNA_RESET_LEVEL2),
           },
   }};
 

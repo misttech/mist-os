@@ -12,6 +12,7 @@
 
 #include <vector>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
 
 #include "src/devices/lib/fidl-metadata/registers.h"
@@ -37,7 +38,7 @@ static const std::vector<fpbus::Mmio> registers_mmios{
 
 static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
     {
-        .name = aml_registers::REGISTER_USB_PHY_V2_RESET,
+        .name = bind_fuchsia_amlogic_platform::NAME_REGISTER_USB_PHY_V2_RESET,
         .mmio_id = RESET_MMIO,
         .masks =
             {
@@ -53,7 +54,7 @@ static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
             },
     },
     {
-        .name = aml_registers::REGISTER_NNA_RESET_LEVEL2,
+        .name = bind_fuchsia_amlogic_platform::NAME_REGISTER_NNA_RESET_LEVEL2,
         .mmio_id = RESET_MMIO,
         .masks =
             {
@@ -64,7 +65,7 @@ static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
             },
     },
     {
-        .name = aml_registers::REGISTER_MALI_RESET,
+        .name = bind_fuchsia_amlogic_platform::NAME_REGISTER_MALI_RESET,
         .mmio_id = RESET_MMIO,
         .masks =
             {

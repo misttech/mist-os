@@ -10,6 +10,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 
@@ -36,7 +37,7 @@ static const std::vector<fpbus::Mmio> registers_mmios{
 
 static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
     {
-        .name = aml_registers::REGISTER_NNA_RESET_LEVEL2,
+        .name = bind_fuchsia_amlogic_platform::NAME_REGISTER_NNA_RESET_LEVEL2,
         .mmio_id = RESET_MMIO,
         .masks =
             {
@@ -48,7 +49,7 @@ static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
     },
 
     {
-        .name = aml_registers::REGISTER_MALI_RESET,
+        .name = bind_fuchsia_amlogic_platform::NAME_REGISTER_MALI_RESET,
         .mmio_id = RESET_MMIO,
         .masks =
             {
@@ -72,7 +73,7 @@ static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
     },
 
     {
-        .name = aml_registers::REGISTER_SPICC0_RESET,
+        .name = bind_fuchsia_amlogic_platform::NAME_REGISTER_SPICC0_RESET,
         .mmio_id = RESET_MMIO,
         .masks =
             {
@@ -84,7 +85,7 @@ static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
     },
 
     {
-        .name = aml_registers::REGISTER_SPICC1_RESET,
+        .name = bind_fuchsia_amlogic_platform::NAME_REGISTER_SPICC1_RESET,
         .mmio_id = RESET_MMIO,
         .masks =
             {
@@ -96,7 +97,7 @@ static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
     },
 
     {
-        .name = aml_registers::REGISTER_USB_PHY_V2_RESET,
+        .name = bind_fuchsia_amlogic_platform::NAME_REGISTER_USB_PHY_V2_RESET,
         .mmio_id = RESET_MMIO,
         .masks =
             {

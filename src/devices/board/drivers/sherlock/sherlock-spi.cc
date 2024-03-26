@@ -88,13 +88,15 @@ const std::vector kGpioSpiProperties = {
 const std::vector kResetRegisterRules = {
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
                             bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, aml_registers::REGISTER_SPICC0_RESET),
+    fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME,
+                            bind_fuchsia_amlogic_platform::NAME_REGISTER_SPICC0_RESET),
 };
 
 const std::vector kResetRegisterProperties = {
     fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
                       bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty(bind_fuchsia_register::NAME, aml_registers::REGISTER_SPICC0_RESET),
+    fdf::MakeProperty(bind_fuchsia_register::NAME,
+                      bind_fuchsia_amlogic_platform::NAME_REGISTER_SPICC0_RESET),
 };
 
 const std::vector<fdf::BindRule> kGpioInitRules = std::vector{

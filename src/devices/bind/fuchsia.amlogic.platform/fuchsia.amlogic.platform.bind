@@ -4,6 +4,8 @@
 
 library fuchsia.amlogic.platform;
 
+using fuchsia.register;
+
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
   AMLOGIC = 0x05,
 };
@@ -88,4 +90,14 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
 enum PWM_ID {
   A,
   AO_D,
+};
+
+extend string fuchsia.register.NAME {
+  REGISTER_USB_PHY_V2_RESET = "usb_phy_v2_reset",
+  REGISTER_NNA_RESET_LEVEL2 = "nna_reset_level2",
+  REGISTER_MALI_RESET = "mali_reset",
+  REGISTER_ISP_RESET = "isp_reset",
+  REGISTER_SPICC0_RESET = "spicc0_reset",
+  REGISTER_SPICC1_RESET = "spicc1_reset",
+  REGISTER_USB_PHY_FACTORY = "usb_phy_factory",
 };

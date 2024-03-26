@@ -476,13 +476,14 @@ zx_status_t Sherlock::CameraInit() {
               fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
                                       bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME,
-                                      aml_registers::REGISTER_ISP_RESET),
+                                      bind_fuchsia_amlogic_platform::NAME_REGISTER_ISP_RESET),
           },
       .properties =
           {
               fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
                                 bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty(bind_fuchsia_register::NAME, aml_registers::REGISTER_ISP_RESET),
+              fdf::MakeProperty(bind_fuchsia_register::NAME,
+                                bind_fuchsia_amlogic_platform::NAME_REGISTER_ISP_RESET),
           },
   }};
 

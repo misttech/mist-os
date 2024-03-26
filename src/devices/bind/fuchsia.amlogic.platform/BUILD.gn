@@ -8,4 +8,5 @@ bind_library("fuchsia.amlogic.platform") {
   sdk_category = "partner"
   source = "fuchsia.amlogic.platform.bind"
   sdk_area = "Driver SDK"
+  public_deps = [ "//src/devices/bind/fuchsia.register" ]
 }
