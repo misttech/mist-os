@@ -1229,13 +1229,7 @@ config("werror") {
   if (!use_ccache) {
     cflags = [
       "-Werror",
-
-      # Declarations marked as deprecated should cause build failures, rather
-      # they should emit warnings to notify developers about the use of
-      # deprecated interfaces.
-      "-Wno-error=deprecated-declarations",
-
-      # Do not add additional -Wno-error to this config.
+      # Do not add -Wno-error= options to this config.
     ]
 
     asmflags = [ "-Wa,--fatal-warnings" ]
@@ -1243,6 +1237,15 @@ config("werror") {
 
     if (current_os == "win") {
       ldflags = [ "-Wl,/WX" ]
+    }
+
+    # New versions of C++ often include new deprecations, so treat them as
+    # warnings by default.
+    if ((defined(experimental_cxx_version) && experimental_cxx_version >= 20) ||
+        # TODO(https://fxbug.dev/327227416): Remove after addressing
+        # Xcode-specific deprecation warnings.
+        is_mac) {
+      cflags += [ "-Wno-error=deprecated-declarations" ]
     }
   }
 
