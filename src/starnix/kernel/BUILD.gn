@@ -306,7 +306,6 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
-    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_rust",

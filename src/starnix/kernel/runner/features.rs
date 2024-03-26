@@ -175,8 +175,7 @@ pub fn run_container_features(
 pub fn run_component_features(
     entries: &Vec<String>,
     kernel: &Arc<Kernel>,
-    outgoing_dir: &mut Option<fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>>,
-    mut maybe_svc: Option<fio::DirectorySynchronousProxy>,
+    mut incoming_dir: Option<fio::DirectoryProxy>,
 ) -> Result<(), Errno> {
     for entry in entries {
         match entry.as_str() {
@@ -201,13 +200,7 @@ pub fn run_component_features(
                 .expect("Failed to connect to device listener registry");
                 kernel
                     .framebuffer
-                    .start_server(
-                        kernel,
-                        view_bound_protocols,
-                        view_identity,
-                        outgoing_dir.take().unwrap(),
-                        maybe_svc.take(),
-                    )
+                    .start_server(kernel, view_bound_protocols, view_identity, incoming_dir.take())
                     .expect("Failed to start framebuffer server");
                 kernel.input_device.start_relay(
                     touch_source_proxy,

@@ -5,6 +5,7 @@
 use crate::run_component_features;
 use anyhow::{anyhow, bail, Error};
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
+use fidl::AsyncChannel;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner::{
     ComponentControllerMarker, ComponentControllerRequest, ComponentControllerRequestStream,
@@ -78,8 +79,9 @@ pub async fn start_component(
         if let (Some(dir_path), Some(dir_handle)) = (entry.path, entry.directory) {
             match dir_path.as_str() {
                 "/svc" => {
-                    maybe_svc =
-                        Some(fio::DirectorySynchronousProxy::new(dir_handle.into_channel()));
+                    maybe_svc = Some(fio::DirectoryProxy::new(AsyncChannel::from_channel(
+                        dir_handle.into_channel(),
+                    )));
                 }
                 "/custom_artifacts" | "/test_data" => {
                     // Mount custom_artifacts and test_data directory at root of container
@@ -147,15 +149,11 @@ pub async fn start_component(
         credentials.cap_inheritable = capabilities;
     }
 
-    run_component_features(
-        &component_features,
-        system_task.kernel(),
-        &mut start_info.outgoing_dir,
-        maybe_svc,
-    )
-    .unwrap_or_else(|e| {
-        log_error!("failed to set component features for {} - {:?}", url, e);
-    });
+    run_component_features(&component_features, system_task.kernel(), maybe_svc).unwrap_or_else(
+        |e| {
+            log_error!("failed to set component features for {} - {:?}", url, e);
+        },
+    );
 
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
     let current_task =

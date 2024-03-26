@@ -19,23 +19,21 @@ use fidl::{
 use fidl_fuchsia_element as felement;
 use fidl_fuchsia_math as fmath;
 use fidl_fuchsia_sysmem as fsysmem;
-use fidl_fuchsia_ui_app as fuiapp;
 use fidl_fuchsia_ui_composition as fuicomposition;
 use fidl_fuchsia_ui_views as fuiviews;
 use flatland_frame_scheduling_lib::{
     PresentationInfo, PresentedInfo, SchedulingLib, ThroughputScheduler,
 };
 use fuchsia_async as fasync;
-use fuchsia_component::{
-    client::{connect_to_protocol, connect_to_protocol_at_dir_root, connect_to_protocol_sync},
-    server::ServiceFs,
+use fuchsia_component::client::{
+    connect_to_protocol, connect_to_protocol_at_dir_root, connect_to_protocol_sync,
 };
 use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
 use fuchsia_scenic::{flatland::ViewCreationTokenPair, BufferCollectionTokenPair};
 use fuchsia_zircon as zx;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    FutureExt, StreamExt, TryStreamExt,
+    FutureExt, StreamExt,
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_sync::Mutex;
@@ -44,7 +42,7 @@ use std::{
     sync::{mpsc::channel, Arc},
 };
 
-use starnix_logging::{log_error, log_warn};
+use starnix_logging::log_error;
 use starnix_uapi::{errno, errors::Errno};
 
 /// The offset at which the framebuffer will be placed.
@@ -55,11 +53,6 @@ const ROOT_TRANSFORM_ID: fuicomposition::TransformId = fuicomposition::Transform
 
 /// The Flatland identifier for the framebuffer image.
 const FB_IMAGE_ID: fuicomposition::ContentId = fuicomposition::ContentId { value: 1 };
-
-/// The protocols that are exposed by the framebuffer server.
-enum ExposedProtocols {
-    ViewProvider(fuiapp::ViewProviderRequestStream),
-}
 
 /// The Scene states that `FramebufferServer` may serve.
 #[derive(Copy, Clone)]
@@ -183,7 +176,7 @@ fn init_fb_scene(
                 FrameUsage::Cpu,
                 1,
             )?;
-            buffer_allocator.set_name(100, "Starnix ViewProvider")?;
+            buffer_allocator.set_name(100, "Starnix View")?;
 
             let sysmem_buffer_collection_token =
                 executor.run_singlethreaded(buffer_allocator.duplicate_token())?;
@@ -289,66 +282,12 @@ pub fn init_viewport_scene(
     server.present();
 }
 
-/// Spawns a thread to serve a `ViewProvider` in `outgoing_dir`.
-///
-/// SAFETY: This function `.expect`'s a lot, because it isn't meant to be used in the long time and
-/// most of the failures would be unexpected and unrecoverable.
-pub fn spawn_view_provider(
-    kernel: &Arc<Kernel>,
-    server: Arc<FramebufferServer>,
-    view_bound_protocols: fuicomposition::ViewBoundProtocols,
-    view_identity: fuiviews::ViewIdentityOnCreation,
-    outgoing_dir: fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>,
-) {
-    kernel.kthreads.spawner().spawn(|_, _| {
-        let mut executor = fasync::LocalExecutor::new();
-        let mut view_bound_protocols = Some(view_bound_protocols);
-        let mut view_identity = Some(view_identity);
-        executor.run_singlethreaded(async move {
-            let mut service_fs = ServiceFs::new_local();
-            service_fs.dir("svc").add_fidl_service(ExposedProtocols::ViewProvider);
-            service_fs.serve_connection(outgoing_dir).expect("");
-
-            while let Some(ExposedProtocols::ViewProvider(mut request_stream)) =
-                service_fs.next().await
-            {
-                while let Ok(Some(event)) = request_stream.try_next().await {
-                    match event {
-                        fuiapp::ViewProviderRequest::CreateView2 { args, control_handle: _ } => {
-                            let view_creation_token = args.view_creation_token.unwrap();
-                            // We don't actually care about the parent viewport at the moment, because we don't resize.
-                            let (_parent_viewport_watcher, parent_viewport_watcher_request) =
-                                create_proxy::<fuicomposition::ParentViewportWatcherMarker>()
-                                    .expect("failed to create ParentViewportWatcherProxy");
-                            server
-                                .flatland
-                                .create_view2(
-                                     view_creation_token,
-                                     view_identity.take().expect("cannot create view because view identity has been consumed"),
-                                    view_bound_protocols.take().expect("cannot create view because view bound protocols have been consumed"),
-                                    parent_viewport_watcher_request,
-                                )
-                                .expect("FIDL error");
-
-                            // Now that the view has been created, start presenting.
-                            server.present();
-                        }
-                        r => {
-                            log_warn!("Got unexpected view provider request: {:?}", r);
-                        }
-                    }
-                }
-            }
-        });
-    });
-}
-
 pub fn send_view_to_graphical_presenter(
     kernel: &Arc<Kernel>,
     server: Arc<FramebufferServer>,
     view_bound_protocols: fuicomposition::ViewBoundProtocols,
     view_identity: fuiviews::ViewIdentityOnCreation,
-    incoming_svc_dir: fidl_fuchsia_io::DirectorySynchronousProxy,
+    incoming_dir: fidl_fuchsia_io::DirectoryProxy,
 ) {
     kernel.kthreads.spawner().spawn(|_, _| {
         let mut executor = fasync::LocalExecutor::new();
@@ -381,7 +320,7 @@ pub fn send_view_to_graphical_presenter(
 
             let graphical_presenter = connect_to_protocol_at_dir_root::<
                 felement::GraphicalPresenterMarker,
-            >(&incoming_svc_dir)
+            >(&incoming_dir)
             .map_err(|_| errno!(ENOENT))
             .expect("Failed to connect to GraphicalPresenter");
 
