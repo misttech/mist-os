@@ -9,8 +9,8 @@ load(
     "fuchsia_component",
     "fuchsia_component_manifest",
     "fuchsia_package",
+    "fuchsia_select",
     "fuchsia_unittest_package",
-    "if_fuchsia",
 )
 
 fuchsia_cc_binary(
@@ -57,10 +57,12 @@ fuchsia_cc_test(
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_googletest//:gtest_main",
-    ] + if_fuchsia([
-        "@fuchsia_sdk//pkg/fdio",
-        "@fuchsia_sdk//pkg/syslog",
-    ]),
+    ] + fuchsia_select({
+        "@platforms//os:fuchsia": [
+            "@fuchsia_sdk//pkg/fdio",
+            "@fuchsia_sdk//pkg/syslog",
+        ],
+    }),
 )
 
 fuchsia_unittest_package(

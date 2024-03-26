@@ -122,7 +122,6 @@ load(
 load(
     "//fuchsia/private:fuchsia_select.bzl",
     _fuchsia_select = "fuchsia_select",
-    _if_fuchsia = "if_fuchsia",
 )
 load(
     "//fuchsia/private:legacy_fuchsia_fidl_cc_library.bzl",
@@ -177,7 +176,6 @@ fuchsia_devicetree_visitor = _fuchsia_devicetree_visitor
 get_component_manifests = _get_component_manifests
 get_fuchsia_api_levels = _get_fuchsia_api_levels
 get_driver_component_manifests = _get_driver_component_manifests
-if_fuchsia = _if_fuchsia
 clangd_compilation_database = _clangd_compilation_database
 fuchsia_toolchain_info = _fuchsia_toolchain_info
 

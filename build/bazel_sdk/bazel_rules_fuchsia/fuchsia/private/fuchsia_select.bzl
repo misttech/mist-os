@@ -23,18 +23,3 @@ def fuchsia_select(configs):
         Selected attribute value depending on the config.
     """
     return select(configs, no_match_error = _ERROR)
-
-# TODO(jayzhuang): Remove this function when downstream usages are removed.
-def if_fuchsia(value, if_not = []):
-    """Selects `value` if targeting Fuchsia. Otherwise selects `if_not`.
-
-    Args:
-        value: The value to select for if targeting Fuchsia.
-        if_not: The value to select for if not targeting Fuchsia.
-    Returns:
-        Selected value depending on whether we're targeting Fuchsia.
-    """
-    return fuchsia_select({
-        "@platforms//os:fuchsia": value,
-        "//conditions:default": if_not,
-    })

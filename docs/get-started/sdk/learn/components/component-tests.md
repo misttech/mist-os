@@ -62,17 +62,19 @@ Below is an example `BUILD.bazel` snippet for including unit tests:
 ```bazel
 load(
     "fuchsia_cc_test",
+    "fuchsia_select",
     "fuchsia_test_package",
-    "if_fuchsia",
 )
 
 fuchsia_cc_test(
     name = "hello_world_test",
     srcs = ["hello_world_test.cc"],
-    deps = if_fuchsia([
+    deps = fuchsia_select({
+      "@platforms//os:fuchsia": [
         "@fuchsia_sdk//pkg/fdio",
         "@fuchsia_sdk//pkg/syslog",
-    ]),
+      ],
+    }),
 )
 
 fuchsia_test_package(

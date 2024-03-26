@@ -16,7 +16,7 @@ cc_binary & cc_test wrappers:
 load(":fuchsia_component.bzl", "fuchsia_test_component")
 load(":fuchsia_component_manifest.bzl", "fuchsia_component_manifest")
 load(":fuchsia_package_resource.bzl", "fuchsia_package_resource")
-load(":fuchsia_select.bzl", "if_fuchsia")
+load(":fuchsia_select.bzl", "fuchsia_select")
 load(
     ":providers.bzl",
     "FuchsiaComponentInfo",
@@ -407,7 +407,10 @@ def fuchsia_wrap_cc_test(
     _add_component_info_for_unit_test(
         name = name,
         base = ":%s_native_cc" % name,
-        generated_component = if_fuchsia(":%s_autogen_component" % name, if_not = None),
+        generated_component = fuchsia_select({
+            "@platforms//os:fuchsia": ":%s_autogen_component" % name,
+            "//conditions:default": None,
+        }),
         testonly = True,
         tags = tags,
         **kwargs

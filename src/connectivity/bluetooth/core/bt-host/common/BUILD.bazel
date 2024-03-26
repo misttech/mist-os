@@ -5,8 +5,8 @@
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_cc_test",
+    "fuchsia_select",
     "fuchsia_unittest_package",
-    "if_fuchsia",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -45,10 +45,12 @@ cc_library(
         "@pigweed//pw_span",
         "@pigweed//pw_string",
         "@pigweed//third_party/fuchsia:fit",
-    ] + if_fuchsia([
-        "@fuchsia_sdk//pkg/inspect_component_cpp",
-        "@fuchsia_sdk//pkg/trace",
-    ]),
+    ] + fuchsia_select({
+        "@platforms//os:fuchsia": [
+            "@fuchsia_sdk//pkg/inspect_component_cpp",
+            "@fuchsia_sdk//pkg/trace",
+        ],
+    }),
 )
 
 fuchsia_cc_test(
