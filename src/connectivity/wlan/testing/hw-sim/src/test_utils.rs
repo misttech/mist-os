@@ -25,7 +25,7 @@ use {
         task::{Context, Poll},
     },
     test_realm_helpers::tracing::Tracing,
-    tracing::{debug, info},
+    tracing::{debug, info, warn},
     wlan_common::test_utils::ExpectWithin,
     wlantap_client::Wlantap,
 };
@@ -130,7 +130,7 @@ impl TestRealmContext {
 type EventStream = wlantap::WlantapPhyEventStream;
 pub struct TestHelper {
     ctx: Arc<TestRealmContext>,
-    _tracing: Tracing,
+    _tracing: Option<Tracing>,
     netdevice_task_handles: Vec<fuchsia_async::Task<()>>,
     _wlantap: Wlantap,
     proxy: Arc<wlantap::WlantapPhyProxy>,
@@ -267,7 +267,10 @@ impl TestHelper {
         config: wlantap::WlantapPhyConfig,
         ctx: Arc<TestRealmContext>,
     ) -> Self {
-        let tracing = Tracing::create_and_initialize_tracing(ctx.test_ns_prefix()).await;
+        let tracing = Tracing::create_and_initialize_tracing(ctx.test_ns_prefix())
+            .await
+            .map_err(|e| warn!("{e:?}"))
+            .ok();
 
         // Trigger creation of wlantap serviced phy and iface for testing.
         let wlantap =
