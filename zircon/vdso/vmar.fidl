@@ -273,6 +273,7 @@ closed protocol Vmar {
     /// - `ZX_VM_PERM_READ_IF_XOM_UNSUPPORTED` Map *vmo* as readable if the system does
     ///   not support mapping execute-only pages. If the system can map execute-only
     ///   this flag is ignored.
+    /// - `ZX_VM_REQUIRE_NON_RESIZABLE` Fail if *vmo* is resizable.
     ///
     /// *vmar_offset* must be 0 if *options* does not have `ZX_VM_SPECIFIC`,
     /// `ZX_VM_SPECIFIC_OVERWRITE` or `ZX_VM_OFFSET_IS_UPPER_LIMIT` set.
@@ -336,6 +337,8 @@ closed protocol Vmar {
     ///
     /// `ZX_ERR_NOT_SUPPORTED` If the vmo is resizable, discardable, or backed by a pager but
     /// `ZX_VM_ALLOW_FAULTS` is not set.
+    ///
+    /// `ZX_ERR_NOT_SUPPORTED` If the vmo is resizable and `ZX_VM_REQUIRE_NON_RESIZABLE` is set.
     ///
     /// `ZX_ERR_BUFFER_TOO_SMALL` The VMO is not resizable and the mapping extends past the end
     /// of the VMO but `ZX_VM_ALLOW_FAULTS` is not set.
