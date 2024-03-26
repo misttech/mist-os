@@ -111,7 +111,6 @@ fuchsia_cc_test(
         "@internal_sdk//fidl/fuchsia.logger:fuchsia.logger_cpp",
         "@internal_sdk//pkg/ddk-platform-defs",
         "@internal_sdk//pkg/driver_compat",
-        "@internal_sdk//pkg/fbl",
         "@internal_sdk//pkg/fzl",
         "@internal_sdk//pkg/mock-mmio-reg",
         "@internal_sdk//pkg/zxtest",

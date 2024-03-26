@@ -51,7 +51,6 @@ fuchsia_cc_driver(
         "@internal_sdk//fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
         "@internal_sdk//pkg/driver_compat",
         "@internal_sdk//pkg/driver_compat_logging",
-        "@internal_sdk//pkg/fbl",
     ],
 )
 
@@ -110,7 +109,6 @@ fuchsia_cc_test(
         "@internal_sdk//pkg/driver_compat_logging",
         "@internal_sdk//pkg/driver_runtime",
         "@internal_sdk//pkg/fake-mmio-reg",
-        "@internal_sdk//pkg/fbl",
         "@internal_sdk//pkg/zxtest",
     ],
 )
