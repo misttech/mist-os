@@ -261,7 +261,7 @@ impl FileOps for BinderConnection {
         _length: Option<usize>,
         _prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
-        panic!("get_vmo should never be called directly.");
+        error!(EINVAL)
     }
 
     fn mmap(

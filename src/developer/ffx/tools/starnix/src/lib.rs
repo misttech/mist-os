@@ -12,12 +12,14 @@ pub mod common;
 
 mod adb;
 mod console;
+mod vmo;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum StarnixSubCommand {
     Adb(adb::StarnixAdbCommand),
     Console(console::StarnixConsoleCommand),
+    Vmo(vmo::StarnixVmoCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -52,6 +54,9 @@ impl FfxMain for StarnixTool {
                 console::starnix_console(command, &self.rcs_proxy, writer)
                     .await
                     .map_err(|e| Error::User(e))
+            }
+            StarnixSubCommand::Vmo(command) => {
+                vmo::starnix_vmo(command, &self.rcs_proxy, writer).await.map_err(|e| Error::User(e))
             }
         }
     }

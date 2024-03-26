@@ -13,6 +13,21 @@ type ConsoleWindowSize = struct {
     y_pixels uint16;
 };
 
+@available(added=HEAD)
+type VmoReference = table {
+    /// The name of the process containing a file backed by the vmo.
+    1: process_name string:MAX;
+
+    /// The Starnix pid of the process containing a file backed by the vmo.
+    2: pid uint64;
+
+    /// The file descriptor number in the process that refers to the vmo.
+    3: fd int32;
+
+    /// The koid of the vmo.
+    4: koid uint64;
+};
+
 @discoverable
 open protocol Controller {
     /// Connects `bridge_socket` to a vsocket at `port` in the container.
@@ -35,6 +50,14 @@ open protocol Controller {
     }) -> (struct {
         exit_code uint8;
     }) error SpawnConsoleError;
+
+    /// Returns all processes that have open files that are backed by a vmo with koid.
+    @available(added=HEAD)
+    flexible GetVmoReferences(table {
+        1: koid uint64;
+    }) -> (table {
+        1: references vector<VmoReference>:MAX;
+    });
 };
 
 type SpawnConsoleError = flexible enum {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl::endpoints::ServerEnd;
+use fidl::{endpoints::ServerEnd, AsHandleRef};
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_element as felement;
 use fidl_fuchsia_io as fio;
@@ -165,6 +165,53 @@ pub async fn serve_container_controller(
                 fstarcontainer::ControllerRequest::SpawnConsole { payload, responder } => {
                     responder
                         .send(spawn_console(&mut locked, system_task.kernel(), payload).await?)?;
+                }
+                fstarcontainer::ControllerRequest::GetVmoReferences { payload, responder } => {
+                    if let Some(koid) = payload.koid {
+                        let thread_groups = system_task.kernel().pids.read().get_thread_groups();
+                        let mut results = vec![];
+                        for thread_group in thread_groups {
+                            if let Some(leader) =
+                                system_task.get_task(thread_group.leader).upgrade()
+                            {
+                                let fds = leader.files.get_all_fds();
+                                for fd in fds {
+                                    if let Ok(file) = leader.files.get(fd) {
+                                        if let Ok(vmo) = file.get_vmo(
+                                            system_task,
+                                            None,
+                                            starnix_core::mm::ProtectionFlags::READ,
+                                        ) {
+                                            let vmo_koid =
+                                                vmo.info().expect("Failed to get vmo info").koid;
+                                            if vmo_koid.raw_koid() == koid {
+                                                let process_name = thread_group
+                                                    .process
+                                                    .get_name()
+                                                    .unwrap_or_default();
+                                                results.push(fstarcontainer::VmoReference {
+                                                    process_name: Some(
+                                                        process_name
+                                                            .into_string()
+                                                            .unwrap_or_default(),
+                                                    ),
+                                                    pid: Some(leader.get_pid() as u64),
+                                                    fd: Some(fd.raw()),
+                                                    koid: Some(koid),
+                                                    ..Default::default()
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        let _ =
+                            responder.send(&fstarcontainer::ControllerGetVmoReferencesResponse {
+                                references: Some(results),
+                                ..Default::default()
+                            });
+                    }
                 }
                 fstarcontainer::ControllerRequest::_UnknownMethod { .. } => (),
             }

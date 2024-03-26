@@ -1,3 +1,4 @@
 ffx/starnix.golden
 ffx/starnix/adb.golden
 ffx/starnix/console.golden
+ffx/starnix/vmo.golden

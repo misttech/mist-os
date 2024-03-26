@@ -40,6 +40,7 @@ rustc_library("lib") {
     "src/common.rs",
     "src/console.rs",
     "src/lib.rs",
+    "src/vmo.rs",
   ]
 }
 
