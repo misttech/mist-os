@@ -7,6 +7,7 @@ import contextlib
 import datetime
 import logging
 import random
+from typing import Any, Literal
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
@@ -36,7 +37,9 @@ class TimeIt(contextlib.ContextDecorator):
         self._started = datetime.datetime.now()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+    def __exit__(
+        self, exc_type: Any, exc_value: Any, traceback: Any
+    ) -> Literal[False]:
         """Context exit hook."""
         self.time_elapsed = abs(datetime.datetime.now() - self._started)
 
@@ -44,14 +47,14 @@ class TimeIt(contextlib.ContextDecorator):
         return False  # Never suppress raised exceptions.
 
 
-class RtcTest(fuchsia_base_test.FuchsiaBaseTest):
+class RtcTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
     """fuchsia.hardware.rtc.Device protocol conformance Test."""
 
     def setup_class(self) -> None:
         super().setup_class()
         self.dut: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
-    def setup_test(self):
+    def setup_test(self) -> None:
         super().setup_test()
         self.rtc = self.dut.rtc
 

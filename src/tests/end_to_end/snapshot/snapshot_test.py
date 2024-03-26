@@ -23,13 +23,13 @@ from fuchsia_base_test import fuchsia_base_test
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class SnapshotTest(fuchsia_base_test.FuchsiaBaseTest):
-    def setup_class(self):
+class SnapshotTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
+    def setup_class(self) -> None:
         """Initialize all DUT(s)"""
         super().setup_class()
         self.fuchsia_dut = self.fuchsia_devices[0]
 
-    def test_snapshot(self):
+    def test_snapshot(self) -> None:
         # Get a device snapshot and extract the inspect.json file.
         for _ in range(self.user_params["repeat_count"]):
             with tempfile.TemporaryDirectory() as td:
@@ -50,7 +50,7 @@ class SnapshotTest(fuchsia_base_test.FuchsiaBaseTest):
 
     def _check_archivist_data(
         self, inspect_data: typing.List[typing.Dict[str, typing.Any]]
-    ):
+    ) -> None:
         # Find the Archivist's data, and assert that it's status is "OK"
         archivist_only: typing.List[typing.Dict[str, typing.Any]] = [
             data
