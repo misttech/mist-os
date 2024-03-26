@@ -41,6 +41,9 @@ using std::enable_if_t;
 using std::has_unique_object_representations;
 using std::has_unique_object_representations_v;
 
+using cpp17::is_base_of_v;
+using std::is_base_of;
+
 using std::is_const;
 using std::is_const_v;
 
