@@ -27,11 +27,10 @@ use {
     fuchsia_zircon::{self as zx},
     futures::future::BoxFuture,
     futures::FutureExt,
-    sandbox::{Capability, Dict, Open},
+    sandbox::{Capability, Dict, Message, Sendable, Sender},
     std::iter,
     std::sync::Arc,
     tracing::warn,
-    vfs::{execution_scope::ExecutionScope, service::endpoint},
 };
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
@@ -218,6 +217,12 @@ pub struct LaunchTaskOnReceive {
     task_name: String,
 }
 
+impl std::fmt::Debug for LaunchTaskOnReceive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LaunchTaskOnReceive").field("task_name", &self.task_name).finish()
+    }
+}
+
 impl LaunchTaskOnReceive {
     pub fn new(
         task_group: WeakTaskGroup,
@@ -236,10 +241,21 @@ impl LaunchTaskOnReceive {
         Self { task_to_launch, task_group, policy, task_name: task_name.into() }
     }
 
-    pub fn into_open(self: Arc<Self>, target: WeakComponentInstance) -> Open {
-        Open::new(endpoint(move |_scope: ExecutionScope, server_end: AsyncChannel| {
-            self.launch_task(server_end.into_zx_channel(), target.clone());
-        }))
+    pub fn into_sender(self: Arc<Self>, target: WeakComponentInstance) -> Sender {
+        #[derive(Debug)]
+        struct TaskAndTarget {
+            task: Arc<LaunchTaskOnReceive>,
+            target: WeakComponentInstance,
+        }
+
+        impl Sendable for TaskAndTarget {
+            fn send(&self, message: Message) -> Result<(), ()> {
+                self.task.launch_task(message.channel, self.target.clone());
+                Ok(())
+            }
+        }
+
+        Sender::new_sendable(TaskAndTarget { task: self, target })
     }
 
     pub fn into_router(self) -> Router {
@@ -315,7 +331,7 @@ impl LaunchTaskOnReceive {
 #[async_trait]
 impl Routable for Arc<LaunchTaskOnReceive> {
     async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
-        Ok(self.clone().into_open(request.target).into())
+        Ok(self.clone().into_sender(request.target).into())
     }
 }
 

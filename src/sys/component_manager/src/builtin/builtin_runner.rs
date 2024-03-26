@@ -260,11 +260,11 @@ impl ElfRunnerProgram {
             let mut entries = svc.lock_entries();
             entries.insert(
                 fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.parse().unwrap(),
-                Capability::Open(elf_runner.into_open(WeakComponentInstance::invalid())),
+                elf_runner.into_sender(WeakComponentInstance::invalid()).into(),
             );
             entries.insert(
                 freport::SnapshotProviderMarker::PROTOCOL_NAME.parse().unwrap(),
-                Capability::Open(snapshot_provider.into_open(WeakComponentInstance::invalid())),
+                snapshot_provider.into_sender(WeakComponentInstance::invalid()).into(),
             );
         }
         output.lock_entries().insert(SVC.parse().unwrap(), Capability::Dictionary(svc));

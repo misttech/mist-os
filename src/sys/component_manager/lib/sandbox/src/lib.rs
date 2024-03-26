@@ -24,5 +24,5 @@ pub use self::directory::Directory;
 pub use self::handle::OneShotHandle;
 pub use self::open::{Open, Path};
 pub use self::receiver::Receiver;
-pub use self::sender::{Message, Sender};
+pub use self::sender::{Message, Sendable, Sender};
 pub use self::unit::Unit;
