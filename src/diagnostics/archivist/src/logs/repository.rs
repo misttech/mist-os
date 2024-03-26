@@ -15,9 +15,10 @@ use crate::{
         multiplex::{Multiplexer, MultiplexerHandle},
         stored_message::StoredMessage,
     },
+    severity_filter::KlogSeverityFilter,
 };
 use diagnostics_data::LogsData;
-use fidl_fuchsia_diagnostics::{LogInterestSelector, Selector, StreamMode};
+use fidl_fuchsia_diagnostics::{LogInterestSelector, Selector, Severity, StreamMode};
 use fuchsia_async as fasync;
 use fuchsia_inspect as inspect;
 use fuchsia_sync::{Mutex, RwLock};
@@ -25,6 +26,8 @@ use fuchsia_trace as ftrace;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use lazy_static::lazy_static;
+use moniker::{Moniker, MonikerBase};
+use selectors::SelectorExt;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::{
@@ -36,6 +39,7 @@ use tracing::{debug, error};
 
 lazy_static! {
     pub static ref INTEREST_CONNECTION_ID: AtomicUsize = AtomicUsize::new(0);
+    pub static ref OUR_MONIKER: Moniker = Moniker::parse_str("bootstrap/archivist").unwrap();
 }
 
 /// LogsRepository holds all diagnostics data and is a singleton wrapped by multiple
@@ -276,7 +280,36 @@ impl LogsRepositoryState {
         }
     }
 
+    /// Updates our own log interest if we are the root Archivist and logging
+    /// to klog.
+    fn maybe_update_own_logs_interest(
+        &mut self,
+        selectors: &[LogInterestSelector],
+        clear_interest: bool,
+    ) {
+        tracing::dispatcher::get_default(|dispatcher| {
+            let Some(publisher) = dispatcher.downcast_ref::<KlogSeverityFilter>() else {
+                return;
+            };
+            let lowest_selector = selectors
+                .iter()
+                .filter(|selector| {
+                    OUR_MONIKER.matches_component_selector(&selector.selector).unwrap_or(false)
+                })
+                .min_by_key(|selector| selector.interest.min_severity.unwrap_or(Severity::Info));
+            if let Some(selector) = lowest_selector {
+                if clear_interest {
+                    *publisher.min_severity.write() = Severity::Info;
+                } else {
+                    *publisher.min_severity.write() =
+                        selector.interest.min_severity.unwrap_or(Severity::Info);
+                }
+            }
+        });
+    }
+
     fn update_logs_interest(&mut self, connection_id: usize, selectors: Vec<LogInterestSelector>) {
+        self.maybe_update_own_logs_interest(&selectors, false);
         let previous_selectors =
             self.interest_registrations.insert(connection_id, selectors).unwrap_or_default();
         // unwrap safe, we just inserted.
@@ -289,6 +322,7 @@ impl LogsRepositoryState {
     pub fn finish_interest_connection(&mut self, connection_id: usize) {
         let selectors = self.interest_registrations.remove(&connection_id);
         if let Some(selectors) = selectors {
+            self.maybe_update_own_logs_interest(&selectors, true);
             for logs_data in self.logs_data_store.values() {
                 logs_data.reset_interest(&selectors);
             }

@@ -8,7 +8,9 @@
 
 use anyhow::{Context, Error};
 use archivist_config::Config;
-use archivist_lib::{archivist::Archivist, component_lifecycle};
+use archivist_lib::{
+    archivist::Archivist, component_lifecycle, severity_filter::KlogSeverityFilter,
+};
 use diagnostics_log::PublishOptions;
 use fuchsia_async as fasync;
 use fuchsia_component::server::{MissingStartupHandle, ServiceFs};
@@ -20,6 +22,7 @@ use tracing_subscriber::{
         format::{self, FormatEvent, FormatFields},
         FmtContext,
     },
+    layer::SubscriberExt,
     registry::LookupSpan,
 };
 
@@ -64,11 +67,18 @@ async fn async_main(config: Config) -> Result<(), Error> {
 async fn init_diagnostics(config: &Config) -> Result<(), Error> {
     if config.log_to_debuglog {
         stdout_to_debuglog::init().await.unwrap();
-        tracing_subscriber::fmt()
-            .event_format(DebugLogEventFormatter)
-            .with_writer(std::io::stdout)
-            .with_max_level(Level::INFO)
-            .init();
+        // NOTE: with_max_level(Level::TRACE) doesn't actually
+        // set the log severity to TRACE level, because our filter overrides that.
+        // It's needed so that tracing passes our filter all messages so that we can
+        // dynamically filter them at runtime.
+        tracing::subscriber::set_global_default(
+            tracing_subscriber::fmt()
+                .event_format(DebugLogEventFormatter)
+                .with_writer(std::io::stdout)
+                .with_max_level(Level::TRACE)
+                .finish()
+                .with(KlogSeverityFilter::default()),
+        )?;
     } else {
         diagnostics_log::initialize(PublishOptions::default().tags(&["embedded"]))?;
     }
