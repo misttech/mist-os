@@ -47,6 +47,7 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(AmlUsbPhy);
+  friend class AmlUsbPhyTest;
 
   zx_status_t InitPhy2();
   zx_status_t InitPhy3();

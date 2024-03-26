@@ -5,10 +5,12 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_AML_USB_PHY_DEVICE_H_
 #define SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_AML_USB_PHY_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.phy/cpp/driver/fidl.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/mmio/mmio-buffer.h>
 
 #include <fbl/mutex.h>
 
@@ -20,40 +22,16 @@ class AmlUsbPhyDevice : public fdf::DriverBase {
  private:
   static constexpr char kDeviceName[] = "aml_usb_phy";
 
- public:
-  AmlUsbPhyDevice(fdf::DriverStartArgs start_args,
-                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)) {}
-  zx::result<> Start() override;
-  void Stop() override;
+  class ChildNode {
+   public:
+    explicit ChildNode(AmlUsbPhyDevice* parent, std::string_view name, uint32_t property_did)
+        : parent_(parent), name_(name), property_did_(property_did) {}
 
-  zx::result<> AddXhci() { return AddDevice(xhci_); }
-  zx::result<> RemoveXhci() { return RemoveDevice(xhci_); }
-  zx::result<> AddDwc2() { return AddDevice(dwc2_); }
-  zx::result<> RemoveDwc2() { return RemoveDevice(dwc2_); }
+    ChildNode& operator--();
+    ChildNode& operator++();
 
- private:
-  friend class AmlUsbPhyTest;
-
-  zx::result<> CreateNode();
-
-  struct ChildNode {
-    explicit ChildNode(std::string_view name, uint32_t property_did)
-        : name_(name), property_did_(property_did) {}
-
-    void reset() __TA_REQUIRES(lock_) {
-      count_ = 0;
-      if (controller_) {
-        auto result = controller_->Remove();
-        if (!result.ok()) {
-          FDF_LOG(ERROR, "Failed to remove %s. %s", name_.data(),
-                  result.FormatDescription().c_str());
-        }
-        controller_.TakeClientEnd().reset();
-      }
-      compat_server_.reset();
-    }
-
+   private:
+    AmlUsbPhyDevice* parent_;
     const std::string_view name_;
     const uint32_t property_did_;
 
@@ -62,17 +40,31 @@ class AmlUsbPhyDevice : public fdf::DriverBase {
     compat::SyncInitializedDeviceServer compat_server_ __TA_GUARDED(lock_);
     std::atomic_uint32_t count_ __TA_GUARDED(lock_) = 0;
   };
-  zx::result<> AddDevice(ChildNode& node);
-  zx::result<> RemoveDevice(ChildNode& node);
+
+ public:
+  AmlUsbPhyDevice(fdf::DriverStartArgs start_args,
+                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)) {}
+  zx::result<> Start() override;
+  void Stop() override;
+
+  ChildNode xhci_{this, "xhci", PDEV_DID_USB_XHCI_COMPOSITE};
+  ChildNode dwc2_{this, "dwc2", PDEV_DID_USB_DWC2};
+
+ private:
+  friend class AmlUsbPhyTest;
+
+  zx::result<> CreateNode();
+
+  // Virtual for testing.
+  virtual zx::result<fdf::MmioBuffer> MapMmio(
+      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t idx);
 
   std::unique_ptr<AmlUsbPhy> device_;
 
   fdf::ServerBindingGroup<fuchsia_hardware_usb_phy::UsbPhy> bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-
-  ChildNode xhci_{"xhci", PDEV_DID_USB_XHCI_COMPOSITE};
-  ChildNode dwc2_{"dwc2", PDEV_DID_USB_DWC2};
 };
 
 }  // namespace aml_usb_phy

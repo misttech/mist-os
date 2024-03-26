@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <lib/ddk/binding_priv.h>
 #include <lib/ddk/metadata.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
@@ -235,65 +234,61 @@ zx::result<> AmlUsbPhyDevice::Start() {
   std::vector<UsbPhy3> usbphy3;
   zx::interrupt irq;
   {
-    zx::result result =
+    zx::result pdev_result =
         incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to open pdev service: %s", result.status_string());
-      return result.take_error();
+    if (pdev_result.is_error()) {
+      FDF_LOG(ERROR, "Failed to open pdev service: %s", pdev_result.status_string());
+      return pdev_result.take_error();
     }
-    auto pdev = ddk::PDevFidl(std::move(result.value()));
+    fidl::WireSyncClient pdev(std::move(pdev_result.value()));
     if (!pdev.is_valid()) {
       FDF_LOG(ERROR, "Failed to get pdev");
       return zx::error(ZX_ERR_NO_RESOURCES);
     }
 
-    auto status = pdev.MapMmio(0, &usbctrl_mmio);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "pdev.MapMmio(0) error %s", zx_status_get_string(status));
-      return zx::error(status);
+    if (auto mmio = MapMmio(pdev, 0); mmio.is_error()) {
+      return mmio.take_error();
+    } else {
+      usbctrl_mmio.emplace(*std::move(mmio));
     }
+
     uint32_t idx = 1;
     for (auto& phy_mode : parsed_metadata.phy_modes) {
-      std::optional<fdf::MmioBuffer> mmio;
-      status = pdev.MapMmio(idx, &mmio);
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "pdev.MapMmio(%d) error %s", idx, zx_status_get_string(status));
-        return zx::error(status);
-      }
-      switch (phy_mode.protocol) {
-        case Usb2_0: {
-          usbphy2.emplace_back(usbphy2.size(), std::move(*mmio), phy_mode.is_otg_capable,
-                               phy_mode.dr_mode);
-        } break;
-        case Usb3_0: {
-          usbphy3.emplace_back(std::move(*mmio), phy_mode.is_otg_capable, phy_mode.dr_mode);
-        } break;
-        default:
-          FDF_LOG(ERROR, "Unsupported protocol type %d", phy_mode.protocol);
-          break;
+      if (auto mmio = MapMmio(pdev, idx); mmio.is_error()) {
+        return mmio.take_error();
+      } else {
+        switch (phy_mode.protocol) {
+          case Usb2_0: {
+            usbphy2.emplace_back(usbphy2.size(), std::move(*mmio), phy_mode.is_otg_capable,
+                                 phy_mode.dr_mode);
+          } break;
+          case Usb3_0: {
+            usbphy3.emplace_back(std::move(*mmio), phy_mode.is_otg_capable, phy_mode.dr_mode);
+          } break;
+          default:
+            FDF_LOG(ERROR, "Unsupported protocol type %d", phy_mode.protocol);
+            break;
+        }
       }
       idx++;
     }
 
-    status = pdev.GetInterrupt(0, &irq);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "pdev.GetInterrupt(0) error %s", zx_status_get_string(status));
-      return zx::error(status);
+    if (auto result = pdev->GetInterruptById(0, 0); !result.ok()) {
+      FDF_LOG(ERROR, "Call to GetInterruptbyId(0) failed %s", result.FormatDescription().c_str());
+      return zx::error(result.status());
+    } else if (result->is_error()) {
+      FDF_LOG(ERROR, "GetInterruptbyId(0) failed %s", zx_status_get_string(result->error_value()));
+      return result->take_error();
+    } else {
+      irq = std::move(result.value()->irq);
     }
 
     // Optional MMIOs
     {
-      std::optional<fdf::MmioBuffer> power_mmio, sleep_mmio;
-      auto status = pdev.MapMmio(idx++, &power_mmio);
-      if (status != ZX_OK) {
-        FDF_LOG(INFO, "Power mmio not found %s", zx_status_get_string(status));
-      }
-      status = pdev.MapMmio(idx++, &sleep_mmio);
-      if (status != ZX_OK) {
-        FDF_LOG(INFO, "Sleep mmio not found %s", zx_status_get_string(status));
-      }
-
-      if (power_mmio.has_value() && sleep_mmio.has_value()) {
+      auto power_mmio = MapMmio(pdev, idx++);
+      auto sleep_mmio = MapMmio(pdev, idx++);
+      if (power_mmio.is_ok() && sleep_mmio.is_ok()) {
+        FDF_LOG(INFO, "Found power and sleep MMIO.");
         auto status = PowerOn(reset_register, *power_mmio, *sleep_mmio);
         if (status != ZX_OK) {
           FDF_LOG(ERROR, "PowerOn() error %s", zx_status_get_string(status));
@@ -368,66 +363,71 @@ zx::result<> AmlUsbPhyDevice::CreateNode() {
   return zx::ok();
 }
 
-zx::result<> AmlUsbPhyDevice::AddDevice(ChildNode& node) {
-  fbl::AutoLock _(&node.lock_);
-  node.count_++;
-  if (node.count_ != 1) {
-    return zx::ok();
+AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator++() {
+  fbl::AutoLock _(&lock_);
+  count_++;
+  if (count_ != 1) {
+    return *this;
   }
 
   {
-    auto result = node.compat_server_.Initialize(incoming(), outgoing(), node_name(), node.name_,
-                                                 compat::ForwardMetadata::None(), std::nullopt,
-                                                 std::string(kDeviceName) + "/");
-    if (result.is_error()) {
-      return result.take_error();
-    }
+    auto result = compat_server_.Initialize(
+        parent_->incoming(), parent_->outgoing(), parent_->node_name(), name_,
+        compat::ForwardMetadata::None(), std::nullopt, std::string(kDeviceName) + "/");
+    ZX_ASSERT_MSG(result.is_ok(), "Failed to initialize compat server: %s", result.status_string());
   }
 
   fidl::Arena arena;
-  auto offers = node.compat_server_.CreateOffers2(arena);
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_usb_phy::Service>(arena, node.name_));
-  auto args =
-      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-          .name(arena, node.name_)
-          .offers2(arena, std::move(offers))
-          .properties(arena,
-                      std::vector{
-                          fdf::MakeProperty(arena, BIND_PLATFORM_DEV_VID, PDEV_VID_GENERIC),
-                          fdf::MakeProperty(arena, BIND_PLATFORM_DEV_PID, PDEV_PID_GENERIC),
-                          fdf::MakeProperty(arena, BIND_PLATFORM_DEV_DID, node.property_did_),
-                      })
-          .Build();
+  auto offers = compat_server_.CreateOffers2(arena);
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_usb_phy::Service>(arena, name_));
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name(arena, name_)
+                  .offers2(arena, std::move(offers))
+                  .properties(arena,
+                              std::vector{
+                                  fdf::MakeProperty(arena, BIND_PLATFORM_DEV_VID, PDEV_VID_GENERIC),
+                                  fdf::MakeProperty(arena, BIND_PLATFORM_DEV_PID, PDEV_PID_GENERIC),
+                                  fdf::MakeProperty(arena, BIND_PLATFORM_DEV_DID, property_did_),
+                              })
+                  .Build();
 
   zx::result controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create controller endpoints: %s",
                 controller_endpoints.status_string());
 
-  fidl::WireResult result = node_->AddChild(args, std::move(controller_endpoints->server), {});
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add child %s", result.FormatDescription().c_str());
-    return zx::error(result.status());
-  }
-  node.controller_.Bind(std::move(controller_endpoints->client));
+  fidl::WireResult result =
+      parent_->node_->AddChild(args, std::move(controller_endpoints->server), {});
+  ZX_ASSERT_MSG(result.ok(), "Failed to add child %s", result.FormatDescription().c_str());
+  ZX_ASSERT_MSG(result->is_ok(), "Failed to add child %d",
+                static_cast<uint32_t>(result->error_value()));
+  controller_.Bind(std::move(controller_endpoints->client));
 
-  return zx::ok();
+  return *this;
 }
 
-zx::result<> AmlUsbPhyDevice::RemoveDevice(ChildNode& node) {
-  fbl::AutoLock _(&node.lock_);
-  if (node.count_ == 0) {
+AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator--() {
+  fbl::AutoLock _(&lock_);
+  if (count_ == 0) {
     // Nothing to remove.
-    return zx::ok();
+    return *this;
   }
-  node.count_--;
-  if (node.count_ != 0) {
+  count_--;
+  if (count_ != 0) {
     // Has more instances.
-    return zx::ok();
+    return *this;
   }
 
-  node.reset();
-  return zx::ok();
+  // Reset.
+  if (controller_) {
+    auto result = controller_->Remove();
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Failed to remove %s. %s", name_.data(), result.FormatDescription().c_str());
+    }
+    controller_.TakeClientEnd().reset();
+  }
+  compat_server_.reset();
+  return *this;
 }
 
 void AmlUsbPhyDevice::Stop() {
@@ -435,6 +435,34 @@ void AmlUsbPhyDevice::Stop() {
   if (!status.ok()) {
     FDF_LOG(ERROR, "Could not remove child: %s", status.status_string());
   }
+}
+
+zx::result<fdf::MmioBuffer> AmlUsbPhyDevice::MapMmio(
+    const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t idx) {
+  auto mmio = pdev->GetMmioById(idx);
+  if (!mmio.ok()) {
+    FDF_LOG(ERROR, "Call to GetMmioById(%d) failed: %s", idx, mmio.FormatDescription().c_str());
+    return zx::error(mmio.status());
+  }
+  if (mmio->is_error()) {
+    FDF_LOG(ERROR, "GetMmioById(%d) failed: %s", idx, zx_status_get_string(mmio->error_value()));
+    return mmio->take_error();
+  }
+
+  if (!mmio->value()->has_vmo() || !mmio->value()->has_size() || !mmio->value()->has_offset()) {
+    FDF_LOG(ERROR, "GetMmioById(%d) returned invalid MMIO", idx);
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  zx::result mmio_buffer =
+      fdf::MmioBuffer::Create(mmio->value()->offset(), mmio->value()->size(),
+                              std::move(mmio->value()->vmo()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  if (mmio_buffer.is_error()) {
+    FDF_LOG(ERROR, "Failed to map MMIO: %s", mmio_buffer.status_string());
+    return zx::error(mmio_buffer.error_value());
+  }
+
+  return mmio_buffer.take_value();
 }
 
 }  // namespace aml_usb_phy

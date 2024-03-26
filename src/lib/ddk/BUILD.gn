@@ -306,7 +306,6 @@ sdk_static_library("ddk") {
     "//src/devices/thermal/drivers/aml-thermal-s905d2g-legacy:*",
     "//src/devices/thermal/drivers/aml-thermistor:*",
     "//src/devices/thermal/drivers/aml-thermistor/test:*",
-    "//src/devices/usb/drivers/aml-usb-phy:*",
     "//src/devices/usb/drivers/crg-udc:*",
     "//src/devices/usb/drivers/dwc2:*",
     "//src/devices/usb/drivers/dwc3:*",

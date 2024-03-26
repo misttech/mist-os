@@ -32,16 +32,15 @@ source_set("common") {
     "usb-phy2.cc",
     "usb-phy3.cc",
   ]
-  deps = [
+  public_deps = [
     ":aml_usb_phy_bind",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//src/devices/usb/lib/usb",
     "//zircon/system/ulib/fbl",
@@ -82,7 +81,6 @@ test("aml-usb-phy-test-bin") {
     ":common",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/registers/testing/mock-registers",
     "//src/devices/testing/fake-mmio-reg",
     "//zircon/system/ulib/zxtest",
@@ -100,5 +98,8 @@ fuchsia_unittest_package("aml-usb-phy-test") {
 
 group("tests") {
   testonly = true
-  deps = [ ":aml_usb_phy_bind_test" ]
+  deps = [
+    ":aml-usb-phy-test",
+    ":aml_usb_phy_bind_test",
+  ]
 }

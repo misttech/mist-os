@@ -160,26 +160,14 @@ void AmlUsbPhy::ChangeMode(UsbPhyBase& phy, UsbMode new_mode) {
   phy.SetMode(new_mode, usbctrl_mmio_, pll_settings_);
 
   if (new_mode == UsbMode::HOST) {
-    auto result = controller_->AddXhci();
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to add xHCI, %s", result.status_string());
-    }
+    ++controller_->xhci_;
     if (old_mode != UsbMode::UNKNOWN) {
-      result = controller_->RemoveDwc2();
-      if (result.is_error()) {
-        FDF_LOG(ERROR, "Failed to remove DWC2, %s", result.status_string());
-      }
+      --controller_->dwc2_;
     }
   } else {
-    auto result = controller_->AddDwc2();
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to add DWC2, %s", result.status_string());
-    }
+    ++controller_->dwc2_;
     if (old_mode != UsbMode::UNKNOWN) {
-      result = controller_->RemoveXhci();
-      if (result.is_error()) {
-        FDF_LOG(ERROR, "Failed to remove xHCI, %s", result.status_string());
-      }
+      --controller_->xhci_;
     }
   }
 }
