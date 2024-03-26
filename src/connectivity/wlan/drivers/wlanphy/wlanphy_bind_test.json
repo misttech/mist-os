@@ -1,16 +1,30 @@
 [
     {
-        "name": "BindRuleFail",
+        "name": "ProtocolFail",
         "expected": "abort",
         "device": {
             "fuchsia.wlan.phyimpl.WlanPhyImpl": "fuchsia.wlan.BIND_PROTOCOL.MAC"
         }
     },
     {
-        "name": "BindRuleMatch",
+        "name": "ServiceFail",
+        "expected": "abort",
+        "device": {
+            "fuchsia.wlan.phyimpl.Service": "fuchsia.wlan.phyimpl.Service.ChannelTransport"
+        }
+    },
+    {
+        "name": "ProtocolMatch",
         "expected": "match",
         "device": {
             "fuchsia.wlan.phyimpl.WlanPhyImpl": "fuchsia.wlan.phyimpl.WlanPhyImpl.DriverTransport"
+        }
+    },
+    {
+        "name": "ServiceMatch",
+        "expected": "match",
+        "device": {
+            "fuchsia.wlan.phyimpl.Service": "fuchsia.wlan.phyimpl.Service.DriverTransport"
         }
     }
 ]

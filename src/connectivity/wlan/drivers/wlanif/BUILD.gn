@@ -58,7 +58,7 @@ source_set("lib_source") {
 driver_bind_rules("wlanif_bind") {
   rules = "wlanif.bind"
   bind_output = "wlanif.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.wlan" ]
+  deps = [ "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_bindlib" ]
 }
 
 fuchsia_driver("wlanif_driver-driver") {

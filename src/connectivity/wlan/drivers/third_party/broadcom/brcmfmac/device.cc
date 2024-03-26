@@ -18,7 +18,6 @@
 #include <lib/sync/cpp/completion.h>
 #include <zircon/status.h>
 
-#include <bind/fuchsia/wlan/phyimpl/cpp/bind.h>
 #include <wlan/common/ieee80211.h>
 
 #include "fidl/fuchsia.wlan.phyimpl/cpp/wire_types.h"
@@ -96,7 +95,6 @@ zx_status_t Device::InitWlanPhyImpl() {
 
   auto args = fdf::wire::NodeAddArgs::Builder(arena)
                   .name("brcmfmac-wlanphyimpl")
-                  // .properties(properties)
                   .offers2(offers)
                   .Build();
 

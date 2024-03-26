@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.wlan;
+using fuchsia.wlan.fullmac;
 
-fuchsia.BIND_PROTOCOL == fuchsia.wlan.BIND_PROTOCOL.IF_IMPL;
+if fuchsia.wlan.fullmac.WlanFullmacImpl == fuchsia.wlan.fullmac.WlanFullmacImpl.DriverTransport {
+    true;
+} else {
+    fuchsia.wlan.fullmac.Service == fuchsia.wlan.fullmac.Service.DriverTransport;
+}
