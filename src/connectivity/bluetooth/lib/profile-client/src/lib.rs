@@ -69,7 +69,10 @@ impl TryFrom<bredr::SearchResultsRequest> for ProfileEvent {
     type Error = Error;
     fn try_from(value: bredr::SearchResultsRequest) -> Result<Self> {
         let bredr::SearchResultsRequest::ServiceFound { peer_id, protocol, attributes, responder } =
-            value;
+            value
+        else {
+            return Err(Error::search_result(fidl::Error::Invalid));
+        };
         let id: PeerId = peer_id.into();
         responder.send()?;
         trace!(%id, ?protocol, ?attributes, "Profile Search Result");
@@ -80,7 +83,10 @@ impl TryFrom<bredr::SearchResultsRequest> for ProfileEvent {
 impl TryFrom<bredr::ConnectionReceiverRequest> for ProfileEvent {
     type Error = Error;
     fn try_from(value: bredr::ConnectionReceiverRequest) -> Result<Self> {
-        let bredr::ConnectionReceiverRequest::Connected { peer_id, channel, protocol, .. } = value;
+        let bredr::ConnectionReceiverRequest::Connected { peer_id, channel, protocol, .. } = value
+        else {
+            return Err(Error::connection_receiver(fidl::Error::Invalid));
+        };
         let id = peer_id.into();
         let channel = channel.try_into().map_err(Error::connection_receiver)?;
         trace!(%id, ?protocol, "Incoming connection");

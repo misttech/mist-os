@@ -147,6 +147,9 @@ impl MockPiconetServer {
                 let _ = proxy.error(bredr::ScoErrorCode::Failure);
                 error!("ConnectSco not implemented");
             }
+            bredr::ProfileRequest::_UnknownMethod { .. } => {
+                error!("ProfileRequest: unknown method received");
+            }
         }
     }
 

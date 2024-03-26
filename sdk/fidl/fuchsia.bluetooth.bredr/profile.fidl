@@ -112,14 +112,14 @@ type A2dpDirectionPriority = strict enum {
 
 /// Audio Priority Direction extension. Used to put the channel in a mode where A2DP packets are
 /// prioritized over other packets in the source or sink direction.
-closed protocol AudioDirectionExt {
+open protocol AudioDirectionExt {
     strict SetPriority(struct {
         priority A2dpDirectionPriority;
     }) -> () error fuchsia.bluetooth.ErrorCode;
 };
 
 /// L2CAP Parameters Extension. Used to configure L2CAP channel parameters on an open channel.
-closed protocol L2capParametersExt {
+open protocol L2capParametersExt {
     /// Request a L2CAP channel parameter update. `request` indicates the
     /// desired parameters, and `new` indicates the new parameters
     /// (which may differ from the requested parameters if they are
@@ -192,7 +192,7 @@ type AudioOffloadConfiguration = table {
 ///
 /// This channel will be closed with a `ZX_ERR_INTERNAL` epitaph if commands are issued when audio
 /// offloading is not started.
-closed protocol AudioOffloadController {
+open protocol AudioOffloadController {
     /// Sent from the server when the audio offloading is started successfully.
     /// Only sent once per protocol.
     strict -> OnStarted();
@@ -203,7 +203,7 @@ closed protocol AudioOffloadController {
 };
 
 /// Audio Offload Extension. Used to retrieve offloading capability and supported features.
-closed protocol AudioOffloadExt {
+open protocol AudioOffloadExt {
     /// Returns the vendor features supported on this chipset
     strict GetSupportedFeatures() -> (table {
         1: audio_offload_features vector<AudioOffloadFeatures>:MAX;
@@ -218,7 +218,7 @@ closed protocol AudioOffloadExt {
 
 /// Represents a service which is registered by this profile. Closing this protocol will remove the
 /// service registration.
-closed protocol ConnectionReceiver {
+open protocol ConnectionReceiver {
     /// Called when a peer connects to this service.  The channel connected is delivered
     /// with parameters in `channel`.
     /// `protocol` will contain a protocol list up to the point connected (for example, if
@@ -235,7 +235,7 @@ const MAX_ATTRIBUTES uint16 = 512;
 
 /// Represents an active search which can produce results when peers are connected.  Closing this
 /// protocol will result in the associated search not being performed on new connected peers.
-closed protocol SearchResults {
+open protocol SearchResults {
     /// Called when a search this client added finds a matching service on a peer.
     /// `peer_id` is the peer the service was found on.
     /// `protocol` includes the ProtocolDescriptorList in the service record if it exists
@@ -259,7 +259,7 @@ const MAX_SERVICES_PER_ADVERTISEMENT uint8 = 32;
 /// profile discoverable by peers. Registered services can receive L2CAP connections made to the
 /// advertised records, and can open new connections on peers.
 @discoverable
-closed protocol Profile {
+open protocol Profile {
     /// Register a set of services.
     ///
     /// The call will resolve when the service advertisement terminates or if there was an error

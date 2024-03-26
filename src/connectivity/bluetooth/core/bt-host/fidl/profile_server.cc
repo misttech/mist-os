@@ -259,6 +259,11 @@ void ProfileServer::L2capParametersExt::RequestParameters(
   callback(ChannelInfoToFidlChannelParameters(channel_->info()));
 }
 
+void ProfileServer::L2capParametersExt::handle_unknown_method(uint64_t ordinal,
+                                                              bool method_has_response) {
+  bt_log(WARN, "fidl", "L2capParametersExt: unknown method received");
+}
+
 void ProfileServer::AudioOffloadExt::GetSupportedFeatures(GetSupportedFeaturesCallback callback) {
   fidlbredr::AudioOffloadExtGetSupportedFeaturesResponse response;
   std::vector<fidlbredr::AudioOffloadFeatures>* mutable_audio_offload_features =
@@ -404,6 +409,16 @@ ProfileServer::AudioOffloadExt::AudioOffloadConfigFromFidl(
   }
 
   return config;
+}
+
+void ProfileServer::AudioOffloadExt::handle_unknown_method(uint64_t ordinal,
+                                                           bool method_has_response) {
+  bt_log(WARN, "fidl", "AudioOffloadExt: unknown method received");
+}
+
+void ProfileServer::AudioOffloadController::handle_unknown_method(uint64_t ordinal,
+                                                                  bool method_has_response) {
+  bt_log(WARN, "fidl", "AudioOffloadController: unknown method received");
 }
 
 ProfileServer::ScoConnectionServer::ScoConnectionServer(
@@ -685,6 +700,10 @@ void ProfileServer::ConnectSco(fuchsia::bluetooth::PeerId fidl_peer_id, bool ini
   };
   request->request_handle =
       adapter()->bredr()->AcceptScoConnection(peer_id, params, std::move(callback));
+}
+
+void ProfileServer::handle_unknown_method(uint64_t ordinal, bool method_has_response) {
+  bt_log(WARN, "fidl", "ProfileServer: unknown method received");
 }
 
 void ProfileServer::OnChannelConnected(uint64_t ad_id, bt::l2cap::Channel::WeakPtr channel,
@@ -970,6 +989,11 @@ void ProfileServer::AudioDirectionExt::SetPriority(
                                  bt_log(DEBUG, "fidl", "ACL priority request failed");
                                  cb(fpromise::error(fuchsia::bluetooth::ErrorCode::FAILED));
                                });
+}
+
+void ProfileServer::AudioDirectionExt::handle_unknown_method(uint64_t ordinal,
+                                                             bool method_has_response) {
+  bt_log(WARN, "fidl", "AudioDirectionExt: unknown method received");
 }
 
 }  // namespace bthost

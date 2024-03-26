@@ -441,6 +441,9 @@ impl ProfileRegistrar {
             bredr::ProfileRequest::ConnectSco { peer_id, initiator, params, receiver, .. } => {
                 let _ = self.profile_upstream.connect_sco(&peer_id, initiator, &params, receiver);
             }
+            bredr::ProfileRequest::_UnknownMethod { .. } => {
+                warn!("ProfileRequest: received unknown method");
+            }
         }
         None
     }
@@ -456,12 +459,14 @@ impl ProfileRegistrar {
     ///      usually due to an error in the upstream server. We must clear all of the services.
     async fn handle_connection_request(&mut self, request: ConnectionEvent) -> Result<(), Error> {
         match request {
-            ConnectionEvent::Request(request) => {
-                let bredr::ConnectionReceiverRequest::Connected {
+            ConnectionEvent::Request(request) => match request {
+                bredr::ConnectionReceiverRequest::Connected {
                     peer_id, channel, protocol, ..
-                } = request;
-                self.handle_incoming_l2cap_connection(peer_id.into(), channel, protocol)
-            }
+                } => self.handle_incoming_l2cap_connection(peer_id.into(), channel, protocol),
+                bredr::ConnectionReceiverRequest::_UnknownMethod { .. } => {
+                    Err(format_err!("ConnectionReceiverRequest: unknown method"))
+                }
+            },
             ConnectionEvent::AdvertisementCanceled => {
                 // The upstream server unexpectedly dropped the advertisement. We must clean up
                 // all of the state.
@@ -1181,7 +1186,7 @@ mod tests {
         // The connect request should be relayed directly to the Profile Server.
         let () = match exec.run_until_stalled(&mut profile_requests.next()) {
             Poll::Ready(Some(Ok(bredr::ProfileRequest::ConnectSco { .. }))) => {}
-            x => panic!("Expected search request, got: {:?}", x),
+            x => panic!("Expected ConnectSco request, got: {:?}", x),
         };
     }
 

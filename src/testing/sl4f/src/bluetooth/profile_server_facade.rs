@@ -387,7 +387,9 @@ impl ProfileServerFacade {
                         },
                         Some(Ok(r)) => r,
                     };
-                    let ConnectionReceiverRequest::Connected { peer_id, channel, .. } = request;
+                    let ConnectionReceiverRequest::Connected { peer_id, channel, .. } = request else {
+                        fx_err_and_bail!(&with_line!(tag), "unknown method")
+                    };
                     let peer_id: PeerId = peer_id.into();
                     info!(
                         tag = &with_line!(tag),
@@ -414,7 +416,10 @@ impl ProfileServerFacade {
                 Ok(r) => r,
             };
             let SearchResultsRequest::ServiceFound { peer_id, protocol, attributes, responder } =
-                request;
+                request
+            else {
+                fx_err_and_bail!(&with_line!(tag), "unknown method")
+            };
             let peer_id: PeerId = peer_id.into();
             info!(
                 tag = &with_line!(tag),

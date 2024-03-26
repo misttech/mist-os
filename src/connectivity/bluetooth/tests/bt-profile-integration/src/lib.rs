@@ -199,7 +199,10 @@ async fn test_add_search((access, profile): (AccessHarness, ProfileHarness)) {
     // The SDP search result conducted following connection should contain the
     // peer ID of the created peer.
     let service_found_fut = search_result.select_next_some().map_err(|e| format_err!("{:?}", e));
-    let SearchResultsRequest::ServiceFound { peer_id, .. } = service_found_fut.await.unwrap();
+    let SearchResultsRequest::ServiceFound { peer_id, .. } = service_found_fut.await.unwrap()
+    else {
+        panic!("unknown method");
+    };
     assert_eq!(connected_peer_id, peer_id.into());
 
     // Peer should be updated with discovered service.

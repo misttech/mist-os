@@ -121,7 +121,10 @@ async fn expect_peer_advertising(
     expected_id: PeerId,
 ) -> ServerChannel {
     let request = search_results.select_next_some().await.unwrap();
-    let bredr::SearchResultsRequest::ServiceFound { peer_id, protocol, responder, .. } = request;
+    let bredr::SearchResultsRequest::ServiceFound { peer_id, protocol, responder, .. } = request
+    else {
+        panic!("unknown method")
+    };
     assert_eq!(expected_id, peer_id.into());
     tracing::info!("Discovered service with protocol: {:?}", protocol);
     responder.send().unwrap();
@@ -301,7 +304,9 @@ async fn passthrough_advertisement_is_discovered() {
         .expect("can register search");
     // We expect it to discover `client's` service advertisement.
     let request = search_results.select_next_some().await.unwrap();
-    let bredr::SearchResultsRequest::ServiceFound { peer_id, responder, .. } = request;
+    let bredr::SearchResultsRequest::ServiceFound { peer_id, responder, .. } = request else {
+        panic!("unknown method")
+    };
     assert_eq!(rfcomm_under_test.peer_id(), peer_id.into());
     // Ack the response so that the `search_results` channel doesn't get full.
     responder.send().unwrap();

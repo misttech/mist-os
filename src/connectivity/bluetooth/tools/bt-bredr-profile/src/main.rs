@@ -97,13 +97,14 @@ async fn connection_receiver(
                 Ok(None) => return Err(anyhow!("{} channel closed", tag)),
                 Ok(Some(event)) => event,
             };
-            let ConnectionReceiverRequest::Connected { channel, .. } = event;
+            let ConnectionReceiverRequest::Connected { channel, .. } = event else {
+                    return Err(anyhow!("ConnectionReceiverRequest: unknown method"));
+            };
             let socket = channel.socket.ok_or(anyhow!("{}: missing socket", tag))?;
             let mode = channel.channel_mode.ok_or(anyhow!("{}: missing channel mode", tag))?;
             let max_tx_sdu_size = channel.max_tx_sdu_size.ok_or(anyhow!("{}: missing max tx sdu", tag))?;
             let chan_id = state.lock().await.l2cap_channels.insert(L2capChannel { socket, mode, max_tx_sdu_size });
             print!("{} Channel Connected to service {}:\n  Channel:\n    Id: {}\n    Mode: {:?}\n    Max Tx Sdu Size: {}\n", RESET_LINE, service_id, chan_id, mode, max_tx_sdu_size);
-
         },
             _ = end_ad_receiver => break,
             complete => break,

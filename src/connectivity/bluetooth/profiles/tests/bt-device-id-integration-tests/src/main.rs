@@ -102,7 +102,10 @@ async fn expect_di_service_found(
     let service_found_fut = results_requests.select_next_some();
     let bredr::SearchResultsRequest::ServiceFound {
         peer_id, protocol, responder, attributes, ..
-    } = service_found_fut.await.expect("should discover service");
+    } = service_found_fut.await.expect("should discover service")
+    else {
+        panic!("unknown method")
+    };
     info!("Test driven peer found DI advertisement: {:?}", attributes);
     let _ = responder.send().expect("can respond to search result");
     assert_eq!(peer_id, expected_id.into());

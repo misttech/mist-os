@@ -109,7 +109,10 @@ async fn a2dp_source_service_advertisement_discovered_by_peer(tf: A2dpSourceInte
     // We expect it to discover A2DP Source component's service advertisement.
     let service_found_fut = results_requests.select_next_some();
     let SearchResultsRequest::ServiceFound { peer_id, responder, .. } =
-        service_found_fut.await.expect("should discover service");
+        service_found_fut.await.expect("should discover service")
+    else {
+        panic!("unknown method");
+    };
     assert_eq!(peer_id, a2dp_src_under_test.peer_id().into());
     let _ = responder.send().unwrap();
 }
@@ -138,6 +141,9 @@ async fn a2dp_source_search_and_connect(tf: A2dpSourceIntegrationTest) {
     match connect_requests.select_next_some().await.expect("connection request") {
         ConnectionReceiverRequest::Connected { peer_id, .. } => {
             assert_eq!(peer_id, a2dp_src_under_test.peer_id().into());
+        }
+        ConnectionReceiverRequest::_UnknownMethod { .. } => {
+            panic!("unknown method");
         }
     }
 }

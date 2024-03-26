@@ -296,8 +296,11 @@ async fn test_hfp_ag_service_advertisement(tf: HfpAgIntegrationTest) {
 
     // Expect the test-driven piconet member to discover the HFP component.
     let service_found_fut = results_requests.select_next_some().map_err(|e| format_err!("{:?}", e));
-    let bredr::SearchResultsRequest::ServiceFound { peer_id, responder, .. } =
-        service_found_fut.await.expect("should receive search results");
+    let search_results_req = service_found_fut.await.expect("should receive search results");
+    let bredr::SearchResultsRequest::ServiceFound { peer_id, responder, .. } = search_results_req
+    else {
+        panic!("SearchResults: unknown method");
+    };
     assert_eq!(hfp_under_test.peer_id(), peer_id.into());
     responder.send().unwrap();
 }
@@ -312,6 +315,9 @@ async fn expect_connection(
         bredr::ConnectionReceiverRequest::Connected { peer_id, channel, .. } => {
             assert_eq!(other, peer_id.into());
             channel.try_into().unwrap()
+        }
+        bredr::ConnectionReceiverRequest::_UnknownMethod { .. } => {
+            panic!("ConnectionReceiverRequest: unknown method");
         }
     }
 }

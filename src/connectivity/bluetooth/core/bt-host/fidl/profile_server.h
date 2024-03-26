@@ -43,6 +43,8 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
     void RequestParameters(fuchsia::bluetooth::bredr::ChannelParameters requested,
                            RequestParametersCallback callback) override;
 
+    void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
+
    private:
     bt::l2cap::Channel::UniqueId unique_id_;
     bt::l2cap::Channel::WeakPtr channel_;
@@ -66,6 +68,8 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
 
     bt::l2cap::Channel::UniqueId unique_id() const { return unique_id_; }
 
+    void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
+
    private:
     std::unique_ptr<bt::l2cap::A2dpOffloadManager::Configuration> AudioOffloadConfigFromFidl(
         fuchsia::bluetooth::bredr::AudioOffloadConfiguration& audio_offload_configuration);
@@ -85,6 +89,8 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
         : ServerBase(this, std::move(request)),
           unique_id_(channel->unique_id()),
           channel_(std::move(channel)) {}
+
+    void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
     bt::l2cap::Channel::UniqueId unique_id() const { return unique_id_; }
 
@@ -141,6 +147,7 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
       fuchsia::bluetooth::PeerId fidl_peer_id, bool initiator,
       std::vector<fuchsia::bluetooth::bredr::ScoConnectionParameters> fidl_params,
       fidl::InterfaceHandle<fuchsia::bluetooth::bredr::ScoConnectionReceiver> receiver) override;
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
   // Callback when clients close their connection targets
   void OnConnectionReceiverError(uint64_t ad_id);
@@ -225,13 +232,15 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
                       bt::l2cap::Channel::WeakPtr channel)
         : ServerBase(this, std::move(request)),
           unique_id_(channel->unique_id()),
-          channel_(std::move(channel)){};
+          channel_(std::move(channel)) {};
 
     bt::l2cap::Channel::UniqueId unique_id() const { return unique_id_; }
 
     // fuchsia::bluetooth::bredr::AudioDirectionExt overrides:
     void SetPriority(fuchsia::bluetooth::bredr::A2dpDirectionPriority priority,
                      SetPriorityCallback callback) override;
+
+    void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
    private:
     bt::l2cap::Channel::UniqueId unique_id_;

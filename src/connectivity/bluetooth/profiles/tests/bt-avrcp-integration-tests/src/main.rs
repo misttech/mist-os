@@ -122,7 +122,10 @@ async fn avrcp_target_service_advertisement(tf: AvrcpIntegrationTest) {
         .unwrap();
     let service_found_fut = results_requests.select_next_some().map_err(|e| format_err!("{:?}", e));
     let bredr::SearchResultsRequest::ServiceFound { peer_id, responder, .. } =
-        service_found_fut.await.unwrap();
+        service_found_fut.await.unwrap()
+    else {
+        panic!("unknown method")
+    };
     assert_eq!(tf.avrcp_observer.peer_id(), peer_id.into());
     responder.send().unwrap();
 }
@@ -139,7 +142,10 @@ async fn avrcp_controller_service_advertisement(tf: AvrcpIntegrationTest) {
         .unwrap();
     let service_found_fut = results_requests.select_next_some().map_err(|e| format_err!("{:?}", e));
     let bredr::SearchResultsRequest::ServiceFound { peer_id, responder, .. } =
-        service_found_fut.await.unwrap();
+        service_found_fut.await.unwrap()
+    else {
+        panic!("unknown method")
+    };
     assert_eq!(tf.avrcp_observer.peer_id(), peer_id.into());
     responder.send().unwrap();
 }
@@ -163,6 +169,9 @@ async fn avrcp_search_and_connect(mut tf: AvrcpIntegrationTest) {
         bredr::ConnectionReceiverRequest::Connected { peer_id, channel, .. } => {
             assert_eq!(tf.avrcp_observer.peer_id(), peer_id.into());
             channel
+        }
+        bredr::ConnectionReceiverRequest::_UnknownMethod { .. } => {
+            panic!("unknown method")
         }
     };
 }
@@ -190,6 +199,9 @@ async fn remote_initiates_connection_to_avrcp(mut tf: AvrcpIntegrationTest) {
         // active at a time.
         bredr::ConnectionReceiverRequest::Connected { peer_id, .. } => {
             assert_eq!(avrcp_profile_id, peer_id.into());
+        }
+        bredr::ConnectionReceiverRequest::_UnknownMethod { .. } => {
+            panic!("unknown method");
         }
     };
 
@@ -260,6 +272,9 @@ async fn remote_initiates_browse_channel_before_control(mut tf: AvrcpIntegration
         bredr::ConnectionReceiverRequest::Connected { peer_id, .. } => {
             assert_eq!(avrcp_profile_id, peer_id.into());
         }
+        bredr::ConnectionReceiverRequest::_UnknownMethod { .. } => {
+            panic!("unknown method");
+        }
     };
     // Mock peer tries to initiate a browse channel connection.
     let params =
@@ -299,6 +314,9 @@ async fn avrcp_disallows_handler_double_sets(mut tf: AvrcpIntegrationTest) {
         bredr::ConnectionReceiverRequest::Connected { peer_id, channel, .. } => {
             assert_eq!(tf.avrcp_observer.peer_id(), peer_id.into());
             channel
+        }
+        bredr::ConnectionReceiverRequest::_UnknownMethod { .. } => {
+            panic!("unknown method");
         }
     };
 
@@ -372,6 +390,9 @@ async fn avrcp_remote_receives_set_absolute_volume_request(mut tf: AvrcpIntegrat
         bredr::ConnectionReceiverRequest::Connected { peer_id, channel, .. } => {
             assert_eq!(tf.avrcp_observer.peer_id(), peer_id.into());
             channel.try_into().unwrap()
+        }
+        bredr::ConnectionReceiverRequest::_UnknownMethod { .. } => {
+            panic!("unknown method")
         }
     };
 
