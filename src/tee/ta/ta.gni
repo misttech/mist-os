@@ -1,0 +1,68 @@
+# Copyright 2024 The Fuchsia Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components/fuchsia_package.gni")
+import("//build/dist/renamed_binary.gni")
+
+# Defines a Fuchsia package containing a Trusted Application
+#
+# Example:
+# ```
+# fuchsia_ta_package("echo") {
+#   sources = [
+#     "ta_source_file.cc",
+#   ]
+#   deps = [
+#     "//path/to/library/used/by/ta",
+#   ]
+# }
+# ```
+#
+# Parameters
+#
+#    sources (list)
+#      Source files for the Trusted Application.
+#
+#    deps (optional)
+#      Dependencies of the Trusted Application.
+template("fuchsia_ta_package") {
+  ta_name = target_name
+  library_target = "_${target_name}_lib"
+  ta_name_resource_target = "_${target_name}_resource"
+
+  shared_library(library_target) {
+    output_name = "${ta_name}"
+    forward_variables_from(invoker,
+                           [
+                             "sources",
+                             "deps",
+                           ])
+    if (!defined(deps)) {
+      deps = []
+    }
+    deps += [ "//src/tee/tee_internal_api" ]
+  }
+
+  # This adds a file to the package containing the name of the TA at a
+  # well-known location so that the runtime knows where in the package the TA is
+  # to load. There are a few other ways we could factor this if needed:
+  # *) We could require that the package name correspond to the TA name and use that
+  # *) We could place the TA name inside a manifest (perhaps even a component manifest)
+  #    and use that
+  # *) An external index could provide the TA name along with other data, such as its
+  #    UUID.
+  resource(ta_name_resource_target) {
+    ta_name_file = "${target_gen_dir}/ta_name"
+    write_file(ta_name_file, ta_name)
+    sources = [ ta_name_file ]
+    outputs = [ "data/ta_name" ]
+  }
+
+  fuchsia_package(ta_name) {
+    deps = [
+      ":${library_target}",
+      ":${ta_name_resource_target}",
+    ]
+  }
+}

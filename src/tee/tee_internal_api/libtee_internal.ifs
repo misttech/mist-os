@@ -1,0 +1,13 @@
+# Copyright 2024 The Fuchsia Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+# 
+# This file lists the symbols exported by the Trusted Application runtime to
+# applications that are part of the TEE Internal Core API.
+
+--- !ifs-v1
+IfsVersion:      3.0
+SoName:          libtee_internal.so
+Symbols:
+  - { Name: TEE_Panic, Type: Func }
+# TODO: Add more TEE_ entry points as they are implemented.

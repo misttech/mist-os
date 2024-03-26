@@ -2,10 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# This is a Trusted App that does nothing.
-shared_library("ta-noop") {
-  testonly = true
+import("//src/tee/ta/ta.gni")
 
+# This is a Trusted App that does nothing.
+fuchsia_ta_package("ta-noop") {
   sources = [ "noop.cc" ]
-  deps = [ "//src/tee/tee_internal_api" ]
 }
