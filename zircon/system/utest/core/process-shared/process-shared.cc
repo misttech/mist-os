@@ -20,31 +20,31 @@
 
 namespace {
 
-zx::result<zx::resource> GetSystemProfileResource(zx::unowned_resource& root_resource) {
+zx::result<zx::resource> GetSystemProfileResource(zx::unowned_resource& resource) {
   zx::resource system_profile_resource;
   const zx_status_t status =
-      zx::resource::create(*root_resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_PROFILE_BASE, 1,
-                           nullptr, 0, &system_profile_resource);
+      zx::resource::create(*resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_PROFILE_BASE, 1, nullptr,
+                           0, &system_profile_resource);
   if (status != ZX_OK) {
     return zx::error(status);
   }
   return zx::ok(std::move(system_profile_resource));
 }
 
-void SetDeadlineMemoryPriority(zx::unowned_resource& root_resource, zx::vmar& vmar) {
+void SetDeadlineMemoryPriority(zx::unowned_resource& resource, zx::vmar& vmar) {
   zx::profile profile;
   zx_profile_info_t profile_info = {.flags = ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY,
                                     .priority = ZX_PRIORITY_HIGH};
 
-  zx::result<zx::resource> result = GetSystemProfileResource(root_resource);
+  zx::result<zx::resource> result = GetSystemProfileResource(resource);
   ASSERT_OK(result.status_value());
   zx_status_t status = zx::profile::create(result.value(), 0u, &profile_info, &profile);
   if (status == ZX_ERR_ACCESS_DENIED) {
     // If we are running as a component test, and not a zbi test, we do not have the root job and
     // cannot create a profile. This is not an issue as when running tests as a component
     // compression is not enabled so the profile is not needed anyway.
-    // TODO(https://fxbug.dev/42138396): Once compression is enabled for builds with component tests support setting
-    // a profile via the profile provider.
+    // TODO(https://fxbug.dev/42138396): Once compression is enabled for builds with component tests
+    // support setting a profile via the profile provider.
     return;
   }
   ASSERT_OK(status);
@@ -226,10 +226,10 @@ TEST(ProcessShared, InfoProcessVmos) {
 //
 // See also https://fxbug.dev/42074452.
 TEST(ProcessShared, InfoTaskStats) {
-  // First, verify we have access to the root resource to run this test.
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  // First, verify we have access to the system resource to run this test.
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
   // We're going to create 3 processes, proc1, proc2, and proc3, with a total of 4 VMARs.  proc1 and
@@ -273,10 +273,10 @@ TEST(ProcessShared, InfoTaskStats) {
 
   // With all the processes created apply a deadline memory priority to them all so that our memory
   // stats are predictable and will not change due to compression.
-  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(root_resource, vmar_shared));
-  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(root_resource, vmar1));
-  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(root_resource, vmar2));
-  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(root_resource, vmar3));
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(system_resource, vmar_shared));
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(system_resource, vmar1));
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(system_resource, vmar2));
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(system_resource, vmar3));
 
   // Now create the 6 VMOs of 1 page each.
   const size_t kSize = zx_system_get_page_size();

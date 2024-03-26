@@ -9,6 +9,7 @@
 // Redeclare the standalone-test function as weak here.
 [[gnu::weak]] decltype(standalone::GetRootResource) standalone::GetRootResource;
 [[gnu::weak]] decltype(standalone::GetMmioResource) standalone::GetMmioResource;
+[[gnu::weak]] decltype(standalone::GetSystemResource) standalone::GetSystemResource;
 
 namespace maybe_standalone {
 
@@ -26,6 +27,14 @@ zx::unowned_resource GetMmioResource() {
     mmio_resource = standalone::GetMmioResource();
   }
   return mmio_resource;
+}
+
+zx::unowned_resource GetSystemResource() {
+  zx::unowned_resource system_resource;
+  if (standalone::GetSystemResource) {
+    system_resource = standalone::GetSystemResource();
+  }
+  return system_resource;
 }
 
 }  // namespace maybe_standalone
