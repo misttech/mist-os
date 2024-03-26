@@ -293,13 +293,6 @@ zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) 
   return ZX_OK;
 }
 
-zx_status_t VnodeF2fs::OpenNode([[maybe_unused]] ValidatedOptions options,
-                                fbl::RefPtr<Vnode> *out_redirect) {
-  return ZX_OK;
-}
-
-zx_status_t VnodeF2fs::CloseNode() { return ZX_OK; }
-
 void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
   ZX_ASSERT_MSG(open_count() == 0, "RecycleNode[%s:%u]: open_count must be zero (%lu)",
                 GetNameView().data(), GetKey(), open_count());

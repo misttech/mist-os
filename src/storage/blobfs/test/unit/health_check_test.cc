@@ -116,7 +116,7 @@ TEST_F(HealthCheckServiceTest, PopulatedFilesystemPassesChecks) {
 
     auto& file = files.emplace_back();
     EXPECT_EQ(root->Lookup(info->path, &file), ZX_OK);
-    EXPECT_EQ(file->OpenValidating(fs::VnodeConnectionOptions(), nullptr), ZX_OK);
+    EXPECT_EQ(file->Open(nullptr), ZX_OK);
   }
 
   fidl::WireSyncClient<fuv::BlobfsVerifier> client = Client();
@@ -124,7 +124,7 @@ TEST_F(HealthCheckServiceTest, PopulatedFilesystemPassesChecks) {
   ASSERT_TRUE(result.ok()) << result.error();
   ASSERT_FALSE(result->is_error());
 
-  // Balance out the OpenValidating() calls above so the node can clean up properly.
+  // Balance out the Open() calls above so the node can clean up properly.
   for (auto& file : files) {
     file->Close();
   }
@@ -137,14 +137,14 @@ TEST_F(HealthCheckServiceTest, NullBlobPassesChecks) {
   auto root = OpenRoot();
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_EQ(root->Lookup(info->path, &file), ZX_OK);
-  ASSERT_EQ(file->OpenValidating(fs::VnodeConnectionOptions(), nullptr), ZX_OK);
+  ASSERT_EQ(file->Open(nullptr), ZX_OK);
 
   fidl::WireSyncClient<fuv::BlobfsVerifier> client = Client();
   auto result = client->Verify(fuv::wire::VerifyOptions{});
   ASSERT_TRUE(result.ok()) << result.error();
   ASSERT_FALSE(result->is_error());
 
-  // Balance out the OpenValidating() call above so the node can clean up properly.
+  // Balance out the Open() call above so the node can clean up properly.
   file->Close();
 }
 
@@ -156,14 +156,14 @@ TEST_F(HealthCheckServiceTest, InvalidFileFailsChecks) {
   auto root = OpenRoot();
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_EQ(root->Lookup(info->path, &file), ZX_OK);
-  ASSERT_EQ(file->OpenValidating(fs::VnodeConnectionOptions(), nullptr), ZX_OK);
+  ASSERT_EQ(file->Open(nullptr), ZX_OK);
 
   fidl::WireSyncClient<fuv::BlobfsVerifier> client = Client();
   auto result = client->Verify(fuv::wire::VerifyOptions{});
   ASSERT_TRUE(result.ok()) << result.error();
   ASSERT_TRUE(result->is_error());
 
-  // Balance out the OpenValidating() call above so the node can clean up properly.
+  // Balance out the Open() call above so the node can clean up properly.
   file->Close();
 }
 

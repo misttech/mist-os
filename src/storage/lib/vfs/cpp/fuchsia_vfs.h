@@ -97,18 +97,10 @@ class FuchsiaVfs : public Vfs {
   // by the intersection of the protocols requested in |options| and those supported by |vnode|.
   // See |fs::NegotiateProtocol| for details.
   //
-  // |channel| usually speaks a protocol that composes |fuchsia.io/Node|, but may speak an arbitrary
-  // arbitrary protocol for service connections.
-  zx_status_t Serve(fbl::RefPtr<Vnode> vnode, zx::channel channel, VnodeConnectionOptions options)
-      __TA_EXCLUDES(vfs_lock_);
-
-  // Begins serving VFS messages over the specified channel. This version takes an |options|
-  // that have been validated.
-  //
-  // |channel| usually speaks a protocol that composes |fuchsia.io/Node|, but may speak an arbitrary
-  // arbitrary protocol for service connections.
-  zx_status_t Serve(fbl::RefPtr<Vnode> vnode, zx::channel channel, Vnode::ValidatedOptions options)
-      __TA_EXCLUDES(vfs_lock_);
+  // |server_end| usually speaks a protocol that composes |fuchsia.io/Node|, but may speak an
+  // arbitrary arbitrary protocol for service connections.
+  zx_status_t Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
+                    VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
 
   // Serves a Vnode over the specified channel (used for creating new filesystems); the Vnode must
   // be a directory.

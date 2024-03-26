@@ -500,7 +500,7 @@ zx_status_t Dir::Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vn
     }
   }
 
-  return (*out)->OpenValidating(fs::VnodeConnectionOptions(), nullptr);
+  return (*out)->Open(nullptr);
 }
 
 zx_status_t Dir::Unlink(std::string_view name, bool must_be_dir) {

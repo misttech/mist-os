@@ -50,7 +50,6 @@ struct VdirCookie {
 class Vfs {
  public:
   class OpenResult;
-  class TraversePathResult;
 
   Vfs();
   virtual ~Vfs() = default;
@@ -142,11 +141,11 @@ class Vfs::OpenResult {
   };
 
   // When this variant is active, |Open| has successfully reached a vnode under this filesystem.
-  // |validated_options| contains options to be used on the new connection, potentially adjusted for
+  // |options| contains options to be used on the new connection, potentially adjusted for
   // posix-flag rights expansion.
   struct Ok {
     fbl::RefPtr<Vnode> vnode;
-    Vnode::ValidatedOptions validated_options;
+    VnodeConnectionOptions options;
   };
 
   // Forwards the constructor arguments into the underlying |std::variant|. This allows |OpenResult|
@@ -156,57 +155,6 @@ class Vfs::OpenResult {
   //
   template <typename T>
   OpenResult(T&& v) : variants_(std::forward<T>(v)) {}
-
-  // Applies the |visitor| function to the variant payload. It simply forwards the visitor into the
-  // underlying |std::variant|. Returns the return value of |visitor|. Refer to C++ documentation
-  // for |std::visit|.
-  template <class Visitor>
-  constexpr auto visit(Visitor&& visitor) -> decltype(visitor(std::declval<zx_status_t>())) {
-    return std::visit(std::forward<Visitor>(visitor), variants_);
-  }
-
-  Ok& ok() { return std::get<Ok>(variants_); }
-  bool is_ok() const { return std::holds_alternative<Ok>(variants_); }
-
-  Error& error() { return std::get<Error>(variants_); }
-  bool is_error() const { return std::holds_alternative<Error>(variants_); }
-
-  Remote& remote() { return std::get<Remote>(variants_); }
-  bool is_remote() const { return std::holds_alternative<Remote>(variants_); }
-
- private:
-  using Variants = std::variant<Error, Remote, Ok>;
-
-  Variants variants_;
-};
-
-class Vfs::TraversePathResult {
- public:
-  // When this variant is active, the indicated error occurred.
-  using Error = zx_status_t;
-
-  // When this variant is active, the path being traversed contains a remote node. |path| is the
-  // remaining portion of the path yet to be traversed. The caller should forward the remainder of
-  // this request to that vnode.
-  //
-  // Used only on Fuchsia.
-  struct Remote {
-    fbl::RefPtr<Vnode> vnode;
-    std::string_view path;
-  };
-
-  // When this variant is active, we have successfully traversed and reached a vnode under this
-  // filesystem.
-  struct Ok {
-    fbl::RefPtr<Vnode> vnode;
-  };
-
-  // Forwards the constructor arguments into the underlying |std::variant|. This allows
-  // |TraversePathResult| to be constructed directly from one of the variants, e.g.
-  //
-  // TraversePathResult r = TraversePathResult::Error{ZX_ERR_ACCESS_DENIED};
-  template <typename T>
-  TraversePathResult(T&& v) : variants_(std::forward<T>(v)) {}
 
   // Applies the |visitor| function to the variant payload. It simply forwards the visitor into the
   // underlying |std::variant|. Returns the return value of |visitor|. Refer to C++ documentation

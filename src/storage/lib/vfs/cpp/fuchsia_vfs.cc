@@ -56,7 +56,7 @@ uint32_t ToStreamOptions(const VnodeConnectionOptions& options) {
   return stream_options;
 }
 
-zx_status_t ConnectService(const fbl::RefPtr<fs::Vnode>& vnode, Vnode::ValidatedOptions options,
+zx_status_t ConnectService(const fbl::RefPtr<fs::Vnode>& vnode, VnodeConnectionOptions options,
                            fidl::ServerEnd<fio::Node> server_end) {
   // For service connections, we don't know the final protocol that will be spoken over |server_end|
   // as it is dependent on the service Vnode type/connector. However, if |fio::OpenFlags::kDescribe|
@@ -66,16 +66,16 @@ zx_status_t ConnectService(const fbl::RefPtr<fs::Vnode>& vnode, Vnode::Validated
   // TODO(https://fxbug.dev/324111653): In io2/Open2, service connections do not support the
   // OnRepresentation event, and use of epitaphs when closing channels is explicitly defined.
   // We will likely need to remove support for protocol switching in io1 to support the migration.
-  if (options->ToIoV1Flags() & ~(fio::OpenFlags::kDescribe | fio::OpenFlags::kNotDirectory)) {
+  if (options.ToIoV1Flags() & ~(fio::OpenFlags::kDescribe | fio::OpenFlags::kNotDirectory)) {
     constexpr zx_status_t kStatus = ZX_ERR_INVALID_ARGS;
-    if (options->flags & fio::OpenFlags::kDescribe) {
+    if (options.flags & fio::OpenFlags::kDescribe) {
       [[maybe_unused]] fidl::Status status = fidl::WireSendEvent(server_end)->OnOpen(kStatus, {});
     } else {
       [[maybe_unused]] zx_status_t status = server_end.Close(kStatus);
     }
     return kStatus;
   }
-  if (options->flags & fio::OpenFlags::kDescribe) {
+  if (options.flags & fio::OpenFlags::kDescribe) {
     fidl::Status status = fidl::WireSendEvent(server_end)
                               ->OnOpen(ZX_OK, fio::wire::NodeInfoDeprecated::WithService({}));
     if (!status.ok()) {
@@ -318,20 +318,14 @@ zx_status_t FuchsiaVfs::Link(zx::event token, fbl::RefPtr<Vnode> oldparent, std:
 
 zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
                               VnodeConnectionOptions options) {
-  zx::result result = vnode->ValidateOptions(options);
-  if (result.is_error()) {
-    return result.status_value();
+  if (zx::result result = vnode->ValidateOptions(options); result.is_error()) {
+    return result.error_value();
   }
-  return Serve(std::move(vnode), std::move(server_end), result.value());
-}
-
-zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
-                              Vnode::ValidatedOptions options) {
   VnodeProtocol protocol;
-  if (options->flags & fio::OpenFlags::kNodeReference) {
+  if (options.flags & fio::OpenFlags::kNodeReference) {
     protocol = VnodeProtocol::kNode;
   } else {
-    zx::result negotiated = NegotiateProtocol(options->protocols() & vnode->GetProtocols());
+    zx::result negotiated = NegotiateProtocol(options.protocols() & vnode->GetProtocols());
     if (negotiated.is_error()) {
       return negotiated.error_value();
     }
@@ -346,20 +340,20 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
       if (koid.is_error()) {
         return koid.error_value();
       }
-      zx::result<zx::stream> stream = vnode->CreateStream(ToStreamOptions(*options));
+      zx::result<zx::stream> stream = vnode->CreateStream(ToStreamOptions(options));
       // Truncate was handled when the Vnode was opened, only append mode applies to this
       // connection. |ToStreamOptions| should handle setting the stream to append mode.
-      bool append = static_cast<bool>(options->flags & fio::OpenFlags::kAppend);
+      bool append = static_cast<bool>(options.flags & fio::OpenFlags::kAppend);
       if (stream.is_ok()) {
         connection = std::make_unique<internal::StreamFileConnection>(
-            this, std::move(vnode), options->rights, append, std::move(*stream), *koid);
+            this, std::move(vnode), options.rights, append, std::move(*stream), *koid);
         break;
       }
       if (stream.error_value() != ZX_ERR_NOT_SUPPORTED) {
         return stream.error_value();
       }
       connection = std::make_unique<internal::RemoteFileConnection>(this, std::move(vnode),
-                                                                    options->rights, append, *koid);
+                                                                    options.rights, append, *koid);
       break;
     }
     case VnodeProtocol::kDirectory: {
@@ -368,12 +362,12 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
         return koid.error_value();
       }
       connection = std::make_unique<internal::DirectoryConnection>(this, std::move(vnode),
-                                                                   options->rights, *koid);
+                                                                   options.rights, *koid);
       break;
     }
     case VnodeProtocol::kNode: {
       connection =
-          std::make_unique<internal::NodeConnection>(this, std::move(vnode), options->rights);
+          std::make_unique<internal::NodeConnection>(this, std::move(vnode), options.rights);
       break;
     }
     case VnodeProtocol::kService: {
@@ -388,7 +382,7 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
 
   // Send an |fuchsia.io/OnOpen| event if requested. At this point we know the connection is either
   // a Node connection, or a File/Directory that composes the node protocol.
-  if (options->flags & fuchsia_io::OpenFlags::kDescribe) {
+  if (options.flags & fuchsia_io::OpenFlags::kDescribe) {
     zx::result representation = connection->NodeGetRepresentation();
     if (representation.is_error()) {
       // Ignore errors since there is nothing we can do if this fails.
@@ -419,11 +413,11 @@ zx_status_t FuchsiaVfs::ServeDirectory(fbl::RefPtr<fs::Vnode> vn,
   if (validated_options.is_error()) {
     return validated_options.status_value();
   }
-  if (zx_status_t status = OpenVnode(validated_options.value(), &vn); status != ZX_OK) {
+  if (zx_status_t status = OpenVnode(&vn); status != ZX_OK) {
     return status;
   }
 
-  return Serve(std::move(vn), server_end.TakeChannel(), validated_options.value());
+  return Serve(std::move(vn), server_end.TakeChannel(), options);
 }
 
 }  // namespace fs

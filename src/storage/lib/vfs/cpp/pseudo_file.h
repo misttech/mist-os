@@ -107,8 +107,7 @@ class BufferedPseudoFile : public PseudoFile {
     friend fbl::internal::MakeRefCountedHelper<Content>;
     friend fbl::RefPtr<Content>;
 
-    Content(fbl::RefPtr<BufferedPseudoFile> file, VnodeConnectionOptions options,
-            fbl::String output);
+    Content(fbl::RefPtr<BufferedPseudoFile> file, fbl::String output);
     ~Content() override;
 
     // Vnode protected implementation:
@@ -117,7 +116,6 @@ class BufferedPseudoFile : public PseudoFile {
     void SetInputLength(size_t length);
 
     fbl::RefPtr<BufferedPseudoFile> const file_;
-    const VnodeConnectionOptions options_;
     fbl::String const output_;
 
     char* input_data_ = nullptr;
@@ -130,14 +128,14 @@ class BufferedPseudoFile : public PseudoFile {
   // |write_handler| is null, then the pseudo-file is considered not writable. The
   // |input_buffer_capacity| determines the maximum number of bytes which can be written to the
   // pseudo-file's input buffer when it it opened for writing.
-  explicit BufferedPseudoFile(ReadHandler read_handler = ReadHandler(),
-                              WriteHandler write_handler = WriteHandler(),
+  explicit BufferedPseudoFile(ReadHandler read_handler = nullptr,
+                              WriteHandler write_handler = nullptr,
                               size_t input_buffer_capacity = 1024);
 
   ~BufferedPseudoFile() override;
 
   // |Vnode| protected implementation:
-  zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect) final;
+  zx_status_t OpenNode(fbl::RefPtr<Vnode>* out_redirect) final;
 
   size_t const input_buffer_capacity_;
 
@@ -172,12 +170,8 @@ class BufferedPseudoFile : public PseudoFile {
 // Writing with a non-zero seek offset returns |ZX_ERR_NO_SPACE|, indicating an attempt to write
 // data beyond what was accepted by the write handler.
 //
-// Opening the file in create mode or truncating it to zero length then closing it without an
-// intervening write is equivalent to writing 0 bytes.  This adaptation improves compatibility with
-// command-line operations which are intended to modify the file in-place such as: `echo "data" >
-// pseudo-file`.
-//
-// Truncating to a non-zero length returns |ZX_ERR_INVALID_ARGS|.
+// Truncating the length to zero and then closing it without an intervening write is equivalent to
+// writing 0 bytes. Truncating to a non-zero length returns |ZX_ERR_INVALID_ARGS|.
 //
 // This class is thread-safe.
 class UnbufferedPseudoFile : public PseudoFile {
@@ -202,15 +196,14 @@ class UnbufferedPseudoFile : public PseudoFile {
     friend fbl::internal::MakeRefCountedHelper<Content>;
     friend fbl::RefPtr<Content>;
 
-    Content(fbl::RefPtr<UnbufferedPseudoFile> file, VnodeConnectionOptions options);
+    explicit Content(fbl::RefPtr<UnbufferedPseudoFile> file);
     ~Content() override;
 
     // Vnode protected implementation.
-    zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect) final;
+    zx_status_t OpenNode(fbl::RefPtr<Vnode>* out_redirect) final;
     zx_status_t CloseNode() final;
 
     fbl::RefPtr<UnbufferedPseudoFile> const file_;
-    const VnodeConnectionOptions options_;
 
     bool truncated_since_last_successful_write_;
   };
@@ -219,13 +212,13 @@ class UnbufferedPseudoFile : public PseudoFile {
   //
   // If the |read_handler| is null, then the pseudo-file is considered not readable.
   // If the |write_handler| is null, then the pseudo-file is considered not writable.
-  explicit UnbufferedPseudoFile(ReadHandler read_handler = ReadHandler(),
-                                WriteHandler write_handler = WriteHandler());
+  explicit UnbufferedPseudoFile(ReadHandler read_handler = nullptr,
+                                WriteHandler write_handler = nullptr);
 
   ~UnbufferedPseudoFile() override;
 
   // |Vnode| protected implementation:
-  zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect) final;
+  zx_status_t OpenNode(fbl::RefPtr<Vnode>* out_redirect) final;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(UnbufferedPseudoFile);
 };

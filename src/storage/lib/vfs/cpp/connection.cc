@@ -107,9 +107,11 @@ void Connection::NodeClone(fio::OpenFlags flags, fidl::ServerEnd<fio::Node> serv
       channel.reset();
     }
   };
+
   if (!PrevalidateFlags(flags)) {
     FS_PRETTY_TRACE_DEBUG("[NodeClone] prevalidate failed", ", incoming flags: ", flags);
-    return write_error(std::move(server_end), ZX_ERR_INVALID_ARGS);
+    write_error(std::move(server_end), ZX_ERR_INVALID_ARGS);
+    return;
   }
   auto clone_options = VnodeConnectionOptions::FromIoV1Flags(flags);
   FS_PRETTY_TRACE_DEBUG("[NodeClone] our options: ", options(),
@@ -128,20 +130,18 @@ void Connection::NodeClone(fio::OpenFlags flags, fidl::ServerEnd<fio::Node> serv
   }
 
   fbl::RefPtr<Vnode> vn(vnode_);
-  auto result = vn->ValidateOptions(clone_options);
-  if (result.is_error()) {
-    return write_error(std::move(server_end), result.status_value());
+  if (zx::result validated = vn->ValidateOptions(clone_options); validated.is_error()) {
+    write_error(std::move(server_end), validated.error_value());
+    return;
   }
-  auto& validated_options = result.value();
-  zx_status_t open_status = ZX_OK;
   if (!(clone_options.flags & fio::OpenFlags::kNodeReference)) {
-    open_status = OpenVnode(validated_options, &vn);
-  }
-  if (open_status != ZX_OK) {
-    return write_error(std::move(server_end), open_status);
+    if (zx_status_t open_status = OpenVnode(&vn); open_status != ZX_OK) {
+      write_error(std::move(server_end), open_status);
+      return;
+    }
   }
 
-  vfs_->Serve(vn, server_end.TakeChannel(), validated_options);
+  vfs_->Serve(vn, server_end.TakeChannel(), clone_options);
 }
 
 zx::result<> Connection::NodeClose() {

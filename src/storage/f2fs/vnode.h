@@ -381,10 +381,6 @@ class VnodeF2fs : public fs::PagedVnode,
   SuperblockInfo &superblock_info_;
   std::string name_ __TA_GUARDED(mutex_);
 
-  zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode> *out_redirect) final
-      __TA_EXCLUDES(mutex_);
-  zx_status_t CloseNode() final;
-
   bool NeedToSyncDir() const;
   bool NeedToCheckpoint();
 

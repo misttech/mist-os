@@ -721,7 +721,8 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
   transaction_or->PinVnode(vn_or.value());
   Vfs()->CommitTransaction(std::move(transaction_or.value()));
 
-  if ((status = vn_or->OpenValidating(fs::VnodeConnectionOptions(), nullptr)) != ZX_OK) {
+  status = vn_or->Open(nullptr);
+  if (status != ZX_OK) {
     return status;
   }
   *out = std::move(vn_or.value());

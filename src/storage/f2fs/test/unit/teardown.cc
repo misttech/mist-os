@@ -107,12 +107,8 @@ TEST(Teardown, ShutdownOnNoConnections) {
   });
   auto child_server = child_client.NewRequest();
   ASSERT_TRUE(child_client.is_bound());
-  auto validated_options = child_dir->ValidateOptions(fs::VnodeConnectionOptions());
-  ASSERT_TRUE(validated_options.is_ok());
-  ASSERT_EQ(child_dir->Open(validated_options.value(), nullptr), ZX_OK);
-  ASSERT_EQ(
-      vfs_or->Serve(std::move(child_dir), child_server.TakeChannel(), validated_options.value()),
-      ZX_OK);
+  ASSERT_EQ(child_dir->Open(nullptr), ZX_OK);
+  ASSERT_EQ(vfs_or->Serve(std::move(child_dir), child_server.TakeChannel(), {}), ZX_OK);
 
   // A) Wait for child vnode sync to begin.
   child_client->Sync([](fuchsia::io::Node2_Sync_Result) {});

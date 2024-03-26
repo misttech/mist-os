@@ -123,15 +123,14 @@ Vfs::OpenResult Vfs::OpenLocked(fbl::RefPtr<Vnode> vndir, std::string_view path,
     }
     options.rights |= parent_rights & inheritable_rights;
   }
-  auto validated_options = vn->ValidateOptions(options);
-  if (validated_options.is_error()) {
-    return validated_options.status_value();
+  if (zx::result validated = vn->ValidateOptions(options); validated.is_error()) {
+    return validated.error_value();
   }
 
   // |node_reference| requests that we don't actually open the underlying Vnode, but use the
   // connection as a reference to the Vnode.
   if (!(options.flags & fuchsia_io::OpenFlags::kNodeReference) && !just_created) {
-    if (zx_status_t status = OpenVnode(validated_options.value(), &vn); status != ZX_OK) {
+    if (zx_status_t status = OpenVnode(&vn); status != ZX_OK) {
       return status;
     }
 
@@ -148,7 +147,7 @@ Vfs::OpenResult Vfs::OpenLocked(fbl::RefPtr<Vnode> vndir, std::string_view path,
     }
   }
 
-  return OpenResult::Ok{.vnode = std::move(vn), .validated_options = validated_options.value()};
+  return OpenResult::Ok{.vnode = std::move(vn), .options = options};
 }
 
 zx_status_t Vfs::Unlink(fbl::RefPtr<Vnode> vndir, std::string_view name, bool must_be_dir) {

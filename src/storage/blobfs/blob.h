@@ -128,8 +128,7 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   }
 
   // Vnode protected overrides:
-  zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect) override
-      __TA_EXCLUDES(mutex_);
+  zx_status_t OpenNode(fbl::RefPtr<Vnode>* out_redirect) override __TA_EXCLUDES(mutex_);
   zx_status_t CloseNode() override __TA_EXCLUDES(mutex_);
   // Returns a handle to an event which will be signalled when the blob is readable.
   zx::result<zx::event> GetObserver() const override __TA_EXCLUDES(mutex_);

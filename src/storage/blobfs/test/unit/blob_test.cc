@@ -452,7 +452,7 @@ TEST_P(BlobTest, VmoNameActiveWhileFdOpen) {
   // Make sure the async part of the write finishes.
   loop().RunUntilIdle();
   ASSERT_EQ(file->Close(), ZX_OK);
-  ASSERT_EQ(file->OpenValidating(fs::VnodeConnectionOptions(), nullptr), ZX_OK);
+  ASSERT_EQ(file->Open(nullptr), ZX_OK);
   auto blob = fbl::RefPtr<Blob>::Downcast(std::move(file));
 
   // Blobfs lazily creates the data VMO on first read.
@@ -466,7 +466,7 @@ TEST_P(BlobTest, VmoNameActiveWhileFdOpen) {
   ASSERT_EQ(blob->Close(), ZX_OK);
   EXPECT_EQ(GetVmoName(GetPagedVmo(*blob)), inactive_name);
 
-  ASSERT_EQ(blob->OpenValidating(fs::VnodeConnectionOptions(), nullptr), ZX_OK);
+  ASSERT_EQ(blob->Open(nullptr), ZX_OK);
   EXPECT_EQ(GetVmoName(GetPagedVmo(*blob)), active_name);
 
   ASSERT_EQ(blob->Close(), ZX_OK);
@@ -487,7 +487,7 @@ TEST_P(BlobTest, VmoNameActiveWhileVmoClonesExist) {
   // Make sure the async part of the write finishes.
   loop().RunUntilIdle();
   ASSERT_EQ(file->Close(), ZX_OK);
-  ASSERT_EQ(file->OpenValidating(fs::VnodeConnectionOptions(), nullptr), ZX_OK);
+  ASSERT_EQ(file->Open(nullptr), ZX_OK);
   auto blob = fbl::RefPtr<Blob>::Downcast(std::move(file));
 
   zx::vmo vmo;

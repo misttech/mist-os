@@ -128,8 +128,7 @@ void FileTester::SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache
 
 void FileTester::CreateRoot(F2fs *fs, fbl::RefPtr<VnodeF2fs> *out) {
   ASSERT_EQ(VnodeF2fs::Vget(fs, fs->GetSuperblockInfo().GetRootIno(), out), ZX_OK);
-  ASSERT_EQ((*out)->Open((*out)->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
-            ZX_OK);
+  ASSERT_EQ((*out)->Open(nullptr), ZX_OK);
 }
 
 void FileTester::Lookup(VnodeF2fs *parent, std::string_view name, fbl::RefPtr<fs::Vnode> *out) {
@@ -139,7 +138,7 @@ void FileTester::Lookup(VnodeF2fs *parent, std::string_view name, fbl::RefPtr<fs
     return;
   }
   ASSERT_TRUE(vn);
-  ASSERT_EQ(vn->Open(vn->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr), ZX_OK);
+  ASSERT_EQ(vn->Open(nullptr), ZX_OK);
   *out = std::move(vn);
 }
 
@@ -191,8 +190,7 @@ void FileTester::VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2
   inode_nid = *nid_or;
 
   VnodeF2fs::Allocate(fs, inode_nid, static_cast<umode_t>(mode), &vnode);
-  ASSERT_EQ(vnode->Open(vnode->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
-            ZX_OK);
+  ASSERT_EQ(vnode->Open(nullptr), ZX_OK);
   vnode->InitFileCache();
   vnode->InitExtentTree();
   vnode->UnlockNewInode();

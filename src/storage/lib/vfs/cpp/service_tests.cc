@@ -46,7 +46,7 @@ TEST(Service, ApiTest) {
   fbl::RefPtr<fs::Vnode> redirect;
   auto result = svc->ValidateOptions({});
   EXPECT_TRUE(result.is_ok());
-  EXPECT_OK(svc->Open(result.value(), &redirect));
+  EXPECT_OK(svc->Open(&redirect));
   EXPECT_NULL(redirect);
 
   // get attr

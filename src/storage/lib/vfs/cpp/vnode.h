@@ -86,25 +86,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // See class comment above about memory management.
   void fbl_recycle() { RecycleNode(); }
 
-  template <typename T>
-  class Validated {
-   public:
-    Validated(const Validated&) = default;
-    Validated& operator=(const Validated&) = default;
-    Validated(Validated&&) noexcept = default;
-    Validated& operator=(Validated&&) noexcept = default;
-
-    const T& value() const { return value_; }
-    const T* operator->() const { return &value(); }
-    const T& operator*() const { return value(); }
-
-   private:
-    explicit Validated(T value) : value_(value) {}
-    friend class Vnode;  // Such that only |Vnode| methods may mint new instances of |Validated<T>|.
-    T value_;
-  };
-  using ValidatedOptions = Validated<VnodeConnectionOptions>;
-
   // METHODS FOR OPTION VALIDATION AND PROTOCOL NEGOTIATION
   //
   // Implementations should override |GetProtocols| to express which representation(s) are supported
@@ -125,16 +106,9 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // for a particular request if the validation passes.
   virtual bool ValidateRights(fuchsia_io::Rights rights) const;
 
-  // Ensures that it is valid to access the vnode with given connection options. The vnode will only
-  // be opened for a particular request if the validation returns |zx::ok(...)|.
-  //
-  // The |zx::ok| variant of the return value is a |ValidatedOptions| object that encodes the
-  // fact that |options| has been validated. It may be used to call other functions that only
-  // accepts validated options.
-  //
-  // The |zx::error| variant of the return value contains a suitable error code
-  // when validation fails.
-  zx::result<ValidatedOptions> ValidateOptions(VnodeConnectionOptions options) const;
+  // Ensures that it is valid to access the vnode with given connection options. The vnode should
+  // only be opened for a particular request if the validation returns |zx::ok(...)|.
+  zx::result<> ValidateOptions(VnodeConnectionOptions options) const;
 
   // Opens the vnode. This is a callback to signal that a new connection is about to be created and
   // I/O operations will follow. In addition, it provides an opportunity to redirect subsequent I/O.
@@ -143,10 +117,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // Vnode implementations should override OpenNode() which this function calls after some
   // bookeeping.
   //
-  // |options| contain the flags and rights supplied by the client, parsed into a struct with
-  // individual fields. It will have already been validated by |ValidateOptions|.
-  //
-  // Open is never invoked if |options.flags| includes |node_reference|. This behavior corresponds
+  // Open will never be invoked when a node reference connection is created. This corresponds
   // to Posix open()'s O_PATH flag which will create a thing representing the path to the file
   // without giving the ability to do most operations like read or write. In the future, we may want
   // the ability to track these connections, in which case we should add a Connect()/Disconnect()
@@ -159,15 +130,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // different vnode may be used for each new connection to a file. Note that the |out_redirect|
   // vnode is not |Open()|ed further for the purpose of creating this connection. Furthermore, the
   // redirected vnode must support the same set of protocols as the original vnode.
-  zx_status_t Open(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect)
-      __TA_EXCLUDES(mutex_);
-
-  // Same as |Open|, but calls |ValidateOptions| on |options| automatically. Errors from
-  // |ValidateOptions| are propagated via the return value. This is convenient when serving a
-  // connection with the validated options is unnecessary e.g. when used from a non-Fuchsia
-  // operating system.
-  zx_status_t OpenValidating(VnodeConnectionOptions options, fbl::RefPtr<Vnode>* out_redirect)
-      __TA_EXCLUDES(mutex_);
+  zx_status_t Open(fbl::RefPtr<Vnode>* out_redirect) __TA_EXCLUDES(mutex_);
 
   // METHODS FOR OPENED NODES
   //
@@ -362,8 +325,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // rolled back.
   //
   // See Open() above for documentation.
-  virtual zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect)
-      __TA_EXCLUDES(mutex_) {
+  virtual zx_status_t OpenNode(fbl::RefPtr<Vnode>* out_redirect) __TA_EXCLUDES(mutex_) {
     return ZX_OK;
   }
   virtual zx_status_t CloseNode() __TA_EXCLUDES(mutex_) { return ZX_OK; }
@@ -388,9 +350,9 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
 
 // Opens a vnode by reference.
 // The |vnode| reference is updated in-place if redirection occurs.
-inline zx_status_t OpenVnode(Vnode::ValidatedOptions options, fbl::RefPtr<Vnode>* vnode) {
+inline zx_status_t OpenVnode(fbl::RefPtr<Vnode>* vnode) {
   fbl::RefPtr<Vnode> redirect;
-  zx_status_t status = (*vnode)->Open(options, &redirect);
+  zx_status_t status = (*vnode)->Open(&redirect);
   if (status == ZX_OK && redirect != nullptr) {
     ZX_DEBUG_ASSERT((*vnode)->GetProtocols() == redirect->GetProtocols());
     *vnode = std::move(redirect);

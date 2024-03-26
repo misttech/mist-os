@@ -119,11 +119,6 @@ struct VnodeConnectionOptions {
     return *this;
   }
 
-  constexpr VnodeConnectionOptions set_create() {
-    flags |= fuchsia_io::OpenFlags::kCreate;
-    return *this;
-  }
-
   // Convenience factory functions for commonly used option combinations.
 
   constexpr static VnodeConnectionOptions ReadOnly() {

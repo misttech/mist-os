@@ -114,7 +114,7 @@ TEST(VmoFile, Open) {
     fbl::RefPtr<fs::Vnode> redirect;
     auto result = file->ValidateOptions(VnodeOptions::ReadOnly());
     EXPECT_RESULT_OK(result);
-    EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
+    EXPECT_EQ(ZX_OK, file->Open(&redirect));
     EXPECT_NULL(redirect);
     EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->ValidateOptions(VnodeOptions::ReadWrite()));
     EXPECT_NULL(redirect);
@@ -136,19 +136,19 @@ TEST(VmoFile, Open) {
     {
       zx::result result = file->ValidateOptions(VnodeOptions::ReadOnly());
       EXPECT_RESULT_OK(result);
-      EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
+      EXPECT_EQ(ZX_OK, file->Open(&redirect));
       EXPECT_NULL(redirect);
     }
     {
       zx::result result = file->ValidateOptions(VnodeOptions::ReadWrite());
       EXPECT_RESULT_OK(result);
-      EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
+      EXPECT_EQ(ZX_OK, file->Open(&redirect));
       EXPECT_NULL(redirect);
     }
     {
       zx::result result = file->ValidateOptions(VnodeOptions::WriteOnly());
       EXPECT_RESULT_OK(result);
-      EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
+      EXPECT_EQ(ZX_OK, file->Open(&redirect));
       EXPECT_NULL(redirect);
       EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->ValidateOptions(VnodeOptions::ReadExec()));
       EXPECT_NULL(redirect);

@@ -1074,16 +1074,9 @@ zx_status_t Blobfs::ReloadSuperblock() {
 
 zx_status_t Blobfs::OpenRootNode(fbl::RefPtr<fs::Vnode>* out) {
   fbl::RefPtr<Directory> vn = fbl::AdoptRef(new Directory(this));
-
-  auto validated_options = vn->ValidateOptions(fs::VnodeConnectionOptions());
-  if (validated_options.is_error()) {
-    return validated_options.status_value();
-  }
-  zx_status_t status = vn->Open(validated_options.value(), nullptr);
-  if (status != ZX_OK) {
+  if (zx_status_t status = vn->Open(nullptr); status != ZX_OK) {
     return status;
   }
-
   *out = std::move(vn);
   return ZX_OK;
 }

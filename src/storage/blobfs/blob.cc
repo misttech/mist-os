@@ -645,8 +645,7 @@ void Blob::WillTeardownFilesystem() {
   // When pager_reference goes out of scope here, it could cause |this| to be deleted.
 }
 
-zx_status_t Blob::OpenNode([[maybe_unused]] ValidatedOptions options,
-                           fbl::RefPtr<Vnode>* out_redirect) {
+zx_status_t Blob::OpenNode(fbl::RefPtr<Vnode>* out_redirect) {
   std::lock_guard lock(mutex_);
   if (IsDataLoaded() && open_count() == 1) {
     // Just went from an unopened node that already had data to an opened node (the open_count()

@@ -38,8 +38,7 @@ class VnodeMapperTestFixture : public testing::Test {
     runner_ = std::move(fs_or.value());
 
     VnodeMinfs::Allocate(&runner_->minfs(), kMinfsTypeFile, &vnode_);
-    EXPECT_EQ(vnode_->Open(vnode_->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
-              ZX_OK);
+    EXPECT_EQ(vnode_->Open(nullptr), ZX_OK);
   }
 
   ~VnodeMapperTestFixture() { vnode_->Close(); }

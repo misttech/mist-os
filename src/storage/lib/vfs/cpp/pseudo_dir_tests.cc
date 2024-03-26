@@ -36,7 +36,7 @@ TEST(PseudoDir, ApiTest) {
   fbl::RefPtr<fs::Vnode> redirect;
   auto validated_options = dir->ValidateOptions(options_directory);
   EXPECT_TRUE(validated_options.is_ok());
-  EXPECT_EQ(ZX_OK, dir->Open(validated_options.value(), &redirect));
+  EXPECT_EQ(ZX_OK, dir->Open(&redirect));
   EXPECT_NULL(redirect);
 
   // get attributes

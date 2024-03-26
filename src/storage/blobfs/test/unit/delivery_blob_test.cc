@@ -123,7 +123,7 @@ TEST_P(DeliveryBlobTest, WriteAll) {
   // Try to open the newly created blob.
   fbl::RefPtr<fs::Vnode> file_ptr;
   ASSERT_EQ(ZX_OK, root()->Lookup(info->GetMerkleRoot(), &file_ptr));
-  ASSERT_EQ(ZX_OK, file_ptr->OpenValidating({}, &file));
+  ASSERT_EQ(ZX_OK, file_ptr->Open(&file));
 
   // Validate file contents.
   if (GetParam().blob_size > 0) {
@@ -166,7 +166,7 @@ TEST_P(DeliveryBlobTest, WriteChunked) {
   // Try to open the newly created blob.
   fbl::RefPtr<fs::Vnode> file_ptr;
   ASSERT_EQ(ZX_OK, root()->Lookup(info->GetMerkleRoot(), &file_ptr));
-  ASSERT_EQ(ZX_OK, file_ptr->OpenValidating({}, &file));
+  ASSERT_EQ(ZX_OK, file_ptr->Open(&file));
 
   // Validate file contents.
   if (GetParam().blob_size > 0) {

@@ -27,11 +27,15 @@ class ScopedVnodeOpen {
   ~ScopedVnodeOpen() { Close(); }
 
   zx_status_t Open(Vnode* vn, const VnodeConnectionOptions& opts = VnodeConnectionOptions()) {
-    if (vnode_)
+    if (vnode_) {
       return ZX_ERR_BAD_STATE;
-    if (zx_status_t status = vn->OpenValidating(opts, nullptr); status != ZX_OK)
+    }
+    if (zx::result validated = vn->ValidateOptions(opts); validated.is_error()) {
+      return validated.error_value();
+    }
+    if (zx_status_t status = vn->Open(nullptr); status != ZX_OK) {
       return status;
-
+    }
     vnode_ = fbl::RefPtr<Vnode>(vn);
     return ZX_OK;
   }

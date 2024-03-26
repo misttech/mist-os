@@ -56,11 +56,11 @@ void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
               vn->OpenRemote(options.ToIoV1Flags(), {}, fidl::StringView::FromExternal(path),
                              std::move(server_end));
         } else if constexpr (std::is_same_v<ResultT, OpenResult::Ok>) {
-          VnodeConnectionOptions options = *result.validated_options;
           // TODO(https://fxbug.dev/42051879): Remove this when web_engine with SDK 13.20230626.3.1
           // or later is rolled. The important commit is in the private integration repo, but the
           // next Fuchsia commit is b615ff398580f3b47c050beb9e8f0fc28907ac67 which can be used with
           // the sdkrevisions tool.
+          VnodeConnectionOptions options = result.options;
           if (options.ToIoV1Flags() == fio::OpenFlags::kRightReadable) {
             bool is_device =
                 path.length() == 8 &&
