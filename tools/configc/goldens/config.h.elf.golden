@@ -127,7 +127,6 @@ struct Config {
   }
 
  private:
-  // TODO(https://fxbug.dev/42050829) store a natural types object here instead
   struct Storage_ final {
     bool my_flag;
     int16_t my_int16;

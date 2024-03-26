@@ -17,7 +17,6 @@ public:
   {{/each}}
 
 private:
-  // TODO(https://fxbug.dev/42050829) store a natural types object here instead
   struct Storage_ final {
     {{#each fields}}
         {{(cpp_type type_)}} {{ident}};

@@ -24,34 +24,19 @@ ZX_ASSERT_MSG(checksum == expected_checksum, "Invalid checksum for config VMO");
 size_t header = 2 + checksum_length;
 size_t fidl_struct_size = vmo_content_size - header;
 
-// Align the struct pointer to 8 bytes by using a generic allocation (as required by FIDL)
-std::unique_ptr<uint8_t[]> fidl_struct(new uint8_t[fidl_struct_size]);
-status = config_vmo.read(fidl_struct.get(), header, fidl_struct_size);
+std::vector<uint8_t> fidl_struct(fidl_struct_size);
+status = config_vmo.read(fidl_struct.data(), header, fidl_struct.size());
 ZX_ASSERT_MSG(status == ZX_OK, "Could not read FIDL struct from config VMO");
 
 // Decode the FIDL struct
-fit::result result = fidl::InplaceUnpersist<{{fidl_cpp_namespace}}::wire::Config>(
-    cpp20::span(fidl_struct.get(), fidl_struct_size));
+fit::result result = fidl::Unpersist<{{fidl_cpp_namespace}}::Config>(fidl_struct);
 ZX_ASSERT_MSG(result.is_ok(), "Could not decode Config FIDL structure");
-{{fidl_cpp_namespace}}::wire::Config& fidl_config = *result.value();
+{{fidl_cpp_namespace}}::Config fidl_config = std::move(result.value());
 
 // Convert the configuration into a new struct
 Config c\{{
 {{#each fields}}
-    {{#if (is_string_vector type_)}}
-    .{{ident}} = from_vector_string_view(fidl_config.{{ident}})
-    {{else}}
-    {{#if (is_vector type_)}}
-        .{{ident}} = from_vector_view(fidl_config.{{ident}})
-    {{else}}
-        {{#if (is_string type_)}}
-        .{{ident}} = std::string(fidl_config.{{ident}}.get())
-        {{else}}
-        .{{ident}} = fidl_config.{{ident}}
-        {{/if}}
-    {{/if}}
-    {{/if}}
-    {{~#unless @last}},{{/unless}}
+    .{{ident}} = std::move(fidl_config.{{ident}}()),
 {{~/each~}}
 }};
 
