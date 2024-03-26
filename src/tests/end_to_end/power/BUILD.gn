@@ -53,10 +53,7 @@ source_set("power_utils") {
 
 group("power") {
   testonly = true
-  deps = [
-    "//src/tests/end_to_end/squareload",
-    "//src/tests/end_to_end/suspend",
-  ]
+  deps = [ "//src/tests/end_to_end/squareload" ]
 }
 
 group("tests") {

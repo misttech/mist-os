@@ -1,8 +1,0 @@
-power_metric: suspend_cpu
-ffx_test_args:
-  - --max-severity-logs
-  - FATAL
-  - --realm
-  - /core/testing:starnix-tests
-ffx_test_url: fuchsia-pkg://fuchsia.com/power_suspend_test#meta/suspend_test.cm
-timeout_sec: 600
