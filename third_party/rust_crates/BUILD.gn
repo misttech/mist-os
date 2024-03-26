@@ -497,7 +497,7 @@ group("md-5") {
 }
 
 group("memchr") {
-  public_deps = [ ":memchr-v2_4_0" ]
+  public_deps = [ ":memchr-v2_6_3" ]
 }
 
 group("memoffset") {
@@ -1438,7 +1438,7 @@ rust_library("aho-corasick-v0_7_18") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
 
   rustenv = []
 
@@ -2605,7 +2605,7 @@ rust_library("bstr-v1_5_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
   deps += [ ":serde-v1_0_147" ]
 
   rustenv = []
@@ -3171,7 +3171,7 @@ rust_library("combine-v4_6_2") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
   deps += [ ":bytes-v1_0_1" ]
 
   rustenv = []
@@ -4084,7 +4084,7 @@ rust_library("csv-core-v0_1_10") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
 
   rustenv = []
 
@@ -5806,7 +5806,7 @@ rust_library("futures-lite-v1_11_3") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
   deps += [ ":fastrand-v1_4_0" ]
   deps += [ ":futures-core-v0_3_19" ]
   deps += [ ":futures-io-v0_3_19" ]
@@ -5990,7 +5990,7 @@ rust_library("futures-util-v0_3_19") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
   deps += [ ":futures-channel-v0_3_19" ]
   deps += [ ":futures-core-v0_3_19" ]
   deps += [ ":futures-io-v0_3_19" ]
@@ -8108,15 +8108,15 @@ rust_library("md-5-v0_10_5") {
   applicable_licenses = [ ":md-5-v0_10_5.license" ]
 }
 
-license("memchr-v2_4_0.license") {
+license("memchr-v2_6_3.license") {
   public_package_name = "memchr"
   license_files = [ "//third_party/rust_crates/ask2patch/memchr/LICENSE-MIT" ]
 }
 
-rust_library("memchr-v2_4_0") {
+rust_library("memchr-v2_6_3") {
   crate_name = "memchr"
   crate_root = "//third_party/rust_crates/ask2patch/memchr/src/lib.rs"
-  output_name = "memchr-7c7563bbdbb1ab9"
+  output_name = "memchr-93f3729765f4deb"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -8125,21 +8125,18 @@ rust_library("memchr-v2_4_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=7c7563bbdbb1ab9",
-    "-Cextra-filename=-7c7563bbdbb1ab9",
+    "--edition=2021",
+    "-Cmetadata=93f3729765f4deb",
+    "-Cextra-filename=-93f3729765f4deb",
+    "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
     "--cfg=feature=\"use_std\"",
-    "--cfg=memchr_runtime_simd",
-    "--cfg=memchr_runtime_sse2",
-    "--cfg=memchr_runtime_sse42",
-    "--cfg=memchr_runtime_avx",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":memchr-v2_4_0.license" ]
+  applicable_licenses = [ ":memchr-v2_6_3.license" ]
 }
 
 license("memoffset-v0_5_3.license") {
@@ -8726,7 +8723,7 @@ rust_library("nom-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":regex-v1_7_3" ]
 
@@ -8763,7 +8760,7 @@ rust_library("nom_locate-v2_1_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
   deps += [ ":bytecount-v0_6_0" ]
   deps += [ ":nom-v5_0_0" ]
 
@@ -10038,7 +10035,7 @@ rust_library("pest-v2_7_8") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
   deps += [ ":thiserror-v1_0_57" ]
   deps += [ ":ucd-trie-v0_1_6" ]
 
@@ -11217,7 +11214,7 @@ rust_library("pulldown-cmark-v0_6_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":getopts-v0_2_18" ]
   deps += [ ":unicase-v2_7_0" ]
@@ -12178,7 +12175,7 @@ rust_library("regex-v1_7_3") {
 
   deps = []
   deps += [ ":aho-corasick-v0_7_18" ]
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
   deps += [ ":regex-syntax-v0_6_29" ]
 
   rustenv = []
@@ -13003,7 +13000,7 @@ rust_library("rustyline-v2_1_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":memchr-v2_6_3" ]
   deps += [ ":libc-v0_2_149" ]
   deps += [ ":log-v0_4_20" ]
   deps += [ ":unicode-segmentation-v1_10_1" ]
@@ -15659,7 +15656,7 @@ rust_library("tokio-v1_25_2") {
   if (!(current_os == "fuchsia")) {
     deps += [ ":bytes-v1_0_1" ]
     deps += [ ":libc-v0_2_149" ]
-    deps += [ ":memchr-v2_4_0" ]
+    deps += [ ":memchr-v2_6_3" ]
     deps += [ ":mio-v0_8_9" ]
     deps += [ ":num_cpus-v1_13_0" ]
     deps += [ ":signal-hook-registry-v1_4_1" ]
