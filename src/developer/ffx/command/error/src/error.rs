@@ -58,11 +58,15 @@ impl std::fmt::Display for Error {
 
 impl From<anyhow::Error> for Error {
     fn from(error: anyhow::Error) -> Self {
-        // this is just a compatibility shim to extract information out of the way
-        // we've traditionally divided user and unexpected errors.
-        match error.downcast::<FfxError>() {
-            Ok(err) => Self::User(err.into()),
-            Err(err) => Self::Unexpected(err),
+        // If it's already an Error, just return it
+        match error.downcast::<Self>() {
+            Ok(this) => this,
+            // this is just a compatibility shim to extract information out of the way
+            // we've traditionally divided user and unexpected errors.
+            Err(error) => match error.downcast::<FfxError>() {
+                Ok(err) => Self::User(err.into()),
+                Err(err) => Self::Unexpected(err),
+            },
         }
     }
 }
