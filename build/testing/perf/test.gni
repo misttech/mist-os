@@ -52,7 +52,7 @@ performance_testing_environments = [
 #   enable_mypy (optional)
 #     If true, enable MyPy type checking on the target and respective deps.
 #     Type: boolean
-#     Default: false
+#     Default: true
 #
 #   local_config_source (optional)
 #     See python_mobly_test in build/python/python_mobly_test.gni
@@ -104,7 +104,7 @@ template("python_perf_test") {
     python_mobly_test("${_test_target_name}") {
       test_name = "${target_name}"
 
-      enable_mypy = false
+      enable_mypy = true
       if (defined(invoker.enable_mypy)) {
         enable_mypy = invoker.enable_mypy
       }
@@ -216,7 +216,7 @@ template("python_perf_test") {
 #   enable_mypy (optional)
 #     If true, enable MyPy type checking on the target and respective deps.
 #     Type: boolean
-#     Default: false
+#     Default: true
 #
 template("fuchsia_component_perf_test") {
   assert(defined(invoker.component_name), "component_name is required")

@@ -5,16 +5,17 @@
 import os
 
 from fuchsia_base_test import fuchsia_base_test
+from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts, test_runner
 from trace_processing import trace_importing, trace_utils, trace_model
 
 
-class PerfTestTraceEventsTest(fuchsia_base_test.FuchsiaBaseTest):
+class PerfTestTraceEventsTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
     def setup_test(self) -> None:
         super().setup_test()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
-    def test_perftest_library_trace_events(self):
+    def test_perftest_library_trace_events(self) -> None:
         with self.device.tracing.trace_session(
             categories=[
                 "kernel",

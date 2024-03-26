@@ -20,7 +20,7 @@ TILE_URL = (
 BENCHMARK_DURATION_SEC = 10
 
 
-class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
+class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
     """Flatland Benchmark.
 
     Attributes:

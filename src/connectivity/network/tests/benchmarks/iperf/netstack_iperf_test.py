@@ -15,6 +15,7 @@ from typing import Any, Self
 
 import honeydew
 from fuchsia_base_test import fuchsia_base_test
+from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts, test_runner
 from perf_publish import publish
 from perf_test_utils import utils
@@ -35,7 +36,7 @@ class Protocol(Enum):
     UDP = 2
 
     @classmethod
-    def from_str(cls, value: str) -> Self:
+    def from_str(cls, value: str) -> "Protocol":
         value = value.lower()
         if value == "tcp":
             return Protocol.TCP
@@ -57,7 +58,7 @@ class Direction(Enum):
     LOOPBACK = 3
 
     @classmethod
-    def from_str(cls, value: str) -> Self:
+    def from_str(cls, value: str) -> "Direction":
         value = value.lower()
         if value == "send":
             return Direction.DEVICE_TO_HOST
@@ -201,7 +202,7 @@ class IperfServer:
             f"iperf3 --server --port {port} --json", get_ssh_addr_timeout=None
         )
 
-    def dump_output_to_file(self, path: os.PathLike) -> None:
+    def dump_output_to_file(self, path: str) -> None:
         self._process.kill()
         output, err = self._process.communicate()
         if err:
@@ -213,7 +214,7 @@ class IperfServer:
             f.write(output)
 
 
-class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
+class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
     def setup_test(self) -> None:
         super().setup_test()
         self._device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
@@ -469,10 +470,13 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await process.communicate()
+        stdout_str = stdout.decode("utf-8")
+        stderr_str = stderr.decode("utf-8")
+
         asserts.assert_equal(
             process.returncode,
             0,
-            f"output: {stdout} stderr: {stderr}",
+            f"output: {stdout_str} stderr: {stderr_str}",
         )
         results_path = os.path.join(
             self.test_case_path,

@@ -6,6 +6,7 @@ import json
 import os
 
 from fuchsia_base_test import fuchsia_base_test
+from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts, test_runner
 from perf_publish import publish
 from perf_test_utils import utils
@@ -45,17 +46,17 @@ ITERATIONS_PER_TEST_PER_PROCESS: int = 120
 # useful for tests that exhibit between-process variation in results
 # (e.g. due to memory layout chosen when a process starts) -- it
 # reduces the variation in the average that we report.
-PROCESS_RUNS: str = 6
+PROCESS_RUNS: int = 6
 
 
-class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
+class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
     def setup_test(self) -> None:
         super().setup_test()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
     # Run some of the microbenchmarks with tracing enabled to measure the
     # overhead of tracing.
-    def test_tracing_categories_enabled(self):
+    def test_tracing_categories_enabled(self) -> None:
         results_files = []
         for i in range(PROCESS_RUNS):
             results_files.append(
@@ -108,7 +109,7 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
     # Run some of the microbenchmarks with tracing enabled but each category
     # disabled to measure the overhead of a trace event with the category turned
     # off.
-    def test_tracing_categories_disabled(self):
+    def test_tracing_categories_disabled(self) -> None:
         results_files = []
         for i in range(PROCESS_RUNS):
             results_files.append(
@@ -145,7 +146,7 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
     # async loop. At the same time sl4f tries to block on stopping the trace but doesn't try to read
     # the trace buffer resulting in a deadlock. Once that's done, it should be as easy as copying
     # this benchmark and changing the categories enabled to 'benchmark'.
-    def test_tracing_rust_categories_disabled(self):
+    def test_tracing_rust_categories_disabled(self) -> None:
         with self.device.tracing.trace_session(
             categories=["nonexistent_category"],
             buffer_size=1,
@@ -153,7 +154,7 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
             directory=self.test_case_path,
             trace_file="trace.fxt",
         ):
-            results_file: os.PathLike = utils.single_run_test_component(
+            results_file: str = utils.single_run_test_component(
                 self.device.ffx,
                 TEST_RUST_URL,
                 self.test_case_path,
@@ -170,8 +171,8 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
             "fuchsia.trace_records.rust.tracing_categories_disabled.txt",
         )
 
-    def test_tracing_rust_tracing_disabled(self):
-        results_file: os.PathLike = utils.single_run_test_component(
+    def test_tracing_rust_tracing_disabled(self) -> None:
+        results_file: str = utils.single_run_test_component(
             self.device.ffx,
             TEST_RUST_URL,
             self.test_case_path,
@@ -187,7 +188,7 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
 
     def _run_tracing_microbenchmark(
         self, run_id: int, categories: list[str], results_suffix: str
-    ):
+    ) -> str:
         with self.device.tracing.trace_session(
             categories=categories,
             buffer_size=36,
@@ -195,7 +196,7 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
             directory=self.test_case_path,
             trace_file="trace.fxt",
         ):
-            results_file: os.PathLike = utils.single_run_test_component(
+            results_file: str = utils.single_run_test_component(
                 self.device.ffx,
                 TEST_URL,
                 self.test_case_path,
@@ -216,9 +217,7 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
         self._add_test_suite_suffix(results_file, results_suffix)
         return results_file
 
-    def _add_test_suite_suffix(
-        self, results_file: list[os.PathLike], suffix: str
-    ) -> None:
+    def _add_test_suite_suffix(self, results_file: str, suffix: str) -> None:
         with open(results_file, "r") as f:
             entries = json.load(f)
         for test_result in entries:
