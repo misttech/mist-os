@@ -427,37 +427,45 @@ TEST(VmoTransferDataTestCase, InvalidInputs) {
 
   // Verify that providing a physical, contiguous, or pinned VMO as either the destination or the
   // source fails.
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (root_resource->is_valid()) {
-    zx::result res = vmo_test::GetTestPhysVmo(kSize);
-    ASSERT_OK(res.status_value());
-    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED,
-              res.value().vmo.transfer_data(0, kPageSize, kPageSize, &src_vmo, 0));
-    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED,
-              dst_vmo.transfer_data(0, kPageSize, kPageSize, &res.value().vmo, 0));
-
-    zx::iommu iommu;
-    zx::bti bti;
-    zx_iommu_desc_dummy_t desc;
-    auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
-
-    ASSERT_OK(zx::iommu::create(*root_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
-    bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoTestCase::TransferData");
-
-    zx::vmo contig_vmo;
-    ASSERT_OK(zx::vmo::create_contiguous(bti, kSize, 0, &contig_vmo));
-    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, contig_vmo.transfer_data(0, kPageSize, kPageSize, &src_vmo, 0));
-    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, dst_vmo.transfer_data(0, kPageSize, kPageSize, &contig_vmo, 0));
-
-    zx::vmo pinned_vmo;
-    ASSERT_OK(zx::vmo::create(kSize, 0, &pinned_vmo));
-    zx_paddr_t paddrs[kPageCount];
-    zx::pmt pmt;
-    ASSERT_OK(bti.pin(ZX_BTI_PERM_READ, pinned_vmo, 0, kSize, paddrs, kPageCount, &pmt));
-    EXPECT_EQ(ZX_ERR_BAD_STATE, pinned_vmo.transfer_data(0, kPageSize, kPageSize, &src_vmo, 0));
-    EXPECT_EQ(ZX_ERR_BAD_STATE, dst_vmo.transfer_data(0, kPageSize, kPageSize, &pinned_vmo, 0));
-    ASSERT_OK(pmt.unpin());
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  zx::result res = vmo_test::GetTestPhysVmo(kSize);
+  ASSERT_OK(res.status_value());
+  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED,
+            res.value().vmo.transfer_data(0, kPageSize, kPageSize, &src_vmo, 0));
+  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED,
+            dst_vmo.transfer_data(0, kPageSize, kPageSize, &res.value().vmo, 0));
+
+  zx::iommu iommu;
+  zx::bti bti;
+  zx_iommu_desc_dummy_t desc;
+  auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
+
+  ASSERT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoTestCase::TransferData");
+
+  zx::vmo contig_vmo;
+  ASSERT_OK(zx::vmo::create_contiguous(bti, kSize, 0, &contig_vmo));
+  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, contig_vmo.transfer_data(0, kPageSize, kPageSize, &src_vmo, 0));
+  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, dst_vmo.transfer_data(0, kPageSize, kPageSize, &contig_vmo, 0));
+
+  zx::vmo pinned_vmo;
+  ASSERT_OK(zx::vmo::create(kSize, 0, &pinned_vmo));
+  zx_paddr_t paddrs[kPageCount];
+  zx::pmt pmt;
+  ASSERT_OK(bti.pin(ZX_BTI_PERM_READ, pinned_vmo, 0, kSize, paddrs, kPageCount, &pmt));
+  EXPECT_EQ(ZX_ERR_BAD_STATE, pinned_vmo.transfer_data(0, kPageSize, kPageSize, &src_vmo, 0));
+  EXPECT_EQ(ZX_ERR_BAD_STATE, dst_vmo.transfer_data(0, kPageSize, kPageSize, &pinned_vmo, 0));
+  ASSERT_OK(pmt.unpin());
 }
 
 }  // namespace

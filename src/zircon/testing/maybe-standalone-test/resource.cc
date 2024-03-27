@@ -37,4 +37,15 @@ zx::unowned_resource GetSystemResource() {
   return system_resource;
 }
 
+zx::result<zx::resource> GetSystemResourceWithBase(zx::unowned_resource& system_resource,
+                                                   uint64_t base) {
+  zx::resource new_resource;
+  const zx_status_t status = zx::resource::create(*system_resource, ZX_RSRC_KIND_SYSTEM, base, 1,
+                                                  nullptr, 0, &new_resource);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(new_resource));
+}
+
 }  // namespace maybe_standalone

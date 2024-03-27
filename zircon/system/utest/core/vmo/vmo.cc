@@ -781,29 +781,37 @@ TEST(VmoTestCase, Info) {
   EXPECT_EQ(info.cache_policy, ZX_CACHE_POLICY_UNCACHED, "vm_info_test: info_vmo.cache_policy");
   EXPECT_EQ(info.handle_rights, basic_info.rights, "vm_info_test: info_vmo.handle_rights");
 
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (root_resource->is_valid()) {
-    zx::iommu iommu;
-    zx::bti bti;
-    auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
-
-    zx_iommu_desc_dummy_t desc;
-    EXPECT_EQ(zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
-                              iommu.reset_and_get_address()),
-              ZX_OK);
-    bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoTestCase::Info");
-
-    len = zx_system_get_page_size() * 12;
-    EXPECT_OK(zx::vmo::create_contiguous(bti, len, 0, &vmo));
-
-    status = vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr);
-    EXPECT_OK(status, "vm_info_test: info_vmo");
-
-    EXPECT_EQ(info.size_bytes, len, "vm_info_test: info_vmo.size_bytes");
-    EXPECT_EQ(info.flags, ZX_INFO_VMO_TYPE_PAGED | ZX_INFO_VMO_VIA_HANDLE | ZX_INFO_VMO_CONTIGUOUS,
-              "vm_info_test: info_vmo.flags");
-    EXPECT_EQ(info.cache_policy, ZX_CACHE_POLICY_CACHED, "vm_info_test: info_vmo.cache_policy");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  zx::iommu iommu;
+  zx::bti bti;
+  auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
+
+  zx_iommu_desc_dummy_t desc;
+  EXPECT_EQ(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+                            iommu.reset_and_get_address()),
+            ZX_OK);
+  bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoTestCase::Info");
+
+  len = zx_system_get_page_size() * 12;
+  EXPECT_OK(zx::vmo::create_contiguous(bti, len, 0, &vmo));
+
+  status = vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr);
+  EXPECT_OK(status, "vm_info_test: info_vmo");
+
+  EXPECT_EQ(info.size_bytes, len, "vm_info_test: info_vmo.size_bytes");
+  EXPECT_EQ(info.flags, ZX_INFO_VMO_TYPE_PAGED | ZX_INFO_VMO_VIA_HANDLE | ZX_INFO_VMO_CONTIGUOUS,
+            "vm_info_test: info_vmo.flags");
+  EXPECT_EQ(info.cache_policy, ZX_CACHE_POLICY_CACHED, "vm_info_test: info_vmo.cache_policy");
 }
 
 TEST(VmoTestCase, SizeAlign) {
@@ -1731,18 +1739,23 @@ TEST(VmoTestCase, ResizeHazard) {
 }
 
 TEST(VmoTestCase, CompressedContiguous) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   zx::iommu iommu;
   zx::bti bti;
   zx_iommu_desc_dummy_t desc;
   auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
 
-  EXPECT_OK(zx::iommu::create(*root_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  EXPECT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
   bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoTestCase::CompressedContiguous");
 
   zx_info_bti_t bti_info;
@@ -1774,18 +1787,23 @@ TEST(VmoTestCase, CompressedContiguous) {
 }
 
 TEST(VmoTestCase, UncachedContiguous) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   zx::iommu iommu;
   zx::bti bti;
   zx_iommu_desc_dummy_t desc;
   auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
 
-  EXPECT_OK(zx::iommu::create(*root_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  EXPECT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
   bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoTestCase::UncachedContiguous");
 
   const uint64_t kSize = zx_system_get_page_size() * 4;
@@ -1822,11 +1840,16 @@ TEST(VmoTestCase, UncachedContiguous) {
 //    operations which do not fit in a target child-slice, but _would_ fit within
 //    the main parent VMO.  See bug 53547 for details.
 TEST(VmoTestCase, PinTests) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   constexpr size_t kTestPages = 6;
 
@@ -1835,7 +1858,7 @@ TEST(VmoTestCase, PinTests) {
   zx_iommu_desc_dummy_t desc;
   auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
 
-  EXPECT_OK(zx::iommu::create(*root_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  EXPECT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
   bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoTestCase::PinTests");
 
   enum class VmoFlavor { Normal, Contig, Physical };
