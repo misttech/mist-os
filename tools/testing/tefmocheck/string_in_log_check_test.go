@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
@@ -26,11 +27,11 @@ func TestCheck(t *testing.T) {
 		endString:   "block_end",
 	}
 	c := stringInLogCheck{
-		String:       killerString,
-		OnlyOnStates: []string{},
-		ExceptString: exceptString,
-		ExceptBlocks: []*logBlock{exceptBlock, exceptBlock2},
-		Type:         swarmingOutputType,
+		String:        killerString,
+		OnlyOnStates:  []string{},
+		ExceptStrings: []string{exceptString},
+		ExceptBlocks:  []*logBlock{exceptBlock, exceptBlock2},
+		Type:          swarmingOutputType,
 	}
 	gotName := c.Name()
 	wantName := "string_in_log/infra_and_test_std_and_klog.txt/KILLER_STRING"
@@ -41,6 +42,7 @@ func TestCheck(t *testing.T) {
 	for _, tc := range []struct {
 		name                string
 		attributeToTest     bool
+		addTag              bool
 		testingOutputs      TestingOutputs
 		typeToCheck         logType
 		skipPassedTask      bool
@@ -53,6 +55,7 @@ func TestCheck(t *testing.T) {
 		shouldMatch         bool
 		wantName            string
 		wantFlake           bool
+		wantTags            []build.TestTag
 	}{
 		{
 			name: "should match simple",
@@ -160,6 +163,25 @@ func TestCheck(t *testing.T) {
 			},
 			shouldMatch: true,
 			wantName:    path.Join(wantName, "foo-test"),
+		},
+		{
+			name:            "should add test name to tag",
+			attributeToTest: true,
+			addTag:          true,
+			testingOutputs: TestingOutputs{
+				SwarmingOutput: []byte(killerString),
+				SwarmingOutputPerTest: []TestLog{
+					{
+						TestName: "foo-test",
+						Bytes:    []byte(killerString),
+						FilePath: "foo/log.txt",
+						Index:    0,
+					},
+				},
+			},
+			shouldMatch: true,
+			wantName:    wantName,
+			wantTags:    []build.TestTag{{Key: "test_name", Value: "foo-test"}},
 		},
 		{
 			name:            "should respect except block even if split across tests",
@@ -559,6 +581,7 @@ func TestCheck(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := c // Make a copy to avoid modifying shared state.
 			c.AttributeToTest = tc.attributeToTest
+			c.AddTag = tc.addTag
 			c.SkipPassedTask = tc.skipPassedTask
 			c.SkipAllPassedTests = tc.skipAllPassedTests
 			c.SkipPassedTest = tc.skipPassedTest
@@ -581,6 +604,11 @@ func TestCheck(t *testing.T) {
 			gotName := c.Name()
 			if tc.wantName != "" && gotName != tc.wantName {
 				t.Errorf("c.Name() returned %q, want %q", gotName, tc.wantName)
+			}
+			if tc.attributeToTest && tc.addTag && tc.shouldMatch {
+				if diff := cmp.Diff(tc.wantTags, c.Tags()); diff != "" {
+					t.Errorf("c.Tags() returned diff (-want +got): %s", diff)
+				}
 			}
 			c.DebugText() // minimal coverage, check it doesn't crash.
 			swarmingOutputPerTest := tc.testingOutputs.SwarmingOutputPerTest

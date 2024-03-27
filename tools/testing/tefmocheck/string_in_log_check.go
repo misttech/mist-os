@@ -15,6 +15,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/bootserver/bootserverconstants"
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
+	"go.fuchsia.dev/fuchsia/tools/build"
 	ffxutilconstants "go.fuchsia.dev/fuchsia/tools/lib/ffxutil/constants"
 	serialconstants "go.fuchsia.dev/fuchsia/tools/lib/serial/constants"
 	syslogconstants "go.fuchsia.dev/fuchsia/tools/lib/syslog/constants"
@@ -31,8 +32,8 @@ type stringInLogCheck struct {
 	// OnlyOnStates will cause Check() to return false if the swarming task
 	// state doesn't match with one of these states.
 	OnlyOnStates []string
-	// ExceptString will cause Check() to return false if present.
-	ExceptString string
+	// ExceptStrings will cause Check() to return false if present.
+	ExceptStrings []string
 	// ExceptBlocks will cause Check() to return false if the string is only
 	// within these blocks. The start string and end string should be unique
 	// strings that only appear around the except block. A stray start string
@@ -63,6 +64,9 @@ type stringInLogCheck struct {
 	// Whether to check the per-test Swarming output for this log and emit a
 	// check that's specific to the test during which the log appeared.
 	AttributeToTest bool
+	// If combined with AttributeToTest, it'll list the test name as a tag instead
+	// of appending it to the tefmo check name.
+	AddTag bool
 
 	swarmingResult *SwarmingRpcsTaskResult
 	testName       string
@@ -191,8 +195,10 @@ func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
 
 func (c *stringInLogCheck) checkBytes(toCheck []byte, start int, end int) bool {
 	toCheckBlock := toCheck[start:end]
-	if c.ExceptString != "" && bytes.Contains(toCheckBlock, []byte(c.ExceptString)) {
-		return false
+	for _, s := range c.ExceptStrings {
+		if bytes.Contains(toCheckBlock, []byte(s)) {
+			return false
+		}
 	}
 	stringBytes := []byte(c.String)
 	if len(c.ExceptBlocks) == 0 {
@@ -244,7 +250,11 @@ func (c *stringInLogCheck) checkBytes(toCheck []byte, start int, end int) bool {
 func (c *stringInLogCheck) Name() string {
 	// TODO(https://fxbug.dev/42150891): With multi-device logs, the file names may be different than
 	// the log type. Consider using the actual filename of the log.
-	return path.Join("string_in_log", string(c.Type), strings.ReplaceAll(c.String, " ", "_"), c.testName)
+	name := path.Join("string_in_log", string(c.Type), strings.ReplaceAll(c.String, " ", "_"))
+	if c.testName != "" && !c.AddTag {
+		name = path.Join(name, c.testName)
+	}
+	return name
 }
 
 func (c *stringInLogCheck) DebugText() string {
@@ -255,13 +265,11 @@ func (c *stringInLogCheck) DebugText() string {
 		debugStr += fmt.Sprintf("%s for task %s.", c.Type, c.swarmingResult.TaskId)
 	}
 	debugStr += "\nThat file should be accessible from the build result page or Sponge.\n"
-	if c.ExceptString != "" {
-		debugStr += fmt.Sprintf("\nDid not find the exception string \"%s\"", c.ExceptString)
+	for _, s := range c.ExceptStrings {
+		debugStr += fmt.Sprintf("\nDid not find the exception string \"%s\"", s)
 	}
-	if len(c.ExceptBlocks) > 0 {
-		for _, block := range c.ExceptBlocks {
-			debugStr += fmt.Sprintf("\nDid not occur inside a block delimited by:\nSTART: %s\nEND: %s", block.startString, block.endString)
-		}
+	for _, block := range c.ExceptBlocks {
+		debugStr += fmt.Sprintf("\nDid not occur inside a block delimited by:\nSTART: %s\nEND: %s", block.startString, block.endString)
 	}
 	return debugStr
 }
@@ -275,6 +283,13 @@ func (c *stringInLogCheck) OutputFiles() []string {
 
 func (c *stringInLogCheck) IsFlake() bool {
 	return c.isFlake
+}
+
+func (c *stringInLogCheck) Tags() []build.TestTag {
+	if c.AddTag && c.testName != "" {
+		return []build.TestTag{{Key: "test_name", Value: c.testName}}
+	}
+	return nil
 }
 
 // StringInLogsChecks returns checks to detect bad strings in certain logs.
@@ -426,7 +441,7 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			}},
 			&stringInLogCheck{String: "double fault, halting", Type: lt},
 			// This string can show up in some boot tests.
-			&stringInLogCheck{String: "entering panic shell loop", Type: lt, ExceptString: "Boot-test-successful!"},
+			&stringInLogCheck{String: "entering panic shell loop", Type: lt, ExceptStrings: []string{"Boot-test-successful!"}},
 		}...)
 	}
 
@@ -636,23 +651,41 @@ func infraToolLogChecks() []FailureModeCheck {
 		// connection. It should come before the ProcessTerminatedMsg to distinguish when the
 		// SSH connection terminates due to the keepalive or something else.
 		&stringInLogCheck{
-			String:      "botanist DEBUG: error sending keepalive",
-			Type:        swarmingOutputType,
-			AlwaysFlake: true,
-			ExceptBlocks: []*logBlock{
-				{startString: "==========> RtcTest <==========", endString: "Summary for test class RtcTest"},
-				{startString: "==========> SoftRebootTest <==========", endString: "Summary for test class SoftRebootTest"},
-				{startString: "==========> NetstackIperfTest <==========", endString: "Summary for test class NetstackIperfTest"},
+			String:          "botanist DEBUG: error sending keepalive",
+			Type:            swarmingOutputType,
+			AlwaysFlake:     true,
+			AttributeToTest: true,
+			AddTag:          true,
+			ExceptStrings: []string{
+				// Reboots by user request mean the test caused the target
+				// to reboot which would cause the SSH connection to fail.
+				"Reboot(UserRequest)",
+				"REBOOT REASON (USER REQUEST)",
+				// Lacewing tests output these logs when rebooting or powering
+				// off the switch to the device.
+				"Successfully rebooted",
+				"Successfully powered off",
+				// OTA tests use dm reboot to reboot the device.
+				"dm reboot",
+				// The NetstackIperfTest blasts a lot of traffic at the device
+				// and often gets close to saturating the host-device link,
+				// which can cause keepalive failures.
+				"==========> NetstackIperfTest <==========",
 			},
 		},
 		&stringInLogCheck{
-			String:      "botanist DEBUG: ssh keepalive timed out",
-			Type:        swarmingOutputType,
-			AlwaysFlake: true,
-			ExceptBlocks: []*logBlock{
-				{startString: "==========> RtcTest <==========", endString: "Summary for test class RtcTest"},
-				{startString: "==========> SoftRebootTest <==========", endString: "Summary for test class SoftRebootTest"},
-				{startString: "==========> NetstackIperfTest <==========", endString: "Summary for test class NetstackIperfTest"},
+			String:          "botanist DEBUG: ssh keepalive timed out",
+			Type:            swarmingOutputType,
+			AlwaysFlake:     true,
+			AttributeToTest: true,
+			AddTag:          true,
+			ExceptStrings: []string{
+				"Reboot(UserRequest)",
+				"REBOOT REASON (USER REQUEST)",
+				"Successfully rebooted",
+				"Successfully powered off",
+				"dm reboot",
+				"==========> NetstackIperfTest <==========",
 			},
 		},
 		&stringInLogCheck{

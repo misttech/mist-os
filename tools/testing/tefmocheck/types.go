@@ -4,7 +4,10 @@
 
 package tefmocheck
 
-import "go.fuchsia.dev/fuchsia/tools/testing/runtests"
+import (
+	"go.fuchsia.dev/fuchsia/tools/build"
+	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
+)
 
 // TestingOutputs are the outputs of a testing Swarming task that are analyzed by a FailureModeCheck.
 type TestingOutputs struct {
@@ -48,6 +51,8 @@ type FailureModeCheck interface {
 	// IsFlake is true if the check is associated with a flaked test and
 	// this check should also be reported as a flake instead of a failure.
 	IsFlake() bool
+	// Tags are the tags to append to the test result.
+	Tags() []build.TestTag
 }
 
 // baseCheck provides default implementations of the FailureModeCheck interface.
@@ -73,4 +78,8 @@ func (c baseCheck) OutputFiles() []string {
 
 func (c baseCheck) IsFlake() bool {
 	return false
+}
+
+func (c baseCheck) Tags() []build.TestTag {
+	return nil
 }

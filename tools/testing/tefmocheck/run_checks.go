@@ -44,6 +44,7 @@ func RunChecks(checks []FailureModeCheck, to *TestingOutputs, outputsDir string)
 			Cases:     []runtests.TestCaseResult{},
 			Result:    runtests.TestFailure,
 			StartTime: time.Now(), // needed by ResultDB
+			Tags:      check.Tags(),
 		}
 		if len(outputsDir) > 0 {
 			outputFile := debugPathForCheck(check)
