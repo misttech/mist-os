@@ -1,0 +1,81 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/sys/test_runners/rust/default.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        binary: "bin/dictionaries_integration_test_bin",
+    },
+
+    // Use static components, not RealmBuilder, because we want this to be an
+    // end to end test that covers cmc.
+    children: [
+        {
+            name: "trigger_a",
+            url: "#meta/trigger_a.cm",
+        },
+        {
+            name: "trigger_b",
+            url: "#meta/trigger_b.cm",
+        },
+        {
+            name: "trigger_c",
+            url: "#meta/trigger_c.cm",
+        },
+        {
+            name: "echo_server",
+            url: "#meta/echo_server.cm",
+        },
+    ],
+    capabilities: [
+        {
+            extends: "#trigger_c/dict",
+            dictionary: "inner",
+        },
+        { dictionary: "outer" },
+    ],
+    use: [
+        {
+            protocol: "fidl.test.components.Trigger-a",
+            from: "self/outer",
+        },
+        {
+            protocol: [
+                "fidl.test.components.Trigger-b",
+                "fidl.test.components.Trigger-c",
+            ],
+            from: "self/outer/inner",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fidl.examples.routing.echo.Echo",
+            from: "#echo_server",
+            to: [
+                "#trigger_a",
+                "#trigger_b",
+                "#trigger_c",
+            ],
+        },
+        {
+            protocol: "fidl.test.components.Trigger",
+            from: "#trigger_a",
+            as: "fidl.test.components.Trigger-a",
+            to: "self/outer",
+        },
+        {
+            protocol: "fidl.test.components.Trigger",
+            from: "#trigger_b",
+            as: "fidl.test.components.Trigger-b",
+            to: "self/inner",
+        },
+        {
+            from: "self",
+            to: "self/outer",
+            dictionary: "inner",
+        },
+    ],
+}

@@ -32,6 +32,7 @@ group("hermetic_tests") {
     "crash_introspect:tests",
     "destruction:destruction_integration_test",
     "diagnostics:tests",
+    "dictionaries:tests",
     "dynamic_offers:tests",
     "elf_runner:tests",
     "events:events_integration_test",
