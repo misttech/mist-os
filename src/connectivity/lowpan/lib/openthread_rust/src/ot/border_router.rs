@@ -90,6 +90,10 @@ pub trait BorderRouter {
     fn border_routing_process_icmp6_ra(&self, message: &[u8]) -> Result<(), WrongSize>;
 
     /// Functional equivalent of
+    /// [`otsys::otBorderRoutingGetPdProcessedRaInfo`](crate::otsys::otBorderRoutingGetPdProcessedRaInfo).
+    fn border_routing_get_pd_processed_ra_info(&self) -> PdProcessedRaInfo;
+
+    /// Functional equivalent of
     /// [`otsys::otBorderRouterGetNextRoute`](crate::otsys::otBorderRouterGetNextRoute).
     // TODO: Determine if the underlying implementation of
     //       this method has undefined behavior when network data
@@ -175,6 +179,10 @@ impl<T: BorderRouter + Boxable> BorderRouter for ot::Box<T> {
 
     fn border_routing_process_icmp6_ra(&self, message: &[u8]) -> Result<(), WrongSize> {
         self.as_ref().border_routing_process_icmp6_ra(message)
+    }
+
+    fn border_routing_get_pd_processed_ra_info(&self) -> PdProcessedRaInfo {
+        self.as_ref().border_routing_get_pd_processed_ra_info()
     }
 
     fn iter_next_local_external_route(
@@ -272,6 +280,14 @@ impl BorderRouter for Instance {
             )
         }
         Ok(())
+    }
+
+    fn border_routing_get_pd_processed_ra_info(&self) -> PdProcessedRaInfo {
+        let mut info = PdProcessedRaInfo::default();
+        unsafe {
+            otBorderRoutingGetPdProcessedRaInfo(self.as_ot_ptr(), info.as_ot_mut_ptr());
+        }
+        info
     }
 
     fn iter_next_local_external_route(

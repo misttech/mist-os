@@ -25,6 +25,9 @@ pub trait Trel {
 
     /// Reset TREL counters
     fn trel_reset_counters(&self);
+
+    /// Return the count of TREL peer
+    fn trel_get_number_of_peers(&self) -> u16;
 }
 
 impl<T: Trel + Boxable> Trel for ot::Box<T> {
@@ -43,6 +46,10 @@ impl<T: Trel + Boxable> Trel for ot::Box<T> {
     fn trel_reset_counters(&self) {
         self.as_ref().trel_reset_counters()
     }
+
+    fn trel_get_number_of_peers(&self) -> u16 {
+        self.as_ref().trel_get_number_of_peers()
+    }
 }
 
 impl Trel for Instance {
@@ -60,6 +67,10 @@ impl Trel for Instance {
 
     fn trel_reset_counters(&self) {
         unsafe { otTrelResetCounters(self.as_ot_ptr()) }
+    }
+
+    fn trel_get_number_of_peers(&self) -> u16 {
+        unsafe { otTrelGetNumberOfPeers(self.as_ot_ptr()) }
     }
 }
 

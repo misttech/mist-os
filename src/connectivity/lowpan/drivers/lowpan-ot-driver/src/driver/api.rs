@@ -1046,7 +1046,24 @@ where
             leader_data: Some((&ot.get_leader_data().ok().unwrap_or_default()).into_ext()),
             uptime: Some(ot.get_uptime().into_nanos()),
             trel_counters: ot.trel_get_counters().map(|x| x.into_ext()),
+            trel_peers_info: Some(fidl_fuchsia_lowpan_experimental::TrelPeersInfo {
+                num_trel_peers: Some(ot.trel_get_number_of_peers().into()),
+                ..Default::default()
+            }),
             nat64_info: Some(nat64_info),
+            upstream_dns_info: Some(fidl_fuchsia_lowpan_experimental::UpstreamDnsInfo {
+                upstream_dns_query_state: match ot.dnssd_upstream_query_is_enabled() {
+                    true => Some(fidl_fuchsia_lowpan_experimental::UpstreamDnsQueryState::UpstreamdnsQueryStateEnabled),
+                    false => Some(fidl_fuchsia_lowpan_experimental::UpstreamDnsQueryState::UpstreamdnsQueryStateDisabled),
+                },
+                ..Default::default()
+            }),
+            dhcp6pd_info: Some(fidl_fuchsia_lowpan_experimental::Dhcp6PdInfo {
+                dhcp6pd_state: Some((&ot.border_routing_dhcp6_pd_get_state()).into_ext()),
+                pd_processed_ra_info: Some((&ot.border_routing_get_pd_processed_ra_info()).into_ext()),
+                hashed_pd_prefix: None,
+                ..Default::default()
+            }),
             ..Default::default()
         })
     }

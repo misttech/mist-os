@@ -307,6 +307,10 @@ pub trait Dnssd {
     /// Functional equivalent of
     /// [`otsys::otDnssdGetCounters`](crate::otsys::otDnssdGetCounters).
     fn dnssd_get_counters(&self) -> &DnssdCounters;
+
+    /// Functional equivalent of
+    /// [`otsys::otDnssdUpstreamQueryIsEnabled`](crate::otsys::otDnssdUpstreamQueryIsEnabled)
+    fn dnssd_upstream_query_is_enabled(&self) -> bool;
 }
 
 impl<T: Dnssd + Boxable> Dnssd for ot::Box<T> {
@@ -357,6 +361,10 @@ impl<T: Dnssd + Boxable> Dnssd for ot::Box<T> {
 
     fn dnssd_get_counters(&self) -> &DnssdCounters {
         self.as_ref().dnssd_get_counters()
+    }
+
+    fn dnssd_upstream_query_is_enabled(&self) -> bool {
+        self.as_ref().dnssd_upstream_query_is_enabled()
     }
 }
 
@@ -492,6 +500,10 @@ impl Dnssd for Instance {
 
     fn dnssd_get_counters(&self) -> &DnssdCounters {
         unsafe { DnssdCounters::ref_from_ot_ptr(otDnssdGetCounters(self.as_ot_ptr())).unwrap() }
+    }
+
+    fn dnssd_upstream_query_is_enabled(&self) -> bool {
+        unsafe { otDnssdUpstreamQueryIsEnabled(self.as_ot_ptr()) }
     }
 }
 

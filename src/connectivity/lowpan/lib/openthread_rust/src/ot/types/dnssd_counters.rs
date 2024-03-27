@@ -48,4 +48,35 @@ impl DnssdCounters {
     pub fn resolved_by_srp(&self) -> u32 {
         self.0.mResolvedBySrp
     }
+
+    /// Represents the count of queries, responses, failures handled by upstream DNS server
+    pub fn upstream_dns_counters(&self) -> UpstreamDnsCounters {
+        self.0.mUpstreamDnsCounters.into()
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+#[repr(transparent)]
+/// Represents the count of queries, responses, failures handled by upstream DNS server
+///
+/// Functional equivalent of [`otsys::otUpstreamDnsCounters`](crate::otsys::otUpstreamDnsCounters).
+pub struct UpstreamDnsCounters(pub otUpstreamDnsCounters);
+
+impl_ot_castable!(UpstreamDnsCounters, otUpstreamDnsCounters);
+
+impl UpstreamDnsCounters {
+    /// The number of queries forwarded
+    pub fn queries(&self) -> u32 {
+        self.0.mQueries
+    }
+
+    /// The number of responses forwarded
+    pub fn responses(&self) -> u32 {
+        self.0.mResponses
+    }
+
+    /// The number of upstream DNS failures
+    pub fn failures(&self) -> u32 {
+        self.0.mFailures
+    }
 }

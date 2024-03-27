@@ -180,6 +180,10 @@ impl FromExt<&ot::BorderRoutingCounters>
             rs_rx: Some(x.rs_rx()),
             rs_tx_success: Some(x.rs_tx_success()),
             rs_tx_failure: Some(x.rs_tx_failure()),
+            inbound_internet_packets: Some(x.inbound_internet().packets()),
+            inbound_internet_bytes: Some(x.inbound_internet().bytes()),
+            outbound_internet_packets: Some(x.outbound_internet().packets()),
+            outbound_internet_bytes: Some(x.outbound_internet().bytes()),
             ..Default::default()
         }
     }
@@ -195,6 +199,12 @@ impl FromExt<&ot::DnssdCounters> for fidl_fuchsia_lowpan_experimental::DnssdCoun
             not_implemented_response: Some(x.not_implemented_response()),
             other_response: Some(x.other_response()),
             resolved_by_srp: Some(x.resolved_by_srp()),
+            upstream_dns_counters: Some(fidl_fuchsia_lowpan_experimental::UpstreamDnsCounters {
+                queries: Some(x.upstream_dns_counters().queries()),
+                responses: Some(x.upstream_dns_counters().responses()),
+                failures: Some(x.upstream_dns_counters().failures()),
+                ..Default::default()
+            }),
             ..Default::default()
         }
     }
@@ -265,6 +275,33 @@ impl FromExt<&ot::Nat64State> for fidl_fuchsia_lowpan_experimental::Nat64State {
             ot::Nat64State::Active => {
                 fidl_fuchsia_lowpan_experimental::Nat64State::Nat64StateActive
             }
+        }
+    }
+}
+
+impl FromExt<&ot::BorderRoutingDhcp6PdState> for fidl_fuchsia_lowpan_experimental::Dhcp6PdState {
+    fn from_ext(x: &ot::BorderRoutingDhcp6PdState) -> Self {
+        match x {
+            ot::BorderRoutingDhcp6PdState::Disabled => {
+                fidl_fuchsia_lowpan_experimental::Dhcp6PdState::Dhcp6PdStateDisabled
+            }
+            ot::BorderRoutingDhcp6PdState::Stopped => {
+                fidl_fuchsia_lowpan_experimental::Dhcp6PdState::Dhcp6PdStateStopped
+            }
+            ot::BorderRoutingDhcp6PdState::Running => {
+                fidl_fuchsia_lowpan_experimental::Dhcp6PdState::Dhcp6PdStateRunning
+            }
+        }
+    }
+}
+
+impl FromExt<&ot::PdProcessedRaInfo> for fidl_fuchsia_lowpan_experimental::PdProcessedRaInfo {
+    fn from_ext(x: &ot::PdProcessedRaInfo) -> Self {
+        fidl_fuchsia_lowpan_experimental::PdProcessedRaInfo {
+            num_platform_ra_received: Some(x.num_platform_ra_received()),
+            num_platform_pio_processed: Some(x.num_platform_pio_processed()),
+            last_platform_ra_msec: Some(x.last_platform_ra_msec()),
+            ..Default::default()
         }
     }
 }

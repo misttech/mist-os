@@ -745,6 +745,25 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                         dnssd_counters_child
                                             .record_uint("resolved_by_srp", y.into());
                                     }
+                                    if let Some(y) = x.upstream_dns_counters {
+                                        dnssd_counters_child.record_child(
+                                            "upstream_dns_counters",
+                                            |upstream_dns_counters_node| {
+                                                if let Some(z) = y.queries {
+                                                    upstream_dns_counters_node
+                                                        .record_uint("queries", z.into());
+                                                }
+                                                if let Some(z) = y.responses {
+                                                    upstream_dns_counters_node
+                                                        .record_uint("responses", z.into());
+                                                }
+                                                if let Some(z) = y.failures {
+                                                    upstream_dns_counters_node
+                                                        .record_uint("failures", z.into());
+                                                }
+                                            },
+                                        );
+                                    }
                                 },
                             );
                         }
@@ -819,6 +838,22 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                     if let Some(y) = x.rs_tx_failure {
                                         border_routing_counters_child
                                             .record_uint("rs_tx_failure", y.into());
+                                    }
+                                    if let Some(y) = x.inbound_internet_packets {
+                                        border_routing_counters_child
+                                            .record_uint("inbound_internet_packets", y.into());
+                                    }
+                                    if let Some(y) = x.inbound_internet_bytes {
+                                        border_routing_counters_child
+                                            .record_uint("inbound_internet_bytes", y.into());
+                                    }
+                                    if let Some(y) = x.outbound_internet_packets {
+                                        border_routing_counters_child
+                                            .record_uint("outbound_internet_packets", y.into());
+                                    }
+                                    if let Some(y) = x.outbound_internet_bytes {
+                                        border_routing_counters_child
+                                            .record_uint("outbound_internet_bytes", y.into());
                                     }
                                 },
                             );
@@ -1122,6 +1157,60 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                             }
                                         },
                                     );
+                                }
+                            });
+                        }
+                        if let Some(x) = telemetry_data.trel_peers_info {
+                            inspector.root().record_child("trel_peers_info", |trel_peers_node| {
+                                if let Some(y) = x.num_trel_peers {
+                                    trel_peers_node.record_uint("num_trel_peers", y.into());
+                                }
+                            });
+                        }
+                        if let Some(x) = telemetry_data.upstream_dns_info {
+                            inspector.root().record_child(
+                                "upstream_dns_info",
+                                |upstream_dns_info_node| {
+                                    if let Some(y) = x.upstream_dns_query_state {
+                                        upstream_dns_info_node.record_string(
+                                            "upstream_dns_query_state",
+                                            format!("{:?}", y),
+                                        );
+                                    }
+                                },
+                            );
+                        }
+                        if let Some(x) = telemetry_data.dhcp6pd_info {
+                            inspector.root().record_child("dhcp6pd_info", |dhcp6pd_info_node| {
+                                if let Some(y) = x.dhcp6pd_state {
+                                    dhcp6pd_info_node
+                                        .record_string("dhcp6pd_state", format!("{:?}", y));
+                                }
+                                if let Some(y) = x.pd_processed_ra_info {
+                                    dhcp6pd_info_node.record_child(
+                                        "pd_processed_ra_info",
+                                        |pd_processed_ra_info_node| {
+                                            if let Some(z) = y.num_platform_ra_received {
+                                                pd_processed_ra_info_node.record_uint(
+                                                    "num_platform_ra_received",
+                                                    z.into(),
+                                                );
+                                            }
+                                            if let Some(z) = y.num_platform_pio_processed {
+                                                pd_processed_ra_info_node.record_uint(
+                                                    "num_platform_pio_processed",
+                                                    z.into(),
+                                                );
+                                            }
+                                            if let Some(z) = y.last_platform_ra_msec {
+                                                pd_processed_ra_info_node
+                                                    .record_uint("last_platform_ra_msec", z.into());
+                                            }
+                                        },
+                                    );
+                                }
+                                if let Some(y) = x.hashed_pd_prefix {
+                                    dhcp6pd_info_node.record_bytes("hashed_pd_prefix", y);
                                 }
                             });
                         }
