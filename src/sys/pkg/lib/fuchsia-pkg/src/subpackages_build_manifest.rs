@@ -177,6 +177,9 @@ mod tests {
         std::fs::File,
     };
 
+    const FAKE_ABI_REVISION: version_history::AbiRevision =
+        version_history::AbiRevision::from_u64(0xdc6e746980ce30a9);
+
     #[test]
     fn test_deserialize() {
         let tmp = tempfile::tempdir().unwrap();
@@ -198,12 +201,12 @@ mod tests {
         let meta_package = MetaPackage::from_name(pkg2_name.clone());
         meta_package.serialize(File::create(&pkg2_meta_package_file).unwrap()).unwrap();
 
-        let mut builder = PackageBuilder::new_without_abi_revision(&pkg1_name);
+        let mut builder = PackageBuilder::new(&pkg1_name, FAKE_ABI_REVISION);
         builder.manifest_path(&pkg1_package_manifest_file);
         let manifest = builder.build(dir, pkg1_meta_far_file).unwrap();
         let pkg1_hash = manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;
 
-        let mut builder = PackageBuilder::new_without_abi_revision(&pkg2_name);
+        let mut builder = PackageBuilder::new(&pkg2_name, FAKE_ABI_REVISION);
         builder.manifest_path(&pkg2_package_manifest_file);
         let manifest = builder.build(dir, pkg2_meta_far_file).unwrap();
         let pkg2_hash = manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;
@@ -297,7 +300,7 @@ mod tests {
         );
 
         // It should work once we write the files.
-        let mut builder = PackageBuilder::new_without_abi_revision("pkg");
+        let mut builder = PackageBuilder::new("pkg", FAKE_ABI_REVISION);
         builder.manifest_path(&pkg_package_manifest_file);
         let package_manifest = builder.build(dir, pkg_meta_far_file).unwrap();
         let pkg_hash = package_manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;
@@ -348,7 +351,7 @@ mod tests {
         );
 
         // It should work once we write the files.
-        let mut builder = PackageBuilder::new_without_abi_revision("pkg");
+        let mut builder = PackageBuilder::new("pkg", FAKE_ABI_REVISION);
         builder.manifest_path(&pkg_package_manifest_file);
         let package_manifest = builder.build(dir, pkg_meta_far_file).unwrap();
         let pkg_hash = package_manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;

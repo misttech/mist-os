@@ -245,8 +245,7 @@ mod tests {
     }
 
     fn create_package(pkg_dir: &Utf8Path) -> Package {
-        let mut builder = PackageBuilder::new_without_abi_revision("some_pkg_name");
-        builder.deprecated_abi_revision(0x406C7CA7EF077DB4.into());
+        let mut builder = PackageBuilder::new("some_pkg_name", 0x406C7CA7EF077DB4.into());
         builder.add_contents_as_blob("bin", BIN_CONTENTS, pkg_dir).unwrap();
         builder.add_contents_as_blob("lib", LIB_CONTENTS, pkg_dir).unwrap();
 

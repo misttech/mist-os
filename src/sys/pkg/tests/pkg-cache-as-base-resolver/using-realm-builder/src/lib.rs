@@ -423,13 +423,15 @@ async fn resolve_component() {
     })
     .unwrap();
     let config_data = fidl::persist(&fcomponent_decl::ConfigValuesData::default()).unwrap();
-    let base_pkg = fuchsia_pkg_testing::PackageBuilder::new("a-base-package")
-        .abi_revision(0x601665c5b1a89c7f.into())
-        .add_resource_at("meta/manifest.cm", &*manifest)
-        .add_resource_at("meta/config-data.cvf", &*config_data)
-        .build()
-        .await
-        .unwrap();
+    let base_pkg = fuchsia_pkg_testing::PackageBuilder::new_with_abi_revision(
+        "a-base-package",
+        0x601665c5b1a89c7f.into(),
+    )
+    .add_resource_at("meta/manifest.cm", &*manifest)
+    .add_resource_at("meta/config-data.cvf", &*config_data)
+    .build()
+    .await
+    .unwrap();
     let env = TestEnvBuilder::new().static_packages(&[&base_pkg]).await.build().await;
 
     let fcomponent_resolution::Component {

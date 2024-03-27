@@ -34,14 +34,13 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
         PackageBuildManifest::from_pm_fini(BufReader::new(package_build_manifest))
             .with_context(|| format!("reading {}", cmd.package_build_manifest_path))?;
 
-    let mut builder = PackageBuilder::from_package_build_manifest(&package_build_manifest)
-        .with_context(|| {
-            format!("creating package manifest from {}", cmd.package_build_manifest_path)
-        })?;
-
-    if let Some(abi_revision) = get_abi_revision(&cmd)? {
-        builder.deprecated_abi_revision(abi_revision);
-    }
+    let mut builder = PackageBuilder::from_package_build_manifest(
+        &package_build_manifest,
+        get_abi_revision(&cmd)?,
+    )
+    .with_context(|| {
+        format!("creating package manifest from {}", cmd.package_build_manifest_path)
+    })?;
 
     if let Some(published_name) = &cmd.published_name {
         builder.published_name(published_name);
@@ -156,12 +155,11 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
     Ok(())
 }
 
-fn get_abi_revision(cmd: &PackageBuildCommand) -> Result<Option<AbiRevision>> {
+fn get_abi_revision(cmd: &PackageBuildCommand) -> Result<AbiRevision> {
     if let Some(api_level) = cmd.api_level {
-        let abi_revision = HISTORY.check_api_level_for_build(api_level)?;
-        Ok(Some(abi_revision))
+        Ok(HISTORY.check_api_level_for_build(api_level)?)
     } else {
-        Ok(None)
+        Ok(HISTORY.get_default_abi_revision_for_swd())
     }
 }
 
@@ -689,5 +687,59 @@ mod test {
                 {empty_file_hash}={empty_file_path}\n"
             ),
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_build_package_with_abi_revision_file_rejected() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let root = Utf8Path::from_path(tempdir.path()).unwrap();
+
+        let out = root.join("out");
+
+        // Write the MetaPackage file.
+        let meta_package_path = root.join("package");
+        let meta_package_file = File::create(&meta_package_path).unwrap();
+        let meta_package = MetaPackage::from_name("my-package".parse().unwrap());
+        meta_package.serialize(meta_package_file).unwrap();
+
+        let supported_version = HISTORY.get_example_supported_version_for_tests();
+
+        // Write the creation manifest file.
+        let package_build_manifest_path = root.join("package-build.manifest");
+        let mut package_build_manifest = File::create(&package_build_manifest_path).unwrap();
+
+        // Create a properly-formatted ABI revision file.
+        let abi_stamp_path = root.join("abi_stamp");
+        std::fs::write(&abi_stamp_path, supported_version.abi_revision.as_bytes()).unwrap();
+
+        package_build_manifest
+            .write_all(
+                format!(
+                    "meta/package={meta_package_path}\n\
+                     meta/fuchsia.abi/abi-revision={abi_stamp_path}\n"
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+
+        // Building the package will fail, because the ABI revision must be
+        // specified on the command line (via the --api-level flag), rather than
+        // via the manifest.
+        let err = cmd_package_build(PackageBuildCommand {
+            package_build_manifest_path,
+            out: out.clone(),
+            api_level: Some(supported_version.api_level),
+            repository: None,
+            published_name: Some("published-name".into()),
+            depfile: true,
+            blobs_json: true,
+            blobs_manifest: true,
+            subpackages_build_manifest_path: None,
+        })
+        .await
+        .unwrap_err();
+
+        let err_string = format!("{:?}", err);
+        assert!(err_string.contains("--api-level"), "Wrong error message: {err_string}");
     }
 }

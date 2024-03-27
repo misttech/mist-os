@@ -102,7 +102,8 @@ impl Package {
         let meta_package = package_directory.meta_package().await.context("read meta/package")?;
         let abi_revision = package_directory.abi_revision().await.context("read abi revision")?;
 
-        let mut pkg = PackageBuilder::new(meta_package.name().as_ref()).abi_revision(abi_revision);
+        let mut pkg =
+            PackageBuilder::new_with_abi_revision(meta_package.name().as_ref(), abi_revision);
 
         fn is_generated_file(path: &Path) -> bool {
             matches!(
@@ -505,7 +506,6 @@ impl<T: Into<Error>> From<T> for VerificationError {
 pub struct PackageBuilder {
     name: PackageName,
     contents: BTreeMap<PathBuf, PackageEntry>,
-    abi_revision: Option<AbiRevision>,
 
     has_subpackages: bool,
     // If None the package has subpackages but this `PackageBuilder` does not have the blobs
@@ -526,6 +526,17 @@ impl PackageBuilder {
     /// * `name` is an invalid package name.
     /// * Creating a tempdir fails.
     pub fn new(name: impl Into<String>) -> Self {
+        Self::new_with_abi_revision(
+            name,
+            // Default to ABI revision for API level 7.
+            0xECCEA2F70ACD6FC0.into(),
+        )
+    }
+
+    /// Creates a new `PackageBuilder`, just like `PackageBuilder::new()`, but
+    /// allowing the caller to specify the ABI revision with which to stamp the
+    /// test package.
+    pub fn new_with_abi_revision(name: impl Into<String>, abi_revision: AbiRevision) -> Self {
         let name = name.into();
 
         let artifacts_tmp = tempfile::tempdir().expect("create tempdir for package");
@@ -535,7 +546,7 @@ impl PackageBuilder {
 
         fs::create_dir(artifacts.join("contents")).expect("create /packages/contents");
 
-        let mut builder = fuchsia_pkg::PackageBuilder::new_without_abi_revision(&name);
+        let mut builder = fuchsia_pkg::PackageBuilder::new(&name, abi_revision);
         builder.manifest_path(artifacts.join("manifest.json"));
         builder.repository("fuchsia.com");
         builder.manifest_blobs_relative_to(fuchsia_pkg::RelativeTo::File);
@@ -544,25 +555,11 @@ impl PackageBuilder {
             builder,
             name: name.try_into().unwrap(),
             contents: BTreeMap::new(),
-            abi_revision: None,
             has_subpackages: false,
             subpackage_blobs: Some(HashMap::new()),
             _artifacts_tmp: artifacts_tmp,
             artifacts,
         }
-    }
-
-    /// Set the ABI Revision that should be included in the package.
-    ///
-    /// # Panics
-    ///
-    /// Panics if ABI Revision has already been set (including by being indirectly set by the API
-    /// level).
-    pub fn abi_revision(mut self, abi_revision: AbiRevision) -> Self {
-        assert_eq!(self.abi_revision, None);
-        self.abi_revision = Some(abi_revision);
-        self.builder.deprecated_abi_revision(abi_revision);
-        self
     }
 
     /// Create a subdirectory within the package.
@@ -683,13 +680,7 @@ impl PackageBuilder {
     }
 
     /// Builds the package.
-    pub async fn build(mut self) -> Result<Package, Error> {
-        // If an ABI revision wasn't specified, default to a pinned one so that merkles won't
-        // change when we create a new ABI revision.
-        if self.abi_revision == None {
-            self.builder.deprecated_abi_revision(0xECCEA2F70ACD6FC0.into());
-        }
-
+    pub async fn build(self) -> Result<Package, Error> {
         // self.artifacts contains outputs from package creation (manifest.json/meta.far) as well
         // as all blobs contained in the package.
         //
@@ -899,7 +890,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_from_dir() {
-        let abi_revision = version_history::HISTORY.get_default_abi_revision_for_swd();
+        let abi_revision = AbiRevision::from_u64(0x5836508c2defac54); // Random value.
 
         let root = {
             let dir = tempfile::tempdir().unwrap();
@@ -922,8 +913,7 @@ mod tests {
 
         let from_dir = Package::from_dir(root.path()).await.unwrap();
 
-        let pkg = PackageBuilder::new("asdf")
-            .abi_revision(abi_revision)
+        let pkg = PackageBuilder::new_with_abi_revision("asdf", abi_revision)
             .add_resource_at("data/hello", "world".as_bytes())
             .build()
             .await

@@ -1704,6 +1704,9 @@ mod tests {
         );
     }
 
+    const FAKE_ABI_REVISION: version_history::AbiRevision =
+        version_history::AbiRevision::from_u64(0x7171611eb2b7b74a);
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_conflicting_package_manifests_errors_out() {
         let tmp = tempfile::tempdir().unwrap();
@@ -1724,7 +1727,7 @@ mod tests {
         // Whoops, we created a package with the same package name but with different contents.
         let pkg2_dir = dir.join("package2");
         let pkg2_meta_far_path = pkg2_dir.join("meta.far");
-        let pkg2_manifest = PackageBuilder::new_without_abi_revision("package1")
+        let pkg2_manifest = PackageBuilder::new("package1", FAKE_ABI_REVISION)
             .build(&pkg2_dir, &pkg2_meta_far_path)
             .unwrap();
         let pkg2_manifest_path = pkg2_dir.join("package2.manifest");
@@ -1757,7 +1760,7 @@ mod tests {
         let pkg1_dir = dir.join("package1");
         let pkg1_meta_far_path = pkg1_dir.join("meta.far");
         let pkg1_manifest = {
-            let mut builder = PackageBuilder::new_without_abi_revision("package1");
+            let mut builder = PackageBuilder::new("package1", FAKE_ABI_REVISION);
             builder.add_contents_as_blob("bin/shared", contents, &pkg1_dir).unwrap();
             builder.build(&pkg1_dir, &pkg1_meta_far_path).unwrap()
         };
@@ -1768,7 +1771,7 @@ mod tests {
         let pkg2_dir = dir.join("package2");
         let pkg2_meta_far_path = pkg2_dir.join("meta.far");
         let pkg2_manifest = {
-            let mut builder = PackageBuilder::new_without_abi_revision("package2");
+            let mut builder = PackageBuilder::new("package2", FAKE_ABI_REVISION);
             builder.add_contents_as_blob("bin/shared", contents, &pkg2_dir).unwrap();
             builder.build(&pkg2_dir, &pkg2_meta_far_path).unwrap()
         };
@@ -1824,7 +1827,7 @@ mod tests {
         let pkg1_dir = dir.join("package1");
         let pkg1_meta_far_path = pkg1_dir.join("meta.far");
         let pkg1_manifest = {
-            let mut builder = PackageBuilder::new_without_abi_revision("package1");
+            let mut builder = PackageBuilder::new("package1", FAKE_ABI_REVISION);
             builder.add_contents_as_blob("bin/shared", contents, &pkg1_dir).unwrap();
             builder.build(&pkg1_dir, &pkg1_meta_far_path).unwrap()
         };
@@ -1835,7 +1838,7 @@ mod tests {
         let pkg2_dir = dir.join("package2");
         let pkg2_meta_far_path = pkg2_dir.join("meta.far");
         let pkg2_manifest = {
-            let mut builder = PackageBuilder::new_without_abi_revision("package2");
+            let mut builder = PackageBuilder::new("package2", FAKE_ABI_REVISION);
             builder.add_contents_as_blob("bin/shared", contents, &pkg2_dir).unwrap();
             builder.build(&pkg2_dir, &pkg2_meta_far_path).unwrap()
         };
@@ -1892,7 +1895,7 @@ mod tests {
         // Whoops, we created a package with the same package name but with different contents.
         let pkg2_dir = dir.join("package2");
         let pkg2_meta_far_path = pkg2_dir.join("meta.far");
-        let pkg2_manifest = PackageBuilder::new_without_abi_revision("package1")
+        let pkg2_manifest = PackageBuilder::new("package1", FAKE_ABI_REVISION)
             .build(&pkg2_dir, &pkg2_meta_far_path)
             .unwrap();
         let pkg2_manifest_path = pkg2_dir.join("package2.manifest");
@@ -1938,7 +1941,7 @@ mod tests {
         // Whoops, we created a package with the same package name but with different contents.
         let pkg2_dir = dir.join("package2");
         let pkg2_meta_far_path = pkg2_dir.join("meta.far");
-        let pkg2_manifest = PackageBuilder::new_without_abi_revision("package1")
+        let pkg2_manifest = PackageBuilder::new("package1", FAKE_ABI_REVISION)
             .build(&pkg2_dir, &pkg2_meta_far_path)
             .unwrap();
         let pkg2_manifest_path = pkg2_dir.join("package2.manifest");
@@ -2004,7 +2007,7 @@ mod tests {
         let pkg1_dir = dir.join("package1");
         let pkg1_meta_far_path = pkg1_dir.join("meta.far");
         let pkg1_manifest = {
-            let mut builder = PackageBuilder::new_without_abi_revision("package1");
+            let mut builder = PackageBuilder::new("package1", FAKE_ABI_REVISION);
             builder.add_contents_as_blob("bin/blob1", b"blob1", &pkg1_dir).unwrap();
             builder.add_contents_as_blob("bin/blob2", b"blob2", &pkg1_dir).unwrap();
             builder.build(&pkg1_dir, &pkg1_meta_far_path).unwrap()

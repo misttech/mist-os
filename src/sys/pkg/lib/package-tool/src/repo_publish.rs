@@ -1229,11 +1229,12 @@ mod tests {
 
         // Package A prime
         let pkgaprime_manifest_path = packages_path.join("packageaprime.json");
-        let (_, pkgaprime_manifest) = test_utils::make_package_manifest_with_api_level(
+        let (_, pkgaprime_manifest) = test_utils::make_package_manifest_with_abi_revision(
             "packagea",
             packages_path.join("pkgaprime").as_std_path(),
             Vec::new(),
-            5.into(),
+            // ABI revision for API level 5
+            0x1FA3D8DDFBEDC6C7.into(),
         );
         serde_json::to_writer(File::create(&pkgaprime_manifest_path).unwrap(), &pkgaprime_manifest)
             .unwrap();

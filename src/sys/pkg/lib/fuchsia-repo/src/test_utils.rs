@@ -200,19 +200,24 @@ pub fn make_package_manifest(
     build_path: &Path,
     subpackages: Vec<(RelativePackageUrl, Hash, PathBuf)>,
 ) -> (PathBuf, PackageManifest) {
-    make_package_manifest_with_api_level(name, build_path, subpackages, 7.into())
+    make_package_manifest_with_abi_revision(
+        name,
+        build_path,
+        subpackages,
+        // ABI revision for API level 7
+        0xECCEA2F70ACD6FC0.into(),
+    )
 }
 
-pub fn make_package_manifest_with_api_level(
+pub fn make_package_manifest_with_abi_revision(
     name: &str,
     build_path: &Path,
     subpackages: Vec<(RelativePackageUrl, Hash, PathBuf)>,
-    api_level: version_history::ApiLevel,
+    abi_revision: version_history::AbiRevision,
 ) -> (PathBuf, PackageManifest) {
     let package_path = build_path.join(name);
 
-    let mut builder = PackageBuilder::new_without_abi_revision(name);
-    builder.deprecated_api_level(api_level).unwrap();
+    let mut builder = PackageBuilder::new(name, abi_revision);
 
     builder
         .add_contents_as_blob(
