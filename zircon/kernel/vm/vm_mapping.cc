@@ -567,7 +567,7 @@ class VmMappingCoalescer {
     AssertHeld(mapping_->lock_ref());
     DEBUG_ASSERT(!aborted_);
     // If this isn't the expected vaddr, flush the run we have first.
-    if (count_ >= ktl::size(phys_) || vaddr != base_ + count_ * PAGE_SIZE) {
+    if (!can_append(vaddr)) {
       zx_status_t status = Flush();
       if (status != ZX_OK) {
         return status;
@@ -579,6 +579,49 @@ class VmMappingCoalescer {
     return ZX_OK;
   }
 
+  zx_status_t AppendOrAdjustMapping(vaddr_t vaddr, paddr_t paddr, uint mmu_flags) {
+    AssertHeld(mapping_->lock_ref());
+    DEBUG_ASSERT(!aborted_);
+    // If this isn't the expected vaddr or mmu_flags have changed, flush the run we have first.
+    if (!can_append(vaddr) || mmu_flags != mmu_flags_) {
+      zx_status_t status = Flush();
+      if (status != ZX_OK) {
+        return status;
+      }
+      base_ = vaddr;
+      mmu_flags_ = mmu_flags;
+    }
+
+    // Query aspace and adjust the mapping if there is already a page mapped here.
+    zx::result result = mapping_->AdjustMapping(vaddr, paddr, mmu_flags_);
+    if (result.is_error()) {
+      return result.status_value();
+    }
+
+    // If page was already mapped, don't add it to the mapping run.
+    if (result.value()) {
+      return ZX_OK;
+    }
+
+    phys_[count_] = paddr;
+    ++count_;
+    return ZX_OK;
+  }
+
+  // How much space remains in the phys_ array, starting from vaddr, that can be used to
+  // opportunistically map additional pages.
+  size_t ExtraPageCapacityFrom(vaddr_t vaddr) {
+    // vaddr must be appendable & the coalescer can't be empty.
+    return (can_append(vaddr) && count_ != 0) ? NumPages - count_ : 0;
+  }
+
+  // Functions for the user to manually manage the pages array. It is up to the user to manage the
+  // page count and ensure the coalescer doesn't overflow, maintains the correct page count and that
+  // the pages are contiguous.
+  paddr_t* GetNextPageSlot() { return &phys_[count_]; }
+
+  void IncrementCount(size_t i) { count_ += i; }
+
   // Submit any outstanding mappings to the MMU.  If this fails, the
   // VmMappingCoalescer is no longer valid.
   zx_status_t Flush();
@@ -588,6 +631,11 @@ class VmMappingCoalescer {
   void Abort() { aborted_ = true; }
 
  private:
+  // Vaddr can be appended if it's the next free slot and the coalescer isn't full.
+  bool can_append(vaddr_t vaddr) {
+    return count_ < ktl::size(phys_) && vaddr == base_ + count_ * PAGE_SIZE;
+  }
+
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmMappingCoalescer);
 
   VmMapping* mapping_;
@@ -595,7 +643,7 @@ class VmMappingCoalescer {
   paddr_t phys_[NumPages];
   size_t count_;
   bool aborted_;
-  const uint mmu_flags_;
+  uint mmu_flags_;
   const ArchVmAspace::ExistingEntryAction existing_entry_action_;
 };
 
@@ -1040,10 +1088,10 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   // Trim out pages to the limit of the VMO.
   max_out_pages = ktl::min(max_out_pages, (vmo_size - vmo_offset) / PAGE_SIZE);
 
-  uint64_t out_pages = 0;
-  __UNINITIALIZED paddr_t pages[kMaxPages];
-
-  bool already_mapped = false;
+  __UNINITIALIZED VmMappingCoalescer<kMaxPages> coalescer(
+      this, va, range.mmu_flags,
+      ENABLE_PAGE_FAULT_UPGRADE ? ArchVmAspace::ExistingEntryAction::Upgrade
+                                : ArchVmAspace::ExistingEntryAction::Skip);
 
   if (likely(object_->is_paged())) {
     VmObjectPaged* object = static_cast<VmObjectPaged*>(object_.get());
@@ -1076,8 +1124,6 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     if (result.is_error()) {
       return result.error_value();
     }
-    pages[0] = result->page->paddr();
-    out_pages = 1;
 
     // We looked up in order to write. Mark as modified.
     if (write) {
@@ -1094,69 +1140,53 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
       range.mmu_flags &= ~ARCH_MMU_FLAG_PERM_WRITE;
     }
 
-    // Query aspace and adjust the mapping if there is already a page mapped here.
-    zx::result map_result = AdjustMapping(va, pages[0], range.mmu_flags);
-    if (map_result.is_error()) {
-      return map_result.status_value();
-    } else {
-      already_mapped = map_result.value();
+    zx_status_t status =
+        coalescer.AppendOrAdjustMapping(va, result->page->paddr(), range.mmu_flags);
+    if (status != ZX_OK) {
+      return status;
     }
+
+    // Check how much space the coalescer has for faulting additional pages.
+    size_t extra_pages = coalescer.ExtraPageCapacityFrom(va + PAGE_SIZE);
+    extra_pages = ktl::min(extra_pages, max_out_pages - 1);
 
     // Acquire any additional pages, but only if they already exist as the user has not actually
     // attempted to use these pages yet.
-    if (max_out_pages > 1 && !already_mapped) {
-      out_pages +=
-          cursor->IfExistPages(result->writable, static_cast<uint>(max_out_pages - 1), &pages[1]);
+    if (extra_pages > 0) {
+      size_t num_pages = cursor->IfExistPages(result->writable, static_cast<uint>(extra_pages),
+                                              coalescer.GetNextPageSlot());
+      coalescer.IncrementCount(num_pages);
     }
+
   } else {
     VmObjectPhysical* object = static_cast<VmObjectPhysical*>(object_.get());
     AssertHeld(object->lock_ref());
 
     // Already validated the size, and since physical VMOs are always allocated, and not resizable,
     // we know we can always retrieve the maximum number of pages without failure.
-    out_pages = max_out_pages;
-    zx_status_t status =
-        object->LookupContiguousLocked(vmo_offset, out_pages * PAGE_SIZE, &pages[0]);
+    uint64_t len = max_out_pages * PAGE_SIZE;
+    paddr_t phys_base = 0;
+    zx_status_t status = object->LookupContiguousLocked(vmo_offset, len, &phys_base);
+
     ASSERT(status == ZX_OK);
 
-    // Query aspace and adjust the mapping if there is already a page mapped here.
-    zx::result result = AdjustMapping(va, pages[0], range.mmu_flags);
-    if (result.is_error()) {
-      return result.status_value();
-    } else {
-      already_mapped = result.value();
+    status = coalescer.AppendOrAdjustMapping(va, phys_base, range.mmu_flags);
+    if (status != ZX_OK) {
+      return status;
     }
 
-    // Extrapolate the remaining pages from the base address.
-    for (uint64_t i = 1; i < out_pages; i++) {
-      pages[i] = pages[0] + i * PAGE_SIZE;
+    // Extrapolate the pages from the base address.
+    for (size_t offset = PAGE_SIZE; offset < len; offset += PAGE_SIZE) {
+      status = coalescer.Append(va + offset, phys_base + offset);
+      if (status != ZX_OK) {
+        return status;
+      }
     }
   }
 
   VM_KTRACE_DURATION(2, "map_page", ("va", ktrace::Pointer{va}), ("pf_flags", pf_flags));
 
-  // Nothing was mapped there before, map it now.
-  if (!already_mapped) {
-    // Assert that we're not accidentally mapping the zero page writable.
-    DEBUG_ASSERT(!(range.mmu_flags & ARCH_MMU_FLAG_PERM_WRITE) ||
-                 ktl::all_of(pages, &pages[out_pages],
-                             [](paddr_t p) { return p != vm_get_zero_page_paddr(); }));
-
-    constexpr ArchVmAspace::ExistingEntryAction existing_action =
-        ENABLE_PAGE_FAULT_UPGRADE ? ArchVmAspace::ExistingEntryAction::Upgrade
-                                  : ArchVmAspace::ExistingEntryAction::Skip;
-    size_t mapped;
-    zx_status_t status =
-        aspace_->arch_aspace().Map(va, pages, out_pages, range.mmu_flags, existing_action, &mapped);
-    if (status != ZX_OK) {
-      ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from map: %d\n", status);
-      TRACEF("failed to map page %d\n", status);
-      return status;
-    }
-    DEBUG_ASSERT(mapped >= 1);
-  }
-
-  return ZX_OK;
+  return coalescer.Flush();
 }
 
 void VmMapping::ActivateLocked() {
