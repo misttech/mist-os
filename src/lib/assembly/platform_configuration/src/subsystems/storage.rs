@@ -142,6 +142,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             builder
                 .package("pkg-cache")
                 .component("meta/pkg-cache.cm")?
+                .field("all_packages_executable", context.build_type == &BuildType::Eng)?
                 .field("use_fxblob", fxfs_blob)?
                 .field("use_system_image", true)?;
 

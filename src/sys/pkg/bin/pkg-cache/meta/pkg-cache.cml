@@ -120,6 +120,14 @@
         },
     ],
     config: {
+        // TODO(https://fxbug.dev/331302451) Use this config value instead of the presence of file
+        // data/pkgfs_disable_executability_restrictions in the system_image package to determine
+        // whether executability should be enforced.
+        //
+        // If true, then all package directories will be executable. Otherwise, only base packages
+        // will be executable.
+        all_packages_executable: { type: "bool" },
+
         // If true, then pkg-cache will use the fuchsia.fxfs.BlobCreator capability from its
         // environment to write blobs and the BlobReader to read and execute blobs.
         // Otherwise, pkg-cache will use the /blob directory to read and write blobs.

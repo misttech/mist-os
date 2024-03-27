@@ -117,7 +117,11 @@ async fn main_inner() -> Result<(), Error> {
     inspector
         .root()
         .record_child("structured_config", |config_node| config.record_inspect(config_node));
-    let pkg_cache_config::Config { use_fxblob, use_system_image } = config;
+    // TODO(https://fxbug.dev/331302451) Use the all_packages_executable config value instead of the
+    // presence of file data/pkgfs_disable_executability_restrictions in the system_image package to
+    // determine whether executability should be enforced.
+    let pkg_cache_config::Config { all_packages_executable: _, use_fxblob, use_system_image } =
+        config;
     let builder = blobfs::Client::builder().readable().writable().executable();
     let blobfs = if use_fxblob { builder.use_creator().use_reader() } else { builder }
         .build()
