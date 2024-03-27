@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/component/cpp/fidl.h>
-
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/node_removal_tracker.h"
 #include "src/devices/bin/driver_manager/tests/driver_manager_test_base.h"

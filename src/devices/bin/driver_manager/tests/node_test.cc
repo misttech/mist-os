@@ -4,8 +4,6 @@
 
 #include "src/devices/bin/driver_manager/node.h"
 
-#include <fuchsia/component/cpp/fidl.h>
-
 #include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "src/devices/bin/driver_manager/composite_node_spec_v2.h"

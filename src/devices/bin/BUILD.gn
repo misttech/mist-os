@@ -17,7 +17,7 @@ group("tests") {
   deps = [
     "driver-index:tests",
     "driver_host:tests",
-    "driver_manager:tests",
+    "driver_manager/tests",
     "driver_playground:tests",
     "driver_runtime:tests",
     "driver_tools:tests",
