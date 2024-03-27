@@ -51,7 +51,7 @@ class TestDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   void RebindCompositeNodeSpec(RebindCompositeNodeSpecRequestView request,
                                RebindCompositeNodeSpecCompleter::Sync& completer) override;
 
-  zx::result<fidl::ClientEnd<fuchsia_driver_index::DriverIndex>> Connect();
+  fidl::ClientEnd<fuchsia_driver_index::DriverIndex> Connect();
 
   // Pop the next completer with the |id| in |completers_| and reply with |result|.
   void ReplyWithMatch(uint32_t id, zx::result<fuchsia_driver_index::MatchDriverResult> result);

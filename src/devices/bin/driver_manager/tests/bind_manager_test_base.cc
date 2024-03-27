@@ -43,13 +43,10 @@ void TestDriverIndex::RebindCompositeNodeSpec(RebindCompositeNodeSpecRequestView
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx::result<fidl::ClientEnd<fdi::DriverIndex>> TestDriverIndex::Connect() {
-  auto endpoints = fidl::CreateEndpoints<fdi::DriverIndex>();
-  if (endpoints.is_error()) {
-    return zx::error(endpoints.status_value());
-  }
-  fidl::BindServer(dispatcher_, std::move(endpoints->server), this);
-  return zx::ok(std::move(endpoints->client));
+fidl::ClientEnd<fdi::DriverIndex> TestDriverIndex::Connect() {
+  auto [client_end, server_end] = fidl::Endpoints<fdi::DriverIndex>::Create();
+  fidl::BindServer(dispatcher_, std::move(server_end), this);
+  return std::move(client_end);
 }
 
 void TestDriverIndex::ReplyWithMatch(uint32_t id, zx::result<fdi::MatchDriverResult> result) {
@@ -107,10 +104,9 @@ void BindManagerTestBase::SetUp() {
 
   driver_index_ = std::make_unique<TestDriverIndex>(dispatcher());
   auto client = driver_index_->Connect();
-  ASSERT_TRUE(client.is_ok());
 
   bridge_ = std::make_unique<TestBindManagerBridge>(
-      fidl::WireClient<fdi::DriverIndex>(std::move(client.value()), dispatcher()));
+      fidl::WireClient<fdi::DriverIndex>(std::move(client), dispatcher()));
 
   bind_manager_ = std::make_unique<TestBindManager>(bridge_.get(), &node_manager_, dispatcher());
   node_manager_.set_bind_manager(bind_manager_.get());

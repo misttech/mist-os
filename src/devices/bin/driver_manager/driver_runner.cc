@@ -451,20 +451,17 @@ void DriverRunner::DestroyDriverComponent(driver_manager::Node& node,
 }
 
 zx::result<DriverHost*> DriverRunner::CreateDriverHost(bool use_next_vdso) {
-  zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
+  auto endpoints = fidl::Endpoints<fio::Directory>::Create();
   std::string name = "driver-host-" + std::to_string(next_driver_host_id_++);
 
   std::shared_ptr<bool> connected = std::make_shared<bool>(false);
   auto create =
-      CreateDriverHostComponent(name, std::move(endpoints->server), connected, use_next_vdso);
+      CreateDriverHostComponent(name, std::move(endpoints.server), connected, use_next_vdso);
   if (create.is_error()) {
     return create.take_error();
   }
 
-  auto client_end = component::ConnectAt<fdh::DriverHost>(endpoints->client);
+  auto client_end = component::ConnectAt<fdh::DriverHost>(endpoints.client);
   if (client_end.is_error()) {
     LOGF(ERROR, "Failed to connect to service '%s': %s",
          fidl::DiscoverableProtocolName<fdh::DriverHost>, client_end.status_string());

@@ -28,13 +28,10 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   FakeDriverIndex(async_dispatcher_t* dispatcher, MatchCallback match_callback)
       : dispatcher_(dispatcher), match_callback_(std::move(match_callback)) {}
 
-  zx::result<fidl::ClientEnd<fuchsia_driver_index::DriverIndex>> Connect() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_driver_index::DriverIndex>();
-    if (endpoints.is_error()) {
-      return zx::error(endpoints.status_value());
-    }
-    fidl::BindServer(dispatcher_, std::move(endpoints->server), this);
-    return zx::ok(std::move(endpoints->client));
+  fidl::ClientEnd<fuchsia_driver_index::DriverIndex> Connect() {
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_driver_index::DriverIndex>::Create();
+    fidl::BindServer(dispatcher_, std::move(server_end), this);
+    return std::move(client_end);
   }
 
   void MatchDriver(MatchDriverRequestView request, MatchDriverCompleter::Sync& completer) override {

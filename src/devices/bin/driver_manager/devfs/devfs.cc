@@ -330,11 +330,7 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
 }
 
 zx::result<fidl::ClientEnd<fio::Directory>> Devfs::Connect(fs::FuchsiaVfs& vfs) {
-  zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fio::Directory>::Create();
   // NB: Serve the `PseudoDir` rather than the root `Devnode` because
   // otherwise we'd end up in the connector code path. Clients that want to open
   // the root node as a device can do so using `"."` and appropriate flags.

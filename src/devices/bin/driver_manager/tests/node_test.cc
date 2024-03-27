@@ -16,13 +16,10 @@ class TestRealm final : public fidl::WireServer<fuchsia_component::Realm> {
  public:
   TestRealm(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
-  zx::result<fidl::ClientEnd<fuchsia_component::Realm>> Connect() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_component::Realm>();
-    if (endpoints.is_error()) {
-      return zx::error(endpoints.status_value());
-    }
-    fidl::BindServer(dispatcher_, std::move(endpoints->server), this);
-    return zx::ok(std::move(endpoints->client));
+  fidl::ClientEnd<fuchsia_component::Realm> Connect() {
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_component::Realm>::Create();
+    fidl::BindServer(dispatcher_, std::move(server_end), this);
+    return std::move(client_end);
   }
 
   void OpenExposedDir(OpenExposedDirRequestView request,
@@ -114,9 +111,8 @@ class Dfv2NodeTest : public DriverManagerTestBase {
     realm_ = std::make_unique<TestRealm>(dispatcher());
 
     auto client = realm_->Connect();
-    ASSERT_TRUE(client.is_ok());
     node_manager = std::make_unique<FakeNodeManager>(
-        fidl::WireClient<fuchsia_component::Realm>(std::move(client.value()), dispatcher()));
+        fidl::WireClient<fuchsia_component::Realm>(std::move(client), dispatcher()));
   }
 
   void StartTestDriver(std::shared_ptr<driver_manager::Node> node,
@@ -142,23 +138,22 @@ class Dfv2NodeTest : public DriverManagerTestBase {
       }));
     }
 
-    auto outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(ZX_OK, outgoing_endpoints.status_value());
+    auto [_, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     auto start_info = fuchsia_component_runner::ComponentStartInfo{{
         .resolved_url = "fuchsia-boot:///#meta/test-driver.cm",
         .program = fuchsia_data::Dictionary{{.entries = std::move(program_entries)}},
-        .outgoing_dir = std::move(outgoing_endpoints->server),
+        .outgoing_dir = std::move(server_end),
     }};
 
     auto controller_endpoints =
-        fidl::CreateEndpoints<fuchsia_component_runner::ComponentController>();
+        fidl::Endpoints<fuchsia_component_runner::ComponentController>::Create();
 
-    node_manager->AddClient(node->name(), std::move(controller_endpoints->client));
+    node_manager->AddClient(node->name(), std::move(controller_endpoints.client));
 
     fidl::Arena arena;
     node->StartDriver(fidl::ToWire(arena, std::move(start_info)),
-                      std::move(controller_endpoints->server),
+                      std::move(controller_endpoints.server),
                       [node](zx::result<> result) { node->CompleteBind(result); });
   }
 

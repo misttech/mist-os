@@ -233,13 +233,11 @@ TEST(Devfs, PassthroughTarget) {
 
   for (const TestRun& test : tests) {
     SCOPED_TRACE(test.file_name);
-    zx::result file_endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-    ASSERT_OK(file_endpoints);
+    auto [_, server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
 
     ASSERT_OK(fidl::WireCall(devfs_client.value())
                   ->Open(fuchsia_io::wire::OpenFlags(), fuchsia_io::wire::ModeType(),
-                         fidl::StringView::FromExternal(test.file_name),
-                         std::move(file_endpoints->server))
+                         fidl::StringView::FromExternal(test.file_name), std::move(server_end))
                   .status());
     loop.Run();
     loop.ResetQuit();

@@ -1101,13 +1101,9 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   }
 
   // Bind the Node associated with the driver.
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-  if (endpoints.is_error()) {
-    cb(zx::error(endpoints.error_value()));
-    return;
-  }
+  auto [client_end, server_end] = fidl::Endpoints<fdf::Node>::Create();
   node_ref_.emplace(
-      dispatcher_, std::move(endpoints->server), this, [](Node* node, fidl::UnbindInfo info) {
+      dispatcher_, std::move(server_end), this, [](Node* node, fidl::UnbindInfo info) {
         node->node_ref_.reset();
         // If the unbind is initiated from us, we don't need to do anything to handle
         // the closure.
@@ -1134,15 +1130,11 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
 
   LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
   // Start the driver within the driver host.
-  zx::result driver_endpoints = fidl::CreateEndpoints<fuchsia_driver_host::Driver>();
-  if (driver_endpoints.is_error()) {
-    cb(driver_endpoints.take_error());
-    return;
-  }
+  auto driver_endpoints = fidl::Endpoints<fuchsia_driver_host::Driver>::Create();
   driver_component_.emplace(*this, std::string(url), std::move(controller),
-                            std::move(driver_endpoints->client));
-  driver_host_.value()->Start(std::move(endpoints->client), name_, properties_, symbols, start_info,
-                              std::move(driver_endpoints->server),
+                            std::move(driver_endpoints.client));
+  driver_host_.value()->Start(std::move(client_end), name_, properties_, symbols, start_info,
+                              std::move(driver_endpoints.server),
                               [weak_self = weak_from_this(), name = name_,
                                cb = std::move(cb)](zx::result<> result) mutable {
                                 auto node_ptr = weak_self.lock();

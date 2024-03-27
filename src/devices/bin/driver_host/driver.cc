@@ -60,19 +60,16 @@ zx::result<fidl::ClientEnd<fio::File>> OpenDriverFile(const fdf::DriverStartArgs
     return pkg.take_error();
   }
   // Open the driver's binary within the driver's package.
-  auto endpoints = fidl::CreateEndpoints<fio::File>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
+  auto [client_end, server_end] = fidl::Endpoints<fio::File>::Create();
   zx_status_t status = fdio_open_at(
       pkg->channel()->get(), relative_binary_path.data(),
       static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightExecutable),
-      endpoints->server.TakeChannel().release());
+      server_end.TakeChannel().release());
   if (status != ZX_OK) {
     LOGF(ERROR, "Failed to start driver; could not open library: %s", zx_status_get_string(status));
     return zx::error(status);
   }
-  return zx::ok(std::move(endpoints->client));
+  return zx::ok(std::move(client_end));
 }
 
 }  // namespace
