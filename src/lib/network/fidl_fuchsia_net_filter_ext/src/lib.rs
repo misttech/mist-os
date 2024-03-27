@@ -80,7 +80,7 @@ mod type_names {
 }
 
 /// Extension type for [`fnet_filter::NamespaceId`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct NamespaceId(pub String);
 
 /// Extension type for [`fnet_filter::RoutineId`].
@@ -931,7 +931,7 @@ impl TryFrom<fnet_filter::Resource> for Resource {
 }
 
 /// Extension type for [`fnet_filter::ControllerId`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ControllerId(pub String);
 
 /// Extension type for [`fnet_filter::Event`].

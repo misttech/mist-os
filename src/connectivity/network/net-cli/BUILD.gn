@@ -61,6 +61,7 @@ rustc_library("lib") {
   ]
 
   sources = [
+    "src/filter.rs",
     "src/lib.rs",
     "src/opts/dhcpd.rs",
     "src/opts/dns.rs",
