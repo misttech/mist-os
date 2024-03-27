@@ -680,3 +680,35 @@ class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(False, f"Should have failed, got {device_env}")
         except execution.DeviceConfigError as e:
             self.assertRegex(str(e), "Failed to get the target name")
+
+    async def test_test_execution_gets_env_from_flags(self) -> None:
+        """Test TestExecution wrapper uses the environment provided by flags"""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            exec_env = environment.ExecutionEnvironment(
+                "/fuchsia", tmp, None, "", ""
+            )
+
+            flags = args.parse_args(
+                ["-e", "foo=bar", "--env", "my_setting=baz"]
+            )
+
+            test = execution.TestExecution(
+                test_list_file.Test(
+                    tests_json_file.TestEntry(
+                        tests_json_file.TestSection(
+                            "foo", "//foo", "linux", path="wont_exist"
+                        )
+                    ),
+                    test_list_file.TestListEntry("foo", [], execution=None),
+                ),
+                exec_env,
+                flags,
+            )
+
+            e = test.environment()
+            assert e is not None
+            self.assertDictEqual(
+                e,
+                {"CWD": tmp, "foo": "bar", "my_setting": "baz"},
+            )

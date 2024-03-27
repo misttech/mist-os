@@ -76,6 +76,10 @@ class TestArgs(unittest.TestCase):
                 "cannot set a negative --parallel-cases",
                 ["--parallel-cases", "-1"],
             ),
+            (
+                "invalid environment variable formatting is checked",
+                ["-e", "abcd"],
+            ),
         ]
     )
     @mock.patch("args.termout.is_valid", return_value=False)

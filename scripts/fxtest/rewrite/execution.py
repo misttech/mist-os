@@ -206,7 +206,7 @@ class TestExecution:
             dict[str, str] | None: Environment for
                 the test, or None if no environment is needed.
         """
-        env = {}
+        env = self._flags.computed_env()
         if self._test.build.test.path or self._test.is_e2e_test():
             env.update(
                 {

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import pathlib
 import sys
 import typing
+import functools
 
 import termout
 import util.arg_option as arg_option
@@ -53,6 +54,7 @@ class Flags:
     break_on_failure: bool
     breakpoints: typing.List[str]
     extra_args: typing.List[str]
+    env: typing.List[str]
 
     output: bool
     simple: bool
@@ -101,6 +103,9 @@ class Flags:
                 "Refusing to output interactive status to a non-TTY."
             )
 
+        # Compute environment and check it is valid.
+        self.computed_env()
+
         if self.only_e2e:
             self.e2e = True
 
@@ -114,7 +119,36 @@ class Flags:
                 self.status = termout.is_valid()
 
     def has_debugger(self) -> bool:
+        """Determine if this set of flags enables debugging.
+
+        Returns:
+            bool: True if a debugger needs to be attached, False otherwise.
+        """
         return bool(self.break_on_failure or self.breakpoints)
+
+    def computed_env(self) -> dict[str, str]:
+        """Compute and return the environment denoted by --env flags.
+
+        Warning: This method recomputes the environment on each call, if this
+        operation is too expensive we will need to memoize the return value.
+
+        Raises:
+            FlagError: If an environment variable is not formatted correctly.
+
+        Returns:
+            dict[str, str]: Mapping from key to value of environment
+                variables for tests executed by this invocation of the
+                command.
+        """
+        ret = {}
+        for val in self.env:
+            split = val.split("=", maxsplit=1)
+            if len(split) != 2:
+                raise FlagError(
+                    f'Environment variable "{val}" must be formatted as "name=value"'
+                )
+            ret[split[0]] = split[1]
+        return ret
 
 
 class FlagError(Exception):
@@ -360,6 +394,14 @@ def parse_args(
         Otherwise only the last segment of the moniker is displayed.
         Default is False.""",
         default=False,
+    )
+    execution.add_argument(
+        "-e",
+        "--env",
+        action="append",
+        type=str,
+        help="Add an environment variable to each test invocation. May be specified multiple times.",
+        default=[],
     )
     execution.add_argument(
         "--break-on-failure",
