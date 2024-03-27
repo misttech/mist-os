@@ -47,6 +47,10 @@ type FeatureConfig = table {
     /// Determines if DHCPv6-PD is enabled or disabled.
     @available(added=18)
     6: dhcpv6_pd_enabled bool;
+
+    /// Determines if DNS upstream query is enabled or disabled.
+    @available(added=19)
+    7: dns_upstream_query_enabled bool;
 };
 
 /// Protocol for connecting to [`Feature`] on a LoWPAN device.
