@@ -28,7 +28,7 @@ i2c
 miscsvc
 nand-broker
 netdevice-migration
-netsvc
+?netsvc
 network-device
 pkg-cache
 platform-bus

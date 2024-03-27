@@ -27,7 +27,6 @@ i2c
 ?live-usb
 miscsvc
 netdevice-migration
-netsvc
 network-device
 pkg-cache
 platform-bus

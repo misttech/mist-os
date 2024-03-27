@@ -68,6 +68,9 @@ bootstrap_userdebug_platform_aib_names = [
   # Kernel args
   "kernel_args_eng",
   "kernel_args_userdebug",
+
+  # Developer
+  "netsvc",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap

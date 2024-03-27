@@ -22,11 +22,6 @@
             url: "fuchsia-boot:///miscsvc#meta/miscsvc.cm",
         },
         {
-            name: "netsvc",
-            url: "fuchsia-boot:///netsvc#meta/netsvc.cm",
-            startup: "eager",
-        },
-        {
             name: "ptysvc",
             url: "fuchsia-boot:///ptysvc#meta/ptysvc.cm",
         },
@@ -148,17 +143,11 @@
             availability: "optional",
         },
         {
-            protocol: [ "fuchsia.boot.Arguments" ],
-            from: "parent",
-            to: "#netsvc",
-        },
-        {
             directory: "boot",
             from: "parent",
             to: [
                 "#fshost",
                 "#miscsvc",
-                "#netsvc",
             ],
             rights: [ "rx*" ],
         },
@@ -344,10 +333,7 @@
             directory: "dev-class",
             from: "#devfs-with-pkg",
             as: "dev-class-network",
-            to: [
-                "#device_name_provider",
-                "#netsvc",
-            ],
+            to: "#device_name_provider",
             subdir: "network",
         },
         {
@@ -372,30 +358,14 @@
             subdir: "display-coordinator",
         },
         {
-            directory: [ "tmp" ],
-            from: "#fshost",
-            to: "#netsvc",
-        },
-        {
-            protocol: "fuchsia.device.NameProvider",
-            from: "#device_name_provider",
-            to: "#netsvc",
-        },
-        {
             protocol: "fuchsia.hardware.pty.Device",
             from: "#ptysvc",
             to: "#virtual_console",
         },
         {
-            protocol: "fuchsia.sysinfo.SysInfo",
-            from: "#sysinfo",
-            to: "#netsvc",
-        },
-        {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
             to: [
-                "#netsvc",
                 "#pkg-cache",
                 "#pwrbtn-monitor",
                 "#svchost",
@@ -443,16 +413,6 @@
             availability: "optional",
         },
         {
-            protocol: [ "fuchsia.paver.Paver" ],
-            from: "#miscsvc",
-            to: "#netsvc",
-        },
-        {
-            protocol: "fuchsia.logger.Log",
-            from: "#archivist",
-            to: "#netsvc",
-        },
-        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
@@ -463,7 +423,6 @@
                 "#device_name_provider",
                 "#fshost",
                 "#miscsvc",
-                "#netsvc",
                 "#power-broker",
                 "#power_manager",
                 "#ptysvc",
@@ -480,11 +439,6 @@
             protocol: [ "fuchsia.kernel.RootJob" ],
             from: "parent",
             to: [ "#pwrbtn-monitor" ],
-        },
-        {
-            protocol: "fuchsia.fshost.Admin",
-            from: "#fshost",
-            to: "#netsvc",
         },
         {
             directory: "dev-class",

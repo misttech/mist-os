@@ -1,0 +1,75 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "netsvc",
+            url: "fuchsia-boot:///netsvc#meta/netsvc.cm",
+            startup: "eager",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.boot.Arguments" ],
+            from: "parent",
+            to: "#netsvc",
+        },
+        {
+            directory: "boot",
+            from: "parent",
+            to: "#netsvc",
+            rights: [ "rx*" ],
+        },
+        {
+            directory: "dev-class",
+            from: "#devfs-with-pkg",
+            as: "dev-class-network",
+            to: "#netsvc",
+            subdir: "network",
+        },
+        {
+            directory: [ "tmp" ],
+            from: "#fshost",
+            to: "#netsvc",
+        },
+        {
+            protocol: "fuchsia.fshost.Admin",
+            from: "#fshost",
+            to: "#netsvc",
+        },
+        {
+            protocol: "fuchsia.device.NameProvider",
+            from: "#device_name_provider",
+            to: "#netsvc",
+        },
+        {
+            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            from: "#shutdown_shim",
+            to: "#netsvc",
+        },
+        {
+            protocol: "fuchsia.sysinfo.SysInfo",
+            from: "#sysinfo",
+            to: "#netsvc",
+        },
+        {
+            protocol: [ "fuchsia.paver.Paver" ],
+            from: "#miscsvc",
+            to: "#netsvc",
+        },
+        {
+            protocol: "fuchsia.logger.Log",
+            from: "#archivist",
+            to: "#netsvc",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#netsvc",
+        },
+    ],
+}

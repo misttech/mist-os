@@ -42,6 +42,7 @@ BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
     "clock_development_tools",
     "kernel_args_eng",
     "kernel_args_userdebug",
+    "netsvc",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap

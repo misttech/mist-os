@@ -104,7 +104,6 @@ assembly_input_bundle("bootstrap") {
     "//src/bringup/bin/svchost:pkg",
     "//src/bringup/bin/device-name-provider:package",
     "//src/bringup/bin/miscsvc:package",
-    "//src/bringup/bin/netsvc:package",
     "//src/bringup/bin/ptysvc:package",
     "//src/bringup/bin/pwrbtn-monitor:package",
     "//src/bringup/bin/sysinfo:package",
@@ -440,6 +439,25 @@ assembly_input_bundle("virtcon_disable") {
   kernel_cmdline = [
     "virtcon.hide-on-boot",
     "virtcon.disable=true",
+  ]
+}
+
+# The netsvc AIB is included by all eng products.
+#
+assembly_input_bundle("netsvc") {
+  bootfs_packages = [ "//src/bringup/bin/netsvc:package" ]
+  compiled_packages = [
+    {
+      name = "bootstrap"
+      component_shards = [
+        {
+          component_name = "bootstrap"
+          shards =
+              rebase_path([ "//src/bringup/bin/netsvc/meta/netsvc.shard.cml" ],
+                          root_build_dir)
+        },
+      ]
+    },
   ]
 }
 
