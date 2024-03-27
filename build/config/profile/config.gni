@@ -17,6 +17,8 @@ declare_args() {
     # https://fxbug.dev/42067345: uncomment the below when issue is fixed.
     # Also, change the expression to not reject //third_party/cobalt/*
     #"//third_party/*",
+    # Do not instrument system headers that are under //prebuilt.
+    "//prebuilt/*",
   ]
 
   # List GN path to files in Clang's `-fprofile-list` format describing files
