@@ -31,38 +31,13 @@
         {
             protocol: [
                 "fuchsia.boot.Arguments",
-                "fuchsia.boot.FactoryItems",
-                "fuchsia.boot.Items",
-                "fuchsia.boot.RootResource",
-                "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.device.NameProvider",
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.hardware.pty.Device",
-                "fuchsia.kernel.Counter",
-                "fuchsia.kernel.DebugBroker",
-                "fuchsia.kernel.RootJob",
-                "fuchsia.kernel.RootJobForInspect",
-                "fuchsia.kernel.Stats",
                 "fuchsia.logger.Log",
-                "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.paver.Paver",
-                "fuchsia.pkg.RepositoryManager",
-                "fuchsia.pkg.rewrite.Engine",
-                "fuchsia.process.Launcher",
-                "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.virtualconsole.SessionManager",
             ],
-        },
-        {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-
-            // Trace manager may be excluded from builds where tracing is not
-            // expected to be used for observability, such as in the bringup
-            // product and non-eng builds of any product.
-            availability: "optional",
         },
     ],
 }

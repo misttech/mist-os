@@ -141,7 +141,6 @@
                 "#archivist",
                 "#cpu_manager",
                 "#fshost",
-                "#netsvc",
                 "#pkg-cache",
                 "#power_manager",
                 "#virtual_console",
@@ -149,22 +148,7 @@
             availability: "optional",
         },
         {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.boot.FactoryItems",
-                "fuchsia.boot.Items",
-                "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.boot.RootResource",
-                "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.exception.Handler",
-                "fuchsia.kernel.RootJob",
-                "fuchsia.kernel.RootJobForInspect",
-                "fuchsia.kernel.Stats",
-                "fuchsia.metrics.MetricEventLoggerFactory",
-                "fuchsia.pkg.RepositoryManager",
-                "fuchsia.pkg.rewrite.Engine",
-                "fuchsia.process.Launcher",
-            ],
+            protocol: [ "fuchsia.boot.Arguments" ],
             from: "parent",
             to: "#netsvc",
         },
@@ -330,47 +314,6 @@
             to: [ "#fshost" ],
         },
         {
-            protocol: [ "fuchsia.virtualconsole.SessionManager" ],
-            from: "#virtual_console",
-            to: "#netsvc",
-        },
-        {
-            protocol: [
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
-            ],
-            from: "#svchost",
-            to: [ "#netsvc" ],
-        },
-        {
-            protocol: [ "fuchsia.driver.development.Manager" ],
-            from: "#driver_manager",
-            to: "#netsvc",
-        },
-        {
-            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
-            from: "#svchost",
-            to: [ "#console-launcher" ],
-        },
-        {
-            protocol: [ "fuchsia.kernel.DebugBroker" ],
-            from: "#svchost",
-            to: "#netsvc",
-        },
-        {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-            from: "#role_manager",
-            to: "#netsvc",
-        },
-        {
-            protocol: [
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
-            ],
-            from: "#miscsvc",
-            to: "#netsvc",
-        },
-        {
             protocol: [ "fuchsia.sysmem.Allocator" ],
             from: "#miscsvc",
             to: "#virtual_console",
@@ -441,10 +384,7 @@
         {
             protocol: "fuchsia.hardware.pty.Device",
             from: "#ptysvc",
-            to: [
-                "#netsvc",
-                "#virtual_console",
-            ],
+            to: "#virtual_console",
         },
         {
             protocol: "fuchsia.sysinfo.SysInfo",
@@ -503,10 +443,7 @@
             availability: "optional",
         },
         {
-            protocol: [
-                "fuchsia.kernel.Counter",
-                "fuchsia.paver.Paver",
-            ],
+            protocol: [ "fuchsia.paver.Paver" ],
             from: "#miscsvc",
             to: "#netsvc",
         },
@@ -545,10 +482,7 @@
             to: [ "#pwrbtn-monitor" ],
         },
         {
-            protocol: [
-                "fuchsia.fshost.Admin",
-                "fuchsia.fshost.BlockWatcher",
-            ],
+            protocol: "fuchsia.fshost.Admin",
             from: "#fshost",
             to: "#netsvc",
         },
