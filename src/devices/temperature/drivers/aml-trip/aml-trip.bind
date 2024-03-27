@@ -6,15 +6,21 @@ composite aml_trip;
 using fuchsia.amlogic.platform;
 using fuchsia.platform;
 using fuchsia.clock;
+using fuchsia.devicetree;
 
 primary node "pdev" {
-  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
-  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D;
+  if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC {
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE;
+  fuchsia.devicetree.FIRST_COMPATIBLE == "amlogic,g12a-thermal";
+  } else {
+    fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+    fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
+    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D;
 
-  accept fuchsia.BIND_PLATFORM_DEV_DID {
-    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.TEMP_SENSOR_DDR,
-    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.TEMP_SENSOR_PLL
+    accept fuchsia.BIND_PLATFORM_DEV_DID {
+      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.TEMP_SENSOR_DDR,
+      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.TEMP_SENSOR_PLL
+    }
   }
 }
 

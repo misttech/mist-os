@@ -13,6 +13,7 @@ driver_bind_rules("aml-trip-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -56,4 +57,12 @@ fuchsia_driver_component("aml-trip") {
 fuchsia_driver_package("package") {
   package_name = "aml-trip"
   driver_components = [ ":aml-trip" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":aml-trip-bind_test",
+    "tests:aml-trip-test-package",
+  ]
 }
