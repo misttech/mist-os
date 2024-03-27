@@ -7,7 +7,10 @@ import("//build/drivers.gni")
 driver_bind_rules("parent_bind") {
   rules = "parent-driver.bind"
   bind_output = "parent-driver.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.test" ]
+  deps = [
+    "//examples/drivers/bind/bindlib:gizmo.example",
+    "//src/devices/bind/fuchsia.test",
+  ]
 }
 
 fuchsia_driver("parent_driver") {
@@ -15,14 +18,8 @@ fuchsia_driver("parent_driver") {
   sources = [ "parent-driver.cc" ]
   deps = [
     ":parent_bind",
-    "//examples/drivers/transport/tests:fuchsia.gizmo.protocol_cpp",
     "//examples/drivers/transport/zircon:fuchsia.examples.gizmo_cpp",
-    "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp",
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/devfs/cpp",
     "//src/devices/lib/driver:driver_runtime",
   ]
 }
@@ -46,14 +43,8 @@ fuchsia_driver("child_driver") {
   sources = [ "child-driver.cc" ]
   deps = [
     ":child_bind",
-    "//examples/drivers/transport/tests:fuchsia.gizmo.protocol_cpp",
     "//examples/drivers/transport/zircon:fuchsia.examples.gizmo_cpp",
-    "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp",
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/devfs/cpp",
     "//src/devices/lib/driver:driver_runtime",
   ]
 }
@@ -63,4 +54,12 @@ fuchsia_driver_component("child_component") {
   manifest = "meta/child-driver.cml"
   deps = [ ":child_driver" ]
   info = "component-info.json"
+}
+
+fuchsia_driver_package("pkg") {
+  package_name = "zircon_transport"
+  driver_components = [
+    ":child_component",
+    ":parent_component",
+  ]
 }

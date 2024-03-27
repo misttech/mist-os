@@ -9,7 +9,6 @@
         bind: 'meta/bind/child-driver.bindbc',
     },
     use: [
-        { service: 'fuchsia.driver.compat.Service' },
         { service: 'fuchsia.examples.gizmo.Service' },
     ],
 }

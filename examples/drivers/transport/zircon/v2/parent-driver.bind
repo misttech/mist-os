@@ -3,5 +3,10 @@
 // found in the LICENSE file.
 
 using fuchsia.test;
+using gizmo.example;
 
-fuchsia.BIND_PROTOCOL == fuchsia.test.BIND_PROTOCOL.PARENT;
+if gizmo.example.TEST_NODE_ID == "zircon_transport_parent" {
+  true;
+} else {
+  fuchsia.BIND_PROTOCOL == fuchsia.test.BIND_PROTOCOL.PARENT;
+}
