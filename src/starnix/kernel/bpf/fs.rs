@@ -180,7 +180,7 @@ impl BpfFsDir {
             Ok(dir.fs().create_node(
                 current_task,
                 BpfFsObject::new(object, &selinux_context),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o600), FsCred::root()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o600), current_task.as_fscred()),
             ))
         })?;
         Ok(())
