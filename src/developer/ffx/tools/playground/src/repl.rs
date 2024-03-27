@@ -3,11 +3,14 @@
 // found in the LICENSE file.
 
 use async_fs::File;
-use futures::executor::block_on;
+use crossterm::cursor::{MoveLeft, MoveRight, MoveUp};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crossterm::QueueableCommand;
 use futures::future::{poll_fn, select, Either, LocalBoxFuture};
 use futures::io::{AsyncReadExt as _, AsyncWrite};
 use futures::task::AtomicWaker;
 use futures::FutureExt as _;
+use std::cell::Cell;
 use std::collections::VecDeque;
 use std::future::Future;
 use std::io::{self, stdin, stdout, Write as _};
@@ -67,19 +70,58 @@ struct ReplInner {
     /// output regardless of whether it has one, but also resume from the end of that line when
     /// further output is submitted.
     last_line_len: usize,
+
+    /// Terminal size. TODO(https://fxbug.dev/331656990): This should update on SIGWINCH
+    terminal_size: (u16, u16),
+
+    /// Character width of the prompt, and the value of cursor_pos at the last time of repaint.
+    cursor_pos_info: Cell<Option<(usize, usize)>>,
 }
 
 impl ReplInner {
     /// Clear and rewrite the input line, updating the contents of the current command and the
     /// cursor position.
     fn repaint(&self) {
+        let mut stdout = stdout();
         if let Some(prompt) = self.prompt.as_ref() {
-            print!("\r\x1b[K{prompt} {}", String::from_iter(self.cmd_buf.iter()));
+            if let Some((prompt_len, last_cursor_pos)) = self.cursor_pos_info.get() {
+                let cursor_line = (prompt_len + last_cursor_pos) / (self.terminal_size.0 as usize);
+                let _ = stdout.queue(MoveUp(cursor_line.try_into().expect("command too large!")));
+                print!("\r\x1b[J{prompt} {}", String::from_iter(self.cmd_buf.iter()));
+                self.cursor_pos_info.set(Some((prompt_len, self.cursor_pos)));
+            } else {
+                print!("\r\x1b[J{prompt} ");
+                let _ = stdout.flush();
+                if let Ok((col, _)) = crossterm::cursor::position() {
+                    self.cursor_pos_info.set(Some((col as usize, self.cursor_pos)));
+                }
+                print!("{}", String::from_iter(self.cmd_buf.iter()));
+            };
+
+            let (prompt_size, _) = self.cursor_pos_info.get().unwrap();
             if self.cmd_buf.len() != self.cursor_pos {
-                print!("\x1b[{}D", self.cmd_buf.len() - self.cursor_pos);
+                let eol_pos = prompt_size + self.cmd_buf.len();
+                let cursor_pos = prompt_size + self.cursor_pos;
+                let eol_line = eol_pos / (self.terminal_size.0 as usize);
+                let eol_col = eol_pos % (self.terminal_size.0 as usize);
+                let cursor_line = cursor_pos / (self.terminal_size.0 as usize);
+                let cursor_col = cursor_pos % (self.terminal_size.0 as usize);
+                let move_up = eol_line - cursor_line;
+                let _ = stdout.queue(MoveUp(move_up.try_into().expect("command too large!")));
+                if eol_col > cursor_col {
+                    let move_left = eol_col - cursor_col;
+                    let _ =
+                        stdout.queue(MoveLeft(move_left.try_into().expect("command too large!")));
+                } else if eol_col < cursor_col {
+                    let move_right = cursor_col - eol_col;
+                    let _ =
+                        stdout.queue(MoveRight(move_right.try_into().expect("command too large!")));
+                }
+            } else if (prompt_size + self.cursor_pos) % (self.terminal_size.0 as usize) == 0 {
+                print!("\r\n");
             }
         }
-        let _ = stdout().flush();
+        let _ = stdout.flush();
     }
 
     /// Print some output. Suspends the input prompt if active so that output flows above the prompt
@@ -129,6 +171,15 @@ impl ReplInner {
         }
         self.cursor_pos = self.cmd_buf.len();
     }
+
+    /// Consume the command being typed and reset the buffer state to start the next one.
+    fn take_cmd(&mut self) -> String {
+        let got = String::from_iter(std::mem::replace(&mut self.cmd_buf, Vec::new()).into_iter());
+        self.cursor_pos = 0;
+        self.history_pos = 0;
+        self.original_cmd_buf = None;
+        got
+    }
 }
 
 /// An asynchronous repl. This takes control of the output TTY and allows us to display a prompt and
@@ -136,9 +187,6 @@ impl ReplInner {
 pub struct Repl {
     /// Lock-protected fields.
     inner: StrictMutex<ReplInner>,
-
-    /// Termios settings to restore when this repl is destroyed.
-    restore_termios: termios::Termios,
 
     /// When this is nonzero, we do not sleep waiting for IO when we are at a prompt. Usually that
     /// means we're trying to display some output, and we need the prompt code to stop sitting on
@@ -153,20 +201,16 @@ pub struct Repl {
 impl Repl {
     /// Create a new Repl. At the moment this squats on stdin and assumes stdin is a TTY.
     pub fn new() -> io::Result<Self> {
-        use termios::*;
-
         let fd = stdin().as_raw_fd();
-        let mut termios = Termios::from_fd(fd)?;
-        let restore_termios = termios.clone();
+        enable_raw_mode().map_err(|x| match x {
+            crossterm::ErrorKind::IoError(e) => e,
+            other => panic!("Unexpected crossterm error {other:?}"),
+        })?;
 
-        termios.c_iflag &= !(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-        termios.c_oflag &= !(OPOST | OCRNL);
-        termios.c_cflag |= CS8;
-        termios.c_lflag &= !(ECHO | ICANON | IEXTEN | ISIG);
-        termios.c_cc[VMIN] = 1;
-        termios.c_cc[VTIME] = 0;
-
-        tcsetattr(fd, TCSAFLUSH, &termios)?;
+        let terminal_size = crossterm::terminal::size().map_err(|x| match x {
+            crossterm::ErrorKind::IoError(e) => e,
+            other => panic!("Unexpected crossterm error {other:?}"),
+        })?;
 
         // SAFETY: We just obtained this file from stdout(), which should guarantee its validity.
         let file = unsafe { File::from_raw_fd(fd) };
@@ -182,8 +226,9 @@ impl Repl {
                 history_pos: 0,
                 prompt: None,
                 last_line_len: 0,
+                terminal_size,
+                cursor_pos_info: Cell::new(None),
             }),
-            restore_termios,
             unblocked: AtomicUsize::new(0),
             wait_unblocked: AtomicWaker::new(),
         })
@@ -288,10 +333,14 @@ impl Repl {
 
                     if byte == 0x03 {
                         // Control-C
+                        inner.cursor_pos = inner.cmd_buf.len();
+                        inner.repaint();
                         print!("^C\r\n");
                         inner.cursor_pos = 0;
                         inner.cmd_buf.clear();
                     } else if byte == 0x04 {
+                        inner.cursor_pos = inner.cmd_buf.len();
+                        inner.repaint();
                         // Control-D
                         print!("^D\r\n");
                         inner.cursor_pos = 0;
@@ -304,18 +353,17 @@ impl Repl {
                             inner.cmd_buf.remove(pos);
                         }
                     } else if byte == b'\r' {
-                        let got = String::from_iter(
-                            std::mem::replace(&mut inner.cmd_buf, Vec::new()).into_iter(),
-                        );
-                        inner.cursor_pos = 0;
-                        inner.history_pos = 0;
-                        inner.original_cmd_buf = None;
                         if ret.is_none() {
+                            inner.cursor_pos = inner.cmd_buf.len();
+                            inner.repaint();
                             print!("\r\n");
+                            let _ = stdout().flush();
+                            let got = inner.take_cmd();
                             inner.add_to_history(&got);
                             ret = Some(got);
                             inner.prompt = None;
                         } else {
+                            let got = inner.take_cmd();
                             inner.cmd_overflow.push_back(got);
                         }
                     } else if byte == b'\t' {
@@ -353,7 +401,7 @@ impl Repl {
                                 let cursor_pos = inner.cursor_pos;
                                 assert!(start <= cursor_pos, "Completion starts after cursor!");
                                 inner.cmd_buf.splice(start..cursor_pos, completion.chars());
-                                inner.cursor_pos = completion.chars().count();
+                                inner.cursor_pos = start + completion.chars().count();
                             }
                         }
                     } else if byte <= 0x7f {
@@ -378,12 +426,7 @@ impl Repl {
 
 impl Drop for Repl {
     fn drop(&mut self) {
-        use termios::*;
-        let _ = tcsetattr(
-            block_on(self.inner.lock()).file.as_raw_fd(),
-            TCSAFLUSH,
-            &self.restore_termios,
-        );
+        let _ = disable_raw_mode();
     }
 }
 
