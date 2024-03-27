@@ -163,15 +163,15 @@ pub struct CheckNow {
 #[argh(
     subcommand,
     name = "force-install",
-    example = "With a known update package URL, trigger an update:
+    example = "With a known update package URL, trigger an update and reboot:
 
     $ ffx target update force-install fuchsia-pkg://fuchsia.com/update
 
-Also trigger a reboot after update:
+Don't reboot after update:
 
     $ ffx target update force-install
     fuchsia-pkg://fuchsia.com/update
-    --reboot",
+    --reboot false",
     description = "Trigger the system updater manually",
     note = "Directly invoke the system updater to install the provided update,
 bypassing any update checks.
