@@ -131,7 +131,7 @@ func NewFFXInstance(
 		// and don't set their own isolated env config.
 		{"config", "env", "set", filepath.Join(outputDir, "global_config.json"), "-l", "global"},
 		// This is a config "alias" for various other config values -- disabling
-		// metrics, device discvery, device autoconnection, etc.
+		// metrics, device discovery, device auto-connection, etc.
 		{"config", "set", "ffx.isolated", "true", "-l", "global"},
 	}
 	if sshKey != "" {
