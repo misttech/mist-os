@@ -48,13 +48,19 @@ type transportProtocolState struct {
 	defaultHandler func(id TransportEndpointID, pkt *PacketBuffer) bool
 }
 
-// ResumableEndpoint is an endpoint that needs to be resumed after restore.
-type ResumableEndpoint interface {
-	// Resume resumes an endpoint after restore. This can be used to restart
-	// background workers such as protocol goroutines. This must be called after
-	// all indirect dependencies of the endpoint has been restored, which
+// RestoredEndpoint is an endpoint that needs to be restored.
+type RestoredEndpoint interface {
+	// Restore restores an endpoint. This can be used to restart background
+	// workers such as protocol goroutines. This must be called after all
+	// indirect dependencies of the endpoint has been restored, which
 	// generally implies at the end of the restore process.
-	Resume(*Stack)
+	Restore(*Stack)
+}
+
+// ResumableEndpoint is an endpoint that needs to be resumed after save.
+type ResumableEndpoint interface {
+	// Resume resumes an endpoint.
+	Resume()
 }
 
 // uniqueIDGenerator is a default unique ID generator.
@@ -115,8 +121,12 @@ type Stack struct {
 	// TODO(gvisor.dev/issue/4595): S/R this field.
 	tables *IPTables
 
-	// resumableEndpoints is a list of endpoints that need to be resumed if the
+	// restoredEndpoints is a list of endpoints that need to be restored if the
 	// stack is being restored.
+	restoredEndpoints []RestoredEndpoint
+
+	// resumableEndpoints is a list of endpoints that need to be resumed
+	// after save.
 	resumableEndpoints []ResumableEndpoint
 
 	// icmpRateLimiter is a global rate limiter for all ICMP messages generated
@@ -485,6 +495,16 @@ func (s *Stack) TransportProtocolOption(transport tcpip.TransportProtocolNumber,
 	return transProtoState.proto.Option(option)
 }
 
+// SendBufSizeProto is a protocol that can return its send buffer size.
+type SendBufSizeProto interface {
+	SendBufferSize() tcpip.TCPSendBufferSizeRangeOption
+}
+
+// TCPSendBufferLimits returns the TCP send buffer size limit.
+func (s *Stack) TCPSendBufferLimits() tcpip.TCPSendBufferSizeRangeOption {
+	return s.transportProtocols[header.TCPProtocolNumber].proto.(SendBufSizeProto).SendBufferSize()
+}
+
 // SetTransportProtocolHandler sets the per-stack default handler for the given
 // protocol.
 //
@@ -841,6 +861,10 @@ type NICOptions struct {
 
 	// GROTimeout specifies the GRO timeout. Zero bypasses GRO.
 	GROTimeout time.Duration
+
+	// DeliverLinkPackets specifies whether the NIC is responsible for
+	// delivering raw packets to packet sockets.
+	DeliverLinkPackets bool
 }
 
 // CreateNICWithOptions creates a NIC with the provided id, LinkEndpoint, and
@@ -1713,16 +1737,26 @@ func (s *Stack) UnregisterRawTransportEndpoint(netProto tcpip.NetworkProtocolNum
 
 // RegisterRestoredEndpoint records e as an endpoint that has been restored on
 // this stack.
-func (s *Stack) RegisterRestoredEndpoint(e ResumableEndpoint) {
+func (s *Stack) RegisterRestoredEndpoint(e RestoredEndpoint) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.restoredEndpoints = append(s.restoredEndpoints, e)
+}
+
+// RegisterResumableEndpoint records e as an endpoint that has to be resumed.
+func (s *Stack) RegisterResumableEndpoint(e ResumableEndpoint) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.resumableEndpoints = append(s.resumableEndpoints, e)
-	s.mu.Unlock()
 }
 
 // RegisteredEndpoints returns all endpoints which are currently registered.
 func (s *Stack) RegisteredEndpoints() []TransportEndpoint {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	var es []TransportEndpoint
 	for _, e := range s.demux.protocol {
 		es = append(es, e.transportEndpoints()...)
@@ -1733,11 +1767,12 @@ func (s *Stack) RegisteredEndpoints() []TransportEndpoint {
 // CleanupEndpoints returns endpoints currently in the cleanup state.
 func (s *Stack) CleanupEndpoints() []TransportEndpoint {
 	s.cleanupEndpointsMu.Lock()
+	defer s.cleanupEndpointsMu.Unlock()
+
 	es := make([]TransportEndpoint, 0, len(s.cleanupEndpoints))
 	for e := range s.cleanupEndpoints {
 		es = append(es, e)
 	}
-	s.cleanupEndpointsMu.Unlock()
 	return es
 }
 
@@ -1745,10 +1780,11 @@ func (s *Stack) CleanupEndpoints() []TransportEndpoint {
 // for restoring a stack after a save.
 func (s *Stack) RestoreCleanupEndpoints(es []TransportEndpoint) {
 	s.cleanupEndpointsMu.Lock()
+	defer s.cleanupEndpointsMu.Unlock()
+
 	for _, e := range es {
 		s.cleanupEndpoints[e] = struct{}{}
 	}
-	s.cleanupEndpointsMu.Unlock()
 }
 
 // Close closes all currently registered transport endpoints.
@@ -1811,17 +1847,32 @@ func (s *Stack) Pause() {
 	}
 }
 
-// Resume restarts the stack after a restore. This must be called after the
+// Restore restarts the stack after a restore. This must be called after the
 // entire system has been restored.
+func (s *Stack) Restore() {
+	// RestoredEndpoint.Restore() may call other methods on s, so we can't hold
+	// s.mu while restoring the endpoints.
+	s.mu.Lock()
+	eps := s.restoredEndpoints
+	s.restoredEndpoints = nil
+	s.mu.Unlock()
+	for _, e := range eps {
+		e.Restore(s)
+	}
+	// Now resume any protocol level background workers.
+	for _, p := range s.transportProtocols {
+		p.proto.Resume()
+	}
+}
+
+// Resume resumes the stack after a save.
 func (s *Stack) Resume() {
-	// ResumableEndpoint.Resume() may call other methods on s, so we can't hold
-	// s.mu while resuming the endpoints.
 	s.mu.Lock()
 	eps := s.resumableEndpoints
 	s.resumableEndpoints = nil
 	s.mu.Unlock()
 	for _, e := range eps {
-		e.Resume(s)
+		e.Resume()
 	}
 	// Now resume any protocol level background workers.
 	for _, p := range s.transportProtocols {

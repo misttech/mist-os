@@ -25,7 +25,7 @@ func (a *acceptQueue) beforeSave() {}
 // +checklocksignore
 func (a *acceptQueue) StateSave(stateSinkObject state.Sink) {
 	a.beforeSave()
-	var endpointsValue []*endpoint
+	var endpointsValue []*Endpoint
 	endpointsValue = a.saveEndpoints()
 	stateSinkObject.SaveValue(0, endpointsValue)
 	stateSinkObject.Save(1, &a.pendingEndpoints)
@@ -38,7 +38,7 @@ func (a *acceptQueue) afterLoad(context.Context) {}
 func (a *acceptQueue) StateLoad(ctx context.Context, stateSourceObject state.Source) {
 	stateSourceObject.Load(1, &a.pendingEndpoints)
 	stateSourceObject.Load(2, &a.capacity)
-	stateSourceObject.LoadValue(0, new([]*endpoint), func(y any) { a.loadEndpoints(y.([]*endpoint)) })
+	stateSourceObject.LoadValue(0, new([]*Endpoint), func(y any) { a.loadEndpoints(ctx, y.([]*Endpoint)) })
 }
 
 func (h *handshake) StateTypeName() string {
@@ -324,11 +324,11 @@ func (sq *sndQueueInfo) StateLoad(ctx context.Context, stateSourceObject state.S
 	stateSourceObject.Load(0, &sq.TCPSndBufState)
 }
 
-func (e *endpoint) StateTypeName() string {
-	return "pkg/tcpip/transport/tcp.endpoint"
+func (e *Endpoint) StateTypeName() string {
+	return "pkg/tcpip/transport/tcp.Endpoint"
 }
 
-func (e *endpoint) StateFields() []string {
+func (e *Endpoint) StateFields() []string {
 	return []string{
 		"TCPEndpointStateInner",
 		"TransportEndpointInfo",
@@ -386,7 +386,7 @@ func (e *endpoint) StateFields() []string {
 }
 
 // +checklocksignore
-func (e *endpoint) StateSave(stateSinkObject state.Sink) {
+func (e *Endpoint) StateSave(stateSinkObject state.Sink) {
 	e.beforeSave()
 	var stateValue EndpointState
 	stateValue = e.saveState()
@@ -445,7 +445,7 @@ func (e *endpoint) StateSave(stateSinkObject state.Sink) {
 }
 
 // +checklocksignore
-func (e *endpoint) StateLoad(ctx context.Context, stateSourceObject state.Source) {
+func (e *Endpoint) StateLoad(ctx context.Context, stateSourceObject state.Source) {
 	stateSourceObject.Load(0, &e.TCPEndpointStateInner)
 	stateSourceObject.Load(1, &e.TransportEndpointInfo)
 	stateSourceObject.Load(2, &e.DefaultSocketOptionsHandler)
@@ -497,7 +497,7 @@ func (e *endpoint) StateLoad(ctx context.Context, stateSourceObject state.Source
 	stateSourceObject.Load(49, &e.owner)
 	stateSourceObject.Load(50, &e.ops)
 	stateSourceObject.Load(51, &e.lastOutOfWindowAckTime)
-	stateSourceObject.LoadValue(11, new(EndpointState), func(y any) { e.loadState(y.(EndpointState)) })
+	stateSourceObject.LoadValue(11, new(EndpointState), func(y any) { e.loadState(ctx, y.(EndpointState)) })
 	stateSourceObject.AfterLoad(func() { e.afterLoad(ctx) })
 }
 
@@ -805,7 +805,7 @@ func (s *segment) StateLoad(ctx context.Context, stateSourceObject state.Source)
 	stateSourceObject.Load(17, &s.acked)
 	stateSourceObject.Load(18, &s.dataMemSize)
 	stateSourceObject.Load(19, &s.lost)
-	stateSourceObject.LoadValue(12, new([]byte), func(y any) { s.loadOptions(y.([]byte)) })
+	stateSourceObject.LoadValue(12, new([]byte), func(y any) { s.loadOptions(ctx, y.([]byte)) })
 }
 
 func (q *segmentQueue) StateTypeName() string {
@@ -861,6 +861,7 @@ func (s *sender) StateFields() []string {
 		"rc",
 		"spuriousRecovery",
 		"retransmitTS",
+		"startCork",
 	}
 }
 
@@ -885,6 +886,7 @@ func (s *sender) StateSave(stateSinkObject state.Sink) {
 	stateSinkObject.Save(13, &s.rc)
 	stateSinkObject.Save(14, &s.spuriousRecovery)
 	stateSinkObject.Save(15, &s.retransmitTS)
+	stateSinkObject.Save(16, &s.startCork)
 }
 
 func (s *sender) afterLoad(context.Context) {}
@@ -907,6 +909,7 @@ func (s *sender) StateLoad(ctx context.Context, stateSourceObject state.Source) 
 	stateSourceObject.Load(13, &s.rc)
 	stateSourceObject.Load(14, &s.spuriousRecovery)
 	stateSourceObject.Load(15, &s.retransmitTS)
+	stateSourceObject.Load(16, &s.startCork)
 }
 
 func (r *rtt) StateTypeName() string {
@@ -1079,7 +1082,7 @@ func init() {
 	state.Register((*SendErrors)(nil))
 	state.Register((*Stats)(nil))
 	state.Register((*sndQueueInfo)(nil))
-	state.Register((*endpoint)(nil))
+	state.Register((*Endpoint)(nil))
 	state.Register((*keepalive)(nil))
 	state.Register((*rackControl)(nil))
 	state.Register((*receiver)(nil))

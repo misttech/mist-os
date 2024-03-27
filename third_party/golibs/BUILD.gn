@@ -2619,7 +2619,6 @@ go_library("gvisor.dev/gvisor") {
     "pkg/tcpip/stack/route_mutex.go",
     "pkg/tcpip/stack/route_stack_mutex.go",
     "pkg/tcpip/stack/stack.go",
-    "pkg/tcpip/stack/stack_global_state.go",
     "pkg/tcpip/stack/stack_mutex.go",
     "pkg/tcpip/stack/stack_options.go",
     "pkg/tcpip/stack/stack_state_autogen.go",
