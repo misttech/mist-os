@@ -116,10 +116,7 @@ class FfxConfig:
         # program termination.
         atexit.register(self._atexit_callback)
 
-        self._ffx_binary: str = _FFX_BINARY
-        if binary_path:
-            self._ffx_binary = binary_path
-
+        self._ffx_binary: str = binary_path if binary_path else _FFX_BINARY
         self._isolate_dir: fuchsia_controller.IsolateDir = (
             fuchsia_controller.IsolateDir(isolate_dir)
         )
