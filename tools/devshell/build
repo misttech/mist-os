@@ -324,12 +324,12 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
       build_api_client="${FUCHSIA_DIR}/build/api/client"
       # TODO(https://fxbug.dev/328316506): Remove --allow-unknown once GN is fixed.
       gn_labels_raw="$("${build_api_client}" fx_build_args_to_labels --allow-unknown --args "${fuchsia_targets[@]}")" || exit 1
-      readarray -t gn_labels <<< "${gn_labels_raw}"
+      read -r -a gn_labels <<< "${gn_labels_raw}"
 
       # Convert GN labels to Ninja targets now.
       # TODO(https://fxbug.dev/328316506): Remove --allow-unknown once GN is fixed.
       ninja_targets_raw="$("${build_api_client}" gn_label_to_ninja_paths --allow-unknown "${gn_labels[@]}")" || exit 1
-      readarray -t ninja_targets <<< "${ninja_targets_raw}"
+      read -r -a ninja_targets <<< "${ninja_targets_raw}"
 
       echo "Building Ninja target(s): ${ninja_targets[*]}"
     else
