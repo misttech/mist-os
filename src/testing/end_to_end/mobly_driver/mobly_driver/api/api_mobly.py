@@ -5,10 +5,12 @@
 """Contains all Mobly APIs used in Mobly Driver."""
 
 import os
-import api_infra
-from mobly import keys
-from mobly import records
 from typing import Any
+
+from mobly import keys, records
+
+from . import api_infra
+
 
 LATEST_RES_SYMLINK_NAME: str = "latest"
 

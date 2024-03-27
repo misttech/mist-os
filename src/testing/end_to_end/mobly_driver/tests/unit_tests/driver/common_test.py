@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for Mobly driver's common.py."""
+"""Unit tests for mobly_driver/driver/common.py."""
 
 import json
 import unittest
@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-import common
+from mobly_driver.driver import common
 
 
 class CommonTest(unittest.TestCase):

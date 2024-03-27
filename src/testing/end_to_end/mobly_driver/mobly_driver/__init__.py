@@ -1,8 +1,8 @@
 #!/usr/bin/env fuchsia-vendored-python
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Contains module-level functions for running Mobly Driver."""
+"""Mobly Driver module."""
 
 import os
 import subprocess
@@ -10,8 +10,8 @@ import time
 from tempfile import NamedTemporaryFile
 from typing import Optional
 
-import api_infra
-import base_mobly_driver
+from mobly_driver.api import api_infra
+from mobly_driver.driver import base
 
 
 class MoblyTestTimeoutException(Exception):
@@ -23,7 +23,7 @@ class MoblyTestFailureException(Exception):
 
 
 def _execute_test(
-    driver: base_mobly_driver.BaseDriver,
+    driver: base.BaseDriver,
     python_path: str,
     test_path: str,
     timeout_sec: Optional[int] = None,
@@ -93,7 +93,7 @@ def _execute_test(
 
 
 def run(
-    driver: base_mobly_driver.BaseDriver,
+    driver: base.BaseDriver,
     python_path: str,
     test_path: str,
     timeout_sec: Optional[int] = None,

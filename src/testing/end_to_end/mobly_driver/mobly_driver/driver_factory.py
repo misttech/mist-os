@@ -7,11 +7,8 @@
 import os
 from typing import Optional
 
-import api_infra
-import base_mobly_driver
-import infra_driver
-import local_driver
-import common
+from mobly_driver.api import api_infra
+from mobly_driver.driver import base, common, infra, local
 
 
 class DriverFactory:
@@ -48,18 +45,18 @@ class DriverFactory:
         self._params_path = params_path
         self._ffx_subtools_search_path = ffx_subtools_search_path
 
-    def get_driver(self) -> base_mobly_driver.BaseDriver:
+    def get_driver(self) -> base.BaseDriver:
         """Returns an environment-specific Mobly Driver implementation.
 
         Returns:
-          A base_mobly_driver.BaseDriver implementation.
+          A base.BaseDriver implementation.
 
         Raises:
           common.DriverException if unexpected execution environment is found.
         """
         botanist_config_path = os.getenv(api_infra.BOT_ENV_TESTBED_CONFIG)
         if not botanist_config_path:
-            return local_driver.LocalDriver(
+            return local.LocalDriver(
                 ffx_path=self._ffx_path,
                 transport=self._transport,
                 multi_device=self._multi_device,
@@ -68,7 +65,7 @@ class DriverFactory:
                 ffx_subtools_search_path=self._ffx_subtools_search_path,
             )
         try:
-            return infra_driver.InfraDriver(
+            return infra.InfraDriver(
                 tb_json_path=os.environ[api_infra.BOT_ENV_TESTBED_CONFIG],
                 ffx_path=self._ffx_path,
                 transport=self._transport,

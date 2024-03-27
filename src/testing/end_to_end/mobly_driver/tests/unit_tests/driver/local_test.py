@@ -2,16 +2,15 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for Mobly driver's local_driver.py."""
+"""Unit tests for mobly_driver/driver/local.py."""
 
 import ipaddress
 import unittest
 from typing import Any
 from unittest.mock import patch
 
-import api_ffx
-import common
-import local_driver
+from mobly_driver.api import api_ffx
+from mobly_driver.driver import common, local
 
 from ipaddress import ip_address
 from parameterized import parameterized
@@ -22,13 +21,13 @@ class LocalDriverTest(unittest.TestCase):
 
     @patch("builtins.print")
     @patch("yaml.dump", return_value="yaml_str")
-    @patch("common.read_yaml_from_file")
-    @patch("api_mobly.get_config_with_test_params")
+    @patch("mobly_driver.driver.common.read_yaml_from_file")
+    @patch("mobly_driver.api.api_mobly.get_config_with_test_params")
     def test_generate_test_config_from_file_with_params_success(
         self, mock_get_config: Any, mock_read_yaml: Any, *unused_args: Any
     ) -> None:
         """Test case for successful config generation from file"""
-        driver = local_driver.LocalDriver(
+        driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
             log_path="log/path",
@@ -43,13 +42,13 @@ class LocalDriverTest(unittest.TestCase):
 
     @patch("builtins.print")
     @patch("yaml.dump", return_value="yaml_str")
-    @patch("common.read_yaml_from_file")
-    @patch("api_mobly.get_config_with_test_params")
+    @patch("mobly_driver.driver.common.read_yaml_from_file")
+    @patch("mobly_driver.api.api_mobly.get_config_with_test_params")
     def test_generate_test_config_from_file_without_params_success(
         self, mock_get_config: Any, mock_read_yaml: Any, *unused_args: Any
     ) -> None:
         """Test case for successful config without params generation"""
-        driver = local_driver.LocalDriver(
+        driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
             log_path="log/path",
@@ -63,13 +62,14 @@ class LocalDriverTest(unittest.TestCase):
 
     @patch("builtins.print")
     @patch(
-        "common.read_yaml_from_file", side_effect=common.InvalidFormatException
+        "mobly_driver.driver.common.read_yaml_from_file",
+        side_effect=common.InvalidFormatException,
     )
     def test_generate_test_config_from_file_invalid_yaml_content_raises_exception(
         self, *unused_args: Any
     ) -> None:
         """Test case for exception being raised on invalid YAML content"""
-        driver = local_driver.LocalDriver(
+        driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
             log_path="log/path",
@@ -79,12 +79,14 @@ class LocalDriverTest(unittest.TestCase):
             driver.generate_test_config()
 
     @patch("builtins.print")
-    @patch("common.read_yaml_from_file", side_effect=OSError)
+    @patch(
+        "mobly_driver.driver.common.read_yaml_from_file", side_effect=OSError
+    )
     def test_generate_test_config_from_file_invalid_path_raises_exception(
         self, *unused_args: Any
     ) -> None:
         """Test case for exception being raised for invalid path"""
-        driver = local_driver.LocalDriver(
+        driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
             log_path="log/path",
@@ -96,20 +98,20 @@ class LocalDriverTest(unittest.TestCase):
     @patch("builtins.print")
     @patch("yaml.dump", return_value="yaml_str")
     @patch(
-        "api_ffx.FfxClient.get_target_ssh_address",
+        "mobly_driver.api.api_ffx.FfxClient.get_target_ssh_address",
         autospec=True,
         return_value=api_ffx.TargetSshAddress(
             ip=ipaddress.ip_address("::1"), port=8022
         ),
     )
     @patch(
-        "api_ffx.FfxClient.target_list",
+        "mobly_driver.api.api_ffx.FfxClient.target_list",
         autospec=True,
         return_value=api_ffx.TargetListResult(
             all_nodes=["dut_1", "dut_2"], default_nodes=[]
         ),
     )
-    @patch("api_mobly.new_testbed_config", autospec=True)
+    @patch("mobly_driver.api.api_mobly.new_testbed_config", autospec=True)
     def test_generate_test_config_from_env_success(
         self,
         mock_new_tb_config: Any,
@@ -118,7 +120,7 @@ class LocalDriverTest(unittest.TestCase):
         *unused_args: Any,
     ) -> None:
         """Test case for successful env config generation"""
-        driver = local_driver.LocalDriver(
+        driver = local.LocalDriver(
             ffx_path="ffx/path", transport="transport", log_path="log/path"
         )
         ret = driver.generate_test_config()
@@ -144,14 +146,14 @@ class LocalDriverTest(unittest.TestCase):
     @patch("builtins.print")
     @patch("yaml.dump", return_value="yaml_str")
     @patch(
-        "api_ffx.FfxClient.get_target_ssh_address",
+        "mobly_driver.api.api_ffx.FfxClient.get_target_ssh_address",
         autospec=True,
         return_value=api_ffx.TargetSshAddress(
             ip=ipaddress.ip_address("::1"), port=8022
         ),
     )
-    @patch("api_ffx.FfxClient.target_list", autospec=True)
-    @patch("api_mobly.new_testbed_config", autospec=True)
+    @patch("mobly_driver.api.api_ffx.FfxClient.target_list", autospec=True)
+    @patch("mobly_driver.api.api_mobly.new_testbed_config", autospec=True)
     def test_multi_device_config_generation(
         self,
         unused_name: str,
@@ -166,7 +168,7 @@ class LocalDriverTest(unittest.TestCase):
             all_nodes=["dut_1", "dut_2"], default_nodes=default_nodes
         )
 
-        driver = local_driver.LocalDriver(
+        driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
             log_path="log/path",
@@ -191,14 +193,14 @@ class LocalDriverTest(unittest.TestCase):
     @patch("builtins.print")
     @patch("yaml.dump", return_value="yaml_str")
     @patch(
-        "api_ffx.FfxClient.get_target_ssh_address",
+        "mobly_driver.api.api_ffx.FfxClient.get_target_ssh_address",
         autospec=True,
         return_value=api_ffx.TargetSshAddress(
             ip=ipaddress.ip_address("::1"), port=8022
         ),
     )
-    @patch("api_ffx.FfxClient.target_list", autospec=True)
-    @patch("api_mobly.new_testbed_config", autospec=True)
+    @patch("mobly_driver.api.api_ffx.FfxClient.target_list", autospec=True)
+    @patch("mobly_driver.api.api_mobly.new_testbed_config", autospec=True)
     def test_single_device_config_generation(
         self,
         unused_name: str,
@@ -214,7 +216,7 @@ class LocalDriverTest(unittest.TestCase):
             all_nodes=["dut_1", "dut_2"], default_nodes=default_nodes
         )
 
-        driver = local_driver.LocalDriver(
+        driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
             log_path="log/path",
@@ -232,7 +234,7 @@ class LocalDriverTest(unittest.TestCase):
 
     @patch("builtins.print")
     @patch(
-        "api_ffx.FfxClient.target_list",
+        "mobly_driver.api.api_ffx.FfxClient.target_list",
         autospec=True,
         return_value=api_ffx.TargetListResult(
             all_nodes=[],
@@ -243,7 +245,7 @@ class LocalDriverTest(unittest.TestCase):
         self, mock_check_output: Any, *unused_args: Any
     ) -> None:
         """Test case for exception being raised when no devices are found"""
-        driver = local_driver.LocalDriver(
+        driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
             log_path="log/path",
@@ -253,7 +255,7 @@ class LocalDriverTest(unittest.TestCase):
 
     @patch("builtins.print")
     @patch(
-        "api_ffx.FfxClient.target_list",
+        "mobly_driver.api.api_ffx.FfxClient.target_list",
         side_effect=api_ffx.CommandException(),
         autospec=True,
     )
@@ -261,7 +263,7 @@ class LocalDriverTest(unittest.TestCase):
         self, mock_check_output: Any, *unused_args: Any
     ) -> None:
         """Test case for exception being raised from discovery failure"""
-        driver = local_driver.LocalDriver(
+        driver = local.LocalDriver(
             ffx_path="ffx/path", transport="transport", log_path="log/path"
         )
         with self.assertRaises(common.DriverException):
@@ -285,7 +287,7 @@ class LocalDriverTest(unittest.TestCase):
     ) -> None:
         """Test case for exception being raised from invalid discovery output"""
         mock_check_output.return_value = discovery_output
-        driver = local_driver.LocalDriver(
+        driver = local.LocalDriver(
             ffx_path="ffx/path", transport="transport", log_path="log/path"
         )
         with self.assertRaises(common.DriverException):

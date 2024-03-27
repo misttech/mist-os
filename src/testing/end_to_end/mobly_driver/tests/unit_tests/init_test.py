@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for Mobly driver's mobly_driver_lib.py."""
+"""Unit tests for Mobly driver's __init__.py."""
 
 import os
 import subprocess
@@ -12,7 +12,7 @@ from unittest import mock
 
 from parameterized import parameterized
 
-import mobly_driver_lib
+import mobly_driver
 
 
 class MoblyDriverLibTest(unittest.TestCase):
@@ -31,7 +31,7 @@ class MoblyDriverLibTest(unittest.TestCase):
         self.mock_process.wait.return_value = 0
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
-        mobly_driver_lib.run(self.mock_driver, "/py/path", "/test/path")
+        mobly_driver.run(self.mock_driver, "/py/path", "/test/path")
 
         self.mock_driver.generate_test_config.assert_called()
         self.mock_driver.teardown.assert_called()
@@ -54,7 +54,7 @@ class MoblyDriverLibTest(unittest.TestCase):
     ) -> None:
         """Test case to ensure exception raised on invalid args"""
         with self.assertRaises(ValueError):
-            mobly_driver_lib.run(
+            mobly_driver.run(
                 driver, python_path, test_path, timeout_sec=timeout_sec
             )
 
@@ -67,8 +67,8 @@ class MoblyDriverLibTest(unittest.TestCase):
         self.mock_process.wait.return_value = 1
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
-        with self.assertRaises(mobly_driver_lib.MoblyTestFailureException):
-            mobly_driver_lib.run(self.mock_driver, "/py/path", "/test/path")
+        with self.assertRaises(mobly_driver.MoblyTestFailureException):
+            mobly_driver.run(self.mock_driver, "/py/path", "/test/path")
 
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
@@ -82,8 +82,8 @@ class MoblyDriverLibTest(unittest.TestCase):
             0,
         ]
 
-        with self.assertRaises(mobly_driver_lib.MoblyTestTimeoutException):
-            mobly_driver_lib.run(self.mock_driver, "/py/path", "/test/path")
+        with self.assertRaises(mobly_driver.MoblyTestTimeoutException):
+            mobly_driver.run(self.mock_driver, "/py/path", "/test/path")
         self.mock_process.kill.assert_called()
 
     @mock.patch("builtins.print")
@@ -95,14 +95,14 @@ class MoblyDriverLibTest(unittest.TestCase):
         self.mock_process.wait.return_value = 1
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
-        with self.assertRaises(mobly_driver_lib.MoblyTestFailureException):
-            mobly_driver_lib.run(self.mock_driver, "/py/path", "/test/path")
+        with self.assertRaises(mobly_driver.MoblyTestFailureException):
+            mobly_driver.run(self.mock_driver, "/py/path", "/test/path")
         self.mock_driver.teardown.assert_called()
 
     @parameterized.expand([[True], [False]])  # type: ignore[misc]
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
-    @mock.patch("mobly_driver_lib.NamedTemporaryFile")
+    @mock.patch("mobly_driver.NamedTemporaryFile")
     def test_run_passes_params_to_popen(
         self,
         verbose: bool,
@@ -119,9 +119,7 @@ class MoblyDriverLibTest(unittest.TestCase):
         mock_tempfile.return_value.__enter__.return_value = self.mock_tmp
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
-        mobly_driver_lib.run(
-            self.mock_driver, py_path, test_path, verbose=verbose
-        )
+        mobly_driver.run(self.mock_driver, py_path, test_path, verbose=verbose)
         mock_popen.assert_called_once_with(
             [py_path, test_path, "-c", tmp_path] + (["-v"] if verbose else []),
             universal_newlines=mock.ANY,
@@ -139,7 +137,7 @@ class MoblyDriverLibTest(unittest.TestCase):
 
         env = {"PATH": "/system/path"}
         with mock.patch.dict(os.environ, env, clear=True):
-            mobly_driver_lib.run(
+            mobly_driver.run(
                 self.mock_driver,
                 "/py/path",
                 "/test/path",

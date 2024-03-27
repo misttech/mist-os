@@ -8,14 +8,11 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-import api_infra
-import api_mobly
-import api_ffx
-import base_mobly_driver
-import common
+from mobly_driver.api import api_ffx, api_infra, api_mobly
+from mobly_driver.driver import base, common
 
 
-class LocalDriver(base_mobly_driver.BaseDriver):
+class LocalDriver(base.BaseDriver):
     """Local Mobly test driver.
 
     This driver is used when executing Mobly tests in the local environment.
@@ -184,7 +181,10 @@ class LocalDriver(base_mobly_driver.BaseDriver):
             print("(To override, provide path to YAML via `config_yaml_path`)")
             try:
                 config = self._generate_config_from_env()
-            except (common.DriverException, common.InvalidFormatException) as e:
+            except (
+                common.DriverException,
+                common.InvalidFormatException,
+            ) as e:
                 raise common.DriverException(
                     f"Local config generation failed: {e}"
                 )

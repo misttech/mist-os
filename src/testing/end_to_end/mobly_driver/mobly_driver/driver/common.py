@@ -4,9 +4,8 @@
 # found in the LICENSE file.
 """Contains common methods used by BaseDriver implementations."""
 
-from typing import Any
-
 import json
+from typing import Any
 
 import yaml
 

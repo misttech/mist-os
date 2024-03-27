@@ -8,8 +8,9 @@ import argparse
 import os
 import sys
 import signal
-import driver_factory
-import mobly_driver_lib
+
+import mobly_driver
+from mobly_driver import driver_factory
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -88,7 +89,7 @@ def main() -> None:
 
     # Use the same Python runtime for Mobly test execution as the one that's
     # currently running this Mobly driver script.
-    mobly_driver_lib.run(
+    mobly_driver.run(
         driver=driver,
         python_path=sys.executable,
         test_path=args.mobly_test_path,

@@ -9,11 +9,10 @@ import json
 from typing import Any
 
 from tempfile import NamedTemporaryFile
-from mobly import keys
-from mobly import config_parser
+from mobly import config_parser, keys
 from parameterized import parameterized, param
 
-import api_mobly
+from mobly_driver.api import api_mobly
 
 
 class ApiMoblyTest(unittest.TestCase):

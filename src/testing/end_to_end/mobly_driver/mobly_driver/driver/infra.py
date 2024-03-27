@@ -6,18 +6,15 @@
 
 import json
 import os
-
 from typing import Any, Optional
 
 import yaml
 
-import api_infra
-import api_mobly
-import base_mobly_driver
-import common
+from mobly_driver.api import api_infra, api_mobly
+from mobly_driver.driver import base, common
 
 
-class InfraDriver(base_mobly_driver.BaseDriver):
+class InfraDriver(base.BaseDriver):
     """Infrastructure Mobly test driver.
 
     This driver is used when executing Mobly tests in the infra environment.

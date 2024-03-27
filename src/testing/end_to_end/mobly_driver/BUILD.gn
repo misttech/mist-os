@@ -7,43 +7,24 @@ import("//build/python/python_library.gni")
 import("//build/testing/host_test_data.gni")
 
 if (is_host) {
-  python_library("api_infra") {
+  python_library("mobly_driver") {
+    library_name = "mobly_driver"
+    source_root = "//src/testing/end_to_end/mobly_driver/mobly_driver"
     enable_mypy = true
-    sources = [ "api_infra.py" ]
-  }
-
-  python_library("api_mobly") {
-    enable_mypy = true
-    sources = [ "api_mobly.py" ]
-    library_deps = [
-      ":api_infra",
-      "//third_party/mobly:mobly_no_testonly",
+    sources = [
+      "__init__.py",
+      "api/__init__.py",
+      "api/api_ffx.py",
+      "api/api_infra.py",
+      "api/api_mobly.py",
+      "driver/__init__.py",
+      "driver/base.py",
+      "driver/common.py",
+      "driver/infra.py",
+      "driver/local.py",
+      "driver_factory.py",
     ]
-  }
-
-  python_library("api_ffx") {
-    enable_mypy = true
-    sources = [ "api_ffx.py" ]
-  }
-
-  python_library("mobly_driver_lib") {
-    enable_mypy = true
-    sources = [ "mobly_driver_lib.py" ]
-    library_deps = [
-      ":api_infra",
-      "drivers:base_mobly_driver",
-    ]
-  }
-
-  python_library("driver_factory") {
-    enable_mypy = true
-    sources = [ "driver_factory.py" ]
-    library_deps = [
-      ":api_infra",
-      "drivers:common",
-      "drivers:infra_driver",
-      "drivers:local_driver",
-    ]
+    library_deps = [ "//third_party/mobly:mobly_no_testonly" ]
   }
 
   # Mobly Driver Python binary definition.
@@ -53,24 +34,11 @@ if (is_host) {
     testonly = true
     enable_mypy = true
     main_source = "main.py"
-    sources = [
-      "api_ffx.py",
-      "api_infra.py",
-      "api_mobly.py",
-      "driver_factory.py",
-      "drivers/base_mobly_driver.py",
-      "drivers/common.py",
-      "drivers/infra_driver.py",
-      "drivers/local_driver.py",
-      "main.py",
-      "mobly_driver_lib.py",
-    ]
+    sources = [ "main.py" ]
     main_callable = "main"
     output_name = _md_bin_name
-    deps = [
-      ":driver_factory",
-      ":mobly_driver_lib",
-    ]
+
+    deps = [ ":mobly_driver" ]
   }
 
   # Mobly Driver test data definition.

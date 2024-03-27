@@ -2,23 +2,22 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for Mobly driver's infra_driver.py."""
+"""Unit tests for mobly_driver/driver/infra.py."""
 
 import unittest
 from unittest.mock import ANY, call, mock_open, patch
 from typing import Any
 
-import common
-import infra_driver
+from mobly_driver.driver import common, infra
 
 
 class InfraMoblyDriverTest(unittest.TestCase):
     """Infra Driver tests"""
 
     @patch("yaml.dump", return_value="yaml_str")
-    @patch("common.read_json_from_file")
-    @patch("common.read_yaml_from_file")
-    @patch("api_mobly.new_testbed_config")
+    @patch("mobly_driver.driver.common.read_json_from_file")
+    @patch("mobly_driver.driver.common.read_yaml_from_file")
+    @patch("mobly_driver.api.api_mobly.new_testbed_config")
     def test_generate_test_config_with_params_success(
         self,
         mock_new_config: Any,
@@ -27,7 +26,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         *unused_args: Any,
     ) -> None:
         """Test case for successful config generation"""
-        driver = infra_driver.InfraDriver(
+        driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
             ffx_path="ffx/path",
             transport="transport",
@@ -42,9 +41,9 @@ class InfraMoblyDriverTest(unittest.TestCase):
         self.assertEqual(ret, "yaml_str")
 
     @patch("yaml.dump", return_value="yaml_str")
-    @patch("common.read_json_from_file")
-    @patch("common.read_yaml_from_file")
-    @patch("api_mobly.new_testbed_config")
+    @patch("mobly_driver.driver.common.read_json_from_file")
+    @patch("mobly_driver.driver.common.read_yaml_from_file")
+    @patch("mobly_driver.api.api_mobly.new_testbed_config")
     def test_generate_test_config_without_params_success(
         self,
         mock_new_config: Any,
@@ -53,7 +52,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         *unused_args: Any,
     ) -> None:
         """Test case for successful config without params generation"""
-        driver = infra_driver.InfraDriver(
+        driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
             ffx_path="ffx/path",
             transport="transport",
@@ -67,13 +66,14 @@ class InfraMoblyDriverTest(unittest.TestCase):
         self.assertEqual(ret, "yaml_str")
 
     @patch(
-        "common.read_json_from_file", side_effect=common.InvalidFormatException
+        "mobly_driver.driver.common.read_json_from_file",
+        side_effect=common.InvalidFormatException,
     )
     def test_generate_test_config_invalid_json_raises_exception(
         self, *unused_args: Any
     ) -> None:
         """Test case for exception being raised on invalid JSON content"""
-        driver = infra_driver.InfraDriver(
+        driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
             ffx_path="ffx/path",
             transport="transport",
@@ -83,14 +83,15 @@ class InfraMoblyDriverTest(unittest.TestCase):
             driver.generate_test_config()
 
     @patch(
-        "common.read_yaml_from_file", side_effect=common.InvalidFormatException
+        "mobly_driver.driver.common.read_yaml_from_file",
+        side_effect=common.InvalidFormatException,
     )
-    @patch("common.read_json_from_file")
+    @patch("mobly_driver.driver.common.read_json_from_file")
     def test_generate_test_config_invalid_yaml_raises_exception(
         self, *unused_args: Any
     ) -> None:
         """Test case for exception being raised on invalid YAML content"""
-        driver = infra_driver.InfraDriver(
+        driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
             ffx_path="ffx/path",
             transport="transport",
@@ -100,12 +101,14 @@ class InfraMoblyDriverTest(unittest.TestCase):
         with self.assertRaises(common.InvalidFormatException):
             driver.generate_test_config()
 
-    @patch("common.read_json_from_file", side_effect=OSError)
+    @patch(
+        "mobly_driver.driver.common.read_json_from_file", side_effect=OSError
+    )
     def test_generate_test_config_invalid_tb_path_raises_exception(
         self, *unused_args: Any
     ) -> None:
         """Test case for exception being raised on invalid testbed JSON path"""
-        driver = infra_driver.InfraDriver(
+        driver = infra.InfraDriver(
             tb_json_path="/does/not/exist",
             ffx_path="ffx/path",
             transport="transport",
@@ -114,12 +117,14 @@ class InfraMoblyDriverTest(unittest.TestCase):
         with self.assertRaises(common.DriverException):
             driver.generate_test_config()
 
-    @patch("common.read_yaml_from_file", side_effect=OSError)
+    @patch(
+        "mobly_driver.driver.common.read_yaml_from_file", side_effect=OSError
+    )
     def test_generate_test_config_invalid_params_path_raises_exception(
         self, *unused_args: Any
     ) -> None:
         """Test case for exception being raised on invalid params YAML path"""
-        driver = infra_driver.InfraDriver(
+        driver = infra.InfraDriver(
             tb_json_path="/does/not/exist",
             ffx_path="ffx/path",
             transport="transport",
@@ -129,12 +134,15 @@ class InfraMoblyDriverTest(unittest.TestCase):
         with self.assertRaises(common.DriverException):
             driver.generate_test_config()
 
-    @patch("api_mobly.get_result_path")
+    @patch("mobly_driver.api.api_mobly.get_result_path")
     @patch(
-        "api_mobly.get_latest_test_output_dir_symlink_path",
+        "mobly_driver.api.api_mobly.get_latest_test_output_dir_symlink_path",
         return_value="path/to/remove",
     )
-    @patch("api_infra.TESTPARSER_RESULT_HEADER", "---MOCK_HEADER---")
+    @patch(
+        "mobly_driver.api.api_infra.TESTPARSER_RESULT_HEADER",
+        "---MOCK_HEADER---",
+    )
     @patch("builtins.open", new_callable=mock_open, read_data="test_result")
     @patch("os.remove")
     @patch("builtins.print")
@@ -142,7 +150,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         self, mock_print: Any, mock_rm: Any, *unused_args: Any
     ) -> None:
         """Test case for teardown"""
-        driver = infra_driver.InfraDriver(
+        driver = infra.InfraDriver(
             tb_json_path="",
             ffx_path="ffx/path",
             transport="transport",
@@ -158,9 +166,9 @@ class InfraMoblyDriverTest(unittest.TestCase):
         )
         mock_rm.assert_called_once_with("path/to/remove")
 
-    @patch("api_mobly.get_result_path")
-    @patch("api_mobly.get_latest_test_output_dir_symlink_path")
-    @patch("api_infra.TESTPARSER_RESULT_HEADER")
+    @patch("mobly_driver.api.api_mobly.get_result_path")
+    @patch("mobly_driver.api.api_mobly.get_latest_test_output_dir_symlink_path")
+    @patch("mobly_driver.api.api_infra.TESTPARSER_RESULT_HEADER")
     @patch("builtins.open", side_effect=OSError)
     @patch("os.remove", side_effect=OSError)
     @patch("builtins.print")
@@ -168,7 +176,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         self, mock_print: Any, mock_rm: Any, *unused_args: Any
     ) -> None:
         """Test case for teardown succeeding despite missing results"""
-        driver = infra_driver.InfraDriver(
+        driver = infra.InfraDriver(
             tb_json_path="",
             ffx_path="ffx/path",
             transport="transport",

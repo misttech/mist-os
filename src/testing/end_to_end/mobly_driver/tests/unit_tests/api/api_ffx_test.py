@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from parameterized import parameterized
 
-import api_ffx
+from mobly_driver.api import api_ffx
 
 
 class FfxClientTest(unittest.TestCase):
