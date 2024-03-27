@@ -8,6 +8,7 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devicetree/testing/visitor-test-helper.h>
 #include <lib/driver/devicetree/visitors/default/bind-property/bind-property.h>
+#include <lib/driver/devicetree/visitors/default/mmio/mmio.h>
 #include <lib/driver/devicetree/visitors/registry.h>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -30,6 +31,7 @@ TEST(RegistersVisitorTest, TestRegistersProperty) {
   fdf_devicetree::VisitorRegistry visitors;
   ASSERT_TRUE(
       visitors.RegisterVisitor(std::make_unique<fdf_devicetree::BindPropertyVisitor>()).is_ok());
+  ASSERT_TRUE(visitors.RegisterVisitor(std::make_unique<fdf_devicetree::MmioVisitor>()).is_ok());
 
   auto tester = std::make_unique<RegistersVisitorTester>("/pkg/test-data/registers.dtb");
   RegistersVisitorTester* registers_tester = tester.get();

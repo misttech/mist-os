@@ -235,6 +235,7 @@ zx::result<> BoardTestHelper::WaitOnDevices(const std::vector<std::string>& devi
   auto close_fd = fit::defer([&dev_fd]() { close(dev_fd); });
 
   for (const auto& path : device_paths) {
+    FX_LOGS(INFO) << "Waiting for " << path;
     auto wait_result = device_watcher::RecursiveWaitForFile(dev_fd, path.c_str());
     if (wait_result.is_error()) {
       FX_LOGS(ERROR) << "Failed to wait for " << path << " : " << wait_result.status_string();

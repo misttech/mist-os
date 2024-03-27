@@ -8,6 +8,7 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devicetree/testing/visitor-test-helper.h>
 #include <lib/driver/devicetree/visitors/default/bind-property/bind-property.h>
+#include <lib/driver/devicetree/visitors/default/mmio/mmio.h>
 #include <lib/driver/devicetree/visitors/registry.h>
 
 #include <cstdint>
@@ -28,6 +29,7 @@ TEST(UsbVisitorTest, TestMetadataAndBindProperty) {
   fdf_devicetree::VisitorRegistry visitors;
   ASSERT_TRUE(
       visitors.RegisterVisitor(std::make_unique<fdf_devicetree::BindPropertyVisitor>()).is_ok());
+  ASSERT_TRUE(visitors.RegisterVisitor(std::make_unique<fdf_devicetree::MmioVisitor>()).is_ok());
 
   auto tester = std::make_unique<UsbPhyVisitorTester>("/pkg/test-data/usb-phy.dtb");
   UsbPhyVisitorTester* usb_visitor_tester = tester.get();

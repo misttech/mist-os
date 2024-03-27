@@ -32,9 +32,9 @@ TEST(MmioVisitorTest, ReadRegSuccessfully) {
   ASSERT_TRUE(mmio_tester->has_visited());
   ASSERT_TRUE(mmio_tester->DoPublish().is_ok());
 
-  // First node is devicetree root. Second one is the sample-device. Check MMIO of sample-device.
+  // Check MMIO of sample-device.
   auto mmio = mmio_tester->env()
-                  .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 1)
+                  .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 0)
                   .mmio();
 
   // Test MMIO properties.
@@ -60,10 +60,10 @@ TEST(MmioVisitorTest, TranslateRegSuccessfully) {
   ASSERT_TRUE(mmio_tester->DoPublish().is_ok());
 
   auto parent_mmio = mmio_tester->env()
-                         .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 1)
+                         .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 0)
                          .mmio();
   auto child_mmio = mmio_tester->env()
-                        .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 2)
+                        .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 1)
                         .mmio();
 
   ASSERT_TRUE(parent_mmio);
@@ -86,16 +86,8 @@ TEST(MmioVisitorTest, IgnoreRegWhichIsNotMmio) {
   ASSERT_TRUE(mmio_tester->manager()->Walk(visitors).is_ok());
   ASSERT_TRUE(mmio_tester->has_visited());
   ASSERT_TRUE(mmio_tester->DoPublish().is_ok());
-
-  auto parent_mmio = mmio_tester->env()
-                         .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 1)
-                         .mmio();
-  auto child_mmio = mmio_tester->env()
-                        .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 2)
-                        .mmio();
-
-  ASSERT_FALSE(parent_mmio);
-  ASSERT_FALSE(child_mmio);
+  ASSERT_EQ(0lu, mmio_tester->env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(3lu, mmio_tester->env().SyncCall(&testing::FakeEnvWrapper::non_pbus_node_size));
 }
 
 }  // namespace

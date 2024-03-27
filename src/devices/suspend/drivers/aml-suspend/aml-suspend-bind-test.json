@@ -14,5 +14,12 @@
         },
         "expected": "match",
         "name": "AML Suspend Bind"
+    },
+    {
+        "name": "Match devicetree",
+        "expected": "match",
+        "device": {
+            "fuchsia.devicetree.FIRST_COMPATIBLE": "\"amlogic,suspend\""
+        }
     }
 ]

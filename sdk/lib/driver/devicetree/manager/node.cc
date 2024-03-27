@@ -62,7 +62,6 @@ Node::Node(Node *parent, const std::string_view name, devicetree::Properties pro
 
 void Node::AddBindProperty(fuchsia_driver_framework::NodeProperty prop) {
   node_properties_.emplace_back(std::move(prop));
-  add_platform_device_ = true;
 }
 
 void Node::AddMmio(fuchsia_hardware_platform_bus::Mmio mmio) {
@@ -111,11 +110,12 @@ void Node::AddNodeSpec(fuchsia_driver_framework::ParentSpec spec) {
 }
 
 zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> &pbus,
-                           fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> &mgr) {
-  if (node_properties_.empty() && !composite_) {
+                           fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> &mgr,
+                           fidl::SyncClient<fuchsia_driver_framework::Node> &fdf_node) {
+  if (node_properties_.empty() && !composite_ && !add_platform_device_) {
     FDF_LOG(
         DEBUG,
-        "Not publishing node '%.*s' because it neither has bind properties nor is it a composite node.",
+        "Not publishing node '%.*s' because it has no node properties, and no platform resources, and it is not a composite node.",
         static_cast<int>(name().size()), name().data());
     return zx::ok();
   }
@@ -131,13 +131,32 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
     }
   }
 
-  // Pass properties to pbus node directly if we are not adding a composite spec.
-  if (add_platform_device_ && !composite_) {
-    pbus_node_.properties() = node_properties_;
+  // Nodes are published as per below logic -
+  // 1. Node has platform resources
+  //     a. Node references other nodes -> PlatformBus.NodeAdd + CompositeNodeManager.AddSpec
+  //     b. Node does not reference other nodes -> PlatformBus.NodeAdd
+  // 2. Node does not have platform resources
+  //     a. Node has bind properties (i.e. compatible string)
+  //        i. Node references other nodes ->  Node.AddChild + CompositeNodeManager.AddSpec
+  //        ii. Node does not reference other nodes -> Node.AddChild
+  //     b. Node has no bind properties
+  //        i. Node references other nodes -> CompositeNodeManager.AddSpec
+  //        ii. Node does not reference other nodes -> Not published
+  //
+
+  bool add_non_platform_device = false;
+  if (!add_platform_device_ && !node_properties_.empty()) {
+    add_non_platform_device = true;
   }
 
   if (add_platform_device_) {
     FDF_LOG(DEBUG, "Adding node '%s' to pbus with instance id %d.", name().c_str(), id_);
+
+    // Pass properties to pbus node directly if we are not adding a composite spec.
+    if (!composite_) {
+      pbus_node_.properties() = node_properties_;
+    }
+
     fdf::Arena arena('PBUS');
     fidl::Arena fidl_arena;
     auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, pbus_node_));
@@ -149,6 +168,27 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
       FDF_LOG(ERROR, "NodeAdd failed: %s", zx_status_get_string(result->error_value()));
       return zx::error(result->error_value());
     }
+  } else if (add_non_platform_device) {
+    FDF_LOG(DEBUG, "Adding node '%s' as board driver child.", name().c_str());
+    fuchsia_driver_framework::NodeAddArgs node_add_args;
+    node_add_args.name() = name();
+
+    node_add_args.properties() = node_properties_;
+
+    auto controller_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+    if (controller_endpoints.is_error()) {
+      FDF_LOG(ERROR, "Create node controller end points failed: %s",
+              zx_status_get_string(controller_endpoints.error_value()));
+      return zx::error(controller_endpoints.error_value());
+    }
+    auto result =
+        fdf_node->AddChild({std::move(node_add_args), std::move(controller_endpoints->server), {}});
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "AddChild request failed: %s",
+              result.error_value().FormatDescription().c_str());
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    node_controller_.Bind(std::move(controller_endpoints->client));
   }
 
   // Add composite node spec if composite.
@@ -177,9 +217,19 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
                                   bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE),
           fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_INSTANCE_ID, id_),
       };
-
-      // pbus node is always the primary parent for now.
       parents_.insert(parents_.begin(), std::move(platform_node));
+    } else if (add_non_platform_device) {
+      // Construct the non platform bus node.
+      fdf::ParentSpec non_pbus_node;
+      non_pbus_node.properties() = node_properties_;
+
+      for (auto &node_property : node_properties_) {
+        fdf::BindRule bind_rule = {node_property.key(),
+                                   fuchsia_driver_framework::Condition::kAccept,
+                                   {node_property.value()}};
+        non_pbus_node.bind_rules().emplace_back(std::move(bind_rule));
+      }
+      parents_.insert(parents_.begin(), std::move(non_pbus_node));
     }
 
     FDF_LOG(DEBUG, "Adding composite node spec to '%.*s' with %zu parents.",

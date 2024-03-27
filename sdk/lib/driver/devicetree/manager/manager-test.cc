@@ -96,14 +96,29 @@ TEST_F(ManagerTest, TestPublishesSimpleNode) {
   ASSERT_EQ(ZX_OK, manager.Walk(default_visitors).status_value());
 
   ASSERT_TRUE(DoPublish(manager).is_ok());
-  ASSERT_EQ(2lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(0lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(2lu, env().SyncCall(&testing::FakeEnvWrapper::non_pbus_node_size));
 
   ASSERT_EQ(0lu, env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_size));
 
-  auto pbus_node = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 1);
-  ASSERT_TRUE(pbus_node.name().has_value());
-  ASSERT_NE(nullptr, strstr("example-device", pbus_node.name()->data()));
-  ASSERT_TRUE(pbus_node.properties().has_value());
+  auto non_pbus_node_0 = env().SyncCall(&testing::FakeEnvWrapper::non_pbus_nodes_at, 0);
+  ASSERT_TRUE(non_pbus_node_0->args().name().has_value());
+  ASSERT_EQ(non_pbus_node_0->args().name(), "dt-root");
+  ASSERT_TRUE(non_pbus_node_0->args().properties().has_value());
+
+  ASSERT_TRUE(testing::CheckHasProperties(
+      {{{
+          .key = fuchsia_driver_framework::NodePropertyKey::WithStringValue(
+              bind_fuchsia_devicetree::FIRST_COMPATIBLE),
+          .value =
+              fuchsia_driver_framework::NodePropertyValue::WithStringValue("fuchsia,sample-dt"),
+      }}},
+      *non_pbus_node_0->args().properties(), false));
+
+  auto non_pbus_node_1 = env().SyncCall(&testing::FakeEnvWrapper::non_pbus_nodes_at, 1);
+  ASSERT_TRUE(non_pbus_node_1->args().name().has_value());
+  ASSERT_NE(nullptr, strstr("example-device", non_pbus_node_1->args().name()->data()));
+  ASSERT_TRUE(non_pbus_node_1->args().properties().has_value());
 
   ASSERT_TRUE(testing::CheckHasProperties(
       {{{
@@ -112,7 +127,7 @@ TEST_F(ManagerTest, TestPublishesSimpleNode) {
           .value =
               fuchsia_driver_framework::NodePropertyValue::WithStringValue("fuchsia,sample-device"),
       }}},
-      *pbus_node.properties(), false));
+      *non_pbus_node_1->args().properties(), false));
 }
 
 TEST_F(ManagerTest, DriverVisitorTest) {
@@ -164,11 +179,11 @@ TEST_F(ManagerTest, TestMetadata) {
 
   ASSERT_TRUE(DoPublish(manager).is_ok());
 
-  ASSERT_EQ(10lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(1lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(9lu, env().SyncCall(&testing::FakeEnvWrapper::non_pbus_node_size));
 
-  // First node is devicetree root. Second one is the sample-device. Check
-  // metadata of sample-device.
-  auto metadata = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 1).metadata();
+  // Check metadata of sample-device.
+  auto metadata = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 0).metadata();
 
   // Test Metadata properties.
   ASSERT_TRUE(metadata);
@@ -350,21 +365,24 @@ TEST_F(ManagerTest, TestSkipDisabledNodes) {
   ASSERT_EQ(ZX_OK, manager.Walk(default_visitors).status_value());
 
   ASSERT_TRUE(DoPublish(manager).is_ok());
-  ASSERT_EQ(3lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(0lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(3lu, env().SyncCall(&testing::FakeEnvWrapper::non_pbus_node_size));
 
-  auto pbus_node0 = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 0);
-  ASSERT_TRUE(pbus_node0.name().has_value());
-  ASSERT_EQ(pbus_node0.name(), "dt-root");
-  auto pbus_node1 = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 1);
-  ASSERT_TRUE(pbus_node1.name().has_value());
-  ASSERT_NE(nullptr, strstr("status-okay-device", pbus_node1.name()->data()));
-  auto pbus_node2 = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 2);
-  ASSERT_TRUE(pbus_node2.name().has_value());
-  ASSERT_NE(nullptr, strstr("status-none-device", pbus_node2.name()->data()));
+  auto non_pbus_node0 = env().SyncCall(&testing::FakeEnvWrapper::non_pbus_nodes_at, 0);
+  ASSERT_TRUE(non_pbus_node0->args().name().has_value());
+  ASSERT_EQ(non_pbus_node0->args().name(), "dt-root");
+  auto non_pbus_node1 = env().SyncCall(&testing::FakeEnvWrapper::non_pbus_nodes_at, 1);
+  ASSERT_TRUE(non_pbus_node1->args().name().has_value());
+  ASSERT_NE(nullptr, strstr("status-okay-device", non_pbus_node1->args().name()->data()));
+  auto non_pbus_node2 = env().SyncCall(&testing::FakeEnvWrapper::non_pbus_nodes_at, 2);
+  ASSERT_TRUE(non_pbus_node2->args().name().has_value());
+  ASSERT_NE(nullptr, strstr("status-none-device", non_pbus_node2->args().name()->data()));
 }
 
-TEST_F(ManagerTest, TestCompositeSpec) {
+TEST_F(ManagerTest, TestNonPbusCompositeSpec) {
   Manager manager(testing::LoadTestBlob("/pkg/test-data/simple.dtb"));
+  static const std::string kTestKey = "test-key";
+  static const std::string kTestProperty = "test-property";
 
   class TestDriverVisitor final : public DriverVisitor {
    public:
@@ -372,10 +390,8 @@ TEST_F(ManagerTest, TestCompositeSpec) {
 
     zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
       visited = true;
-      parent_spec.bind_rules({fdf::MakeAcceptBindRule(bind_fuchsia_devicetree::FIRST_COMPATIBLE,
-                                                      SAMPLE_DEVICE_COMPATIBILITY)});
-      parent_spec.properties({fdf::MakeProperty(bind_fuchsia_devicetree::FIRST_COMPATIBLE,
-                                                SAMPLE_DEVICE_COMPATIBILITY)});
+      parent_spec.bind_rules({fdf::MakeAcceptBindRule(kTestKey, kTestProperty)});
+      parent_spec.properties({fdf::MakeProperty(kTestKey, kTestProperty)});
       node.AddNodeSpec(parent_spec);
       return zx::ok();
     }
@@ -388,7 +404,62 @@ TEST_F(ManagerTest, TestCompositeSpec) {
   ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
   ASSERT_TRUE(DoPublish(manager).is_ok());
 
-  ASSERT_EQ(2lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(0lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(2lu, env().SyncCall(&testing::FakeEnvWrapper::non_pbus_node_size));
+  ASSERT_EQ(1lu, env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_size));
+
+  auto mgr_request = env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_at, 0);
+  ASSERT_TRUE(mgr_request.parents().has_value());
+  ASSERT_EQ(2lu, mgr_request.parents()->size());
+
+  EXPECT_TRUE(testing::CheckHasProperties(
+      {{
+          fdf::MakeProperty(bind_fuchsia_devicetree::FIRST_COMPATIBLE, SAMPLE_DEVICE_COMPATIBILITY),
+      }},
+      (*mgr_request.parents())[0].properties(), true));
+  EXPECT_TRUE(testing::CheckHasBindRules(
+      {
+          fdf::MakeAcceptBindRule(bind_fuchsia_devicetree::FIRST_COMPATIBLE,
+                                  SAMPLE_DEVICE_COMPATIBILITY),
+      },
+      (*mgr_request.parents())[0].bind_rules(), true));
+
+  EXPECT_TRUE(testing::CheckHasProperties({{fdf::MakeProperty(kTestKey, kTestProperty)}},
+                                          (*mgr_request.parents())[1].properties(), false));
+  EXPECT_TRUE(testing::CheckHasBindRules({{fdf::MakeAcceptBindRule(kTestKey, kTestProperty)}},
+                                         (*mgr_request.parents())[1].bind_rules(), false));
+}
+
+TEST_F(ManagerTest, TestPbusCompositeSpec) {
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/simple.dtb"));
+  static const std::string kTestKey = "test-key";
+  static const std::string kTestProperty = "test-property";
+
+  class TestDriverVisitor final : public DriverVisitor {
+   public:
+    TestDriverVisitor() : DriverVisitor({SAMPLE_DEVICE_COMPATIBILITY}) {}
+
+    zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
+      visited = true;
+      parent_spec.bind_rules({fdf::MakeAcceptBindRule(kTestKey, kTestProperty)});
+      parent_spec.properties({fdf::MakeProperty(kTestKey, kTestProperty)});
+      node.AddNodeSpec(parent_spec);
+      // This adds a pbus resource, making the one of the parent of the composite to be platform
+      // device.
+      node.AddBootMetadata({});
+      return zx::ok();
+    }
+    bool visited = false;
+    fuchsia_driver_framework::ParentSpec parent_spec;
+  };
+
+  DefaultVisitors<TestDriverVisitor> visitor;
+
+  ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
+  ASSERT_TRUE(DoPublish(manager).is_ok());
+
+  ASSERT_EQ(1lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(1lu, env().SyncCall(&testing::FakeEnvWrapper::non_pbus_node_size));
   ASSERT_EQ(1lu, env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_size));
 
   auto mgr_request = env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_at, 0);
@@ -406,13 +477,10 @@ TEST_F(ManagerTest, TestCompositeSpec) {
       },
       (*mgr_request.parents())[0].bind_rules(), true));
 
-  EXPECT_TRUE(testing::CheckHasProperties(
-      {{fdf::MakeProperty(bind_fuchsia_devicetree::FIRST_COMPATIBLE, SAMPLE_DEVICE_COMPATIBILITY)}},
-      (*mgr_request.parents())[1].properties(), false));
-  EXPECT_TRUE(testing::CheckHasBindRules(
-      {{fdf::MakeAcceptBindRule(bind_fuchsia_devicetree::FIRST_COMPATIBLE,
-                                SAMPLE_DEVICE_COMPATIBILITY)}},
-      (*mgr_request.parents())[1].bind_rules(), false));
+  EXPECT_TRUE(testing::CheckHasProperties({{fdf::MakeProperty(kTestKey, kTestProperty)}},
+                                          (*mgr_request.parents())[1].properties(), false));
+  EXPECT_TRUE(testing::CheckHasBindRules({{fdf::MakeAcceptBindRule(kTestKey, kTestProperty)}},
+                                         (*mgr_request.parents())[1].bind_rules(), false));
 }
 
 }  // namespace

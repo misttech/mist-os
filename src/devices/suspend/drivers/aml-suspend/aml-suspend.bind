@@ -6,8 +6,8 @@ using fuchsia.platform;
 using fuchsia.amlogic.platform;
 using fuchsia.devicetree;
 
-if fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE {
-  fuchsia.devicetree.FIRST_COMPATIBLE == "amlogic,suspend";
+if fuchsia.devicetree.FIRST_COMPATIBLE == "amlogic,suspend" {
+  true;
 }
 else {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;

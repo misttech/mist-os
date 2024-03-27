@@ -43,20 +43,21 @@ class Manager final : public NodeManager {
   // This needs to be called before |PublishDevices|.
   zx::result<> Walk(Visitor& visitor);
 
-  // TODO(323033625): Temporary overload to allow for a soft transition across repositories.
-  zx::result<> PublishDevices(fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus,
+  // TODO(331226069) : Remove after soft transition.
+  zx::result<> PublishDevices(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus,
                               fidl::ClientEnd<fuchsia_driver_framework::CompositeNodeManager> mgr) {
-    auto sync_client = fdf::WireSyncClient(std::move(pbus));
-    return PublishDevices(sync_client, std::move(mgr));
+    fidl::SyncClient<fuchsia_driver_framework::Node> fdf_node;
+    return PublishDevices(pbus, std::move(mgr), fdf_node);
   }
 
   // Publish the discovered devices.
-  // |pbus| should be the platform bus.
-  // |parent_node| is the root node of the devicetree. This will eventually be
-  // used for housing the metadata nodes.
-  // |mgr| is the device group manager.
-  zx::result<> PublishDevices(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus,
-                              fidl::ClientEnd<fuchsia_driver_framework::CompositeNodeManager> mgr);
+  // The devices maybe added as a platform device using |pbus_client| if it contains any platform
+  // resources, or it maybe added as a child of the board driver using |fdf_node|, or it maybe added
+  // as a composite of multiple devices if it references other nodes.
+  zx::result<> PublishDevices(
+      fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus_client,
+      fidl::ClientEnd<fuchsia_driver_framework::CompositeNodeManager> mgr,
+      fidl::SyncClient<fuchsia_driver_framework::Node>& fdf_node);
 
   const std::vector<std::unique_ptr<Node>>& nodes() { return nodes_publish_order_; }
 

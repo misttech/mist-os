@@ -57,7 +57,8 @@ class Node {
   // Publish this node.
   // TODO(https://fxbug.dev/42059490): Switch to fdf::SyncClient when it's available.
   zx::result<> Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus,
-                       fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager>& mgr);
+                       fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager>& mgr,
+                       fidl::SyncClient<fuchsia_driver_framework::Node>& fdf_node);
 
   const std::string& name() const { return name_; }
 
@@ -103,6 +104,9 @@ class Node {
 
   // Storing handle to manager. This is ok as the manager always outlives the node instance.
   NodeManager* manager_;
+
+  // Valid only when a non platform bus node is published.
+  fidl::SyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 };
 
 class ReferenceNode {

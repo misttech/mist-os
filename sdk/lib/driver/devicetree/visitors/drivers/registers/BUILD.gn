@@ -47,6 +47,7 @@ test("registers-visitor-test-bin") {
     "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
     "//sdk/lib/driver/devicetree/visitors:registry",
     "//sdk/lib/driver/devicetree/visitors/default/bind-property",
+    "//sdk/lib/driver/devicetree/visitors/default/mmio",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
     "//src/lib/fxl/test:gtest_main",

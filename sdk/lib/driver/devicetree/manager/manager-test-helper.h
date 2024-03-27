@@ -5,6 +5,7 @@
 #ifndef LIB_DRIVER_DEVICETREE_MANAGER_MANAGER_TEST_HELPER_H_
 #define LIB_DRIVER_DEVICETREE_MANAGER_MANAGER_TEST_HELPER_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/logging/cpp/logger.h>
@@ -93,12 +94,31 @@ class FakeCompositeNodeManager final
   std::vector<AddSpecRequest> requests_;
 };
 
+class FakeNode final : public fidl::Server<fuchsia_driver_framework::Node> {
+ public:
+  void AddChild(AddChildRequest& request, AddChildCompleter::Sync& completer) override {
+    requests_.push_back(std::make_shared<AddChildRequest>(std::move(request)));
+    completer.Reply(zx::ok());
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_driver_framework::Node> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  std::vector<std::shared_ptr<AddChildRequest>>& requests() { return requests_; }
+
+ private:
+  std::vector<std::shared_ptr<AddChildRequest>> requests_;
+};
+
 class FakeEnvWrapper {
  public:
   void Bind(fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus_endpoints_server,
-            fidl::ServerEnd<fuchsia_driver_framework::CompositeNodeManager> mgr_endpoints_server);
+            fidl::ServerEnd<fuchsia_driver_framework::CompositeNodeManager> mgr_endpoints_server,
+            fidl::ServerEnd<fuchsia_driver_framework::Node> node_endpoint_server);
 
   size_t pbus_node_size();
+
+  size_t non_pbus_node_size();
 
   size_t mgr_requests_size();
 
@@ -107,9 +127,13 @@ class FakeEnvWrapper {
 
   fuchsia_hardware_platform_bus::Node pbus_nodes_at(size_t index);
 
+  std::shared_ptr<fidl::Request<fuchsia_driver_framework::Node::AddChild>> non_pbus_nodes_at(
+      size_t index);
+
  private:
   FakePlatformBus pbus_;
   FakeCompositeNodeManager mgr_;
+  FakeNode node_;
 };
 
 class ManagerTestHelper {
@@ -130,6 +154,7 @@ class ManagerTestHelper {
   async_patterns::TestDispatcherBound<FakeEnvWrapper> env_{env_dispatcher->async_dispatcher(),
                                                            std::in_place};
   fidl::SyncClient<fuchsia_driver_framework::Node> node_;
+  fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   std::unique_ptr<fdf::Logger> logger_;
 };
 

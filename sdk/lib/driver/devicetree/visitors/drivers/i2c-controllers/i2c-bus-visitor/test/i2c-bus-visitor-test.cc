@@ -9,6 +9,7 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devicetree/testing/visitor-test-helper.h>
 #include <lib/driver/devicetree/visitors/default/bind-property/bind-property.h>
+#include <lib/driver/devicetree/visitors/default/mmio/mmio.h>
 #include <lib/driver/devicetree/visitors/registry.h>
 
 #include <cstdint>
@@ -32,6 +33,7 @@ TEST(I2cBusVisitorTest, TestI2CChannels) {
   fdf_devicetree::VisitorRegistry visitors;
   ASSERT_TRUE(
       visitors.RegisterVisitor(std::make_unique<fdf_devicetree::BindPropertyVisitor>()).is_ok());
+  ASSERT_TRUE(visitors.RegisterVisitor(std::make_unique<fdf_devicetree::MmioVisitor>()).is_ok());
 
   auto tester = std::make_unique<I2cBusVisitorTester>("/pkg/test-data/i2c.dtb");
   I2cBusVisitorTester* i2c_tester = tester.get();
@@ -40,15 +42,17 @@ TEST(I2cBusVisitorTest, TestI2CChannels) {
   ASSERT_EQ(ZX_OK, i2c_tester->manager()->Walk(visitors).status_value());
   ASSERT_TRUE(i2c_tester->DoPublish().is_ok());
 
-  auto node_count =
+  auto pbus_node_count =
       i2c_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_node_size);
+  auto non_pbus_node_count =
+      i2c_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::non_pbus_node_size);
 
   ASSERT_EQ(
       2lu, i2c_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_size));
 
   uint32_t node_tested_count = 0;
   uint32_t mgr_request_idx = 0;
-  for (size_t i = 0; i < node_count; i++) {
+  for (size_t i = 0; i < pbus_node_count; i++) {
     auto node =
         i2c_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i);
 
@@ -73,8 +77,12 @@ TEST(I2cBusVisitorTest, TestI2CChannels) {
       EXPECT_EQ(channels[1].address(), static_cast<uint32_t>(I2C_ADDRESS2));
       node_tested_count++;
     }
+  }
 
-    if (node.name()->find("child-") != std::string::npos) {
+  for (size_t i = 0; i < non_pbus_node_count; i++) {
+    auto node =
+        i2c_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::non_pbus_nodes_at, i);
+    if (node->args().name()->find("child-") != std::string::npos) {
       auto mgr_request = i2c_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
       ASSERT_TRUE(mgr_request.parents().has_value());
@@ -87,9 +95,9 @@ TEST(I2cBusVisitorTest, TestI2CChannels) {
           (*mgr_request.parents())[1].properties(), false));
 
       uint32_t address = 0;
-      if (node.name() == "child-c") {
+      if (node->args().name() == "child-c") {
         address = I2C_ADDRESS1;
-      } else if (node.name() == "child-1e") {
+      } else if (node->args().name() == "child-1e") {
         address = I2C_ADDRESS2;
       }
 

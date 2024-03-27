@@ -12,7 +12,8 @@ namespace {
 TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt",
-      "sys/platform/dt-root",
+      "sys/platform/pt/dt-root",
+      "sys/platform/pt/suspend",
       "sys/platform/interrupt-controller-ffc01000",
       "sys/platform/i2c-5000",
       "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24",
@@ -29,7 +30,6 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/gpu-ffe40000/gpu-ffe40000_group/aml-gpu",
       "sys/platform/arm-mali-ffe40000",
       "sys/platform/audio-controller-ff642000/audio-controller-ff642000_group/aml-g12-audio-composite",
-      "sys/platform/suspend",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/xhci",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2",

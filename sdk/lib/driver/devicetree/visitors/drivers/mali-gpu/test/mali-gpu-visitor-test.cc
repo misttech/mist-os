@@ -36,14 +36,14 @@ TEST(MaliGpuVisitorTest, TestBindProperty) {
   ASSERT_TRUE(mali_tester->DoPublish().is_ok());
 
   auto node_count =
-      mali_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_node_size);
+      mali_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::non_pbus_node_size);
 
   uint32_t node_tested_count = 0;
   for (size_t i = 0; i < node_count; i++) {
     auto node =
-        mali_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i);
+        mali_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::non_pbus_nodes_at, i);
 
-    if (node.name()->find("mali-controller") != std::string::npos) {
+    if (node->args().name()->find("mali-controller") != std::string::npos) {
       node_tested_count++;
       auto mgr_request =
           mali_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, 0);

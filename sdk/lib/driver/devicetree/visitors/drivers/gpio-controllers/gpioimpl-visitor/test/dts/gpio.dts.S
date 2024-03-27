@@ -62,15 +62,17 @@
 
     };
 
-    audio {
+    audio@ffffc000 {
       compatible = "test,audio";
+      reg = <0x0 0xffffc000 0x0 0x1000>;
       gpios = <&gpioA PIN1 0 &gpioA PIN2 0>;
       gpio-names = PIN1_NAME, PIN2_NAME;
       pinctrl-0 = <&group1 &group3>;
     };
 
-    video {
+    video@ffffd000 {
       compatible = "test,video";
+      reg = <0x0 0xffffd000 0x0 0x1000>;
       pinctrl-0 = <&group2 &group4>;
     };
 

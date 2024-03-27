@@ -156,11 +156,12 @@ zx::result<> Manager::Walk(Visitor& visitor) {
 
 zx::result<> Manager::PublishDevices(
     fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus_client,
-    fidl::ClientEnd<fuchsia_driver_framework::CompositeNodeManager> mgr) {
+    fidl::ClientEnd<fuchsia_driver_framework::CompositeNodeManager> mgr,
+    fidl::SyncClient<fuchsia_driver_framework::Node>& fdf_node) {
   auto mgr_client = fidl::SyncClient(std::move(mgr));
 
   for (auto& node : nodes_publish_order_) {
-    zx::result<> status = node->Publish(pbus_client, mgr_client);
+    zx::result<> status = node->Publish(pbus_client, mgr_client, fdf_node);
     if (status.is_error()) {
       return status.take_error();
     }

@@ -24,8 +24,9 @@
       phandle = <0x10>;
     };
 
-    audio {
+    audio@ffffc000 {
       compatible = "test,audio";
+      reg = <0x0 0xffffc000 0x0 0x1000>;
       pwms = <&pwmA PIN1 PIN1_EXTRA &pwmA PIN2 PIN2_EXTRA>;
       pwm-names = PIN1_NAME, PIN2_NAME;
     };

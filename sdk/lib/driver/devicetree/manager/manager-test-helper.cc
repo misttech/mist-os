@@ -9,7 +9,9 @@
 #include <sys/stat.h>
 #include <zircon/assert.h>
 
+#include <memory>
 #include <sstream>
+#include <utility>
 
 namespace fdf_devicetree::testing {
 
@@ -132,13 +134,18 @@ bool CheckHasBindRules(std::vector<fuchsia_driver_framework::BindRule> expected,
 
 void FakeEnvWrapper::Bind(
     fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus_endpoints_server,
-    fidl::ServerEnd<fuchsia_driver_framework::CompositeNodeManager> mgr_endpoints_server) {
+    fidl::ServerEnd<fuchsia_driver_framework::CompositeNodeManager> mgr_endpoints_server,
+    fidl::ServerEnd<fuchsia_driver_framework::Node> node_endpoint_server) {
   fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(pbus_endpoints_server), &pbus_);
   fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                    std::move(mgr_endpoints_server), &mgr_);
+  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                   std::move(node_endpoint_server), &node_);
 }
 
 size_t FakeEnvWrapper::pbus_node_size() { return pbus_.nodes().size(); }
+
+size_t FakeEnvWrapper::non_pbus_node_size() { return node_.requests().size(); }
 
 size_t FakeEnvWrapper::mgr_requests_size() { return mgr_.requests().size(); }
 
@@ -148,6 +155,11 @@ FakeCompositeNodeManager::AddSpecRequest FakeEnvWrapper::mgr_requests_at(size_t 
 
 fuchsia_hardware_platform_bus::Node FakeEnvWrapper::pbus_nodes_at(size_t index) {
   return pbus_.nodes()[index];
+}
+
+std::shared_ptr<fidl::Request<fuchsia_driver_framework::Node::AddChild>>
+FakeEnvWrapper::non_pbus_nodes_at(size_t index) {
+  return node_.requests()[index];
 }
 
 void ManagerTestHelper::ConnectLogger(std::string_view tag) {
@@ -178,9 +190,10 @@ zx::result<> ManagerTestHelper::DoPublish(Manager& manager) {
   node_.Bind(std::move(node_endpoints->client));
 
   env_.SyncCall(&FakeEnvWrapper::Bind, std::move(pbus_endpoints->server),
-                std::move(mgr_endpoints->server));
-  return manager.PublishDevices(std::move(pbus_endpoints->client),
-                                std::move(mgr_endpoints->client));
+                std::move(mgr_endpoints->server), std::move(node_endpoints->server));
+  pbus_.Bind(std::move(pbus_endpoints->client));
+
+  return manager.PublishDevices(pbus_, std::move(mgr_endpoints->client), node_);
 }
 
 }  // namespace fdf_devicetree::testing

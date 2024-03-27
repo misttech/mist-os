@@ -33,15 +33,15 @@ TEST(MyDevicetreeVisitorTest, TestMetadataAndBindProperty) {
   ASSERT_TRUE(my_devicetree_visitor_tester->DoPublish().is_ok());
 
   auto node_count =
-      my_devicetree_visitor_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_node_size);
+      my_devicetree_visitor_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::non_pbus_node_size);
 
   uint32_t node_tested_count = 0;
   for (size_t i = 0; i < node_count; i++) {
     auto node =
-        my_devicetree_visitor_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i);
+        my_devicetree_visitor_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::non_pbus_nodes_at, i);
 
     // <Add tests for specific node properties>.
-    if (node.name()->find("") != std::string::npos) {
+    if (node->args().name()->find("") != std::string::npos) {
       node_tested_count++;
       // <Add Node specific metadata or bind property tests below>.
     }

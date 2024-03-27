@@ -23,14 +23,16 @@
       #clock-cells = <1>;
     };
 
-    video {
+    video@ffffc000 {
       compatible = "test-video";
+      reg = <0x0 0xffffc000 0x0 0x1000>;
       clocks = <&clkA CLK_ID1 &clkA CLK_ID2>;
       clock-names = CLK1_NAME, CLK2_NAME;
     };
 
-    audio {
+    audio@ffffd000 {
       compatible = "test-audio";
+      reg = <0x0 0xffffd000 0x0 0x1000>;
       assigned-clocks = <&clkA CLK_ID3 &clkB CLK_ID4>;
       assigned-clock-rates = <0 CLK_ID4_RATE>;
       assigned-clock-parents = <&clkA CLK_ID5>;
