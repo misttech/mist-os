@@ -203,7 +203,6 @@ structured_config_values = {
   # TODO(https://fxbug.dev/42075179) support other delivery blob types in pkg-resolver.
   assert(delivery_blob_type == 1)
   fetch_delivery_blob = true
-  delivery_blob_fallback = false
 
   # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
   # 4,096 B/s minimum bandwidth (the default minimum bandwidth used by rust-tuf

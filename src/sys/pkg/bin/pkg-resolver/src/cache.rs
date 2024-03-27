@@ -40,7 +40,6 @@ pub struct BlobFetchParams {
     body_network_timeout: Duration,
     download_resumption_attempts_limit: u64,
     blob_type: fpkg::BlobType,
-    delivery_blob_fallback: bool,
 }
 
 impl BlobFetchParams {
@@ -58,10 +57,6 @@ impl BlobFetchParams {
 
     pub fn blob_type(&self) -> fpkg::BlobType {
         self.blob_type
-    }
-
-    pub fn delivery_blob_fallback(&self) -> bool {
-        self.delivery_blob_fallback
     }
 }
 
@@ -581,7 +576,7 @@ async fn fetch_blob(
     inspect: inspect::NeedsRemoteType,
     http_client: &fuchsia_hyper::HttpsClient,
     stats: Arc<Mutex<Stats>>,
-    mut cobalt_sender: ProtocolSender<MetricEvent>,
+    cobalt_sender: ProtocolSender<MetricEvent>,
     merkle: BlobId,
     context: FetchBlobContext,
     blob_fetch_params: BlobFetchParams,
@@ -599,7 +594,7 @@ async fn fetch_blob(
         "hash" => merkle.to_string().as_str()
     );
     let inspect = inspect.http();
-    let mut res = fetch_blob_http(
+    let res = fetch_blob_http(
         &inspect,
         http_client,
         &mirror,
@@ -608,39 +603,10 @@ async fn fetch_blob(
         context.expected_len,
         blob_fetch_params,
         &stats,
-        cobalt_sender.clone(),
+        cobalt_sender,
         trace_id,
     )
     .await;
-    if let (Err(FetchErrorKind::NotFound), fpkg::BlobType::Delivery, true) = (
-        res.as_ref().map_err(FetchError::kind),
-        blob_fetch_params.blob_type(),
-        blob_fetch_params.delivery_blob_fallback(),
-    ) {
-        tracing::info!("Delivery blob {merkle} not found, falling back to uncompressed blob");
-        res = fetch_blob_http(
-            &inspect,
-            http_client,
-            &mirror,
-            merkle,
-            &context.opener,
-            context.expected_len,
-            BlobFetchParams { blob_type: fpkg::BlobType::Uncompressed, ..blob_fetch_params },
-            &stats,
-            cobalt_sender.clone(),
-            trace_id,
-        )
-        .await;
-
-        cobalt_sender.send(
-            MetricEvent::builder(metrics::DELIVERY_BLOB_FALLBACK_METRIC_ID)
-                .with_event_codes(match &res {
-                    Ok(_) => metrics::DeliveryBlobFallbackMetricDimensionResult::Success,
-                    Err(_) => metrics::DeliveryBlobFallbackMetricDimensionResult::Failure,
-                })
-                .as_occurrence(1),
-        );
-    }
     guard.map(|o| o.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())]));
     res
 }

@@ -28,7 +28,7 @@ async fn verify_resolve_fails_then_succeeds<H: HttpResponder>(
     responder: H,
     failure_error: fidl_fuchsia_pkg::ResolveError,
 ) {
-    let env = TestEnvBuilder::new().delivery_blob_fallback(false).build().await;
+    let env = TestEnvBuilder::new().build().await;
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)

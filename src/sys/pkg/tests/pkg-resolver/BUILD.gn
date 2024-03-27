@@ -211,7 +211,6 @@ rustc_test("resolve_succeeds") {
     "//src/storage/lib/delivery_blob",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
-    "//src/sys/pkg/lib/metrics:cobalt_sw_delivery_registry_rustlib",
     "//src/sys/pkg/testing/blobfs-ramdisk",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
@@ -443,7 +442,6 @@ fuchsia_structured_config_values("pkg-resolver-config") {
   cm_label = ":pkg-resolver-manifest"
   values = {
     fetch_delivery_blob = true
-    delivery_blob_fallback = false
 
     # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
     # 4,096 B/s minimum bandwidth (the default minimum bandwidth used by rust-tuf

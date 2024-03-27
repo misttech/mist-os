@@ -75,9 +75,6 @@
         // Whether to fetch delivery blob or uncompressed blob.
         fetch_delivery_blob: { type: "bool" },
 
-        // Whether to fallback to uncompressed blob if fetching delivery blob fails.
-        delivery_blob_fallback: { type: "bool" },
-
         // The timeout, in seconds, to use when performing TUF metadata network operations.
         tuf_metadata_timeout_seconds: { type: "uint32" },
 

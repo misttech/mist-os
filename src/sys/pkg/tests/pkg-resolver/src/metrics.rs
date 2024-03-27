@@ -465,7 +465,7 @@ mod pkg_resolver_blob_fetch {
 
     async fn verify_status_ranges(test_table: &[StatusTest]) {
         let pkg = PackageBuilder::new("just_meta_far").build().await.expect("created pkg");
-        let env = TestEnvBuilder::new().delivery_blob_fallback(false).build().await;
+        let env = TestEnvBuilder::new().build().await;
         let repo = Arc::new(
             RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
                 .add_package(&pkg)

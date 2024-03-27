@@ -35,7 +35,6 @@ impl BlobFetcher {
             params.download_resumption_attempts_limit(),
         );
         node.record_string("blob_type", format!("{:?}", params.blob_type()));
-        node.record_bool("delivery_blob_fallback", params.delivery_blob_fallback());
         Self { queue: node.create_child("queue"), _node: node }
     }
 
@@ -178,7 +177,6 @@ mod tests {
                     .body_network_timeout(Duration::from_secs(1))
                     .download_resumption_attempts_limit(2)
                     .blob_type(fpkg::BlobType::Delivery)
-                    .delivery_blob_fallback(false)
                     .build(),
             )
         }
@@ -197,7 +195,6 @@ mod tests {
                     blob_body_timeout_seconds: 1u64,
                     blob_download_resumption_attempts_limit: 2u64,
                     blob_type: "Delivery",
-                    delivery_blob_fallback: false,
                     queue: {}
                 }
             }

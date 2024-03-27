@@ -196,7 +196,6 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
             } else {
                 fpkg::BlobType::Uncompressed
             })
-            .delivery_blob_fallback(structured_config.delivery_blob_fallback)
             .build(),
     );
     futures.push(blob_fetch_queue.boxed_local());

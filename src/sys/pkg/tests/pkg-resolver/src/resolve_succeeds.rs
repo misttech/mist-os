@@ -7,7 +7,6 @@
 /// different types of packages when blobfs is in various intermediate states.
 use {
     assert_matches::assert_matches,
-    cobalt_sw_delivery_registry as metrics,
     diagnostics_assertions::assert_data_tree,
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
     fuchsia_pkg_testing::{serve::responder, Package, PackageBuilder, RepositoryBuilder},
@@ -942,42 +941,6 @@ async fn superpackage() {
 
     superpackage.verify_contents(&package).await.unwrap();
     assert!(env.blobfs.list_blobs().unwrap().is_superset(&subpackage.list_blobs()));
-
-    env.stop().await;
-}
-
-#[fuchsia::test]
-async fn fetch_delivery_blob_fallback() {
-    let env =
-        TestEnvBuilder::new().fetch_delivery_blob(true).delivery_blob_fallback(true).build().await;
-
-    let pkg = make_pkg_with_extra_blobs("delivery_blob_fallback", 1).await;
-    let repo = Arc::new(
-        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
-            .delivery_blob_type(None)
-            .add_package(&pkg)
-            .build()
-            .await
-            .unwrap(),
-    );
-    let served_repository = Arc::clone(&repo).server().start().unwrap();
-
-    let repo_url = "fuchsia-pkg://test".parse().unwrap();
-    let repo_config = served_repository.make_repo_config(repo_url);
-
-    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
-
-    let (resolved_pkg, _resolved_context) =
-        env.resolve_package("fuchsia-pkg://test/delivery_blob_fallback").await.unwrap();
-
-    pkg.verify_contents(&resolved_pkg).await.unwrap();
-
-    env.assert_count_events(
-        metrics::DELIVERY_BLOB_FALLBACK_METRIC_ID,
-        // 3 blobs: meta.far, bin/delivery_blob_fallback, data/delivery_blob_fallback-0
-        vec![metrics::DeliveryBlobFallbackMetricDimensionResult::Success; 3],
-    )
-    .await;
 
     env.stop().await;
 }
