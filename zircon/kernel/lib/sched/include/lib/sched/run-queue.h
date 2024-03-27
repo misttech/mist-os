@@ -73,6 +73,12 @@ class RunQueue {
   // Given the most recently executed thread, evaluates the next thread that
   // should be scheduled and the time at which the preemption timer should fire
   // for the subsequent round of scheduling.
+  //
+  // The next thread is the one that is active and has the earliest finish time
+  // within its current period. In the event of a tie of finish times, the one
+  // with the earlier start time is picked - and then in the event of a tie of
+  // start times, the thread with the lowest address is expediently picked
+  // (which is a small bias that should not persist across runs of the system).
   EvaluateNextThreadResult EvaluateNextThread(Thread& current, Time now) {
     // Ensure `current` is activated before having it - and its otherwise false
     // finish time - factor into the next round of scheduling decisions.
@@ -82,11 +88,7 @@ class RunQueue {
     while (!next) {
       // Try to avoid rebalancing (from tree insertion and deletion) in the case
       // where the next thread is the current one.
-      //
-      // As a tie-breaker when the next eligible has the same finish time as the
-      // current, ensure a wider variety of work being done by letting the other
-      // one have its turn.
-      if (auto it = FindNextEligibleThread(now); it && it->finish() <= current.finish()) {
+      if (auto it = FindNextEligibleThread(now); it && SchedulesBeforeIfActive(*it, current)) {
         // The next eligible might actually be expired (e.g., due to bandwidth
         // oversubscription), in which case it should be reactivated and
         // requeued, and our search should begin again for an eligible thread
@@ -157,6 +159,17 @@ class RunQueue {
 
     static void ResetBest(Thread& target) {}
   };
+
+  // Provided both threads are active, this gives whether the first should be
+  // scheduled before the second, which is a simple lexicographic order on
+  // (finish, start, address). (The address is a guaranteed and convenient final
+  // tiebreaker which should never amount to a consistent bias.)
+  //
+  // This comparison is only valid if the given threads are active. It is the
+  // caller's responsibility to ensure that this is the case.
+  static constexpr bool SchedulesBeforeIfActive(const Thread& a, const Thread& b) {
+    return std::make_tuple(a.finish(), a.start(), &a) < std::make_tuple(b.finish(), b.start(), &b);
+  }
 
   // Shorthand for convenience and readability.
   static constexpr Time SubtreeMinFinish(mutable_iterator it) {

@@ -6,6 +6,8 @@
 
 #include <lib/sched/run-queue.h>
 
+#include <array>
+
 #include <gtest/gtest.h>
 
 #include "test-thread.h"
@@ -184,10 +186,55 @@ TEST(RunQueueTests, EvaluateNextThread) {
     EXPECT_EQ(preemption, Time{5});
   }
 
-  // * Next thread has same finish time as current.
+  // * Another thread has same finish time as current and an earlier start.
+  //
+  // The other should win.
   {
-    TestThread current{{Capacity(5), Period(10)}, Start(0)};
-    TestThread threadA{{Capacity(2), Period(10)}, Start(0)};
+    TestThread current = TestThread{{Capacity(5), Period(9)}, Start(1)};
+    TestThread threadA = TestThread{{Capacity(2), Period(10)}, Start(0)};
+
+    sched::RunQueue<TestThread> queue;
+    queue.Queue(threadA, Start(0));
+
+    auto [next, preemption] = queue.EvaluateNextThread(current, Start(1));
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(preemption, Time{3});
+
+    EXPECT_FALSE(threadA.IsQueued());
+    EXPECT_TRUE(current.IsQueued());
+  }
+
+  // * Another thread has same finish time as current and a later start.
+  //
+  // The current should win.
+  {
+    TestThread current = TestThread{{Capacity(5), Period(10)}, Start(0)};
+    TestThread threadA = TestThread{{Capacity(2), Period(9)}, Start(1)};
+
+    sched::RunQueue<TestThread> queue;
+    queue.Queue(threadA, Start(0));
+
+    auto [next, preemption] = queue.EvaluateNextThread(current, Start(1));
+    EXPECT_EQ(&current, next);
+    EXPECT_EQ(preemption, Time{6});
+
+    EXPECT_FALSE(current.IsQueued());
+    EXPECT_TRUE(threadA.IsQueued());
+  }
+
+  // * Another thread has same start and finish time as current.
+  // * Other thread has a lower address.
+  //
+  // The other should win.
+  {
+    // Define in an array together to control for address comparison.
+    std::array threads = {
+        TestThread{{Capacity(2), Period(10)}, Start(0)},  // threadA
+        TestThread{{Capacity(5), Period(10)}, Start(0)},  // current
+    };
+
+    TestThread& current = threads[1];
+    TestThread& threadA = threads[0];
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
@@ -198,6 +245,31 @@ TEST(RunQueueTests, EvaluateNextThread) {
 
     EXPECT_FALSE(threadA.IsQueued());
     EXPECT_TRUE(current.IsQueued());
+  }
+
+  // * Another thread has same start and finish time as current.
+  // * The current thread has a lower address.
+  //
+  // Current should win.
+  {
+    // Define in an array together to control for address comparison.
+    std::array threads = {
+        TestThread{{Capacity(5), Period(10)}, Start(0)},  // current
+        TestThread{{Capacity(2), Period(10)}, Start(0)},  // threadA
+    };
+
+    TestThread& current = threads[0];
+    TestThread& threadA = threads[1];
+
+    sched::RunQueue<TestThread> queue;
+    queue.Queue(threadA, Start(0));
+
+    auto [next, preemption] = queue.EvaluateNextThread(current, Start(0));
+    EXPECT_EQ(&current, next);
+    EXPECT_EQ(preemption, Time{5});
+
+    EXPECT_FALSE(current.IsQueued());
+    EXPECT_TRUE(threadA.IsQueued());
   }
 
   // * Next thread has no work yet done.
@@ -237,7 +309,7 @@ TEST(RunQueueTests, EvaluateNextThread) {
 
   // * Next-to-next thread will become eligible before next thread finishes.
   {
-    TestThread current{{Capacity(5), Period(10)}, Start(0)};
+    TestThread current{{Capacity(5), Period(15)}, Start(0)};
     current.Tick(Duration{5});
     TestThread threadA{{Capacity(7), Period(10)}, Start(5)};
     TestThread threadB{{Capacity(3), Period(5)}, Start(7)};
