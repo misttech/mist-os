@@ -54,14 +54,11 @@ zx::result<> SimpleDriver::Start() {
                   .properties(arena, std::move(properties))
                   .Build();
 
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create endpoints: %s",
-                controller_endpoints.status_string());
-  child_controller_.Bind(std::move(controller_endpoints->client));
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+  child_controller_.Bind(std::move(client_end));
 
-  fidl::WireResult result =
-      fidl::WireCall(node())->AddChild(args, std::move(controller_endpoints->server), {});
+  fidl::WireResult result = fidl::WireCall(node())->AddChild(args, std::move(server_end), {});
   if (!result.ok()) {
     FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
     return zx::error(result.status());

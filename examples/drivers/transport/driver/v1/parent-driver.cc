@@ -53,10 +53,7 @@ zx_status_t DriverTransportDevice::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t DriverTransportDevice::Bind() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
-  }
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   // Publish `fuchsia.examples.gizmo.Service` to the outgoing directory.
   fuchsia_examples_gizmo::Service::InstanceHandler handler({.device = bind_handler(dispatcher_)});
@@ -65,7 +62,7 @@ zx_status_t DriverTransportDevice::Bind() {
     return status.status_value();
   }
 
-  status = outgoing_.Serve(std::move(endpoints->server));
+  status = outgoing_.Serve(std::move(server_end));
   if (status.is_error()) {
     return status.status_value();
   }
@@ -75,7 +72,7 @@ zx_status_t DriverTransportDevice::Bind() {
   };
   return DdkAdd(ddk::DeviceAddArgs("transport-child")
                     .set_runtime_service_offers(offers)
-                    .set_outgoing_dir(endpoints->client.TakeChannel()));
+                    .set_outgoing_dir(client_end.TakeChannel()));
 }
 
 void DriverTransportDevice::GetHardwareId(fdf::Arena& arena,

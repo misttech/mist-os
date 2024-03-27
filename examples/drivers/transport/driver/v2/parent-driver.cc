@@ -34,19 +34,16 @@ zx::result<> ParentDriverTransportDriver::Start() {
                   .Build();
 
   // Create endpoints of the `NodeController` for the child node.
-  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (endpoints.is_error()) {
-    FDF_SLOG(ERROR, "Failed to create endpoint", KV("status", endpoints.status_string()));
-    return zx::error(endpoints.status_value());
-  }
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
-  auto child_result = fidl::WireCall(node())->AddChild(args, std::move(endpoints->server), {});
+  auto child_result = fidl::WireCall(node())->AddChild(args, std::move(server_end), {});
   if (!child_result.ok()) {
     FDF_SLOG(ERROR, "Failed to add child", KV("status", child_result.status_string()));
     return zx::error(child_result.status());
   }
 
-  controller_.Bind(std::move(endpoints->client), dispatcher());
+  controller_.Bind(std::move(client_end), dispatcher());
   return zx::ok();
 }
 

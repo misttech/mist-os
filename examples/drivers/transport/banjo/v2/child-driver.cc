@@ -29,24 +29,21 @@ zx::result<> ChildBanjoTransportDriver::Start() {
   }
 
   // Create endpoints of the `NodeController` for a child node.
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (endpoints.is_error()) {
-    FDF_SLOG(ERROR, "Failed to create endpoint", KV("status", endpoints.status_string()));
-    return zx::error(endpoints.status_value());
-  }
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
   // Add the child node.
   auto args = fuchsia_driver_framework::NodeAddArgs({
       .name = "transport-child",
   });
-  auto result = parent_node_->AddChild({std::move(args), std::move(endpoints->server), {}});
+  auto result = parent_node_->AddChild({std::move(args), std::move(server_end), {}});
   if (result.is_error()) {
     const auto& error = result.error_value();
     FDF_SLOG(ERROR, "Failed to add child", KV("status", error.FormatDescription()));
     return zx::error(error.is_domain_error() ? static_cast<uint32_t>(error.domain_error())
                                              : error.framework_error().status());
   }
-  controller_.Bind(std::move(endpoints->client), dispatcher());
+  controller_.Bind(std::move(client_end), dispatcher());
   return zx::ok();
 }
 
