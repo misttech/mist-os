@@ -631,7 +631,12 @@ void Session::HandleException(ThreadImpl* thread, const debug_ipc::NotifyExcepti
 // This is the main entrypoint for all thread stops notifications in the client.
 void Session::DispatchNotifyException(const debug_ipc::NotifyException& notify, bool set_metadata) {
   ThreadImpl* thread = ThreadImplFromKoid(notify.thread.id);
-  FX_DCHECK(thread->process());
+  if (!thread) {
+    // Don't crash if we get an invalid KOID from the agent. However, the agent should be sending
+    // us valid IDs so debug assert to try to identify that error.
+    FX_DCHECK(thread);
+    return;
+  }
 
   if (thread->process()->HasLoadedSymbols()) {
     // Normal case, just handle the exception.
