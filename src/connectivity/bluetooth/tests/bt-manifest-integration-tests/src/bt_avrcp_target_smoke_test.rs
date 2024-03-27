@@ -81,16 +81,19 @@ async fn mock_avrcp_target_client(
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
     let lifecycle_svc = handles.connect_to_protocol::<LifecycleMarker>()?;
-    let lifecycle = lifecycle_svc.clone();
-    loop {
-        match lifecycle_svc.get_state().await.unwrap() {
-            LifecycleState::Initializing => {}
-            LifecycleState::Ready => break,
+    fasync::Task::local(async move {
+        let lifecycle = lifecycle_svc.clone();
+        loop {
+            match lifecycle_svc.get_state().await.unwrap() {
+                LifecycleState::Initializing => {}
+                LifecycleState::Ready => break,
+            }
+            fasync::Timer::new(fasync::Time::after(1_i64.millis())).await;
         }
-        fasync::Timer::new(fasync::Time::after(1_i64.millis())).await;
-    }
-    info!("Client successfully connected to Lifecycle service");
-    sender.send(Event::Lifecycle(Some(lifecycle))).await.expect("failed sending ack to test");
+        info!("Client successfully connected to Lifecycle service");
+        sender.send(Event::Lifecycle(Some(lifecycle))).await.expect("failed sending ack to test");
+    })
+    .detach();
     Ok(())
 }
 
