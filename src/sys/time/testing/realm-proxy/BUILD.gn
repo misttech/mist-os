@@ -39,7 +39,7 @@ rustc_binary("bin") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//src/sys/time/testing:timekeeper_integration",
-    "//src/sys/time/testing/fidl:test.time.realm_rust",
+    "//src/sys/time/testing/fidl/test.time.realm:rust",
     "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",

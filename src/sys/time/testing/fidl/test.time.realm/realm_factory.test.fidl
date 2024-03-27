@@ -1,4 +1,4 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -12,64 +12,10 @@
 /// details.
 library test.time.realm;
 
-using fuchsia.hardware.rtc;
 using fuchsia.io;
 using fuchsia.metrics.test;
 using fuchsia.testing.harness;
-using fuchsia.time.external;
 using zx;
-
-/// Used to manipulate the internal push source for testing.
-open protocol PushSourcePuppet {
-    /// Sets the next sample to be reported by the push source.
-    flexible SetSample(@generated_name("SetSampleArgs") struct {
-        sample fuchsia.time.external.TimeSample;
-    }) -> ();
-
-    /// Sets the next status to be reported by the push source.
-    flexible SetStatus(@generated_name("SetStatusArgs") struct {
-        status fuchsia.time.external.Status;
-    }) -> ();
-
-    /// Deliberately crash the time source.
-    flexible Crash() -> ();
-
-    /// Returns the number of cumulative connections served during the lifetime of
-    /// the PushSourcePuppet. This allows asserting behavior, such as when
-    /// Timekeeper has restarted a connection. Timekeeper's lifetime is independent
-    /// of that of PushSourcePuppet.
-    flexible GetLifetimeServedConnections() -> (@generated_name("ConnectionsResponse") struct {
-        num_lifetime_connections uint32;
-    });
-};
-
-/// The maximum number of recorded RTC updates that can be retrieved by
-/// `RtcUpdates/Get` in a single call.
-///
-/// This limit should be generous enough to serve most, if not all, testing
-/// needs.
-const MAX_TIME_UPDATES uint64 = 100;
-
-/// Used to read the RtcUpdates on the fake clock. If you need something more
-/// complex, set `RealmOptions.rtc.rtc_handle` instead.
-open protocol RtcUpdates {
-    /// Reads the RTC updates that the clock received so far.
-    flexible Get(@generated_name("GetRequest") resource table {}) -> (
-        @generated_name("GetResponse") resource struct {
-           /// List the RTC updates that happened since the last call.
-           ///
-           /// If more than the maximum number of updates happened, an
-           /// error `OperationError.FAILED` will be returned instead.
-           ///
-           /// This behavior *may* be modified if we regularly start encountering
-           /// more than a maximum number of allowed updates.
-           updates vector<fuchsia.hardware.rtc.Time>:MAX_TIME_UPDATES;
-
-           /// Optionals, added for expansion.
-           opts @generated_name("GetResponseOpts") resource table {};
-        }
-    ) error fuchsia.testing.harness.OperationError;
-};
 
 @discoverable
 open protocol RealmFactory {

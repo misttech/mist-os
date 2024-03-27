@@ -1,4 +1,4 @@
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -11,27 +11,9 @@ import("//build/fidl/fidl.gni")
 group("fidl") {
   testonly = true
   deps = [
-    ":test.time.realm_cpp",
-    ":test.time.realm_rust",
-    ":test.time_cpp",
-    ":test.time_rust",
+    "test.time:cpp",
+    "test.time:rust",
+    "test.time.realm:cpp",
+    "test.time.realm:rust",
   ]
-}
-
-fidl("test.time.realm") {
-  testonly = true
-  sources = [ "realm_factory.test.fidl" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.rtc",
-    "//sdk/fidl/fuchsia.io",
-    "//sdk/fidl/fuchsia.metrics.test",
-    "//sdk/fidl/fuchsia.testing.harness",
-    "//sdk/fidl/fuchsia.time.external",
-  ]
-}
-
-fidl("test.time") {
-  testonly = true
-  sources = [ "time_source_control.test.fidl" ]
-  public_deps = [ "//sdk/fidl/fuchsia.time.external" ]
 }

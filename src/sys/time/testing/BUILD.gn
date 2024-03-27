@@ -29,8 +29,8 @@ rustc_library("timekeeper_integration") {
   source_root = "lib/lib.rs"
 
   deps = [
-    "fidl:test.time.realm_rust",
-    "fidl:test.time_rust",
+    "fidl/test.time:rust",
+    "fidl/test.time.realm:rust",
     "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
