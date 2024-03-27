@@ -5,21 +5,15 @@
 use crate::target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter};
 use anyhow::Result;
 use async_trait::async_trait;
-use discovery::{DiscoverySources, TargetEvent, TargetHandle};
 use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::EnvironmentContext;
 use ffx_list_args::{AddressTypes, ListCommand};
-use ffx_target::{Description, TargetInfoQuery};
+use ffx_target::TargetInfoQuery;
 use fho::{daemon_protocol, deferred, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx as ffx;
-use fuchsia_async::Timer;
-use futures::{FutureExt, StreamExt, TryStreamExt};
-use std::collections::HashSet;
-use std::time::Duration;
+use futures::TryStreamExt;
 
 mod target_formatter;
-
-const CONFIG_LOCAL_DISCOVERY_TIMEOUT: &str = "discovery.timeout";
 
 fn address_types_from_cmd(cmd: &ListCommand) -> AddressTypes {
     if cmd.no_ipv4 && cmd.no_ipv6 {
@@ -48,7 +42,7 @@ fho::embedded_plugin!(ListTool);
 impl FfxMain for ListTool {
     type Writer = VerifiedMachineWriter<Vec<JsonTarget>>;
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        let infos = if is_discovery_enabled(&self.context).await {
+        let infos = if ffx_target::is_discovery_enabled(&self.context).await {
             list_targets(self.tc_proxy.await?, &self.cmd).await?
         } else {
             local_list_targets(&self.context, &self.cmd).await?
@@ -56,11 +50,6 @@ impl FfxMain for ListTool {
         show_targets(self.cmd, infos, writer, &self.context).await?;
         Ok(())
     }
-}
-
-async fn is_discovery_enabled(ctx: &EnvironmentContext) -> bool {
-    !ffx_config::is_usb_discovery_disabled(ctx).await
-        || !ffx_config::is_mdns_discovery_disabled(ctx).await
 }
 
 async fn show_targets(
@@ -126,97 +115,14 @@ fn handle_to_info(handle: discovery::TargetHandle) -> ffx::TargetInfo {
     }
 }
 
-// Descriptions are used for matching against a TargetInfoQuery
-fn handle_to_description(handle: &discovery::TargetHandle) -> Description {
-    let addresses = match &handle.state {
-        discovery::TargetState::Product(target_addr) => target_addr.clone(),
-        _ => vec![],
-    };
-    Description { nodename: handle.node_name.clone(), addresses, ..Default::default() }
-}
-
-fn non_empty_match(on1: &Option<String>, on2: &Option<String>) -> bool {
-    match (on1, on2) {
-        (Some(n1), Some(n2)) => n1 == n2,
-        _ => false,
-    }
-}
-
 async fn local_list_targets(
     ctx: &EnvironmentContext,
     cmd: &ListCommand,
 ) -> Result<Vec<ffx::TargetInfo>> {
-    let sources = DiscoverySources::MDNS
-        | DiscoverySources::USB
-        | DiscoverySources::MANUAL
-        | DiscoverySources::EMULATOR;
-
     let name = cmd.nodename.clone();
     let query = TargetInfoQuery::from(name);
-    let filter = move |handle: &TargetHandle| {
-        let description = handle_to_description(handle);
-        query.match_description(&description)
-    };
-    let stream = discovery::wait_for_devices(filter, true, false, sources).await?;
-    let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).await.unwrap_or(1000);
-    let delay = Duration::from_millis(discovery_delay);
-
-    // This is tricky. We want the stream to complete immediately if we find
-    // a target whose name matches the query exactly. Otherwise, run until the
-    // timer fires.
-    // We can't use `Stream::wait_until()`, because that would require us
-    // to return true for the found item, and false for the _next_ item.
-    // But there may be no next item, so the stream would end up waiting for
-    // the timer anyway. Instead, we create two futures: the timer, and one
-    // that is ready when we find the name we're looking for. Then we use
-    // `Stream::take_until()`, waiting until _either_ of those futures is ready
-    // (by using `race()`). The only remaining tricky part is that we need to
-    // examine each event to determine if it matches what we're looking for --
-    // so we interpose a closure via `Stream::map()` that examines each item,
-    // before returning them unmodified.
-    // Oh, and once we've got a set of results, if any of them are Err, cause
-    // the whole thing to be an Err.  We could stop the race early in case of
-    // failure by using the same technique, I suppose.
-    let target_events: Result<Vec<TargetEvent>> = {
-        let timer = Timer::new(delay).fuse();
-        let found_name_event = async_utils::event::Event::new();
-        let found_it = found_name_event.wait().fuse();
-        let results: Vec<Result<_>> = stream
-            .map(move |ev| {
-                if let Ok(TargetEvent::Added(ref h)) = ev {
-                    if non_empty_match(&h.node_name, &cmd.nodename) {
-                        found_name_event.signal();
-                    }
-                    ev
-                } else {
-                    unreachable!()
-                }
-            })
-            .take_until(futures_lite::future::race(timer, found_it))
-            .collect()
-            .await;
-        // Fail if any results are Err
-        let r: Result<Vec<_>> = results.into_iter().collect();
-        r
-    };
-
-    // Extract handles from Added events
-    let added_handles: Vec<_> =
-        target_events?
-            .into_iter()
-            .map(|e| {
-                if let discovery::TargetEvent::Added(handle) = e {
-                    handle
-                } else {
-                    unreachable!()
-                }
-            })
-            .collect();
-
-    // Sometimes libdiscovery returns multiple Added events for the same target (I think always
-    // user emulators). The information is always the same, let's just extract the unique entries.
-    let unique_handles = added_handles.into_iter().collect::<HashSet<_>>();
-    let targets = unique_handles.into_iter().map(|t| handle_to_info(t)).collect::<Vec<_>>();
+    let handles = ffx_target::resolve_target_query(query, ctx).await?;
+    let targets = handles.into_iter().map(|t| handle_to_info(t)).collect::<Vec<_>>();
 
     Ok(targets)
 }

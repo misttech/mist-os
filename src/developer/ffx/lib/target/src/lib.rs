@@ -15,10 +15,12 @@ use fidl_fuchsia_developer_ffx::{
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_net as net;
+use fuchsia_async::Timer;
 use futures::{select, Future, FutureExt, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use netext::IsLocalAddr;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::net::{IpAddr, Ipv6Addr};
 use std::net::{SocketAddr, SocketAddrV6};
 use std::sync::Arc;
@@ -44,7 +46,7 @@ pub use query::TargetInfoQuery;
 pub use fidl_fuchsia_developer_ffx::TargetProxy;
 
 const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
-const DISCOVERY_TIMEOUT: &str = "discovery.timeout";
+const CONFIG_LOCAL_DISCOVERY_TIMEOUT: &str = "discovery.timeout";
 
 /// Attempt to connect to RemoteControl on a target device using a connection to a daemon.
 ///
@@ -52,14 +54,14 @@ const DISCOVERY_TIMEOUT: &str = "discovery.timeout";
 /// fidl table.
 #[tracing::instrument]
 pub async fn get_remote_proxy(
-    target: Option<String>,
+    target_spec: Option<String>,
     daemon_proxy: DaemonProxy,
     proxy_timeout: Duration,
     mut target_info: Option<&mut Option<TargetInfo>>,
     env_context: &EnvironmentContext,
 ) -> Result<RemoteControlProxy> {
     let (target_proxy, target_proxy_fut) =
-        open_target_with_fut(target.clone(), daemon_proxy, proxy_timeout, env_context)?;
+        open_target_with_fut(target_spec.clone(), daemon_proxy, proxy_timeout, env_context)?;
     let mut target_proxy_fut = target_proxy_fut.boxed_local().fuse();
     let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()?;
     let mut open_remote_control_fut =
@@ -88,12 +90,12 @@ pub async fn get_remote_proxy(
             }
         }
     };
-    let target = target.as_ref().map(ToString::to_string);
+    let target_spec = target_spec.as_ref().map(ToString::to_string);
     match res {
         Ok(_) => Ok(remote_proxy),
         Err(err) => Err(anyhow::Error::new(FfxError::TargetConnectionError {
             err,
-            target,
+            target: target_spec,
             logs: Some(target_proxy.get_ssh_logs().await?),
         })),
     }
@@ -173,71 +175,189 @@ pub(crate) fn target_addr_info_to_socket(ti: &TargetAddrInfo) -> SocketAddr {
     socket
 }
 
+pub async fn is_discovery_enabled(ctx: &EnvironmentContext) -> bool {
+    !ffx_config::is_usb_discovery_disabled(ctx).await
+        || !ffx_config::is_mdns_discovery_disabled(ctx).await
+}
+
+fn non_empty_match_name(on1: &Option<String>, on2: &Option<String>) -> bool {
+    match (on1, on2) {
+        (Some(n1), Some(n2)) => n1 == n2,
+        _ => false,
+    }
+}
+
+fn non_empty_match_addr(state: &discovery::TargetState, sa: &Option<SocketAddr>) -> bool {
+    match (state, sa) {
+        (discovery::TargetState::Product(addrs), Some(sa)) => {
+            addrs.iter().any(|a| a.ip() == sa.ip())
+        }
+        _ => false,
+    }
+}
+
+// Descriptions are used for matching against a TargetInfoQuery
+fn handle_to_description(handle: &discovery::TargetHandle) -> Description {
+    let addresses = match &handle.state {
+        discovery::TargetState::Product(target_addr) => target_addr.clone(),
+        _ => vec![],
+    };
+    Description { nodename: handle.node_name.clone(), addresses, ..Default::default() }
+}
+
+pub async fn resolve_target_query(
+    query: TargetInfoQuery,
+    ctx: &EnvironmentContext,
+) -> Result<Vec<discovery::TargetHandle>> {
+    // Get nodename, in case we're trying to find an exact match
+    let (qname, qaddr) = match query {
+        TargetInfoQuery::NodenameOrSerial(ref s) => (Some(s.clone()), None),
+        TargetInfoQuery::Addr(ref a) => (None, Some(a.clone())),
+        _ => (None, None),
+    };
+    let sources = DiscoverySources::MDNS
+        | DiscoverySources::USB
+        | DiscoverySources::MANUAL
+        | DiscoverySources::EMULATOR;
+
+    let filter = move |handle: &TargetHandle| {
+        let description = handle_to_description(handle);
+        query.match_description(&description)
+    };
+    let stream = discovery::wait_for_devices(filter, true, false, sources).await?;
+    let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).await.unwrap_or(1000);
+    let delay = Duration::from_millis(discovery_delay);
+
+    // This is tricky. We want the stream to complete immediately if we find
+    // a target whose name matches the query exactly. Otherwise, run until the
+    // timer fires.
+    // We can't use `Stream::wait_until()`, because that would require us
+    // to return true for the found item, and false for the _next_ item.
+    // But there may be no next item, so the stream would end up waiting for
+    // the timer anyway. Instead, we create two futures: the timer, and one
+    // that is ready when we find the name we're looking for. Then we use
+    // `Stream::take_until()`, waiting until _either_ of those futures is ready
+    // (by using `race()`). The only remaining tricky part is that we need to
+    // examine each event to determine if it matches what we're looking for --
+    // so we interpose a closure via `Stream::map()` that examines each item,
+    // before returning them unmodified.
+    // Oh, and once we've got a set of results, if any of them are Err, cause
+    // the whole thing to be an Err.  We could stop the race early in case of
+    // failure by using the same technique, I suppose.
+    let target_events: Result<Vec<TargetEvent>> = {
+        let timer = Timer::new(delay).fuse();
+        let found_target_event = async_utils::event::Event::new();
+        let found_it = found_target_event.wait().fuse();
+        let results: Vec<Result<_>> = stream
+            .map(move |ev| {
+                if let Ok(TargetEvent::Added(ref h)) = ev {
+                    if non_empty_match_name(&h.node_name, &qname) {
+                        found_target_event.signal();
+                    } else if non_empty_match_addr(&h.state, &qaddr) {
+                        found_target_event.signal();
+                    }
+                    ev
+                } else {
+                    unreachable!()
+                }
+            })
+            .take_until(futures_lite::future::race(timer, found_it))
+            .collect()
+            .await;
+        // Fail if any results are Err
+        let r: Result<Vec<_>> = results.into_iter().collect();
+        r
+    };
+
+    // Extract handles from Added events
+    let added_handles: Vec<_> =
+        target_events?
+            .into_iter()
+            .map(|e| {
+                if let discovery::TargetEvent::Added(handle) = e {
+                    handle
+                } else {
+                    unreachable!()
+                }
+            })
+            .collect();
+
+    // Sometimes libdiscovery returns multiple Added events for the same target (I think always
+    // user emulators). The information is always the same, let's just extract the unique entries.
+    let unique_handles = added_handles.into_iter().collect::<HashSet<_>>();
+    Ok(unique_handles.into_iter().collect())
+}
+
 /// Attempts to resolve the query into a target's ssh-able address. Returns Some(_) if a target has been
 /// found, None otherwise.
 pub async fn resolve_target_address(
-    query: TargetInfoQuery,
+    target_spec: Option<String>,
     env_context: &EnvironmentContext,
 ) -> Result<Option<SocketAddr>> {
-    let nodename_or_serial = match query {
-        TargetInfoQuery::NodenameOrSerial(nnos) => nnos,
-        TargetInfoQuery::First => {
-            return Ok(None);
+    let query = TargetInfoQuery::from(target_spec.clone());
+    // If it's already an address, return it
+    if let TargetInfoQuery::Addr(a) = query {
+        let scope_id = if let SocketAddr::V6(addr) = a { addr.scope_id() } else { 0 };
+        return Ok(Some(TargetAddr::new(a.ip(), scope_id, SSH_PORT_DEFAULT).into()));
+    }
+    let handles = resolve_target_query(query, env_context).await?;
+    if handles.len() == 0 {
+        return Ok(None);
+    }
+    if handles.len() > 1 {
+        return Err(FfxError::DaemonError {
+            err: DaemonError::TargetAmbiguous,
+            target: target_spec,
         }
-        TargetInfoQuery::Addr(a) => {
-            let scope_id = if let SocketAddr::V6(addr) = a { addr.scope_id() } else { 0 };
-            return Ok(Some(TargetAddr::new(a.ip(), scope_id, SSH_PORT_DEFAULT).into()));
+        .into());
+    }
+    let target = &handles[0];
+
+    match &target.state {
+        TargetState::Product(ref addresses) => {
+            if addresses.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Target discovered but does not contain addresses: {target:?}"
+                ));
+            }
+            let mut addrs_sorted = addresses
+                .into_iter()
+                .map(SocketAddr::from)
+                .sorted_by(|a1, a2| {
+                    match (a1.ip().is_link_local_addr(), a2.ip().is_link_local_addr()) {
+                        (true, true) | (false, false) => Ordering::Equal,
+                        (true, false) => Ordering::Less,
+                        (false, true) => Ordering::Greater,
+                    }
+                })
+                .collect::<Vec<_>>();
+            let mut sock: SocketAddr = addrs_sorted.pop().unwrap();
+            if sock.port() == 0 {
+                sock.set_port(SSH_PORT_DEFAULT)
+            }
+            Ok(Some(sock))
         }
-    };
-    let mut stream = discovery::wait_for_devices(
-        move |handle: &TargetHandle| {
-            // TODO(b/329328874): This should use query matching.
-            // This will only match the nodename initially because checking the product state and
-            // returning an error will make it clearer to the user what the source of the error is.
-            handle.node_name.as_ref().map(|n| *n == nodename_or_serial).unwrap_or(false)
-        },
-        true,
-        false,
-        DiscoverySources::MDNS
-            | DiscoverySources::USB
-            | DiscoverySources::MANUAL
-            | DiscoverySources::EMULATOR,
-    )
-    .await?;
-    let delay = Duration::from_millis(env_context.get(DISCOVERY_TIMEOUT).await.unwrap_or(1000));
-    let event = timeout(delay, async { stream.next().await.transpose() })
-        .await??
-        .expect("target event should have been received");
-    match event {
-        TargetEvent::Added(target) => match target.state {
-            TargetState::Product(ref addresses) => {
-                if addresses.is_empty() {
-                    return Err(anyhow::anyhow!(
-                        "Target discovered but does not contain addresses: {target:?}"
-                    ));
-                }
-                let mut addrs_sorted = addresses
-                    .into_iter()
-                    .map(SocketAddr::from)
-                    .sorted_by(|a1, a2| {
-                        match (a1.ip().is_link_local_addr(), a2.ip().is_link_local_addr()) {
-                            (true, true) | (false, false) => Ordering::Equal,
-                            (true, false) => Ordering::Less,
-                            (false, true) => Ordering::Greater,
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                let mut sock: SocketAddr = addrs_sorted.pop().unwrap();
-                if sock.port() == 0 {
-                    sock.set_port(SSH_PORT_DEFAULT)
-                }
-                Ok(Some(sock))
-            }
-            state => {
-                Err(anyhow::anyhow!("Target discovered but not in the correct state: {state:?}"))
-            }
-        },
-        _ => unreachable!(),
+        state => Err(anyhow::anyhow!("Target discovered but not in the correct state: {state:?}")),
+    }
+}
+
+/// If daemon discovery is disabled, attempts to resolve the query into an
+/// _address_ string query that can be passed to the daemon. If already an
+/// address, just return it. Otherwise, perform discovery to find the address.
+/// Returns Some(_) if a target has been found, None otherwise.
+pub async fn maybe_locally_resolve_target_spec(
+    target_spec: Option<String>,
+    env_context: &EnvironmentContext,
+) -> Result<Option<String>> {
+    if is_discovery_enabled(env_context).await {
+        Ok(target_spec)
+    } else {
+        let query = TargetInfoQuery::from(target_spec.clone());
+        let addr = match query {
+            TargetInfoQuery::Addr(addr) => Some(addr),
+            _ => resolve_target_address(target_spec, env_context).await?,
+        };
+        Ok(addr.map(|addr| addr.to_string()))
     }
 }
 
@@ -358,15 +478,12 @@ impl OvernetClient {
 ///
 /// Unlike other errors, this is not intended to be run in a tight loop.
 pub async fn knock_target_daemonless(
-    target_query_string: String,
+    target_spec: String,
     context: &EnvironmentContext,
 ) -> Result<Option<CompatibilityInfo>, KnockError> {
-    let query = TargetInfoQuery::from(target_query_string.as_str());
-    let addr = resolve_target_address(query, context)
+    let addr = resolve_target_address(Some(target_spec.clone()), context)
         .await?
-        .ok_or_else(|| {
-            anyhow::anyhow!("Unable to resolve address of target '{target_query_string}'")
-        })
+        .ok_or_else(|| anyhow::anyhow!("Unable to resolve address of target '{target_spec}'"))
         .context("resolving target address")?;
     let node = overnet_core::Router::new(None)?;
     let fidl_pipe =
