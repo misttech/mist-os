@@ -256,6 +256,7 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "standard_userdebug_and_eng",
                          "mdns_fuchsia_device_wired_service",
                          "omaha_client_empty_eager_config",
+                         "power_framework",
                          "radar_proxy_with_injector",
                          "sl4f",
                          "wlan_development",
@@ -301,9 +302,6 @@ eng_only_platform_aib_names =
       # Sensor data playback support.
       "sensors_playback",
 
-      # Suspend/resume Support
-      "power_framework",
-
       # Bluetooth testing support
       "bluetooth_pandora",
     ]
@@ -326,7 +324,10 @@ required_userdebug_aib_names =
 # If an AIB is added to this experimental list, it does not require security
 # review, but will be banned from user builds. These AIBs may still be used
 # on userdebug builds as long as scrutiny is not run on those builds.
-experimental_aib_names = [ "adb_support" ]
+experimental_aib_names = [
+  "adb_support",
+  "power_framework",
+]
 
 # Ensure that we do not list any experimental AIBs as required
 _experimental_required_aibs = required_userdebug_aib_names -
