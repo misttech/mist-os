@@ -8,8 +8,8 @@ bt-transport-usb
 buttons
 clock
 ?config
-console
-console-launcher
+?console
+?console-launcher
 cpu-manager
 devfs
 device-name-provider

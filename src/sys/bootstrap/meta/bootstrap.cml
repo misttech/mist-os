@@ -18,20 +18,6 @@
             on_terminate: "reboot",
         },
         {
-            name: "console",
-            url: "fuchsia-boot:///console#meta/console.cm",
-
-            // Usually, console is started when console-launcher starts. But, startup eager is
-            // required because in products with console.shell=false, console-launcher exits
-            // early and does not start console; it should be started in order to get serial logs.
-            startup: "eager",
-        },
-        {
-            name: "console-launcher",
-            url: "fuchsia-boot:///console-launcher#meta/console-launcher.cm",
-            startup: "eager",
-        },
-        {
             name: "miscsvc",
             url: "fuchsia-boot:///miscsvc#meta/miscsvc.cm",
         },
@@ -153,7 +139,6 @@
             from: "parent",
             to: [
                 "#archivist",
-                "#console-launcher",
                 "#cpu_manager",
                 "#fshost",
                 "#netsvc",
@@ -181,97 +166,12 @@
                 "fuchsia.process.Launcher",
             ],
             from: "parent",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
-        },
-        {
-            protocol: [
-                "fuchsia.kernel.InfoResource",
-                "fuchsia.kernel.ProfileResource",
-            ],
-            from: "parent",
-            to: [ "#console-launcher" ],
-        },
-        {
-            protocol: [
-                "fuchsia.dash.Launcher",
-                "fuchsia.tracing.controller.Controller",
-            ],
-            from: "parent",
-            to: [ "#console-launcher" ],
-            availability: "optional",
-        },
-
-        // Allow shell tools launched from the console to use the root Realm
-        // querying protocols.
-        {
-            protocol: [
-                "fuchsia.sys2.LifecycleController.root",
-                "fuchsia.sys2.RealmExplorer.root",
-                "fuchsia.sys2.RealmQuery.root",
-                "fuchsia.sys2.RouteValidator.root",
-            ],
-            from: "parent",
-            to: "#console-launcher",
-        },
-        {
-            // Allow launching shell tools from the console,
-            // including from universe packages.
-            protocol: [
-                "fuchsia.pkg.PackageResolver",
-                "fuchsia.process.Resolver",
-            ],
-            from: "parent",
-            to: "#console-launcher",
-        },
-        {
-            // Allow the console to run `snapshot`.
-            protocol: "fuchsia.feedback.DataProvider",
-            from: "parent",
-            to: "#console-launcher",
-        },
-        {
-            // Allow networking from programs running in the console.
-            protocol: [
-                "fuchsia.net.name.Lookup",
-                "fuchsia.posix.socket.Provider",
-            ],
-            from: "parent",
-            to: "#console-launcher",
-        },
-        {
-            // Allow launching / managing guests from the console.
-            protocol: [
-                "fuchsia.virtualization.DebianGuestManager",
-                "fuchsia.virtualization.LinuxManager",
-                "fuchsia.virtualization.TerminaGuestManager",
-                "fuchsia.virtualization.ZirconGuestManager",
-            ],
-            from: "parent",
-            to: "#console-launcher",
-
-            // Virtualization is not present in all configurations.
-            // See: https://fxbug.dev/42054333
-            availability: "optional",
-        },
-        {
-            protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.host.ArchiveAccessor",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-                "fuchsia.diagnostics.LogSettings",
-            ],
-            from: "#archivist",
-            to: "#console-launcher",
+            to: "#netsvc",
         },
         {
             directory: "boot",
             from: "parent",
             to: [
-                "#console-launcher",
                 "#fshost",
                 "#miscsvc",
                 "#netsvc",
@@ -326,14 +226,6 @@
         {
             protocol: [
                 "fuchsia.boot.Arguments",
-                "fuchsia.kernel.DebugResource",
-            ],
-            from: "parent",
-            to: "#console",
-        },
-        {
-            protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.process.Launcher",
@@ -379,7 +271,6 @@
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
             from: "parent",
             to: [
-                "#console",
                 "#fshost",
                 "#ptysvc",
                 "#pwrbtn-monitor",
@@ -441,10 +332,7 @@
         {
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],
             from: "#virtual_console",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
+            to: "#netsvc",
         },
         {
             protocol: [
@@ -452,18 +340,12 @@
                 "fuchsia.tracing.kernel.Reader",
             ],
             from: "#svchost",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
+            to: [ "#netsvc" ],
         },
         {
             protocol: [ "fuchsia.driver.development.Manager" ],
             from: "#driver_manager",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
+            to: "#netsvc",
         },
         {
             protocol: [ "fuchsia.scheduler.ProfileProvider" ],
@@ -473,18 +355,12 @@
         {
             protocol: [ "fuchsia.kernel.DebugBroker" ],
             from: "#svchost",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
+            to: "#netsvc",
         },
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "#role_manager",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
+            to: "#netsvc",
         },
         {
             protocol: [
@@ -492,10 +368,7 @@
                 "fuchsia.sysmem2.Allocator",
             ],
             from: "#miscsvc",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
+            to: "#netsvc",
         },
         {
             protocol: [ "fuchsia.sysmem.Allocator" ],
@@ -511,7 +384,6 @@
             directory: "dev-topological",
             from: "#devfs-with-pkg",
             to: [
-                "#console-launcher",
                 "#miscsvc",
                 "#sysinfo",
             ],
@@ -559,62 +431,17 @@
         {
             directory: [ "tmp" ],
             from: "#fshost",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
-        },
-        {
-            directory: [
-                "pkgfs",
-                "root-ssl-certificates",
-                "system",
-            ],
-            from: "#pkg-cache",
-            to: "#console-launcher",
-        },
-        {
-            directory: "shell-commands-bin",
-            from: "#pkg-cache",
-            as: "bin",
-            to: "#console-launcher",
-        },
-        {
-            directory: [
-                "blob",
-                "data",
-            ],
-            from: "#fshost",
-            to: [ "#console-launcher" ],
-        },
-
-        // Offer the log services to the console
-        {
-            protocol: [ "fuchsia.logger.Log" ],
-            from: "#archivist",
-            to: "#console",
-        },
-
-        // Offer the kernel serial console to the console-launcher
-        {
-            protocol: "fuchsia.hardware.pty.Device",
-            from: "#console",
-            as: "console",
-            to: "#console-launcher",
+            to: "#netsvc",
         },
         {
             protocol: "fuchsia.device.NameProvider",
             from: "#device_name_provider",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
+            to: "#netsvc",
         },
         {
             protocol: "fuchsia.hardware.pty.Device",
             from: "#ptysvc",
             to: [
-                "#console-launcher",
                 "#netsvc",
                 "#virtual_console",
             ],
@@ -622,16 +449,12 @@
         {
             protocol: "fuchsia.sysinfo.SysInfo",
             from: "#sysinfo",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
+            to: "#netsvc",
         },
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
             to: [
-                "#console-launcher",
                 "#netsvc",
                 "#pkg-cache",
                 "#pwrbtn-monitor",
@@ -685,18 +508,12 @@
                 "fuchsia.paver.Paver",
             ],
             from: "#miscsvc",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
+            to: "#netsvc",
         },
         {
             protocol: "fuchsia.logger.Log",
             from: "#archivist",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
+            to: "#netsvc",
         },
         {
             protocol: [
@@ -705,8 +522,6 @@
             ],
             from: "#archivist",
             to: [
-                "#console",
-                "#console-launcher",
                 "#cpu_manager",
                 "#device_name_provider",
                 "#fshost",
@@ -735,16 +550,7 @@
                 "fuchsia.fshost.BlockWatcher",
             ],
             from: "#fshost",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
-        },
-        {
-            protocol: [ "fuchsia.tpm.cr50.Cr50" ],
-            from: "#cr50_agent",
-            to: "#console-launcher",
-            source_availability: "unknown",
+            to: "#netsvc",
         },
         {
             directory: "dev-class",

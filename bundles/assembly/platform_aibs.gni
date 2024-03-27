@@ -18,6 +18,9 @@ bootstrap_user_platform_aib_names = [
   # The bootstrap feature-set-level
   "bootstrap",
 
+  #Diagnostics
+  "console",
+
   # Driver Framework
   "driver_framework",
 

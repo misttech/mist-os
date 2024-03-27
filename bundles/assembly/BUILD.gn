@@ -102,8 +102,6 @@ assembly_input_bundle("bootstrap") {
   ]
   bootfs_packages = [
     "//src/bringup/bin/svchost:pkg",
-    "//src/bringup/bin/console:package",
-    "//src/bringup/bin/console-launcher:package",
     "//src/bringup/bin/device-name-provider:package",
     "//src/bringup/bin/miscsvc:package",
     "//src/bringup/bin/netsvc:package",
@@ -392,6 +390,29 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/pwm/bin/pwmctl:bootfs",
     "//src/ui/light/bin/lights-cli:bootfs",
     "//src/zircon/testing/mutex_pi_exerciser:bootfs",
+  ]
+}
+
+# The console AIB is included by all eng and userdebug products, and can be
+# optionally included by user products.
+#
+assembly_input_bundle("console") {
+  bootfs_packages = [
+    "//src/bringup/bin/console:package",
+    "//src/bringup/bin/console-launcher:package",
+  ]
+  compiled_packages = [
+    {
+      name = "bootstrap"
+      component_shards = [
+        {
+          component_name = "bootstrap"
+          shards = rebase_path(
+                  [ "//src/bringup/bin/console/meta/console.shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
   ]
 }
 
