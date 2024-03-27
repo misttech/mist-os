@@ -273,8 +273,7 @@ function is-listening-on-port {
   local port=$1
 
   if [[ "$(uname -s)" == "Darwin" ]]; then
-    # TODO(https://fxbug.dev/331275117) Ignore sockets in state time-wait.
-    if netstat -anp tcp | awk '{print $4}' | grep "\.${port}$" > /dev/null; then
+    if netstat -anp tcp | grep -v TIME_WAIT | awk '{print $4}' | grep "\.${port}$" > /dev/null; then
       return 0
     fi
   else
