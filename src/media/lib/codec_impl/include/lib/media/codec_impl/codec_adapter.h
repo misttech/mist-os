@@ -5,8 +5,12 @@
 #ifndef SRC_MEDIA_LIB_CODEC_IMPL_INCLUDE_LIB_MEDIA_CODEC_IMPL_CODEC_ADAPTER_H_
 #define SRC_MEDIA_LIB_CODEC_IMPL_INCLUDE_LIB_MEDIA_CODEC_IMPL_CODEC_ADAPTER_H_
 
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
 #include <fuchsia/mediacodec/cpp/fidl.h>
+#include <lib/fidl/cpp/hlcpp_conversion.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/thread.h>
 
 #include <list>
@@ -147,8 +151,8 @@ class CodecAdapter {
       CodecPort port, fuchsia::mediacodec::SecureMemoryMode secure_memory_mode);
 
   // All codecs must implement this for both ports.  The returned structure will
-  // be sent to sysmem in a SetConstraints() call.  This method can be called
-  // on the FIDL thread or the StreamControl domain (thread for now).
+  // be sent to sysmem in a SetConstraints() call.  This method can be called on
+  // the FIDL thread or the StreamControl domain (thread for now).
   //
   // Input:
   //
@@ -197,9 +201,25 @@ class CodecAdapter {
   // out (all still 0), the caller will fill them out based on
   // IsCoreCodecMappedBufferUseful() and IsCoreCodecHwBased().  The core codec
   // must either leave usage set to all 0, or completely fill them out.
+  //
+  // deprecated; this overload will go away when all client code is overriding
+  // the other overload below instead.
   virtual fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) = 0;
+  // This default implementation will go away once all client code is overriding this overload and
+  // the above overload can also go away.
+  virtual fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
+      CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
+      const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
+    auto v1_constraints_hlcpp =
+        CoreCodecGetBufferCollectionConstraints(port, stream_buffer_constraints, partial_settings);
+    auto v1_constraints = fidl::HLCPPToNatural(std::move(v1_constraints_hlcpp));
+    auto v2_constraints_result = sysmem::V2CopyFromV1BufferCollectionConstraints(&v1_constraints);
+    ZX_ASSERT(v2_constraints_result.is_ok());
+    auto v2_constraints = std::move(v2_constraints_result.value());
+    return v2_constraints;
+  }
 
   // There are no VMO handles in the buffer_collection_info.  Those are instead
   // provided via calls to CoreCodecAddBuffer(), as CodecImpl handles allocation
@@ -212,8 +232,31 @@ class CodecAdapter {
   // This call occurs regardless of whether "settings" or "partial settings" are
   // set (regardless of whether the client is using sysmem), after the client
   // sets input or output settings, and before the first buffer is added.
+  //
+  // This overload will go away once all clients have moved to the other
+  // overload. For now the default implementation allows CodecAdapter
+  // sub-classes to delete their override of this method as long as they have an
+  // override of the other method (that doesn't call this method, unlike the
+  // default implementation of the other method).
   virtual void CoreCodecSetBufferCollectionInfo(
       CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) = 0;
+  // This implementation will go away after clients have all overridden this
+  // virtual method.
+  virtual void CoreCodecSetBufferCollectionInfo(
+      CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
+    // If the CodecAdapter didn't override this virtual method, the CodecAdapter
+    // only supports setting sysmem(1) BufferCollectionInfo_2.
+    auto clone_result =
+        sysmem::V2CloneBufferCollectionInfo(buffer_collection_info, ZX_RIGHT_SAME_RIGHTS);
+    // We don't expect to be unable to duplicate handles created by sysmem.
+    ZX_ASSERT(clone_result.is_ok());
+    auto clone = std::move(clone_result.value());
+    auto v1_result = sysmem::V1MoveFromV2BufferCollectionInfo(std::move(clone));
+    ZX_ASSERT(v1_result.is_ok());
+    auto v1_hlcpp = fidl::NaturalToHLCPP(std::move(v1_result.value()));
+    // The callee will clone as needed.
+    CoreCodecSetBufferCollectionInfo(port, v1_hlcpp);
+  }
 
   // Stream lifetime:
   //

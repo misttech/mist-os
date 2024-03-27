@@ -5,8 +5,10 @@
 #ifndef SRC_MEDIA_LIB_CODEC_IMPL_INCLUDE_LIB_MEDIA_CODEC_IMPL_CODEC_IMPL_H_
 #define SRC_MEDIA_LIB_CODEC_IMPL_INCLUDE_LIB_MEDIA_CODEC_IMPL_CODEC_IMPL_H_
 
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/media/drm/cpp/fidl.h>
 #include <fuchsia/mediacodec/cpp/fidl.h>
+#include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/closure-queue/closure_queue.h>
@@ -81,6 +83,12 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
   // The CodecImpl will take care of doing set_error_handler() on the sysmem
   // connection.  The sysmem connection should be set up to use the
   // shared_fidl_dispatcher.
+  CodecImpl(fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
+            std::unique_ptr<CodecAdmission> codec_admission,
+            async_dispatcher_t* shared_fidl_dispatcher, thrd_t shared_fidl_thread,
+            StreamProcessorParams params,
+            fidl::InterfaceRequest<fuchsia::media::StreamProcessor> request);
+  // deprecated; clients should use the other constructor above
   CodecImpl(fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem,
             std::unique_ptr<CodecAdmission> codec_admission,
             async_dispatcher_t* shared_fidl_dispatcher, thrd_t shared_fidl_thread,
@@ -205,6 +213,58 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
   void FailFatalLocked(const char* format, ...);
 
  private:
+  template <typename Protocol>
+  class AsyncEventHandler : public fidl::AsyncEventHandler<Protocol> {
+   public:
+    using ErrorFunction = fit::function<void(fidl::UnbindInfo)>;
+    explicit AsyncEventHandler(ErrorFunction error_function = nullptr)
+        : error_function_(std::move(error_function)) {}
+    void set_error_handler(ErrorFunction error_function) {
+      error_function_ = std::move(error_function);
+    }
+    bool is_error_handler_set() { return !!error_function_; }
+
+   private:
+    void on_fidl_error(fidl::UnbindInfo error) override {
+      // Client code must set an error function before binding.
+      ZX_DEBUG_ASSERT(error_function_);
+      // move locally so doesn't get deallocated while running
+      auto local_error_function = std::move(error_function_);
+      local_error_function(error);
+    }
+    ErrorFunction error_function_;
+  };
+
+  // the order of base classes is significant; the AsyncEventHandler is a base instead of a member
+  // to make sure the destructor runs after ~fidl::Client
+  template <typename Protocol>
+  class Client : private AsyncEventHandler<Protocol>, public fidl::Client<Protocol> {
+   public:
+    using ErrorFunction = typename AsyncEventHandler<Protocol>::ErrorFunction;
+    Client() = default;
+
+    // No move because AsyncEventHandler* is held by fidl::Client.
+    Client(Client&& to_move) = delete;
+    Client& operator=(Client&& to_move) = delete;
+    // No copy
+    Client(const Client& to_copy) = delete;
+    Client& operator=(const Client& to_copy) = delete;
+
+    void Bind(fidl::ClientEnd<Protocol> client_end, async_dispatcher_t* dispatcher,
+              typename AsyncEventHandler<Protocol>::ErrorFunction on_error) {
+      ZX_DEBUG_ASSERT(client_end.is_valid());
+      ZX_DEBUG_ASSERT(dispatcher);
+      ZX_DEBUG_ASSERT(!!on_error);
+      AsyncEventHandler<Protocol>::set_error_handler(std::move(on_error));
+      fidl::Client<Protocol>::Bind(std::move(client_end), dispatcher, this);
+    }
+
+    void handle_unknown_event(fidl::UnknownEventMetadata<Protocol> metadata) override {
+      // old clients aren't required to pay attention to any too-new events; ignore
+      return;
+    }
+  };
+
   // We keep a queue of Stream objects rather than just a single current stream
   // object, so we can track which streams are future-discarded and which are
   // not yet known to be future-discarded.  This difference matters because
@@ -336,19 +396,19 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
     uint32_t packet_count();
     uint32_t buffer_count();
 
-    fuchsia::sysmem::CoherencyDomain coherency_domain();
+    fuchsia_sysmem2::CoherencyDomain coherency_domain();
 
     const fuchsia::media::StreamBufferPartialSettings& partial_settings();
 
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> TakeToken();
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> TakeToken();
 
     // The caller should std::move() in the buffer_collection_info.  This call
     // is only valid if this instance was created from
     // StreamBufferPartialSettings, and this method hasn't been called before
     // on this instance.
-    void SetBufferCollectionInfo(fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info);
+    void SetBufferCollectionInfo(fuchsia_sysmem2::BufferCollectionInfo buffer_collection_info);
 
-    const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info();
+    const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info();
 
     // We use SetBufferCollectionInfo(), but then take the VMOs back.  This
     // just happens to be more convenient than taking the VMOs before doing
@@ -361,11 +421,12 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
     bool is_secure();
 
     // Only call from FIDL thread.
-    fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection> NewBufferCollectionRequest(
-        async_dispatcher_t* dispatcher);
+    fidl::ServerEnd<fuchsia_sysmem2::BufferCollection> NewBufferCollectionRequest(
+        async_dispatcher_t* dispatcher,
+        CodecImpl::Client<fuchsia_sysmem2::BufferCollection>::ErrorFunction on_error);
 
     // Only call from FIDL thread.
-    fuchsia::sysmem::BufferCollectionPtr& buffer_collection();
+    std::unique_ptr<Client<fuchsia_sysmem2::BufferCollection>>& buffer_collection();
 
     // Only call from FIDL thread.
     void UnbindBufferCollection();
@@ -383,15 +444,25 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
     std::unique_ptr<const fuchsia::media::StreamBufferConstraints> constraints_;
     std::unique_ptr<fuchsia::media::StreamBufferPartialSettings> partial_settings_;
 
-    fuchsia::sysmem::BufferCollectionPtr buffer_collection_;
+    // This is in a unique_ptr<> because ~PortSettings does an async post to the fidl thread to send
+    // a Close() - the error handler comes from CodecImpl, but is wrapped to prevent CodecImpl's
+    // error handler from running if gone_marker_ (see below) has been deleted already (in which
+    // case CodecImpl doesn't expect its error handler to be run).
+    std::unique_ptr<Client<fuchsia_sysmem2::BufferCollection>> buffer_collection_;
 
     // In the case of partial_settings_, the remainder of the settings arrive
     // from sysmem in a BufferCollectionInfo_2.  When that arrives from
     // sysmem, we move the VMOs into CodecBuffer(s), and the remainder of the
     // settings get stored here.
-    std::unique_ptr<fuchsia::sysmem::BufferCollectionInfo_2> buffer_collection_info_;
+    std::unique_ptr<fuchsia_sysmem2::BufferCollectionInfo> buffer_collection_info_;
 
     bool is_complete_seen_output_ = false;
+
+    // Because ~PortSettings defers unbind until after sending Close() async, the error handler of
+    // buffer_collection_ can run after Any error handler or similar that bypasses the
+    // shared_fidl_queue_ must take a weak_ptr<> from gone_marker_, and check gone_marker_ before
+    // accessing any part of "this".
+    std::shared_ptr<std::monostate> gone_marker_;
   };
 
   // While we list this first in the member variables to hint that this gets
@@ -406,7 +477,7 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
   // previous Codec channel, when there's a concurrency cap of 1 (for example).
   std::unique_ptr<CodecAdmission> codec_admission_;
 
-  fuchsia::sysmem::AllocatorPtr sysmem_;
+  Client<fuchsia_sysmem2::Allocator> sysmem_;
 
   async_dispatcher_t* shared_fidl_dispatcher_;
   thrd_t shared_fidl_thread_;
@@ -516,7 +587,7 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
 
   // Held here temporarily until DeviceFidl is ready to handle errors so we can
   // bind.
-  fidl::InterfaceHandle<fuchsia::sysmem::Allocator> tmp_sysmem_;
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> tmp_sysmem_;
 
   // Held here temporarily until DeviceFidl is ready to handle errors so we can
   // bind.
@@ -814,16 +885,16 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
   bool FixupBufferCollectionConstraintsLocked(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings,
-      fuchsia::sysmem::BufferCollectionConstraints* buffer_collection_constraints);
+      fuchsia_sysmem2::BufferCollectionConstraints* buffer_collection_constraints);
 
   void OnBufferCollectionInfo(CodecPort port, uint64_t buffer_lifetime_ordinal, zx_status_t status,
-                              fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info);
+                              fuchsia_sysmem2::BufferCollectionInfo buffer_collection_info);
 
   // When this method is called we know we're already on the correct thread per
   // the port.
-  void OnBufferCollectionInfoInternal(
-      CodecPort port, uint64_t buffer_lifetime_ordinal, zx_status_t allocate_status,
-      fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info);
+  void OnBufferCollectionInfoInternal(CodecPort port, uint64_t buffer_lifetime_ordinal,
+                                      zx_status_t allocate_status,
+                                      fuchsia_sysmem2::BufferCollectionInfo buffer_collection_info);
 
   // This is set if IsCoreCodecHwBased(), so CodecBuffer::Pin() can get the physical address info,
   // so DMA can be done directly from/to BufferCollection buffers.  We cache this just so we're not
@@ -974,10 +1045,15 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
   fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) override;
+  fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
+      CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
+      const fuchsia::media::StreamBufferPartialSettings& partial_settings) override;
 
   void CoreCodecSetBufferCollectionInfo(
       CodecPort port,
       const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override;
+  void CoreCodecSetBufferCollectionInfo(
+      CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) override;
 
   fuchsia::media::StreamOutputFormat CoreCodecGetOutputFormat(
       uint64_t stream_lifetime_ordinal,

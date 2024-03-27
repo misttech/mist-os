@@ -45,6 +45,7 @@ source_set("codec_impl_tests") {
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/lib/stdcompat",
     "//src/lib/testing/loop_fixture",
     "//src/media/lib/codec_impl",
