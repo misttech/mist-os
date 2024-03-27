@@ -1437,3 +1437,7 @@ config("no-tlsdesc") {
     "HAVE_TLSDESC=$have_tlsdesc",
   ]
 }
+
+config("Wno-deprecated-pragma") {
+  cflags = [ "-Wno-deprecated-pragma" ]
+}

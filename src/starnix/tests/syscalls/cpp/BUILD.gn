@@ -188,6 +188,9 @@ test("syscalls_cpp_test_bin") {
   # TODO(b/307959737): Compile syscall test with the bionic toolchain and then move this
   # to the bionic toolchain.
   configs += [ ":march" ]
+
+  # TODO(b/331282813): 'ENODATA' is deprecated in ISO C++, disable the warning for now.
+  configs += [ "//build/config:Wno-deprecated-pragma" ]
 }
 
 test("crash") {
