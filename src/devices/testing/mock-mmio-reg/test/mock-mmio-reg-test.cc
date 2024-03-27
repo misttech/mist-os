@@ -4,9 +4,8 @@
 
 #include <lib/mmio/mmio.h>
 
-#include <fbl/algorithm.h>
+#include <gtest/gtest.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
-#include <zxtest/zxtest.h>
 
 namespace ddk_mock_test {
 
@@ -40,9 +39,9 @@ TEST(MockMmioReg, View) {
   reg_region[0x80].ExpectRead(0x5be3254c).ExpectWrite(0x6ba7d0af);
   reg_region[0x60].ExpectRead(0xa1026dfe).ExpectWrite(0x0164bff2);
 
-  EXPECT_EQ(dut.Read32(0x20), 0x8ed43ca9);
-  EXPECT_EQ(dut_view_1.Read32(0x40), 0x5be3254c);
-  EXPECT_EQ(dut_view_2.Read32(0), 0xa1026dfe);
+  EXPECT_EQ(dut.Read32(0x20), 0x8ed43ca9ul);
+  EXPECT_EQ(dut_view_1.Read32(0x40), 0x5be3254cul);
+  EXPECT_EQ(dut_view_2.Read32(0), 0xa1026dfeul);
 
   dut.Write32(0x7a5da8d8, 0x20);
   dut_view_1.Write32(0x6ba7d0af, 0x40);
@@ -61,9 +60,9 @@ TEST(MockMmioReg, Offset) {
   reg_region[0x1'0080].ExpectRead(0x5be3254c).ExpectWrite(0x6ba7d0af);
   reg_region[0x1'0060].ExpectRead(0xa1026dfe).ExpectWrite(0x0164bff2);
 
-  EXPECT_EQ(dut.Read32(0x1'0020), 0x8ed43ca9);
-  EXPECT_EQ(dut.Read32(0x1'0080), 0x5be3254c);
-  EXPECT_EQ(dut.Read32(0x1'0060), 0xa1026dfe);
+  EXPECT_EQ(dut.Read32(0x1'0020), 0x8ed43ca9ul);
+  EXPECT_EQ(dut.Read32(0x1'0080), 0x5be3254cul);
+  EXPECT_EQ(dut.Read32(0x1'0060), 0xa1026dfeul);
 
   dut.Write32(0x7a5da8d8, 0x1'0020);
   dut.Write32(0x6ba7d0af, 0x1'0080);

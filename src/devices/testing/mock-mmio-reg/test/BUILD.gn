@@ -20,11 +20,10 @@ test("mock-mmio-reg-test-bin") {
   output_name = "mock-mmio-reg-test"
   sources = [ "mock-mmio-reg-test.cc" ]
   deps = [
-    "//sdk/lib/fdio",
     "//src/devices/lib/mmio",
     "//src/devices/testing/mock-mmio-reg",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gtest",
   ]
 }
 

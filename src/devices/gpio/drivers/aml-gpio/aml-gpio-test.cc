@@ -10,6 +10,7 @@
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 
+#include <gtest/gtest.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 
 namespace {
@@ -166,7 +167,7 @@ struct IncomingNamespace {
 };
 
 template <uint32_t kPid>
-class AmlGpioTest : public zxtest::Test {
+class AmlGpioTest : public testing::Test {
  public:
   AmlGpioTest() : node_server_("root"), dut_(TestAmlGpioDriver::GetDriverRegistration()) {}
 
@@ -199,9 +200,10 @@ class AmlGpioTest : public zxtest::Test {
     zx::result svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(svc_endpoints.is_ok());
 
-    EXPECT_OK(fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
+    EXPECT_EQ(fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
                            static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                           svc_endpoints->server.TakeChannel().release()));
+                           svc_endpoints->server.TakeChannel().release()),
+              ZX_OK);
 
     zx::result gpioimpl_client_end =
         fdf::internal::DriverTransportConnect<fuchsia_hardware_gpioimpl::Service::Device>(
@@ -213,7 +215,7 @@ class AmlGpioTest : public zxtest::Test {
 
   void TearDown() override {
     zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
-    EXPECT_OK(prepare_stop_result.status_value());
+    EXPECT_EQ(prepare_stop_result.status_value(), ZX_OK);
     EXPECT_TRUE(dut_.Stop().is_ok());
   }
 

@@ -26,6 +26,7 @@ static_library("gtest_no_testonly") {
   visibility = [
     ":*",
     "//sdk/lib/driver/testing/cpp:*",
+    "//src/devices/testing/mock-mmio-reg:*",
     "//src/graphics/magma/tests/integration:*",
     "//src/graphics/tests/common:*",
     "//src/graphics/tests/vkreadback:*",

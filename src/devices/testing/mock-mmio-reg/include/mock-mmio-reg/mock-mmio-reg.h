@@ -11,7 +11,7 @@
 #include <memory>
 
 #include <fbl/vector.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/lib/mmio/test-helper.h"
 
@@ -162,7 +162,6 @@ class MockMmioRegRegion {
   // Accesses to registers lower than this offset are not permitted.
   MockMmioRegRegion(size_t reg_size, size_t reg_count, size_t reg_offset = 0)
       : reg_size_(reg_size), reg_count_(reg_count), reg_offset_(reg_offset) {
-    ASSERT_GT(reg_size_, 0);
     regs_.resize(reg_count_);
   }
 

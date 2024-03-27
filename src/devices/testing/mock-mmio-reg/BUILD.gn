@@ -18,9 +18,11 @@ sdk_source_set("mock-mmio-reg") {
   sdk_name = "mock-mmio-reg"
   public = [ "include/mock-mmio-reg/mock-mmio-reg.h" ]
   include_base = "include"
-  deps = [
+  public_deps = [
     "//src/devices/lib/mmio:test_helper",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
   ]
+  non_sdk_public_deps = [ "//third_party/googletest:gtest_no_testonly" ]
   public_configs = [ ":headers.config" ]
 }
