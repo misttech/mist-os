@@ -6,9 +6,24 @@
 
 load(":providers.bzl", "FuchsiaProductAssemblyBundleInfo")
 
+def _get_directory(ctx, rule_name):
+    for file in ctx.files.files:
+        if file.basename == "assembly_config.json":
+            return file.dirname
+
+    fail("\n\n" +
+         "When calling {}:\n".format(rule_name) +
+         "Could not find assembly_config.json from {}\n".format(ctx.attr.files) +
+         "Use the 'directory' attribute to specify the proper directory.\n\n")
+
 def _fuchsia_platform_artifacts_impl(ctx):
+    if ctx.file.directory:
+        directory = ctx.file.directory.path
+    else:
+        directory = _get_directory(ctx, "fuchsia_platform_artifacts")
+
     return [FuchsiaProductAssemblyBundleInfo(
-        root = ctx.file.directory.path,
+        root = directory,
         files = ctx.files.files,
     )]
 
@@ -19,7 +34,6 @@ fuchsia_platform_artifacts = rule(
     attrs = {
         "directory": attr.label(
             doc = "The directory of prebuilt platform artifacts.",
-            mandatory = True,
             allow_single_file = True,
         ),
         "files": attr.label(
@@ -31,7 +45,11 @@ fuchsia_platform_artifacts = rule(
 )
 
 def _fuchsia_legacy_bundle_impl(ctx):
-    directory = ctx.file.directory.path
+    if ctx.file.directory:
+        directory = ctx.file.directory.path
+    else:
+        directory = _get_directory(ctx, "fuchsia_legacy_bundle")
+
     return [FuchsiaProductAssemblyBundleInfo(
         root = directory,
         files = ctx.files.files,
