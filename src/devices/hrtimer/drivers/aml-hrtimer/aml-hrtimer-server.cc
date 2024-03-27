@@ -334,6 +334,11 @@ void AmlHrtimerServer::SetEvent(SetEventRequest& request, SetEventCompleter::Syn
   completer.Reply(zx::ok());
 }
 
+void AmlHrtimerServer::StartAndWait(StartAndWaitRequest& request,
+                                    StartAndWaitCompleter::Sync& completer) {
+  completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kNotSupported));
+}
+
 void AmlHrtimerServer::GetProperties(GetPropertiesCompleter::Sync& completer) {
   std::vector<fuchsia_hardware_hrtimer::TimerProperties> timers_properties;
   for (auto& i : timers_properties_) {

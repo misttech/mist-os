@@ -4,6 +4,7 @@
 library fuchsia.hardware.hrtimer;
 
 using zx;
+using fuchsia.power.broker;
 
 /// Maximum count of timers supported by this protocol, arbitrary,
 const MAX_COUNT_TIMERS uint32 = 64;
@@ -25,6 +26,9 @@ type DriverError = flexible enum {
     /// The operation failed because the current state of the driver does not allow it, or a
     /// precondition of the operation is not satisfied.
     BAD_STATE = 4;
+
+    /// The in-progress operation has been canceled.
+    CANCELED = 5;
 };
 
 /// Amount of time for one tick of a timer.
@@ -56,10 +60,17 @@ type TimerProperties = table {
     /// Required.
     3: max_ticks uint64;
 
-    /// If true then the `SetEvent` method is supported, if false it is not supported.
+    /// If true then the `SetEvent` method is supported, if false or not present it is not
+    /// supported.
     ///
-    /// Required.
+    /// Optional.
     4: supports_event bool;
+
+    /// If true then the `StartAndWait` method is supported, if false or not present it is not
+    /// supported.
+    ///
+    /// Optional.
+    5: supports_wait bool;
 };
 
 /// Driver properties.
@@ -78,7 +89,7 @@ open protocol Device {
     /// Start the timer `id` to expire after `ticks`.
     ///
     /// If `ticks` is 0 then the timer will expire in 0 ticks (immediately).
-    /// If the timer `id` was already started, then the previous `Start` is cancelled and the driver
+    /// If the timer `id` was already started, then the previous `Start` is canceled and the driver
     /// will restart the timer. Note that this may race with the expiration of the previous timer,
     /// for instance the notification process may be already started and a new `Start` call won't
     /// be able to stop a notification that is already in flight.
@@ -133,6 +144,38 @@ open protocol Device {
         id uint64;
         event zx.Handle:EVENT;
     }) -> () error DriverError;
+
+    /// Start the timer `id` to expire after `ticks` and waits until the timer expires with
+    /// support for preventing suspension via the Power Framework.
+    ///
+    /// The driver will not respond (hang) until the timer has triggered.
+    /// Calling `Stop` on the timer will abort this call and return `CANCELED`. Note that this
+    /// may race with the expiration of the timer.
+    ///
+    /// The `keep_alive` LeaseControl channel keeps a lease on a power element that keeps the
+    /// system from suspending. When `keep_alive` is closed, then the driver lease keeping the
+    /// system from suspending will be dropped. Hence, to guarantee that the system is not
+    /// suspended by the Power Framework a client must either keep this `keep_alive` channel for
+    /// as long as the system needs to not suspend, or a client must get its own lease from the
+    /// Power Framework to prevent suspension before it drops `keep_alive`.
+    /// Note that there is no need to keep both the `keep_alive` channel and a new lease from the
+    /// Power Framwork to prevent suspension, one lease is enough to keep the system from
+    /// suspending.
+    ///
+    /// If the specified `id` is not within the `properties` returned by `GetProperties`,
+    /// i.e. if 'id' is not a valid identifier, this call will return `INVALID_ARGS`.
+    /// If this method is not supported for the given `id`, then this call will return
+    /// `NOT_SUPPORTED`.
+    /// If the driver does not have a `keep_alive` channel to provide to the client, then this
+    /// call will return `BAD_STATE`.
+    /// If the driver encounters an internal error, then this call will return `INTERNAL_ERROR`.
+    flexible StartAndWait(struct {
+        id uint64;
+        resolution Resolution;
+        ticks uint64;
+    }) -> (resource struct {
+        keep_alive client_end:fuchsia.power.broker.LeaseControl;
+    }) error DriverError;
 
     /// Get driver properties.
     flexible GetProperties() -> (resource struct {

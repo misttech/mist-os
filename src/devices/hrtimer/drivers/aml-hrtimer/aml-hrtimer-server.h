@@ -29,6 +29,7 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   void Stop(StopRequest& request, StopCompleter::Sync& completer) override;
   void GetTicksLeft(GetTicksLeftRequest& request, GetTicksLeftCompleter::Sync& completer) override;
   void SetEvent(SetEventRequest& request, SetEventCompleter::Sync& completer) override;
+  void StartAndWait(StartAndWaitRequest& request, StartAndWaitCompleter::Sync& completer) override;
   void GetProperties(GetPropertiesCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_hrtimer::Device> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
