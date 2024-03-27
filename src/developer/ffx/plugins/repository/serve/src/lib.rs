@@ -25,11 +25,19 @@ use {
     fidl_fuchsia_pkg_rewrite::EngineMarker,
     fuchsia_async as fasync,
     fuchsia_repo::{
-        manager::RepositoryManager, repo_client::RepoClient, repository::PmRepository,
-        repository::RepoProvider, server::RepositoryServer,
+        manager::RepositoryManager,
+        repo_client::RepoClient,
+        repository::{PmRepository, RepoProvider},
+        server::RepositoryServer,
     },
+    futures::executor::block_on,
+    futures::SinkExt,
+    futures::StreamExt,
     futures::TryStreamExt as _,
     pkg::repo::register_target_with_fidl_proxies,
+    signal_hook::{
+        consts::signal::SIGHUP, consts::signal::SIGINT, consts::signal::SIGTERM, iterator::Signals,
+    },
     std::{fs, io::Write, path::Path, sync::Arc, time::Duration},
     timeout::timeout,
 };
@@ -78,6 +86,28 @@ async fn get_target_infos(
     Ok(targets)
 }
 
+#[tracing::instrument(skip(conn_quit_tx, server_quit_tx))]
+fn start_signal_monitoring(
+    mut conn_quit_tx: futures::channel::mpsc::Sender<()>,
+    mut server_quit_tx: futures::channel::mpsc::Sender<()>,
+) {
+    tracing::debug!("Starting monitoring for SIGHUP, SIGINT, SIGTERM");
+    let mut signals = Signals::new(&[SIGHUP, SIGINT, SIGTERM]).unwrap();
+    // Can't use async here, as signals.forever() is blocking.
+    let _signal_handle_thread = std::thread::spawn(move || {
+        if let Some(signal) = signals.forever().next() {
+            match signal {
+                SIGINT | SIGHUP | SIGTERM => {
+                    tracing::info!("Received signal {signal}, quitting");
+                    let _ = block_on(conn_quit_tx.send(())).ok();
+                    let _ = block_on(server_quit_tx.send(())).ok();
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
+}
+
 async fn connect_to_rcs(
     target_collection_proxy: &TargetCollectionProxy,
     query: &FfxTargetQuery,
@@ -97,7 +127,7 @@ async fn connect_to_rcs(
 }
 
 async fn connect_to_target(
-    target_identifier: String,
+    target_spec: String,
     aliases: Option<Vec<String>>,
     storage_type: Option<RepositoryStorageType>,
     repo_server_listen_addr: std::net::SocketAddr,
@@ -106,7 +136,7 @@ async fn connect_to_target(
     alias_conflict_mode: FfxRepositoryRegistrationAliasConflictMode,
 ) -> Result<(), anyhow::Error> {
     let target_query =
-        FfxTargetQuery { string_matcher: Some(target_identifier.clone()), ..Default::default() };
+        FfxTargetQuery { string_matcher: Some(target_spec.clone()), ..Default::default() };
 
     let rcs_proxy = connect_to_rcs(target_collection_proxy, &target_query).await?;
 
@@ -137,7 +167,7 @@ async fn connect_to_target(
     for (repo_name, repo) in repo_manager.repositories() {
         let repo_target = FfxCliRepositoryTarget {
             repo_name: Some(repo_name),
-            target_identifier: Some(target_identifier.clone()),
+            target_identifier: Some(target_spec.clone()),
             aliases: aliases.clone(),
             storage_type,
             ..Default::default()
@@ -237,77 +267,97 @@ impl FfxMain for ServeTool {
             fs::write(port_path, port.clone())
                 .with_context(|| format!("creating port file for port {}", port))?;
         };
-        let task = fasync::Task::local(server_fut);
+
+        let server_addr = server.local_addr().clone();
+
+        let server_task = fasync::Task::local(server_fut);
+        let (server_stop_tx, mut server_stop_rx) = futures::channel::mpsc::channel::<()>(1);
+        let (loop_stop_tx, mut loop_stop_rx) = futures::channel::mpsc::channel::<()>(1);
 
         if !self.cmd.no_device {
-            loop {
-                // Resolving the default target is typically fast
-                // or does not succeed, in which case we return from the
-                // function with an error.
-                tracing::info!("Getting target specifier");
-                let target_spec =
-                    timeout(Duration::from_secs(1), get_target_specifier(&self.context))
-                        .await
-                        .with_context(|| format!("getting target specifier for default target"))??
-                        .ok_or(anyhow!("no target specifier"))?;
+            // Resolving the default target is typically fast
+            // or does not succeed, in which case we return
+            tracing::info!("Getting target specifier");
+            let target_spec = timeout(Duration::from_secs(1), get_target_specifier(&self.context))
+                .await
+                .context("getting target specifier")??
+                .context("resolving target specifier")?;
 
-                // This blocks until the default target becomes available
-                // if a connection is possible.
-                tracing::info!("Attempting connection to default target: {target_spec}");
-                let connection = connect_to_target(
-                    target_spec.clone(),
-                    Some(self.cmd.alias.clone()),
-                    self.cmd.storage_type,
-                    server.local_addr(),
-                    Arc::clone(&repo_manager),
-                    &self.target_collection_proxy,
-                    self.cmd.alias_conflict_mode.into(),
-                )
-                .await;
+            let mut server_stop_tx = server_stop_tx.clone();
+            let _conn_loop_task = fasync::Task::local(async move {
+               'conn: loop {
+                    // This blocks until the default target becomes available
+                    // if a connection is possible.
+                    tracing::info!("Attempting connection to default target: {target_spec}");
+                    let connection = connect_to_target(
+                        target_spec.clone(),
+                        Some(self.cmd.alias.clone()),
+                        self.cmd.storage_type,
+                        server_addr,
+                        Arc::clone(&repo_manager),
+                        &self.target_collection_proxy,
+                        self.cmd.alias_conflict_mode.into(),
+                    )
+                    .await;
 
-                match connection {
-                    Ok(()) => {
-                        let s = format!(
-                            "Serving repository '{repo_path}' to target '{target_spec}' over address '{}'.",
-                            server.local_addr()
-                        );
-                        writeln!(writer, "{}", s,)
-                            .map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
-                        tracing::info!("{}", s);
-                        loop {
-                            fuchsia_async::Timer::new(std::time::Duration::from_secs(10)).await;
-                            if let Err(e) = knock_target_by_name(
-                                &Some(target_spec.clone()),
-                                &self.target_collection_proxy,
-                                SERVE_KNOCK_TIMEOUT,
-                                SERVE_KNOCK_TIMEOUT,
-                            )
-                            .await
-                            {
-                                tracing::warn!("Connection to target lost, retrying. Error: {}", e);
-                                break;
-                            };
+                    match connection {
+                        Ok(()) => {
+                            let s = format!(
+                                "Serving repository '{repo_path}' to target '{target_spec}' over address '{}'.",
+                                server_addr
+                            );
+                            if let Err(e) = writeln!(writer, "{}", s) {
+                                tracing::error!("Failed to write to output: {:?}", e);
+                            }
+                            tracing::info!("{}", s);
+                            loop {
+                                fuchsia_async::Timer::new(std::time::Duration::from_secs(10)).await;
+                                // If serving is supposed to shut down and this task has not been
+                                // cancelled already, exit voluntarily.
+                                if let Ok(Some(_)) = loop_stop_rx.try_next() {
+                                    break 'conn;
+                                }
+                                if let Err(e) = knock_target_by_name(
+                                    &Some(target_spec.clone()),
+                                    &self.target_collection_proxy,
+                                    SERVE_KNOCK_TIMEOUT,
+                                    SERVE_KNOCK_TIMEOUT,
+                                )
+                                .await
+                                {
+                                    tracing::warn!("Connection to target lost, retrying. Error: {}", e);
+                                    break;
+                                };
+                            }
                         }
-                    }
-                    Err(e) => {
-                        tracing::warn!("Cannot (yet) serve repository, retrying. Error: {}", e);
-                        // If a a connection can't be established due to PEER_CLOSED, we end up
-                        // here immediately after connect_to_target() fails. Wait before a
-                        // reconnect attempt is made.
-                        fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
-                    }
-                };
-            }
+                        Err(e) => {
+                            // If we end up here, it is unlikely a reconnect will be successful without
+                            // ffx being restarted.
+                            tracing::error!("Cannot serve repository to target, exiting. Error: {}", e);
+                            let _ = server_stop_tx.send(());
+                            break;
+                        }
+                    };
+                }
+            }).detach();
         } else {
-            let s =
-                format!("Serving repository '{repo_path}' over address '{}'.", server.local_addr());
+            let s = format!("Serving repository '{repo_path}' over address '{}'.", server_addr);
             writeln!(writer, "{}", s).map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
             tracing::info!("{}", s);
         }
 
-        // Wait for the server to shut down.
-        task.await;
+        let _ = fasync::Task::local(async move {
+            if let Some(_) = server_stop_rx.next().await {
+                server.stop();
+            }
+        })
+        .detach();
 
+        // Register signal handler.
+        start_signal_monitoring(loop_stop_tx, server_stop_tx);
+
+        // Wait for the server to shut down.
+        server_task.await;
         Ok(())
     }
 }
@@ -338,10 +388,7 @@ mod test {
         fidl_fuchsia_pkg_rewrite_ext::Rule,
         frcs::RemoteControlMarker,
         fuchsia_repo::repository::HttpRepository,
-        futures::{
-            channel::mpsc::{self, Receiver},
-            SinkExt, StreamExt as _, TryStreamExt,
-        },
+        futures::channel::mpsc::{self, Receiver},
         std::{collections::BTreeSet, sync::Mutex, time},
         url::Url,
     };
@@ -399,7 +446,7 @@ mod test {
             // The vector is pop()ed at each incoming request.
             mut target_responses: Option<Vec<FakeTargetResponse>>,
         ) -> (Self, TargetCollectionProxy, Receiver<String>) {
-            let (sender, rx) = mpsc::channel::<String>(8);
+            let (sender, rx) = futures::channel::mpsc::channel::<String>(8);
             let fake_rcs = FakeRcs::new();
             // We pop vector elements below, so reverse the vec to
             // maintain the expected temporal order.
@@ -586,7 +633,7 @@ mod test {
 
     impl FakeRepositoryManager {
         fn new() -> (Self, mpsc::Receiver<()>) {
-            let (sender, rx) = mpsc::channel::<()>(1);
+            let (sender, rx) = futures::channel::mpsc::channel::<()>(1);
             let events = Arc::new(Mutex::new(Vec::new()));
 
             (Self { events, sender }, rx)
@@ -642,7 +689,7 @@ mod test {
 
     impl FakeEngine {
         fn new() -> (Self, mpsc::Receiver<()>) {
-            let (sender, rx) = mpsc::channel::<()>(1);
+            let (sender, rx) = futures::channel::mpsc::channel::<()>(1);
             let events = Arc::new(Mutex::new(Vec::new()));
 
             (Self { events, sender }, rx)
@@ -1008,9 +1055,6 @@ mod test {
             reqs,
             vec![RemoteControlMarker::PROTOCOL_NAME, RemoteControlMarker::PROTOCOL_NAME,]
         );
-
-        // TODO: Remove probably?
-        fuchsia_async::Timer::new(std::time::Duration::from_secs(5)).await;
 
         // The second target knock is not answered, see the open_target_responses vector above.
         // Hence we expect reconnect instead of another RemoteControlMarker::PROTOCOL_NAME

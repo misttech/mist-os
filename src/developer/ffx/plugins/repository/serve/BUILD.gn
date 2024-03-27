@@ -38,6 +38,7 @@ ffx_plugin("ffx_repository_serve") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:signal-hook",
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [
