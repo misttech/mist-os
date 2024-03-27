@@ -99,7 +99,7 @@ def handle_package_manifest(
         inputs["distribution_name"],
     )
 
-    subtype = f"{arch}-api{api_level}"
+    subtype = f"{arch}-api-{api_level}"
 
     with open(input_manifest_path, "r") as manifest_file:
         input_manifest = json.load(manifest_file)
@@ -258,7 +258,7 @@ def main():
     visited_subpackages = set()
 
     # Capture content checklist file in metadata and file list.
-    subtype = f"{arch}-api{api_level}"
+    subtype = f"{arch}-api-{api_level}"
     content_checklist_path = (
         f"packages/{distribution_name}/{subtype}/release/content_checklist_path"
     )
