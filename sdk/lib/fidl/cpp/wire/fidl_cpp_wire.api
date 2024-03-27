@@ -4,7 +4,7 @@
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/async_binding.h": "137d8957e5a482d66b719b930dd63286",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/async_transaction.h": "7f71296357846e14eb9acfd3b96d9f7e",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/base_wire_result.h": "38281d07216a5ad9223afc334ee8d172",
-  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/channel.h": "20a4e6d34d9dd1c829c64d4dd5ae614d",
+  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/channel.h": "9e247878499875c20e090a6a241897c2",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/client.h": "a84855796913a4d8934cc304d1b1997a",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/client_base.h": "c430512f81a1ccfa990b51aa61aad919",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/coding_errors.h": "be750bc859242469747a577ad4145cec",

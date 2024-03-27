@@ -26,6 +26,68 @@ template <typename Protocol>
 struct Endpoints {
   fidl::ClientEnd<Protocol> client;
   fidl::ServerEnd<Protocol> server;
+
+  // Creates a pair of Zircon channel endpoints speaking the |Protocol| protocol.
+  // Whenever interacting with FIDL, using this method should be encouraged over
+  // |zx::channel::create|, because this method encodes the precise protocol type
+  // into its results at compile time.
+  //
+  // The return value is struct containing client and server endpoints.
+  // Given the following:
+  //
+  //     auto endpoints = fidl::CreateEndpoints<MyProtocol>();
+  //
+  //  The channel endpoints may be accessed via:
+  //
+  //     endpoints->client;
+  //     endpoints->server;
+  //
+  //  Or you may use structured bindings to gain access:
+  //
+  //     auto [client_end, server_end] = fidl::Endpoints<MyProtocol>::Create();
+  static Endpoints<Protocol> Create() {
+    zx::channel local, remote;
+    ZX_ASSERT(zx::channel::create(0, &local, &remote) == ZX_OK);
+    return Endpoints<Protocol>{
+        fidl::ClientEnd<Protocol>(std::move(local)),
+        fidl::ServerEnd<Protocol>(std::move(remote)),
+    };
+  }
+
+  // Creates a pair of Zircon channel endpoints speaking the |Protocol| protocol.
+  // Whenever interacting with FIDL, using this method should be encouraged over
+  // |zx::channel::create|, because this method encodes the precise protocol type
+  // into its results at compile time.
+  //
+  // This overload of |CreateEndpoints| may lead to more concise code when the
+  // caller already has the client endpoint defined as an instance variable.
+  // It will replace the destination of |out_client| with a newly created client
+  // endpoint, and return the corresponding server endpoint:
+  //
+  //     // |client_end_| is an instance variable.
+  //     auto server_end = fidl::Endpoints<Protocol>::Create(&client_end_);
+  static fidl::ServerEnd<Protocol> Create(fidl::ClientEnd<Protocol>* out_client) {
+    Endpoints<Protocol> endpoints = Create();
+    *out_client = fidl::ClientEnd<Protocol>(std::move(endpoints->client));
+    return fidl::ServerEnd<Protocol>(std::move(endpoints->server));
+  }
+  // Creates a pair of Zircon channel endpoints speaking the |Protocol| protocol.
+  // Whenever interacting with FIDL, using this method should be encouraged over
+  // |zx::channel::create|, because this method encodes the precise protocol type
+  // into its results at compile time.
+  //
+  // This overload of |CreateEndpoints| may lead to more concise code when the
+  // caller already has the server endpoint defined as an instance variable.
+  // It will replace the destination of |out_server| with a newly created server
+  // endpoint, and return the corresponding client endpoint:
+  //
+  //     // |server_end_| is an instance variable.
+  //     auto client_end = fidl::Endpoints<Protocol>::Create(&server_end_);
+  static fidl::ClientEnd<Protocol> Create(fidl::ServerEnd<Protocol>* out_server) {
+    Endpoints<Protocol> endpoints = Create();
+    *out_server = fidl::ServerEnd<Protocol>(std::move(endpoints->server));
+    return fidl::ClientEnd<Protocol>(std::move(endpoints->client));
+  }
 };
 
 // Creates a pair of Zircon channel endpoints speaking the |Protocol| protocol.
