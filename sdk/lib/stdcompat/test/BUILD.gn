@@ -45,6 +45,7 @@ group("stdcompat-test-deps") {
   public_deps = [
     "//sdk/lib/stdcompat",
     "//src/lib/fxl/test:gtest_main",
+    "//src/sys/test_runners/gtest:death_test",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
@@ -78,21 +79,15 @@ test("stdcompat-unit-test") {
   configs += [ ":stdcompat-Wundef" ]
 }
 
-fuchsia_component("stdcompat-test") {
-  testonly = true
-  manifest = "meta/stdcompat-test.cml"
+fuchsia_unittest_component("stdcompat-test") {
   deps = [ ":stdcompat-unit-test" ]
 }
 
-fuchsia_component("stdcompat-polyfills-test") {
-  testonly = true
-  manifest = "meta/stdcompat-polyfills-test.cml"
+fuchsia_unittest_component("stdcompat-polyfills-test") {
   deps = [ ":stdcompat-polyfills-unit-test" ]
 }
 
-fuchsia_component("stdcompat-polyfills-no-inline-variables-test") {
-  testonly = true
-  manifest = "meta/stdcompat-polyfills-no-inline-variables-test.cml"
+fuchsia_unittest_component("stdcompat-polyfills-no-inline-variables-test") {
   deps = [ ":stdcompat-polyfills-no-inline-variables-unit-test" ]
 }
 
