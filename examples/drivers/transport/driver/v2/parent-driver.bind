@@ -3,5 +3,12 @@
 // found in the LICENSE file.
 
 using fuchsia.test;
+using gizmo.example;
 
-fuchsia.BIND_PROTOCOL == fuchsia.test.BIND_PROTOCOL.PARENT;
+// The driver either bind to test protocol for the unit test
+// or gizmo.example.TEST_NODE_ID for the test node.
+if gizmo.example.TEST_NODE_ID == "driver_transport_parent" {
+  true;
+} else {
+  fuchsia.BIND_PROTOCOL == fuchsia.test.BIND_PROTOCOL.PARENT;
+}

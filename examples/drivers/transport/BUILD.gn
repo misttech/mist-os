@@ -19,12 +19,12 @@ group("hermetic_tests") {
 
     # TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
     # ":driver-test-package-v1",
-    ":driver-test-package-v2",
 
     # TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
     # ":zircon-test-package-v1",
     ":zircon-test-package-v2",
     "banjo/v2/tests:child-driver-hermetic-test-pkg",
+    "driver/v2/tests:child-driver-hermetic-test-pkg",
   ]
 }
 

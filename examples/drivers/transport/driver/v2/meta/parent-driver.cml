@@ -9,17 +9,9 @@
         bind: 'meta/bind/parent-driver.bindbc',
     },
     capabilities: [
-        { service: 'fuchsia.driver.compat.Service' },
         { service: 'fuchsia.examples.gizmo.Service' },
     ],
-    use: [
-        { service: 'fuchsia.driver.compat.Service' },
-    ],
     expose: [
-        {
-            service: 'fuchsia.driver.compat.Service',
-            from: 'self',
-        },
         {
             service: 'fuchsia.examples.gizmo.Service',
             from: 'self',
