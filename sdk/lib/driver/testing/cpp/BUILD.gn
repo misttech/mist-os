@@ -69,12 +69,18 @@ sdk_source_set("base_fixture") {
   ]
 }
 
-source_set("gtest_fixture") {
-  testonly = true
+sdk_source_set("gtest_fixture") {
+  category = "internal"
+  sdk_name = "driver_testing_cpp_gtest_fixture"
+  include_base = "//sdk"
+
+  public_configs = [ "//sdk/config" ]
+
   sources = [ "fixtures/gtest_fixture.h" ]
   public_deps = [
     ":base_fixture",
     "//sdk/lib/driver/compat/cpp",
-    "//third_party/googletest:gtest",
   ]
+
+  non_sdk_public_deps = [ "//third_party/googletest:gtest_no_testonly" ]
 }

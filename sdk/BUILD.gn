@@ -679,6 +679,8 @@ sdk_molecule("platform_libs") {
     "//sdk/lib/driver/devicetree/visitors:registration_sdk",
     "//sdk/lib/driver/devicetree/visitors/default:default_sdk",
     "//sdk/lib/driver/devicetree/visitors/drivers:all-driver-visitors_sdk",
+    "//sdk/lib/driver/promise/cpp:cpp_sdk",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture_sdk",
     "//sdk/lib/sys/component:realm_builder_shard",
     "//src/devices/block/lib/sdmmc:sdmmc_sdk",
     "//src/devices/testing/fake-bti:fake-bti_sdk",

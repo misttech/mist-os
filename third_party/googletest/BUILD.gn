@@ -25,6 +25,7 @@ static_library("gtest_no_testonly") {
   # packaged into the SDK, since they cannot be testonly.
   visibility = [
     ":*",
+    "//sdk/lib/driver/testing/cpp:*",
     "//src/graphics/magma/tests/integration:*",
     "//src/graphics/tests/common:*",
     "//src/graphics/tests/vkreadback:*",
