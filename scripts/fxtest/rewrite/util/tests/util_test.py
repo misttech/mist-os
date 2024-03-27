@@ -27,27 +27,35 @@ class TestArgOptions(unittest.TestCase):
 
         parser = argparse.ArgumentParser()
         parser.add_argument(
-            "-m",
-            "--main-option",
+            "-p",
+            "--package",
             action=arg_option.SelectionAction,
+            nargs=0,
             dest="option",
         )
         parser.add_argument(
-            "-a",
-            "--alt-option",
+            "-c",
+            "--component",
             action=arg_option.SelectionAction,
+            nargs=0,
             dest="option",
         )
-        parser.add_argument("option", action=arg_option.SelectionAction)
+        parser.add_argument(
+            "option", action=arg_option.SelectionAction, nargs="*"
+        )
 
-        args = parser.parse_args(["-m", "one", "two", "-a", "three", "four"])
+        args = parser.parse_intermixed_args(
+            arg_option.SelectionAction.preprocess_args(
+                ["-p", "one", "two", "-c", "three", "four"]
+            )
+        )
         self.assertListEqual(
             args.option,
             [
-                "--main-option",
+                "--package",
                 "one",
                 "two",
-                "--alt-option",
+                "--component",
                 "three",
                 "four",
             ],

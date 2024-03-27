@@ -172,17 +172,13 @@ def parse_args(
 
     extra_args: typing.List[str] = []
 
+    cli_args = cli_args if cli_args is not None else sys.argv[1:]
+
     if cli_args is not None and "--" in cli_args:
         extra_index = cli_args.index("--")
         (cli_args, extra_args) = (
             cli_args[:extra_index],
             cli_args[extra_index + 1 :],
-        )
-    elif cli_args is None and "--" in sys.argv:
-        extra_index = sys.argv.index("--")
-        (sys.argv, extra_args) = (
-            sys.argv[:extra_index],
-            sys.argv[extra_index + 1 :],
         )
 
     parser = argparse.ArgumentParser(
@@ -258,29 +254,31 @@ def parse_args(
     selection.add_argument(
         "-p",
         "--package",
-        action=arg_option.SelectionAction,
+        action=arg_option.InvalidAction,
+        nargs=0,
         dest="selection",
-        nargs="*",
         help="Match tests against their Fuchsia package name",
     )
     selection.add_argument(
         "-c",
         "--component",
-        action=arg_option.SelectionAction,
+        action=arg_option.InvalidAction,
+        nargs=0,
         dest="selection",
-        nargs="*",
         help="Match tests against their Fuchsia component name",
     )
     selection.add_argument(
         "-a",
         "--and",
-        action=arg_option.SelectionAction,
+        action=arg_option.InvalidAction,
+        nargs=0,
         dest="selection",
-        nargs="*",
         help="Add requirements to the preceding filter",
     )
     selection.add_argument(
-        "selection", action=arg_option.SelectionAction, nargs="*"
+        "selection",
+        action=arg_option.SelectionAction,
+        nargs="*",
     )
     selection.add_argument(
         "--fuzzy",
@@ -337,8 +335,8 @@ def parse_args(
     execution.add_argument(
         "--test-filter",
         type=str,
+        action="append",
         default=[],
-        nargs="*",
         help="Run specific test cases in a test suite. Can be specified multiple times to pass in multiple patterns.",
     )
     execution.add_argument(
@@ -505,7 +503,7 @@ def parse_args(
             if hasattr(defaults, action.dest):
                 action.default = getattr(defaults, action.dest)
 
-    flags: Flags = Flags(
-        **vars(parser.parse_args(cli_args)), extra_args=extra_args
-    )
+    cli_args = arg_option.SelectionAction.preprocess_args(cli_args)
+    namespace = parser.parse_intermixed_args(cli_args)
+    flags: Flags = Flags(**vars(namespace), extra_args=extra_args)
     return flags

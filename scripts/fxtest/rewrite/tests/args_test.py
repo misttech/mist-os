@@ -114,6 +114,45 @@ class TestArgs(unittest.TestCase):
         flags = args.parse_args(["--parallel=1"], config_file.default_flags)
         self.assertEqual(flags.parallel, 1)
 
+    def test_selections_after_test_filter(self) -> None:
+        """Passing more selections after a --test-filter works"""
+        flags = args.parse_args(["foo", "--test-filter", "some*", "bar"])
+        flags.validate()
+        self.assertListEqual(flags.test_filter, ["some*"])
+        self.assertListEqual(flags.selection, ["foo", "bar"])
+
+        flags = args.parse_args(
+            [
+                "foo",
+                "--test-filter",
+                "some*",
+                "bar",
+                "-a",
+                "baz",
+                "alpha",
+                "--test-filter",
+                "something*",
+                "beta",
+                "-c",
+                "gamma.cm",
+            ]
+        )
+        flags.validate()
+        self.assertListEqual(flags.test_filter, ["some*", "something*"])
+        self.assertListEqual(
+            flags.selection,
+            [
+                "foo",
+                "bar",
+                "--and",
+                "baz",
+                "alpha",
+                "beta",
+                "--component",
+                "gamma.cm",
+            ],
+        )
+
     @parameterized.expand(  # type: ignore[misc]
         [
             ("default is None", [], [], None),
