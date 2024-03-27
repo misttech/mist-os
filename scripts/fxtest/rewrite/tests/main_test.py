@@ -400,7 +400,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 (
                     "fx",
                     "build",
-                    "//src/sys:foo_test_package",
+                    "src/sys:foo_test_package",
                     "--host",
                     "//src/sys:bar_test",
                 ),

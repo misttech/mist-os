@@ -524,7 +524,10 @@ async def do_build(
     Returns:
         bool: True only if the tests were built and published, False otherwise.
     """
-    label_to_rule = re.compile(r"(//[^()]+)\(")
+    # Labels start with // and end with a toolchain, starting with
+    # '('. Both toolchain and '//' need to be omitted for building
+    # device tests through fx build.
+    label_to_rule = re.compile(r"//([^()]+)\(")
     build_command_line = []
     for selection in tests.selected:
         label = selection.build.test.package_label or selection.build.test.label
@@ -533,7 +536,8 @@ async def do_build(
             # Host tests are built by output name.
             match = label_to_rule.match(label)
             if match:
-                build_command_line.extend(["--host", match.group(1)])
+                # NOTE: Prepend // for host labels, since that seems to be required.
+                build_command_line.extend(["--host", "//" + match.group(1)])
         elif label:
             # Other tests are built by label content, without toolchain.
             match = label_to_rule.match(label)
