@@ -116,6 +116,22 @@ TEST(AsConstTest, DeniesRvalueReferences) {
                 "cpp17::as_const should not accept rvalue references.");
 }
 
+// Note since these are static asserts the testing actually happens at compile
+// time.
+TEST(ToUnderlying, TypesMatch) {
+  enum class E1 : char { e };
+
+  static_assert(std::is_same_v<char, decltype(cpp23::to_underlying(E1::e))>);
+
+  enum struct E2 : long { e };
+
+  static_assert(std::is_same_v<long, decltype(cpp23::to_underlying(E2::e))>);
+
+  enum E3 : unsigned { e };
+
+  static_assert(std::is_same_v<unsigned, decltype(cpp23::to_underlying(e))>);
+}
+
 // TODO(https://fxbug.dev/42180908)
 // #if defined(__cpp_lib_as_const) && __cpp_lib_as_const >= 201510L &&
 // !defined(LIB_STDCOMPAT_USE_POLYFILLS)
