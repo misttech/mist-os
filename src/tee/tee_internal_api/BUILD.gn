@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/rust/rustc_cdylib.gni")
+import("//build/rust/rustc_library.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 
 group("tee_internal_api") {
@@ -28,27 +28,14 @@ ifs_shared_library("lib") {
   abi = "libtee_internal.ifs"
 }
 
-rustc_cdylib("impl") {
+rustc_library("tee_internal_impl") {
   edition = "2021"
-  output_name = "tee_internal"
-  public = [
-    "include/lib/tee_internal_api/tee_internal_api.h",
-    "include/lib/tee_internal_api/tee_internal_api_types.h",
-  ]
 
   sources = [
     "src/binding.rs",
     "src/binding_stubs.rs",
     "src/lib.rs",
     "src/tee_impl.rs",
-  ]
-
-  configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
-  configs += [ "//build/config/fuchsia:static_rust_standard_library" ]
-  deps = [
-    # When statically linking the Rust standard library there's an unspecified dependency on fdio.
-    # Add the dep so our library can link.
-    "//sdk/lib/fdio",
   ]
 
   # TODO: Write tests.

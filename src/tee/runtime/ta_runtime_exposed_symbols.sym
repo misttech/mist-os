@@ -2,11 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
-  testonly = true
-  deps = [
-    "runtime:tests",
-    "ta:tests",
-    "tee_internal_api:tests",
-  ]
-}
+{
+  TEE_Panic;
+  # TODO: Add more TEE_... symbols here as they are implemented.
+};

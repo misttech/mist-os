@@ -10,7 +10,14 @@
 
 use crate::tee_impl;
 
+// This function returns a list of the C entry point that we want to expose from
+// this program. They need to be referenced from main to ensure that the linker
+// thinks that they are referenced and need to be included in the final binary.
+pub fn exposed_c_entry_points() -> &'static [*const extern "C" fn()] {
+    &[TEE_Panic as *const extern "C" fn()]
+}
+
 #[no_mangle]
-extern "C" fn TEE_Panic(code: u32) {
+pub extern "C" fn TEE_Panic(code: u32) {
     tee_impl::panic(code)
 }

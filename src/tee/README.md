@@ -7,8 +7,11 @@ This directory contains support for hosting a Trusted Execution Environment insi
 The `ta` directory contains Trusted Application implementations for testing
 purposes.
 
-The `tee_internal_api` contains the definition and implementation of the TEE
-Internal Core API.
+The `tee_internal_api` directory contains the definition and implementation of
+the TEE Internal Core API.
+
+The `runtime` directory contains the TA runtime binary connecting the TEE
+bindings with the fuchsia.tee.Application FIDL protocol.
 
 ## Glossary
 
