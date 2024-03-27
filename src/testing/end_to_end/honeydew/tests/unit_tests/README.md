@@ -1,10 +1,14 @@
-# Honeydew Unit tests
+# Honeydew unit tests
 
 [TOC]
 
 ## Execution
-Below commands will run all of the honeydew's unit test cases
+
+Below commands run all Honeydew unit tests:
 ```shell
+# Configure to build Fuchsia on core.x64 along with Honeydew unit tests
 fx set core.x64 --with-host //src/testing/end_to_end/honeydew/tests/unit_tests:tests
+
+# Run the Honeydew unit test
 fx test //src/testing/end_to_end/honeydew/tests/unit_tests --host --output
 ```
