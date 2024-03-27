@@ -298,6 +298,10 @@ moniker, so they are easier to visually inspect.**
   - Append `--` to your arguments to pass remaining arguments verbatim to the
   test. For example: `fx test foo -- --argument_for_test`
   will pass `--argument_for_test` to the test itself.
+- **Host tests will inherit a limited set of environment variables
+from the user's environment automatically**
+  - Use `--env` (`-e`) to add new `KEY=VALUE` environment variables
+  to tests. This flag may be specified multiple times.
 
 ### Output options
 
