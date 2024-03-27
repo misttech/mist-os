@@ -699,7 +699,7 @@ TEST(VmoTestCase, ChildResizeRight) {
   ASSERT_OK(zx::vmo::create(len, 0, &parent));
 
   uint32_t child_types[] = {ZX_VMO_CHILD_SNAPSHOT, ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE,
-                            ZX_VMO_CHILD_SLICE};
+                            ZX_VMO_CHILD_SLICE, ZX_VMO_CHILD_SNAPSHOT_MODIFIED};
 
   for (auto child_type : child_types) {
     zx::vmo vmo;
@@ -2104,6 +2104,8 @@ TEST(VmoTestCase, Discardable) {
   EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kSize, &child));
   EXPECT_EQ(ZX_ERR_NOT_SUPPORTED,
             vmo.create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0, kSize, &child));
+  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED,
+            vmo.create_child(ZX_VMO_CHILD_SNAPSHOT_MODIFIED, 0, kSize, &child));
 
   // Cannot create a discardable pager backed VMO.
   zx::pager pager;
@@ -2207,6 +2209,10 @@ TEST(VmoTestCase, NoWriteResizable) {
                                  ZX_VMO_CHILD_RESIZABLE,
                              0, zx_system_get_page_size(), &child));
   EXPECT_EQ(ZX_ERR_INVALID_ARGS,
+            vmo.create_child(
+                ZX_VMO_CHILD_SNAPSHOT_MODIFIED | ZX_VMO_CHILD_NO_WRITE | ZX_VMO_CHILD_RESIZABLE, 0,
+                zx_system_get_page_size(), &child));
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS,
             vmo.create_child(ZX_VMO_CHILD_SLICE | ZX_VMO_CHILD_NO_WRITE | ZX_VMO_CHILD_RESIZABLE, 0,
                              zx_system_get_page_size(), &child));
   // Prove that creating a non-resizable one works.
@@ -2224,6 +2230,10 @@ TEST(VmoTestCase, NoWriteResizable) {
             vmo.create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE | ZX_VMO_CHILD_NO_WRITE |
                                  ZX_VMO_CHILD_RESIZABLE,
                              0, zx_system_get_page_size(), &child));
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS,
+            vmo.create_child(
+                ZX_VMO_CHILD_SNAPSHOT_MODIFIED | ZX_VMO_CHILD_NO_WRITE | ZX_VMO_CHILD_RESIZABLE, 0,
+                zx_system_get_page_size(), &child));
   EXPECT_EQ(ZX_ERR_INVALID_ARGS,
             vmo.create_child(ZX_VMO_CHILD_SLICE | ZX_VMO_CHILD_NO_WRITE | ZX_VMO_CHILD_RESIZABLE, 0,
                              zx_system_get_page_size(), &child));
