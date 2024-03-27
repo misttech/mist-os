@@ -93,7 +93,7 @@ test("aml-thermal-s905d2g-legacy-test-bin") {
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
     "//src/devices/lib/mmio:test_helper",
-    "//src/devices/testing/mock-mmio-reg",
+    "//src/devices/testing/mock-mmio-reg-zxtest",
     "//src/devices/testing/no_ddk",
     "//src/lib/ddk",
     "//src/lib/ddktl",

@@ -32,7 +32,7 @@ executable("aml-trip-test-bin") {
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
     "//src/devices/testing/fake-mmio-reg",
-    "//src/devices/testing/mock-mmio-reg",
+    "//src/devices/testing/mock-mmio-reg-zxtest",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",

@@ -7,7 +7,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/mmio/mmio.h>
 
-#include <mock-mmio-reg/mock-mmio-reg.h>
+#include <mock-mmio-reg-zxtest/mock-mmio-reg.h>
 
 #include "s905d3-nna-regs.h"
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"

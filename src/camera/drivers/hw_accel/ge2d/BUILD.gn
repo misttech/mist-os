@@ -107,7 +107,7 @@ executable("ge2d_task_unittest_bin") {
     "//src/devices/lib/mmio",
     "//src/devices/lib/sysmem",
     "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-mmio-reg",
+    "//src/devices/testing/mock-mmio-reg-zxtest",
     "//src/devices/testing/no_ddk",
     "//src/lib/ddk",
     "//src/lib/fsl",

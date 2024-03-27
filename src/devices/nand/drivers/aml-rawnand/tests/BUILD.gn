@@ -18,7 +18,7 @@ test("aml-rawnand-unittest-bin") {
     "//sdk/lib/fdio",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
-    "//src/devices/testing/mock-mmio-reg",
+    "//src/devices/testing/mock-mmio-reg-zxtest",
     "//zircon/system/ulib/zxtest",
   ]
 }

@@ -18,7 +18,7 @@
 
 #include <map>
 
-#include <mock-mmio-reg/mock-mmio-reg.h>
+#include <mock-mmio-reg-zxtest/mock-mmio-reg.h>
 #include <zxtest/zxtest.h>
 
 #include "sdk/lib/inspect/testing/cpp/zxtest/inspect.h"

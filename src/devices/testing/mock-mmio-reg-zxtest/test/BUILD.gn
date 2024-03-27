@@ -1,0 +1,33 @@
+# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/test.gni")
+
+group("test") {
+  testonly = true
+  deps = [ ":mock-mmio-reg-zxtest-test-bin" ]
+}
+
+test("mock-mmio-reg-zxtest-test-bin") {
+  if (is_fuchsia) {
+    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
+    if (configs + fdio_config - fdio_config != configs) {
+      configs -= fdio_config
+    }
+  }
+  output_name = "mock-mmio-reg-zxtest-test"
+  sources = [ "mock-mmio-reg-test.cc" ]
+  deps = [
+    "//sdk/lib/fdio",
+    "//src/devices/lib/mmio",
+    "//src/devices/testing/mock-mmio-reg-zxtest",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_package("mock-mmio-reg-zxtest-test") {
+  deps = [ ":mock-mmio-reg-zxtest-test-bin" ]
+}

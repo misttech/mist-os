@@ -55,7 +55,7 @@ test("registers-test") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/devices/testing/mock-mmio-reg",
+    "//src/devices/testing/mock-mmio-reg-zxtest",
     "//src/devices/testing/no_ddk",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

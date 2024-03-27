@@ -1,0 +1,43 @@
+# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/cpp/sdk_source_set.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ "test:mock-mmio-reg-zxtest-test" ]
+}
+
+config("headers.config") {
+  include_dirs = [ "include" ]
+}
+
+source_set("mock-mmio-reg-zxtest") {
+  public = [ "include/mock-mmio-reg-zxtest/mock-mmio-reg.h" ]
+  deps = [
+    "//src/devices/lib/mmio:test_helper",
+    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+  ]
+  public_configs = [ ":headers.config" ]
+
+  # New tests should use gtest and the gtest version of this library:
+  # //src/devices/testing/mock-mmio-reg
+  visibility = [
+    "test:*",
+    "//src/camera/drivers/hw_accel/gdc:*",
+    "//src/camera/drivers/hw_accel/ge2d:*",
+    "//src/devices/ml/drivers/aml-nna:*",
+    "//src/devices/nand/drivers/aml-rawnand/tests:*",
+    "//src/devices/power/drivers/aml-meson-power:*",
+    "//src/devices/pwm/drivers/aml-pwm:*",
+    "//src/devices/registers/drivers/registers:*",
+    "//src/devices/suspend/drivers/aml-suspend/tests:*",
+    "//src/devices/temperature/drivers/aml-trip/tests:*",
+    "//src/devices/thermal/drivers/aml-thermal:*",
+    "//src/devices/thermal/drivers/aml-thermal-s905d2g-legacy:*",
+    "//src/media/audio/drivers/aml-g12-tdm/test:*",
+    "//src/ui/backlight/drivers/ti-lp8556:*",
+    "//vendor/*",
+  ]
+}

@@ -24,7 +24,7 @@
 #include <utility>
 #include <vector>
 
-#include <mock-mmio-reg/mock-mmio-reg.h>
+#include <mock-mmio-reg-zxtest/mock-mmio-reg.h>
 #include <zxtest/zxtest.h>
 
 #include "src/camera/drivers/hw_accel/ge2d/ge2d.h"

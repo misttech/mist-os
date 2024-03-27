@@ -9,7 +9,7 @@
 #include <ddk/metadata/pwm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
-#include <mock-mmio-reg/mock-mmio-reg.h>
+#include <mock-mmio-reg-zxtest/mock-mmio-reg.h>
 #include <soc/aml-common/aml-pwm-regs.h>
 
 namespace {
