@@ -524,14 +524,16 @@ async def do_build(
     Returns:
         bool: True only if the tests were built and published, False otherwise.
     """
-    label_to_rule = re.compile(r"//([^()]+)\(")
+    label_to_rule = re.compile(r"(//[^()]+)\(")
     build_command_line = []
     for selection in tests.selected:
         label = selection.build.test.package_label or selection.build.test.label
         path = selection.build.test.path
         if path is not None:
             # Host tests are built by output name.
-            build_command_line.append(path)
+            match = label_to_rule.match(label)
+            if match:
+                build_command_line.extend(["--host", match.group(1)])
         elif label:
             # Other tests are built by label content, without toolchain.
             match = label_to_rule.match(label)
