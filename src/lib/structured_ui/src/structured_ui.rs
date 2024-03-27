@@ -308,6 +308,13 @@ impl Notice {
         self.message = Some(message.into());
         self
     }
+
+    pub fn get_title(&self) -> Option<String> {
+        self.title.clone()
+    }
+    pub fn get_message(&self) -> Option<String> {
+        self.message.clone()
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
