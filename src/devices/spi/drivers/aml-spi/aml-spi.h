@@ -123,14 +123,12 @@ class AmlSpi : public fdf::WireServer<fuchsia_hardware_spiimpl::SpiImpl> {
   };
 
   AmlSpi(fdf::MmioBuffer mmio, fidl::ClientEnd<fuchsia_hardware_registers::Device> reset,
-         fidl::ClientEnd<fuchsia_scheduler::ProfileProvider> profile_provider, uint32_t reset_mask,
-         fbl::Array<ChipInfo> chips, zx::interrupt interrupt,
+         uint32_t reset_mask, fbl::Array<ChipInfo> chips, zx::interrupt interrupt,
          const amlogic_spi::amlspi_config_t& config, zx::bti bti, DmaBuffer tx_buffer,
          DmaBuffer rx_buffer)
       : mmio_(std::move(mmio)),
         dispatcher_(fdf::Dispatcher::GetCurrent()),
         reset_(std::move(reset), dispatcher_->async_dispatcher()),
-        profile_provider_(std::move(profile_provider), dispatcher_->async_dispatcher()),
         reset_mask_(reset_mask),
         chips_(std::move(chips)),
         interrupt_(std::move(interrupt)),
@@ -199,8 +197,6 @@ class AmlSpi : public fdf::WireServer<fuchsia_hardware_spiimpl::SpiImpl> {
   void Exchange8(const uint8_t* txdata, uint8_t* out_rxdata, size_t size);
   void Exchange64(const uint8_t* txdata, uint8_t* out_rxdata, size_t size);
 
-  void SetThreadProfile();
-
   void WaitForTransferComplete();
   void WaitForDmaTransferComplete();
 
@@ -223,7 +219,6 @@ class AmlSpi : public fdf::WireServer<fuchsia_hardware_spiimpl::SpiImpl> {
   fdf::MmioBuffer mmio_;
   fdf::UnownedDispatcher dispatcher_;
   fidl::WireClient<fuchsia_hardware_registers::Device> reset_;
-  fidl::WireClient<fuchsia_scheduler::ProfileProvider> profile_provider_;
   const uint32_t reset_mask_;
   const fbl::Array<ChipInfo> chips_;
   bool need_reset_ = false;

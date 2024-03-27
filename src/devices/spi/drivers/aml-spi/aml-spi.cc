@@ -755,8 +755,8 @@ size_t AmlSpi::DoDmaTransfer(size_t words_remaining) {
   constexpr size_t kDefaultRequestSizeWords = 8;
   constexpr size_t kMaxRequestCount = 0xfff;
 
-  // TODO(https://fxbug.dev/42051588): It may be possible to complete the transfer in fewer iterations by
-  // using request sizes 2-7 instead of 8, like the reference driver does.
+  // TODO(https://fxbug.dev/42051588): It may be possible to complete the transfer in fewer
+  // iterations by using request sizes 2-7 instead of 8, like the reference driver does.
   const size_t request_size =
       words_remaining < kFifoSizeWords ? words_remaining : kDefaultRequestSizeWords;
   const size_t request_count = std::min(words_remaining / request_size, kMaxRequestCount);
@@ -784,7 +784,8 @@ size_t AmlSpi::DoDmaTransfer(size_t words_remaining) {
 }
 
 bool AmlSpi::UseDma(size_t size) const {
-  // TODO(https://fxbug.dev/42051588): Support DMA transfers greater than the pre-allocated buffer size.
+  // TODO(https://fxbug.dev/42051588): Support DMA transfers greater than the pre-allocated buffer
+  // size.
   return size % sizeof(uint64_t) == 0 && size <= tx_buffer_.mapped.size() &&
          size <= rx_buffer_.mapped.size();
 }
@@ -965,11 +966,6 @@ void AmlSpiDriver::AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_confi
     FDF_LOG(WARNING, "Did not bind the reset register client.");
   }
 
-  zx::result profile_provider = incoming()->Connect<fuchsia_scheduler::ProfileProvider>();
-  if (profile_provider.is_error()) {
-    FDF_LOG(WARNING, "Failed to connect to ProfileProvider");
-  }
-
   AmlSpi::DmaBuffer tx_buffer, rx_buffer;
   // Supplying a BTI is optional.
   if (bti.is_valid()) {
@@ -998,10 +994,9 @@ void AmlSpiDriver::AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_confi
       config.bus_id == 0 ? kSpi0ResetMask : (config.bus_id == 1 ? kSpi1ResetMask : 0);
 
   fbl::AllocChecker ac;
-  device_.reset(new (&ac) AmlSpi(std::move(mmio), *std::move(reset_register_client),
-                                 *std::move(profile_provider), reset_mask, std::move(chips),
-                                 std::move(interrupt), config, std::move(bti), std::move(tx_buffer),
-                                 std::move(rx_buffer)));
+  device_.reset(new (&ac) AmlSpi(std::move(mmio), *std::move(reset_register_client), reset_mask,
+                                 std::move(chips), std::move(interrupt), config, std::move(bti),
+                                 std::move(tx_buffer), std::move(rx_buffer)));
   if (!ac.check()) {
     return completer(zx::error(ZX_ERR_NO_MEMORY));
   }
