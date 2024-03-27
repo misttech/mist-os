@@ -60,7 +60,7 @@
     "package_name": "vulkan-loader-tests"
   },
   {
-    "archive_gn_label": "//src/connectivity/wlan/testing/hw-sim/test:simulate-scan-wlan-hw-sim-tests_archive_copy",
+    "archive_gn_label": "//src/connectivity/wlan/testing/hw-sim/test/simulate_scan:simulate-scan-wlan-hw-sim-tests_archive_copy",
     "archive_name": "simulate-scan-wlan-hw-sim-tests",
     "package_name": "simulate-scan-wlan-hw-sim-tests"
   },

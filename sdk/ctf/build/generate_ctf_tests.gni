@@ -250,7 +250,7 @@ template("generate_simulate-scan-wlan-hw-sim-tests") {
       "//src/connectivity/wlan/tests/helpers/realm-factory",
       "//src/lib/fuchsia-component-test/realm_builder_server:pkg",
     ]
-    test_component = "//src/connectivity/wlan/testing/hw-sim/test:simulate-scan-test-root-component"
+    test_component = "//src/connectivity/wlan/testing/hw-sim/test/simulate_scan:simulate-scan-test-root-component"
     test_component_name = "test-root.cm"
   }
 }

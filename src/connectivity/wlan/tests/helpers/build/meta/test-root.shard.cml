@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// This is a common CML shard for the hw-sim integration test root components.
+// This is a common CML shard for the WLAN integration test root components.
 // The manifest that includes this shard MUST define a child with the name "test_suite"
 // that uses the test.wlan.realm.RealmFactory protocol and offers fuchsia.test.Suite.
 {

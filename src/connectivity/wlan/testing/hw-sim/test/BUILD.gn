@@ -1,148 +1,35 @@
 # Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-import("hw_sim_integration_test.gni")
-
-hw_sim_integration_test("scan-contemporary-privacy") {
-  manifest = "meta/scan_contemporary_privacy.cml"
-  deps = [ "scan_contemporary_privacy" ]
-}
-
-hw_sim_integration_test("scan-legacy-privacy") {
-  manifest = "meta/scan_legacy_privacy.cml"
-  deps = [ "scan_legacy_privacy" ]
-}
-
-hw_sim_integration_test("connect-to-all-modern-bss-protections") {
-  manifest = "meta/connect_to_all_modern_bss_protections.cml"
-  deps = [ "connect_to_all_modern_bss_protections" ]
-}
-
-hw_sim_integration_test("connect-to-open-network") {
-  manifest = "meta/connect_to_open_network.cml"
-  deps = [ "connect_to_open_network" ]
-}
-
-hw_sim_integration_test("connect-to-wpa1-network") {
-  manifest = "meta/connect_to_wpa1_network.cml"
-  deps = [ "connect_to_wpa1_network" ]
-}
-
-hw_sim_integration_test("connect-with-bad-password") {
-  manifest = "meta/connect_with_bad_password.cml"
-  deps = [ "connect_with_bad_password" ]
-}
-
-hw_sim_integration_test("connect-with-failed-association") {
-  manifest = "meta/connect_with_failed_association.cml"
-  deps = [ "connect_with_failed_association" ]
-}
-
-hw_sim_integration_test("connect-with-wrong-credential-type") {
-  manifest = "meta/connect_with_wrong_credential_type.cml"
-  deps = [ "connect_with_wrong_credential_type" ]
-}
-
-hw_sim_integration_test("ethernet-tx-rx") {
-  manifest = "meta/ethernet_tx_rx.cml"
-  deps = [ "ethernet_tx_rx" ]
-}
-
-hw_sim_integration_test("handle-tx-event-hooks") {
-  manifest = "meta/handle-tx-event-hooks.cml"
-  deps = [ "handle_tx_event_hooks" ]
-}
-
-hw_sim_integration_test("multiple-clients-ap") {
-  manifest = "meta/multiple_clients_ap.cml"
-  deps = [ "multiple_clients_ap" ]
-}
-
-hw_sim_integration_test("open-ap-connect") {
-  manifest = "meta/open_ap_connect.cml"
-  deps = [ "open_ap_connect" ]
-}
-
-hw_sim_integration_test("reconnect-to-wpa2-network") {
-  manifest = "meta/reconnect_to_wpa2_network.cml"
-  deps = [ "reconnect_to_wpa2_network" ]
-}
-
-hw_sim_integration_test("set-country") {
-  manifest = "meta/set_country.cml"
-  deps = [ "set_country" ]
-}
-
-hw_sim_integration_test("sim-client-vs-sim-ap") {
-  manifest = "meta/sim_client_vs_sim_ap.cml"
-  deps = [ "sim_client_vs_sim_ap" ]
-}
-
-hw_sim_integration_test("simulate-scan") {
-  ctf = true
-  manifest = "meta/simulate_scan.cml"
-  deps = [ "simulate_scan" ]
-}
-
-hw_sim_integration_test("verify-ethernet") {
-  manifest = "meta/verify_ethernet.cml"
-  deps = [ "verify_ethernet" ]
-}
-
-hw_sim_integration_test("verify-wlan-inspect") {
-  manifest = "meta/verify_wlan_inspect.cml"
-  deps = [ "verify_wlan_inspect" ]
-}
-
-hw_sim_integration_test("run-without-regulatory-manager") {
-  manifest = "meta/run_without_regulatory_manager.cml"
-  deps = [ "run_without_regulatory_manager" ]
-}
-
-hw_sim_integration_test("autoconnect-idle-iface") {
-  manifest = "meta/autoconnect_idle_iface.cml"
-  deps = [ "autoconnect_idle_iface" ]
-}
-
-hw_sim_integration_test("rate-selection") {
-  test_specs = {
-    environments = [ nuc_env ]
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  manifest = "meta/rate_selection.cml"
-  deps = [ "rate_selection" ]
-}
 
 group("wlan-hw-sim-component-tests") {
   testonly = true
   deps = [
-    ":autoconnect-idle-iface-wlan-hw-sim-tests-latest",
-    ":connect-to-all-modern-bss-protections-wlan-hw-sim-tests-latest",
-    ":connect-to-open-network-wlan-hw-sim-tests-latest",
-    ":connect-to-wpa1-network-wlan-hw-sim-tests-latest",
-    ":connect-with-bad-password-wlan-hw-sim-tests-latest",
-    ":connect-with-failed-association-wlan-hw-sim-tests-latest",
-    ":connect-with-wrong-credential-type-wlan-hw-sim-tests-latest",
-    ":ethernet-tx-rx-wlan-hw-sim-tests-latest",
-    ":handle-tx-event-hooks-wlan-hw-sim-tests-latest",
-    ":multiple-clients-ap-wlan-hw-sim-tests-latest",
-    ":open-ap-connect-wlan-hw-sim-tests-latest",
-    ":rate-selection-wlan-hw-sim-tests-latest",
-    ":reconnect-to-wpa2-network-wlan-hw-sim-tests-latest",
-    ":run-without-regulatory-manager-wlan-hw-sim-tests-latest",
-    ":scan-contemporary-privacy-wlan-hw-sim-tests-latest",
-    ":scan-legacy-privacy-wlan-hw-sim-tests-latest",
-    ":set-country-wlan-hw-sim-tests-latest",
-    ":sim-client-vs-sim-ap-wlan-hw-sim-tests-latest",
-    ":simulate-scan-wlan-hw-sim-tests-latest",
-    ":verify-ethernet-wlan-hw-sim-tests-latest",
-    ":verify-wlan-inspect-wlan-hw-sim-tests-latest",
+    "./autoconnect_idle_iface",
+    "./connect_to_all_modern_bss_protections",
+    "./connect_to_open_network",
+    "./connect_to_wpa1_network",
+    "./connect_with_bad_password",
+    "./connect_with_failed_association",
+    "./connect_with_wrong_credential_type",
+    "./ethernet_tx_rx",
+    "./handle_tx_event_hooks",
+    "./multiple_clients_ap",
+    "./open_ap_connect",
+    "./rate_selection",
+    "./reconnect_to_wpa2_network",
+    "./run_without_regulatory_manager",
+    "./scan_contemporary_privacy",
+    "./scan_legacy_privacy",
+    "./set_country",
+    "./sim_client_vs_sim_ap",
+    "./simulate_scan:simulate-scan",
+    "./verify_ethernet",
+    "./verify_wlan_inspect",
   ]
 }
 
 group("ctf-tests") {
   testonly = true
-  deps = [ ":simulate-scan-wlan-hw-sim-tests_archive" ]
+  deps = [ "./simulate_scan:simulate-scan-wlan-hw-sim-tests_archive" ]
 }
