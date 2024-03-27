@@ -89,7 +89,7 @@ type Foo = enum : string { // Error: enums may only be of integral primitive typ
 };
 
 type Bar = table {
-    2: x uint32; // Error: missing ordinal 1 (ordinals must be dense)
+    65: x uint32; // Error: ordinal is too large
 };
 )FIDL");
   ASSERT_FALSE(library.Compile());
@@ -108,13 +108,13 @@ type Bar = table {
   },
   {
     "category": "fidlc/error",
-    "error_id": "fi-0100",
-    "message": "missing ordinal 1 (ordinals must be dense); consider marking it reserved",
+    "error_id": "fi-0092",
+    "message": "ordinal is too large; table ordinals cannot be greater than 64",
     "path": "example.fidl",
     "start_line": 9,
     "start_char": 4,
     "end_line": 9,
-    "end_char": 6
+    "end_char": 7
   }
 ])JSON");
 }

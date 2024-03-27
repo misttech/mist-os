@@ -238,17 +238,27 @@ type Foo = strict union {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(UnionTests, BadMustBeDense) {
+TEST(UnionTests, GoodOrdinalGapStart) {
   TestLibrary library(R"FIDL(
 library example;
 
 type Example = strict union {
-    1: first int64;
-    3: third int64;
+    2: two int64;
 };
 )FIDL");
-  library.ExpectFail(ErrNonDenseOrdinal, 2);
-  ASSERT_COMPILER_DIAGNOSTICS(library);
+  ASSERT_COMPILED(library);
+}
+
+TEST(UnionTests, GoodOrdinalGapMiddle) {
+  TestLibrary library(R"FIDL(
+library example;
+
+type Example = strict union {
+    1: one int64;
+    3: three int64;
+};
+)FIDL");
+  ASSERT_COMPILED(library);
 }
 
 TEST(UnionTests, BadNoNullableMembers) {

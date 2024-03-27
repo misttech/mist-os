@@ -284,11 +284,27 @@ type Foo = table {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(TableTests, BadMustBeDense) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0100.test.fidl");
-  library.ExpectFail(ErrNonDenseOrdinal, 2);
-  ASSERT_COMPILER_DIAGNOSTICS(library);
+TEST(TableTests, GoodOrdinalGapStart) {
+  TestLibrary library(R"FIDL(
+library example;
+
+type MyTable = table {
+    2: two int64;
+};
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
+TEST(TableTests, GoodOrdinalGapMiddle) {
+  TestLibrary library(R"FIDL(
+library example;
+
+type MyTable = table {
+    1: one int64;
+    3: three int64;
+};
+)FIDL");
+  ASSERT_COMPILED(library);
 }
 
 TEST(TableTests, Good64OrdinalsMaxIsTable) {
@@ -384,7 +400,7 @@ type Example = table {
 TEST(TableTests, BadTooManyOrdinals) {
   TestLibrary library;
   library.AddFile("bad/fi-0092.test.fidl");
-  library.ExpectFail(ErrTooManyTableOrdinals);
+  library.ExpectFail(ErrTableOrdinalTooLarge);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

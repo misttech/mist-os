@@ -192,8 +192,8 @@ constexpr RetiredDef<89> ErrDuplicateStructMemberName;
 constexpr RetiredDef<90> ErrDuplicateStructMemberNameCanonical;
 constexpr ErrorDef<91, std::string_view, const Type *> ErrInvalidStructMemberType(
     "struct field {0} has an invalid default type {1}");
-constexpr ErrorDef<92> ErrTooManyTableOrdinals(
-    "table contains too many ordinals; tables are limited to 64 ordinals");
+constexpr ErrorDef<92> ErrTableOrdinalTooLarge(
+    "ordinal is too large; table ordinals cannot be greater than 64");
 constexpr ErrorDef<93> ErrMaxOrdinalNotTable(
     "the 64th ordinal of a table may only contain a table type");
 constexpr ErrorDef<94, SourceSpan> ErrDuplicateTableFieldOrdinal(
@@ -204,8 +204,7 @@ constexpr ErrorDef<97, SourceSpan> ErrDuplicateUnionMemberOrdinal(
     "multiple union fields with the same ordinal; previous was at {0}");
 constexpr RetiredDef<98> ErrDuplicateUnionMemberName;
 constexpr RetiredDef<99> ErrDuplicateUnionMemberNameCanonical;
-constexpr ErrorDef<100, uint64_t> ErrNonDenseOrdinal(
-    "missing ordinal {0} (ordinals must be dense); consider marking it reserved");
+constexpr RetiredDef<100> ErrNonDenseOrdinal;
 constexpr ErrorDef<101> ErrCouldNotResolveSizeBound("unable to resolve size bound");
 constexpr ErrorDef<102, Decl::Kind> ErrCouldNotResolveMember("unable to resolve {0} member");
 constexpr ErrorDef<103, std::string_view> ErrCouldNotResolveMemberDefault(
@@ -525,7 +524,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0089 */ &ErrDuplicateStructMemberName,
     /* fi-0090 */ &ErrDuplicateStructMemberNameCanonical,
     /* fi-0091 */ &ErrInvalidStructMemberType,
-    /* fi-0092 */ &ErrTooManyTableOrdinals,
+    /* fi-0092 */ &ErrTableOrdinalTooLarge,
     /* fi-0093 */ &ErrMaxOrdinalNotTable,
     /* fi-0094 */ &ErrDuplicateTableFieldOrdinal,
     /* fi-0095 */ &ErrDuplicateTableFieldName,

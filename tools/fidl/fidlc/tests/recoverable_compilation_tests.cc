@@ -50,15 +50,14 @@ type OtherEnum = enum {
 };
 
 type NonDenseTable = table {
-    1: s string;
-    3: b uint8;                   // Error: non-dense ordinals
+    65: s string;                 // Error: too many ordinals
 };
 )FIDL");
   library.ExpectFail(ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
   library.ExpectFail(ErrDuplicateMemberValue, Decl::Kind::kEnum, "TWO", "ONE", "example.fidl:11:5");
   library.ExpectFail(ErrCouldNotResolveMember, Decl::Kind::kEnum);
   library.ExpectFail(ErrTypeCannotBeConvertedToType, "\"2\"", "string:1", "uint32");
-  library.ExpectFail(ErrNonDenseOrdinal, 2);
+  library.ExpectFail(ErrTableOrdinalTooLarge);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -179,16 +178,16 @@ TEST(RecoverableCompilationTests, BadRecoverInTable) {
 library example;
 
 type Foo = table {
-    // 1: reserved;          // Error: not dense
-    2: bar string:optional;  // Error: table member cannot be optional
-    2: qux                   // Error: duplicate ordinal
+    1: bar string:optional;  // Error: table member cannot be optional
+    1: qux                   // Error: duplicate ordinal
        vector;               // Error: expected 1 layout parameter
+    65: s string;            // Error: too many ordinals
 };
 )FIDL");
-  library.ExpectFail(ErrNonDenseOrdinal, 1);
   library.ExpectFail(ErrOptionalTableMember);
-  library.ExpectFail(ErrDuplicateTableFieldOrdinal, "example.fidl:6:5");
+  library.ExpectFail(ErrDuplicateTableFieldOrdinal, "example.fidl:5:5");
   library.ExpectFail(ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
+  library.ExpectFail(ErrTableOrdinalTooLarge);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -197,15 +196,13 @@ TEST(RecoverableCompilationTests, BadRecoverInUnion) {
 library example;
 
 type Foo = union {
-    // 1: reserved;          // Error: not dense
-    2: bar string:optional;  // Error: union member cannot be optional
-    2: qux                   // Error: duplicate ordinal
+    1: bar string:optional;  // Error: union member cannot be optional
+    1: qux                   // Error: duplicate ordinal
         vector;              // Error: expected 1 layout parameter
 };
 )FIDL");
-  library.ExpectFail(ErrNonDenseOrdinal, 1);
   library.ExpectFail(ErrOptionalUnionMember);
-  library.ExpectFail(ErrDuplicateUnionMemberOrdinal, "example.fidl:6:5");
+  library.ExpectFail(ErrDuplicateUnionMemberOrdinal, "example.fidl:5:5");
   library.ExpectFail(ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

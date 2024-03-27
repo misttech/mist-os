@@ -75,19 +75,6 @@ class Scope {
 
 using Ordinal64Scope = Scope<uint64_t>;
 
-std::optional<std::pair<uint64_t, SourceSpan>> FindFirstNonDenseOrdinal(
-    const Ordinal64Scope& scope) {
-  uint64_t last_ordinal_seen = 0;
-  for (const auto& ordinal_and_loc : scope) {
-    uint64_t next_expected_ordinal = last_ordinal_seen + 1;
-    if (ordinal_and_loc.first != next_expected_ordinal) {
-      return std::optional{std::make_pair(next_expected_ordinal, ordinal_and_loc.second)};
-    }
-    last_ordinal_seen = ordinal_and_loc.first;
-  }
-  return std::nullopt;
-}
-
 struct MethodScope {
   Ordinal64Scope ordinals;
   Scope<std::string> canonical_names;
@@ -1270,10 +1257,6 @@ void CompileStep::CompileTable(Table* table_declaration) {
   Ordinal64Scope ordinal_scope;
 
   CompileAttributeList(table_declaration->attributes.get());
-  if (table_declaration->members.size() > kMaxTableOrdinals) {
-    reporter()->Fail(ErrTooManyTableOrdinals, table_declaration->name.span().value());
-  }
-
   for (size_t i = 0; i < table_declaration->members.size(); i++) {
     auto& member = table_declaration->members[i];
     CompileAttributeList(member.attributes.get());
@@ -1281,6 +1264,9 @@ void CompileStep::CompileTable(Table* table_declaration) {
     if (!ordinal_result.ok()) {
       reporter()->Fail(ErrDuplicateTableFieldOrdinal, member.ordinal->span(),
                        ordinal_result.previous_occurrence());
+    }
+    if (member.ordinal->value > kMaxTableOrdinals) {
+      reporter()->Fail(ErrTableOrdinalTooLarge, member.ordinal->span());
     }
     if (!member.maybe_used) {
       continue;
@@ -1303,11 +1289,6 @@ void CompileStep::CompileTable(Table* table_declaration) {
         }
       }
     }
-  }
-
-  if (auto ordinal_and_loc = FindFirstNonDenseOrdinal(ordinal_scope)) {
-    auto [ordinal, span] = *ordinal_and_loc;
-    reporter()->Fail(ErrNonDenseOrdinal, span, ordinal);
   }
 }
 
@@ -1354,11 +1335,6 @@ void CompileStep::CompileUnion(Union* union_declaration) {
     reporter()->Fail(ErrStrictUnionMustHaveNonReservedMember,
                      union_declaration->name.span().value());
   }
-
-  if (auto ordinal_and_loc = FindFirstNonDenseOrdinal(ordinal_scope)) {
-    auto [ordinal, span] = *ordinal_and_loc;
-    reporter()->Fail(ErrNonDenseOrdinal, span, ordinal);
-  }
 }
 
 void CompileStep::CompileOverlay(Overlay* overlay_declaration) {
@@ -1388,11 +1364,6 @@ void CompileStep::CompileOverlay(Overlay* overlay_declaration) {
     if (!member_used.type_ctor->type) {
       continue;
     }
-  }
-
-  if (auto ordinal_and_loc = FindFirstNonDenseOrdinal(ordinal_scope)) {
-    auto [ordinal, span] = *ordinal_and_loc;
-    reporter()->Fail(ErrNonDenseOrdinal, span, ordinal);
   }
 }
 

@@ -105,7 +105,6 @@ fi-0092.test.fidl
 fi-0093.test.fidl
 fi-0094.test.fidl
 fi-0097.test.fidl
-fi-0100.test.fidl
 fi-0101-a.test.fidl
 fi-0101-b.test.fidl
 fi-0102.test.fidl
