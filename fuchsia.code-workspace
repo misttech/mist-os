@@ -239,7 +239,8 @@
       "third_party/acpica/**": true,
       "third_party/alacritty/**": true,
       "third_party/android/**": true,
-      "third_party/antlion/**": true,
+      // antlion hosts connectivity end-to-end Python tests.
+      "third_party/antlion/**": false,
       "third_party/bazel_platforms/**": true,
       "third_party/bazel_rules_cc/**": true,
       "third_party/bazel_rules_go/**": true,
