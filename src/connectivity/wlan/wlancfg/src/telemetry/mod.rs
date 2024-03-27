@@ -3543,7 +3543,7 @@ impl StatsLogger {
 
         log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
-            log_integer,
+            log_occurrence,
             metrics::RECOVERY_OCCURRENCE_METRIC_ID,
             1,
             &[dimension.as_event_code()],
@@ -3556,7 +3556,7 @@ impl StatsLogger {
             metric_id: u32,
             event_codes: &[u32],
         ) {
-            log_cobalt_1dot1!(proxy, log_integer, metric_id, 1, event_codes,)
+            log_cobalt_1dot1!(proxy, log_occurrence, metric_id, 1, event_codes,)
         }
 
         match reason {
@@ -7437,13 +7437,16 @@ mod tests {
         assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // Expect that Cobalt has been notified of the recovery event
-        test_helper.drain_cobalt_events(&mut test_fut);
-        let logged_metrics = test_helper.get_logged_metrics(metrics::RECOVERY_OCCURRENCE_METRIC_ID);
-        assert_eq!(logged_metrics.len(), 1);
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut test_helper.cobalt_1dot1_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
+                metric_id, event_codes, responder, ..
+            }))) => {
+                assert_eq!(metric_id, metrics::RECOVERY_OCCURRENCE_METRIC_ID);
+                assert_eq!(event_codes, vec![expected_dimension.as_event_code()]);
 
-        // Verify the reason dimension.
-        assert_eq!(logged_metrics[0].event_codes.len(), 1);
-        assert_eq!(logged_metrics[0].event_codes[0], expected_dimension.as_event_code());
+                assert!(responder.send(Ok(())).is_ok());
+        });
     }
 
     #[test_case(
@@ -7711,7 +7714,7 @@ mod tests {
         // Verify the metric that was emitted.
         assert_variant!(
             exec.run_until_stalled(&mut cobalt_1dot1_stream.next()),
-            Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogInteger {
+            Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
                 metric_id, event_codes, responder, ..
             }))) => {
                 assert_eq!(metric_id, expected_metric_id);
