@@ -5,7 +5,7 @@
 use crate::{
     device::DeviceMode,
     mm::PAGE_SIZE,
-    selinux::hooks::current_task_hooks::post_setxattr,
+    selinux::hooks::current_task_hooks::{get_fs_node_security_id, post_setxattr},
     signals::{send_standard_signal, SignalInfo},
     task::{CurrentTask, Kernel, WaitQueue, Waiter},
     time::utc,
@@ -143,6 +143,9 @@ pub type FsNodeHandle = Arc<FsNodeReleaser>;
 pub type WeakFsNodeHandle = Weak<FsNodeReleaser>;
 
 #[derive(Debug, Default, Clone)]
+pub struct FsNodeSecurityId(Option<SecurityId>);
+
+#[derive(Debug, Default, Clone)]
 pub struct FsNodeInfo {
     pub ino: ino_t,
     pub mode: FileMode,
@@ -156,7 +159,7 @@ pub struct FsNodeInfo {
     pub time_status_change: zx::Time,
     pub time_access: zx::Time,
     pub time_modify: zx::Time,
-    pub sid: Option<SecurityId>,
+    pub sid: FsNodeSecurityId,
 }
 
 impl FsNodeInfo {
@@ -1973,6 +1976,36 @@ impl FsNode {
         let handle = self.weak_handle.upgrade().ok_or_else(|| errno!(ENOENT))?;
         self.write_guard_state.lock().create_write_guard(handle, mode)
     }
+
+    /// Sets the cached security id to `sid`. Storing the security id will cause the security id to
+    /// *not* be recomputed in `FsNode::effective_sid`.
+    pub(crate) fn set_cached_sid(&self, sid: SecurityId) {
+        self.update_info(|info| info.sid = FsNodeSecurityId(Some(sid)));
+    }
+
+    /// Clears the cached security id. Clearing the security id will cause the security id to
+    /// be be recomputed using an extended attribute value on the next `FsNode::effective_sid`.
+    pub(crate) fn clear_cached_sid(&self) {
+        self.update_info(|info| info.sid = FsNodeSecurityId(None));
+    }
+
+    /// Returns the security id currently stored in this node. This API should only be used by code
+    /// that is responsible for controlling the cached security id; e.g., to check its current value
+    /// before engaging logic that may compute a new value. Access control enforcement code should
+    /// use `FsNode::effective_sid`, *not* this function.
+    pub fn cached_sid(&self) -> Option<SecurityId> {
+        self.info().sid.0
+    }
+
+    /// Returns the security id that should be used for SELinux access control checks at this time.
+    /// If no security id is cached, it is recomputed via `get_fs_node_security_id()`. Access
+    /// control enforcement code should use this function, *not* `FsNode::cached_sid`.
+    pub fn effective_sid(&self, current_task: &CurrentTask) -> SecurityId {
+        match self.info().sid.0 {
+            Some(sid) => sid,
+            None => get_fs_node_security_id(current_task, self),
+        }
+    }
 }
 
 impl std::fmt::Debug for FsNode {
@@ -2202,7 +2235,8 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, node.info().sid);
+        assert_eq!(None, node.info().sid.0);
+        assert_eq!(None, node.cached_sid());
 
         node.set_xattr(
             current_task.as_ref(),
@@ -2213,6 +2247,9 @@ mod tests {
         )
         .expect("setxattr");
 
-        assert!(node.info().sid.is_some());
+        let node_info_sid = node.info().sid.0.clone();
+        let node_stored_sid = node.cached_sid();
+        assert!(node_info_sid.is_some());
+        assert_eq!(node_info_sid, node_stored_sid);
     }
 }
