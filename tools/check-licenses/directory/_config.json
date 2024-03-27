@@ -14,14 +14,6 @@
             },
             {
                 "notes": [
-                    "Temporary skip to support landing //third_party/fuchsia-infra-bazel-rules"
-                ],
-                "paths": [
-                    "third_party/fuchsia-infra-bazel-rules"
-                ]
-            },
-            {
-                "notes": [
                     "Temporary skip, to allow removal of icu stable library."
                 ],
                 "paths": [

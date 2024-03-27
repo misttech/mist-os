@@ -167,6 +167,8 @@ tables_generator_tests_*.txt
 /third_party/Vulkan-Utility-Libraries/src
 !/third_party/pypng
 /third_party/pypng/src
+!/third_party/fuchsia-infra-bazel-rules
+/third_party/fuchsia-infra-bazel-rules/src
 
 /tmp/
 /vendor/

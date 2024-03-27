@@ -1,0 +1,6 @@
+Name: Fuchsia Infra Bazel Rules
+License File: src/LICENSE
+Description:
+
+This repository provides tools and Bazel rules for helping projects
+integrate with Fuchsia's CI infrastructure.
