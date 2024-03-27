@@ -25,12 +25,7 @@
         {
             event_stream: [ "stopped" ],
             from: "parent",
-            to: [
-                "#test_realm_factory",
-
-                // TODO(124589): Remove when all tests are migrated to use the test realm factory.
-                "#test_suite",
-            ],
+            to: [ "#test_realm_factory" ],
         },
     ],
     expose: [
