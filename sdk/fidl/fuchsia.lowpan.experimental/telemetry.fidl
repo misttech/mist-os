@@ -105,6 +105,46 @@ type BorderRoutingCounters = table {
     ///
     /// Required.
    14: rs_tx_failure uint32;
+
+    /// Inbound Internet packets when DHCPv6 PD enabled.
+    ///
+    /// Optional.
+   15: inbound_internet_packets uint64;
+
+    /// Inbound Internet bytes when DHCPv6 PD enabled.
+    ///
+    /// Optional.
+   16: inbound_internet_bytes uint64;
+
+    /// Outbound Internet packets when DHCPv6 PD enabled.
+    ///
+    /// Optional.
+   17: outbound_internet_packets uint64;
+
+    /// Outbound Internet bytes when DHCPv6 PD enabled.
+    ///
+    /// Optional.
+   18: outbound_internet_bytes uint64;
+};
+
+/// Represents the count of queries, responses, failures handled by upstream DNS server
+///
+/// Derived from `otUpstreamDnsCounters`(https://openthread.io/reference/group/api-dnssd-server)
+type UpstreamDnsCounters = table {
+    /// The number of queries forwarded
+    ///
+    /// Required.
+    1: queries uint32;
+
+    /// The number of responses forwarded
+    ///
+    /// Required.
+    2: responses uint32;
+
+    /// The number of upstream DNS failures
+    ///
+    /// Required.
+    3: failures uint32;
 };
 
 /// Counters associated with the DNS-SD server.
@@ -143,6 +183,11 @@ type DnssdCounters = table {
     ///
     /// Required.
     7: resolved_by_srp uint32;
+
+    /// The counters of upstream DNS feature.
+    ///
+    /// Optional.
+    8: upstream_dns_counters UpstreamDnsCounters;
 };
 
 /// Registration information about the SRP server.
@@ -383,6 +428,87 @@ type TrelCounters = table {
     5: tx_packets uint64;
 };
 
+/// Represents the TREL peer related info.
+///
+/// The info is available in OpenThread via https://openthread.io/reference/group/api-trel
+/// More fields may be added per request.
+type TrelPeersInfo = table {
+    /// Number of TREL peers for this Thread Border Router.
+    ///
+    /// Required.
+    1: num_trel_peers uint16;
+};
+
+/// Represents the Upstream DNS state
+type UpstreamDnsQueryState = flexible enum {
+    UPSTREAMDNS_QUERY_STATE_UNSPECIFIED = 0;
+    UPSTREAMDNS_QUERY_STATE_ENABLED = 1;
+    UPSTREAMDNS_QUERY_STATE_DISABLED = 2;
+};
+
+/// Represents the Upstream DNS related info.
+///
+/// The info is available in OpenThread via https://openthread.io/reference/group/api-dnssd-server
+/// More fields may be added per request.
+type UpstreamDnsInfo = table {
+    /// State of upstream DNS query.
+    ///
+    /// Required.
+    1: upstream_dns_query_state UpstreamDnsQueryState;
+};
+
+/// Platform counters related to processed RA info when DHCPv6 PD is enabled.
+type PdProcessedRaInfo = table {
+    /// The number of platform generated RA handled by ApplyPlatformGeneratedRa.
+    ///
+    /// Required.
+    1: num_platform_ra_received uint32;
+
+    /// The number of PIO processed for adding OMR prefixes.
+    ///
+    /// Required.
+    2: num_platform_pio_processed uint32;
+
+    /// The duration since the last processed RA message.
+    ///
+    /// Required.
+    3: last_platform_ra_msec uint32;
+};
+
+/// Represents the DHCPv6 PD state.
+type Dhcp6PdState = flexible enum {
+    DHCP6_PD_STATE_UNSPECIFIED = 0;
+
+    /// DHCPv6 PD is disabled on the border router.
+    DHCP6_PD_STATE_DISABLED = 1;
+
+    /// DHCPv6 PD is enabled but won't try to request and publish a prefix.
+    DHCP6_PD_STATE_STOPPED = 2;
+
+    /// DHCPv6 PD is enabled and will try to request and publish a prefix.
+    DHCP6_PD_STATE_RUNNING = 3;
+};
+
+/// DHCPv6 PD related info.
+type Dhcp6PdInfo = table {
+    /// DHCPv6 PD state.
+    ///
+    /// Required.
+    1: dhcp6pd_state Dhcp6PdState;
+
+    /// DHCPv6 PD processed RA Info.
+    ///
+    /// Optional.
+    2: pd_processed_ra_info PdProcessedRaInfo;
+
+    /// DHCPv6 PD prefix.
+    ///
+    /// Optional.
+    // Choose the 32 bytes as SHA256 is used.
+    // Reference: https://github.com/openthread/ot-br-posix/pull/2110
+    3: hashed_pd_prefix vector<uint8>:32;
+};
+
 /// LoWPAN Interface Telemetry Information.
 ///
 /// The fields in this table are used for providing low-level telemetry and information about the
@@ -481,4 +607,19 @@ type Telemetry = table {
     ///
     /// Only present on Thread networks.
    20: trel_counters TrelCounters;
+
+    /// Information about the TREL peers, if available.
+    ///
+    /// Only present on Thread networks.
+   21: trel_peers_info TrelPeersInfo;
+
+    /// Information about the Upstream DNS feature, if available.
+    ///
+    /// Only present on Thread networks.
+   22: upstream_dns_info UpstreamDnsInfo;
+
+    /// Information about the DHCPv6 PD feature, if available.
+    ///
+    /// Only present on Thread networks.
+   23: dhcp6pd_info Dhcp6PdInfo;
 };
