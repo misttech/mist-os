@@ -842,7 +842,7 @@ fn set_configuration(
             }
             if let Some(_) = multicast_forwarding {
                 tracing::warn!(
-                "TODO(https://fxbug.dev/42075111): setting multicast_forwarding not yet supported"
+                "TODO(https://fxbug.dev/323052525): setting multicast_forwarding not yet supported"
             )
             }
             (
@@ -878,7 +878,7 @@ fn set_configuration(
             }
             if let Some(_) = multicast_forwarding {
                 tracing::warn!(
-                    "TODO(https://fxbug.dev/42075111): setting multicast_forwarding not yet supported"
+                    "TODO(https://fxbug.dev/323052525): setting multicast_forwarding not yet supported"
                 )
             }
 
@@ -1022,7 +1022,7 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
         // TODO(https://fxbug.dev/42071402): Support IGMP configuration
         // changes.
         igmp: None,
-        // TODO(https://fxbug.dev/42075111): Support multicast forwarding
+        // TODO(https://fxbug.dev/323052525): Support multicast forwarding
         // configuration changes.
         multicast_forwarding: None,
         arp: arp.map(IntoFidl::into_fidl),
@@ -1056,7 +1056,7 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
         // TODO(https://fxbug.dev/42071402): Support MLD configuration
         // changes.
         mld: None,
-        // TODO(https://fxbug.dev/42075111): Support multicast forwarding
+        // TODO(https://fxbug.dev/323052525): Support multicast forwarding
         // configuration changes.
         multicast_forwarding: None,
         ndp,

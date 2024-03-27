@@ -2770,7 +2770,7 @@ impl IpForwarding {
             }
         }
         match N::VERSION {
-            // TODO(https://fxbug.dev/42075111): Implement multicast forwarding in Netstack3.
+            // TODO(https://fxbug.dev/323052525): Implement multicast forwarding in Netstack3.
             NetstackVersion::Netstack3 => IpForwarding {
                 v4: false_if_none(self.v4),
                 v4_multicast: None,
