@@ -51,7 +51,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 matches!(
                     context.feature_set_level,
                     FeatureSupportLevel::Standard | FeatureSupportLevel::Utility
-                ) && *context.build_type == BuildType::Eng
+                ) && *context.build_type != BuildType::User
             );
             builder.platform_bundle("power_framework");
         }
