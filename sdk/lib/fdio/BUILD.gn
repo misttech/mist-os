@@ -148,8 +148,13 @@ if (is_fuzzer) {
     ldflags = [ "-Wl,--version-script=" +
                 rebase_path(fdio_version_script, root_build_dir) ]
 
-    # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-    configs += [ "//build/config:Wno-vla-cxx-extension" ]
+    configs += [
+      # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
+      "//build/config:Wno-vla-cxx-extension",
+
+      # TODO(b/331282813): 'ENODATA' is deprecated in ISO C++, disable the warning for now.
+      "//build/config:Wno-deprecated-pragma",
+    ]
   }
 } else {
   source_set("fdio") {
