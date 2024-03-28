@@ -5,7 +5,7 @@
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 use fuchsia_zircon::{self as zx, AsHandleRef, MessageBuf, MessageBufEtc};
 
@@ -68,12 +68,14 @@ impl Channel {
         bytes: &mut Vec<u8>,
         handles: &mut Vec<zx::Handle>,
     ) -> Poll<Result<(), zx::Status>> {
-        let res = self.0.get_ref().read_split(bytes, handles);
-        if res == Err(zx::Status::SHOULD_WAIT) {
-            self.0.need_readable(cx)?;
-            return Poll::Pending;
+        loop {
+            let res = self.0.get_ref().read_split(bytes, handles);
+            if res == Err(zx::Status::SHOULD_WAIT) {
+                ready!(self.0.need_readable(cx)?);
+            } else {
+                return Poll::Ready(res);
+            }
         }
-        Poll::Ready(res)
     }
 
     /// Receives a message on the channel and registers this `Channel` as
@@ -87,12 +89,14 @@ impl Channel {
         bytes: &mut Vec<u8>,
         handles: &mut Vec<zx::HandleInfo>,
     ) -> Poll<Result<(), zx::Status>> {
-        let res = self.0.get_ref().read_etc_split(bytes, handles);
-        if res == Err(zx::Status::SHOULD_WAIT) {
-            self.0.need_readable(cx)?;
-            return Poll::Pending;
+        loop {
+            let res = self.0.get_ref().read_etc_split(bytes, handles);
+            if res == Err(zx::Status::SHOULD_WAIT) {
+                ready!(self.0.need_readable(cx)?);
+            } else {
+                return Poll::Ready(res);
+            }
         }
-        Poll::Ready(res)
     }
 
     /// Receives a message on the channel and registers this `Channel` as

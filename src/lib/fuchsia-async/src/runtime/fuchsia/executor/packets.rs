@@ -11,7 +11,7 @@ use std::{
         atomic::{AtomicU32, Ordering},
         Arc,
     },
-    task::Context,
+    task::{Context, Poll},
     u64, usize,
 };
 
@@ -30,16 +30,20 @@ pub fn need_signal_or_peer_closed(
     handle: zx::HandleRef<'_>,
     port: &zx::Port,
     key: u64,
-) -> Result<(), zx::Status> {
+) -> Poll<Result<(), zx::Status>> {
     task.register(cx.waker());
     let old =
         zx::Signals::from_bits_truncate(atomic_signals.fetch_and(!signal.bits(), Ordering::SeqCst));
     if old.contains(zx::Signals::OBJECT_PEER_CLOSED) {
-        cx.waker().wake_by_ref();
-    } else if old.contains(signal) {
-        schedule_packet(handle, port, key, signal | zx::Signals::OBJECT_PEER_CLOSED)?;
+        // We don't want to return an error here because even though the peer has closed, the
+        // object could still have queued messages that can be read.
+        Poll::Ready(Ok(()))
+    } else {
+        if old.contains(signal) {
+            schedule_packet(handle, port, key, signal | zx::Signals::OBJECT_PEER_CLOSED)?;
+        }
+        Poll::Pending
     }
-    Ok(())
 }
 
 /// A trait for handling the arrival of a packet on a `zx::Port`.

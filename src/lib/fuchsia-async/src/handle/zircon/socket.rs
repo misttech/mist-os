@@ -62,15 +62,14 @@ impl Socket {
         buf: &mut [u8],
     ) -> Poll<Result<usize, zx::Status>> {
         ready!(self.poll_readable(cx))?;
-        let res = self.0.get_ref().read(buf);
-        if res == Err(zx::Status::SHOULD_WAIT) {
-            self.need_readable(cx)?;
-            return Poll::Pending;
+        loop {
+            let res = self.0.get_ref().read(buf);
+            match res {
+                Err(zx::Status::SHOULD_WAIT) => ready!(self.need_readable(cx)?),
+                Err(zx::Status::PEER_CLOSED) => return Poll::Ready(Ok(0)),
+                _ => return Poll::Ready(res),
+            }
         }
-        if res == Err(zx::Status::PEER_CLOSED) {
-            return Poll::Ready(Ok(0));
-        }
-        Poll::Ready(res)
     }
 
     /// Attempt to write into the socket, registering for wakeup if the socket is not ready. Used
@@ -82,12 +81,12 @@ impl Socket {
         buf: &[u8],
     ) -> Poll<Result<usize, zx::Status>> {
         ready!(self.poll_writable(cx))?;
-        let res = self.0.get_ref().write(buf);
-        if res == Err(zx::Status::SHOULD_WAIT) {
-            self.need_writable(cx)?;
-            Poll::Pending
-        } else {
-            Poll::Ready(res)
+        loop {
+            let res = self.0.get_ref().write(buf);
+            match res {
+                Err(zx::Status::SHOULD_WAIT) => ready!(self.need_writable(cx)?),
+                _ => return Poll::Ready(res),
+            }
         }
     }
 
@@ -104,17 +103,16 @@ impl Socket {
         let len = out.len();
         out.resize(len + avail, 0);
         let (_, mut tail) = out.split_at_mut(len);
-        match self.0.get_ref().read(&mut tail) {
-            Err(zx::Status::SHOULD_WAIT) => {
-                self.need_readable(cx)?;
-                Poll::Pending
-            }
-            Err(e) => Poll::Ready(Err(e)),
-            Ok(bytes) => {
-                if bytes == avail {
-                    Poll::Ready(Ok(bytes))
-                } else {
-                    Poll::Ready(Err(zx::Status::BAD_STATE))
+        loop {
+            match self.0.get_ref().read(&mut tail) {
+                Err(zx::Status::SHOULD_WAIT) => ready!(self.need_readable(cx)?),
+                Err(e) => return Poll::Ready(Err(e)),
+                Ok(bytes) => {
+                    return if bytes == avail {
+                        Poll::Ready(Ok(bytes))
+                    } else {
+                        Poll::Ready(Err(zx::Status::BAD_STATE))
+                    }
                 }
             }
         }
@@ -144,7 +142,7 @@ impl ReadableHandle for Socket {
         self.0.poll_readable(cx)
     }
 
-    fn need_readable(&self, cx: &mut Context<'_>) -> Result<(), zx::Status> {
+    fn need_readable(&self, cx: &mut Context<'_>) -> Poll<Result<(), zx::Status>> {
         self.0.need_readable(cx)
     }
 }
@@ -154,7 +152,7 @@ impl WritableHandle for Socket {
         self.0.poll_writable(cx)
     }
 
-    fn need_writable(&self, cx: &mut Context<'_>) -> Result<(), zx::Status> {
+    fn need_writable(&self, cx: &mut Context<'_>) -> Poll<Result<(), zx::Status>> {
         self.0.need_writable(cx)
     }
 }
@@ -407,9 +405,7 @@ mod tests {
 
         // Call need_readable to reacquire the read signal. The socket now knows
         // that the signal is not actually set, so returns Pending.
-        async_s2
-            .need_readable(&mut Context::from_waker(noop_waker_ref()))
-            .expect("failed need read");
+        assert!(async_s2.need_readable(&mut Context::from_waker(noop_waker_ref())).is_pending());
         let mut rx_fut = poll_fn(|cx| async_s2.poll_readable(cx));
         assert!(executor.run_until_stalled(&mut rx_fut).is_pending());
 
@@ -439,9 +435,7 @@ mod tests {
 
         // Call need_writable to reacquire the write signal. The socket now
         // knows that the signal is not actually set, so returns Pending.
-        async_s2
-            .need_writable(&mut Context::from_waker(noop_waker_ref()))
-            .expect("failed need write");
+        assert!(async_s2.need_writable(&mut Context::from_waker(noop_waker_ref())).is_pending());
         let mut tx_fut = poll_fn(|cx| async_s2.poll_writable(cx));
         assert!(executor.run_until_stalled(&mut tx_fut).is_pending());
 

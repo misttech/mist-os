@@ -308,17 +308,13 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
         // SAFETY: Safety relies on the pointer returned by `B` being valid,
         // which itself depends on a correct implementation of `FifoEntry` for
         // `W`.
-        let result = unsafe { fifo.write_ptr(elem_size, bytes, count) };
-        match result {
-            Err(e) => {
-                if e == zx::Status::SHOULD_WAIT {
-                    self.handle.need_writable(cx)?;
-                    Poll::Pending
-                } else {
-                    Poll::Ready(Err(e))
-                }
+        loop {
+            let result = unsafe { fifo.write_ptr(elem_size, bytes, count) };
+            match result {
+                Err(zx::Status::SHOULD_WAIT) => ready!(self.handle.need_writable(cx)?),
+                Err(e) => return Poll::Ready(Err(e)),
+                Ok(count) => return Poll::Ready(Ok(count)),
             }
-            Ok(count) => Poll::Ready(Ok(count)),
         }
     }
 
@@ -335,21 +331,17 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
         let bytes = entries.as_bytes_ptr_mut();
         let count = entries.count();
         let fifo = self.as_ref();
-        // SAFETY: Safety relies on the pointer returned by `B` being valid,
-        // which itself depends on a correct implementation of `FifoEntry` for
-        // `R`.
-        let result = unsafe { fifo.read_ptr(elem_size, bytes, count) };
 
-        match result {
-            Err(e) => {
-                if e == zx::Status::SHOULD_WAIT {
-                    self.handle.need_readable(cx)?;
-                    return Poll::Pending;
-                }
-                return Poll::Ready(Err(e));
-            }
-            Ok(count) => {
-                return Poll::Ready(Ok(count));
+        loop {
+            // SAFETY: Safety relies on the pointer returned by `B` being valid,
+            // which itself depends on a correct implementation of `FifoEntry` for
+            // `R`.
+            let result = unsafe { fifo.read_ptr(elem_size, bytes, count) };
+
+            match result {
+                Err(zx::Status::SHOULD_WAIT) => ready!(self.handle.need_readable(cx)?),
+                Err(e) => return Poll::Ready(Err(e)),
+                Ok(count) => return Poll::Ready(Ok(count)),
             }
         }
     }

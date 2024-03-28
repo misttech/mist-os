@@ -64,7 +64,7 @@ use {
     fuchsia_async::{
         self as fasync, ReadableHandle as _, ReadableState, WritableHandle as _, WritableState,
     },
-    fuchsia_zircon as zx,
+    fuchsia_zircon::{self as zx, AsHandleRef as _},
     futures::{
         channel::mpsc::UnboundedSender,
         future::{self, poll_fn},
@@ -73,7 +73,7 @@ use {
     std::{
         cell::{Cell, RefCell},
         io::Write,
-        task::Context,
+        task::{ready, Context, Poll},
     },
     virtio_device::{
         chain::{ReadableChain, WritableChain},
@@ -298,17 +298,12 @@ pub struct ReadWrite {
     control_packets: UnboundedSender<VirtioVsockHeader>,
 }
 
+#[derive(PartialEq)]
 enum SocketState {
-    // The socket is either ready for RX or TX, depending on what was queried.
+    // The socket is either ready for RX or TX, depending on what was queried.  The client might
+    // have closed the socket, but there are bytes remaining on the device socket that have yet to
+    // be sent to the guest.
     Ready,
-
-    // The client closed its socket, but there are bytes remaining on the device socket that
-    // have yet to be sent to the guest.
-    ClosedWithBytesOutstanding,
-
-    // Socket had a read signal but has no bytes outstanding. This should happen at most one time
-    // consecutively.
-    SpuriousWakeup,
 
     // The socket is closed with no bytes pending to be sent to the guest. The connection
     // can safely transition from the read write state.
@@ -427,9 +422,9 @@ impl ReadWrite {
     }
 
     async fn send_credit_update_when_credit_available(&self) -> Result<SocketState, Error> {
-        // By default async sockets cache signals until a read or write failure, but the
-        // device requires an accurate signal before sending the guest a credit update.
-        self.socket.need_writable(&mut Context::from_waker(noop_waker_ref()))?;
+        // By default async sockets cache signals until a read or write failure, but the device
+        // requires an accurate signal before sending the guest a credit update.
+        let _ = self.socket.need_writable(&mut Context::from_waker(noop_waker_ref()))?;
         match poll_fn(move |cx| self.socket.poll_writable(cx)).await {
             Ok(WritableState::Closed) => {
                 self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_SEND, true);
@@ -473,35 +468,54 @@ impl ReadWrite {
     }
 
     async fn get_rx_socket_state(&self) -> SocketState {
-        if let Err(_) = self.socket.need_readable(&mut Context::from_waker(noop_waker_ref())) {
-            return SocketState::Closed;
-        }
-        match poll_fn(move |cx| self.socket.poll_readable(cx)).await {
-            Ok(ReadableState::Readable) => {
-                if self.socket.as_ref().outstanding_read_bytes().unwrap_or(0) == 0 {
-                    SocketState::SpuriousWakeup
-                } else {
-                    SocketState::Ready
-                }
-            }
-            Err(_) | Ok(ReadableState::Closed | ReadableState::ReadableAndClosed) => {
-                match self.socket.as_ref().outstanding_read_bytes() {
-                    Ok(size) if size > 0 => {
-                        // The socket peer is closed, but bytes remain on the local socket that
-                        // have yet to be transmitted to the guest. Signal to the guest not to
-                        // send any more data if not already done.
-                        if !self.conn_flags.borrow().contains(VirtioVsockFlags::SHUTDOWN_SEND) {
-                            *self.tx_shutdown_leeway.borrow_mut() =
-                                fasync::Time::after(zx::Duration::from_seconds(1));
-                            self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_SEND, true);
-                            self.send_half_shutdown_packet();
+        poll_fn(move |cx| {
+            loop {
+                let result = ready!(self.socket.poll_readable(cx));
+                let outstanding_bytes = self.socket.as_ref().outstanding_read_bytes();
+                let state = match result {
+                    Ok(ReadableState::Readable) => {
+                        if outstanding_bytes.unwrap_or(0) == 0 {
+                            // This branch is expected when the socket is first created.  Ignore
+                            // errors here since we'll loop around and call `poll_readable` again.
+                            let _ = ready!(self.socket.need_readable(cx));
+                            continue;
                         }
-                        SocketState::ClosedWithBytesOutstanding
+                        SocketState::Ready
                     }
-                    _ => SocketState::Closed,
+                    Ok(ReadableState::Closed | ReadableState::ReadableAndClosed) => {
+                        if outstanding_bytes.unwrap_or(0) == 0 {
+                            SocketState::Closed
+                        } else {
+                            SocketState::Ready
+                        }
+                    }
+                    Err(_) => SocketState::Closed,
+                };
+                // Just checking for ReadableAndClosed is unreliable.  The remote end of the socket
+                // might be written to which will generate a notification, and *then* closed, which
+                // won't generate a notification (the port notifications are one-shot), so
+                // typically, we'll see Readable rather than ReadableAndClosed.  To workaround that,
+                // we explicitly check for the peer-closed signal.
+                if state == SocketState::Ready
+                    && !self.conn_flags.borrow().contains(VirtioVsockFlags::SHUTDOWN_SEND)
+                    && self
+                        .socket
+                        .as_handle_ref()
+                        .wait_handle(zx::Signals::OBJECT_PEER_CLOSED, zx::Time::INFINITE_PAST)
+                        .is_ok()
+                {
+                    // The socket peer is closed, but bytes remain on the local socket that have yet
+                    // to be transmitted to the guest. Signal to the guest not to send any more data
+                    // if not already done.
+                    *self.tx_shutdown_leeway.borrow_mut() =
+                        fasync::Time::after(zx::Duration::from_seconds(1));
+                    self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_SEND, true);
+                    self.send_half_shutdown_packet();
                 }
+                return Poll::Ready(state);
             }
-        }
+        })
+        .await
     }
 
     // Returns true when the connection wants the next available RX chain. Returns false if the
@@ -522,34 +536,21 @@ impl ReadWrite {
             return true;
         }
 
-        let mut num_spurious_wakeups = 0;
-        loop {
-            match self.get_rx_socket_state().await {
-                SocketState::SpuriousWakeup => {
-                    num_spurious_wakeups += 1;
-                    if num_spurious_wakeups > 1 {
-                        // TODO(https://fxbug.dev/42059838): Investigate consecutive spurious wakeups.
-                        tracing::error!(
-                            "Connection saw {} consecutive spurious wakeups",
-                            num_spurious_wakeups
-                        );
-                    }
+        match self.get_rx_socket_state().await {
+            SocketState::Ready => {
+                if self.credit.borrow().peer_free_bytes() == 0 {
+                    // This connection is waiting on a credit update via guest TX.
+                    future::pending::<bool>().await
+                } else {
+                    true
                 }
-                SocketState::Ready | SocketState::ClosedWithBytesOutstanding => {
-                    if self.credit.borrow().peer_free_bytes() == 0 {
-                        // This connection is waiting on a credit update via guest TX.
-                        break future::pending::<bool>().await;
-                    } else {
-                        break true;
-                    }
-                }
-                SocketState::Closed => {
-                    // This connection will transmit no more bytes, either due to error or a closed
-                    // and drained peer.
-                    self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_BOTH, true);
-                    self.send_half_shutdown_packet();
-                    break false;
-                }
+            }
+            SocketState::Closed => {
+                // This connection will transmit no more bytes, either due to error or a closed
+                // and drained peer.
+                self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_BOTH, true);
+                self.send_half_shutdown_packet();
+                false
             }
         }
     }
@@ -1078,7 +1079,7 @@ mod tests {
         fuchsia_async::TestExecutor,
         futures::{channel::mpsc, FutureExt, TryStreamExt},
         rand::{distributions::Standard, Rng},
-        std::{collections::HashSet, io::Read, pin::Pin, task::Poll},
+        std::{collections::HashSet, io::Read, pin::Pin},
         virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
         zerocopy::FromBytes,
     };
@@ -1800,7 +1801,7 @@ mod tests {
         // until the client reads from the socket.
         let state_action_fut = state.do_state_action();
         futures::pin_mut!(state_action_fut);
-        assert!(executor.run_until_stalled(&mut state_action_fut).is_pending());
+        assert_eq!(executor.run_until_stalled(&mut state_action_fut), Poll::Pending);
 
         let mut read_buf = vec![0u8; 5];
         assert_eq!(
