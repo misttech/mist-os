@@ -86,6 +86,9 @@ pub async fn log_impl(
             " and replaced with --symbolize."
         ));
         eprintln!("These legacy options will eventually be removed.");
+        if cmd.raw {
+            no_symbolize = true;
+        }
     } else {
         match cmd.symbolize {
             SymbolizeMode::Off => {
