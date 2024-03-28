@@ -12,6 +12,8 @@ toc:
   path: /docs/development/debugger/running.md
 - title: "Commands and interaction model"
   path: /docs/development/debugger/commands.md
+- title: "Use the debugger to automatically debug tests"
+  path: /docs/development/debugger/tests.md
 - title: "Debugging a process, component, or crash dump"
   path: /docs/development/debugger/attaching.md
 - title: "Controlling thread execution"
