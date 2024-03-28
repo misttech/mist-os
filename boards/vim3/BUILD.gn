@@ -73,6 +73,11 @@ _base = {
             "/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device"
       }
     }
+
+    development_support = {
+      # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
+      enable_debug_access_port_for_soc = "amlogic-a311d"
+    }
   }
 }
 

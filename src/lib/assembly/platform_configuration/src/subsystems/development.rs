@@ -81,6 +81,13 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             (BuildType::User, false) | (BuildType::UserDebug, false) => {}
         }
 
+        if let Some(soc) =
+            &context.board_info.platform.development_support.enable_debug_access_port_for_soc
+        {
+            let _arg = format!("kernel.arm64.debug.dap-rom-soc={}", soc.to_string());
+            // builder.kernel_arg(arg);
+        }
+
         Ok(())
     }
 }
