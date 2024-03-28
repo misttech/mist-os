@@ -6,15 +6,9 @@ use {
     crate::indexer::*,
     crate::resolved_driver::{DriverPackageType, ResolvedDriver},
     anyhow::Context,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
-    serde::Deserialize,
+    fidl_fuchsia_component_resolution as fresolution,
     std::{collections::HashSet, rc::Rc},
 };
-
-#[derive(Deserialize)]
-struct JsonDriver {
-    driver_url: String,
-}
 
 fn log_error(err: anyhow::Error) -> anyhow::Error {
     tracing::error!("{:#?}", err);
@@ -22,19 +16,13 @@ fn log_error(err: anyhow::Error) -> anyhow::Error {
 }
 
 pub async fn load_boot_drivers(
-    config: &fio::DirectoryProxy,
+    boot_drivers: &Vec<String>,
     resolver: &fresolution::ResolverProxy,
     eager_drivers: &HashSet<url::Url>,
     disabled_drivers: &HashSet<url::Url>,
 ) -> Result<Vec<ResolvedDriver>, anyhow::Error> {
-    let manifest = fuchsia_fs::directory::open_file_no_describe(
-        &config,
-        "boot_driver_manifest",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .context("boot: Failed to open driver_manifest")?;
     let resolved_drivers = load_drivers(
-        manifest,
+        boot_drivers,
         &resolver,
         &eager_drivers,
         &disabled_drivers,
@@ -48,19 +36,13 @@ pub async fn load_boot_drivers(
 
 pub async fn load_base_drivers(
     indexer: Rc<Indexer>,
-    config: &fio::DirectoryProxy,
+    base_drivers: &Vec<String>,
     resolver: &fresolution::ResolverProxy,
     eager_drivers: &HashSet<url::Url>,
     disabled_drivers: &HashSet<url::Url>,
 ) -> Result<(), anyhow::Error> {
-    let manifest = fuchsia_fs::directory::open_file_no_describe(
-        &config,
-        "base_driver_manifest",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .context("boot: Failed to open driver_manifest")?;
     let resolved_drivers = load_drivers(
-        manifest,
+        &base_drivers,
         &resolver,
         &eager_drivers,
         &disabled_drivers,
@@ -78,22 +60,18 @@ pub async fn load_base_drivers(
 }
 
 pub async fn load_drivers(
-    manifest: fio::FileProxy,
+    drivers: &Vec<String>,
     resolver: &fresolution::ResolverProxy,
     eager_drivers: &HashSet<url::Url>,
     disabled_drivers: &HashSet<url::Url>,
     package_type: DriverPackageType,
 ) -> Result<Vec<ResolvedDriver>, anyhow::Error> {
-    let data: String = fuchsia_fs::file::read_to_string(&manifest)
-        .await
-        .context("Failed to read base manifest")?;
-    let drivers: Vec<JsonDriver> = serde_json::from_str(&data)?;
     let mut resolved_drivers = std::vec::Vec::new();
-    for driver in drivers {
-        let url = match url::Url::parse(&driver.driver_url) {
+    for driver_url in drivers {
+        let url = match url::Url::parse(&driver_url) {
             Ok(u) => u,
             Err(e) => {
-                tracing::error!("Found bad driver url: {}: error: {}", driver.driver_url, e);
+                tracing::error!("Found bad driver url: {}: error: {}", driver_url, e);
                 continue;
             }
         };
@@ -121,6 +99,7 @@ mod tests {
     use super::*;
     use crate::resolved_driver::load_driver;
     use fidl_fuchsia_component_decl as fdecl;
+    use fidl_fuchsia_io as fio;
 
     #[fuchsia::test]
     async fn test_load_fallback_driver() {

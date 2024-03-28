@@ -15,7 +15,7 @@ use {
         DevelopmentManagerRequest, DevelopmentManagerRequestStream, DriverIndexRequest,
         DriverIndexRequestStream,
     },
-    fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_driver_registrar as fdr, fuchsia_async as fasync,
     fuchsia_component::client,
     fuchsia_component::server::ServiceFs,
     fuchsia_zircon::Status,
@@ -344,16 +344,13 @@ async fn main() -> Result<(), anyhow::Error> {
         tracing::info!("Marking driver {} as eager", driver);
     }
 
-    let config_dir =
-        fuchsia_fs::directory::open_in_namespace("/config", fio::OpenFlags::RIGHT_READABLE)
-            .context("Failed to open /config")?;
     let boot_resolver = client::connect_to_protocol_at_path::<fresolution::ResolverMarker>(
         "/svc/fuchsia.component.resolution.Resolver-boot",
     )
     .context("Failed to connect to boot resolver")?;
 
     let boot_drivers =
-        load_boot_drivers(&config_dir, &boot_resolver, &eager_drivers, &disabled_drivers)
+        load_boot_drivers(&config.boot_drivers, &boot_resolver, &eager_drivers, &disabled_drivers)
             .await
             .context("Failed to load boot drivers")
             .map_err(log_error)?;
@@ -379,7 +376,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     .context("Failed to connect to base component resolver")?;
                 load_base_drivers(
                     index.clone(),
-                    &config_dir,
+                    &config.base_drivers,
                     &base_resolver,
                     &eager_drivers,
                     &disabled_drivers,
@@ -435,7 +432,7 @@ mod tests {
         fidl::endpoints::{ClientEnd, Proxy},
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
         fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
-        fidl_fuchsia_mem as fmem,
+        fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
         std::collections::HashMap,
     };
 
@@ -592,15 +589,22 @@ mod tests {
 
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::new();
-
-        let config =
-            fuchsia_fs::directory::open_in_namespace("/pkg/config", fio::OpenFlags::RIGHT_READABLE)
-                .unwrap();
+        let base_drivers = vec![
+            "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm".into(),
+            "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind2-component.cm".into(),
+            "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-fallback-component.cm"
+                .into(),
+        ];
 
         // Run two tasks: the fake resolver and the task that loads the base drivers.
-        let load_base_drivers_task =
-            load_base_drivers(index.clone(), &config, &resolver, &eager_drivers, &disabled_drivers)
-                .fuse();
+        let load_base_drivers_task = load_base_drivers(
+            index.clone(),
+            &base_drivers,
+            &resolver,
+            &eager_drivers,
+            &disabled_drivers,
+        )
+        .fuse();
         let resolver_task = run_resolver_server(resolver_stream).fuse();
         futures::pin_mut!(load_base_drivers_task, resolver_task);
         futures::select! {
@@ -1349,17 +1353,13 @@ mod tests {
     async fn test_load_packaged_boot_drivers() {
         let (resolver, resolver_stream) =
             fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
-        let config = fuchsia_fs::directory::open_in_namespace(
-            "/pkg/config/",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
 
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::new();
+        let boot_drivers = vec![];
 
         let load_boot_drivers_task =
-            load_boot_drivers(&config, &resolver, &eager_drivers, &disabled_drivers).fuse();
+            load_boot_drivers(&boot_drivers, &resolver, &eager_drivers, &disabled_drivers).fuse();
 
         let resolver_task = run_resolver_server(resolver_stream).fuse();
         futures::pin_mut!(load_boot_drivers_task, resolver_task);
@@ -1389,15 +1389,11 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
         let eager_drivers = HashSet::from([eager_driver_component_url.clone()]);
         let disabled_drivers = HashSet::new();
-
-        let config = fuchsia_fs::directory::open_in_namespace(
-            "/pkg/config/",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
+        let boot_drivers =
+            vec!["fuchsia-boot:///driver-index-unittests#meta/test-fallback-component.cm".into()];
 
         let load_boot_drivers_task =
-            load_boot_drivers(&config, &resolver, &eager_drivers, &disabled_drivers).fuse();
+            load_boot_drivers(&boot_drivers, &resolver, &eager_drivers, &disabled_drivers).fuse();
 
         let resolver_task = run_resolver_server(resolver_stream).fuse();
         futures::pin_mut!(load_boot_drivers_task, resolver_task);
@@ -1432,14 +1428,14 @@ mod tests {
 
         let eager_drivers = HashSet::from([eager_driver_component_url.clone()]);
         let disabled_drivers = HashSet::new();
-
-        let config =
-            fuchsia_fs::directory::open_in_namespace("/pkg/config", fio::OpenFlags::RIGHT_READABLE)
-                .unwrap();
+        let base_drivers = vec![
+            "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-fallback-component.cm"
+                .into(),
+        ];
 
         let load_base_drivers_task = load_base_drivers(
             Rc::clone(&index),
-            &config,
+            &base_drivers,
             &resolver,
             &eager_drivers,
             &disabled_drivers,
@@ -1484,13 +1480,10 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::from([disabled_driver_component_url.clone()]);
-
-        let config =
-            fuchsia_fs::directory::open_in_namespace("/pkg/config", fio::OpenFlags::RIGHT_READABLE)
-                .unwrap();
+        let boot_drivers = vec![];
 
         let load_boot_drivers_task =
-            load_boot_drivers(&config, &resolver, &eager_drivers, &disabled_drivers).fuse();
+            load_boot_drivers(&boot_drivers, &resolver, &eager_drivers, &disabled_drivers).fuse();
 
         let resolver_task = run_resolver_server(resolver_stream).fuse();
         futures::pin_mut!(load_boot_drivers_task, resolver_task);
@@ -1522,14 +1515,11 @@ mod tests {
 
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::from([disabled_driver_component_url.clone()]);
-
-        let config =
-            fuchsia_fs::directory::open_in_namespace("/pkg/config", fio::OpenFlags::RIGHT_READABLE)
-                .unwrap();
+        let base_drivers = vec![];
 
         let load_base_drivers_task = load_base_drivers(
             Rc::clone(&index),
-            &config,
+            &base_drivers,
             &resolver,
             &eager_drivers,
             &disabled_drivers,
@@ -1640,13 +1630,12 @@ mod tests {
     #[ignore = "Re-enable once we have a fake resolver"]
     #[fuchsia::test]
     async fn test_boot_drivers() {
-        let config =
-            fuchsia_fs::directory::open_in_namespace("/pkg/config", fio::OpenFlags::RIGHT_READABLE)
-                .unwrap();
+        let boot_drivers = vec![];
         let boot_resolver = client::connect_to_protocol::<fresolution::ResolverMarker>().unwrap();
-        let drivers = load_boot_drivers(&config, &boot_resolver, &HashSet::new(), &HashSet::new())
-            .await
-            .unwrap();
+        let drivers =
+            load_boot_drivers(&boot_drivers, &boot_resolver, &HashSet::new(), &HashSet::new())
+                .await
+                .unwrap();
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();

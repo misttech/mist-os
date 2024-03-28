@@ -46,7 +46,6 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_rust",
     "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_rust",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/devices/lib/bind:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
@@ -63,13 +62,14 @@ rustc_binary("bin") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:regex",
-    "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:url",
   ]
 
-  test_deps = [ "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust" ]
+  test_deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
+  ]
 
   sources = [
     "src/composite_node_spec_manager.rs",
@@ -141,28 +141,6 @@ fuchsia_driver_component("test-fallback-component") {
   manifest = "meta/test-fallback-component.cml"
 }
 
-driver_manifest("base-driver-manifest") {
-  manifest_name = "base_driver_manifest"
-  install_as_config_resource = true
-  package_url = "fuchsia-pkg://fuchsia.com/driver-index-unittests"
-  deps = [
-    ":test-bind-component",
-    ":test-bind2-component",
-    ":test-fallback-component",
-  ]
-}
-
-driver_manifest("boot-driver-manifest") {
-  manifest_name = "boot_driver_manifest"
-  install_as_config_resource = true
-  package_url = "fuchsia-boot:///driver-index-unittests"
-  deps = [
-    ":test-bind-component",
-    ":test-bind2-component",
-    ":test-fallback-component",
-  ]
-}
-
 # Run with `fx test driver-index-unittests`.
 fuchsia_unittest_package("driver-index-unittests") {
   manifest = "meta/driver-index-unittests.cml"
@@ -172,9 +150,7 @@ fuchsia_unittest_package("driver-index-unittests") {
     }
   }
   deps = [
-    ":base-driver-manifest",
     ":bin_test",
-    ":boot-driver-manifest",
     ":test-bind-component",
     ":test-bind2-component",
     ":test-fallback-component",

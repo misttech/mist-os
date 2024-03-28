@@ -48,11 +48,6 @@
             path: "/boot",
         },
         {
-            directory: "config",
-            rights: [ "r*" ],
-            path: "/config",
-        },
-        {
             directory: "pkg_drivers",
             rights: [ "rx*" ],
             path: "/pkg_drivers",
@@ -84,11 +79,6 @@
         },
         {
             directory: "boot",
-            from: "self",
-            to: "#realm_builder",
-        },
-        {
-            directory: "config",
             from: "self",
             to: "#realm_builder",
         },

@@ -224,7 +224,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
  public:
   DriverTestRealm(component::OutgoingDirectory* outgoing, async_dispatcher_t* dispatcher,
                   driver_test_realm_config::Config config)
-      : outgoing_(outgoing), dispatcher_(dispatcher), vfs_(dispatcher_), config_(config) {}
+      : outgoing_(outgoing), dispatcher_(dispatcher), config_(config) {}
 
   zx::result<> Init() {
     // We must connect capabilities up early as not all users wait for Start to complete before
@@ -366,16 +366,11 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     // We only index /pkg if it's not identical to /boot.
     const bool create_pkg_config = request.args().pkg() || request.args().boot();
 
-    zx::result config_dir = ConstructConfigDir(
+    zx::result base_and_boot_configs = ConstructBootAndBaseConfig(
         boot_dir,
         create_pkg_config ? pkg_drivers_dir : fidl::UnownedClientEnd<fuchsia_io::Directory>({}));
-    if (config_dir.is_error()) {
-      completer.Reply(config_dir.take_error());
-      return;
-    }
-    result = outgoing_->AddDirectory(std::move(*config_dir), "config");
-    if (result.is_error()) {
-      completer.Reply(result.take_error());
+    if (base_and_boot_configs.is_error()) {
+      completer.Reply(base_and_boot_configs.take_error());
       return;
     }
 
@@ -429,6 +424,14 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     const std::vector<std::string> kEmptyVec;
     std::vector<component_testing::ConfigCapability> configurations;
     configurations.push_back({
+        .name = "fuchsia.driver.BootDrivers",
+        .value = std::move(base_and_boot_configs->boot_drivers),
+    });
+    configurations.push_back({
+        .name = "fuchsia.driver.BaseDrivers",
+        .value = std::move(base_and_boot_configs->base_drivers),
+    });
+    configurations.push_back({
         .name = "fuchsia.driver.BindEager",
         .value = request.args().driver_bind_eager().value_or(kEmptyVec),
     });
@@ -440,6 +443,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     realm_builder_.AddRoute({
         .capabilities =
             {
+                component_testing::Config{.name = "fuchsia.driver.BootDrivers"},
+                component_testing::Config{.name = "fuchsia.driver.BaseDrivers"},
                 component_testing::Config{.name = "fuchsia.driver.BindEager"},
                 component_testing::Config{.name = "fuchsia.driver.DisabledDrivers"},
             },
@@ -530,18 +535,22 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
   }
 
  private:
-  zx::result<fidl::ClientEnd<fio::Directory>> ConstructConfigDir(
+  struct BootAndBaseConfigResult {
+    std::vector<std::string> boot_drivers;
+    std::vector<std::string> base_drivers;
+  };
+  static zx::result<BootAndBaseConfigResult> ConstructBootAndBaseConfig(
       fidl::UnownedClientEnd<fuchsia_io::Directory> boot_dir,
       fidl::UnownedClientEnd<fuchsia_io::Directory> pkg_drivers_dir) {
     auto list = std::vector<
         std::tuple<fidl::UnownedClientEnd<fuchsia_io::Directory>, std::string, std::string>>{
         std::make_tuple(boot_dir, "fuchsia-boot:///", "boot"),
     };
-    std::unordered_map<std::string, std::string> results;
+    std::unordered_map<std::string, std::vector<std::string>> results;
     if (pkg_drivers_dir.is_valid()) {
       list.emplace_back(pkg_drivers_dir, "fuchsia-pkg://fuchsia.com/", "pkg");
     } else {
-      results["pkg"] = "[]";
+      results["pkg"] = {};
     }
 
     for (const auto& [dir, url_prefix, type] : list) {
@@ -587,54 +596,22 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
         }
 
         // We add a fake package name of dtr to make it identifiable.
-        std::string entry =
-            fxl::Substitute("\t{\"driver_url\": \"$0dtr#meta/$1\"}", url_prefix, manifest);
+        std::string entry = fxl::Substitute("$0dtr#meta/$1", url_prefix, manifest);
         driver_components.push_back(entry);
       }
 
-      std::string joined_components = fxl::JoinStrings(driver_components, ",\n");
-      std::string driver_manifest = fxl::Substitute("[\n$0\n]", joined_components);
-      FX_SLOG(DEBUG, "Final manifest:", FX_KV("type", type), FX_KV("manifest", driver_manifest));
-      results[type] = std::move(driver_manifest);
+      results[type] = std::move(driver_components);
     }
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      return zx::error(ZX_ERR_INTERNAL);
-    }
-    boot_driver_manifest_ = fbl::MakeRefCounted<fs::BufferedPseudoFile>(
-        [manifest = std::move(results["boot"])](fbl::String* out_string) {
-          *out_string = manifest.c_str();
-          return ZX_OK;
-        });
-    base_driver_manifest_ = fbl::MakeRefCounted<fs::BufferedPseudoFile>(
-        [manifest = std::move(results["pkg"])](fbl::String* out_string) {
-          *out_string = manifest.c_str();
-          return ZX_OK;
-        });
-    zx_status_t status = dir_->AddEntry("boot_driver_manifest", boot_driver_manifest_);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-    status = dir_->AddEntry("base_driver_manifest", base_driver_manifest_);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-    status =
-        vfs_.Serve(dir_, endpoints->server.TakeChannel(), fs::VnodeConnectionOptions::ReadOnly());
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-    return zx::ok(std::move(endpoints->client));
+    return zx::ok(BootAndBaseConfigResult{
+        .boot_drivers = std::move(results["boot"]),
+        .base_drivers = std::move(results["pkg"]),
+    });
   }
 
   bool is_started_ = false;
   component::OutgoingDirectory* outgoing_;
   async_dispatcher_t* dispatcher_;
-  fs::SynchronousVfs vfs_;
-  fbl::RefPtr<fs::PseudoDir> dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
-  fbl::RefPtr<fs::PseudoFile> boot_driver_manifest_;
-  fbl::RefPtr<fs::PseudoFile> base_driver_manifest_;
   fidl::ServerBindingGroup<fuchsia_driver_test::Realm> bindings_;
 
   struct Directory {

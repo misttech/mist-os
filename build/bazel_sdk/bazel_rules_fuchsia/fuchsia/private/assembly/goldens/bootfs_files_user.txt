@@ -12,8 +12,6 @@ config/build_info/minimum_utc_stamp
 ?config/component_id_index
 ?config/component_manager
 ?config/cpu_manager/node_config.json
-?config/driver_index/base_driver_manifest
-?config/driver_index/boot_driver_manifest
 ?config/power_manager/node_config.json
 ?config/power_manager/thermal_config.json
 config/profiles/bringup.profiles

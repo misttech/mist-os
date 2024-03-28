@@ -37,10 +37,6 @@ impl<D: Destination> std::fmt::Display for FileEntry<D> {
 pub enum BootfsDestination {
     /// List of additional boot arguments to add to the ZBI.
     AdditionalBootArgs,
-    /// The driver manifest for base drivers.
-    BaseDriverManifest,
-    /// The driver manifest for boot drivers.
-    BootDriverManifest,
     /// The list of bootfs packages.
     BootfsPackageIndex,
     /// The component manifest for the bootstrap realm.
@@ -75,8 +71,6 @@ impl std::fmt::Display for BootfsDestination {
             match self {
                 Self::FromAIB(s) => return write!(f, "{}", s),
                 Self::AdditionalBootArgs => "config/additional_boot_args",
-                Self::BaseDriverManifest => "config/driver_index/base_driver_manifest",
-                Self::BootDriverManifest => "config/driver_index/boot_driver_manifest",
                 Self::BootfsPackageIndex => "data/bootfs_packages",
                 Self::ComponentIdIndex => "config/component_id_index",
                 Self::ComponentManagerConfig => "config/component_manager",
@@ -454,8 +448,6 @@ mod tests {
             "config/component_id_index",
             "config/component_manager",
             "config/cpu_manager/node_config.json",
-            "config/driver_index/base_driver_manifest",
-            "config/driver_index/boot_driver_manifest",
             "config/power_manager/node_config.json",
             "config/power_manager/thermal_config.json",
             "config/zxcrypt",

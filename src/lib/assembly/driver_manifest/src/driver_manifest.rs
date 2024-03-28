@@ -4,11 +4,10 @@
 
 use {
     anyhow::{Context, Result},
+    assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType},
     assembly_config_schema::DriverDetails,
     camino::Utf8Path,
     fuchsia_pkg::PackageManifest,
-    serde::{Deserialize, Serialize},
-    std::fs::File,
 };
 
 /// Possible driver package.
@@ -19,17 +18,10 @@ pub enum DriverPackageType {
     Boot,
 }
 
-/// A driver manifest fragment.
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
-pub struct DriverManifest {
-    /// Url of a driver to load at boot.
-    pub driver_url: String,
-}
-
 /// A builder for the driver manifest package.
 #[derive(Default)]
 pub struct DriverManifestBuilder {
-    drivers: Vec<DriverManifest>,
+    drivers: Vec<String>,
 }
 
 impl DriverManifestBuilder {
@@ -38,28 +30,22 @@ impl DriverManifestBuilder {
         let driver_manifests = driver_details
             .components
             .iter()
-            .map(|component_path| DriverManifest {
-                driver_url: format!("{}#{}", package_url, component_path),
-            })
-            .collect::<Vec<DriverManifest>>();
+            .map(|component_path| format!("{}#{}", package_url, component_path))
+            .collect::<Vec<String>>();
 
         self.drivers.extend(driver_manifests);
         Ok(())
     }
 
-    /// Create the driver manifest.
-    pub fn create_manifest_file(&self, manifest_path: &Utf8Path) -> Result<()> {
-        if let Some(parent) = manifest_path.parent() {
-            std::fs::create_dir_all(parent).context(format!(
-                "Creating parent dir {} for {} in gendir",
-                parent, manifest_path
-            ))?;
-        }
-        let manifest_file = File::create(&manifest_path)
-            .context(format!("Creating the driver manifest file: {}", manifest_path))?;
-        serde_json::to_writer(manifest_file, &self.drivers)
-            .context(format!("Writing the manifest file {}", manifest_path))?;
-        Ok(())
+    /// Encode driver manifest as a config capability.
+    pub fn create_config(&self) -> Config {
+        Config::new(
+            ConfigValueType::Vector {
+                nested_type: ConfigNestedValueType::String { max_size: 150 },
+                max_count: 200,
+            },
+            self.drivers.clone().into(),
+        )
     }
 
     /// Helper function to determine a driver's package url
@@ -86,12 +72,12 @@ mod tests {
     use super::*;
     use assembly_test_util::generate_test_manifest;
     use camino::Utf8PathBuf;
-    use std::fs;
+    use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
 
     #[test]
-    fn create_manifest_file() -> Result<()> {
+    fn create_config() -> Result<()> {
         let tmp = TempDir::new()?;
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
 
@@ -115,13 +101,17 @@ mod tests {
             )?,
         )?;
 
-        let manifest_path = &outdir.join("manifest");
-        driver_manifest_builder.create_manifest_file(manifest_path)?;
+        let config = driver_manifest_builder.create_config();
 
-        let manifest_contents = fs::read_to_string(manifest_path)?;
         assert_eq!(
-            "[{\"driver_url\":\"fuchsia-pkg://testrepository.com/base_driver#meta/foobar.cm\"}]",
-            manifest_contents
+            Config::new(
+                ConfigValueType::Vector {
+                    nested_type: ConfigNestedValueType::String { max_size: 150 },
+                    max_count: 200,
+                },
+                vec!["fuchsia-pkg://testrepository.com/base_driver#meta/foobar.cm"].into(),
+            ),
+            config
         );
 
         Ok(())

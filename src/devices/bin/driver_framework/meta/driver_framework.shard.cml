@@ -63,7 +63,9 @@
             from: "parent",
             to: "#driver_index",
             config: [
+                "fuchsia.driver.BaseDrivers",
                 "fuchsia.driver.BindEager",
+                "fuchsia.driver.BootDrivers",
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
                 "fuchsia.driver.DisabledDrivers",
                 "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",

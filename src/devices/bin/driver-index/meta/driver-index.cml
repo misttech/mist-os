@@ -20,6 +20,26 @@
     ],
     use: [
         {
+            config: "fuchsia.driver.BootDrivers",
+            key: "boot_drivers",
+            type: "vector",
+            max_count: 200,
+            element: {
+                type: "string",
+                max_size: 150,
+            },
+        },
+        {
+            config: "fuchsia.driver.BaseDrivers",
+            key: "base_drivers",
+            type: "vector",
+            max_count: 200,
+            element: {
+                type: "string",
+                max_size: 150,
+            },
+        },
+        {
             // Whether or not ephemeral drivers should be allowed to be registered dynamically.
             config: "fuchsia.driver.EnableEphemeralDrivers",
             key: "enable_ephemeral_drivers",
@@ -65,11 +85,6 @@
                 type: "string",
                 max_size: 100,
             },
-        },
-        {
-            directory: "config",
-            rights: [ "r*" ],
-            path: "/config",
         },
         {
             protocol: [
