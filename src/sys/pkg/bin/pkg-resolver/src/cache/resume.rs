@@ -20,7 +20,6 @@ use {
 pub(super) async fn resuming_get<'a>(
     client: &'a fuchsia_hyper::HttpsClient,
     uri: &'a http::Uri,
-    expected_len: Option<u64>,
     blob_fetch_params: BlobFetchParams,
     fetch_stats: &'a FetchStats,
 ) -> Result<(u64, impl Stream<Item = Result<hyper::body::Bytes, FetchError>> + 'a), FetchError> {
@@ -43,21 +42,10 @@ pub(super) async fn resuming_get<'a>(
         });
     }
 
-    let expected_len = match (expected_len, response.size_hint().exact()) {
-        (Some(expected), Some(actual)) => {
-            if expected != actual {
-                return Err(FetchError::ContentLengthMismatch {
-                    expected,
-                    actual,
-                    uri: uri.to_string(),
-                });
-            } else {
-                expected
-            }
-        }
-        (Some(length), None) | (None, Some(length)) => length,
-        (None, None) => return Err(FetchError::UnknownLength { uri: uri.to_string() }),
-    };
+    let expected_len = response
+        .size_hint()
+        .exact()
+        .ok_or_else(|| FetchError::UnknownLength { uri: uri.to_string() })?;
 
     let chunks = async_generator::generate(move |mut co| {
         async move {

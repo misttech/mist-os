@@ -72,8 +72,8 @@
         },
     ],
     config: {
-        // Whether to fetch delivery blob or uncompressed blob.
-        fetch_delivery_blob: { type: "bool" },
+        // The type of delivery blob to fetch.
+        delivery_blob_type: { type: "uint32" },
 
         // The timeout, in seconds, to use when performing TUF metadata network operations.
         tuf_metadata_timeout_seconds: { type: "uint32" },

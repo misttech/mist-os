@@ -281,7 +281,7 @@ async fn missing_subpackage_meta_far_does_not_hang() {
 
 #[fuchsia::test]
 async fn delivery_blob_not_available() {
-    let env = TestEnvBuilder::new().fetch_delivery_blob(true).build().await;
+    let env = TestEnvBuilder::new().build().await;
 
     let pkg = make_pkg_with_extra_blobs("delivery_blob", 1).await;
     let repo = Arc::new(

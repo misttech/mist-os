@@ -82,7 +82,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, fidl_fuchsia_pkg as fpkg, hyper::StatusCode};
+    use {
+        super::*, assert_matches::assert_matches, delivery_blob::DeliveryBlobType,
+        hyper::StatusCode,
+    };
 
     #[test]
     fn http_errors_aborts_on_io_error() {
@@ -100,7 +103,7 @@ mod tests {
         let err = FetchError::BadHttpStatus {
             code: StatusCode::INTERNAL_SERVER_ERROR,
             uri: "fake-uri".into(),
-            blob_type: fpkg::BlobType::Delivery,
+            blob_type: DeliveryBlobType::Type1,
         };
         assert_eq!(backoff.next_backoff(&err), Some(Duration::from_secs(0)));
         assert_eq!(backoff.next_backoff(&err), None);
@@ -110,7 +113,7 @@ mod tests {
         FetchError::BadHttpStatus {
             code: StatusCode::TOO_MANY_REQUESTS,
             uri: "fake-uri".into(),
-            blob_type: fpkg::BlobType::Delivery,
+            blob_type: DeliveryBlobType::Type1,
         }
     }
 

@@ -50,9 +50,6 @@ impl CustomTargetMetadata {
     pub fn merkle(&self) -> pkg::BlobId {
         self.merkle
     }
-    pub fn size(&self) -> u64 {
-        self.size
-    }
 }
 
 #[derive(Debug)]

@@ -315,7 +315,6 @@ pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
     blobfs_and_system_image:
         Box<dyn FnOnce(blobfs_ramdisk::Implementation) -> BlobfsAndSystemImageFut>,
     mounts: MountsFn,
-    fetch_delivery_blob: Option<bool>,
     tuf_metadata_timeout_seconds: Option<u32>,
     blob_network_header_timeout_seconds: Option<u32>,
     blob_network_body_timeout_seconds: Option<u32>,
@@ -352,7 +351,6 @@ impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, f
                     })
                     .build()
             },
-            fetch_delivery_blob: None,
             tuf_metadata_timeout_seconds: None,
             blob_network_header_timeout_seconds: None,
             blob_network_body_timeout_seconds: None,
@@ -381,7 +379,6 @@ where
         TestEnvBuilder::<_, MountsFn> {
             blobfs_and_system_image: Box::new(move |_| future::ready((blobfs, system_image))),
             mounts: self.mounts,
-            fetch_delivery_blob: self.fetch_delivery_blob,
             tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
@@ -412,7 +409,6 @@ where
                 future::ready((blobfs, Some(system_image_hash)))
             }),
             mounts: self.mounts,
-            fetch_delivery_blob: self.fetch_delivery_blob,
             tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
@@ -429,7 +425,6 @@ where
         TestEnvBuilder::<_, _> {
             blobfs_and_system_image: self.blobfs_and_system_image,
             mounts: || mounts,
-            fetch_delivery_blob: self.fetch_delivery_blob,
             tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
@@ -466,12 +461,6 @@ where
     pub fn blob_download_concurrency_limit(mut self, limit: u16) -> Self {
         assert_eq!(self.blob_download_concurrency_limit, None);
         self.blob_download_concurrency_limit = Some(limit);
-        self
-    }
-
-    pub fn fetch_delivery_blob(mut self, fetch_delivery_blob: bool) -> Self {
-        assert_eq!(self.fetch_delivery_blob, None);
-        self.fetch_delivery_blob = Some(fetch_delivery_blob);
         self
     }
 
@@ -597,24 +586,13 @@ where
             .await
             .unwrap();
 
-        if self.fetch_delivery_blob.is_some()
-            || self.tuf_metadata_timeout_seconds.is_some()
+        if self.tuf_metadata_timeout_seconds.is_some()
             || self.blob_network_header_timeout_seconds.is_some()
             || self.blob_network_body_timeout_seconds.is_some()
             || self.blob_download_resumption_attempts_limit.is_some()
             || self.blob_download_concurrency_limit.is_some()
         {
             builder.init_mutable_config_from_package(&pkg_resolver).await.unwrap();
-            if let Some(fetch_delivery_blob) = self.fetch_delivery_blob {
-                builder
-                    .set_config_value(
-                        &pkg_resolver,
-                        "fetch_delivery_blob",
-                        fetch_delivery_blob.into(),
-                    )
-                    .await
-                    .unwrap();
-            }
             if let Some(tuf_metadata_timeout_seconds) = self.tuf_metadata_timeout_seconds {
                 builder
                     .set_config_value(

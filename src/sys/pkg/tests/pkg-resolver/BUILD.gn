@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/dist/renamed_binary.gni")
+import("//build/images/args.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 
@@ -441,7 +442,7 @@ fuchsia_component_manifest("pkg-resolver-manifest") {
 fuchsia_structured_config_values("pkg-resolver-config") {
   cm_label = ":pkg-resolver-manifest"
   values = {
-    fetch_delivery_blob = true
+    delivery_blob_type = delivery_blob_type
 
     # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
     # 4,096 B/s minimum bandwidth (the default minimum bandwidth used by rust-tuf

@@ -335,10 +335,7 @@ impl RepositoryManager {
 
         async move {
             let repo = repo.await?;
-            crate::cache::merkle_for_url(repo, url, cobalt_sender)
-                .await
-                .map(|(blob_id, _)| blob_id)
-                .map_err(Into::into)
+            crate::cache::merkle_for_url(repo, url, cobalt_sender).await.map_err(Into::into)
         }
         .boxed_local()
     }

@@ -5,6 +5,7 @@
 use {
     crate::{repository::Repository, repository_manager::Stats, TCP_KEEPALIVE_TIMEOUT},
     cobalt_sw_delivery_registry as metrics,
+    delivery_blob::DeliveryBlobType,
     fidl_contrib::protocol_connector::ProtocolSender,
     fidl_fuchsia_metrics::MetricEvent,
     fidl_fuchsia_pkg::{self as fpkg},
@@ -39,7 +40,7 @@ pub struct BlobFetchParams {
     header_network_timeout: Duration,
     body_network_timeout: Duration,
     download_resumption_attempts_limit: u64,
-    blob_type: fpkg::BlobType,
+    blob_type: DeliveryBlobType,
 }
 
 impl BlobFetchParams {
@@ -55,7 +56,7 @@ impl BlobFetchParams {
         self.download_resumption_attempts_limit
     }
 
-    pub fn blob_type(&self) -> fpkg::BlobType {
+    pub fn blob_type(&self) -> DeliveryBlobType {
         self.blob_type
     }
 }
@@ -70,22 +71,12 @@ pub async fn cache_package<'a>(
     cobalt_sender: ProtocolSender<MetricEvent>,
     trace_id: ftrace::Id,
 ) -> Result<(BlobId, PackageDirectory), CacheError> {
-    let (merkle, size) =
-        merkle_for_url(repo, url, cobalt_sender).await.map_err(CacheError::MerkleFor)?;
+    let merkle = merkle_for_url(repo, url, cobalt_sender).await.map_err(CacheError::MerkleFor)?;
     // If a merkle pin was specified, use it, but only after having verified that the name and
     // variant exist in the TUF repo.  Note that this doesn't guarantee that the merkle pinned
     // package ever actually existed in the repo or that the merkle pin refers to the named
     // package.
-    let (merkle, size) = if let Some(merkle_pin) = url.hash() {
-        (BlobId::from(merkle_pin), None)
-    } else {
-        // The size in TUF is uncompressed blob size, which won't match delivery blob size, so we
-        // shouldn't use it if fetching delivery blobs.
-        match blob_fetcher.blob_type {
-            fpkg::BlobType::Delivery => (merkle, None),
-            fpkg::BlobType::Uncompressed => (merkle, Some(size)),
-        }
-    };
+    let merkle = if let Some(merkle_pin) = url.hash() { BlobId::from(merkle_pin) } else { merkle };
 
     let meta_far_blob = BlobInfo { blob_id: merkle, length: 0 };
 
@@ -97,7 +88,7 @@ pub async fn cache_package<'a>(
         // Only add the meta.far fetch to the queue if the meta.far is not already cached to avoid
         // blocking resolves of fully cached packages behind in-progress resolves.
         let meta_opener = get.make_open_meta_blob();
-        if let Some(needed_meta) = meta_opener.open(blob_fetcher.blob_type).await? {
+        if let Some(needed_meta) = meta_opener.open(fpkg::BlobType::Delivery).await? {
             let () = meta_opener.register_opened_blob(needed_meta);
             let () = blob_fetcher
                 .push(
@@ -105,7 +96,6 @@ pub async fn cache_package<'a>(
                     FetchBlobContext {
                         opener: meta_opener,
                         mirrors: Arc::clone(&mirrors),
-                        expected_len: size,
                         parent_trace_id: trace_id,
                     },
                 )
@@ -146,7 +136,6 @@ pub async fn cache_package<'a>(
                                     // before adding to the queue, like is done for meta.fars.
                                     opener: get.make_open_blob(need.blob_id),
                                     mirrors: Arc::clone(&mirrors),
-                                    expected_len: None,
                                     parent_trace_id: trace_id,
                                 },
                             )
@@ -408,7 +397,7 @@ pub async fn merkle_for_url(
     repo: Arc<AsyncMutex<Repository>>,
     url: &AbsolutePackageUrl,
     mut cobalt_sender: ProtocolSender<MetricEvent>,
-) -> Result<(BlobId, u64), MerkleForError> {
+) -> Result<BlobId, MerkleForError> {
     let target_path = TargetPath::new(format!(
         "{}/{}",
         url.name(),
@@ -425,7 +414,7 @@ pub async fn merkle_for_url(
             })
             .as_occurrence(1),
     );
-    res.map(|custom| (custom.merkle(), custom.size()))
+    res.map(|custom| custom.merkle())
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -453,7 +442,6 @@ pub enum MerkleForError {
 pub struct FetchBlobContext {
     opener: pkg::cache::DeferredOpenBlob,
     mirrors: Arc<[MirrorConfig]>,
-    expected_len: Option<u64>,
     parent_trace_id: ftrace::Id,
 }
 
@@ -471,23 +459,13 @@ impl work_queue::TryMerge for FetchBlobContext {
             return Err(other);
         }
 
-        // Unmergeable if both contain different expected lengths. One of these instances will
-        // fail, but we can't know which one here.
-        let expected_len = match (self.expected_len, other.expected_len) {
-            (Some(x), None) | (None, Some(x)) => Some(x),
-            (None, None) => None,
-            (Some(x), Some(y)) if x == y => Some(x),
-            _ => return Err(other),
-        };
-
         // Don't attempt to merge mirrors, but do merge these contexts if the mirrors are
         // equivalent.
         if self.mirrors != other.mirrors {
             return Err(other);
         }
 
-        // Contexts are mergeable, apply the merged state.
-        self.expected_len = expected_len;
+        // Contexts are mergeable.
         Ok(())
     }
 }
@@ -498,7 +476,6 @@ impl work_queue::TryMerge for FetchBlobContext {
 #[derive(Clone)]
 pub struct BlobFetcher {
     sender: work_queue::WorkSender<BlobId, FetchBlobContext, Result<(), Arc<FetchError>>>,
-    blob_type: fpkg::BlobType,
 }
 
 impl BlobFetcher {
@@ -540,10 +517,7 @@ impl BlobFetcher {
             },
         );
 
-        (
-            blob_fetch_queue.into_future(),
-            BlobFetcher { sender: blob_fetcher, blob_type: blob_fetch_params.blob_type() },
-        )
+        (blob_fetch_queue.into_future(), BlobFetcher { sender: blob_fetcher })
     }
 
     /// Enqueue the given blob to be fetched, or attach to an existing request to
@@ -600,7 +574,6 @@ async fn fetch_blob(
         &mirror,
         merkle,
         &context.opener,
-        context.expected_len,
         blob_fetch_params,
         &stats,
         cobalt_sender,
@@ -633,7 +606,6 @@ async fn fetch_blob_http(
     mirror: &MirrorConfig,
     merkle: BlobId,
     opener: &pkg::cache::DeferredOpenBlob,
-    expected_len: Option<u64>,
     blob_fetch_params: BlobFetchParams,
     stats: &Mutex<Stats>,
     cobalt_sender: ProtocolSender<MetricEvent>,
@@ -654,10 +626,8 @@ async fn fetch_blob_http(
             let res = async {
                 let inspect = inspect.attempt();
                 inspect.state(inspect::Http::CreateBlob);
-                if let Some(pkg::cache::NeededBlob { blob, closer: blob_closer }) = opener
-                    .open(blob_fetch_params.blob_type)
-                    .await
-                    .map_err(FetchError::CreateBlob)?
+                if let Some(pkg::cache::NeededBlob { blob, closer: blob_closer }) =
+                    opener.open(fpkg::BlobType::Delivery).await.map_err(FetchError::CreateBlob)?
                 {
                     inspect.state(inspect::Http::DownloadBlob);
                     let guard = ftrace::async_enter!(
@@ -670,7 +640,6 @@ async fn fetch_blob_http(
                         &inspect,
                         client,
                         blob_url,
-                        expected_len,
                         blob,
                         blob_fetch_params,
                         &fetch_stats,
@@ -734,13 +703,9 @@ async fn fetch_blob_http(
 fn make_blob_url(
     blob_mirror_url: http::Uri,
     merkle: &BlobId,
-    blob_type: fpkg::BlobType,
+    blob_type: DeliveryBlobType,
 ) -> Result<hyper::Uri, http_uri_ext::Error> {
-    let path = match blob_type {
-        fpkg::BlobType::Uncompressed => merkle.to_string(),
-        fpkg::BlobType::Delivery => format!("1/{merkle}"),
-    };
-    blob_mirror_url.extend_dir_with_path(&path)
+    blob_mirror_url.extend_dir_with_path(&format!("{}/{merkle}", u32::from(blob_type)))
 }
 
 // On success, returns the size of the downloaded blob in bytes (useful for tracing).
@@ -748,7 +713,6 @@ async fn download_blob(
     inspect: &inspect::Attempt<inspect::Http>,
     client: &fuchsia_hyper::HttpsClient,
     uri: &http::Uri,
-    expected_len: Option<u64>,
     dest: pkg::cache::Blob<pkg::cache::NeedsTruncate>,
     blob_fetch_params: BlobFetchParams,
     fetch_stats: &FetchStats,
@@ -756,7 +720,7 @@ async fn download_blob(
 ) -> Result<u64, FetchError> {
     inspect.state(inspect::Http::HttpGet);
     let (expected_len, content) =
-        resume::resuming_get(client, uri, expected_len, blob_fetch_params, fetch_stats).await?;
+        resume::resuming_get(client, uri, blob_fetch_params, fetch_stats).await?;
     ftrace::async_instant!(trace_id, c"app", c"header_received");
 
     inspect.expected_size_bytes(expected_len);
@@ -835,8 +799,8 @@ pub enum FetchError {
     #[error("could not create blob")]
     CreateBlob(#[source] pkg::cache::OpenBlobError),
 
-    #[error("Fetch of {blob_type:?} blob at {uri} failed: http request expected 200, got {code}")]
-    BadHttpStatus { code: hyper::StatusCode, uri: String, blob_type: fpkg::BlobType },
+    #[error("Fetch of type {blob_type:?} delivery blob at {uri} failed: http request expected 200, got {code}")]
+    BadHttpStatus { code: hyper::StatusCode, uri: String, blob_type: DeliveryBlobType },
 
     #[error("repository has no configured mirrors")]
     NoMirrors,
@@ -1095,17 +1059,7 @@ mod tests {
             make_blob_url(
                 "http://example.com".parse::<Uri>().unwrap(),
                 &merkle,
-                fpkg::BlobType::Uncompressed
-            )
-            .unwrap(),
-            format!("http://example.com/{merkle}").parse::<Uri>().unwrap()
-        );
-
-        assert_eq!(
-            make_blob_url(
-                "http://example.com".parse::<Uri>().unwrap(),
-                &merkle,
-                fpkg::BlobType::Delivery
+                DeliveryBlobType::Type1
             )
             .unwrap(),
             format!("http://example.com/1/{merkle}").parse::<Uri>().unwrap()
@@ -1115,30 +1069,30 @@ mod tests {
             make_blob_url(
                 "http://example.com/noslash".parse::<Uri>().unwrap(),
                 &merkle,
-                fpkg::BlobType::Uncompressed
+                DeliveryBlobType::Type1
             )
             .unwrap(),
-            format!("http://example.com/noslash/{merkle}").parse::<Uri>().unwrap()
+            format!("http://example.com/noslash/1/{merkle}").parse::<Uri>().unwrap()
         );
 
         assert_eq!(
             make_blob_url(
                 "http://example.com/slash/".parse::<Uri>().unwrap(),
                 &merkle,
-                fpkg::BlobType::Uncompressed
+                DeliveryBlobType::Type1
             )
             .unwrap(),
-            format!("http://example.com/slash/{merkle}").parse::<Uri>().unwrap()
+            format!("http://example.com/slash/1/{merkle}").parse::<Uri>().unwrap()
         );
 
         assert_eq!(
             make_blob_url(
                 "http://example.com/twoslashes//".parse::<Uri>().unwrap(),
                 &merkle,
-                fpkg::BlobType::Uncompressed
+                DeliveryBlobType::Type1
             )
             .unwrap(),
-            format!("http://example.com/twoslashes//{merkle}").parse::<Uri>().unwrap()
+            format!("http://example.com/twoslashes//1/{merkle}").parse::<Uri>().unwrap()
         );
 
         // IPv6 zone id
@@ -1146,10 +1100,10 @@ mod tests {
             make_blob_url(
                 "http://[fe80::e022:d4ff:fe13:8ec3%252]:8083/blobs/".parse::<Uri>().unwrap(),
                 &merkle,
-                fpkg::BlobType::Uncompressed
+                DeliveryBlobType::Type1
             )
             .unwrap(),
-            format!("http://[fe80::e022:d4ff:fe13:8ec3%252]:8083/blobs/{merkle}")
+            format!("http://[fe80::e022:d4ff:fe13:8ec3%252]:8083/blobs/1/{merkle}")
                 .parse::<Uri>()
                 .unwrap()
         );

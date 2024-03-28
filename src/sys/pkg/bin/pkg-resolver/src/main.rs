@@ -10,6 +10,7 @@ use {
     anyhow::{anyhow, Context as _, Error},
     async_lock::RwLock as AsyncRwLock,
     cobalt_sw_delivery_registry as metrics,
+    delivery_blob::DeliveryBlobType,
     fdio::Namespace,
     fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_contrib::{protocol_connector::ProtocolSender, ProtocolConnector},
@@ -176,6 +177,11 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         .await,
     ));
 
+    let delivery_blob_type: DeliveryBlobType =
+        structured_config.delivery_blob_type.try_into().with_context(|| {
+            format!("invalid delivery blob type {}", structured_config.delivery_blob_type)
+        })?;
+
     let (blob_fetch_queue, blob_fetcher) = crate::cache::BlobFetcher::new(
         inspector.root().create_child("blob_fetcher"),
         structured_config.blob_download_concurrency_limit.into(),
@@ -191,11 +197,7 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
             .download_resumption_attempts_limit(
                 structured_config.blob_download_resumption_attempts_limit.into(),
             )
-            .blob_type(if structured_config.fetch_delivery_blob {
-                fpkg::BlobType::Delivery
-            } else {
-                fpkg::BlobType::Uncompressed
-            })
+            .blob_type(delivery_blob_type)
             .build(),
     );
     futures.push(blob_fetch_queue.boxed_local());
