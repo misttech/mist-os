@@ -91,6 +91,16 @@ impl NativeIntoFidl<String> for RelativePath {
     }
 }
 
+impl NativeIntoFidl<Option<String>> for RelativePath {
+    fn native_into_fidl(self) -> Option<String> {
+        if self.is_dot() {
+            None
+        } else {
+            Some(self.to_string())
+        }
+    }
+}
+
 /// Generates `FidlIntoNative` and `NativeIntoFidl` implementations that leaves the input unchanged.
 macro_rules! fidl_translations_identical {
     ($into_type:ty) => {
@@ -172,7 +182,7 @@ impl ComponentDecl {
             .map(|r| UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: r.clone(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             })
             .or_else(|| {
                 self.uses.iter().find_map(|u| match u {
@@ -275,7 +285,7 @@ impl NativeIntoFidl<fdecl::DeliveryType> for DeliveryType {
 pub trait SourcePath {
     fn source_path(&self) -> BorrowedSeparatedPath<'_>;
     fn is_from_dictionary(&self) -> bool {
-        self.source_path().dirname.is_some()
+        !self.source_path().dirname.is_dot()
     }
 }
 
@@ -305,7 +315,8 @@ pub struct UseServiceDecl {
     pub source: UseSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target_path: Path,
     pub dependency_type: DependencyType,
     #[fidl_decl(default)]
@@ -319,7 +330,8 @@ pub struct UseProtocolDecl {
     pub source: UseSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target_path: Path,
     pub dependency_type: DependencyType,
     #[fidl_decl(default)]
@@ -333,7 +345,8 @@ pub struct UseDirectoryDecl {
     pub source: UseSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target_path: Path,
 
     #[cfg_attr(
@@ -405,7 +418,8 @@ pub struct UseRunnerDecl {
     pub source: UseSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
 }
 
 #[cfg(feature = "target_api_level_head")]
@@ -517,7 +531,8 @@ pub struct OfferServiceDecl {
     pub source: OfferSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
     pub source_instance_filter: Option<Vec<String>>,
@@ -533,7 +548,8 @@ pub struct OfferProtocolDecl {
     pub source: OfferSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
     pub dependency_type: DependencyType,
@@ -548,7 +564,8 @@ pub struct OfferDirectoryDecl {
     pub source: OfferSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
     pub dependency_type: DependencyType,
@@ -586,7 +603,8 @@ pub struct OfferRunnerDecl {
     pub source: OfferSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
 }
@@ -598,7 +616,8 @@ pub struct OfferResolverDecl {
     pub source: OfferSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
 }
@@ -611,7 +630,8 @@ pub struct OfferDictionaryDecl {
     pub source: OfferSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
     pub dependency_type: DependencyType,
@@ -904,7 +924,8 @@ pub struct ExposeServiceDecl {
     pub source: ExposeSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
     pub target_name: Name,
     #[fidl_decl(default)]
@@ -918,7 +939,8 @@ pub struct ExposeProtocolDecl {
     pub source: ExposeSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
     pub target_name: Name,
     #[fidl_decl(default)]
@@ -932,7 +954,8 @@ pub struct ExposeDirectoryDecl {
     pub source: ExposeSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
     pub target_name: Name,
 
@@ -958,7 +981,8 @@ pub struct ExposeRunnerDecl {
     pub source: ExposeSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
     pub target_name: Name,
 }
@@ -970,7 +994,8 @@ pub struct ExposeResolverDecl {
     pub source: ExposeSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
     pub target_name: Name,
 }
@@ -983,7 +1008,8 @@ pub struct ExposeDictionaryDecl {
     pub source: ExposeSource,
     pub source_name: Name,
     #[cfg(feature = "target_api_level_head")]
-    pub source_dictionary: Option<RelativePath>,
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
     pub target_name: Name,
     #[fidl_decl(default)]
@@ -3311,7 +3337,7 @@ mod tests {
                             dependency_type: DependencyType::Strong,
                             source: UseSource::Parent,
                             source_name: "netstack".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target_path: "/svc/mynetstack".parse().unwrap(),
                             availability: Availability::Required,
                         }),
@@ -3319,7 +3345,7 @@ mod tests {
                             dependency_type: DependencyType::Strong,
                             source: UseSource::Parent,
                             source_name: "legacy_netstack".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target_path: "/svc/legacy_mynetstack".parse().unwrap(),
                             availability: Availability::Optional,
                         }),
@@ -3327,7 +3353,7 @@ mod tests {
                             dependency_type: DependencyType::Strong,
                             source: UseSource::Child("echo".to_string()),
                             source_name: "echo_service".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target_path: "/svc/echo_service".parse().unwrap(),
                             availability: Availability::Required,
                         }),
@@ -3335,7 +3361,7 @@ mod tests {
                             dependency_type: DependencyType::Strong,
                             source: UseSource::Framework,
                             source_name: "dir".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target_path: "/data".parse().unwrap(),
                             rights: fio::Operations::CONNECT,
                             subdir: Some("foo/bar".into()),
@@ -3362,7 +3388,7 @@ mod tests {
                         UseDecl::Runner(UseRunnerDecl {
                             source: UseSource::Environment,
                             source_name: "elf".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                         }),
                         UseDecl::Config(UseConfigurationDecl {
                             source: UseSource::Parent,
@@ -3376,7 +3402,7 @@ mod tests {
                         ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Child("netstack".to_string()),
                             source_name: "legacy_netstack".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target_name: "legacy_mynetstack".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: Availability::Required,
@@ -3384,7 +3410,7 @@ mod tests {
                         ExposeDecl::Directory(ExposeDirectoryDecl {
                             source: ExposeSource::Child("netstack".to_string()),
                             source_name: "dir".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target_name: "data".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             rights: Some(fio::Operations::CONNECT),
@@ -3394,21 +3420,21 @@ mod tests {
                         ExposeDecl::Runner(ExposeRunnerDecl {
                             source: ExposeSource::Child("netstack".to_string()),
                             source_name: "elf".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             target_name: "elf".parse().unwrap(),
                         }),
                         ExposeDecl::Resolver(ExposeResolverDecl {
                             source: ExposeSource::Child("netstack".to_string()),
                             source_name: "pkg".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             target_name: "pkg".parse().unwrap(),
                         }),
                         ExposeDecl::Service(ExposeServiceDecl {
                             source: ExposeSource::Collection("modular".parse().unwrap()),
                             source_name: "netstack1".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target_name: "mynetstack".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: Availability::Required,
@@ -3416,7 +3442,7 @@ mod tests {
                         ExposeDecl::Service(ExposeServiceDecl {
                             source: ExposeSource::Collection("modular".parse().unwrap()),
                             source_name: "netstack2".parse().unwrap(),
-                            source_dictionary: None,
+                            source_dictionary: ".".parse().unwrap(),
                             target_name: "mynetstack".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: Availability::Required,
@@ -3424,7 +3450,7 @@ mod tests {
                         ExposeDecl::Dictionary(ExposeDictionaryDecl {
                             source: ExposeSource::Child("netstack".to_string()),
                             source_name: "bundle".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target_name: "mybundle".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: Availability::Required,
@@ -3434,7 +3460,7 @@ mod tests {
                         OfferDecl::Protocol(OfferProtocolDecl {
                             source: OfferSource::Parent,
                             source_name: "legacy_netstack".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target: OfferTarget::static_child("echo".to_string()),
                             target_name: "legacy_mynetstack".parse().unwrap(),
                             dependency_type: DependencyType::Weak,
@@ -3443,7 +3469,7 @@ mod tests {
                         OfferDecl::Directory(OfferDirectoryDecl {
                             source: OfferSource::Parent,
                             source_name: "dir".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target: OfferTarget::Collection("modular".parse().unwrap()),
                             target_name: "data".parse().unwrap(),
                             rights: Some(fio::Operations::CONNECT),
@@ -3461,21 +3487,21 @@ mod tests {
                         OfferDecl::Runner(OfferRunnerDecl {
                             source: OfferSource::Parent,
                             source_name: "elf".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target: OfferTarget::static_child("echo".to_string()),
                             target_name: "elf2".parse().unwrap(),
                         }),
                         OfferDecl::Resolver(OfferResolverDecl {
                             source: OfferSource::Parent,
                             source_name: "pkg".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target: OfferTarget::static_child("echo".to_string()),
                             target_name: "pkg".parse().unwrap(),
                         }),
                         OfferDecl::Service(OfferServiceDecl {
                             source: OfferSource::Parent,
                             source_name: "netstack1".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             source_instance_filter: None,
                             renamed_instances: None,
                             target: OfferTarget::static_child("echo".to_string()),
@@ -3485,7 +3511,7 @@ mod tests {
                         OfferDecl::Service(OfferServiceDecl {
                             source: OfferSource::Parent,
                             source_name: "netstack2".parse().unwrap(),
-                            source_dictionary: None,
+                            source_dictionary: ".".parse().unwrap(),
                             source_instance_filter: None,
                             renamed_instances: None,
                             target: OfferTarget::static_child("echo".to_string()),
@@ -3495,7 +3521,7 @@ mod tests {
                         OfferDecl::Service(OfferServiceDecl {
                             source: OfferSource::Parent,
                             source_name: "netstack3".parse().unwrap(),
-                            source_dictionary: None,
+                            source_dictionary: ".".parse().unwrap(),
                             source_instance_filter: Some(vec!["allowedinstance".to_string()]),
                             renamed_instances: Some(vec![NameMapping{source_name: "default".to_string(), target_name: "allowedinstance".to_string()}]),
                             target: OfferTarget::static_child("echo".to_string()),
@@ -3515,7 +3541,7 @@ mod tests {
                         OfferDecl::Dictionary(OfferDictionaryDecl {
                             source: OfferSource::Parent,
                             source_name: "bundle".parse().unwrap(),
-                            source_dictionary: Some("in/dict".parse().unwrap()),
+                            source_dictionary: "in/dict".parse().unwrap(),
                             target: OfferTarget::static_child("echo".to_string()),
                             target_name: "mybundle".parse().unwrap(),
                             dependency_type: DependencyType::Weak,

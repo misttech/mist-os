@@ -1748,7 +1748,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseService(UseServiceDecl {
                 source: UseSource::Parent,
                 source_name: "foo".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target_path: "/svc/foo".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -1844,7 +1844,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseService(UseServiceDecl {
                 source: UseSource::Parent,
                 source_name: "foo".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target_path: "/svc/foo".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -1942,7 +1942,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 RouteRequest::UseService(UseServiceDecl {
                     source: UseSource::Parent,
                     source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
+                    source_dictionary: Default::default(),
                     target_path: "/svc/foo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2413,7 +2413,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         .expose(ExposeDecl::EventStream(ExposeEventStreamDecl {
                             source: ExposeSource::Framework,
                             source_name: "started".parse().unwrap(),
-    source_dictionary: None,
+    source_dictionary: Default::default(),
                             scope: Some(vec![EventScope::Child(ChildRef {
                                 name: "e".to_string(),
                                 collection: None,
@@ -3501,7 +3501,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &b_component,
             &mut NoopRouteMapper,
@@ -3580,7 +3580,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &c_component,
             &mut NoopRouteMapper,
@@ -3656,7 +3656,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &c_component,
             &mut NoopRouteMapper,
@@ -3729,7 +3729,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &c_component,
             &mut NoopRouteMapper,
@@ -3791,7 +3791,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &b_component,
             &mut NoopRouteMapper,
@@ -3848,7 +3848,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &b_component,
             &mut NoopRouteMapper,
@@ -3893,7 +3893,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "elf".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &a_component,
             &mut NoopRouteMapper,
@@ -3952,7 +3952,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &b_component,
             &mut NoopRouteMapper,
@@ -3989,7 +3989,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &a_component,
             &mut NoopRouteMapper,
@@ -4051,7 +4051,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Child("b".parse().unwrap()),
                 source_name: "dwarf".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &a_component,
             &mut NoopRouteMapper,
@@ -4115,7 +4115,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Parent,
                 source_name: "dwarf".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &b_component,
             &mut NoopRouteMapper,
@@ -4183,7 +4183,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
             }),
             &b_component,
             &mut NoopRouteMapper,

@@ -141,7 +141,7 @@ async fn expose_pkg_from_framework() {
                 exposes: vec![cm_rust::ExposeDecl::Directory(cm_rust::ExposeDirectoryDecl {
                     source: cm_rust::ExposeSource::Framework,
                     source_name: "pkg".parse().unwrap(),
-                    source_dictionary: None,
+                    source_dictionary: Default::default(),
                     target: cm_rust::ExposeTarget::Parent,
                     target_name: "config".parse().unwrap(),
                     rights: Some(fio::R_STAR_DIR),
@@ -192,7 +192,7 @@ async fn use_pkg_from_framework() {
     config_reader_decl.uses.push(cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
         source: cm_rust::UseSource::Framework,
         source_name: "pkg".parse().unwrap(),
-        source_dictionary: None,
+        source_dictionary: Default::default(),
         target_path: "/config".parse().unwrap(),
         rights: fio::R_STAR_DIR,
         subdir: Some("data".into()),

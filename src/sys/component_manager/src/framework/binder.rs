@@ -26,7 +26,7 @@ lazy_static! {
     static ref DEBUG_REQUEST: RouteRequest = RouteRequest::UseProtocol(cm_rust::UseProtocolDecl {
         source: cm_rust::UseSource::Framework,
         source_name: BINDER_SERVICE.clone(),
-        source_dictionary: None,
+        source_dictionary: Default::default(),
         target_path: cm_types::Path::new("/null").unwrap(),
         dependency_type: cm_rust::DependencyType::Strong,
         availability: Default::default(),

@@ -195,7 +195,7 @@ async fn spawn_local_child() -> SpawnedChild {
     child_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
         source: cm_rust::UseSource::Parent,
         source_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
-        source_dictionary: None,
+        source_dictionary: Default::default(),
         target_path: "/svc/fidl.examples.routing.echo.Echo".parse().unwrap(),
         dependency_type: cm_rust::DependencyType::Strong,
         availability: cm_rust::Availability::Required,

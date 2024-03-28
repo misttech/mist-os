@@ -48,7 +48,7 @@ fn expose_decl(name: &str, id: bt_types::PeerId, capability_name: &str) -> Expos
     ExposeDecl::Protocol(ExposeProtocolDecl {
         source: ExposeSource::Child(name.to_string()),
         source_name: capability_name.parse().unwrap(),
-        source_dictionary: None,
+        source_dictionary: Default::default(),
         target: ExposeTarget::Parent,
         target_name: capability_path_for_peer_id(id, capability_name).parse().unwrap(),
         availability: cm_rust::Availability::Required,
@@ -1005,7 +1005,7 @@ mod tests {
         let expose_profile_decl = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: profile_capability_name.clone().parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: ExposeTarget::Parent,
             target_name: profile_capability_name.clone().parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -1022,7 +1022,7 @@ mod tests {
             let custom_expose_profile_decl = ExposeProtocolDecl {
                 source: ExposeSource::Child(bt_rfcomm_name),
                 source_name: profile_capability_name.parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target: ExposeTarget::Parent,
                 target_name: custom_profile_capability_name,
                 availability: cm_rust::Availability::Required,
@@ -1048,7 +1048,7 @@ mod tests {
         let mut expose_proto_decl = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: profile_capability_name.clone(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: ExposeTarget::Parent,
             target_name: profile_capability_name,
             availability: cm_rust::Availability::Required,
@@ -1088,7 +1088,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: bredr::ProfileTestMarker::PROTOCOL_NAME.parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target_path: format!("/svc/{}", bredr::ProfileTestMarker::PROTOCOL_NAME)
                 .parse()
                 .unwrap(),
@@ -1104,7 +1104,7 @@ mod tests {
         let offer_profile_test = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::static_child(super::mock_piconet_server_moniker().to_string()),
             source_name: profile_test_name.clone(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: OfferTarget::static_child(member_spec.name.clone()),
             target_name: profile_test_name,
             dependency_type: DependencyType::Strong,
@@ -1144,7 +1144,7 @@ mod tests {
         let profile_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: profile_capability_name.clone(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: ExposeTarget::Parent,
             target_name: profile_capability_name.clone(),
             availability: cm_rust::Availability::Required,
@@ -1161,7 +1161,7 @@ mod tests {
         let profile_test_use = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: profile_test_name.clone(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target_path: format!("/svc/{}", bredr::ProfileTestMarker::PROTOCOL_NAME)
                 .parse()
                 .unwrap(),
@@ -1174,7 +1174,7 @@ mod tests {
         let profile_offer = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::static_child(interposer_name.clone()),
             source_name: profile_capability_name.clone(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: OfferTarget::static_child(profile_name.to_string()),
             target_name: profile_capability_name.clone(),
             dependency_type: DependencyType::Strong,
@@ -1187,7 +1187,7 @@ mod tests {
         let profile_test_offer = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::static_child(super::mock_piconet_server_moniker().to_string()),
             source_name: profile_test_name.clone(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: OfferTarget::static_child(interposer_name.clone()),
             target_name: profile_test_name.clone(),
             dependency_type: DependencyType::Strong,
@@ -1200,7 +1200,7 @@ mod tests {
         let log_offer = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Parent,
             source_name: log_capability_name.clone(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: OfferTarget::static_child(profile_name.to_string()),
             target_name: log_capability_name.clone(),
             dependency_type: DependencyType::Strong,
@@ -1243,7 +1243,7 @@ mod tests {
         let profile_offer1 = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::static_child(interposer_name.clone()),
             source_name: profile_capability_name.clone(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: OfferTarget::static_child(bt_rfcomm_name.clone()),
             target_name: profile_capability_name.clone(),
             dependency_type: DependencyType::Strong,
@@ -1253,7 +1253,7 @@ mod tests {
         let profile_offer2 = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::static_child(bt_rfcomm_name.clone()),
             source_name: profile_capability_name.clone(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: OfferTarget::static_child(profile_name.to_string()),
             target_name: profile_capability_name.clone(),
             dependency_type: DependencyType::Strong,
@@ -1299,7 +1299,7 @@ mod tests {
         let fake_capability_expose1 = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child(profile_name.to_string()),
             source_name: fake_cap1.clone().parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: ExposeTarget::Parent,
             target_name: capability_path_for_peer_id(profile_member.peer_id(), &fake_cap1)
                 .parse()
@@ -1310,7 +1310,7 @@ mod tests {
         let fake_capability_expose2 = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child(profile_name.to_string()),
             source_name: fake_cap2.clone().parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: ExposeTarget::Parent,
             target_name: capability_path_for_peer_id(profile_member.peer_id(), &fake_cap2)
                 .parse()
@@ -1321,7 +1321,7 @@ mod tests {
         let fake_capability_offer3 = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Parent,
             source_name: fake_cap3.clone().parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: OfferTarget::static_child(profile_name.to_string()),
             target_name: fake_cap3.parse().unwrap(),
             dependency_type: DependencyType::Strong,
@@ -1373,7 +1373,7 @@ mod tests {
         let profile1_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child(profile_name1.to_string()),
             source_name: fake_cap.clone().parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: ExposeTarget::Parent,
             target_name: capability_path_for_peer_id(profile_member1.peer_id(), &fake_cap)
                 .parse()
@@ -1383,7 +1383,7 @@ mod tests {
         let profile2_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child(profile_name2.to_string()),
             source_name: fake_cap.clone().parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: ExposeTarget::Parent,
             target_name: capability_path_for_peer_id(profile_member2.peer_id(), &fake_cap)
                 .parse()

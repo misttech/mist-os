@@ -979,7 +979,7 @@ impl ComponentModelForAnalyzer {
                     RouteRequest::UseRunner(UseRunnerDecl {
                         source: UseSource::Environment,
                         source_name: runner.clone(),
-                        source_dictionary: None,
+                        source_dictionary: Default::default(),
                     }),
                     target,
                 );
@@ -1499,7 +1499,7 @@ mod tests {
             RouteRequest::UseProtocol(UseProtocolDecl {
                 source: UseSource::Parent,
                 source_name: "bar_svc".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target_path: "/svc/hippo".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,

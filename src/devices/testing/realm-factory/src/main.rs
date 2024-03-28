@@ -123,7 +123,7 @@ async fn add_dynamic_expose(
     decl.exposes.push(cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
         source: cm_rust::ExposeSource::Self_,
         source_name: expose_parsed.clone(),
-        source_dictionary: None,
+        source_dictionary: Default::default(),
         target_name: expose_parsed.clone(),
         target: cm_rust::ExposeTarget::Parent,
         availability: cm_rust::Availability::Required,
@@ -159,7 +159,7 @@ async fn add_dynamic_offer(
     decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
         source: cm_rust::OfferSource::Parent,
         source_name: offer_parsed.clone(),
-        source_dictionary: None,
+        source_dictionary: Default::default(),
         target_name: offer_parsed.clone(),
         target: cm_rust::OfferTarget::Collection(
             "realm_builder".parse::<cm_types::Name>().unwrap(),

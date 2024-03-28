@@ -675,7 +675,7 @@ async fn get_realm(
     debug_data_decl.exposes.push(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
         source: cm_rust::ExposeSource::Self_,
         source_name: "fuchsia.debugdata.Publisher".parse().unwrap(),
-        source_dictionary: None,
+        source_dictionary: Default::default(),
         target: cm_rust::ExposeTarget::Parent,
         target_name: "fuchsia.debugdata.Publisher".parse().unwrap(),
         availability: cm_rust::Availability::Required,
@@ -694,7 +694,7 @@ async fn get_realm(
         cm_rust::ExposeResolverDecl {
             source: cm_rust::ExposeSource::Self_,
             source_name: HERMETIC_RESOLVER_CAPABILITY_NAME.parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: cm_rust::ExposeTarget::Parent,
             target_name: HERMETIC_RESOLVER_CAPABILITY_NAME.parse().unwrap(),
         },

@@ -3015,7 +3015,7 @@ pub mod tests {
                 name: "b".into(),
                 collection: Some("coll_1".parse().unwrap()),
             }),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             source_name: "dyn_offer_source_name".parse().unwrap(),
             target_name: "dyn_offer_target_name".parse().unwrap(),
             dependency_type: DependencyType::Strong,
@@ -3125,7 +3125,7 @@ pub mod tests {
                 collection: Some("coll_1".parse().unwrap()),
             }),
             source_name: "dyn_offer2_source_name".parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target_name: "dyn_offer2_target_name".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -3536,7 +3536,7 @@ pub mod tests {
             vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Parent,
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target: OfferTarget::Child(ChildRef {
                     name: "foo".into(),
                     collection: Some("col".parse().unwrap()),
@@ -3563,7 +3563,7 @@ pub mod tests {
             vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Void,
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target: OfferTarget::Child(ChildRef {
                     name: "foo".into(),
                     collection: Some("col".parse().unwrap()),
@@ -3582,7 +3582,7 @@ pub mod tests {
                             collection: Some("col".parse().unwrap()),
                         })),
                         source_name: Some("fuchsia.example.Echo".to_string()),
-                        source_dictionary: None,
+                        source_dictionary: Default::default(),
                         target: None,
                         target_name: Some("fuchsia.example.Echo".to_string()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
@@ -3600,7 +3600,7 @@ pub mod tests {
                         collection: Some("col".parse().unwrap()),
                     }),
                     source_name: "fuchsia.example.Echo".parse().unwrap(),
-                    source_dictionary: None,
+                    source_dictionary: Default::default(),
                     target: OfferTarget::Child(ChildRef {
                         name: "foo".into(),
                         collection: Some("col".parse().unwrap()),

@@ -277,7 +277,7 @@ mod tests {
         UseDirectoryDecl {
             source,
             source_name,
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target_path: "/dir".parse().unwrap(),
             rights,
             subdir: None,
@@ -296,7 +296,7 @@ mod tests {
         OfferDirectoryDecl {
             source,
             source_name,
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target,
             target_name,
             rights,
@@ -314,7 +314,7 @@ mod tests {
         UseProtocolDecl {
             source,
             source_name,
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target_path: "/dir/svc".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -330,7 +330,7 @@ mod tests {
         OfferProtocolDecl {
             source,
             source_name,
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target,
             target_name,
             dependency_type: DependencyType::Strong,
@@ -1186,7 +1186,7 @@ mod tests {
                                             "dependency_type": "strong",
                                             "rights": 1,
                                             "source": "parent",
-                                            "source_dictionary": null,
+                                            "source_dictionary": ".",
                                             "source_name": "bad_dir",
                                             "subdir": null,
                                             "target_path": "/dir",
@@ -1233,7 +1233,7 @@ mod tests {
                                             "availability": "required",
                                             "dependency_type": "strong",
                                             "source": "parent",
-                                            "source_dictionary": null,
+                                            "source_dictionary": ".",
                                             "source_name": "protocol",
                                             "target_path": "/dir/svc",
                                             "type": "protocol",
@@ -1251,7 +1251,7 @@ mod tests {
                                                     "name": "missing_child",
                                                 },
                                             },
-                                            "source_dictionary": null,
+                                            "source_dictionary": ".",
                                             "source_name": "protocol",
                                             "target": {
                                                 "child": {
@@ -1320,7 +1320,7 @@ mod tests {
                                       "rights": 1,
                                       "source": "parent",
                                       "source_name": "bad_dir",
-                                      "source_dictionary": null,
+                                      "source_dictionary": ".",
                                       "subdir": null,
                                       "target_path": "/dir",
                                       "type": "directory",
@@ -1342,7 +1342,7 @@ mod tests {
                                       "rights": 1,
                                       "source": "parent",
                                       "source_name": "good_dir",
-                                      "source_dictionary": null,
+                                      "source_dictionary": ".",
                                       "subdir": null,
                                       "target_path": "/dir",
                                       "type": "directory"
@@ -1357,7 +1357,7 @@ mod tests {
                                       "rights": 1,
                                       "source": "self_",
                                       "source_name": "good_dir",
-                                      "source_dictionary": null,
+                                      "source_dictionary": ".",
                                       "subdir": null,
                                       "target": {
                                           "child": {
@@ -1415,7 +1415,7 @@ mod tests {
                                     "dependency_type": "strong",
                                     "source": "parent",
                                     "source_name": "protocol",
-                                    "source_dictionary": null,
+                                    "source_dictionary": ".",
                                     "target_path": "/dir/svc",
                                     "type": "protocol",
                                 },
@@ -1433,7 +1433,7 @@ mod tests {
                                         },
                                     },
                                     "source_name": "protocol",
-                                    "source_dictionary": null,
+                                    "source_dictionary": ".",
                                     "target": {
                                         "child": {
                                             "collection": null,
@@ -1503,7 +1503,7 @@ mod tests {
                                             "rights": 1,
                                             "source": "parent",
                                             "source_name": "bad_dir",
-                                            "source_dictionary": null,
+                                            "source_dictionary": ".",
                                             "subdir": null,
                                             "target_path": "/dir",
                                             "type": "directory",
@@ -1544,7 +1544,7 @@ mod tests {
                                             "dependency_type": "strong",
                                             "source": "parent",
                                             "source_name": "protocol",
-                                            "source_dictionary": null,
+                                            "source_dictionary": ".",
                                             "target_path": "/dir/svc",
                                             "type": "protocol",
                                         },
@@ -1562,7 +1562,7 @@ mod tests {
                                                 },
                                             },
                                             "source_name": "protocol",
-                                            "source_dictionary": null,
+                                            "source_dictionary": ".",
                                             "target": {
                                                 "child": {
                                                     "collection": null,
@@ -1630,7 +1630,7 @@ mod tests {
                                       "rights": 1,
                                       "source": "parent",
                                       "source_name": "bad_dir",
-                                      "source_dictionary": null,
+                                      "source_dictionary": ".",
                                       "subdir": null,
                                       "target_path": "/dir",
                                       "type": "directory",

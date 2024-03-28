@@ -68,7 +68,7 @@ where
     V: Clone + Send + Sync + 'static,
 {
     let cap_type = CapabilityTypeName::from(&use_decl);
-    if use_decl.source_path().dirname.is_some() {
+    if !use_decl.source_path().dirname.is_dot() {
         return Err(RoutingError::DictionariesNotSupported { cap_type });
     }
     match Use::route(use_decl, use_target.clone(), &sources, visitor, mapper).await? {
@@ -155,7 +155,7 @@ where
 {
     let cap_type = CapabilityTypeName::from(offer.iter().next().unwrap());
     for offer in offer.iter() {
-        if offer.source_path().dirname.is_some() {
+        if !offer.source_path().dirname.is_dot() {
             return Err(RoutingError::DictionariesNotSupported { cap_type });
         }
     }
@@ -312,7 +312,7 @@ where
 {
     let cap_type = CapabilityTypeName::from(expose.iter().next().unwrap());
     for expose in expose.iter() {
-        if expose.source_path().dirname.is_some() {
+        if !expose.source_path().dirname.is_dot() {
             return Err(RoutingError::DictionariesNotSupported { cap_type });
         }
     }
@@ -374,7 +374,7 @@ where
     V: Clone + Send + Sync + 'static,
 {
     let cap_type = CapabilityTypeName::from(&use_decl);
-    if use_decl.source_path().dirname.is_some() {
+    if !use_decl.source_path().dirname.is_dot() {
         return Err(RoutingError::DictionariesNotSupported { cap_type });
     }
     mapper.add_use(target.moniker().clone(), &use_decl.clone().into());
@@ -1627,7 +1627,7 @@ mod tests {
             .map(|i| OfferServiceDecl {
                 source: OfferSource::Parent,
                 source_name: format!("foo_source_{}", i).parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target: OfferTarget::Collection("coll".parse().unwrap()),
                 target_name: "foo_target".parse().unwrap(),
                 source_instance_filter: None,
@@ -1638,7 +1638,7 @@ mod tests {
         let collection_offer = OfferServiceDecl {
             source: OfferSource::Collection("coll".parse().unwrap()),
             source_name: "foo_source".parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: OfferTarget::Child(ChildRef { name: "target".into(), collection: None }),
             target_name: "foo_target".parse().unwrap(),
             source_instance_filter: None,
@@ -1670,7 +1670,7 @@ mod tests {
             .map(|i| ExposeServiceDecl {
                 source: ExposeSource::Child("source".into()),
                 source_name: format!("foo_source_{}", i).parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target: ExposeTarget::Parent,
                 target_name: "foo_target".parse().unwrap(),
                 availability: Availability::Required,
@@ -1679,7 +1679,7 @@ mod tests {
         let collection_expose = ExposeServiceDecl {
             source: ExposeSource::Collection("coll".parse().unwrap()),
             source_name: "foo_source".parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target: ExposeTarget::Parent,
             target_name: "foo_target".parse().unwrap(),
             availability: Availability::Required,

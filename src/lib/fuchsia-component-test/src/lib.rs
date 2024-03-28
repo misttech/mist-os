@@ -957,7 +957,7 @@ impl RealmBuilder {
                     let expose = ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: decl.target_name.clone(),
-                        source_dictionary: None,
+                        source_dictionary: Default::default(),
                         target: ExposeTarget::Parent,
                         target_name: decl.target_name.clone(),
                         availability: decl.availability,

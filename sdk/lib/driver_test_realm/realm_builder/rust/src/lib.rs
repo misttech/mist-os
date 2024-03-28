@@ -72,7 +72,7 @@ impl DriverTestRealmBuilder for RealmBuilder {
         decl.exposes.push(cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
             source: cm_rust::ExposeSource::Self_,
             source_name: S::SERVICE_NAME.parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target_name: S::SERVICE_NAME.parse().unwrap(),
             target: cm_rust::ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
@@ -96,7 +96,7 @@ impl DriverTestRealmBuilder for RealmBuilder {
         decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
             source: cm_rust::OfferSource::Parent,
             source_name: P::PROTOCOL_NAME.parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target_name: P::PROTOCOL_NAME.parse().unwrap(),
             target: cm_rust::OfferTarget::Collection("realm_builder".parse().unwrap()),
             dependency_type: cm_rust::DependencyType::Strong,

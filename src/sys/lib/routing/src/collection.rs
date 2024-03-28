@@ -443,7 +443,7 @@ mod tests {
             super::get_instance_filter(&OfferServiceDecl {
                 source: OfferSource::Parent,
                 source_name: "foo".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target: OfferTarget::Child(ChildRef { name: "a".into(), collection: None }),
                 target_name: "bar".parse().unwrap(),
                 source_instance_filter,

@@ -100,7 +100,7 @@ impl ComponentDeclBuilder {
             dependency_type: cm_rust::DependencyType::Strong,
             source: cm_rust::UseSource::Framework,
             source_name: "fuchsia.component.Realm".parse().unwrap(),
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
@@ -584,7 +584,7 @@ impl From<CapabilityBuilder> for cm_rust::CapabilityDecl {
 pub struct UseBuilder {
     source_name: Option<Name>,
     type_: CapabilityTypeName,
-    source_dictionary: Option<RelativePath>,
+    source_dictionary: RelativePath,
     source: cm_rust::UseSource,
     target_name: Option<Name>,
     target_path: Option<Path>,
@@ -633,7 +633,7 @@ impl UseBuilder {
             source_name: None,
             target_name: None,
             target_path: None,
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             rights: fio::R_STAR_DIR,
             subdir: None,
             dependency_type: cm_rust::DependencyType::Strong,
@@ -697,7 +697,7 @@ impl UseBuilder {
                 | CapabilityTypeName::Directory
                 | CapabilityTypeName::Runner
         );
-        self.source_dictionary = Some(dictionary.parse().unwrap());
+        self.source_dictionary = dictionary.parse().unwrap();
         self
     }
 
@@ -833,7 +833,7 @@ impl From<UseBuilder> for cm_rust::UseDecl {
 pub struct ExposeBuilder {
     source_name: Option<Name>,
     type_: CapabilityTypeName,
-    source_dictionary: Option<RelativePath>,
+    source_dictionary: RelativePath,
     source: Option<cm_rust::ExposeSource>,
     target: cm_rust::ExposeTarget,
     target_name: Option<Name>,
@@ -878,7 +878,7 @@ impl ExposeBuilder {
             target: cm_rust::ExposeTarget::Parent,
             source_name: None,
             target_name: None,
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             rights: None,
             subdir: None,
             availability: cm_rust::Availability::Required,
@@ -909,7 +909,7 @@ impl ExposeBuilder {
                 | CapabilityTypeName::Runner
                 | CapabilityTypeName::Resolver
         );
-        self.source_dictionary = Some(dictionary.parse().unwrap());
+        self.source_dictionary = dictionary.parse().unwrap();
         self
     }
 
@@ -1037,7 +1037,7 @@ impl From<ExposeBuilder> for cm_rust::ExposeDecl {
 pub struct OfferBuilder {
     source_name: Option<Name>,
     type_: CapabilityTypeName,
-    source_dictionary: Option<RelativePath>,
+    source_dictionary: RelativePath,
     source: Option<cm_rust::OfferSource>,
     target: Option<cm_rust::OfferTarget>,
     target_name: Option<Name>,
@@ -1094,7 +1094,7 @@ impl OfferBuilder {
             target: None,
             source_name: None,
             target_name: None,
-            source_dictionary: None,
+            source_dictionary: Default::default(),
             source_instance_filter: None,
             renamed_instances: None,
             rights: None,
@@ -1129,7 +1129,7 @@ impl OfferBuilder {
                 | CapabilityTypeName::Runner
                 | CapabilityTypeName::Resolver
         );
-        self.source_dictionary = Some(dictionary.parse().unwrap());
+        self.source_dictionary = dictionary.parse().unwrap();
         self
     }
 

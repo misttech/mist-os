@@ -257,7 +257,7 @@ impl<'de, const N: usize> de::Deserialize<'de> for BoundedName<N> {
 ///
 /// Note that while `"/"` is accepted, `"."` (which is synonymous in fuchsia.io) is rejected.
 #[derive(Eq, Ord, PartialOrd, PartialEq, Hash, Clone)]
-pub struct NamespacePath(Option<RelativePath>);
+pub struct NamespacePath(RelativePath);
 
 impl NamespacePath {
     /// Like [Path::new] but `path` may be `/`.
@@ -266,6 +266,9 @@ impl NamespacePath {
         if path.is_empty() {
             return Err(ParseError::Empty);
         }
+        if path == "." {
+            return Err(ParseError::InvalidValue);
+        }
         if !path.starts_with('/') {
             return Err(ParseError::NoLeadingSlash);
         }
@@ -273,20 +276,20 @@ impl NamespacePath {
             return Err(ParseError::TooLong);
         }
         if path == "/" {
-            Ok(Self(None))
+            Ok(Self(RelativePath::dot()))
         } else {
-            Ok(Self(Some(path[1..].parse()?)))
+            Ok(Self(path[1..].parse()?))
         }
     }
 
     /// Returns the [NamespacePath] for `"/"`.
     pub fn root() -> Self {
-        Self(None)
+        Self(RelativePath::dot())
     }
 
     /// Splits the path according to `"/"`.
     pub fn split(&self) -> Vec<Name> {
-        self.0.as_ref().map(|p| p.split()).unwrap_or_default()
+        self.0.split()
     }
 
     pub fn to_path_buf(&self) -> PathBuf {
@@ -296,7 +299,7 @@ impl NamespacePath {
     /// Returns a path that represents the parent directory of this one, or None if this is a
     /// root dir.
     pub fn parent(&self) -> Option<Self> {
-        self.0.as_ref().map(|p| Self(p.parent()))
+        self.0.parent().map(|p| Self(p))
     }
 
     /// Returns whether `prefix` is a prefix of `self` in terms of path segments.
@@ -314,13 +317,13 @@ impl NamespacePath {
 
     /// The last path segment, or None.
     pub fn basename(&self) -> Option<&Name> {
-        self.0.as_ref().map(|p| p.basename())
+        self.0.basename()
     }
 }
 
 impl IterablePath for NamespacePath {
     fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + '_> {
-        self.0.as_ref().map(|p| p.iter_segments()).unwrap_or_else(|| Box::new(iter::empty()))
+        self.0.iter_segments()
     }
 }
 
@@ -371,8 +374,8 @@ impl fmt::Debug for NamespacePath {
 
 impl fmt::Display for NamespacePath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(p) = &self.0 {
-            write!(f, "/{p}")
+        if !self.0.is_dot() {
+            write!(f, "/{}", self.0)
         } else {
             write!(f, "/")
         }
@@ -384,12 +387,13 @@ impl fmt::Display for NamespacePath {
 ///
 /// - [NamespacePath]: Namespace paths
 /// - [Path]: Outgoing paths and namespace paths that can't be "/"
-/// - [RelativePath]: Dictionary paths and subdir paths
+/// - [RelativePath]: Dictionary paths
 ///
 /// [Path] obeys the following constraints:
 ///
 /// - Is a [fuchsia.io.Path](https://fuchsia.dev/reference/fidl/fuchsia.io#Directory.Open).
 /// - Begins with `/`.
+/// - Is not `.`.
 /// - Contains at least one path segment (just `/` is disallowed).
 /// - Each path segment is a [Name]. (This is strictly more constrained than a fuchsia.io
 ///   path segment.)
@@ -420,14 +424,14 @@ impl ser::Serialize for Path {
 impl Path {
     /// Creates a [`Path`] from a [`String`], returning an `Err` if the string fails validation.
     /// The string must be non-empty, no more than [`MAX_PATH_LENGTH`] bytes in length, start with
-    /// a leading `/`, not be exactly `/`, and each segment must be a valid [`Name`]. As a result,
-    /// [`Path`]s are always valid [`NamespacePath`]s.
+    /// a leading `/`, not be exactly `/` or `.`, and each segment must be a valid [`Name`]. As a
+    /// result, [`Path`]s are always valid [`NamespacePath`]s.
     pub fn new(path: impl AsRef<str>) -> Result<Self, ParseError> {
         let path = path.as_ref();
         if path.is_empty() {
             return Err(ParseError::Empty);
         }
-        if path == "/" {
+        if path == "/" || path == "." {
             return Err(ParseError::InvalidValue);
         }
         if !path.starts_with('/') {
@@ -451,14 +455,12 @@ impl Path {
     /// Returns a path that represents the parent directory of this one. Returns [NamespacePath]
     /// instead of [Path] because the parent could be the root dir.
     pub fn parent(&self) -> NamespacePath {
-        match self.0.parent() {
-            p @ Some(_) => NamespacePath(p),
-            None => NamespacePath::root(),
-        }
+        let p = self.0.parent().expect("can't be root");
+        NamespacePath(p)
     }
 
     pub fn basename(&self) -> &Name {
-        self.0.basename()
+        self.0.basename().expect("can't be root")
     }
 }
 
@@ -470,7 +472,7 @@ impl IterablePath for Path {
 
 impl From<Path> for NamespacePath {
     fn from(value: Path) -> Self {
-        Self(Some(value.0))
+        Self(value.0)
     }
 }
 
@@ -551,15 +553,18 @@ impl<'de> de::Deserialize<'de> for Path {
 }
 
 /// Same as [Path] except the path does not begin with `/`.
-#[derive(Eq, Ord, PartialOrd, PartialEq, Hash, Clone)]
+#[derive(Eq, Ord, PartialOrd, PartialEq, Hash, Clone, Default)]
 pub struct RelativePath {
     segments: Vec<Name>,
 }
 
 impl RelativePath {
-    /// Like [Path::new] but `path` must not begin with `/`.
+    /// Like [Path::new] but `path` must not begin with `/` and may be `.`.
     pub fn new(path: impl AsRef<str>) -> Result<Self, ParseError> {
         let path: &str = path.as_ref();
+        if path == "." {
+            return Ok(Self::dot());
+        }
         if path.is_empty() {
             return Err(ParseError::Empty);
         }
@@ -578,8 +583,16 @@ impl RelativePath {
         Ok(Self { segments })
     }
 
+    pub fn dot() -> Self {
+        Self { segments: vec![] }
+    }
+
+    pub fn is_dot(&self) -> bool {
+        self.segments.is_empty()
+    }
+
     pub fn parent(&self) -> Option<Self> {
-        if self.segments.len() <= 1 {
+        if self.segments.is_empty() {
             None
         } else {
             let segments: Vec<_> =
@@ -592,8 +605,8 @@ impl RelativePath {
         self.segments.clone()
     }
 
-    pub fn basename(&self) -> &Name {
-        self.segments.last().expect("can't be empty")
+    pub fn basename(&self) -> Option<&Name> {
+        self.segments.last()
     }
 
     pub fn to_path_buf(&self) -> PathBuf {
@@ -629,7 +642,11 @@ impl fmt::Debug for RelativePath {
 
 impl fmt::Display for RelativePath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.segments.join("/"))
+        if self.is_dot() {
+            write!(f, ".")
+        } else {
+            write!(f, "{}", self.segments.join("/"))
+        }
     }
 }
 
@@ -655,8 +672,7 @@ impl<'de> de::Deserialize<'de> for RelativePath {
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.write_str(
                     "a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters \
-                     in length, not starting with `/`, and containing no \
-                     empty path segments",
+                     in length, not starting with `/`, and containing no empty path segments",
                 )
             }
 
@@ -691,21 +707,21 @@ impl<'de> de::Deserialize<'de> for RelativePath {
 /// dirname and basename, like Fuchsia component decl.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BorrowedSeparatedPath<'a> {
-    pub dirname: Option<&'a RelativePath>,
+    pub dirname: &'a RelativePath,
     pub basename: &'a Name,
 }
 
 impl BorrowedSeparatedPath<'_> {
     /// Converts this [BorrowedSeparatedPath] to the owned type.
     pub fn to_owned(&self) -> SeparatedPath {
-        SeparatedPath { dirname: self.dirname.map(Clone::clone), basename: self.basename.clone() }
+        SeparatedPath { dirname: self.dirname.clone(), basename: self.basename.clone() }
     }
 }
 
 impl fmt::Display for BorrowedSeparatedPath<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(dirname) = &self.dirname {
-            write!(f, "{}/{}", dirname, self.basename)
+        if !self.dirname.is_dot() {
+            write!(f, "{}/{}", self.dirname, self.basename)
         } else {
             write!(f, "{}", self.basename)
         }
@@ -714,11 +730,7 @@ impl fmt::Display for BorrowedSeparatedPath<'_> {
 
 impl IterablePath for BorrowedSeparatedPath<'_> {
     fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + '_> {
-        if let Some(d) = self.dirname {
-            Box::new(d.iter_segments().chain(iter::once(self.basename)))
-        } else {
-            Box::new(iter::once(self.basename))
-        }
+        Box::new(self.dirname.iter_segments().chain(iter::once(self.basename)))
     }
 }
 
@@ -727,31 +739,27 @@ impl IterablePath for BorrowedSeparatedPath<'_> {
 /// basename, like Fuchsia component decl.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SeparatedPath {
-    pub dirname: Option<RelativePath>,
+    pub dirname: RelativePath,
     pub basename: Name,
 }
 
 impl SeparatedPath {
     /// Obtains a reference to this [SeparatedPath] as the borrowed type.
     pub fn as_ref(&self) -> BorrowedSeparatedPath<'_> {
-        BorrowedSeparatedPath { dirname: self.dirname.as_ref(), basename: &self.basename }
+        BorrowedSeparatedPath { dirname: &self.dirname, basename: &self.basename }
     }
 }
 
 impl IterablePath for SeparatedPath {
     fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + '_> {
-        if let Some(d) = &self.dirname {
-            Box::new(d.iter_segments().chain(iter::once(&self.basename)))
-        } else {
-            Box::new(iter::once(&self.basename))
-        }
+        Box::new(self.dirname.iter_segments().chain(iter::once(&self.basename)))
     }
 }
 
 impl fmt::Display for SeparatedPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(dirname) = &self.dirname {
-            write!(f, "{}/{}", dirname, self.basename)
+        if !self.dirname.is_dot() {
+            write!(f, "{}/{}", self.dirname, self.basename)
         } else {
             write!(f, "{}", self.basename)
         }
@@ -1208,6 +1216,24 @@ mod tests {
         };
     }
 
+    macro_rules! expect_ok_no_serialize {
+        ($type_:ty, $($input:tt)+) => {
+            assert_matches!(
+                ($($input)*).parse::<$type_>(),
+                Ok(_)
+            );
+        };
+    }
+
+    macro_rules! expect_err_no_serialize {
+        ($type_:ty, $err:pat, $($input:tt)+) => {
+            assert_matches!(
+                ($($input)*).parse::<$type_>(),
+                Err($err)
+            );
+        };
+    }
+
     macro_rules! expect_err {
         ($type_:ty, $err:pat, $($input:tt)+) => {
             assert_matches!(
@@ -1252,11 +1278,13 @@ mod tests {
     fn test_invalid_path() {
         expect_err!(Path, ParseError::Empty, "");
         expect_err!(Path, ParseError::InvalidValue, "/");
+        expect_err!(Path, ParseError::InvalidValue, ".");
         expect_err!(Path, ParseError::NoLeadingSlash, "foo");
         expect_err!(Path, ParseError::NoLeadingSlash, "foo/");
         expect_err!(Path, ParseError::InvalidValue, "/foo/");
         expect_err!(Path, ParseError::InvalidValue, "/foo//bar");
         expect_err!(Path, ParseError::InvalidSegment, "/fo\0b/bar");
+        expect_err!(Path, ParseError::InvalidSegment, "/foo/.");
         expect_err!(
             Path,
             ParseError::InvalidSegment,
@@ -1264,6 +1292,45 @@ mod tests {
         );
         // 2048 * 2 characters per repeat = 4096
         expect_err!(
+            Path,
+            ParseError::TooLong,
+            repeat("/x").take(2048).collect::<String>().as_str()
+        );
+    }
+
+    #[test]
+    fn test_valid_namespace_path() {
+        expect_ok_no_serialize!(NamespacePath, "/");
+        expect_ok_no_serialize!(NamespacePath, "/foo");
+        expect_ok_no_serialize!(NamespacePath, "/foo/bar");
+        expect_ok_no_serialize!(
+            NamespacePath,
+            format!("/{}", repeat("x").take(100).collect::<String>()).as_str()
+        );
+        // 2047 * 2 characters per repeat = 4094
+        expect_ok_no_serialize!(
+            NamespacePath,
+            repeat("/x").take(2047).collect::<String>().as_str()
+        );
+    }
+
+    #[test]
+    fn test_invalid_namespace_path() {
+        expect_err_no_serialize!(NamespacePath, ParseError::Empty, "");
+        expect_err_no_serialize!(NamespacePath, ParseError::InvalidValue, ".");
+        expect_err_no_serialize!(NamespacePath, ParseError::NoLeadingSlash, "foo");
+        expect_err_no_serialize!(NamespacePath, ParseError::NoLeadingSlash, "foo/");
+        expect_err_no_serialize!(NamespacePath, ParseError::InvalidValue, "/foo/");
+        expect_err_no_serialize!(NamespacePath, ParseError::InvalidValue, "/foo//bar");
+        expect_err_no_serialize!(NamespacePath, ParseError::InvalidSegment, "/fo\0b/bar");
+        expect_err_no_serialize!(NamespacePath, ParseError::InvalidSegment, "/foo/.");
+        expect_err_no_serialize!(
+            NamespacePath,
+            ParseError::InvalidSegment,
+            format!("/{}", repeat("x").take(256).collect::<String>()).as_str()
+        );
+        // 2048 * 2 characters per repeat = 4096
+        expect_err_no_serialize!(
             Path,
             ParseError::TooLong,
             repeat("/x").take(2048).collect::<String>().as_str()
@@ -1306,25 +1373,23 @@ mod tests {
             assert_eq!(format!("{path}"), expected_fmt);
             assert_eq!(format!("{owned_path}"), expected_fmt);
         }
-        test_path(SeparatedPath { dirname: None, basename: "foo".parse().unwrap() }, vec!["foo"]);
         test_path(
-            SeparatedPath {
-                dirname: Some("bar".parse().unwrap()),
-                basename: "foo".parse().unwrap(),
-            },
+            SeparatedPath { dirname: ".".parse().unwrap(), basename: "foo".parse().unwrap() },
+            vec!["foo"],
+        );
+        test_path(
+            SeparatedPath { dirname: "bar".parse().unwrap(), basename: "foo".parse().unwrap() },
             vec!["bar", "foo"],
         );
         test_path(
-            SeparatedPath {
-                dirname: Some("bar/baz".parse().unwrap()),
-                basename: "foo".parse().unwrap(),
-            },
+            SeparatedPath { dirname: "bar/baz".parse().unwrap(), basename: "foo".parse().unwrap() },
             vec!["bar", "baz", "foo"],
         );
     }
 
     #[test]
     fn test_valid_relative_path() {
+        expect_ok!(RelativePath, ".");
         expect_ok!(RelativePath, "foo");
         expect_ok!(RelativePath, "foo/bar");
         expect_ok!(RelativePath, &format!("x{}", repeat("/x").take(2047).collect::<String>()));
@@ -1338,6 +1403,7 @@ mod tests {
         expect_err!(RelativePath, ParseError::InvalidValue, "foo/");
         expect_err!(RelativePath, ParseError::InvalidValue, "/foo/");
         expect_err!(RelativePath, ParseError::InvalidValue, "foo//bar");
+        expect_err!(RelativePath, ParseError::InvalidSegment, "..");
         expect_err!(RelativePath, ParseError::InvalidSegment, "foo/..");
         expect_err!(
             RelativePath,

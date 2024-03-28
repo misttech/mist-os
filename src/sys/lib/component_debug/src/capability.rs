@@ -181,7 +181,7 @@ mod tests {
                     uses: vec![UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "fuchsia.foo.bar".parse().unwrap(),
-                        source_dictionary: None,
+                        source_dictionary: Default::default(),
                         target_path: "/svc/fuchsia.foo.bar".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -189,7 +189,7 @@ mod tests {
                     exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "fuchsia.foo.bar".parse().unwrap(),
-                        source_dictionary: None,
+                        source_dictionary: Default::default(),
                         target: ExposeTarget::Parent,
                         target_name: "fuchsia.foo.bar".parse().unwrap(),
                         availability: Availability::Required,
@@ -197,7 +197,7 @@ mod tests {
                     offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "fuchsia.foo.bar".parse().unwrap(),
-                        source_dictionary: None,
+                        source_dictionary: Default::default(),
                         target: OfferTarget::Child(ChildRef {
                             name: "my_bar".into(),
                             collection: None,
@@ -244,7 +244,7 @@ mod tests {
                         UseDecl::Protocol(UseProtocolDecl {
                             source: UseSource::Parent,
                             source_name: "fuchsia.foo.bar".parse().unwrap(),
-                            source_dictionary: None,
+                            source_dictionary: Default::default(),
                             target_path: "/svc/fuchsia.foo.bar".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
                             availability: Availability::Required
@@ -259,7 +259,7 @@ mod tests {
                         OfferDecl::Protocol(OfferProtocolDecl {
                             source: OfferSource::Self_,
                             source_name: "fuchsia.foo.bar".parse().unwrap(),
-                            source_dictionary: None,
+                            source_dictionary: Default::default(),
                             target: OfferTarget::Child(ChildRef {
                                 name: "my_bar".into(),
                                 collection: None,
@@ -278,7 +278,7 @@ mod tests {
                         ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
                             source_name: "fuchsia.foo.bar".parse().unwrap(),
-                            source_dictionary: None,
+                            source_dictionary: Default::default(),
                             target: ExposeTarget::Parent,
                             target_name: "fuchsia.foo.bar".parse().unwrap(),
                             availability: Availability::Required

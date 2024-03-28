@@ -420,14 +420,14 @@ pub(crate) mod test {
                 dependency_type: cm::DependencyType::Strong,
                 source: cm::UseSource::Parent,
                 source_name: "test_protocol".parse().expect("use protocol name"),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target_path: "/svc/test_protocol".parse().expect("use protocol target path"),
                 availability: cm::Availability::Required,
             }))
             .expose(cm::ExposeDecl::Protocol(cm::ExposeProtocolDecl {
                 source: cm::ExposeSource::Self_,
                 source_name: "test_protocol".parse().expect("expose protocol source name"),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target_name: "test_protocol".parse().expect("expose protocol target name"),
                 target: cm::ExposeTarget::Parent,
                 availability: cm::Availability::Required,
@@ -435,7 +435,7 @@ pub(crate) mod test {
             .offer(cm::OfferDecl::Protocol(cm::OfferProtocolDecl {
                 source: cm::OfferSource::Parent,
                 source_name: "test_protocol".parse().unwrap(),
-                source_dictionary: None,
+                source_dictionary: Default::default(),
                 target: cm::OfferTarget::static_child("test_child".to_string()),
                 target_name: "test_protocol".parse().unwrap(),
                 dependency_type: cm::DependencyType::Strong,

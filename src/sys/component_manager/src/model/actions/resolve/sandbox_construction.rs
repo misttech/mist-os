@@ -362,8 +362,10 @@ fn build_environment(
     }
     for debug_registration in &environment_decl.debug_capabilities {
         let cm_rust::DebugRegistration::Protocol(debug_protocol) = debug_registration;
-        let source_path =
-            SeparatedPath { dirname: None, basename: debug_protocol.source_name.clone() };
+        let source_path = SeparatedPath {
+            dirname: Default::default(),
+            basename: debug_protocol.source_name.clone(),
+        };
         let router = match &debug_protocol.source {
             cm_rust::RegistrationSource::Parent => {
                 use_from_parent_router(component_input, source_path, component.as_weak())

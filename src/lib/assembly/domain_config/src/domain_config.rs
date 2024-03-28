@@ -177,7 +177,7 @@ mod tests {
         assert_matches!(&component.exposes[0], ExposeDecl::Directory(ExposeDirectoryDecl {
             source: ExposeSource::Framework,
             source_name,
-            source_dictionary: None,
+            source_dictionary,
             target: ExposeTarget::Parent,
             target_name,
             rights: _,
@@ -185,6 +185,7 @@ mod tests {
             availability: _,
         }) => {
             assert_eq!(source_name, &cml::Name::new("pkg").unwrap());
+            assert!(source_dictionary.is_dot());
             assert_eq!(target_name, &cml::Name::new("config-dir").unwrap());
             assert_eq!(subdir, &PathBuf::from("meta/fuchsia.domain_config/config-dir"));
         });
@@ -335,7 +336,7 @@ mod tests {
         assert_matches!(&component.exposes[0], ExposeDecl::Directory(ExposeDirectoryDecl {
             source: ExposeSource::Framework,
             source_name,
-            source_dictionary: None,
+            source_dictionary,
             target: ExposeTarget::Parent,
             target_name,
             rights: _,
@@ -343,6 +344,7 @@ mod tests {
             availability: _,
         }) => {
             assert_eq!(source_name, &cml::Name::new("pkg").unwrap());
+            assert!(source_dictionary.is_dot());
             assert_eq!(target_name, &cml::Name::new("config-dir").unwrap());
             assert_eq!(subdir, &PathBuf::from("meta/fuchsia.domain_config/config-dir"));
         });
