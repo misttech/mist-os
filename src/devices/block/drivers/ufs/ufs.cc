@@ -28,11 +28,9 @@ zx::result<> Ufs::NotifyEventCallback(NotifyEvent event, uint64_t data) {
     case NotifyEvent::kPostLinkStartup:
     case NotifyEvent::kDeviceInitDone:
     case NotifyEvent::kSetupTransferRequestList:
-      return zx::ok();
-    // If these get called we're probably in trouble.
     case NotifyEvent::kPrePowerModeChange:
     case NotifyEvent::kPostPowerModeChange:
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
+      return zx::ok();
     default:
       return zx::error(ZX_ERR_INVALID_ARGS);
   };
@@ -559,13 +557,18 @@ zx::result<> Ufs::InitDeviceInterface() {
     return result.take_error();
   }
 
-  if (zx::result<> result = device_manager_->SetReferenceClock(); result.is_error()) {
-    zxlogf(ERROR, "Failed to set reference clock %s", result.status_string());
+  if (zx::result<> result = device_manager_->InitReferenceClock(); result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize reference clock %s", result.status_string());
     return result.take_error();
   }
 
-  if (zx::result<> result = device_manager_->SetUicPowerMode(); result.is_error()) {
-    zxlogf(ERROR, "Failed to set UIC power mode %s", result.status_string());
+  if (zx::result<> result = device_manager_->InitUicPowerMode(); result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize UIC power mode %s", result.status_string());
+    return result.take_error();
+  }
+
+  if (zx::result<> result = device_manager_->InitUfsPowerMode(); result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize UFS power mode %s", result.status_string());
     return result.take_error();
   }
 
@@ -838,6 +841,27 @@ void Ufs::DdkRelease() {
   }
 
   delete this;
+}
+
+void Ufs::DdkSuspend(ddk::SuspendTxn txn) {
+  zxlogf(INFO, "Ufs DdkSuspend, suspend_reason = %d, requested_state = %d", txn.suspend_reason(),
+         txn.requested_state());
+
+  if (auto result = device_manager_->Suspend(); result.is_error()) {
+    txn.Reply(result.error_value(), txn.requested_state());
+    return;
+  }
+  txn.Reply(ZX_OK, txn.requested_state());
+}
+
+void Ufs::DdkResume(ddk::ResumeTxn txn) {
+  zxlogf(INFO, "Ufs DdkResume, requested_state = %d", txn.requested_state());
+
+  if (auto result = device_manager_->Resume(); result.is_error()) {
+    txn.Reply(result.error_value(), DEV_POWER_STATE_D1, txn.requested_state());
+    return;
+  }
+  txn.Reply(ZX_OK, DEV_POWER_STATE_D0, txn.requested_state());
 }
 
 static zx_driver_ops_t driver_ops = {

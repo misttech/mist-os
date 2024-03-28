@@ -38,9 +38,11 @@ and provides reliable data transfer through the M-PHY physical layer.
 
 ## TODO
 * Support write booster
-* Support Power Mode
 * Support RPMB logical unit
 * Support Utp Task Management Request
+* Support write protect
+* Support runtime suspend
+* Support background operation
 * Implement Ufs tools
 * Integration tests
 * Support high speed gear 2

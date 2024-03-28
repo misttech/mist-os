@@ -53,9 +53,9 @@ zx::result<> UicCommand::SendUicCommand() {
 
   UicCommandReg::Get().FromValue(static_cast<uint8_t>(GetOpcode())).WriteTo(&mmio);
 
-  // TODO(https://fxbug.dev/42075643): Currently, the UIC commands are only used during the initialisation
-  // process, so we implemented them as polling. However, if DME_HIBERNATE and DME_POWERMODE are
-  // added in the future, it should be changed to an interrupt method.
+  // TODO(https://fxbug.dev/42075643): Currently, the UIC commands are only used during the
+  // initialization process, so we implemented them as polling. However, if DME_HIBERNATE and
+  // DME_POWERMODE are added in the future, it should be changed to an interrupt method.
 
   // Wait for 'UIC command completion status'
   auto wait_for_completion = [&]() -> bool {
@@ -134,6 +134,15 @@ zx::result<> DmeHibernateCommand::UicPostProcess() {
   if (zx_status_t status = GetController().WaitWithTimeout(wait_for, timeout, timeout_message);
       status != ZX_OK) {
     return zx::error(status);
+  }
+
+  HostControllerStatusReg::PowerModeStatus power_mode_state =
+      HostControllerStatusReg::Get().ReadFrom(&mmio).uic_power_mode_change_request_status();
+  if (power_mode_state != HostControllerStatusReg::PowerModeStatus::kPowerOk &&
+      power_mode_state != HostControllerStatusReg::PowerModeStatus::kPowerLocal &&
+      power_mode_state != HostControllerStatusReg::PowerModeStatus::kPowerRemote) {
+    zxlogf(ERROR, "Failed to change power mode, UPMCRS = 0x%x\n", power_mode_state);
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   InterruptStatusReg::Get().FromValue(flag).WriteTo(&mmio);

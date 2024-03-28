@@ -15,7 +15,7 @@ namespace ufs {
 enum class Attributes {
   bBootLunEn = 0x00,
   bCurrentPowerMode = 0x02,
-  bActiveICCLevel = 0x03,
+  bActiveIccLevel = 0x03,
   bOutOfOrderDataEn = 0x04,
   bBackgroundOpStatus = 0x05,
   bPurgeStatus = 0x06,

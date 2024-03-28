@@ -76,4 +76,12 @@ uint8_t UfsTest::GetSlotStateCount(SlotState slot_state) {
   return count;
 }
 
+zx::result<uint32_t> UfsTest::ReadAttribute(Attributes attribute) {
+  return ufs_->GetDeviceManager().ReadAttribute(attribute);
+}
+
+zx::result<> UfsTest::WriteAttribute(Attributes attribute, uint32_t value) {
+  return ufs_->GetDeviceManager().WriteAttribute(attribute, value);
+}
+
 }  // namespace ufs

@@ -38,6 +38,9 @@ zx_status_t QueryRequestProcessor::DefaultReadDescriptorHandler(UfsMockDevice &m
     uint8_t lun = req_upiu.index;
     std::memcpy(rsp_upiu.command_data.data(), &mock_device.GetLogicalUnit(lun).GetUnitDesc(),
                 sizeof(UnitDescriptor));
+  } else if (req_upiu.idn == static_cast<uint8_t>(DescriptorType::kPower)) {
+    std::memcpy(rsp_upiu.command_data.data(), &mock_device.GetPowerDesc(),
+                sizeof(PowerParametersDescriptor));
   } else {
     zxlogf(ERROR, "UFS MOCK: read descriptor idn: 0x%x is not supported", req_upiu.idn);
     return ZX_ERR_NOT_SUPPORTED;

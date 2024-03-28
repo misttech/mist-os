@@ -39,6 +39,9 @@ class UfsTest : public zxtest::Test {
 
   uint8_t GetSlotStateCount(SlotState slot_state);
 
+  zx::result<uint32_t> ReadAttribute(Attributes attribute);
+  zx::result<> WriteAttribute(Attributes attribute, uint32_t value);
+
  protected:
   std::shared_ptr<zx_device> fake_root_;
   zx_device *device_;

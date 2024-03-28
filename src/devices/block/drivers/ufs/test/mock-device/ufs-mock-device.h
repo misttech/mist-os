@@ -120,6 +120,7 @@ class UfsMockDevice {
   FakeRegisters *GetRegisters() { return &registers_; }
   DeviceDescriptor &GetDeviceDesc() { return device_desc_; }
   GeometryDescriptor &GetGeometryDesc() { return geometry_desc_; }
+  PowerParametersDescriptor &GetPowerDesc() { return power_desc_; }
   void SetAttribute(Attributes idn, uint32_t value) {
     attributes_[static_cast<size_t>(idn)] = value;
   }
@@ -141,6 +142,7 @@ class UfsMockDevice {
   std::array<UfsLogicalUnit, kMaxLunCount> logical_units_;
   DeviceDescriptor device_desc_;
   GeometryDescriptor geometry_desc_;
+  PowerParametersDescriptor power_desc_;
   std::array<uint32_t, static_cast<size_t>(Attributes::kAttributeCount)> attributes_;
   std::array<bool, static_cast<size_t>(Flags::kFlagCount)> flags_;
 

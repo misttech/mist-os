@@ -101,11 +101,8 @@ TEST_F(QueryRequestTest, WriteAttribute) {
 
   mock_device_->SetAttribute(Attributes::bCurrentPowerMode, 0);
 
-  uint8_t power_mode = 0x11;  // Active power mode
-  WriteAttributeUpiu write_attribute_upiu(Attributes::bCurrentPowerMode, power_mode);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          write_attribute_upiu);
+  uint8_t power_mode = static_cast<uint8_t>(UfsPowerMode::kActive);
+  auto response = WriteAttribute(Attributes::bCurrentPowerMode, power_mode);
   ASSERT_OK(response);
   ASSERT_EQ(power_mode, mock_device_->GetAttribute(Attributes::bCurrentPowerMode));
 }
@@ -113,17 +110,26 @@ TEST_F(QueryRequestTest, WriteAttribute) {
 TEST_F(QueryRequestTest, ReadAttribute) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
-  uint8_t power_mode = 0x11;  // Active power mode
+  uint8_t power_mode = static_cast<uint8_t>(UfsPowerMode::kActive);
   mock_device_->SetAttribute(Attributes::bCurrentPowerMode, power_mode);
 
-  ReadAttributeUpiu read_attribute_upiu(Attributes::bCurrentPowerMode);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          read_attribute_upiu);
-  ASSERT_OK(response);
-  auto attribute = response->GetResponse<AttributeResponseUpiu>().GetAttribute();
-
+  auto attribute = ReadAttribute(Attributes::bCurrentPowerMode);
+  ASSERT_OK(attribute);
   ASSERT_EQ(attribute, power_mode);
+}
+
+TEST_F(QueryRequestTest, ReadAttributeExcpetion) {
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+
+  mock_device_->GetQueryRequestProcessor().SetHook(
+      QueryOpcode::kReadAttribute,
+      [](ufs_mock_device::UfsMockDevice& mock_device, QueryRequestUpiuData& req_upiu,
+         QueryResponseUpiuData& rsp_upiu) {
+        rsp_upiu.header.response = UpiuHeaderResponse::kTargetFailure;  // Error injection
+        return ZX_OK;
+      });
+  auto attribute = ReadAttribute(Attributes::bCurrentPowerMode);
+  ASSERT_EQ(attribute.status_value(), ZX_ERR_BAD_STATE);
 }
 
 TEST_F(QueryRequestTest, ReadFlag) {

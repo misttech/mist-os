@@ -437,5 +437,15 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultReportLunsHandler(
   return zx::ok(std::move(data_buffer));
 }
 
+zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultStartStopUnitHandler(
+    UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
+    cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
+  std::vector<uint8_t> data_buffer;
+
+  // Nothing to do in mock device.
+
+  return zx::ok(std::move(data_buffer));
+}
+
 }  // namespace ufs_mock_device
 }  // namespace ufs

@@ -174,6 +174,34 @@ TEST_F(UicTest, SendUicCommandException) {
         UicCommandOpcode::kDmeHibernateEnter,
         ufs_mock_device::UicCmdProcessor::DefaultDmeHibernateEnterHandler);
   }
+
+  // Hibernate command returns bad state
+  {
+    mock_device_->GetUicCmdProcessor().SetHook(
+        UicCommandOpcode::kDmeHibernateEnter,
+        [](ufs_mock_device::UfsMockDevice& mock_device, uint32_t ucmdarg1, uint32_t ucmdarg2,
+           uint32_t ucmdarg3) {
+          InterruptStatusReg::Get()
+              .ReadFrom(mock_device.GetRegisters())
+              .set_uic_hibernate_enter_status(true)
+              .WriteTo(mock_device.GetRegisters());
+
+          HostControllerStatusReg::Get()
+              .ReadFrom(mock_device.GetRegisters())
+              .set_uic_power_mode_change_request_status(
+                  HostControllerStatusReg::PowerModeStatus::kPowerFatalError)
+              .WriteTo(mock_device.GetRegisters());
+        });
+
+    DmeHibernateEnterCommand dme_hibernate_command(*ufs_);
+    auto result = dme_hibernate_command.SendCommand();
+    EXPECT_EQ(result.status_value(), ZX_ERR_BAD_STATE);
+
+    // Restore the default handler.
+    mock_device_->GetUicCmdProcessor().SetHook(
+        UicCommandOpcode::kDmeHibernateEnter,
+        ufs_mock_device::UicCmdProcessor::DefaultDmeHibernateEnterHandler);
+  }
 }
 
 }  // namespace ufs

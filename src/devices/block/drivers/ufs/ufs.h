@@ -81,7 +81,7 @@ class Ufs;
 
 using HostControllerCallback = fit::function<zx::result<>(NotifyEvent, uint64_t data)>;
 
-using UfsDeviceType = ddk::Device<Ufs, ddk::Initializable>;
+using UfsDeviceType = ddk::Device<Ufs, ddk::Suspendable, ddk::Resumable, ddk::Initializable>;
 class Ufs : public scsi::Controller, public UfsDeviceType {
  public:
   static constexpr char kDriverName[] = "ufs";
@@ -101,6 +101,8 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
 
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
+  void DdkSuspend(ddk::SuspendTxn txn);
+  void DdkResume(ddk::ResumeTxn txn);
 
   // scsi::Controller
   size_t BlockOpSize() override { return sizeof(IoCommand); }
@@ -146,6 +148,9 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   zx_status_t WaitWithTimeout(fit::function<zx_status_t()> wait_for, uint32_t timeout_us,
                               const fbl::String &timeout_message);
 
+  static zx::result<uint16_t> TranslateUfsLunToScsiLun(uint8_t ufs_lun);
+  static zx::result<uint8_t> TranslateScsiLunToUfsLun(uint16_t scsi_lun);
+
   // for test
   uint32_t GetLogicalUnitCount() const { return logical_unit_count_; }
   thrd_t &GetIoThread() { return io_thread_; }
@@ -156,6 +161,8 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   bool HasWellKnownLun(WellKnownLuns lun) {
     return well_known_lun_set_.find(lun) != well_known_lun_set_.end();
   }
+
+  bool IsSuspended() const { return device_manager_->IsSuspended(); }
 
  private:
   friend class UfsTest;
@@ -176,9 +183,6 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   zx_status_t DisableHostController();
 
   zx::result<> AllocatePages(zx::vmo &vmo, fzl::VmoMapper &mapper, size_t size);
-
-  static zx::result<uint16_t> TranslateUfsLunToScsiLun(uint8_t ufs_lun);
-  static zx::result<uint8_t> TranslateScsiLunToUfsLun(uint16_t scsi_lun);
 
   ddk::Pci pci_;
   fdf::MmioBuffer mmio_;

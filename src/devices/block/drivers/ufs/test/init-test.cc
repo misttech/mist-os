@@ -4,6 +4,7 @@
 
 #include <fbl/unaligned.h>
 
+#include "src/devices/block/drivers/ufs/device_manager.h"
 #include "unit-lib.h"
 
 namespace ufs {
@@ -64,6 +65,41 @@ TEST_F(InitTest, LogicalUnitBlockInfo) {
 TEST_F(InitTest, UnitAttentionClear) {
   mock_device_->SetUnitAttention(true);
   ASSERT_NO_FATAL_FAILURE(RunInit());
+}
+
+TEST_F(InitTest, SuspendAndResume) {
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+
+  ASSERT_FALSE(ufs_->IsSuspended());
+  UfsPowerMode power_mode = UfsPowerMode::kActive;
+  ASSERT_EQ(ufs_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
+  ASSERT_EQ(ufs_->GetDeviceManager().GetCurrentPowerCondition(),
+            ufs_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
+  ASSERT_EQ(ufs_->GetDeviceManager().GetCurrentLinkState(),
+            ufs_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  // Issue DdkSuspend and verify that errors are returned for subsequent operations.
+  ddk::SuspendTxn suspend_txn(device_, 0, false, DEVICE_SUSPEND_REASON_REBOOT);
+  ufs_->DdkSuspend(std::move(suspend_txn));
+  fake_root_->GetLatestChild()->WaitUntilSuspendReplyCalled();
+  ASSERT_TRUE(ufs_->IsSuspended());
+  power_mode = UfsPowerMode::kSleep;
+  ASSERT_EQ(ufs_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
+  ASSERT_EQ(ufs_->GetDeviceManager().GetCurrentPowerCondition(),
+            ufs_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
+  ASSERT_EQ(ufs_->GetDeviceManager().GetCurrentLinkState(),
+            ufs_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  ddk::ResumeTxn resume_txn(device_, 0);
+  ufs_->DdkResume(std::move(resume_txn));
+  fake_root_->GetLatestChild()->WaitUntilResumeReplyCalled();
+  ASSERT_FALSE(ufs_->IsSuspended());
+  power_mode = UfsPowerMode::kActive;
+  ASSERT_EQ(ufs_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
+  ASSERT_EQ(ufs_->GetDeviceManager().GetCurrentPowerCondition(),
+            ufs_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
+  ASSERT_EQ(ufs_->GetDeviceManager().GetCurrentLinkState(),
+            ufs_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
 }
 
 }  // namespace ufs

@@ -102,7 +102,7 @@ static zx_status_t ControlIn(void* ctx, uint8_t request_type, uint8_t request, u
         *out_read_actual = 0;
         return ZX_OK;
       }
-      *reinterpret_cast<unsigned char*>(out_read_buffer) = 1; // Max lun number
+      *reinterpret_cast<unsigned char*>(out_read_buffer) = 1;  // Max lun number
       *out_read_actual = 1;
       return ZX_OK;
     }

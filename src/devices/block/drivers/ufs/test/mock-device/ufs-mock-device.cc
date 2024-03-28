@@ -90,7 +90,7 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
       .set_host_controller_enable(true)
       .WriteTo(&registers_);
 
-  std::memset(&device_desc_, 0, sizeof(DeviceDescriptor));
+  std::memset(&device_desc_, 0, sizeof(device_desc_));
   device_desc_.bLength = sizeof(DeviceDescriptor);
   device_desc_.bDescriptorIDN = static_cast<size_t>(DescriptorType::kDevice);
   device_desc_.bDeviceSubClass = 0x01;
@@ -101,7 +101,7 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
   device_desc_.bUD0BaseOffset = 0x16;
   device_desc_.bUDConfigPLength = 0x1A;
 
-  std::memset(&geometry_desc_, 0, sizeof(GeometryDescriptor));
+  std::memset(&geometry_desc_, 0, sizeof(geometry_desc_));
   geometry_desc_.bLength = sizeof(GeometryDescriptor);
   geometry_desc_.bDescriptorIDN = static_cast<size_t>(DescriptorType::kGeometry);
   geometry_desc_.qTotalRawDeviceCapacity = htobe64(kMockTotalDeviceCapacity >> 9);  // 16MB
@@ -115,6 +115,13 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
   } else if (kMaxLunCount == 32) {
     geometry_desc_.bMaxNumberLU = 0x01;
   }
+
+  std::memset(&power_desc_, 0, sizeof(power_desc_));
+  power_desc_.bLength = sizeof(PowerParametersDescriptor);
+  power_desc_.bDescriptorIDN = static_cast<size_t>(DescriptorType::kPower);
+
+  SetAttribute(Attributes::bCurrentPowerMode, static_cast<uint32_t>(UfsPowerMode::kActive));
+  SetAttribute(Attributes::bActiveIccLevel, kHighestActiveIcclevel);
 }
 
 zx_status_t UfsMockDevice::AddLun(uint8_t lun) {
