@@ -254,6 +254,8 @@ looming deadlines or other teams.
 
 ### API calibration {#calibration}
 
+_[Request an API Calibration][api-calibration-request]_
+
 Periodically, the API council will meet for *API calibration*. The purpose of
 API calibration is to promote consistency of API reviews across the project and
 to improve the quality of API reviews by cross-pollinating best practices across
@@ -263,6 +265,8 @@ topic and helps ensure each participant has a chance to provide their feedback.
 Fuchsia contributors can observe API calibration meetings. Observing these
 meetings can be a good way to learn best practices about evolving our API
 surface.
+
+[api-calibration-request]: https://g-issues.fuchsia.dev/issues/new?component=1454153&template=1892475
 
 #### Review RFCs with API changes
 
