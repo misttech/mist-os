@@ -76,8 +76,22 @@ func extractPythonScript(tokens []string) string {
 	return ""
 }
 
+// pythonWrapperScripts is a list of known python wrappers used in our build
+// system. They should be stripped in order to get the real command of a build
+// action.
+var pythonWrapperScripts = []string{
+	"action_tracer.py",
+	"cxx_link_remote_wrapper.py",
+	"cxx_remote_wrapper.py",
+	"output_cacher.py",
+	"output_leak_scanner.py",
+	"prebuilt_tool_remote_wrapper.py",
+	"restat_cacher.py",
+	"rustc_remote_wrapper.py",
+}
+
 func isWrapperPythonScript(script string) bool {
-	for _, s := range []string{"action_tracer.py", "output_cacher.py"} {
+	for _, s := range pythonWrapperScripts {
 		if strings.HasSuffix(script, s) {
 			return true
 		}
@@ -108,6 +122,16 @@ func extractCommand(cmd []string) string {
 				return baseCmd(cmd[i+2])
 			}
 			break
+		}
+
+		if c == "reclient_cxx.sh" {
+			// reclient_cxx.sh wraps a normal cxx build command to enable reclient.
+			// The actual command is after the --.
+			for j := i + 1; j < len(cmd); j++ {
+				if cmd[j] == "--" && j+1 < len(cmd) {
+					return extractCommand(cmd[j+1:])
+				}
+			}
 		}
 
 		if pythonRE.MatchString(c) {

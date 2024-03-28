@@ -671,6 +671,14 @@ func TestCategory(t *testing.T) {
 			},
 			want: "build_everything.py",
 		},
+		{
+			step: Step{
+				Command: &compdb.Command{
+					Command: "../../build/rbe/reclient_cxx.sh --working-subdir=out/default --exec_strategy=remote_local_fallback --preserve_unchanged_output_mtime --  ../../prebuilt/third_party/clang/linux-x64/bin/clang++ -MD -MF host_x64/obj/third_party/protobuf/src/google/protobuf/util/internal/libprotobuf_full.json_objectwriter.cc.o.d -DTOOLCHAIN_VERSION=SkDvAQt_IN7-4-_K2xShZJxH9sfemvCs0bioG10wxIEC -D_LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS -D_LIBCPP_REMOVE_TRANSITIVE_INCLUDES -DGOOGLE_PROTOBUF_NO_RTTI -DHAVE_PTHREAD -I../.. -Ihost_x64/gen -I../../third_party/protobuf/src -fcolor-diagnostics -fcrash-diagnostics-dir=clang-crashreports -fcrash-diagnostics=all -ffp-contract=off --sysroot=../../prebuilt/third_party/sysroot/linux --target=x86_64-unknown-linux-gnu -ffile-compilation-dir=. -no-canonical-prefixes -fomit-frame-pointer -fdata-sections -ffunction-sections -O0 -Xclang -debug-info-kind=constructor -g3 -grecord-gcc-switches -gdwarf-5 -gz=zstd -Wall -Wextra -Wconversion -Wextra-semi -Wimplicit-fallthrough -Wnewline-eof -Wstrict-prototypes -Wwrite-strings -Wno-sign-conversion -Wno-unused-parameter -Wnonportable-system-include-path -Wno-missing-field-initializers -Wno-extra-qualification -Wno-cast-function-type-strict -Wno-cast-function-type-mismatch -Wno-unknown-warning-option -fvisibility=hidden -Werror -Wa,--fatal-warnings --sysroot=../../prebuilt/third_party/sysroot/linux --target=x86_64-unknown-linux-gnu -fPIE -Wno-deprecated-pragma -Wno-enum-enum-conversion -Wno-extra-semi -Wno-float-conversion -Wno-implicit-float-conversion -Wno-implicit-int-conversion -Wno-implicit-int-float-conversion -Wno-invalid-noreturn -Wno-missing-field-initializers -Wno-sign-compare -Wno-unused-function -Wno-unused-private-field -Wno-deprecated-declarations -Wno-c++98-compat-extra-semi -Wno-shorten-64-to-32 -fvisibility-inlines-hidden -stdlib=libc++ -std=c++17 -fno-exceptions -fno-rtti -ftemplate-backtrace-limit=0 -stdlib=libc++ -c ../../third_party/protobuf/src/google/protobuf/util/internal/json_objectwriter.cc -o host_x64/obj/third_party/protobuf/src/google/protobuf/util/internal/libprotobuf_full.json_objectwriter.cc.o",
+				},
+			},
+			want: "clang++",
+		},
 	} {
 		if got := tc.step.Category(); got != tc.want {
 			t.Errorf("Category() = %s, want: %s, step: %#v", got, tc.want, tc.step)
