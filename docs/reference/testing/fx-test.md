@@ -148,6 +148,50 @@ This command is resilient to corrupt or incomplete log files,
 so it should still work even if you terminate the `fx test` command
 running the tests.
 
+### Basic test debugging
+
+`fx test` integrates with `zxdb` to provide a simple and easy way to debug your
+test failures, without needing to recompile anything. Pass `--break-on-failure`
+to your `fx test` invocation to automatically have test failures break into the
+debugger:
+
+```none {.devsite-disable-click-to-copy}
+$ fx test --break-on-failure rust_crasher_test.cm
+...
+⚠️  zxdb caught test failure in rust_crasher_test.cm, type `frame` to get started.
+   14 LLVM_LIBC_FUNCTION(void, abort, ()) {
+   15   for (;;) {
+ ▶ 16     CRASH_WITH_UNIQUE_BACKTRACE();
+   17     _zx_process_exit(ZX_TASK_RETCODE_EXCEPTION_KILL);
+   18   }
+══════════════════════════
+ Invalid opcode exception
+══════════════════════════
+ Process 1 (koid=107752) thread 1 (koid=107754)
+ Faulting instruction: 0x4159210ab797
+
+🛑 process 1 __llvm_libc::__abort_impl__() • abort.cc:16
+[zxdb] // Now you can debug why the test failed!
+```
+
+You can also use the `--breakpoint=<location>` option to set a breakpoint at a specific
+location anywhere in your code. `<location>` takes standard zxdb breakpoint
+syntax, typically a file and line number or a function name:
+
+  * `--breakpoint=my_file.rs:123` sets a breakpoint on line 123 of my_file.rs.
+  * `--breakpoint=some_function` sets a breakpoint on `some_function`.
+
+Note that this option will cause your tests to run significantly slower, since
+zxdb will need to load all of the symbols for your test to be able to install
+the breakpoint. It is highly recommended to only use this option in addition to
+`--test-filter`.
+
+When you're finished debugging the test failure, you can type `quit`, `ctrl+d`,
+or `detach *` to resume running your tests. Note, if there were multiple test
+case failures, this will not pause to let you debug those tests as well. See
+[debugging tests][zxdb-testing-docs] for details about how to debug multiple
+test failures that occur in parallel.
+
 ## Configuration options
 
 `fx test` is highly configurable, and a full list of options is
@@ -294,6 +338,15 @@ pushed to the target and is being run.**
 - **Test output logs contain only the last segment of the component
 moniker, so they are easier to visually inspect.**
   - Use `--[no-]show-full-moniker-in-logs` to toggle this behavior.
+- **Failing tests terminate following failure without waiting**
+  - Use `--break-on-failure` to catch failing tests with [zxdb][zxdb-docs].
+  - Use `--breakpoint=<location>` to install breakpoints at specific
+    [locations][#basic-test-debugging].
+
+  Note that using the `--breakpoint` option will significantly slow down your
+  tests. It is highly recommended to only use this option in conjunction with
+  `--test-filter`. `--break-on-failure` may be used with many tests with minimal
+  impact to performance.
 - **Command line arguments to the test are completely controlled by test runners**
   - Append `--` to your arguments to pass remaining arguments verbatim to the
   test. For example: `fx test foo -- --argument_for_test`
@@ -359,3 +412,5 @@ Protocol][build-event-protocol]{:.external}).
 [fxtest-rewrite-event]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite/event.py
 [fxtest-source]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite
 [trf-docs]: /docs/development/testing/components/test_runner_framework.md
+[zxdb-docs]: /docs/development/debugger/commands.md
+[zxdb-testing-docs]: /docs/development/debugger/tests.md
