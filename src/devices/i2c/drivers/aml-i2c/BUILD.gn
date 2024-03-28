@@ -5,8 +5,6 @@
 import("//build/bazel/drivers/bazel_driver_package.gni")
 import("//build/bazel/wrappers.gni")
 import("//build/bind/bind.gni")
-import("//build/components.gni")
-import("//build/drivers.gni")
 
 driver_bind_rules("aml_i2c_bind") {
   rules = "aml_i2c.bind"
@@ -26,56 +24,6 @@ group("tests") {
     ":aml-i2c-test-package",
     ":aml_i2c_bind_test",
   ]
-}
-
-source_set("aml-i2c-source") {
-  configs += [
-    "//build/config/fuchsia:enable_zircon_asserts",
-    "//build/config:all_source",
-  ]
-  sources = [
-    "aml-i2c.cc",
-    "aml-i2c.h",
-  ]
-  deps = [
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-    "//sdk/lib/driver/compat/cpp:logging",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk:ddk_metadata",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/trace",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/mmio",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_driver("aml-i2c-driver") {
-  output_name = "aml-i2c"
-  deps = [ ":aml-i2c-source" ]
-}
-
-fuchsia_driver_component("aml-i2c") {
-  info = "aml-i2c-info.json"
-  component_name = "aml-i2c"
-  deps = [
-    ":aml-i2c-driver",
-    ":aml_i2c_bind",
-  ]
-  manifest = "meta/aml-i2c.cml"
-}
-
-fuchsia_driver_package("package") {
-  package_name = "aml-i2c"
-  driver_components = [ ":aml-i2c" ]
 }
 
 bazel_fuchsia_test_package("aml-i2c-test-package") {

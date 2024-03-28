@@ -5,8 +5,6 @@
 import("//build/bazel/drivers/bazel_driver_package.gni")
 import("//build/bazel/wrappers.gni")
 import("//build/bind/bind.gni")
-import("//build/components.gni")
-import("//build/drivers.gni")
 
 bazel_driver_package("bazel_package") {
   bazel_target = "//src/devices/gpio/drivers/aml-gpio:aml-gpio"
@@ -33,45 +31,6 @@ driver_bind_rules("aml-gpio-bind") {
     "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.platform",
   ]
-}
-
-fuchsia_driver("aml-gpio-driver") {
-  output_name = "aml-gpio"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
-  sources = [ "aml-gpio.cc" ]
-  deps = [
-    ":aml-gpio-bind",
-    "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_bindlib_cpp",
-    "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/fit-promise",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/mmio",
-    "//src/lib/ddk:ddk_metadata",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/ddk-platform-defs",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_driver_component("aml-gpio") {
-  component_name = "aml-gpio"
-  deps = [ ":aml-gpio-driver" ]
-  info = "aml-gpio-info.json"
-  manifest = "meta/aml-gpio.cml"
-}
-
-fuchsia_driver_package("package") {
-  package_name = "aml-gpio"
-  driver_components = [ ":aml-gpio" ]
 }
 
 group("tests") {

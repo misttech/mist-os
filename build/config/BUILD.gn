@@ -735,7 +735,6 @@ config("test_exercising_sdk_headers") {
 config("Wno-unused-function") {
   cflags = [ "-Wno-unused-function" ]
   visibility = [
-    "//src/devices/i2c/drivers/aml-i2c:aml-i2c-driver",
     "//src/devices/i2c/drivers/intel-i2c:intel-i2c-driver",
     "//zircon/third_party/uapp/dash",
     "//zircon/third_party/ulib/musl/ldso",
