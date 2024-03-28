@@ -180,6 +180,31 @@ impl<I: IpTypesIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::I
     }
 }
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<
+        I: IpTypesIpExt,
+        Config,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::IpState<I>>,
+    > IpDeviceSendContext<I, BC> for CoreCtxWithIpDeviceConfiguration<'_, Config, L, BC>
+{
+    fn send_ip_frame<S>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device: &DeviceId<BC>,
+        local_addr: SpecifiedAddr<<I as Ip>::Addr>,
+        body: S,
+        broadcast: Option<<I as IpTypesIpExt>::BroadcastMarker>,
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
+        let Self { config: _, core_ctx } = self;
+        send_ip_frame(core_ctx, bindings_ctx, device, local_addr, body, broadcast)
+    }
+}
+
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
     IpDeviceConfigurationContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {

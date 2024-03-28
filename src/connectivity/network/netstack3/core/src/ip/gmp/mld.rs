@@ -35,34 +35,19 @@ use tracing::{debug, error};
 use zerocopy::ByteSlice;
 
 use crate::{
-    context::{RngContext, SendFrameContext, TimerContext, TimerHandler},
+    context::{RngContext, TimerContext, TimerHandler},
     device::{AnyDevice, DeviceIdContext},
-    ip::gmp::{
-        gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
-        GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateContext,
-        GmpStateMachine, GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecific, QueryTarget,
+    ip::{
+        device::IpDeviceSendContext,
+        gmp::{
+            gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
+            GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateContext,
+            GmpStateMachine, GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecific,
+            QueryTarget,
+        },
     },
     Instant,
 };
-
-/// Metadata for sending an MLD packet in an IP packet.
-///
-/// `MldFrameMetadata` is used by [`MldContext`]'s [`FrameContext`] bound. When
-/// [`FrameContext::send_frame`] is called with an `MldFrameMetadata`, the body
-/// contains an MLD packet in an IP packet. It is encapsulated in a link-layer
-/// frame, and sent to the link-layer address corresponding to the given local
-/// IP address.
-#[cfg_attr(test, derive(Debug, PartialEq))]
-pub(crate) struct MldFrameMetadata<D> {
-    pub(crate) device: D,
-    pub(crate) dst_ip: MulticastAddr<Ipv6Addr>,
-}
-
-impl<D> MldFrameMetadata<D> {
-    fn new(device: D, dst_ip: MulticastAddr<Ipv6Addr>) -> MldFrameMetadata<D> {
-        MldFrameMetadata { device, dst_ip }
-    }
-}
 
 /// The bindings execution context for MLD.
 pub(crate) trait MldBindingsContext<DeviceId>:
@@ -89,7 +74,7 @@ pub(crate) trait MldStateContext<BC: MldBindingsContext<Self::DeviceId>>:
 
 /// The execution context for the Multicast Listener Discovery (MLD) protocol.
 pub(crate) trait MldContext<BC: MldBindingsContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice> + SendFrameContext<BC, MldFrameMetadata<Self::DeviceId>>
+    DeviceIdContext<AnyDevice> + IpDeviceSendContext<Ipv6, BC>
 {
     /// Calls the function with a mutable reference to the device's MLD state
     /// and whether or not MLD is enabled for the `device`.
@@ -444,7 +429,7 @@ fn send_mld_packet<
             .unwrap(),
         );
     core_ctx
-        .send_frame(bindings_ctx, MldFrameMetadata::new(device.clone(), dst_ip), body)
+        .send_ip_frame(bindings_ctx, &device, dst_ip.into_specified(), body, None)
         .map_err(|_| MldError::SendFailure { addr: group_addr.into() })
 }
 
@@ -453,7 +438,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use net_types::ethernet::Mac;
-    use packet::ParseBuffer;
+    use packet::{BufferMut, ParseBuffer};
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
         icmp::{mld::MulticastListenerQuery, IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet},
@@ -464,7 +449,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeInstant, FakeTimerCtxExt},
-            InstantContext as _,
+            InstantContext as _, SendFrameContext,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -491,6 +476,19 @@ mod tests {
         time::TimerIdInner,
         TimerId,
     };
+
+    /// Metadata for sending an MLD packet in an IP packet.
+    #[derive(Debug, PartialEq)]
+    pub(crate) struct MldFrameMetadata<D> {
+        pub(crate) device: D,
+        pub(crate) dst_ip: MulticastAddr<Ipv6Addr>,
+    }
+
+    impl<D> MldFrameMetadata<D> {
+        fn new(device: D, dst_ip: MulticastAddr<Ipv6Addr>) -> MldFrameMetadata<D> {
+            MldFrameMetadata { device, dst_ip }
+        }
+    }
 
     /// A fake [`MldContext`] that stores the [`MldInterface`] and an optional
     /// IPv6 link-local address that may be returned in calls to
@@ -573,6 +571,30 @@ mod tests {
             _device: &FakeDeviceId,
         ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
             self.get_ref().ipv6_link_local
+        }
+    }
+
+    impl IpDeviceSendContext<Ipv6, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
+        fn send_ip_frame<S>(
+            &mut self,
+            bindings_ctx: &mut FakeBindingsCtxImpl,
+            device_id: &Self::DeviceId,
+            local_addr: SpecifiedAddr<Ipv6Addr>,
+            body: S,
+            _broadcast: Option<Never>,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            self.send_frame(
+                bindings_ctx,
+                MldFrameMetadata::new(
+                    device_id.clone(),
+                    MulticastAddr::new(local_addr.get()).expect("addr should be multicast"),
+                ),
+                body,
+            )
         }
     }
 

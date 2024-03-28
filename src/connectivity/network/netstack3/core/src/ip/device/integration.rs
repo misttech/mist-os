@@ -22,14 +22,14 @@ use net_types::{
     ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
-use packet::{BufferMut, EmptyBuf, Serializer};
+use packet::{EmptyBuf, Serializer};
 use packet_formats::icmp::{
     ndp::{NeighborSolicitation, RouterSolicitation},
     IcmpUnusedCode,
 };
 
 use crate::{
-    context::{CounterContext, InstantContext, SendFrameContext},
+    context::{CounterContext, InstantContext},
     device::{AnyDevice, DeviceId, DeviceIdContext},
     error::{ExistsError, NotFoundError},
     ip::{
@@ -55,12 +55,12 @@ use crate::{
                 Ipv6DeviceConfiguration, SlaacConfig,
             },
             AddressRemovedReason, DelIpAddr, IpAddressId, IpDeviceAddr, IpDeviceBindingsContext,
-            IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext, Ipv6DeviceAddr,
+            IpDeviceIpExt, IpDeviceStateContext, Ipv6DeviceAddr,
         },
         gmp::{
             self,
-            igmp::{IgmpContext, IgmpGroupState, IgmpPacketMetadata, IgmpStateContext},
-            mld::{MldContext, MldFrameMetadata, MldGroupState, MldStateContext},
+            igmp::{IgmpContext, IgmpGroupState, IgmpStateContext},
+            mld::{MldContext, MldGroupState, MldStateContext},
             GmpHandler, GmpQueryHandler, GmpState, MulticastGroupSet,
         },
         socket::ipv6_source_address_selection::SasCandidate,
@@ -1295,37 +1295,6 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
     }
 }
 
-impl<'a, Config, BC: BindingsContext>
-    SendFrameContext<BC, IgmpPacketMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>>
-    for CoreCtxWithIpDeviceConfiguration<
-        'a,
-        Config,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
-        BC,
-    >
-{
-    fn send_frame<S>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        meta: IgmpPacketMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>,
-        body: S,
-    ) -> Result<(), S>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut,
-    {
-        let Self { config: _, core_ctx } = self;
-        IpDeviceSendContext::<Ipv4, _>::send_ip_frame(
-            core_ctx,
-            bindings_ctx,
-            &meta.device,
-            meta.dst_ip.into_specified(),
-            body,
-            None,
-        )
-    }
-}
-
 impl<
         'a,
         Config: Borrow<Ipv6DeviceConfiguration>,
@@ -1381,32 +1350,6 @@ impl<
                     )
                 })
             },
-        )
-    }
-}
-
-impl<'a, Config, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    SendFrameContext<BC, MldFrameMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>>
-    for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
-{
-    fn send_frame<S>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        meta: MldFrameMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>,
-        body: S,
-    ) -> Result<(), S>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut,
-    {
-        let Self { config: _, core_ctx } = self;
-        IpDeviceSendContext::<Ipv6, _>::send_ip_frame(
-            core_ctx,
-            bindings_ctx,
-            &meta.device,
-            meta.dst_ip.into_specified(),
-            body,
-            None,
         )
     }
 }

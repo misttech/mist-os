@@ -31,33 +31,19 @@ use tracing::{debug, error};
 use zerocopy::ByteSlice;
 
 use crate::{
-    context::{RngContext, SendFrameContext, TimerContext, TimerHandler},
+    context::{RngContext, TimerContext, TimerHandler},
     device::{AnyDevice, DeviceIdContext},
-    ip::gmp::{
-        gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
-        GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateContext,
-        GmpStateMachine, GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecific, QueryTarget,
+    ip::{
+        device::IpDeviceSendContext,
+        gmp::{
+            gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
+            GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateContext,
+            GmpStateMachine, GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecific,
+            QueryTarget,
+        },
     },
     Instant,
 };
-
-/// Metadata for sending an IGMP packet.
-///
-/// `IgmpPacketMetadata` is used by [`IgmpContext`]'s [`FrameContext`] bound.
-/// When [`FrameContext::send_frame`] is called with an `IgmpPacketMetadata`,
-/// the body will be encapsulated in an IP packet with a TTL of 1 and with the
-/// "Router Alert" option set.
-#[cfg_attr(test, derive(Debug, PartialEq))]
-pub(crate) struct IgmpPacketMetadata<D> {
-    pub(crate) device: D,
-    pub(crate) dst_ip: MulticastAddr<Ipv4Addr>,
-}
-
-impl<D> IgmpPacketMetadata<D> {
-    fn new(device: D, dst_ip: MulticastAddr<Ipv4Addr>) -> IgmpPacketMetadata<D> {
-        IgmpPacketMetadata { device, dst_ip }
-    }
-}
 
 /// The bindings execution context for IGMP.
 pub(crate) trait IgmpBindingsContext<DeviceId>:
@@ -87,7 +73,7 @@ pub(crate) trait IgmpStateContext<BC: IgmpBindingsContext<Self::DeviceId>>:
 
 /// The execution context for the Internet Group Management Protocol (IGMP).
 pub(crate) trait IgmpContext<BC: IgmpBindingsContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice> + SendFrameContext<BC, IgmpPacketMetadata<Self::DeviceId>>
+    DeviceIdContext<AnyDevice> + IpDeviceSendContext<Ipv4, BC>
 {
     /// Calls the function with a mutable reference to the device's IGMP state
     /// and whether or not IGMP is enabled for the `device`.
@@ -403,7 +389,7 @@ where
     let body = body.into_serializer().encapsulate(builder);
 
     core_ctx
-        .send_frame(bindings_ctx, IgmpPacketMetadata::new(device.clone(), dst_ip), body)
+        .send_ip_frame(bindings_ctx, &device, dst_ip.into_specified(), body, None)
         .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
 }
 
@@ -557,7 +543,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeInstant, FakeTimerCtxExt},
-            InstantContext as _,
+            InstantContext as _, SendFrameContext as _,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
@@ -583,6 +569,19 @@ mod tests {
         time::TimerIdInner,
         TimerId,
     };
+
+    /// Metadata for sending an IGMP packet.
+    #[derive(Debug, PartialEq)]
+    pub(crate) struct IgmpPacketMetadata<D> {
+        pub(crate) device: D,
+        pub(crate) dst_ip: MulticastAddr<Ipv4Addr>,
+    }
+
+    impl<D> IgmpPacketMetadata<D> {
+        fn new(device: D, dst_ip: MulticastAddr<Ipv4Addr>) -> IgmpPacketMetadata<D> {
+            IgmpPacketMetadata { device, dst_ip }
+        }
+    }
 
     /// A fake [`IgmpContext`] that stores the [`MulticastGroupSet`] and an
     /// optional IPv4 address and subnet that may be returned in calls to
@@ -660,6 +659,30 @@ mod tests {
 
         fn get_ip_addr_subnet(&mut self, _device: &FakeDeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
             self.get_ref().addr_subnet
+        }
+    }
+
+    impl IpDeviceSendContext<Ipv4, FakeBindingsCtx> for FakeCoreCtx {
+        fn send_ip_frame<S>(
+            &mut self,
+            bindings_ctx: &mut FakeBindingsCtx,
+            device_id: &Self::DeviceId,
+            local_addr: SpecifiedAddr<Ipv4Addr>,
+            body: S,
+            _broadcast: Option<()>,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            self.send_frame(
+                bindings_ctx,
+                IgmpPacketMetadata::new(
+                    device_id.clone(),
+                    MulticastAddr::new(local_addr.get()).expect("addr should be multicast"),
+                ),
+                body,
+            )
         }
     }
 
