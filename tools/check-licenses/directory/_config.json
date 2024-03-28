@@ -6,10 +6,18 @@
                 "notes": [
                     "Unblocking the landing of the rust analyzer prebuilt.",
                     "License files and README.fuchsia files to come later.",
-                    "More info in fxbug.dev/326281393"
+                    "More info in https://fxbug.dev/326281393"
                 ],
                 "paths": [
                     "prebuilt/third_party/rust-analyzer"
+                ]
+            },
+            {
+                "notes": [
+                    "Temporary skip, to allow landing of shac check repos in fuchsia.git"
+                ],
+                "paths": [
+                    "third_party/shac-project"
                 ]
             },
             {
