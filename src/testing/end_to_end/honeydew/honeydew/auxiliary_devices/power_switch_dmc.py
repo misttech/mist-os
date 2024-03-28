@@ -67,7 +67,9 @@ class PowerSwitchDmc(power_switch.PowerSwitch):
         Raises:
             PowerSwitchError: In case of failure.
         """
-        _LOGGER.info("Powering off %s...", self._name)
+        # LINT.IfChange
+        _LOGGER.info("Lacewing is powering off %s...", self._name)
+        # LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go)
         self._run(
             command=self._generate_dmc_power_state_cmd(
                 power_state=PowerState.OFF

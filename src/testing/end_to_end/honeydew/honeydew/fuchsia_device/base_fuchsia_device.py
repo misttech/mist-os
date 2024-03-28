@@ -389,7 +389,9 @@ class BaseFuchsiaDevice(
             errors.FuchsiaControllerError: On communications failure.
             errors.Sl4FError: On communications failure.
         """
-        _LOGGER.info("Rebooting %s...", self.device_name)
+        # LINT.IfChange
+        _LOGGER.info("Lacewing is rebooting %s...", self.device_name)
+        # LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go)
         self.log_message_to_device(
             message=f"Rebooting {self.device_name}...",
             level=custom_types.LEVEL.INFO,

@@ -661,10 +661,12 @@ func infraToolLogChecks() []FailureModeCheck {
 				// to reboot which would cause the SSH connection to fail.
 				"Reboot(UserRequest)",
 				"REBOOT REASON (USER REQUEST)",
-				// Lacewing tests output these logs when rebooting or powering
-				// off the switch to the device.
-				"Successfully rebooted",
-				"Successfully powered off",
+				// Lacewing tests output these logs when rebooting, powering
+				// off the switch to the device, or putting the device into
+				// fastboot mode.
+				"Lacewing is rebooting",
+				"Lacewing is powering off",
+				"Lacewing is booting the following device to fastboot mode",
 				// OTA tests use dm reboot to reboot the device.
 				"dm reboot",
 				// The NetstackIperfTest blasts a lot of traffic at the device
@@ -682,8 +684,9 @@ func infraToolLogChecks() []FailureModeCheck {
 			ExceptStrings: []string{
 				"Reboot(UserRequest)",
 				"REBOOT REASON (USER REQUEST)",
-				"Successfully rebooted",
-				"Successfully powered off",
+				"Lacewing is rebooting",
+				"Lacewing is powering off",
+				"Lacewing is booting the following device to fastboot mode",
 				"dm reboot",
 				"==========> NetstackIperfTest <==========",
 			},
