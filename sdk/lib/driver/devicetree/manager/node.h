@@ -167,6 +167,8 @@ class ChildNode {
     return node_->properties();
   }
 
+  Node* GetNode() const { return node_; }
+
   void AddNodeSpec(fuchsia_driver_framework::ParentSpec spec) {
     node_->AddNodeSpec(std::move(spec));
   }

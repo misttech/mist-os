@@ -14,6 +14,7 @@ group("tests") {
     "mmc:tests",
     "pwm-controllers:tests",
     "registers:tests",
+    "thermal:tests",
     "usb:tests",
   ]
   testonly = true
