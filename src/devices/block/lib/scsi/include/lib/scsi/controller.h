@@ -28,6 +28,7 @@ enum class Opcode : uint8_t {
   MODE_SELECT_6 = 0x15,
   MODE_SENSE_6 = 0x1A,
   START_STOP_UNIT = 0x1B,
+  SEND_DIAGNOSTIC = 0x1D,
   TOGGLE_REMOVABLE = 0x1E,
   READ_FORMAT_CAPACITIES = 0x23,
   READ_CAPACITY_10 = 0x25,
@@ -228,7 +229,7 @@ struct FixedFormatSenseDataHeader {
   DEF_SUBBIT(mark_sense_key, 7, filemark);
   DEF_SUBBIT(mark_sense_key, 6, eom);
   DEF_SUBBIT(mark_sense_key, 5, ili);
-  DEF_ENUM_SUBFIELD(mark_sense_key, scsi::SenseKey, 3, 0, sense_key);
+  DEF_ENUM_SUBFIELD(mark_sense_key, SenseKey, 3, 0, sense_key);
   DEF_SUBBIT(sense_key_specific[0], 7, sksv);
   // Additional sense byte follow after 18 bytes.
 } __PACKED;
@@ -759,6 +760,39 @@ struct FormatUnitInitializationPatternDescriptor {
 static_assert(sizeof(FormatUnitInitializationPatternDescriptor) == 4,
               "Format Unit Initialization Pattern Descriptor must be 4 bytes");
 
+enum class SelfTestCode : uint8_t {
+  kNone = 0x0,
+  kBackgroundShortSelfTest = 0x1,
+  kBackgroundExtendedSelfTest = 0x2,
+  kReserved1 = 0x3,
+  kAbortBackgroundSelfTest = 0x4,
+  kForegroundShortSelfTest = 0x5,
+  kForegroundExtendedSelfTest = 0x6,
+  kReserved2 = 0x7,
+};
+
+// SPC-4, section 6.32 "SEND DIAGNOSTIC command".
+struct SendDiagnosticCDB {
+  Opcode opcode;
+  // self_test_code_and_parameters (7 downto 5) is 'SELF-TEST CODE'
+  // self_test_code_and_parameters (4) is 'PF (Page format)'
+  // self_test_code_and_parameters (2) is 'SELFTEST (Self test)'
+  // self_test_code_and_parameters (1) is 'DEVOFFL (SCSI target device offline)'
+  // self_test_code_and_parameters (0) is 'UNITOFFL (Unit offline)'
+  uint8_t self_test_code_and_parameters;
+  uint8_t reserved;
+  uint16_t parameter_list_length;
+  uint8_t control;
+
+  DEF_ENUM_SUBFIELD(self_test_code_and_parameters, SelfTestCode, 7, 5, self_test_code);
+  DEF_SUBBIT(self_test_code_and_parameters, 4, pf);
+  DEF_SUBBIT(self_test_code_and_parameters, 2, self_test);
+  DEF_SUBBIT(self_test_code_and_parameters, 1, dev_off_l);
+  DEF_SUBBIT(self_test_code_and_parameters, 0, unit_off_l);
+} __PACKED;
+
+static_assert(sizeof(SendDiagnosticCDB) == 6, "Send Diagnostic CDB must be 6 bytes");
+
 struct DiskOp;
 struct DiskOptions;
 
@@ -839,6 +873,11 @@ class Controller {
   // Format the selected LU. Currently only supports type 0 protection, FMTDATA=0 (mandatory), and
   // does not send a parameter list.
   zx_status_t FormatUnit(uint8_t target, uint16_t lun);
+
+  // Request diagnostic operation to the device.
+  // This function currently only supports the default self-test feature, which is the minimum
+  // requirement.
+  zx_status_t SendDiagnostic(uint8_t target, uint16_t lun, SelfTestCode code);
 
   // Check the status of each LU and bind it. This function returns the number of LUs found.
   zx::result<uint32_t> ScanAndBindLogicalUnits(zx_device_t* device, uint8_t target,

@@ -348,6 +348,28 @@ zx_status_t Controller::FormatUnit(uint8_t target, uint16_t lun) {
   return status;
 }
 
+zx_status_t Controller::SendDiagnostic(uint8_t target, uint16_t lun, SelfTestCode code) {
+  SendDiagnosticCDB cdb = {};
+  cdb.opcode = Opcode::SEND_DIAGNOSTIC;
+  cdb.set_self_test_code(code);
+
+  // We only supports the default self-test feature.
+  cdb.set_self_test(true);
+  cdb.set_pf(false);
+  cdb.parameter_list_length = 0;
+
+  cdb.set_dev_off_l(false);
+  cdb.set_unit_off_l(false);
+
+  zx_status_t status =
+      ExecuteCommandSync(target, lun, {&cdb, sizeof(cdb)}, /*is_write=*/false, {nullptr, 0});
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "SEND DIAGNOSTIC failed for target %u, lun %u: %s", target, lun,
+           zx_status_get_string(status));
+  }
+  return status;
+}
+
 zx::result<uint32_t> Controller::ScanAndBindLogicalUnits(zx_device_t* device, uint8_t target,
                                                          uint32_t max_transfer_bytes,
                                                          uint16_t max_lun, LuCallback lu_callback,
