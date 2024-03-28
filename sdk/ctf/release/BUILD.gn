@@ -6,12 +6,12 @@ import("//sdk/ctf/build/compatibility_test_suite.gni")
 import("//sdk/ctf/build/ctf.gni")
 import("//sdk/ctf/build/internal/platform_version.gni")
 
-compatibility_test_suite("ctf_milestone") {
+compatibility_test_suite("f18") {
   api_level = max_supported_api_level
-  path = "//prebuilt/cts/current_milestone/$host_platform/cts"
+  path = "//prebuilt/ctf/f18/$host_platform/cts"
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":ctf_milestone" ]
+  deps = [ ":f18" ]
 }

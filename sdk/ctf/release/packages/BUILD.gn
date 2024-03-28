@@ -7,7 +7,7 @@ import("//sdk/ctf/build/internal/platform_version.gni")
 
 generate_ctf_packages("packages_milestone") {
   api_level = max_supported_api_level
-  manifest = "//prebuilt/cts/current_milestone/$host_platform/cts/package_archives.json"
+  manifest = "//prebuilt/ctf/f18/$host_platform/cts/package_archives.json"
 }
 
 # To list all packages:
