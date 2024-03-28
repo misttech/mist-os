@@ -200,13 +200,7 @@ load(
     "//:build/bazel/repository_rules.bzl",
     "bazel_inputs_repository",
     "boringssl_repository",
-    "fuchsia_build_info_repository",
     "googletest_repository",
-)
-
-fuchsia_build_info_repository(
-    name = "fuchsia_build_info",
-    python_interpreter = "prebuilt/third_party/python3/%s/bin/python3" % fuchsia_host_tag,
 )
 
 # com_google_absl is a dependency of com_google_googletest

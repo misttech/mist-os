@@ -30,7 +30,7 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
-    update_version_file = "@fuchsia_build_info//:build_info_version.txt",
+    update_version_file = "@legacy_ninja_build_outputs//:build_info_version.txt",
     virtual_devices = [
         ":workbench_emu",
     ],
@@ -46,7 +46,7 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:qemu-x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
-    update_version_file = "@fuchsia_build_info//:build_info_version.txt",
+    update_version_file = "@legacy_ninja_build_outputs//:build_info_version.txt",
     virtual_devices = [
         ":workbench_emu",
     ],
@@ -61,7 +61,7 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:arm64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
-    update_version_file = "@fuchsia_build_info//:build_info_version.txt",
+    update_version_file = "@legacy_ninja_build_outputs//:build_info_version.txt",
 )
 
 fuchsia_product_bundle(
@@ -73,7 +73,7 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:vim3",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
-    update_version_file = "@fuchsia_build_info//:build_info_version.txt",
+    update_version_file = "@legacy_ninja_build_outputs//:build_info_version.txt",
 )
 
 fuchsia_product(

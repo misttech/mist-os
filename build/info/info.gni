@@ -19,19 +19,11 @@ declare_args() {
 build_info_files = {
   product = "$root_build_dir/product.txt"
   board = "$root_build_dir/board.txt"
-
-  # LINT.IfChange
-  jiri_snapshot = "//.jiri_root/update_history/latest"
-
-  # LINT.ThenChange(//build/bazel/workspace/scripts/update_workspace.py)
-
-  # LINT.IfChange
-  latest_commit_date = "$root_build_dir/latest-commit-date.txt"
-  latest_commit_hash = "$root_build_dir/latest-commit-hash.txt"
-  minimum_utc_stamp = "$root_build_dir/minimum-utc-stamp.txt"
   version = "$root_build_dir/version.txt"
-
-  # LINT.ThenChange(//build/bazel/repository_rules.bzl)
+  jiri_snapshot = "//.jiri_root/update_history/latest"
+  latest_commit_hash = "$root_build_dir/latest-commit-hash.txt"
+  latest_commit_date = "$root_build_dir/latest-commit-date.txt"
+  minimum_utc_stamp = "$root_build_dir/minimum-utc-stamp.txt"
 }
 
 default_product_build_info = {
