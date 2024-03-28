@@ -144,10 +144,7 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
   //        ii. Node does not reference other nodes -> Not published
   //
 
-  bool add_non_platform_device = false;
-  if (!add_platform_device_ && !node_properties_.empty()) {
-    add_non_platform_device = true;
-  }
+  bool add_non_platform_device = !add_platform_device_ && !node_properties_.empty();
 
   if (add_platform_device_) {
     FDF_LOG(DEBUG, "Adding node '%s' to pbus with instance id %d.", name().c_str(), id_);

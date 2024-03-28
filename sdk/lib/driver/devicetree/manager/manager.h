@@ -43,13 +43,6 @@ class Manager final : public NodeManager {
   // This needs to be called before |PublishDevices|.
   zx::result<> Walk(Visitor& visitor);
 
-  // TODO(331226069) : Remove after soft transition.
-  zx::result<> PublishDevices(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus,
-                              fidl::ClientEnd<fuchsia_driver_framework::CompositeNodeManager> mgr) {
-    fidl::SyncClient<fuchsia_driver_framework::Node> fdf_node;
-    return PublishDevices(pbus, std::move(mgr), fdf_node);
-  }
-
   // Publish the discovered devices.
   // The devices maybe added as a platform device using |pbus_client| if it contains any platform
   // resources, or it maybe added as a child of the board driver using |fdf_node|, or it maybe added
