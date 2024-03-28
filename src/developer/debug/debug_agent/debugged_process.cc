@@ -254,7 +254,11 @@ void DebuggedProcess::PopulateCurrentThreads() {
       continue;
 
     auto new_thread = std::make_unique<DebuggedThread>(debug_agent_, this, std::move(thread));
+    DebuggedThread* new_thread_ptr = new_thread.get();  // Save for notification.
     threads_.emplace(thread_koid, std::move(new_thread));
+
+    // Notify the client.
+    new_thread_ptr->SendThreadNotification();
   }
 }
 

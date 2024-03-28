@@ -634,7 +634,8 @@ void Session::DispatchNotifyException(const debug_ipc::NotifyException& notify, 
   if (!thread) {
     // Don't crash if we get an invalid KOID from the agent. However, the agent should be sending
     // us valid IDs so debug assert to try to identify that error.
-    FX_DCHECK(thread);
+    FX_DCHECK(thread) << "Got notification for nonexistant process/thread "
+                      << notify.thread.id.process << "/" << notify.thread.id.thread;
     return;
   }
 
