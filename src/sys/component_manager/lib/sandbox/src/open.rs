@@ -8,8 +8,6 @@ use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::TryStreamExt;
-use std::collections::VecDeque;
-use std::fmt::Debug;
 use std::sync::Arc;
 use vfs::{
     directory::entry::{DirectoryEntry, OpenRequest, SubNode},
@@ -209,54 +207,6 @@ impl ValidatePath for String {
 impl ValidatePath for &str {
     fn validate(self) -> Result<vfs::path::Path, zx::Status> {
         vfs::path::Path::validate_and_split(self)
-    }
-}
-
-/// A path type that supports efficient prepending and appending.
-#[derive(Default, Debug, Clone)]
-pub struct Path {
-    pub segments: VecDeque<String>,
-}
-
-impl Path {
-    pub fn new(path: &str) -> Path {
-        debug_assert!(ValidatePath::validate(path).is_ok());
-        let path = Path { segments: path.split("/").map(|s| s.to_owned()).collect() };
-        debug_assert!(ValidatePath::validate(path.fuchsia_io_path().as_str()).is_ok());
-        path
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.segments.is_empty()
-    }
-
-    pub fn next(&mut self) -> Option<String> {
-        self.segments.pop_front()
-    }
-
-    pub fn peek(&self) -> Option<&String> {
-        self.segments.front()
-    }
-
-    pub fn prepend(&mut self, segment: String) {
-        debug_assert!(ValidatePath::validate(segment.as_str()).is_ok());
-        self.segments.push_front(segment);
-        debug_assert!(ValidatePath::validate(self.fuchsia_io_path().as_str()).is_ok());
-    }
-
-    pub fn append(&mut self, segment: String) {
-        debug_assert!(ValidatePath::validate(segment.as_str()).is_ok());
-        self.segments.push_back(segment);
-        debug_assert!(ValidatePath::validate(self.fuchsia_io_path().as_str()).is_ok());
-    }
-
-    /// Returns a path that will be valid for using in a `fuchsia.io/Directory.Open` operation.
-    pub fn fuchsia_io_path(&self) -> String {
-        if self.is_empty() {
-            ".".to_owned()
-        } else {
-            self.segments.iter().map(String::as_str).collect::<Vec<&str>>().join("/")
-        }
     }
 }
 
