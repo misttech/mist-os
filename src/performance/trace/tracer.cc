@@ -83,7 +83,7 @@ void Tracer::Terminate() {
   controller::TerminateOptions terminate_options{};
   terminate_options.set_write_results(true);
   controller_->TerminateTracing(std::move(terminate_options),
-                                [](controller::TerminateResult result) {
+                                [](controller::Controller_TerminateTracing_Result result) {
                                   // TODO(dje): Print provider stats.
                                 });
 }

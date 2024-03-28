@@ -226,7 +226,8 @@ void TraceManagerTest::BeginStopSession(controller::StopOptions options) {
   MarkBeginOperation();
 
   stop_state_.stop_completed = false;
-  auto callback = [this]() {
+  auto callback = [this](controller::Controller_StopTracing_Result result) {
+    ASSERT_TRUE(result.is_response());
     stop_state_.stop_completed = true;
     // We need to run the loop one last time to pick up the result.
     // Be sure to exit it now that we have the result.
@@ -297,10 +298,12 @@ void TraceManagerTest::BeginTerminateSession(controller::TerminateOptions option
   MarkBeginOperation();
 
   terminate_state_.terminate_completed = false;
-  controller()->TerminateTracing(std::move(options), [this](controller::TerminateResult result) {
-    terminate_state_.terminate_completed = true;
-    terminate_state_.terminate_result = std::move(result);
-  });
+  controller()->TerminateTracing(
+      std::move(options), [this](controller::Controller_TerminateTracing_Result result) {
+        ASSERT_TRUE(result.is_response());
+        terminate_state_.terminate_completed = true;
+        terminate_state_.terminate_result = std::move(result.response().result);
+      });
   RunLoopUntilIdle();
   // The loop will exit for the transition to kTerminating.
   // Note: If there are no providers then the state will transition again

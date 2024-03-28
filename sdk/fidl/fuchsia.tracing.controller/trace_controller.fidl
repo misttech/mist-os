@@ -69,7 +69,7 @@ protocol Controller {
     /// If `options.write_results` is true, then the trace controller
     /// continues to transfer any remaining data to the output socket
     /// until finished, then closes the output.
-    strict TerminateTracing(struct {
+    flexible TerminateTracing(struct {
         options TerminateOptions;
     }) -> (struct {
         result TerminateResult;
@@ -95,7 +95,7 @@ protocol Controller {
     /// If tracing has already stopped then this does nothing.
     /// Returning a result lets callers know when it's ok to, for example,
     /// start tracing again.
-    strict StopTracing(struct {
+    flexible StopTracing(struct {
         options StopOptions;
     }) -> ();
 

@@ -95,7 +95,7 @@ class TraceSession {
   // Stops tracing first if necessary (see |Stop()|).
   // If terminating providers takes longer than |stop_timeout_|, we forcefully
   // terminate tracing and invoke |callback|.
-  void Terminate(fit::function<void(controller::TerminateResult)> callback);
+  void Terminate(fit::function<void(controller::Controller_TerminateTracing_Result)> callback);
 
   // Starts the trace.
   // Invokes |callback| when all providers in this session have
@@ -112,7 +112,8 @@ class TraceSession {
   //
   // If stopping providers takes longer than |stop_timeout_|, we forcefully
   // stop tracing and invoke |callback|.
-  void Stop(bool write_results, fit::closure callback);
+  void Stop(bool write_results,
+            fit::function<void(controller::Controller_StopTracing_Result)> callback);
 
   // Remove |provider|, it's dead Jim.
   void RemoveDeadProvider(TraceProviderBundle* provider);
@@ -181,8 +182,8 @@ class TraceSession {
       session_terminate_timeout_{this};
 
   controller::Controller::StartTracingCallback start_callback_;
-  fit::closure stop_callback_;
-  fit::function<void(controller::TerminateResult)> terminate_callback_;
+  fit::function<void(controller::Controller_StopTracing_Result)> stop_callback_;
+  fit::function<void(controller::Controller_TerminateTracing_Result)> terminate_callback_;
 
   fit::closure abort_handler_;
   AlertCallback alert_callback_;

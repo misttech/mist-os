@@ -81,14 +81,23 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         )
         socket_task = asyncio.get_running_loop().create_task(client.read_all())
         await asyncio.sleep(10)
-        await controller.stop_tracing(
+        stop_res = await controller.stop_tracing(
             options=tracing_controller.StopOptions(write_results=True)
         )
-        res = await controller.terminate_tracing(
-            options=tracing_controller.TerminateOptions(write_results=True)
+        asserts.assert_true(
+            stop_res.response,
+            msg="Error retrieving known categories",
         )
 
-        terminate_result = res.result
+        terminate_res = await controller.terminate_tracing(
+            options=tracing_controller.TerminateOptions(write_results=True)
+        )
+        asserts.assert_true(
+            terminate_res.response,
+            msg="Error retrieving known categories",
+        )
+
+        terminate_result = terminate_res.response.result
         asserts.assert_true(
             len(terminate_result.provider_stats) > 0,
             msg="Terminate result provider stats should not be empty.",

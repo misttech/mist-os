@@ -117,7 +117,8 @@ void TraceSession::AddProvider(TraceProviderBundle* provider) {
 
 void TraceSession::MarkInitialized() { TransitionToState(State::kInitialized); }
 
-void TraceSession::Terminate(fit::function<void(controller::TerminateResult)> callback) {
+void TraceSession::Terminate(
+    fit::function<void(controller::Controller_TerminateTracing_Result)> callback) {
   if (state_ == State::kTerminating) {
     FX_LOGS(DEBUG) << "Ignoring terminate request, already terminating";
     return;
@@ -166,7 +167,8 @@ void TraceSession::Start(fuchsia::tracing::BufferDisposition buffer_disposition,
   additional_categories_ = additional_categories;
 }
 
-void TraceSession::Stop(bool write_results, fit::closure callback) {
+void TraceSession::Stop(bool write_results,
+                        fit::function<void(controller::Controller_StopTracing_Result)> callback) {
   FX_DCHECK(state_ == State::kInitialized || state_ == State::kStarting ||
             state_ == State::kStarted);
 
@@ -307,9 +309,12 @@ void TraceSession::NotifyStopped() {
   if (stop_callback_) {
     FX_LOGS(DEBUG) << "Marking session as having stopped";
     session_stop_timeout_.Cancel();
+    controller::Controller_StopTracing_Result stop_result;
+    controller::Controller_StopTracing_Response response;
+    stop_result.set_response(response);
     auto callback = std::move(stop_callback_);
     FX_DCHECK(callback);
-    callback();
+    callback(std::move(stop_result));
   }
 }
 
@@ -370,11 +375,14 @@ void TraceSession::TerminateSessionIfEmpty() {
 
     session_terminate_timeout_.Cancel();
 
+    controller::Controller_TerminateTracing_Result result;
     controller::TerminateResult terminate_result;
     terminate_result.set_provider_stats(std::move(trace_stats_));
+    result.set_response(
+        controller::Controller_TerminateTracing_Response(std::move(terminate_result)));
     auto callback = std::move(terminate_callback_);
     FX_DCHECK(callback);
-    callback(std::move(terminate_result));
+    callback(std::move(result));
   }
 }
 
@@ -396,11 +404,14 @@ void TraceSession::FinishTerminatingDueToTimeout() {
         }
       }
     }
+    controller::Controller_TerminateTracing_Result result;
     controller::TerminateResult terminate_result;
     terminate_result.set_provider_stats(std::move(trace_stats_));
+    result.set_response(
+        controller::Controller_TerminateTracing_Response(std::move(terminate_result)));
     auto callback = std::move(terminate_callback_);
     FX_DCHECK(callback);
-    callback(std::move(terminate_result));
+    callback(std::move(result));
   }
 }
 

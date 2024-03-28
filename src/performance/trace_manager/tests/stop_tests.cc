@@ -17,10 +17,13 @@ TEST_F(TraceManagerTest, StopUninitialize) {
 
   controller::StopOptions stop_options{GetDefaultStopOptions()};
   bool stop_completed = false;
-  controller()->StopTracing(std::move(stop_options), [this, &stop_completed]() {
-    stop_completed = true;
-    QuitLoop();
-  });
+  controller()->StopTracing(
+      std::move(stop_options),
+      [this, &stop_completed](controller::Controller_StopTracing_Result result) {
+        ASSERT_TRUE(result.is_response());
+        stop_completed = true;
+        QuitLoop();
+      });
   RunLoopUntilIdle();
   FX_LOGS(DEBUG) << "Loop done";
   EXPECT_TRUE(stop_completed);
@@ -36,7 +39,9 @@ TEST_F(TraceManagerTest, RetryAfterFailedStop) {
   ASSERT_TRUE(StartSession());
 
   controller::StopOptions stop_options{GetDefaultStopOptions()};
-  controller()->StopTracing(std::move(stop_options), []() {});
+  controller()->StopTracing(
+      std::move(stop_options),
+      [](controller::Controller_StopTracing_Result result) { ASSERT_TRUE(result.is_response()); });
   RunLoopUntilIdle();
   ASSERT_EQ(GetSessionState(), SessionState::kStopping);
 
@@ -84,10 +89,13 @@ template <typename T>
 void TryExtraStop(TraceManagerTest* fixture, const T& interface_ptr) {
   controller::StopOptions stop_options{fixture->GetDefaultStopOptions()};
   bool stop_completed = false;
-  interface_ptr->StopTracing(std::move(stop_options), [fixture, &stop_completed]() {
-    stop_completed = true;
-    fixture->QuitLoop();
-  });
+  interface_ptr->StopTracing(
+      std::move(stop_options),
+      [fixture, &stop_completed](controller::Controller_StopTracing_Result result) {
+        ASSERT_TRUE(result.is_response());
+        stop_completed = true;
+        fixture->QuitLoop();
+      });
   fixture->RunLoopUntilIdle();
   FX_LOGS(DEBUG) << "Loop done, expecting session still stopped";
   EXPECT_TRUE(stop_completed);
@@ -121,7 +129,9 @@ TEST_F(TraceManagerTest, StopWhileStopping) {
   ASSERT_TRUE(StartSession());
 
   controller::StopOptions stop1_options{GetDefaultStopOptions()};
-  controller()->StopTracing(std::move(stop1_options), []() {});
+  controller()->StopTracing(
+      std::move(stop1_options),
+      [](controller::Controller_StopTracing_Result result) { ASSERT_TRUE(result.is_response()); });
   RunLoopUntilIdle();
   // The loop will exit for the transition to kStopping.
   FX_LOGS(DEBUG) << "Loop done, expecting session stopping";
@@ -132,10 +142,13 @@ TEST_F(TraceManagerTest, StopWhileStopping) {
   // still remain in |kStopping|.
   controller::StopOptions stop2_options{GetDefaultStopOptions()};
   bool stop_completed = false;
-  controller()->StopTracing(std::move(stop2_options), [this, &stop_completed]() {
-    stop_completed = true;
-    QuitLoop();
-  });
+  controller()->StopTracing(
+      std::move(stop2_options),
+      [this, &stop_completed](controller::Controller_StopTracing_Result result) {
+        ASSERT_TRUE(result.is_response());
+        stop_completed = true;
+        QuitLoop();
+      });
   RunLoopUntilIdle();
   FX_LOGS(DEBUG) << "Stop loop done";
   EXPECT_TRUE(stop_completed);
@@ -154,7 +167,10 @@ TEST_F(TraceManagerTest, StopWhileTerminating) {
   ASSERT_TRUE(StopSession());
 
   controller::TerminateOptions options{GetDefaultTerminateOptions()};
-  controller()->TerminateTracing(std::move(options), [](controller::TerminateResult result) {});
+  controller()->TerminateTracing(std::move(options),
+                                 [](controller::Controller_TerminateTracing_Result result) {
+                                   ASSERT_TRUE(result.is_response());
+                                 });
   RunLoopUntilIdle();
   ASSERT_EQ(GetSessionState(), SessionState::kTerminating);
 
@@ -163,10 +179,13 @@ TEST_F(TraceManagerTest, StopWhileTerminating) {
   // still remain in |kTerminating|.
   controller::StopOptions stop_options{GetDefaultStopOptions()};
   bool stop_completed = false;
-  controller()->StopTracing(std::move(stop_options), [this, &stop_completed]() {
-    stop_completed = true;
-    QuitLoop();
-  });
+  controller()->StopTracing(
+      std::move(stop_options),
+      [this, &stop_completed](controller::Controller_StopTracing_Result result) {
+        ASSERT_TRUE(result.is_response());
+        stop_completed = true;
+        QuitLoop();
+      });
   RunLoopUntilIdle();
   FX_LOGS(DEBUG) << "Stop loop done";
   EXPECT_TRUE(stop_completed);

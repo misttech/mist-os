@@ -72,7 +72,9 @@ TEST_F(TraceManagerTest, StartWhileStopping) {
   ASSERT_TRUE(StartSession());
 
   controller::StopOptions stop_options{GetDefaultStopOptions()};
-  controller()->StopTracing(std::move(stop_options), []() {});
+  controller()->StopTracing(
+      std::move(stop_options),
+      [](controller::Controller_StopTracing_Result result) { ASSERT_TRUE(result.is_response()); });
   RunLoopUntilIdle();
   // The loop will exit for the transition to kStopping.
   FX_LOGS(DEBUG) << "Loop done, expecting session stopping";
@@ -111,7 +113,10 @@ TEST_F(TraceManagerTest, StartWhileTerminating) {
   ASSERT_TRUE(StopSession());
 
   controller::TerminateOptions options{GetDefaultTerminateOptions()};
-  controller()->TerminateTracing(std::move(options), [](controller::TerminateResult result) {});
+  controller()->TerminateTracing(std::move(options),
+                                 [](controller::Controller_TerminateTracing_Result result) {
+                                   ASSERT_TRUE(result.is_response());
+                                 });
   RunLoopUntilIdle();
   ASSERT_EQ(GetSessionState(), SessionState::kTerminating);
 

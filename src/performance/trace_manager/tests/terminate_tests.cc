@@ -29,7 +29,10 @@ TEST_F(TraceManagerTest, TerminateWhenNotInitialized) {
   options.set_write_results(false);
   bool terminated = false;
   controller()->TerminateTracing(
-      std::move(options), [&terminated](controller::TerminateResult result) { terminated = true; });
+      std::move(options), [&terminated](controller::Controller_TerminateTracing_Result result) {
+        ASSERT_TRUE(result.is_response());
+        terminated = true;
+      });
 
   RunLoopUntilIdle();
 

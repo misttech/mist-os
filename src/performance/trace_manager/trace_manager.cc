@@ -70,7 +70,7 @@ void TraceManager::OnEmptyControllerSet() {
     // tracing has ended.
     if (session_->state() != TraceSession::State::kTerminating) {
       FX_LOGS(INFO) << "Controller is gone, terminating trace";
-      session_->Terminate([this](controller::TerminateResult result) {
+      session_->Terminate([this](controller::Controller_TerminateTracing_Result result) {
         FX_LOGS(INFO) << "Trace terminated";
         session_.reset();
       });
@@ -166,7 +166,7 @@ void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket 
       [this]() {
         if (session_->state() != TraceSession::State::kTerminating) {
           FX_LOGS(INFO) << "Aborting and terminating trace";
-          session_->Terminate([this](controller::TerminateResult result) {
+          session_->Terminate([this](controller::Controller_TerminateTracing_Result result) {
             FX_LOGS(INFO) << "Terminated trace";
             session_.reset();
           });
@@ -189,15 +189,21 @@ void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket 
 // fidl
 void TraceManager::TerminateTracing(controller::TerminateOptions options,
                                     TerminateTracingCallback terminate_callback) {
+  controller::Controller_TerminateTracing_Result result;
+  controller::TerminateResult terminate_result;
   if (!session_) {
     FX_LOGS(DEBUG) << "Ignoring terminate request, tracing not initialized";
-    controller::TerminateResult result;
+    result.set_response(
+        controller::Controller_TerminateTracing_Response(std::move(terminate_result)));
     terminate_callback(std::move(result));
     return;
   }
 
   if (session_->state() == TraceSession::State::kTerminating) {
     FX_LOGS(INFO) << "Ignoring terminate request. Already terminating";
+    result.set_response(
+        controller::Controller_TerminateTracing_Response(std::move(terminate_result)));
+    terminate_callback(std::move(result));
     return;
   }
 
@@ -207,8 +213,7 @@ void TraceManager::TerminateTracing(controller::TerminateOptions options,
 
   FX_LOGS(INFO) << "Terminating trace";
   session_->Terminate([this, terminate_callback = std::move(terminate_callback)](
-                          controller::TerminateResult result) {
-    FX_LOGS(INFO) << "Terminated trace";
+                          controller::Controller_TerminateTracing_Result result) {
     terminate_callback(std::move(result));
     session_.reset();
   });
@@ -285,9 +290,12 @@ void TraceManager::StartTracing(controller::StartOptions options,
 
 // fidl
 void TraceManager::StopTracing(controller::StopOptions options, StopTracingCallback stop_callback) {
+  controller::Controller_StopTracing_Result stop_result;
+  controller::Controller_StopTracing_Response response;
   if (!session_) {
     FX_LOGS(DEBUG) << "Ignoring stop request, tracing not started";
-    stop_callback();
+    stop_result.set_response(response);
+    stop_callback(std::move(stop_result));
     return;
   }
 
@@ -295,7 +303,8 @@ void TraceManager::StopTracing(controller::StopOptions options, StopTracingCallb
       session_->state() != TraceSession::State::kStarting &&
       session_->state() != TraceSession::State::kStarted) {
     FX_LOGS(DEBUG) << "Ignoring stop request, state != Initialized,Starting,Started";
-    stop_callback();
+    stop_result.set_response(response);
+    stop_callback(std::move(stop_result));
     return;
   }
 
@@ -305,9 +314,10 @@ void TraceManager::StopTracing(controller::StopOptions options, StopTracingCallb
   }
 
   FX_LOGS(INFO) << "Stopping trace" << (write_results ? ", and writing results" : "");
-  session_->Stop(write_results, [stop_callback = std::move(stop_callback)]() {
+  session_->Stop(write_results, [stop_callback = std::move(stop_callback)](
+                                    controller::Controller_StopTracing_Result result) {
     FX_LOGS(INFO) << "Stopped trace";
-    stop_callback();
+    stop_callback(std::move(result));
   });
 }
 
