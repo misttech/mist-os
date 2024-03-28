@@ -25,13 +25,13 @@ using Time = ffl::Fixed<zx_time_t, 0>;
 // The parameters that specify a thread's activation period (i.e., the
 // recurring cycle in which it is scheduled).
 struct BandwidthParameters {
+  // The duration of the thread's activation period.
+  Duration period;
+
   // The total duration within a given activation period in which a thread is
   // expected to complete its work. This can be regarded as a measure of the
   // expected worst-case runtime.
-  Duration capacity;
-
-  // The duration of the thread's activation period.
-  Duration period;
+  Duration firm_capacity;
 };
 
 // The base thread class from which we expect schedulable thread types to
@@ -41,15 +41,15 @@ template <typename Thread>
 class ThreadBase {
  public:
   constexpr ThreadBase(BandwidthParameters bandwidth, Time start)
-      : capacity_(bandwidth.capacity), period_(bandwidth.period) {
-    ZX_ASSERT(bandwidth.capacity > 0);
-    ZX_ASSERT(bandwidth.period >= bandwidth.capacity);
+      : period_(bandwidth.period), firm_capacity_(bandwidth.firm_capacity) {
+    ZX_ASSERT(bandwidth.period >= bandwidth.firm_capacity);
+    ZX_ASSERT(bandwidth.firm_capacity > 0);
     ReactivateIfExpired(start);
   }
 
-  constexpr Duration capacity() const { return capacity_; }
-
   constexpr Duration period() const { return period_; }
+
+  constexpr Duration firm_capacity() const { return firm_capacity_; }
 
   // The start of the thread's current activation period.
   constexpr Time start() const { return start_; }
@@ -63,12 +63,12 @@ class ThreadBase {
 
   // The remaining time expected to be scheduled within the current activation
   // period.
-  constexpr Duration time_slice_remaining() const { return capacity() - time_slice_used(); }
+  constexpr Duration time_slice_remaining() const { return firm_capacity() - time_slice_used(); }
 
   // Whether the thread has completed its work for the current activation
   // period or activation period itself has ended.
   constexpr bool IsExpired(Time now) const {
-    return time_slice_used() >= capacity() || now >= finish();
+    return time_slice_used() >= firm_capacity() || now >= finish();
   }
 
   // Reactivates the thread in a new activation period beginning `now`.
@@ -90,8 +90,8 @@ class ThreadBase {
   // For access to `run_queue_` alone.
   friend class RunQueue<Thread>;
 
-  Duration capacity_{0};
   Duration period_{0};
+  Duration firm_capacity_{0};
   Time start_{Time::Min()};
   Duration time_slice_used_{0};
 

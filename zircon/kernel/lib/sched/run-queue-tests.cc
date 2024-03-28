@@ -24,9 +24,9 @@ TEST(RunQueueTests, Empty) {
 }
 
 TEST(RunQueueTests, QueueNonExpired) {
-  TestThread thread1{{Capacity(5), Period(10)}, Start(0)};
-  TestThread thread2{{Capacity(2), Period(10)}, Start(1)};
-  TestThread thread3{{Capacity(3), Period(15)}, Start(2)};
+  TestThread thread1{{Period(10), Capacity(5)}, Start(0)};
+  TestThread thread2{{Period(10), Capacity(2)}, Start(1)};
+  TestThread thread3{{Period(15), Capacity(3)}, Start(2)};
 
   EXPECT_FALSE(thread1.IsQueued());
   EXPECT_FALSE(thread2.IsQueued());
@@ -70,9 +70,9 @@ TEST(RunQueueTests, QueueNonExpired) {
 }
 
 TEST(RunQueueTests, QueueExpired) {
-  TestThread thread1{{Capacity(5), Period(10)}, Start(0)};
-  TestThread thread2{{Capacity(2), Period(10)}, Start(1)};
-  TestThread thread3{{Capacity(3), Period(15)}, Start(2)};
+  TestThread thread1{{Period(10), Capacity(5)}, Start(0)};
+  TestThread thread2{{Period(10), Capacity(2)}, Start(1)};
+  TestThread thread3{{Period(15), Capacity(3)}, Start(2)};
 
   thread1.Tick(Capacity(5));
   thread2.Tick(Capacity(2));
@@ -103,9 +103,9 @@ TEST(RunQueueTests, QueueExpired) {
 }
 
 TEST(RunQueueTests, Dequeue) {
-  TestThread thread1{{Capacity(5), Period(10)}, Start(0)};
-  TestThread thread2{{Capacity(2), Period(10)}, Start(1)};
-  TestThread thread3{{Capacity(3), Period(15)}, Start(2)};
+  TestThread thread1{{Period(10), Capacity(5)}, Start(0)};
+  TestThread thread2{{Period(10), Capacity(2)}, Start(1)};
+  TestThread thread3{{Period(15), Capacity(3)}, Start(2)};
 
   sched::RunQueue<TestThread> queue;
   queue.Queue(thread1, Start(0));
@@ -127,9 +127,9 @@ TEST(RunQueueTests, Dequeue) {
 }
 
 TEST(RunQueueTests, OrderedByStartTime) {
-  TestThread thread1{{Capacity(5), Period(10)}, Start(0)};
-  TestThread thread2{{Capacity(2), Period(10)}, Start(1)};
-  TestThread thread3{{Capacity(3), Period(15)}, Start(2)};
+  TestThread thread1{{Period(10), Capacity(5)}, Start(0)};
+  TestThread thread2{{Period(10), Capacity(2)}, Start(1)};
+  TestThread thread3{{Period(15), Capacity(3)}, Start(2)};
 
   sched::RunQueue<TestThread> queue;
   queue.Queue(thread3, Start(0));  // Queuing order should not matter.
@@ -151,7 +151,7 @@ TEST(RunQueueTests, EvaluateNextThread) {
   // * No work done in the current activation cycle, so preemption is once
   //   that's done.
   {
-    TestThread current{{Capacity(5), Period(10)}, Start(0)};
+    TestThread current{{Period(10), Capacity(5)}, Start(0)};
 
     sched::RunQueue<TestThread> queue;
     auto [next, preemption] = queue.EvaluateNextThread(current, Start(5));
@@ -163,7 +163,7 @@ TEST(RunQueueTests, EvaluateNextThread) {
   // * Some work done in the current activation cycle, so preemption should
   //   begin once that's done.
   {
-    TestThread current{{Capacity(5), Period(10)}, Start(5)};
+    TestThread current{{Period(10), Capacity(5)}, Start(5)};
     current.Tick(Duration{3});
 
     sched::RunQueue<TestThread> queue;
@@ -174,9 +174,9 @@ TEST(RunQueueTests, EvaluateNextThread) {
 
   // * Next is current, because the other threads are not yet eligible.
   {
-    TestThread current{{Capacity(5), Period(10)}, Start(0)};
-    TestThread threadA{{Capacity(2), Period(10)}, Start(10)};
-    TestThread threadB{{Capacity(3), Period(15)}, Start(10)};
+    TestThread current{{Period(10), Capacity(5)}, Start(0)};
+    TestThread threadA{{Period(10), Capacity(2)}, Start(10)};
+    TestThread threadB{{Period(15), Capacity(3)}, Start(10)};
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
@@ -190,8 +190,8 @@ TEST(RunQueueTests, EvaluateNextThread) {
   //
   // The other should win.
   {
-    TestThread current = TestThread{{Capacity(5), Period(9)}, Start(1)};
-    TestThread threadA = TestThread{{Capacity(2), Period(10)}, Start(0)};
+    TestThread current = TestThread{{Period(9), Capacity(5)}, Start(1)};
+    TestThread threadA = TestThread{{Period(10), Capacity(2)}, Start(0)};
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
@@ -208,8 +208,8 @@ TEST(RunQueueTests, EvaluateNextThread) {
   //
   // The current should win.
   {
-    TestThread current = TestThread{{Capacity(5), Period(10)}, Start(0)};
-    TestThread threadA = TestThread{{Capacity(2), Period(9)}, Start(1)};
+    TestThread current = TestThread{{Period(10), Capacity(5)}, Start(0)};
+    TestThread threadA = TestThread{{Period(9), Capacity(2)}, Start(1)};
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
@@ -229,8 +229,8 @@ TEST(RunQueueTests, EvaluateNextThread) {
   {
     // Define in an array together to control for address comparison.
     std::array threads = {
-        TestThread{{Capacity(2), Period(10)}, Start(0)},  // threadA
-        TestThread{{Capacity(5), Period(10)}, Start(0)},  // current
+        TestThread{{Period(10), Capacity(2)}, Start(0)},  // threadA
+        TestThread{{Period(10), Capacity(5)}, Start(0)},  // current
     };
 
     TestThread& current = threads[1];
@@ -254,8 +254,8 @@ TEST(RunQueueTests, EvaluateNextThread) {
   {
     // Define in an array together to control for address comparison.
     std::array threads = {
-        TestThread{{Capacity(5), Period(10)}, Start(0)},  // current
-        TestThread{{Capacity(2), Period(10)}, Start(0)},  // threadA
+        TestThread{{Period(10), Capacity(5)}, Start(0)},  // current
+        TestThread{{Period(10), Capacity(2)}, Start(0)},  // threadA
     };
 
     TestThread& current = threads[0];
@@ -274,8 +274,8 @@ TEST(RunQueueTests, EvaluateNextThread) {
 
   // * Next thread has no work yet done.
   {
-    TestThread current{{Capacity(5), Period(10)}, Start(0)};
-    TestThread threadA{{Capacity(2), Period(10)}, Start(5)};
+    TestThread current{{Period(10), Capacity(5)}, Start(0)};
+    TestThread threadA{{Period(10), Capacity(2)}, Start(5)};
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
@@ -291,8 +291,8 @@ TEST(RunQueueTests, EvaluateNextThread) {
 
   // * Next thread has had some work done so far.
   {
-    TestThread current{{Capacity(5), Period(10)}, Start(0)};
-    TestThread threadA{{Capacity(2), Period(10)}, Start(5)};
+    TestThread current{{Period(10), Capacity(5)}, Start(0)};
+    TestThread threadA{{Period(10), Capacity(2)}, Start(5)};
     threadA.Tick(Duration{1});
 
     sched::RunQueue<TestThread> queue;
@@ -309,10 +309,10 @@ TEST(RunQueueTests, EvaluateNextThread) {
 
   // * Next-to-next thread will become eligible before next thread finishes.
   {
-    TestThread current{{Capacity(5), Period(15)}, Start(0)};
+    TestThread current{{Period(15), Capacity(5)}, Start(0)};
     current.Tick(Duration{5});
-    TestThread threadA{{Capacity(7), Period(10)}, Start(5)};
-    TestThread threadB{{Capacity(3), Period(5)}, Start(7)};
+    TestThread threadA{{Period(10), Capacity(7)}, Start(5)};
+    TestThread threadB{{Period(5), Capacity(3)}, Start(7)};
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
@@ -327,10 +327,10 @@ TEST(RunQueueTests, EvaluateNextThread) {
   // The originally scheduled next two threads are now expired: the third is
   // picked.
   {
-    TestThread current{{Capacity(3), Period(4)}, Start(0)};
+    TestThread current{{Period(4), Capacity(3)}, Start(0)};
     current.Tick(Duration{3});
-    TestThread threadA{{Capacity(7), Period(10)}, Start(1)};
-    TestThread threadB{{Capacity(3), Period(5)}, Start(5)};
+    TestThread threadA{{Period(10), Capacity(7)}, Start(1)};
+    TestThread threadB{{Period(5), Capacity(3)}, Start(5)};
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));

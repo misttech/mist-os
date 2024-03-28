@@ -36,9 +36,13 @@ TestThread* AllocateNewThread(FuzzedDataProvider& provider,
                               Time max_start = Time::Max()) {
   Time start = ConsumeTime(provider, max_start);
   Duration period = ConsumeDuration(provider, Time::Max() - start);
-  Duration capacity = ConsumeDuration(provider, period);
+  Duration firm_capacity = ConsumeDuration(provider, period);
   threads.emplace_back(std::make_unique<TestThread>(
-      sched::BandwidthParameters{.capacity = capacity, .period = period}, start));
+      sched::BandwidthParameters{
+          .period = period,
+          .firm_capacity = firm_capacity,
+      },
+      start));
   return threads.back().get();
 }
 

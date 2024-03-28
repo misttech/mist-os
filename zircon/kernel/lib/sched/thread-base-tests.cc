@@ -17,29 +17,29 @@ using Time = sched::Time;
 
 TEST(ThreadBaseTests, Start) {
   {
-    TestThread thread{{Capacity(5), Period(10)}, Start(0)};
+    TestThread thread{{Period(10), Capacity(5)}, Start(0)};
     EXPECT_EQ(Time{0}, thread.start());
   }
   {
-    TestThread thread{{Capacity(10), Period(100)}, Start(10)};
+    TestThread thread{{Period(100), Capacity(10)}, Start(10)};
     EXPECT_EQ(Time{10}, thread.start());
   }
 }
 
 TEST(ThreadBaseTests, Finish) {
   {
-    TestThread thread{{Capacity(5), Period(10)}, Start(0)};
+    TestThread thread{{Period(10), Capacity(5)}, Start(0)};
     EXPECT_EQ(Time{10}, thread.finish());  // start + period
   }
   {
-    TestThread thread{{Capacity(10), Period(100)}, Start(10)};
+    TestThread thread{{Period(100), Capacity(10)}, Start(10)};
     EXPECT_EQ(Time{110}, thread.finish());  // start + period
   }
 }
 
 TEST(ThreadBaseTests, Tick) {
-  TestThread thread{{Capacity(5), Period(10)}, Start(0)};
-  EXPECT_EQ(Capacity(5), thread.capacity());
+  TestThread thread{{Period(10), Capacity(5)}, Start(0)};
+  EXPECT_EQ(Capacity(5), thread.firm_capacity());
   EXPECT_EQ(Duration{0}, thread.time_slice_used());
   EXPECT_EQ(Duration{5}, thread.time_slice_remaining());
   EXPECT_FALSE(thread.IsExpired(Start(0)));
@@ -48,20 +48,20 @@ TEST(ThreadBaseTests, Tick) {
   EXPECT_TRUE(thread.IsExpired(Start(10)));
 
   thread.Tick(Duration{2});
-  EXPECT_EQ(Capacity(5), thread.capacity());
+  EXPECT_EQ(Capacity(5), thread.firm_capacity());
   EXPECT_EQ(Duration{2}, thread.time_slice_used());
   EXPECT_EQ(Duration{3}, thread.time_slice_remaining());
   EXPECT_FALSE(thread.IsExpired(Start(0)));
 
   thread.Tick(Duration{3});
-  EXPECT_EQ(Capacity(5), thread.capacity());
+  EXPECT_EQ(Capacity(5), thread.firm_capacity());
   EXPECT_EQ(Duration{5}, thread.time_slice_used());
   EXPECT_EQ(Duration{0}, thread.time_slice_remaining());
   EXPECT_TRUE(thread.IsExpired(Start(0)));
 }
 
 TEST(ThreadBaseTests, ReactivateIfExpired) {
-  TestThread thread{{Capacity(5), Period(10)}, Start(0)};
+  TestThread thread{{Period(10), Capacity(5)}, Start(0)};
   EXPECT_EQ(Time{0}, thread.start());
   EXPECT_EQ(Time{10}, thread.finish());
 
