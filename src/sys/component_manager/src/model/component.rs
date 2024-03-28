@@ -12,8 +12,9 @@ use {
                     self, build_component_sandbox, extend_dict_with_offers, ComponentEnvironment,
                     ComponentInput,
                 },
-                shutdown, start, ActionSet, DestroyAction, DiscoverAction, ResolveAction,
-                ShutdownAction, ShutdownType, StartAction, StopAction, UnresolveAction,
+                shutdown, start, ActionKey, ActionSet, DestroyAction, DiscoverAction,
+                ResolveAction, ShutdownAction, ShutdownType, StartAction, StopAction,
+                UnresolveAction,
             },
             context::ModelContext,
             environment::Environment,
@@ -2607,6 +2608,12 @@ impl Routable for CapabilityRequestedHook {
                 receiver: receiver.clone(),
             },
         );
+        // TODO(https://fxbug.dev/320698181): Before dispatching events we need to wait for any
+        // in-progress resolve actions to end. See https://fxbug.dev/320698181#comment21 for why.
+        {
+            let resolve_completed = source.lock_actions().await.wait_for_action(ActionKey::Resolve);
+            resolve_completed.await.unwrap();
+        }
         source.hooks.dispatch(&event).await;
         if receiver.is_taken() {
             Ok(sender.into())

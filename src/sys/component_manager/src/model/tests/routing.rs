@@ -21,6 +21,7 @@ use {
             },
             component::{IncomingCapabilities, StartReason},
             error::{ActionError, ModelError, ResolveActionError, StartActionError},
+            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             routing::{router::Routable, Route, RouteRequest, RouteSource, RoutingError},
             testing::{
                 echo_service::EchoProtocol, mocks::ControllerActionResponse, out_dir::OutDir,
@@ -37,6 +38,8 @@ use {
         resolving::ResolverError,
     },
     assert_matches::assert_matches,
+    async_trait::async_trait,
+    async_utils::PollExt,
     bedrock_error::{BedrockError, DowncastErrorForTest},
     cm_rust::*,
     cm_rust_testing::*,
@@ -46,12 +49,8 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
-    fuchsia_zircon::AsHandleRef,
-    futures::{
-        channel::{mpsc, oneshot},
-        join, StreamExt,
-    },
+    fuchsia_zircon::{self as zx, AsHandleRef},
+    futures::{channel::mpsc, channel::oneshot, join, lock::Mutex, StreamExt},
     maplit::btreemap,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     routing::component_instance::ComponentInstanceInterface,
@@ -59,7 +58,11 @@ use {
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
     sandbox::Open,
-    std::{collections::HashSet, iter, pin::pin, sync::Arc, task::Poll},
+    std::{
+        collections::HashSet,
+        sync::{Arc, Weak},
+    },
+    std::{iter, pin::pin, task::Poll},
     tracing::warn,
     vfs::{execution_scope::ExecutionScope, pseudo_directory, service},
 };
@@ -3571,4 +3574,203 @@ async fn source_component_shutdown_after_routing_before_open() {
     open.open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
     fasync::OnSignals::new(&client_end, zx::Signals::CHANNEL_PEER_CLOSED).await.unwrap();
     assert!(!root.is_started());
+}
+
+/// A hook on the Resolved event that finishes when receives a value on an mpsc channel.
+pub struct BlockingResolvedHook {
+    receiver: Mutex<mpsc::UnboundedReceiver<Moniker>>,
+}
+
+impl BlockingResolvedHook {
+    fn new() -> (Arc<Self>, mpsc::UnboundedSender<Moniker>) {
+        let (sender, receiver) = mpsc::unbounded();
+        (Arc::new(Self { receiver: Mutex::new(receiver) }), sender)
+    }
+}
+
+impl BlockingResolvedHook {
+    pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
+        vec![HooksRegistration::new(
+            "BlockingResolvedHook",
+            vec![EventType::Resolved],
+            Arc::downgrade(self) as Weak<dyn Hook>,
+        )]
+    }
+}
+
+#[async_trait]
+impl Hook for BlockingResolvedHook {
+    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
+        match &event.payload {
+            EventPayload::Resolved { component, .. } => {
+                let expected_moniker = self.receiver.lock().await.next().await.unwrap();
+                assert_eq!(component.moniker, expected_moniker);
+            }
+            _ => (),
+        };
+        Ok(())
+    }
+}
+
+/// This is a regression test for the flake in https://fxbug.dev/320698181.
+///
+///         root
+///        /    \
+///  provider   consumer
+///
+/// root: offers `foo_svc` from provider to consumer, and capability_requested to provider
+/// provider: exposes `foo_svc` and capability_requested
+/// consumer: uses `foo_svc`
+///
+/// Tests that a protocol capability is "routed" through a capability_requested event
+/// rather than the outgoing directory of a component when resolution is slow.
+///
+/// Capability requested routing needs to wait for the provider to finish resolving
+/// before sending the event. This ensures that the static event stream is registered
+/// and handles the CapabilityRequested event. If this happens late, for example if the
+/// resolver is slow, routing incorrectly falls through to the outgoing dir.
+#[fuchsia::test]
+fn slow_resolve_races_with_capability_requested() {
+    // Building the `RoutingTest` may stall so we run it outside of `run_until_stalled`.
+    let mut executor = fasync::TestExecutor::new();
+    let test = executor.run_singlethreaded(async move {
+        let components = vec![
+            (
+                "root",
+                ComponentDeclBuilder::new()
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("foo_svc")
+                            .target_name("foo_svc")
+                            .source(OfferSource::static_child("provider".into()))
+                            .target(OfferTarget::static_child("consumer".to_string()))
+                            .build(),
+                    )
+                    .offer(
+                        OfferBuilder::event_stream()
+                            .name("capability_requested")
+                            .target_name("capability_requested")
+                            .scope(vec![EventScope::Child(ChildRef {
+                                name: "consumer".into(),
+                                collection: None,
+                            })])
+                            .source(OfferSource::Parent)
+                            .target(OfferTarget::static_child("provider".to_string())),
+                    )
+                    .child(ChildBuilder::new().name("provider"))
+                    .child(ChildBuilder::new().name("consumer"))
+                    .build(),
+            ),
+            (
+                "provider",
+                ComponentDeclBuilder::new()
+                    .capability(
+                        CapabilityBuilder::protocol().name("foo_svc").path("/svc/foo").build(),
+                    )
+                    .use_(
+                        UseBuilder::event_stream()
+                            .source(UseSource::Parent)
+                            .name("capability_requested")
+                            .path("/events/capability_requested")
+                            .filter(btreemap! {
+                                "name".to_string() => DictionaryValue::Str("foo_svc".to_string())
+                            }),
+                    )
+                    // The protocol is exposed from self but in reality would be provided via
+                    // CapabilityRequested, similar to how archivist exposes `fuchsia.logger.LogSink`.
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo_svc")
+                            .source(ExposeSource::Self_)
+                            .target_name("foo_svc")
+                            .target(ExposeTarget::Parent),
+                    )
+                    .build(),
+            ),
+            (
+                "consumer",
+                ComponentDeclBuilder::new()
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Parent)
+                            .name("foo_svc")
+                            .path("/svc/hippo"),
+                    )
+                    .build(),
+            ),
+        ];
+        RoutingTestBuilder::new("root", components)
+            .set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
+                name: "capability_requested".parse().unwrap(),
+            })])
+            .build()
+            .await
+    });
+
+    let mut test_body = Box::pin(async move {
+        // Add a hook that delays component resolution.
+        let (blocking_resolved_hook, resolved_hook_sender) = BlockingResolvedHook::new();
+        test.model.root().hooks.install_front(blocking_resolved_hook.hooks()).await;
+
+        // Resolve root.
+        resolved_hook_sender.unbounded_send(Moniker::root()).unwrap();
+
+        // Resolve consumer and get its namespace.
+        resolved_hook_sender.unbounded_send("consumer".parse().unwrap()).unwrap();
+        let namespace_consumer = test.bind_and_get_namespace("consumer".parse().unwrap()).await;
+
+        let root = test.model.root().clone();
+        let concurrent_resolve_task = fasync::Task::spawn(async move {
+            let provider = root.find(&"provider".parse().unwrap()).await.unwrap();
+            provider.resolve().await.unwrap();
+        });
+
+        // Route and connect to the capability before the provider is resolved.
+        let _echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
+            &namespace_consumer,
+            &"/svc/hippo".parse().unwrap(),
+        )
+        .await;
+
+        _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+
+        // Resolve provider and get its namespace.
+        resolved_hook_sender.unbounded_send("provider".parse().unwrap()).unwrap();
+        let namespace_provider =
+            test.bind_and_get_namespace(vec!["provider"].try_into().unwrap()).await;
+
+        concurrent_resolve_task.await;
+
+        // The provider component should receive a CapabilityRequested event for the
+        // `foo_svc` protocol. If it doesn't, routing will go to the outgoing directory and fail.
+        let event_stream = capability_util::connect_to_svc_in_namespace::<
+            fcomponent::EventStreamMarker,
+        >(
+            &namespace_provider, &"/events/capability_requested".parse().unwrap()
+        )
+        .await;
+
+        let event = event_stream.get_next().await.unwrap().into_iter().next().unwrap();
+
+        assert_matches!(&event,
+        fcomponent::Event {
+            header: Some(fcomponent::EventHeader {
+            moniker: Some(moniker), .. }), ..
+        } if *moniker == ".".to_string() );
+
+        assert_matches!(&event,
+        fcomponent::Event {
+            header: Some(fcomponent::EventHeader {
+            component_url: Some(component_url), .. }), ..
+        } if *component_url == "test:///consumer".to_string() );
+
+        assert_matches!(&event,
+            fcomponent::Event {
+                payload:
+                        Some(fcomponent::EventPayload::CapabilityRequested(
+                            fcomponent::CapabilityRequestedPayload { name: Some(name), .. })), ..
+            } if *name == "foo_svc".to_string()
+        );
+    });
+    executor.run_until_stalled(&mut test_body).unwrap();
 }

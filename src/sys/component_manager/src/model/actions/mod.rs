@@ -77,7 +77,7 @@ use {
         task::{Context, Poll},
         Future,
     },
-    std::collections::HashMap,
+    std::collections::{HashMap, HashSet},
     std::fmt::Debug,
     std::hash::Hash,
     std::pin::Pin,
@@ -121,7 +121,7 @@ pub enum ActionKey {
 /// Each action is mapped to a future that returns when the action is complete.
 pub struct ActionSet {
     rep: HashMap<ActionKey, ActionNotifier>,
-    history: Vec<ActionKey>,
+    history: HashSet<ActionKey>,
     passive_waiters: HashMap<ActionKey, Vec<oneshot::Sender<()>>>,
 }
 
@@ -199,7 +199,7 @@ impl ActionTask {
 
 impl ActionSet {
     pub fn new() -> Self {
-        ActionSet { rep: HashMap::new(), history: vec![], passive_waiters: HashMap::new() }
+        ActionSet { rep: HashMap::new(), history: HashSet::new(), passive_waiters: HashMap::new() }
     }
 
     pub fn contains(&self, key: &ActionKey) -> bool {
@@ -281,7 +281,7 @@ impl ActionSet {
     async fn finish<'a>(component: &Arc<ComponentInstance>, key: &'a ActionKey) {
         let mut action_set = component.lock_actions().await;
         action_set.rep.remove(key);
-        action_set.history.push(key.clone());
+        action_set.history.insert(key.clone());
         for sender in action_set.passive_waiters.entry(key.clone()).or_insert(vec![]).drain(..) {
             let _ = sender.send(());
         }
