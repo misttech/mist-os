@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::anyhow;
+use fancy_regex::Regex;
 use fidl::endpoints::Proxy;
 use fidl_codec::{library as lib, Value as FidlValue};
 use fidl_fuchsia_io as fio;
@@ -13,6 +14,7 @@ use futures::{Future, FutureExt, Stream, StreamExt};
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::OnceLock;
 use std::sync::{Arc, Mutex};
 
 use crate::compiler::Visitor;
@@ -272,16 +274,7 @@ impl InterpreterInner {
             return Err(error!("$fs_root is not a handle"));
         };
 
-        let Value::String(pwd) = pwd else {
-            return Err(error!("$pwd is not a string"));
-        };
-
-        if !pwd.starts_with("/") {
-            return Err(error!("$pwd is not an absolute path"));
-        }
-
-        let sep = if pwd.ends_with("/") { "" } else { "/" };
-        let path = if path.starts_with("/") { path } else { format!("{pwd}{sep}{path}") };
+        let path = canonicalize_path(path, pwd)?;
 
         if !fs_root
             .get_client_protocol()
@@ -581,5 +574,66 @@ impl Interpreter {
         let pwd = pwd.await.ok_or_else(|| error!("$pwd undefined"))??;
 
         self.inner.open(path, fs_root, pwd).await
+    }
+}
+
+/// Turn a path into a dotless, absolute form.
+pub fn canonicalize_path(path: String, pwd: Value) -> Result<String> {
+    static MULTIPLE_SLASHES: OnceLock<Regex> = OnceLock::new();
+    static SINGLE_DOT: OnceLock<Regex> = OnceLock::new();
+    static DOUBLE_DOT_ELIMINATION: OnceLock<Regex> = OnceLock::new();
+
+    let multiple_slashes = MULTIPLE_SLASHES.get_or_init(|| Regex::new(r"/{2,}").unwrap());
+    let single_dot = SINGLE_DOT.get_or_init(|| Regex::new(r"/\.(?=/|$)").unwrap());
+    let double_dot_elimination =
+        DOUBLE_DOT_ELIMINATION.get_or_init(|| Regex::new(r"(^|[^/]+)/\.\.(/|$)").unwrap());
+
+    let Value::String(pwd) = pwd else {
+        return Err(error!("$pwd is not a string"));
+    };
+
+    if !pwd.starts_with("/") {
+        return Err(error!("$pwd is not an absolute path"));
+    }
+
+    let sep = if pwd.ends_with("/") { "" } else { "/" };
+    let path = if path.starts_with("/") { path } else { format!("{pwd}{sep}{path}") };
+    let path = multiple_slashes.replace_all(&path, "/");
+    let mut path = single_dot.replace_all(&path, "").to_string();
+    let mut path_len = path.len();
+    loop {
+        let new_path = double_dot_elimination.replace(&path, "");
+        if new_path.len() == path_len {
+            break;
+        }
+        path = new_path.to_string();
+        path_len = path.len();
+    }
+
+    if path.ends_with("/") {
+        path.pop();
+    }
+
+    if path.is_empty() {
+        path.push('/');
+    }
+
+    Ok(path.to_string())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn canonicalize() {
+        assert_eq!(
+            "/foo",
+            &canonicalize_path(
+                "././/baz/bang/../../..".to_owned(),
+                Value::String("/foo/bar".to_owned())
+            )
+            .unwrap()
+        );
     }
 }

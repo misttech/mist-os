@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use crate::error::{Error, Result};
-use crate::interpreter::Interpreter;
+use crate::interpreter::{canonicalize_path, Interpreter};
 use crate::value::{
     InUseHandle, PlaygroundValue, ReplayableIterator, ReplayableIteratorCursor, Value, ValueExt,
 };
@@ -31,6 +31,7 @@ impl Interpreter {
             let fs_root_getter =
                 self.get_runnable("$fs_root").await.expect("Could not compile fs_root getter");
             let pwd_getter = self.get_runnable("$pwd").await.expect("Could not compile pwd getter");
+            let pwd_getter_clone = pwd_getter.clone();
             self.add_command("open", move |mut args, underscore| {
                 let inner_weak = inner_weak.clone();
                 let fs_root_getter = fs_root_getter.clone();
@@ -124,6 +125,38 @@ impl Interpreter {
             })
             .await
             .expect("Failed to install `read` command");
+
+            let Value::OutOfLine(PlaygroundValue::Invocable(pwd_setter)) =
+                self.run(r"\x {$pwd = $x}").await.expect("Could not build pwd setter")
+            else {
+                unreachable!("cd setter wasn't an invocable");
+            };
+            let pwd_getter = pwd_getter_clone;
+            self.add_command("cd", move |args, _| {
+                let pwd_setter = pwd_setter.clone();
+                let pwd_getter = pwd_getter.clone();
+                async move {
+                    let pwd = pwd_getter().await?;
+
+                    let Result::<[Value; 1], _>::Ok([path]) = args.try_into() else {
+                        return Err(error!("cd takes exactly one argument"));
+                    };
+
+                    let Value::String(path) = path else {
+                        return Err(error!("path must be a string"));
+                    };
+
+                    let path = canonicalize_path(path, pwd)?;
+
+                    let _ = pwd_setter
+                        .invoke(vec![Value::String(path)], None)
+                        .await
+                        .expect("cd setter failed!");
+                    Ok(Value::Null)
+                }
+            })
+            .await
+            .expect("Failed to install `cd` command");
         };
 
         let Either::Left(_) = futures::future::select(pin!(fut), executor_fut).await else {
@@ -326,6 +359,26 @@ mod test {
                 }
 
                 assert_eq!(crate::test::NEILS_PHILOSOPHY, bytes.as_slice());
+            })
+            .await
+    }
+
+    #[fuchsia::test]
+    async fn cd() {
+        Test::test("cd /test; let a = $pwd; cd foo; let b = $pwd; cd \"../..\"; let c = $pwd; [$a, $b, $c]")
+            .with_fidl()
+            .with_standard_test_dirs()
+            .check(|value| {
+                let Value::List(value) = value else {
+                    panic!();
+                };
+                let [Value::String(a), Value::String(b), Value::String(c)]: [Value; 3] = value.try_into().unwrap() else {
+                    panic!();
+                };
+
+                assert_eq!("/test", &a);
+                assert_eq!("/test/foo", &b);
+                assert_eq!("/", &c);
             })
             .await
     }
