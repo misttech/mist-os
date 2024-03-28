@@ -27,6 +27,12 @@ def _ninja_target_from_gn_label(gn_label):
         ninja_target = dir_name.removesuffix(target_name).removesuffix("/") + ":" + target_name
     return ninja_target
 
+################################################################################
+################################################################################
+#####
+#####    bazel_inputs_repository()
+#####
+
 def _bazel_inputs_repository_impl(repo_ctx):
     build_bazel_content = '''# Auto-generated - do not edit
 
@@ -153,6 +159,12 @@ googletest_repository = repository_rule(
     },
 )
 
+################################################################################
+################################################################################
+#####
+#####    boringssl_repository()
+#####
+
 def _boringssl_repository_impl(repo_ctx):
     """Create a @boringssl repository."""
 
@@ -209,6 +221,111 @@ boringssl_repository = repository_rule(
         "content_hash_file": attr.string(
             doc = "Path to content hash file for this repository, relative to workspace root.",
             mandatory = False,
+        ),
+    },
+)
+
+################################################################################
+################################################################################
+#####
+#####    fuchsia_build_info_repository()
+#####
+
+def _fuchsia_build_info_repository_impl(repo_ctx):
+    args_json_path = repo_ctx.path(repo_ctx.attr.args_json)
+    args = json.decode(repo_ctx.read(args_json_path))
+
+    # LINT.IfChange
+    files = struct(
+        version = "build_info_version.txt",
+        timestamp = "minimum-utc-stamp.txt",
+        date_file = "latest-commit-date.txt",
+        hash_file = "latest-commit-hash.txt",
+        jiri_snapshot = "jiri_snapshot.xml",
+    )
+
+    repo_ctx.symlink(
+        repo_ctx.path(Label("@//:jiri_snapshot.xml")),
+        files.jiri_snapshot,
+    )
+
+    # LINT.ThenChange(//build/info/info.gni)
+
+    # LINT.IfChange
+    integration_git_head_path = repo_ctx.path("@//:integration/.git/HEAD")
+    cmd_args = [
+        str(repo_ctx.workspace_root) + "/" + repo_ctx.attr.python_interpreter,
+        str(repo_ctx.path(Label("@//build/info:gen_latest_commit_date.py"))),
+        "--repo",
+        str(repo_ctx.workspace_root) + "/integration",
+        "--timestamp-file",
+        files.timestamp,
+        "--date-file",
+        files.date_file,
+        "--commit-hash-file",
+        files.hash_file,
+    ]
+    if args.get("truncate_build_info_commit_date", False):
+        cmd_args += ["--truncate"]
+    ret = repo_ctx.execute(cmd_args, quiet = False)
+    if ret.return_code != 0:
+        args_str = " ".join(cmd_args)
+        fail("When invoking: {}:\n{}\n".format(args_str, ret.stderr))
+
+    version = args.get("build_info_version", "")
+    if version != "":
+        repo_ctx.file(files.version, version)
+    else:
+        # Use the date file as the version info content.
+        repo_ctx.symlink(files.date_file, files.version)
+
+    # LINT.ThenChange(//build/info/BUILD.gn)
+
+    build_args_bzl = '''# AUTO-GENERATED - DO NOT EDIT
+
+"""Constants extracted from current {args_json_path}."""
+use_vbmeta = {use_vbmeta}
+authorized_ssh_keys_label = "{authorized_ssh_keys_label}"
+delegated_network_provisioning = {delegated_network_provisioning}
+build_info_product = "{build_info_product}"
+
+'''.format(
+        args_json_path = args_json_path,
+        use_vbmeta = args.get("use_vbmeta", False),
+        authorized_ssh_keys_label = args.get("authorized_ssh_keys_label", ""),
+        delegated_network_provisioning = args.get("delegated_network_provisioning", False),
+        build_info_product = args.get("build_info_product", ""),
+    )
+
+    repo_ctx.file("WORKSPACE.bazel", "workspace(name = {})\n".format(repo_ctx.name))
+    repo_ctx.file("build_args.bzl", build_args_bzl)
+
+    build_bazel = "# AUTO-GENERATED\n\nexports_files({})\n".format(
+        json.encode_indent(
+            [
+                files.date_file,
+                files.timestamp,
+                files.hash_file,
+                files.jiri_snapshot,
+                files.version,
+            ],
+            prefix = "",
+            indent = "    ",
+        ),
+    )
+    repo_ctx.file("BUILD.bazel", build_bazel)
+
+fuchsia_build_info_repository = repository_rule(
+    implementation = _fuchsia_build_info_repository_impl,
+    doc = "Provide targets a rules related to the current Fuchsia platform build configuration.",
+    attrs = {
+        "args_json": attr.label(
+            doc = "Label to GN-generated args.json file, relative to workspace root.",
+            default = "//:args.json",
+        ),
+        "python_interpreter": attr.string(
+            doc = "Path to host python interpreter, relative to workspace root.",
+            mandatory = True,
         ),
     },
 )

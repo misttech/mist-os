@@ -49,7 +49,10 @@ _IGNORED_FILE_SUFFIXES = (
 # A list of external repository names which do not require a hash content file
 # I.e. their implementation should already record the right dependencies to
 # their input files.
-_BAZEL_NO_CONTENT_HASH_REPOSITORIES = ("@fuchsia_build_config//",)
+_BAZEL_NO_CONTENT_HASH_REPOSITORIES = (
+    "@fuchsia_build_config//",
+    "@fuchsia_build_info//",
+)
 
 # Technical notes on input (source and build files) located in Bazel external
 # repositories.

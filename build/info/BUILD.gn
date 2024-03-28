@@ -20,6 +20,8 @@ if (current_toolchain == default_toolchain) {
     ]
   }
 
+  # LINT.IfChange
+
   action("latest-commit-date-and-hash") {
     visibility = [
       ":*",
@@ -77,4 +79,6 @@ if (current_toolchain == default_toolchain) {
     ]
     deps = [ ":build_info_files" ]
   }
+
+  # LINT.ThenChange(//build/bazel/repository_rules.bzl)
 }

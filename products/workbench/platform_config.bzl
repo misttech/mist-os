@@ -9,7 +9,7 @@ products. This platform configuration is meant to feed into Fuchsia's product
 assembly process.
 """
 
-load("@legacy_ninja_build_outputs//:build_args.bzl", "delegated_network_provisioning")
+load("@fuchsia_build_info//:build_args.bzl", "delegated_network_provisioning")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "BUILD_TYPES",

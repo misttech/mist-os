@@ -818,6 +818,19 @@ common --enable_bzlmod=false
         ),
     )
 
+    # Provide a few links for the benefit of the @fuchsia_build_info
+    # repository.
+    generated.add_symlink(
+        os.path.join("workspace", "args.json"),
+        os.path.join(gn_output_dir, "args.json"),
+    )
+    # LINT.IfChange
+    generated.add_symlink(
+        os.path.join("workspace", "jiri_snapshot.xml"),
+        os.path.join(fuchsia_dir, ".jiri_root", "update_history", "latest"),
+    )
+    # LINT.ThenChange(//build/info/info.gni)
+
     # Generate wrapper script in topdir/bazel that invokes Bazel with the right --output_base.
     bazel_launcher_content = expand_template_file(
         "template.bazel.sh",
