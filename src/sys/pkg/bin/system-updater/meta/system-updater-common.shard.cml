@@ -26,9 +26,9 @@
             ],
         },
         {
-            directory: "pkgfs-system",
+            directory: "system",
             rights: [ "r*" ],
-            path: "/pkgfs/system",
+            path: "/system",
         },
         {
             directory: "build-info",

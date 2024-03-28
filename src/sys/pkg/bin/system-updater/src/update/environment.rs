@@ -157,13 +157,12 @@ pub struct NamespaceSystemInfo;
 #[async_trait]
 impl SystemInfo for NamespaceSystemInfo {
     async fn system_image_hash(&self) -> Result<Option<fuchsia_hash::Hash>, Error> {
-        let proxy = if let Ok(proxy) = fuchsia_fs::directory::open_in_namespace(
-            "/pkgfs/system",
-            fio::OpenFlags::RIGHT_READABLE,
-        ) {
+        let proxy = if let Ok(proxy) =
+            fuchsia_fs::directory::open_in_namespace("/system", fio::OpenFlags::RIGHT_READABLE)
+        {
             proxy
         } else {
-            // system-updater will always have /pkgfs/system in its namespace because its manifest
+            // system-updater will always have /system in its namespace because its manifest
             // requests it, but on configurations that do not have a system_image package it will
             // not be routed a directory, so we can't just check for NOT_FOUND.
             return Ok(None);

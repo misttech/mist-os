@@ -212,16 +212,16 @@ impl TestEnvBuilder {
         fs.dir("config").add_remote("build-info", build_info);
 
         if let Some(hash) = system_image_hash {
-            let system_image_path = test_dir.path().join("pkgfs-system");
+            let system_image_path = test_dir.path().join("system");
             create_dir(&system_image_path).expect("crate system-image dir");
             let mut meta = File::create(system_image_path.join("meta")).unwrap();
             let () = meta.write_all(hash.to_string().as_bytes()).unwrap();
-            let pkgfs_system = fuchsia_fs::directory::open_in_namespace(
+            let system = fuchsia_fs::directory::open_in_namespace(
                 system_image_path.to_str().unwrap(),
                 fuchsia_fs::OpenFlags::RIGHT_READABLE,
             )
             .unwrap();
-            fs.add_remote("pkgfs-system", pkgfs_system);
+            fs.add_remote("system", system);
         }
 
         // A buffer to store all the interactions the system-updater has with external services.
@@ -433,9 +433,7 @@ impl TestEnvBuilder {
                 .add_route(
                     Route::new()
                         .capability(
-                            Capability::directory("pkgfs-system")
-                                .path("/pkgfs-system")
-                                .rights(fio::R_STAR_DIR),
+                            Capability::directory("system").path("/system").rights(fio::R_STAR_DIR),
                         )
                         .from(&fake_capabilities)
                         .to(&system_updater),
