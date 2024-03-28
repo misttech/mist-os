@@ -227,7 +227,7 @@ class DiskTest : public zxtest::Test {
                 EXPECT_EQ(decoded_cdb.page_code(), PageCode::kAllPageCode);
                 EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
                 EXPECT_FALSE(is_write);
-                ModeSense6ParameterHeader header = {};
+                Mode6ParameterHeader header = {};
                 memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
               } else {
                 EXPECT_EQ(cdb.iov_len, 10);
@@ -237,7 +237,7 @@ class DiskTest : public zxtest::Test {
                 EXPECT_EQ(decoded_cdb.page_code(), PageCode::kAllPageCode);
                 EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
                 EXPECT_FALSE(is_write);
-                ModeSense10ParameterHeader header = {};
+                Mode10ParameterHeader header = {};
                 memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
               }
               break;
@@ -250,7 +250,7 @@ class DiskTest : public zxtest::Test {
                 EXPECT_EQ(decoded_cdb.page_code(), PageCode::kCachingPageCode);
                 EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
                 EXPECT_FALSE(is_write);
-                ModeSense6ParameterHeader header = {};
+                Mode6ParameterHeader header = {};
                 memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
                 CachingModePage response = {};
                 response.set_page_code(static_cast<uint8_t>(PageCode::kCachingPageCode));
@@ -264,7 +264,7 @@ class DiskTest : public zxtest::Test {
                 EXPECT_EQ(decoded_cdb.page_code(), PageCode::kCachingPageCode);
                 EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
                 EXPECT_FALSE(is_write);
-                ModeSense10ParameterHeader header = {};
+                Mode10ParameterHeader header = {};
                 memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
                 CachingModePage response = {};
                 response.set_page_code(static_cast<uint8_t>(PageCode::kCachingPageCode));

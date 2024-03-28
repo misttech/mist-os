@@ -268,7 +268,7 @@ void UmsFunction::HandleReadCapacity16(ums_cbw_t* cbw) {
 void UmsFunction::HandleModeSense6(ums_cbw_t* cbw) {
   zxlogf(DEBUG, "HandleModeSense6");
   usb::Request<>* req = &data_req_.value();
-  scsi::ModeSense6ParameterHeader* data;
+  scsi::Mode6ParameterHeader* data;
   req->Mmap(reinterpret_cast<void**>(&data));
   memset(data, 0, sizeof(*data));
   req->request()->header.length = sizeof(*data);

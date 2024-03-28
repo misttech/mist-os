@@ -145,7 +145,7 @@ zx::result<> Controller::ModeSense(uint8_t target, uint16_t lun, PageCode page_c
   size_t cdb_size = 0;
 
   if (use_mode_sense_6 && data.iov_len <= UINT8_MAX) {  // MODE SENSE 6
-    if (data.iov_len < sizeof(ModeSense6ParameterHeader)) {
+    if (data.iov_len < sizeof(Mode6ParameterHeader)) {
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
     ModeSense6CDB* cdb_6 = reinterpret_cast<ModeSense6CDB*>(cdb);
@@ -157,7 +157,7 @@ zx::result<> Controller::ModeSense(uint8_t target, uint16_t lun, PageCode page_c
 
     cdb_size = sizeof(ModeSense6CDB);
   } else {  // MODE SENSE 10
-    if (data.iov_len < sizeof(ModeSense10ParameterHeader) || data.iov_len > UINT16_MAX) {
+    if (data.iov_len < sizeof(Mode10ParameterHeader) || data.iov_len > UINT16_MAX) {
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
     ModeSense10CDB* cdb_10 = reinterpret_cast<ModeSense10CDB*>(cdb);
@@ -184,7 +184,7 @@ zx::result<> Controller::ModeSense(uint8_t target, uint16_t lun, PageCode page_c
 zx::result<std::tuple<bool, bool>> Controller::ModeSenseDpoFuaAndWriteProtectedEnabled(
     uint8_t target, uint16_t lun, bool use_mode_sense_6) {
   constexpr uint8_t header_size =
-      std::max(sizeof(ModeSense6ParameterHeader), sizeof(ModeSense10ParameterHeader));
+      std::max(sizeof(Mode6ParameterHeader), sizeof(Mode10ParameterHeader));
   uint8_t data[header_size];
 
   zx::result result =
@@ -197,13 +197,11 @@ zx::result<std::tuple<bool, bool>> Controller::ModeSenseDpoFuaAndWriteProtectedE
 
   bool dpo_fua_available, write_protected;
   if (use_mode_sense_6) {
-    ModeSense6ParameterHeader* parameter_header =
-        reinterpret_cast<ModeSense6ParameterHeader*>(data);
+    Mode6ParameterHeader* parameter_header = reinterpret_cast<Mode6ParameterHeader*>(data);
     dpo_fua_available = parameter_header->dpo_fua_available();
     write_protected = parameter_header->write_protected();
   } else {
-    ModeSense10ParameterHeader* parameter_header =
-        reinterpret_cast<ModeSense10ParameterHeader*>(data);
+    Mode10ParameterHeader* parameter_header = reinterpret_cast<Mode10ParameterHeader*>(data);
     dpo_fua_available = parameter_header->dpo_fua_available();
     write_protected = parameter_header->write_protected();
   }
@@ -214,7 +212,7 @@ zx::result<std::tuple<bool, bool>> Controller::ModeSenseDpoFuaAndWriteProtectedE
 zx::result<bool> Controller::ModeSenseWriteCacheEnabled(uint8_t target, uint16_t lun,
                                                         bool use_mode_sense_6) {
   constexpr uint8_t header_size =
-      std::max(sizeof(ModeSense6ParameterHeader), sizeof(ModeSense10ParameterHeader));
+      std::max(sizeof(Mode6ParameterHeader), sizeof(Mode10ParameterHeader));
   uint8_t data[header_size + sizeof(CachingModePage)];
 
   zx::result result =
@@ -226,7 +224,7 @@ zx::result<bool> Controller::ModeSenseWriteCacheEnabled(uint8_t target, uint16_t
   }
 
   uint32_t mode_page_offset =
-      use_mode_sense_6 ? sizeof(ModeSense6ParameterHeader) : sizeof(ModeSense10ParameterHeader);
+      use_mode_sense_6 ? sizeof(Mode6ParameterHeader) : sizeof(Mode10ParameterHeader);
   CachingModePage* mode_page = reinterpret_cast<CachingModePage*>(data + mode_page_offset);
   if (mode_page->page_code() != static_cast<uint8_t>(PageCode::kCachingPageCode)) {
     zxlogf(ERROR, "failed for target %u, lun %u to retrieve caching mode page", target, lun);

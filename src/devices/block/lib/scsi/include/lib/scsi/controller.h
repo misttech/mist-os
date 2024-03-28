@@ -250,6 +250,38 @@ enum class PageCode : uint8_t {
   kAllPageCode = 0x3F,
 };
 
+// SPC-4 Revision 37, section 6.11 "MODE SELECT (6) command".
+struct ModeSelect6CDB {
+  Opcode opcode;
+  // pf_and_sp (4) is 'PF (Page format)'
+  // pf_and_sp (0) is 'SP (Save pages)'
+  uint8_t pf_and_sp;
+  uint16_t reserved;
+  uint8_t parameter_list_length;
+  uint8_t control;
+
+  DEF_SUBBIT(pf_and_sp, 4, page_format);
+  DEF_SUBBIT(pf_and_sp, 0, save_pages);
+} __PACKED;
+
+static_assert(sizeof(ModeSelect6CDB) == 6, "Mode Select 6 CDB must be 6 bytes");
+
+// SPC-4 Revision 37, section 6.12 "MODE SELECT (10) command".
+struct ModeSelect10CDB {
+  Opcode opcode;
+  // pf_and_sp (4) is 'PF (Page format)'
+  // pf_and_sp (0) is 'SP (Save pages)'
+  uint8_t pf_and_sp;
+  uint8_t reserved[5];
+  uint16_t parameter_list_length;
+  uint8_t control;
+
+  DEF_SUBBIT(pf_and_sp, 4, page_format);
+  DEF_SUBBIT(pf_and_sp, 0, save_pages);
+} __PACKED;
+
+static_assert(sizeof(ModeSelect10CDB) == 10, "Mode Select 10 CDB must be 10 bytes");
+
 // SPC-4 Revision 37, section 6.13 "MODE SENSE (6) command".
 struct ModeSense6CDB {
   Opcode opcode;
@@ -271,7 +303,7 @@ struct ModeSense6CDB {
 
 static_assert(sizeof(ModeSense6CDB) == 6, "Mode Sense 6 CDB must be 6 bytes");
 
-struct ModeSense6ParameterHeader {
+struct Mode6ParameterHeader {
   uint8_t mode_data_length;
   // 00h is 'Direct Access Block Device'
   uint8_t medium_type;
@@ -285,7 +317,7 @@ struct ModeSense6ParameterHeader {
   DEF_SUBBIT(device_specific_parameter, 4, dpo_fua_available);
 } __PACKED;
 
-static_assert(sizeof(ModeSense6ParameterHeader) == 4, "Mode Sense 6 parameters must be 4 bytes");
+static_assert(sizeof(Mode6ParameterHeader) == 4, "Mode Sense 6 parameters must be 4 bytes");
 
 // SPC-4 Revision 37, section 6.14 "MODE SENSE (10) command".
 struct ModeSense10CDB {
@@ -311,7 +343,7 @@ struct ModeSense10CDB {
 
 static_assert(sizeof(ModeSense10CDB) == 10, "Mode Sense 10 CDB must be 10 bytes");
 
-struct ModeSense10ParameterHeader {
+struct Mode10ParameterHeader {
   uint16_t mode_data_length;
   // 00h is 'Direct Access Block Device'
   uint8_t medium_type;
@@ -327,7 +359,7 @@ struct ModeSense10ParameterHeader {
   DEF_SUBBIT(reserved[0], 0, long_lba);
 } __PACKED;
 
-static_assert(sizeof(ModeSense10ParameterHeader) == 8, "Mode Sense 10 parameters must be 8 bytes");
+static_assert(sizeof(Mode10ParameterHeader) == 8, "Mode Sense 10 parameters must be 8 bytes");
 
 struct CachingModePage {
   uint8_t ps_spf_and_page_code;
@@ -920,7 +952,7 @@ class Controller {
   // Read Logical Block Provisioning VPD Page (0xB2), check that it supports the UNMAP command.
   zx::result<bool> InquirySupportUnmapCommand(uint8_t target, uint16_t lun);
 
-  // Return ModeSense(6|10)ParameterHeader for the specified lun.
+  // Return Mode(6|10)ParameterHeader for the specified lun.
   zx::result<> ModeSense(uint8_t target, uint16_t lun, PageCode page_code, iovec data,
                          bool use_mode_sense_6);
 

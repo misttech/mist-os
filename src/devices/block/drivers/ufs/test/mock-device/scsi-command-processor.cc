@@ -363,14 +363,14 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultModeSense10Handler
   auto *mode_sense_10_cdb = reinterpret_cast<scsi::ModeSense10CDB *>(command_upiu.cdb);
 
   if (mode_sense_10_cdb->page_code() == scsi::PageCode::kAllPageCode) {
-    data_buffer.resize(sizeof(scsi::ModeSense10ParameterHeader));
-    auto *mode_page = reinterpret_cast<scsi::ModeSense10ParameterHeader *>(data_buffer.data());
+    data_buffer.resize(sizeof(scsi::Mode10ParameterHeader));
+    auto *mode_page = reinterpret_cast<scsi::Mode10ParameterHeader *>(data_buffer.data());
     mode_page->set_dpo_fua_available(true);
     mode_page->set_write_protected(false);
   } else if (mode_sense_10_cdb->page_code() == scsi::PageCode::kCachingPageCode) {
-    data_buffer.resize(sizeof(scsi::ModeSense10ParameterHeader) + sizeof(scsi::CachingModePage));
+    data_buffer.resize(sizeof(scsi::Mode10ParameterHeader) + sizeof(scsi::CachingModePage));
     auto *caching_mode_page = reinterpret_cast<scsi::CachingModePage *>(
-        data_buffer.data() + sizeof(scsi::ModeSense10ParameterHeader));
+        data_buffer.data() + sizeof(scsi::Mode10ParameterHeader));
     caching_mode_page->set_page_code(static_cast<uint8_t>(scsi::PageCode::kCachingPageCode));
     caching_mode_page->set_write_cache_enabled(true);
   } else {
