@@ -6,11 +6,10 @@
 #define LIB_STDCOMPAT_TYPE_TRAITS_H_
 
 #include <cstddef>
-#include <tuple>
 #include <type_traits>
 
-#include "internal/type_traits.h"
-#include "version.h"
+#include "internal/type_traits.h"  // IWYU pragma: keep
+#include "version.h"               // IWYU pragma: keep
 
 namespace cpp17 {
 
