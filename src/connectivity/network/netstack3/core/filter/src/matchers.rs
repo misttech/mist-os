@@ -182,7 +182,7 @@ pub struct PacketMatcher<I: IpExt, DeviceClass> {
 }
 
 impl<I: IpExt, DeviceClass> PacketMatcher<I, DeviceClass> {
-    pub(crate) fn matches<B, P: IpPacket<B, I>, D: InterfaceProperties<DeviceClass>>(
+    pub(crate) fn matches<P: IpPacket<I>, D: InterfaceProperties<DeviceClass>>(
         &self,
         packet: &P,
         interfaces: &Interfaces<'_, D>,
@@ -369,14 +369,14 @@ mod tests {
             PacketMatcher { dst_address: Some(matcher), ..Default::default() },
         ] {
             assert_ne!(
-                matcher.matches::<_, _, FakeDeviceId>(
+                matcher.matches::<_, FakeDeviceId>(
                     &FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
                     &Interfaces { ingress: None, egress: None },
                 ),
                 invert
             );
             assert_eq!(
-                matcher.matches::<_, _, FakeDeviceId>(
+                matcher.matches::<_, FakeDeviceId>(
                     &FakeIpPacket {
                         src_ip: I::IP_OUTSIDE_SUBNET,
                         dst_ip: I::IP_OUTSIDE_SUBNET,
@@ -431,7 +431,7 @@ mod tests {
     )]
     #[test_case(Protocol::Icmp, FakeIpPacket::<Ipv4, FakeTcpSegment>::arbitrary_value() => false)]
     #[test_case(Protocol::Icmp, FakeIpPacket::<Ipv4, FakeUdpPacket>::arbitrary_value() => false)]
-    fn match_on_transport_protocol<B, I: Ip + TestIpExt, P: IpPacket<B, I>>(
+    fn match_on_transport_protocol<I: TestIpExt, P: IpPacket<I>>(
         protocol: Protocol,
         packet: P,
     ) -> bool {
@@ -444,7 +444,7 @@ mod tests {
             ..Default::default()
         };
 
-        matcher.matches::<_, _, FakeDeviceId>(&packet, &Interfaces { ingress: None, egress: None })
+        matcher.matches::<_, FakeDeviceId>(&packet, &Interfaces { ingress: None, egress: None })
     }
 
     #[test_case(
@@ -488,7 +488,7 @@ mod tests {
         };
         let (src, dst) = transport_header;
         assert_eq!(
-            matcher.matches::<_, _, FakeDeviceId>(
+            matcher.matches::<_, FakeDeviceId>(
                 &FakeIpPacket::<Ipv4, _> {
                     body: FakeTcpSegment { src_port: src, dst_port: dst },
                     ..ArbitraryValue::arbitrary_value()
@@ -509,7 +509,7 @@ mod tests {
         };
         let (src, dst) = transport_header;
         assert_eq!(
-            matcher.matches::<_, _, FakeDeviceId>(
+            matcher.matches::<_, FakeDeviceId>(
                 &FakeIpPacket::<Ipv4, _> {
                     body: FakeUdpPacket { src_port: src, dst_port: dst },
                     ..ArbitraryValue::arbitrary_value()
@@ -535,7 +535,7 @@ mod tests {
         };
 
         assert_eq!(
-            matcher.matches::<_, _, FakeDeviceId>(
+            matcher.matches::<_, FakeDeviceId>(
                 &FakeIpPacket::<_, FakeTcpSegment> {
                     src_ip: I::IP_OUTSIDE_SUBNET,
                     ..ArbitraryValue::arbitrary_value()
@@ -545,7 +545,7 @@ mod tests {
             false
         );
         assert_eq!(
-            matcher.matches::<_, _, FakeDeviceId>(
+            matcher.matches::<_, FakeDeviceId>(
                 &FakeIpPacket::<_, FakeTcpSegment> {
                     dst_ip: I::IP_OUTSIDE_SUBNET,
                     ..ArbitraryValue::arbitrary_value()
@@ -555,7 +555,7 @@ mod tests {
             false
         );
         assert_eq!(
-            matcher.matches::<_, _, FakeDeviceId>(
+            matcher.matches::<_, FakeDeviceId>(
                 &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
@@ -566,7 +566,7 @@ mod tests {
     #[test]
     fn match_by_default_if_no_specified_matchers() {
         assert_eq!(
-            PacketMatcher::<_, FakeDeviceClass>::default().matches::<_, _, FakeDeviceId>(
+            PacketMatcher::<_, FakeDeviceClass>::default().matches::<_, FakeDeviceId>(
                 &FakeIpPacket::<Ipv4, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),

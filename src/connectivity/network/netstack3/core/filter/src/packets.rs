@@ -24,7 +24,7 @@ use zerocopy::ByteSliceMut;
 //
 // TODO(https://fxbug.dev/321013529): provide the necessary methods and associated
 // type for packet header modification.
-pub trait IpPacket<B, I: IpExt> {
+pub trait IpPacket<I: IpExt> {
     /// The type that provides access to transport-layer header inspection, if a
     /// transport header is contained in the body of the IP packet.
     type TransportPacket<'a>: MaybeTransportPacket
@@ -106,7 +106,7 @@ pub trait TransportPacket {
     fn dst_port(&self) -> u16;
 }
 
-impl<B: ByteSliceMut + ParseBuffer> IpPacket<B, Ipv4> for Ipv4Packet<B> {
+impl<B: ByteSliceMut + ParseBuffer> IpPacket<Ipv4> for Ipv4Packet<B> {
     type TransportPacket<'a> = Option<ParsedTransportHeader> where Self: 'a;
 
     fn src_addr(&self) -> Ipv4Addr {
@@ -131,7 +131,7 @@ impl<B: ByteSliceMut + ParseBuffer> IpPacket<B, Ipv4> for Ipv4Packet<B> {
     }
 }
 
-impl<B: ByteSliceMut + ParseBuffer> IpPacket<B, Ipv6> for Ipv6Packet<B> {
+impl<B: ByteSliceMut + ParseBuffer> IpPacket<Ipv6> for Ipv6Packet<B> {
     type TransportPacket<'a> = Option<ParsedTransportHeader> where Self: 'a;
 
     fn src_addr(&self) -> Ipv6Addr {
@@ -174,7 +174,7 @@ impl<'a, B: ParseBuffer, I: IpExt> RxPacket<'a, B, I> {
     }
 }
 
-impl<B: ParseBuffer, I: IpExt> IpPacket<B, I> for RxPacket<'_, B, I> {
+impl<B: ParseBuffer, I: IpExt> IpPacket<I> for RxPacket<'_, B, I> {
     type TransportPacket<'a> = Option<ParsedTransportHeader> where Self: 'a;
 
     fn src_addr(&self) -> I::Addr {
@@ -235,7 +235,7 @@ impl<'a, S: MaybeTransportPacket, I: IpExt> TxPacket<'a, S, I> {
     }
 }
 
-impl<S: MaybeTransportPacket, I: IpExt> IpPacket<(), I> for TxPacket<'_, S, I> {
+impl<S: MaybeTransportPacket, I: IpExt> IpPacket<I> for TxPacket<'_, S, I> {
     type TransportPacket<'a> = &'a S where Self: 'a;
 
     fn src_addr(&self) -> I::Addr {
@@ -564,8 +564,6 @@ pub mod testutil {
             const SUBNET: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::/126");
         }
 
-        pub struct FakeBuffer;
-
         pub struct FakeIpPacket<I: IpExt, T>
         where
             for<'a> &'a T: TransportPacketExt<I>,
@@ -579,7 +577,7 @@ pub mod testutil {
             fn proto() -> I::Proto;
         }
 
-        impl<I: IpExt, T> IpPacket<FakeBuffer, I> for FakeIpPacket<I, T>
+        impl<I: IpExt, T> IpPacket<I> for FakeIpPacket<I, T>
         where
             for<'a> &'a T: TransportPacketExt<I>,
         {
