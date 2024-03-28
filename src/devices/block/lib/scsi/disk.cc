@@ -241,11 +241,11 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       cdb.opcode = Opcode::SYNCHRONIZE_CACHE_10;
       // Prefer writing to storage medium (instead of nv cache) and return only
       // after completion of operation.
-      cdb.syncnv_immed = 0;
+      cdb.reserved_and_immed = 0;
       // Ideally this would flush specific blocks, but several platforms don't
       // support this functionality, so just synchronize the whole disk.
       cdb.logical_block_address = 0;
-      cdb.num_blocks = 0;
+      cdb.number_of_logical_blocks = 0;
       controller_->ExecuteCommandAsync(target_, lun_, {&cdb, sizeof(cdb)},
                                        /*is_write=*/false, block_size_bytes_, disk_op,
                                        {nullptr, 0});

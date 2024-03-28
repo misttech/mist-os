@@ -332,7 +332,7 @@ TEST_F(ScsiCommandTest, SynchronizeCache10) {
   auto cdb = reinterpret_cast<scsi::SynchronizeCache10CDB *>(cdb_buffer);
   cdb->opcode = scsi::Opcode::SYNCHRONIZE_CACHE_10;
   cdb->logical_block_address = htobe32(block_offset);
-  cdb->num_blocks = htobe16(GetBlockCount());
+  cdb->number_of_logical_blocks = htobe16(GetBlockCount());
 
   ScsiCommandUpiu cache_upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   ASSERT_EQ(cache_upiu.GetOpcode(), scsi::Opcode::SYNCHRONIZE_CACHE_10);

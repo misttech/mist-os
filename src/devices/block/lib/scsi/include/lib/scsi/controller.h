@@ -45,6 +45,7 @@ enum class Opcode : uint8_t {
   WRITE_16 = 0x8A,
   VERIFY_16 = 0x8F,
   PRE_FETCH_16 = 0x90,
+  SYNCHRONIZE_CACHE_16 = 0x91,
   READ_CAPACITY_16 = 0x9E,
   REPORT_LUNS = 0xA0,
   SECURITY_PROTOCOL_IN = 0xA2,
@@ -592,22 +593,36 @@ static_assert(sizeof(PreFetch10CDB) == 10, "Pre-Fetch 10 CDB must be 10 bytes");
 // SBC-3 Revision 36, section 5.26 "SYNCHRONIZE CACHE (10) command".
 struct SynchronizeCache10CDB {
   Opcode opcode;
-  // syncnv_immed(2) - SYNC_NV - If SYNC_NV is 1 prefer write to nonvolatile cache.
-  // syncnv_immed(1) - IMMED - If IMMED is 1 return after CDB has been
-  //                           validated.
-  uint8_t syncnv_immed;
+  // reserved_and_immed(1) is 'IMMED'
+  uint8_t reserved_and_immed;
   uint32_t logical_block_address;
   // group_num(4 downto 0) is 'group number'
   uint8_t group_num;
-  uint16_t num_blocks;
+  uint16_t number_of_logical_blocks;
   uint8_t control;
 
-  DEF_SUBBIT(syncnv_immed, 2, sync_nv);
-  DEF_SUBBIT(syncnv_immed, 1, immed);
+  DEF_SUBBIT(reserved_and_immed, 1, immed);
   DEF_SUBFIELD(group_num, 4, 0, group_number);
 } __PACKED;
 
 static_assert(sizeof(SynchronizeCache10CDB) == 10, "Synchronize Cache 10 CDB must be 10 bytes");
+
+// SBC-3 Revision 36, section 5.27 "SYNCHRONIZE CACHE (16) command".
+struct SynchronizeCache16CDB {
+  Opcode opcode;
+  // reserved_and_immed(1) is 'IMMED'
+  uint8_t reserved_and_immed;
+  uint64_t logical_block_address;
+  uint32_t number_of_logical_blocks;
+  // group_num(4 downto 0) is 'group number'
+  uint8_t group_num;
+  uint8_t control;
+
+  DEF_SUBBIT(reserved_and_immed, 1, immed);
+  DEF_SUBFIELD(group_num, 4, 0, group_number);
+} __PACKED;
+
+static_assert(sizeof(SynchronizeCache16CDB) == 16, "Synchronize Cache 16 CDB must be 16 bytes");
 
 enum class PowerCondition : uint8_t {
   kStartValid = 0x0,
