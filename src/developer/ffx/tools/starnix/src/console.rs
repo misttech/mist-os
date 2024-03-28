@@ -136,7 +136,13 @@ pub async fn starnix_console(
     _writer: SimpleWriter,
 ) -> Result<()> {
     if !termion::is_tty(&std::io::stdout()) {
-        bail!("ffx starnix console must be run in a tty.");
+        bail!(
+            "ffx starnix console must be run in a tty. \
+If you are attempting to use this command in a automated \
+test, please be aware that this command is intended only \
+for interactive use. Please do not use this command in an \
+automated test."
+        );
     }
     if command.argv.is_empty() {
         bail!(
