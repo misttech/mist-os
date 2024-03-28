@@ -17,723 +17,18 @@
 
 #include <bind/fuchsia/platform/cpp/bind.h>
 
+#include "gmock/gmock.h"
 #include "src/devices/bin/driver_manager/composite_node_spec_v2.h"
 #include "src/devices/bin/driver_manager/testing/fake_driver_index.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
+#include "src/devices/bin/driver_manager/tests/driver_runner_test_fixture.h"
 
-namespace fdata = fuchsia_data;
-namespace fdfw = fuchsia_driver_framework;
-namespace fdh = fuchsia_driver_host;
-namespace fio = fuchsia_io;
-namespace fprocess = fuchsia_process;
+namespace driver_runner {
+
 namespace frunner = fuchsia_component_runner;
-namespace fcomponent = fuchsia_component;
-namespace fdecl = fuchsia_component_decl;
 
-using driver_manager::BindResultTracker;
 using driver_manager::Collection;
-using driver_manager::CompositeNodeSpecCreateInfo;
-using driver_manager::CompositeNodeSpecV2;
-using driver_manager::CreateCompositeServiceOffer;
-using driver_manager::Devfs;
-using driver_manager::DriverRunner;
-using driver_manager::InspectManager;
 using driver_manager::Node;
-using driver_manager::NodeType;
 using testing::ElementsAre;
-
-const std::string root_driver_url = "fuchsia-boot:///#meta/root-driver.cm";
-const std::string root_driver_binary = "driver/root-driver.so";
-
-const std::string second_driver_url = "fuchsia-boot:///#meta/second-driver.cm";
-const std::string second_driver_binary = "driver/second-driver.so-";
-
-struct NodeChecker {
-  std::vector<std::string> node_name;
-  std::vector<std::string> child_names;
-  std::map<std::string, std::string> str_properties;
-};
-
-struct CreatedChild {
-  std::optional<fidl::Client<fdfw::Node>> node;
-  std::optional<fidl::Client<fdfw::NodeController>> node_controller;
-};
-
-void CheckNode(const inspect::Hierarchy& hierarchy, const NodeChecker& checker) {
-  auto node = hierarchy.GetByPath(checker.node_name);
-  ASSERT_NE(nullptr, node);
-
-  if (node->children().size() != checker.child_names.size()) {
-    printf("Mismatched children\n");
-    for (size_t i = 0; i < node->children().size(); i++) {
-      printf("Child %ld : %s\n", i, node->children()[i].name().c_str());
-    }
-    ASSERT_EQ(node->children().size(), checker.child_names.size());
-  }
-
-  for (auto& child : checker.child_names) {
-    auto ptr = node->GetByPath({child});
-    if (!ptr) {
-      printf("Failed to find child %s\n", child.c_str());
-    }
-    ASSERT_NE(nullptr, ptr);
-  }
-
-  for (auto& property : checker.str_properties) {
-    auto prop = node->node().get_property<inspect::StringPropertyValue>(property.first);
-    if (!prop) {
-      printf("Failed to find property %s\n", property.first.c_str());
-    }
-    ASSERT_EQ(property.second, prop->value());
-  }
-}
-
-zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> LoaderFactory() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_ldsvc::Loader>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  return zx::ok(std::move(endpoints->client));
-}
-
-fdecl::ChildRef CreateChildRef(std::string name, std::string collection) {
-  return fdecl::ChildRef({.name = std::move(name), .collection = std::move(collection)});
-}
-
-class FakeContext : public fpromise::context {
- public:
-  fpromise::executor* executor() const override {
-    EXPECT_TRUE(false);
-    return nullptr;
-  }
-
-  fpromise::suspended_task suspend_task() override {
-    EXPECT_TRUE(false);
-    return fpromise::suspended_task();
-  }
-};
-
-fidl::AnyTeardownObserver TeardownWatcher(size_t index, std::vector<size_t>& indices) {
-  return fidl::ObserveTeardown([&indices = indices, index] { indices.emplace_back(index); });
-}
-
-class TestRealm : public fidl::testing::TestBase<fcomponent::Realm> {
- public:
-  using CreateChildHandler = fit::function<void(fdecl::CollectionRef collection, fdecl::Child decl,
-                                                std::vector<fdecl::Offer> offers)>;
-  using OpenExposedDirHandler =
-      fit::function<void(fdecl::ChildRef child, fidl::ServerEnd<fio::Directory> exposed_dir)>;
-
-  void SetCreateChildHandler(CreateChildHandler create_child_handler) {
-    create_child_handler_ = std::move(create_child_handler);
-  }
-
-  void SetOpenExposedDirHandler(OpenExposedDirHandler open_exposed_dir_handler) {
-    open_exposed_dir_handler_ = std::move(open_exposed_dir_handler);
-  }
-
-  fidl::VectorView<fprocess::wire::HandleInfo> TakeHandles(fidl::AnyArena& arena) {
-    if (handles_.has_value()) {
-      return fidl::ToWire(arena, std::move(handles_));
-    }
-
-    return fidl::VectorView<fprocess::wire::HandleInfo>(arena, 0);
-  }
-
-  void AssertDestroyedChildren(const std::vector<fdecl::ChildRef>& expected) {
-    auto destroyed_children = destroyed_children_;
-    for (const auto& child : expected) {
-      auto it = std::find_if(destroyed_children.begin(), destroyed_children.end(),
-                             [&child](const fdecl::ChildRef& other) {
-                               return child.name() == other.name() &&
-                                      child.collection() == other.collection();
-                             });
-      ASSERT_NE(it, destroyed_children.end());
-      destroyed_children.erase(it);
-    }
-    ASSERT_EQ(destroyed_children.size(), 0ul);
-  }
-
- private:
-  void CreateChild(CreateChildRequest& request, CreateChildCompleter::Sync& completer) override {
-    handles_ = std::move(request.args().numbered_handles());
-    auto offers = request.args().dynamic_offers();
-    create_child_handler_(
-        std::move(request.collection()), std::move(request.decl()),
-        offers.has_value() ? std::move(offers.value()) : std::vector<fdecl::Offer>{});
-    completer.Reply(fidl::Response<fuchsia_component::Realm::CreateChild>(fit::ok()));
-  }
-
-  void DestroyChild(DestroyChildRequest& request, DestroyChildCompleter::Sync& completer) override {
-    destroyed_children_.push_back(std::move(request.child()));
-    completer.Reply(fidl::Response<fuchsia_component::Realm::DestroyChild>(fit::ok()));
-  }
-
-  void OpenExposedDir(OpenExposedDirRequest& request,
-                      OpenExposedDirCompleter::Sync& completer) override {
-    open_exposed_dir_handler_(std::move(request.child()), std::move(request.exposed_dir()));
-    completer.Reply(fidl::Response<fuchsia_component::Realm::OpenExposedDir>(fit::ok()));
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    printf("Not implemented: Realm::%s\n", name.c_str());
-  }
-
-  CreateChildHandler create_child_handler_;
-  OpenExposedDirHandler open_exposed_dir_handler_;
-  std::optional<std::vector<fprocess::HandleInfo>> handles_;
-  std::vector<fdecl::ChildRef> destroyed_children_;
-};
-
-class TestDirectory : public fidl::testing::TestBase<fio::Directory> {
- public:
-  using OpenHandler =
-      fit::function<void(const std::string& path, fidl::ServerEnd<fio::Node> object)>;
-
-  explicit TestDirectory(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-
-  void Bind(fidl::ServerEnd<fio::Directory> request) {
-    bindings_.AddBinding(dispatcher_, std::move(request), this, fidl::kIgnoreBindingClosure);
-  }
-
-  void SetOpenHandler(OpenHandler open_handler) { open_handler_ = std::move(open_handler); }
-
- private:
-  void Clone(CloneRequest& request, CloneCompleter::Sync& completer) override {
-    EXPECT_EQ(fio::OpenFlags::kCloneSameRights, request.flags());
-    fidl::ServerEnd<fio::Directory> dir(request.object().TakeChannel());
-    Bind(std::move(dir));
-  }
-
-  void Open(OpenRequest& request, OpenCompleter::Sync& completer) override {
-    open_handler_(request.path(), std::move(request.object()));
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    printf("Not implemented: Directory::%s\n", name.c_str());
-  }
-
-  async_dispatcher_t* dispatcher_;
-  fidl::ServerBindingGroup<fio::Directory> bindings_;
-  OpenHandler open_handler_;
-};
-
-class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
- public:
-  explicit TestDriver(async_dispatcher_t* dispatcher, fidl::ClientEnd<fdfw::Node> node,
-                      fidl::ServerEnd<fdh::Driver> server)
-      : dispatcher_(dispatcher),
-        stop_handler_([]() {}),
-        node_(std::move(node), dispatcher),
-        driver_binding_(dispatcher, std::move(server), this, fidl::kIgnoreBindingClosure) {}
-
-  fidl::Client<fdfw::Node>& node() { return node_; }
-
-  using StopHandler = fit::function<void()>;
-  void SetStopHandler(StopHandler handler) { stop_handler_ = std::move(handler); }
-
-  void SetDontCloseBindingInStop() { dont_close_binding_in_stop_ = true; }
-
-  void Stop(StopCompleter::Sync& completer) override {
-    stop_handler_();
-    if (!dont_close_binding_in_stop_) {
-      driver_binding_.Close(ZX_OK);
-    }
-  }
-
-  void DropNode() { node_ = {}; }
-  void CloseBinding() { driver_binding_.Close(ZX_OK); }
-
-  std::shared_ptr<CreatedChild> AddChild(std::string_view child_name, bool owned,
-                                         bool expect_error) {
-    fdfw::NodeAddArgs args({.name = std::make_optional<std::string>(child_name)});
-    return AddChild(std::move(args), owned, expect_error);
-  }
-
-  std::shared_ptr<CreatedChild> AddChild(
-      fdfw::NodeAddArgs child_args, bool owned, bool expect_error,
-      fit::function<void()> on_bind = []() {}) {
-    auto controller_endpoints = fidl::CreateEndpoints<fdfw::NodeController>();
-    ZX_ASSERT(ZX_OK == controller_endpoints.status_value());
-
-    auto child_node_endpoints = fidl::CreateEndpoints<fdfw::Node>();
-    ZX_ASSERT(ZX_OK == child_node_endpoints.status_value());
-
-    fidl::ServerEnd<fdfw::Node> child_node_server = {};
-    if (owned) {
-      child_node_server = std::move(child_node_endpoints->server);
-    }
-
-    node_
-        ->AddChild({std::move(child_args), std::move(controller_endpoints->server),
-                    std::move(child_node_server)})
-        .Then([expect_error](fidl::Result<fdfw::Node::AddChild> result) {
-          if (expect_error) {
-            EXPECT_TRUE(result.is_error());
-          } else {
-            EXPECT_TRUE(result.is_ok());
-          }
-        });
-
-    class NodeEventHandler : public fidl::AsyncEventHandler<fdfw::Node> {
-     public:
-      explicit NodeEventHandler(std::shared_ptr<CreatedChild> child) : child_(std::move(child)) {}
-      void on_fidl_error(::fidl::UnbindInfo error) override {
-        child_->node.reset();
-        delete this;
-      }
-      void handle_unknown_event(fidl::UnknownEventMetadata<fdfw::Node> metadata) override {}
-
-     private:
-      std::shared_ptr<CreatedChild> child_;
-    };
-
-    class ControllerEventHandler : public fidl::AsyncEventHandler<fdfw::NodeController> {
-     public:
-      explicit ControllerEventHandler(std::shared_ptr<CreatedChild> child,
-                                      fit::function<void()> on_bind)
-          : child_(std::move(child)), on_bind_(std::move(on_bind)) {}
-      void OnBind() override { on_bind_(); }
-      void on_fidl_error(::fidl::UnbindInfo error) override {
-        child_->node_controller.reset();
-        delete this;
-      }
-      void handle_unknown_event(
-          fidl::UnknownEventMetadata<fdfw::NodeController> metadata) override {}
-
-     private:
-      std::shared_ptr<CreatedChild> child_;
-      fit::function<void()> on_bind_;
-    };
-
-    std::shared_ptr<CreatedChild> child = std::make_shared<CreatedChild>();
-    child->node_controller.emplace(std::move(controller_endpoints->client), dispatcher_,
-                                   new ControllerEventHandler(child, std::move(on_bind)));
-    if (owned) {
-      child->node.emplace(std::move(child_node_endpoints->client), dispatcher_,
-                          new NodeEventHandler(child));
-    }
-
-    return child;
-  }
-
- private:
-  async_dispatcher_t* dispatcher_;
-  StopHandler stop_handler_;
-  fidl::Client<fdfw::Node> node_;
-  fidl::ServerBinding<fdh::Driver> driver_binding_;
-  bool dont_close_binding_in_stop_ = false;
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    printf("Not implemented: Driver::%s\n", name.c_str());
-  }
-};
-
-class TestDriverHost : public fidl::testing::TestBase<fdh::DriverHost> {
- public:
-  using StartHandler =
-      fit::function<void(fdfw::DriverStartArgs start_args, fidl::ServerEnd<fdh::Driver> driver)>;
-
-  void SetStartHandler(StartHandler start_handler) { start_handler_ = std::move(start_handler); }
-
- private:
-  void Start(StartRequest& request, StartCompleter::Sync& completer) override {
-    start_handler_(std::move(request.start_args()), std::move(request.driver()));
-    completer.Reply(zx::ok());
-  }
-
-  void InstallLoader(InstallLoaderRequest& request,
-                     InstallLoaderCompleter::Sync& completer) override {}
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    printf("Not implemented: DriverHost::%s\n", name.data());
-  }
-
-  StartHandler start_handler_;
-};
-
-class TestTransaction : public fidl::Transaction {
- public:
-  explicit TestTransaction(bool close) : close_(close) {}
-
- private:
-  std::unique_ptr<Transaction> TakeOwnership() override {
-    return std::make_unique<TestTransaction>(close_);
-  }
-
-  zx_status_t Reply(fidl::OutgoingMessage* message, fidl::WriteOptions write_options) override {
-    EXPECT_TRUE(false);
-    return ZX_OK;
-  }
-
-  void Close(zx_status_t epitaph) override {
-    EXPECT_TRUE(close_) << "epitaph: " << zx_status_get_string(epitaph);
-  }
-
-  bool close_;
-};
-
-struct Driver {
-  std::string url;
-  std::string binary;
-  bool colocate = false;
-  bool close = false;
-  bool host_restart_on_crash = false;
-  bool use_next_vdso = false;
-};
-
-class DriverRunnerTest : public gtest::TestLoopFixture {
- public:
-  void TearDown() override { Unbind(); }
-
- protected:
-  InspectManager& inspect() { return inspect_; }
-  TestRealm& realm() { return realm_; }
-  TestDirectory& driver_dir() { return driver_dir_; }
-  TestDriverHost& driver_host() { return driver_host_; }
-
-  fidl::WireClient<fuchsia_device::Controller> ConnectToDeviceController(
-      std::string_view child_name) {
-    fs::SynchronousVfs vfs(dispatcher());
-    zx::result dev_res = devfs().Connect(vfs);
-    EXPECT_EQ(dev_res.status_value(), ZX_OK);
-    fidl::WireClient<fuchsia_io::Directory> dev{std::move(*dev_res), dispatcher()};
-    zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-    EXPECT_EQ(controller_endpoints.status_value(), ZX_OK);
-
-    auto device_controller_path = std::string(child_name) + "/device_controller";
-    EXPECT_EQ(
-        dev->Open(fuchsia_io::OpenFlags::kNotDirectory, {},
-                  fidl::StringView::FromExternal(device_controller_path),
-                  fidl::ServerEnd<fuchsia_io::Node>(controller_endpoints->server.TakeChannel()))
-            .status(),
-        ZX_OK);
-    EXPECT_TRUE(RunLoopUntilIdle());
-
-    return fidl::WireClient<fuchsia_device::Controller>{std::move(controller_endpoints->client),
-                                                        dispatcher()};
-  }
-
-  fidl::ClientEnd<fuchsia_component::Realm> ConnectToRealm() {
-    zx::result realm_endpoints = fidl::CreateEndpoints<fcomponent::Realm>();
-    ZX_ASSERT(ZX_OK == realm_endpoints.status_value());
-    realm_binding_.emplace(dispatcher(), std::move(realm_endpoints->server), &realm_,
-                           fidl::kIgnoreBindingClosure);
-    return std::move(realm_endpoints->client);
-  }
-
-  FakeDriverIndex CreateDriverIndex() {
-    return FakeDriverIndex(dispatcher(), [](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
-      if (args.name().get() == "second") {
-        return zx::ok(FakeDriverIndex::MatchResult{
-            .url = second_driver_url,
-        });
-      }
-
-      if (args.name().get() == "dev-group-0") {
-        return zx::ok(FakeDriverIndex::MatchResult{
-            .spec = fdfw::CompositeParent({
-                .composite = fdfw::CompositeInfo{{
-                    .spec = fdfw::CompositeNodeSpec{{
-                        .name = "test-group",
-                        .parents = std::vector<fdfw::ParentSpec>(2),
-                    }},
-                    .matched_driver = fdfw::CompositeDriverMatch{{
-                        .composite_driver = fdfw::CompositeDriverInfo{{
-                            .composite_name = "test-composite",
-                            .driver_info = fdfw::DriverInfo{{
-                                .url = "fuchsia-boot:///#meta/composite-driver.cm",
-                                .colocate = true,
-                                .package_type = fdfw::DriverPackageType::kBoot,
-                            }},
-                        }},
-                        .parent_names = {{"node-0", "node-1"}},
-                        .primary_parent_index = 1,
-                    }},
-                }},
-                .index = 0,
-            })});
-      }
-
-      if (args.name().get() == "dev-group-1") {
-        return zx::ok(FakeDriverIndex::MatchResult{
-            .spec = fdfw::CompositeParent({
-                .composite = fdfw::CompositeInfo{{
-                    .spec = fdfw::CompositeNodeSpec{{
-                        .name = "test-group",
-                        .parents = std::vector<fdfw::ParentSpec>(2),
-                    }},
-                    .matched_driver = fdfw::CompositeDriverMatch{{
-                        .composite_driver = fdfw::CompositeDriverInfo{{
-                            .composite_name = "test-composite",
-                            .driver_info = fdfw::DriverInfo{{
-                                .url = "fuchsia-boot:///#meta/composite-driver.cm",
-                                .colocate = true,
-                                .package_type = fdfw::DriverPackageType::kBoot,
-                            }},
-                        }},
-                        .parent_names = {{"node-0", "node-1"}},
-                        .primary_parent_index = 1,
-                    }},
-                }},
-                .index = 1,
-            })});
-      }
-
-      return zx::error(ZX_ERR_NOT_FOUND);
-    });
-  }
-
-  void SetupDriverRunner(FakeDriverIndex driver_index) {
-    driver_index_.emplace(std::move(driver_index));
-    driver_runner_.emplace(ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory,
-                           dispatcher(), false);
-    SetupDevfs();
-  }
-
-  void SetupDriverRunner() { SetupDriverRunner(CreateDriverIndex()); }
-
-  void PrepareRealmForDriverComponentStart(const std::string& name, const std::string& url) {
-    realm().SetCreateChildHandler(
-        [name, url](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
-          EXPECT_EQ("boot-drivers", collection.name());
-          EXPECT_EQ(name, decl.name().value());
-          EXPECT_EQ(url, decl.url().value());
-        });
-  }
-
-  void PrepareRealmForSecondDriverComponentStart() {
-    PrepareRealmForDriverComponentStart("dev.second", second_driver_url);
-  }
-
-  void PrepareRealmForStartDriverHost(bool use_next_vdso) {
-    constexpr std::string_view kDriverHostName = "driver-host-";
-    std::string coll = "driver-hosts";
-    realm().SetCreateChildHandler(
-        [coll, kDriverHostName, use_next_vdso](fdecl::CollectionRef collection, fdecl::Child decl,
-                                               auto offers) {
-          EXPECT_EQ(coll, collection.name());
-          EXPECT_EQ(kDriverHostName, decl.name().value().substr(0, kDriverHostName.size()));
-          if (use_next_vdso) {
-            EXPECT_EQ("fuchsia-boot:///driver_host#meta/driver_host_next.cm", decl.url());
-          } else {
-            EXPECT_EQ("fuchsia-boot:///driver_host#meta/driver_host.cm", decl.url());
-          }
-        });
-    realm().SetOpenExposedDirHandler(
-        [this, coll, kDriverHostName](fdecl::ChildRef child, auto exposed_dir) {
-          EXPECT_EQ(coll, child.collection().value_or(""));
-          EXPECT_EQ(kDriverHostName, child.name().substr(0, kDriverHostName.size()));
-          driver_host_dir_.Bind(std::move(exposed_dir));
-        });
-    driver_host_dir_.SetOpenHandler([this](const std::string& path, auto object) {
-      EXPECT_EQ(fidl::DiscoverableProtocolName<fdh::DriverHost>, path);
-      driver_host_binding_.emplace(dispatcher(),
-                                   fidl::ServerEnd<fdh::DriverHost>(object.TakeChannel()),
-                                   &driver_host_, fidl::kIgnoreBindingClosure);
-    });
-  }
-
-  void StopDriverComponent(fidl::ClientEnd<frunner::ComponentController> component) {
-    fidl::WireClient client(std::move(component), dispatcher());
-    auto stop_result = client->Stop();
-    ASSERT_EQ(ZX_OK, stop_result.status());
-    EXPECT_TRUE(RunLoopUntilIdle());
-  }
-
-  struct StartDriverResult {
-    std::unique_ptr<TestDriver> driver;
-    fidl::ClientEnd<frunner::ComponentController> controller;
-  };
-
-  using StartDriverHandler = fit::function<void(TestDriver*, fdfw::DriverStartArgs)>;
-
-  StartDriverResult StartDriver(Driver driver,
-                                std::optional<StartDriverHandler> start_handler = std::nullopt) {
-    std::unique_ptr<TestDriver> started_driver;
-    driver_host().SetStartHandler(
-        [&started_driver, dispatcher = dispatcher(), start_handler = std::move(start_handler)](
-            fdfw::DriverStartArgs start_args, fidl::ServerEnd<fdh::Driver> driver) mutable {
-          started_driver = std::make_unique<TestDriver>(
-              dispatcher, std::move(start_args.node().value()), std::move(driver));
-          start_args.node().reset();
-          if (start_handler.has_value()) {
-            start_handler.value()(started_driver.get(), std::move(start_args));
-          }
-        });
-
-    if (!driver.colocate) {
-      PrepareRealmForStartDriverHost(driver.use_next_vdso);
-    }
-
-    fidl::Arena arena;
-
-    fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 4);
-    program_entries[0].key.Set(arena, "binary");
-    program_entries[0].value = fdata::wire::DictionaryValue::WithStr(arena, driver.binary);
-
-    program_entries[1].key.Set(arena, "colocate");
-    program_entries[1].value =
-        fdata::wire::DictionaryValue::WithStr(arena, driver.colocate ? "true" : "false");
-
-    program_entries[2].key.Set(arena, "host_restart_on_crash");
-    program_entries[2].value = fdata::wire::DictionaryValue::WithStr(
-        arena, driver.host_restart_on_crash ? "true" : "false");
-
-    program_entries[3].key.Set(arena, "use_next_vdso");
-    program_entries[3].value =
-        fdata::wire::DictionaryValue::WithStr(arena, driver.use_next_vdso ? "true" : "false");
-
-    auto program_builder = fdata::wire::Dictionary::Builder(arena);
-    program_builder.entries(program_entries);
-
-    auto outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(ZX_OK, outgoing_endpoints.status_value());
-
-    auto start_info_builder = frunner::wire::ComponentStartInfo::Builder(arena);
-    start_info_builder.resolved_url(driver.url)
-        .program(program_builder.Build())
-        .outgoing_dir(std::move(outgoing_endpoints->server))
-        .ns({})
-        .numbered_handles(realm().TakeHandles(arena));
-
-    auto controller_endpoints = fidl::CreateEndpoints<frunner::ComponentController>();
-    EXPECT_EQ(ZX_OK, controller_endpoints.status_value());
-    TestTransaction transaction(driver.close);
-    {
-      fidl::WireServer<frunner::ComponentRunner>::StartCompleter::Sync completer(&transaction);
-      fidl::WireRequest<frunner::ComponentRunner::Start> request{
-          start_info_builder.Build(), std::move(controller_endpoints->server)};
-      static_cast<fidl::WireServer<frunner::ComponentRunner>&>(driver_runner().runner_for_tests())
-          .Start(&request, completer);
-    }
-    RunLoopUntilIdle();
-    return {std::move(started_driver), std::move(controller_endpoints->client)};
-  }
-
-  zx::result<StartDriverResult> StartRootDriver() {
-    realm().SetCreateChildHandler(
-        [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
-          EXPECT_EQ("boot-drivers", collection.name());
-          EXPECT_EQ("dev", decl.name());
-          EXPECT_EQ(root_driver_url, decl.url());
-        });
-    auto start = driver_runner().StartRootDriver(root_driver_url);
-    if (start.is_error()) {
-      return start.take_error();
-    }
-    EXPECT_TRUE(RunLoopUntilIdle());
-
-    StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
-      ValidateProgram(start_args.program(), root_driver_binary, "false", "false", "false");
-    };
-    return zx::ok(StartDriver(
-        {
-            .url = root_driver_url,
-            .binary = root_driver_binary,
-        },
-        std::move(start_handler)));
-  }
-
-  StartDriverResult StartSecondDriver(bool colocate = false, bool host_restart_on_crash = false,
-                                      bool use_next_vdso = false) {
-    StartDriverHandler start_handler = [colocate, host_restart_on_crash, use_next_vdso](
-                                           TestDriver* driver, fdfw::DriverStartArgs start_args) {
-      if (!colocate) {
-        EXPECT_FALSE(start_args.symbols().has_value());
-      }
-
-      ValidateProgram(start_args.program(), second_driver_binary, colocate ? "true" : "false",
-                      host_restart_on_crash ? "true" : "false", use_next_vdso ? "true" : "false");
-    };
-    return StartDriver(
-        {
-            .url = second_driver_url,
-            .binary = second_driver_binary,
-            .colocate = colocate,
-            .host_restart_on_crash = host_restart_on_crash,
-            .use_next_vdso = use_next_vdso,
-        },
-        std::move(start_handler));
-  }
-
-  void Unbind() {
-    if (driver_host_binding_.has_value()) {
-      driver_host_binding_.reset();
-      EXPECT_TRUE(RunLoopUntilIdle());
-    }
-  }
-
-  static void ValidateProgram(std::optional<::fuchsia_data::Dictionary>& program,
-                              std::string_view binary, std::string_view colocate,
-                              std::string_view host_restart_on_crash,
-                              std::string_view use_next_vdso) {
-    ZX_ASSERT(program.has_value());
-    auto& entries_opt = program.value().entries();
-    ZX_ASSERT(entries_opt.has_value());
-    auto& entries = entries_opt.value();
-    EXPECT_EQ(4u, entries.size());
-    EXPECT_EQ("binary", entries[0].key());
-    EXPECT_EQ(std::string(binary), entries[0].value()->str().value());
-    EXPECT_EQ("colocate", entries[1].key());
-    EXPECT_EQ(std::string(colocate), entries[1].value()->str().value());
-    EXPECT_EQ("host_restart_on_crash", entries[2].key());
-    EXPECT_EQ(std::string(host_restart_on_crash), entries[2].value()->str().value());
-    EXPECT_EQ("use_next_vdso", entries[3].key());
-    EXPECT_EQ(std::string(use_next_vdso), entries[3].value()->str().value());
-  }
-
-  static void AssertNodeBound(const std::shared_ptr<CreatedChild>& child) {
-    auto& node = child->node;
-    ASSERT_TRUE(node.has_value() && node.value().is_valid());
-  }
-
-  static void AssertNodeNotBound(const std::shared_ptr<CreatedChild>& child) {
-    auto& node = child->node;
-    ASSERT_FALSE(node.has_value() && node.value().is_valid());
-  }
-
-  static void AssertNodeControllerBound(const std::shared_ptr<CreatedChild>& child) {
-    auto& controller = child->node_controller;
-    ASSERT_TRUE(controller.has_value() && controller.value().is_valid());
-  }
-
-  static void AssertNodeControllerNotBound(const std::shared_ptr<CreatedChild>& child) {
-    auto& controller = child->node_controller;
-    ASSERT_FALSE(controller.has_value() && controller.value().is_valid());
-  }
-
-  inspect::Hierarchy Inspect() {
-    FakeContext context;
-    auto inspector = driver_runner().Inspect()(context).take_value();
-    return inspect::ReadFromInspector(inspector)(context).take_value();
-  }
-
-  void SetupDevfs() { driver_runner().root_node()->SetupDevfsForRootNode(devfs_); }
-
-  Devfs& devfs() {
-    ZX_ASSERT(devfs_.has_value());
-    return devfs_.value();
-  }
-
-  DriverRunner& driver_runner() { return driver_runner_.value(); }
-
-  FakeDriverIndex& driver_index() { return driver_index_.value(); }
-
- private:
-  TestRealm realm_;
-  TestDirectory driver_host_dir_{dispatcher()};
-  TestDirectory driver_dir_{dispatcher()};
-  TestDriverHost driver_host_;
-  std::optional<fidl::ServerBinding<fcomponent::Realm>> realm_binding_;
-  std::optional<fidl::ServerBinding<fdh::DriverHost>> driver_host_binding_;
-
-  std::optional<Devfs> devfs_;
-  InspectManager inspect_{dispatcher()};
-  std::optional<FakeDriverIndex> driver_index_;
-  std::optional<DriverRunner> driver_runner_;
-};
 
 // Start the root driver.
 TEST_F(DriverRunnerTest, StartRootDriver) {
@@ -1790,8 +1085,8 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
                .properties = std::vector<fuchsia_driver_framework::NodeProperty>(),
            })}});
 
-  auto spec = std::make_unique<CompositeNodeSpecV2>(
-      CompositeNodeSpecCreateInfo{
+  auto spec = std::make_unique<driver_manager::CompositeNodeSpecV2>(
+      driver_manager::CompositeNodeSpecCreateInfo{
           .name = name,
           .size = 2,
       },
@@ -2046,7 +1341,7 @@ TEST_F(DriverRunnerTest, TestBindResultTracker) {
     *callback_called_ptr = true;
   };
 
-  BindResultTracker tracker(3, std::move(callback));
+  driver_manager::BindResultTracker tracker(3, std::move(callback));
   ASSERT_EQ(false, callback_called);
   tracker.ReportNoBind();
   ASSERT_EQ(false, callback_called);
@@ -2063,7 +1358,7 @@ TEST_F(DriverRunnerTest, TestBindResultTracker) {
         *callback_called_ptr = true;
       };
 
-  BindResultTracker tracker_two(3, std::move(callback_two));
+  driver_manager::BindResultTracker tracker_two(3, std::move(callback_two));
   ASSERT_EQ(false, callback_called);
   tracker_two.ReportNoBind();
   ASSERT_EQ(false, callback_called);
@@ -2085,7 +1380,7 @@ TEST_F(DriverRunnerTest, TestBindResultTracker) {
         *callback_called_ptr = true;
       };
 
-  BindResultTracker tracker_three(3, std::move(callback_three));
+  driver_manager::BindResultTracker tracker_three(3, std::move(callback_three));
   ASSERT_EQ(false, callback_called);
   tracker_three.ReportNoBind();
   ASSERT_EQ(false, callback_called);
@@ -2250,7 +1545,7 @@ TEST(CompositeServiceOfferTest, WorkingOffer) {
   service.source_instance_filter(filters);
 
   auto offer = fdecl::wire::Offer::WithService(arena, service.Build());
-  auto new_offer = CreateCompositeServiceOffer(arena, offer, "parent_node", false);
+  auto new_offer = driver_manager::CreateCompositeServiceOffer(arena, offer, "parent_node", false);
   ASSERT_TRUE(new_offer);
 
   ASSERT_EQ(2ul, new_offer->service().renamed_instances().count());
@@ -2297,7 +1592,7 @@ TEST(CompositeServiceOfferTest, WorkingOfferPrimary) {
   service.source_instance_filter(filters);
 
   auto offer = fdecl::wire::Offer::WithService(arena, service.Build());
-  auto new_offer = CreateCompositeServiceOffer(arena, offer, "parent_node", true);
+  auto new_offer = driver_manager::CreateCompositeServiceOffer(arena, offer, "parent_node", true);
   ASSERT_TRUE(new_offer);
 
   ASSERT_EQ(3ul, new_offer->service().renamed_instances().count());
@@ -2356,7 +1651,8 @@ TEST(NodeTest, ToCollection) {
   constexpr char kChild2Name[] = "child2";
   std::shared_ptr<Node> child2 = std::make_shared<Node>(
       kChild2Name, std::vector<std::weak_ptr<Node>>{parent, child1}, nullptr, loop.dispatcher(),
-      inspect.CreateDevice(kChild2Name, zx::vmo{}, kProtocolId), 0, NodeType::kComposite);
+      inspect.CreateDevice(kChild2Name, zx::vmo{}, kProtocolId), 0,
+      driver_manager::NodeType::kComposite);
 
   // Test parentless
   EXPECT_EQ(ToCollection(*grandparent, fdfw::DriverPackageType::kBoot), Collection::kBoot);
@@ -2474,3 +1770,5 @@ TEST(NodeTest, ToCollection) {
   EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
   EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 }
+
+}  // namespace driver_runner

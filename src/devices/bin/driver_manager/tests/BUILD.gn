@@ -33,25 +33,26 @@ source_set("driver_manager_test_base") {
   ]
 }
 
-executable("driver_runner_test") {
+source_set("driver_runner_test_fixture") {
   testonly = true
-  sources = [ "driver_runner_test.cc" ]
-
-  deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp_testing",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp_testing",
-    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp_testing",
-    "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp_testing",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
+  sources = [
+    "driver_runner_test_fixture.cc",
+    "driver_runner_test_fixture.h",
+  ]
+  public_deps = [
     "//sdk/lib/inspect/testing/cpp",
-    "//sdk/lib/sys/cpp/testing:unit",
     "//src/devices/bin/driver_manager:driver_runner",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
+}
+
+executable("driver_runner_test") {
+  testonly = true
+  sources = [ "driver_runner_test.cc" ]
+
+  deps = [ ":driver_runner_test_fixture" ]
 }
 
 fuchsia_unittest_component("driver-runner-test") {
