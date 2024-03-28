@@ -175,8 +175,8 @@ test("amlogic-display-test") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/testing/fake-mmio-reg",
+    "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-range",
-    "//src/devices/testing/no_ddk",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
@@ -201,4 +201,10 @@ group("tests") {
 fuchsia_unittest_package("amlogic-display-test-package") {
   package_name = "amlogic-display-test"
   deps = [ ":amlogic-display-test" ]
+
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
