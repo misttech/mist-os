@@ -40,6 +40,8 @@ source_set("common") {
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
     "//src/devices/usb/lib/usb",

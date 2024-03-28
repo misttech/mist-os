@@ -5,11 +5,12 @@
 #include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy-device.h"
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <lib/ddk/binding_priv.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <fbl/auto_lock.h>
 
 #include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.h"
@@ -380,16 +381,19 @@ AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator++() {
   fidl::Arena arena;
   auto offers = compat_server_.CreateOffers2(arena);
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_usb_phy::Service>(arena, name_));
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                  .name(arena, name_)
-                  .offers2(arena, std::move(offers))
-                  .properties(arena,
-                              std::vector{
-                                  fdf::MakeProperty(arena, BIND_PLATFORM_DEV_VID, PDEV_VID_GENERIC),
-                                  fdf::MakeProperty(arena, BIND_PLATFORM_DEV_PID, PDEV_PID_GENERIC),
-                                  fdf::MakeProperty(arena, BIND_PLATFORM_DEV_DID, property_did_),
-                              })
-                  .Build();
+  auto args =
+      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+          .name(arena, name_)
+          .offers2(arena, std::move(offers))
+          .properties(arena,
+                      std::vector{
+                          fdf::MakeProperty(arena, bind_fuchsia::PLATFORM_DEV_VID,
+                                            bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
+                          fdf::MakeProperty(arena, bind_fuchsia::PLATFORM_DEV_PID,
+                                            bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+                          fdf::MakeProperty(arena, bind_fuchsia::PLATFORM_DEV_DID, property_did_),
+                      })
+          .Build();
 
   zx::result controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
