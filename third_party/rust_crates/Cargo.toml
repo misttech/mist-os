@@ -294,7 +294,7 @@ notify = { version = "5.1.0", default-features = false, features = ["macos_fseve
 # See b/42169853, not used for target-side code to avoid system-wide impact of yield in spinloops.
 parking_lot = "0.9"
 petgraph = { version = "0.6.2" }
-proc-macro2 = { version = "1.0.78", features = ["span-locations"] }
+proc-macro2 = { version = "1.0.79", features = ["span-locations"] }
 pulldown-cmark = "0.6.0"
 quote = "1.0.35"
 rustfix = "0.6.1"
@@ -676,7 +676,7 @@ rustflags = ["--cfg=use_fallback"]
 rustflags = ["--cfg=u128", "--cfg=use_proc_macro", "--cfg=wrap_proc_macro"]
 
 # cargo-gnaw suggested "--cfg=proc_macro_span" as well but proc_macro_span is still an unstable feature.
-[gn.package.proc-macro2."1.0.78"]
+[gn.package.proc-macro2."1.0.79"]
 rustflags = ["--cfg=span_locations", "--cfg=wrap_proc_macro"]
 
 [gn.package.pulldown-cmark."0.6.0"]
