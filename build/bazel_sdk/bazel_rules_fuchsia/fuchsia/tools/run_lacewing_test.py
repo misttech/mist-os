@@ -12,7 +12,7 @@ import sys
 import tempfile
 
 from pathlib import Path
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 
 # `bazel test` incorrectly handles stdout, so logging to stderr will keep our
@@ -62,14 +62,21 @@ def parse_args() -> Tuple[argparse.Namespace, List[str]]:
         help="A path to the ffx tool.",
         required=True,
     )
+    parser.add_argument(
+        "--target",
+        help="Optionally specify the target to run these tests against. Defaults to the default target device.",
+    )
     return parser.parse_known_args()
 
 
-def write_mobly_config(test_bed: str, ffx: Path) -> Path:
-    target = subprocess.check_output(
-        [ffx, "target", "default", "get"],
-        text=True,
-    ).strip()
+def write_mobly_config(test_bed: str, ffx: Path, target: Optional[str]) -> Path:
+    target = (
+        target
+        or subprocess.check_output(
+            [ffx, "target", "default", "get"],
+            text=True,
+        ).strip()
+    )
     mobly_config_contents = json.dumps(
         {
             "TestBeds": [
@@ -132,7 +139,7 @@ def main() -> int:
     test_bed = "GeneratedTestbed"
 
     # Write the mobly config.
-    mobly_config = write_mobly_config(test_bed, args.ffx)
+    mobly_config = write_mobly_config(test_bed, args.ffx, args.target)
 
     # Run the lacewing test.
     result = run_lacewing_test(
