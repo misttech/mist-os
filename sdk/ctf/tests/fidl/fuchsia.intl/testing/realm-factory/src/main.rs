@@ -10,6 +10,7 @@ use {
     fidl_fuchsia_io as fio,
     fidl_fuchsia_settings::IntlMarker,
     fidl_fuchsia_stash::StoreMarker,
+    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
@@ -36,6 +37,7 @@ async fn serve_realm_factory(stream: RealmFactoryRequestStream) {
 
 async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<()> {
     let mut realms = vec![];
+    let mut task_group = fasync::TaskGroup::new();
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             RealmFactoryRequest::CreateRealm2 { options, dictionary, responder } => {
@@ -44,10 +46,20 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
                 realms.push(realm);
                 responder.send(Ok(()))?;
             }
+            RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
+                let realm = create_realm(options).await?;
+                let request_stream = realm_server.into_stream()?;
+                task_group.spawn(async move {
+                    realm_proxy::service::serve(realm, request_stream).await.unwrap();
+                });
+                responder.send(Ok(()))?;
+            }
 
             RealmFactoryRequest::_UnknownMethod { .. } => unreachable!(),
         }
     }
+
+    task_group.join().await;
     Ok(())
 }
 

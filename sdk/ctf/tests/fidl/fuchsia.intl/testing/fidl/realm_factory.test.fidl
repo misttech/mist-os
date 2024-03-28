@@ -1,7 +1,6 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 library fuchsia.intl.test;
 
 using fuchsia.testing.harness;
@@ -16,5 +15,11 @@ open protocol RealmFactory {
     flexible CreateRealm2(resource struct {
         options RealmOptions;
         dictionary server_end:fuchsia.component.sandbox.Dictionary;
+    }) -> () error fuchsia.testing.harness.OperationError;
+
+    @deprecated
+    flexible CreateRealm(resource struct {
+        options RealmOptions;
+        realm_server server_end:fuchsia.testing.harness.RealmProxy;
     }) -> () error fuchsia.testing.harness.OperationError;
 };
