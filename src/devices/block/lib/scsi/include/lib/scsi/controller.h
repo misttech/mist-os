@@ -84,6 +84,7 @@ enum class SenseKey : uint8_t {
 
 // SCSI command structures (CDBs)
 
+// SPC-4 Revision 37, section 6.47 "TEST UNIT READY command".
 struct TestUnitReadyCDB {
   Opcode opcode;
   uint8_t reserved[4];
@@ -92,6 +93,7 @@ struct TestUnitReadyCDB {
 
 static_assert(sizeof(TestUnitReadyCDB) == 6, "TestUnitReady CDB must be 6 bytes");
 
+// SPC-4 Revision 37, section 6.6 "INQUIRY command".
 struct InquiryCDB {
   static constexpr uint8_t kPageListVpdPageCode = 0x00;
   static constexpr uint8_t kBlockLimitsVpdPageCode = 0xB0;
@@ -134,7 +136,7 @@ static_assert(sizeof(InquiryData) == 36, "Inquiry data must be 36 bytes");
 static_assert(offsetof(InquiryData, t10_vendor_id) == 8, "T10 Vendor ID is at offset 8");
 static_assert(offsetof(InquiryData, product_id) == 16, "Product ID is at offset 16");
 
-// SBC-3, section 6.6.3 "Block Limits VPD page".
+// SBC-3 Revision 36, section 6.6.3 "Block Limits VPD page".
 struct VPDBlockLimits {
   uint8_t peripheral_qualifier_device_type;
   uint8_t page_code;
@@ -154,7 +156,7 @@ struct VPDBlockLimits {
 
 static_assert(sizeof(VPDBlockLimits) == 44, "BlockLimits Page must be 44 bytes");
 
-// SBC-3, section 6.6.4 "Logical Block Provisioning VPD page".
+// SBC-3 Revision 36, section 6.6.4 "Logical Block Provisioning VPD page".
 struct VPDLogicalBlockProvisioning {
   uint8_t peripheral_qualifier_device_type;
   uint8_t page_code;
@@ -185,6 +187,7 @@ struct VPDPageList {
   uint8_t pages[255];
 };
 
+// SPC-4 Revision 37, section 6.39 "REQUEST SENSE command".
 struct RequestSenseCDB {
   Opcode opcode;
   uint8_t desc;
@@ -244,7 +247,7 @@ enum class PageCode : uint8_t {
   kAllPageCode = 0x3F,
 };
 
-// SPC-4, section 6.11 "MODE SENSE(6) command".
+// SPC-4 Revision 37, section 6.13 "MODE SENSE (6) command".
 struct ModeSense6CDB {
   Opcode opcode;
   // dbd (3) is 'DBD (Disable block descriptors)'
@@ -281,7 +284,7 @@ struct ModeSense6ParameterHeader {
 
 static_assert(sizeof(ModeSense6ParameterHeader) == 4, "Mode Sense 6 parameters must be 4 bytes");
 
-// SPC-4, section 6.12 "MODE SENSE(10) command".
+// SPC-4 Revision 37, section 6.14 "MODE SENSE (10) command".
 struct ModeSense10CDB {
   Opcode opcode;
   // dbd (4) is 'LLBAA (Long LBA accepted)'
@@ -346,6 +349,7 @@ struct CachingModePage {
 
 static_assert(sizeof(CachingModePage) == 20, "Caching Mode Page must be 20 bytes");
 
+// SBC-3 Revision 36, section 5.15 "READ CAPACITY (10) command".
 struct ReadCapacity10CDB {
   Opcode opcode;
   uint8_t reserved0;
@@ -364,6 +368,7 @@ struct ReadCapacity10ParameterData {
 
 static_assert(sizeof(ReadCapacity10ParameterData) == 8, "Read Capacity 10 Params are 8 bytes");
 
+// SBC-3 Revision 36, section 5.16 "READ CAPACITY (16) command".
 struct ReadCapacity16CDB {
   Opcode opcode;
   uint8_t service_action;
@@ -386,6 +391,7 @@ struct ReadCapacity16ParameterData {
 
 static_assert(sizeof(ReadCapacity16ParameterData) == 32, "Read Capacity 16 Params are 32 bytes");
 
+// SPC-4 Revision 37, section 6.33 "REPORT LUNS command".
 struct ReportLunsCDB {
   Opcode opcode;
   uint8_t reserved0;
@@ -407,6 +413,7 @@ struct ReportLunsParameterDataHeader {
 
 static_assert(sizeof(ReportLunsParameterDataHeader) == 16, "Report LUNs Header must be 16 bytes");
 
+// SBC-3 Revision 36, section 5.11 "READ (10) command".
 struct Read10CDB {
   Opcode opcode;
   // dpo_fua(7 downto 5) - Read protect
@@ -430,6 +437,7 @@ struct Read10CDB {
 
 static_assert(sizeof(Read10CDB) == 10, "Read 10 CDB must be 10 bytes");
 
+// SBC-3 Revision 36, section 5.12 "READ (12) command".
 struct Read12CDB {
   Opcode opcode;
   // dpo_fua(4) - DPO - Disable Page Out
@@ -451,6 +459,7 @@ struct Read12CDB {
 
 static_assert(sizeof(Read12CDB) == 12, "Read 12 CDB must be 12 bytes");
 
+// SBC-3 Revision 36, section 5.13 "READ (16) command".
 struct Read16CDB {
   Opcode opcode;
   // dpo_fua(4) - DPO - Disable Page Out
@@ -472,7 +481,7 @@ struct Read16CDB {
 
 static_assert(sizeof(Read16CDB) == 16, "Read 16 CDB must be 16 bytes");
 
-// SBC-3, section 5.29 "VERIFY (10) command".
+// SBC-3 Revision 36, section 5.29 "VERIFY (10) command".
 struct Verify10CDB {
   Opcode opcode;
   // vrprotect_and_dpo_and_bytchk(7 downto 5) is 'VRPROTECT (Verify Protect)'
@@ -493,6 +502,7 @@ struct Verify10CDB {
 
 static_assert(sizeof(Verify10CDB) == 10, "Verify 10 CDB must be 10 bytes");
 
+// SBC-3 Revision 36, section 5.33 "WRITE (10) command".
 struct Write10CDB {
   Opcode opcode;
   // dpo_fua(7 downto 5) - Write protect
@@ -516,6 +526,7 @@ struct Write10CDB {
 
 static_assert(sizeof(Write10CDB) == 10, "Write 10 CDB must be 10 bytes");
 
+// SBC-3 Revision 36, section 5.34 "WRITE (12) command".
 struct Write12CDB {
   Opcode opcode;
   // dpo_fua(4) - DPO - Disable Page Out
@@ -537,6 +548,7 @@ struct Write12CDB {
 
 static_assert(sizeof(Write12CDB) == 12, "Write 12 CDB must be 12 bytes");
 
+// SBC-3 Revision 36, section 5.35 "WRITE (16) command".
 struct Write16CDB {
   Opcode opcode;
   // dpo_fua(4) - DPO - Disable Page Out
@@ -558,6 +570,7 @@ struct Write16CDB {
 
 static_assert(sizeof(Write16CDB) == 16, "Write 16 CDB must be 16 bytes");
 
+// SBC-3 Revision 36, section 5.26 "SYNCHRONIZE CACHE (10) command".
 struct SynchronizeCache10CDB {
   Opcode opcode;
   // syncnv_immed(2) - SYNC_NV - If SYNC_NV is 1 prefer write to nonvolatile cache.
@@ -588,7 +601,7 @@ enum class PowerCondition : uint8_t {
   kForceStandby0 = 0xb,
 };
 
-// SBC-3, section 5.25 "START STOP UNIT command".
+// SBC-3 Revision 36, section 5.25 "START STOP UNIT command".
 struct StartStopUnitCDB {
   Opcode opcode;
   // reserved_and_immed(0) is IMMED
@@ -613,6 +626,7 @@ struct StartStopUnitCDB {
 
 static_assert(sizeof(StartStopUnitCDB) == 6, "Start Stop Unit CDB must be 6 bytes");
 
+// SPC-4 Revision 37, section 6.40 "SECURITY PROTOCOL IN command".
 struct SecurityProtocolInCDB {
   Opcode opcode;
   uint8_t security_protocol;
@@ -629,6 +643,7 @@ struct SecurityProtocolInCDB {
 
 static_assert(sizeof(SecurityProtocolInCDB) == 12, "Security Protocol In CDB must be 12 bytes");
 
+// SPC-4 Revision 37, section 6.41 "SECURITY PROTOCOL OUT command".
 struct SecurityProtocolOutCDB {
   Opcode opcode;
   uint8_t security_protocol;
@@ -645,6 +660,7 @@ struct SecurityProtocolOutCDB {
 
 static_assert(sizeof(SecurityProtocolOutCDB) == 12, "Security Protocol Out CDB must be 12 bytes");
 
+// SBC-3 Revision 36, section 5.28 "UNMAP command".
 struct UnmapCDB {
   Opcode opcode;
   // anch (0) is 'anchor'
@@ -680,6 +696,7 @@ struct UnmapParameterListHeader {
 
 static_assert(sizeof(UnmapParameterListHeader) == 8, "Unmap parameter list header must be 8 bytes");
 
+// SPC-4 Revision 37, section 6.49 "WRITE BUFFER command".
 struct WriteBufferCDB {
   Opcode opcode;
   // mod (4 downto 0) is 'mode'
@@ -694,7 +711,7 @@ struct WriteBufferCDB {
 
 static_assert(sizeof(WriteBufferCDB) == 10, "Write Buffer CDB must be 10 bytes");
 
-// SBC-3, section 5.3 "FORMAT UNIT command".
+// SBC-3 Revision 36, section 5.3 "FORMAT UNIT command".
 struct FormatUnitCDB {
   Opcode opcode;
   uint8_t parameters;
@@ -795,7 +812,7 @@ enum class SelfTestCode : uint8_t {
   kReserved2 = 0x7,
 };
 
-// SPC-4, section 6.32 "SEND DIAGNOSTIC command".
+// SPC-4 Revision 37, section 6.42 "SEND DIAGNOSTIC command".
 struct SendDiagnosticCDB {
   Opcode opcode;
   // self_test_code_and_parameters (7 downto 5) is 'SELF-TEST CODE'
