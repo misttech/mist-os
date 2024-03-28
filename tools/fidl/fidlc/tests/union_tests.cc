@@ -313,16 +313,12 @@ type Foo = flexible union {
 }
 
 TEST(UnionTests, BadEmptyStrictUnion) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0086-a.test.fidl");
-  library.ExpectFail(ErrStrictUnionMustHaveNonReservedMember);
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
+  TestLibrary library(R"FIDL(
+library example;
 
-TEST(UnionTests, BadOnlyReservedStrictUnion) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0086-b.test.fidl");
-  library.ExpectFail(ErrStrictUnionMustHaveNonReservedMember);
+type Value = strict union {};
+)FIDL");
+  library.ExpectFail(ErrMustHaveOneMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

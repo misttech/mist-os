@@ -1332,8 +1332,7 @@ void CompileStep::CompileUnion(Union* union_declaration) {
   }
 
   if (union_declaration->strictness == Strictness::kStrict && !contains_non_reserved_member) {
-    reporter()->Fail(ErrStrictUnionMustHaveNonReservedMember,
-                     union_declaration->name.span().value());
+    reporter()->Fail(ErrMustHaveOneMember, union_declaration->name.span().value());
   }
 }
 

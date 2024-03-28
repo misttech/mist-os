@@ -107,8 +107,6 @@ fi-0081.test.fidl
 fi-0082.test.fidl
 fi-0083.test.fidl
 fi-0084.test.fidl
-fi-0086-a.test.fidl
-fi-0086-b.test.fidl
 fi-0088.test.fidl
 fi-0091.test.fidl
 fi-0092.test.fidl

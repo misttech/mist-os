@@ -184,8 +184,7 @@ constexpr ErrorDef<83> ErrFuchsiaIoExplicitOrdinals(
 constexpr ErrorDef<84> ErrPayloadStructHasDefaultMembers(
     "default values are not allowed on members of request/response structs");
 constexpr RetiredDef<85> ErrDuplicateServiceMemberName;
-constexpr ErrorDef<86> ErrStrictUnionMustHaveNonReservedMember(
-    "strict unions must have at least one non-reserved member");
+constexpr RetiredDef<86> ErrStrictUnionMustHaveNonReservedMember;
 constexpr RetiredDef<87> ErrDuplicateServiceMemberNameCanonical;
 constexpr ErrorDef<88> ErrOptionalServiceMember("service members cannot be optional");
 constexpr RetiredDef<89> ErrDuplicateStructMemberName;
