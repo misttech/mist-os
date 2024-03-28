@@ -60,12 +60,10 @@ fuchsia_package("pkg") {
     ":default",
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
     "//src/lib/fake-clock/svc",
+    "//src/sys/time/testing:config-values-faketime",
+    "//src/sys/time/testing:config-values-integration",
+    "//src/sys/time/testing:timekeeper_for_integration",
+    "//src/sys/time/testing:timekeeper_with_fake_time",
     "//src/sys/time/testing/dev_time_source:component",
-
-    # TODO: b/327476961 - These need to be moved too.
-    "//src/sys/time/timekeeper_integration:config-values-faketime",
-    "//src/sys/time/timekeeper_integration:config-values-integration",
-    "//src/sys/time/timekeeper_integration:timekeeper_for_integration",
-    "//src/sys/time/timekeeper_integration:timekeeper_with_fake_time",
   ]
 }

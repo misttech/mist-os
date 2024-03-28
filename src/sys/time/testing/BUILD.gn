@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_library.gni")
 
@@ -54,4 +55,40 @@ rustc_library("timekeeper_integration") {
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:tracing",
   ]
+}
+
+fuchsia_component_manifest("manifest_for_integration") {
+  testonly = true
+  component_name = "timekeeper_for_integration"
+  manifest = "meta/timekeeper_for_integration.cml"
+}
+
+fuchsia_component_manifest("manifest_with_fake_time") {
+  testonly = true
+  component_name = "timekeeper_with_fake_time"
+  manifest = "meta/timekeeper_with_fake_time.cml"
+}
+
+fuchsia_component("timekeeper_for_integration") {
+  testonly = true
+  cm_label = ":manifest_for_integration"
+  deps = [ "//src/sys/time/timekeeper:bin" ]
+}
+
+fuchsia_component("timekeeper_with_fake_time") {
+  testonly = true
+  cm_label = ":manifest_with_fake_time"
+  deps = [ "//src/sys/time/timekeeper:bin_with_fake_time" ]
+}
+
+fuchsia_structured_config_values("config-values-faketime") {
+  testonly = true
+  cm_label = ":timekeeper_with_fake_time"
+  values_source = "config/values.json5"
+}
+
+fuchsia_structured_config_values("config-values-integration") {
+  testonly = true
+  cm_label = ":timekeeper_for_integration"
+  values_source = "config/values.json5"
 }
