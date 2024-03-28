@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/cpu/drivers/aml-cpu/aml-cpu-v2.h"
+#include "src/devices/cpu/drivers/aml-cpu/aml-cpu-driver.h"
 
 #include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
@@ -11,11 +11,11 @@
 
 namespace amlogic_cpu {
 
-AmlCpuV2::AmlCpuV2(fdf::DriverStartArgs start_args,
-                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : DriverBase("aml-cpu-v2", std::move(start_args), std::move(driver_dispatcher)) {}
+AmlCpuDriver::AmlCpuDriver(fdf::DriverStartArgs start_args,
+                           fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : DriverBase("aml-cpu", std::move(start_args), std::move(driver_dispatcher)) {}
 
-zx::result<> AmlCpuV2::Start() {
+zx::result<> AmlCpuDriver::Start() {
   // Get the metadata for the performance domains.
   auto perf_doms =
       compat::GetMetadataArray<perf_domain_t>(incoming(), DEVICE_METADATA_AML_PERF_DOMAINS, "pdev");
@@ -72,7 +72,7 @@ zx::result<> AmlCpuV2::Start() {
   return zx::ok();
 }
 
-zx::result<std::unique_ptr<AmlCpuV2PerformanceDomain>> AmlCpuV2::BuildPerformanceDomain(
+zx::result<std::unique_ptr<AmlCpuPerformanceDomain>> AmlCpuDriver::BuildPerformanceDomain(
     const perf_domain_t& perf_domain, const std::vector<operating_point>& pd_op_points,
     const AmlCpuConfiguration& config) {
   char fragment_name[32];
@@ -125,8 +125,7 @@ zx::result<std::unique_ptr<AmlCpuV2PerformanceDomain>> AmlCpuV2::BuildPerformanc
     power_client = std::move(client_end_result.value());
   }
 
-  auto device =
-      std::make_unique<AmlCpuV2PerformanceDomain>(dispatcher(), pd_op_points, perf_domain);
+  auto device = std::make_unique<AmlCpuPerformanceDomain>(dispatcher(), pd_op_points, perf_domain);
 
   auto st = device->Init(std::move(pll_div16_client), std::move(cpu_div16_client),
                          std::move(cpu_scaler_client), std::move(power_client));
@@ -140,13 +139,13 @@ zx::result<std::unique_ptr<AmlCpuV2PerformanceDomain>> AmlCpuV2::BuildPerformanc
   return zx::ok(std::move(device));
 }
 
-void AmlCpuV2PerformanceDomain::CpuCtrlConnector(
+void AmlCpuPerformanceDomain::CpuCtrlConnector(
     fidl::ServerEnd<fuchsia_hardware_cpu_ctrl::Device> server) {
   FDF_LOG(INFO, "Binding domain to server");
   bindings_.AddBinding(dispatcher_, std::move(server), this, fidl::kIgnoreBindingClosure);
 }
 
-zx::result<> AmlCpuV2PerformanceDomain::AddChild(
+zx::result<> AmlCpuPerformanceDomain::AddChild(
     fidl::WireSyncClient<fuchsia_driver_framework::Node>& node) {
   fidl::Arena arena;
 
@@ -193,4 +192,4 @@ zx::result<> AmlCpuV2PerformanceDomain::AddChild(
 
 }  // namespace amlogic_cpu
 
-FUCHSIA_DRIVER_EXPORT(amlogic_cpu::AmlCpuV2);
+FUCHSIA_DRIVER_EXPORT(amlogic_cpu::AmlCpuDriver);

@@ -23,106 +23,14 @@ driver_bind_rules("aml-cpu-bind") {
   ]
 }
 
-config("dfv1") {
-  defines = [ "DFV1" ]
-}
-
 fuchsia_driver("aml-cpu-driver") {
-  output_name = "aml-cpu-v1"
-  configs += [
-    ":dfv1",
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
-  sources = [
-    "aml-cpu-v1.cc",
-    "aml-cpu.cc",
-  ]
-  deps = [
-    ":aml-cpu-bind",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
-    "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp",
-    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
-    "//sdk/lib/fidl",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/mmio",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_driver_component("component-v1") {
-  component_name = "aml-cpu-v1"
-  deps = [ ":aml-cpu-driver" ]
-  manifest = "meta/aml-cpu.cml"
-  info = "aml-cpu-info.json"
-}
-
-fuchsia_driver_package("package-v1") {
-  package_name = "aml-cpu-v1"
-  driver_components = [ ":component-v1" ]
-}
-
-test("aml-cpu-test-bin") {
-  configs += [ ":dfv1" ]
-  sources = [
-    "aml-cpu-test.cc",
-    "aml-cpu-v1.cc",
-    "aml-cpu.cc",
-  ]
-  output_name = "aml-cpu-test"
-  deps = [
-    ":aml-cpu-bind",
-    "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_testing",
-    "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp",
-    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fidl",
-    "//sdk/lib/inspect/testing/cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/testing/fake-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/mmio",
-    "//src/devices/testing/fake-mmio-reg",
-    "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/predicates",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_unittest_package("aml-cpu-test") {
-  deps = [ ":aml-cpu-test-bin" ]
-  test_specs = {
-    environments = basic_envs
-  }
-}
-
-fuchsia_driver("aml-cpu-v2-driver") {
   output_name = "aml-cpu"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
-    "aml-cpu-v2.cc",
+    "aml-cpu-driver.cc",
     "aml-cpu.cc",
   ]
   deps = [
@@ -130,40 +38,37 @@ fuchsia_driver("aml-cpu-v2-driver") {
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/compat/cpp:logging",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
   ]
 }
 
-fuchsia_driver_component("component") {
-  component_name = "aml-cpu"
+fuchsia_driver_component("aml-cpu") {
   deps = [
     ":aml-cpu-bind",
-    ":aml-cpu-v2-driver",
+    ":aml-cpu-driver",
   ]
-  manifest = "meta/aml-cpu-v2.cml"
+  manifest = "meta/aml-cpu.cml"
   info = "aml-cpu-info.json"
 }
 
 fuchsia_driver_package("package") {
   package_name = "aml-cpu"
-  driver_components = [ ":component" ]
+  driver_components = [ ":aml-cpu" ]
 }
 
-test("aml-cpu-v2-test-bin") {
+test("aml-cpu-test-bin") {
   sources = [
-    "aml-cpu-v2-test.cc",
-    "aml-cpu-v2.cc",
+    "aml-cpu-driver.cc",
+    "aml-cpu-test.cc",
     "aml-cpu.cc",
   ]
-  output_name = "aml-cpu-v2-test"
+  output_name = "aml-cpu-test"
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/compat/cpp:logging",
     "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//sdk/lib/inspect/testing/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
@@ -176,8 +81,8 @@ test("aml-cpu-v2-test-bin") {
   ]
 }
 
-fuchsia_unittest_package("aml-cpu-v2-test") {
-  deps = [ ":aml-cpu-v2-test-bin" ]
+fuchsia_unittest_package("aml-cpu-test") {
+  deps = [ ":aml-cpu-test-bin" ]
   test_specs = {
     environments = basic_envs
   }
@@ -188,14 +93,5 @@ group("tests") {
   deps = [
     ":aml-cpu-bind_test",
     ":aml-cpu-test",
-    ":aml-cpu-v2-test",
-  ]
-}
-
-group("aml-cpu") {
-  testonly = true
-  deps = [
-    ":component",
-    ":component-v1",
   ]
 }
