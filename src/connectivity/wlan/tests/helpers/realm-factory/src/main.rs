@@ -150,10 +150,6 @@ async fn start_and_connect_to_driver_test_realm(
 
 async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> Result<(), Error> {
     // Create child components.
-    let archivist = builder
-        .add_child("archivist", "#meta/archivist-for-embedding.cm", ChildOptions::new())
-        .await?;
-
     let trace_manager =
         builder.add_child("trace_manager", "#meta/trace_manager.cm", ChildOptions::new()).await?;
 
@@ -201,6 +197,9 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
         )
         .await?;
 
+    // Route capabilities to components.
+    // NOTE: fuchsia.logger.LogSink and fuchsia.inspect.InspectSink are automatically routed
+    // to all components in RealmBuilder, so we don't route them here.
     builder
         .add_route(
             Route::new()
@@ -226,32 +225,9 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor"))
-                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
-                .from(&archivist)
-                .to(Ref::parent()),
-        )
-        .await?;
-
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .from(Ref::parent())
-                .to(&archivist)
-                .to(&wlancfg)
-                .to(&wlandevicemonitor)
-                .to(&stash),
-        )
-        .await?;
-
-    builder
-        .add_route(
-            Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry"))
                 .from(&trace_manager)
                 .to(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
-                .to(&archivist)
                 .to(&wlancfg)
                 .to(&wlandevicemonitor)
                 .to(&stash),
@@ -270,30 +246,10 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
     builder
         .add_route(
             Route::new()
-                .capability(Capability::event_stream("directory_ready"))
-                .capability(Capability::event_stream("capability_requested"))
-                .from(Ref::parent())
-                .to(&archivist),
-        )
-        .await?;
-
-    builder
-        .add_route(
-            Route::new()
                 .capability(Capability::storage("data"))
                 .from(Ref::parent())
                 .to(&stash)
                 .to(&wlancfg),
-        )
-        .await?;
-
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
-                .from(&archivist)
-                .to(&wlancfg)
-                .to(&wlandevicemonitor),
         )
         .await?;
 

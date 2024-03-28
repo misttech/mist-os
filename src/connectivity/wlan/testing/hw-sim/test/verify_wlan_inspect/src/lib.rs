@@ -7,10 +7,8 @@ use {
     diagnostics_assertions::{assert_data_tree, AnyProperty},
     diagnostics_hierarchy::DiagnosticsHierarchy,
     diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
-    fidl_fuchsia_diagnostics::ArchiveAccessorMarker,
     fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_test_wlan_realm::WlanConfig,
-    fuchsia_component::client::connect_to_protocol_at,
     fuchsia_zircon::DurationNum,
     ieee80211::Bssid,
     lazy_static::lazy_static,
@@ -132,9 +130,8 @@ async fn verify_wlan_inspect() {
             .await;
     }
 
-    let policy_hierarchy = get_inspect_hierarchy(&policy_moniker, helper.test_ns_prefix())
-        .await
-        .expect("expect Inspect data");
+    let policy_hierarchy =
+        get_inspect_hierarchy(&policy_moniker).await.expect("expect Inspect data");
     assert_data_tree!(policy_hierarchy, root: contains {
         external: {
             client_stats: contains {
@@ -155,9 +152,8 @@ async fn verify_wlan_inspect() {
         },
     });
 
-    let monitor_hierarchy = get_inspect_hierarchy(&devicemonitor_moniker, helper.test_ns_prefix())
-        .await
-        .expect("expect Inspect data");
+    let monitor_hierarchy =
+        get_inspect_hierarchy(&devicemonitor_moniker).await.expect("expect Inspect data");
     assert_data_tree!(monitor_hierarchy, root: contains {
         device_events: contains {
             "0": contains {},
@@ -203,9 +199,8 @@ async fn verify_wlan_inspect() {
     })
     .await;
 
-    let policy_hierarchy = get_inspect_hierarchy(&policy_moniker, helper.test_ns_prefix())
-        .await
-        .expect("expect Inspect data");
+    let policy_hierarchy =
+        get_inspect_hierarchy(&policy_moniker).await.expect("expect Inspect data");
     assert_data_tree!(policy_hierarchy, root: contains {
         external: {
             client_stats: contains {
@@ -226,9 +221,8 @@ async fn verify_wlan_inspect() {
         },
     });
 
-    let monitor_hierarchy = get_inspect_hierarchy(&devicemonitor_moniker, helper.test_ns_prefix())
-        .await
-        .expect("expect Inspect data");
+    let monitor_hierarchy =
+        get_inspect_hierarchy(&devicemonitor_moniker).await.expect("expect Inspect data");
     assert_data_tree!(monitor_hierarchy, root: contains {
         device_events: contains {
             "0": contains {},
@@ -261,13 +255,8 @@ async fn verify_wlan_inspect() {
     });
 }
 
-async fn get_inspect_hierarchy(
-    component: &str,
-    test_ns_prefix: &str,
-) -> Result<DiagnosticsHierarchy, Error> {
-    let archive_proxy = connect_to_protocol_at::<ArchiveAccessorMarker>(test_ns_prefix)?;
+async fn get_inspect_hierarchy(component: &str) -> Result<DiagnosticsHierarchy, Error> {
     ArchiveReader::new()
-        .with_archive(archive_proxy)
         .add_selector(ComponentSelector::new(vec![component.to_string()]))
         .snapshot::<Inspect>()
         .await?

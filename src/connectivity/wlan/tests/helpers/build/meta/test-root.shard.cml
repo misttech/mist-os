@@ -44,6 +44,11 @@
             to: "#test_suite",
         },
         {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor",
+            from: "parent",
+            to: "#test_suite",
+        },
+        {
             storage: "data",
             from: "self",
             to: "#test_realm_factory",
@@ -57,14 +62,6 @@
             storage: "custom_artifacts",
             from: "parent",
             to: "#test_suite",
-        },
-        {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
-            from: "parent",
-            to: "#test_realm_factory",
         },
     ],
     expose: [

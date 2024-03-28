@@ -220,7 +220,6 @@ fuchsia_structured_config_rust_lib("archivist-config") {
 
 group("archivist-for-embedding-bundle") {
   visibility = [
-    "//src/connectivity/wlan/tests/helpers/realm-factory/*",
     "//src/diagnostics/*",
     "//src/lib/diagnostics/*",
     "//src/sys/component_manager/tests/*",

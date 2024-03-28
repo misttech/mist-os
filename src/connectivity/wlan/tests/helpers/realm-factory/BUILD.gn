@@ -53,7 +53,6 @@ fuchsia_package("realm-factory") {
     "//src/connectivity/location/regulatory_region:regulatory_region_component",
     "//src/connectivity/wlan/wlancfg:service",
     "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor_component",
-    "//src/diagnostics/archivist:archivist-for-embedding-bundle",
     "//src/performance/trace_manager:component_hermetic",
     "//src/sys/stash:stash_secure_v2",
 
