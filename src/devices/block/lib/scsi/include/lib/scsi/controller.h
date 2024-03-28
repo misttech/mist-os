@@ -35,6 +35,7 @@ enum class Opcode : uint8_t {
   READ_10 = 0x28,
   WRITE_10 = 0x2A,
   VERIFY_10 = 0x2F,
+  PRE_FETCH_10 = 0x34,
   SYNCHRONIZE_CACHE_10 = 0x35,
   WRITE_BUFFER = 0x3B,
   UNMAP = 0x42,
@@ -43,6 +44,7 @@ enum class Opcode : uint8_t {
   READ_16 = 0x88,
   WRITE_16 = 0x8A,
   VERIFY_16 = 0x8F,
+  PRE_FETCH_16 = 0x90,
   READ_CAPACITY_16 = 0x9E,
   REPORT_LUNS = 0xA0,
   SECURITY_PROTOCOL_IN = 0xA2,
@@ -569,6 +571,23 @@ struct Write16CDB {
 } __PACKED;
 
 static_assert(sizeof(Write16CDB) == 16, "Write 16 CDB must be 16 bytes");
+
+// SBC-3 Revision 36, section 5.8 "PRE-FETCH (10) command".
+struct PreFetch10CDB {
+  Opcode opcode;
+  // reserved_and_immed(1) is 'IMMED'
+  uint8_t reserved_and_immed;
+  uint32_t logical_block_address;
+  // group_num (4 downto 0) is 'group_number'
+  uint8_t group_num;
+  uint16_t prefetch_length;
+  uint8_t control;
+
+  DEF_SUBBIT(reserved_and_immed, 1, immed);
+  DEF_SUBFIELD(group_num, 4, 0, group_number);
+} __PACKED;
+
+static_assert(sizeof(PreFetch10CDB) == 10, "Pre-Fetch 10 CDB must be 10 bytes");
 
 // SBC-3 Revision 36, section 5.26 "SYNCHRONIZE CACHE (10) command".
 struct SynchronizeCache10CDB {
