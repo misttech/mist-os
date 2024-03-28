@@ -313,10 +313,6 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/fake_battery.cm" ]
     },
   ]
-  kernel_cmdline = [
-    # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
-    "kernel.arm64.debug.dap-rom-soc=amlogic-a311d",
-  ]
 }
 
 board_input_bundle("board_driver") {
