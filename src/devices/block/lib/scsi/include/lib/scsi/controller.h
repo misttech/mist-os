@@ -34,6 +34,7 @@ enum class Opcode : uint8_t {
   READ_CAPACITY_10 = 0x25,
   READ_10 = 0x28,
   WRITE_10 = 0x2A,
+  VERIFY_10 = 0x2F,
   SYNCHRONIZE_CACHE_10 = 0x35,
   WRITE_BUFFER = 0x3B,
   UNMAP = 0x42,
@@ -41,11 +42,13 @@ enum class Opcode : uint8_t {
   MODE_SENSE_10 = 0x5A,
   READ_16 = 0x88,
   WRITE_16 = 0x8A,
+  VERIFY_16 = 0x8F,
   READ_CAPACITY_16 = 0x9E,
   REPORT_LUNS = 0xA0,
   SECURITY_PROTOCOL_IN = 0xA2,
   READ_12 = 0xA8,
   WRITE_12 = 0xAA,
+  VERIFY_12 = 0xAF,
   SECURITY_PROTOCOL_OUT = 0xB5,
 };
 
@@ -468,6 +471,27 @@ struct Read16CDB {
 } __PACKED;
 
 static_assert(sizeof(Read16CDB) == 16, "Read 16 CDB must be 16 bytes");
+
+// SBC-3, section 5.29 "VERIFY (10) command".
+struct Verify10CDB {
+  Opcode opcode;
+  // vrprotect_and_dpo_and_bytchk(7 downto 5) is 'VRPROTECT (Verify Protect)'
+  // vrprotect_and_dpo_and_bytchk(4) is 'DPO (Disble Page Out)'
+  // vrprotect_and_dpo_and_bytchk (2 downto 1) is 'BYTCHK (Byte Check)'
+  uint8_t vrprotect_and_dpo_and_bytchk;
+  uint32_t logical_block_address;
+  // group_num (5 downto 0) - GROUP NUMBER
+  uint8_t group_num;
+  uint16_t verification_length;
+  uint8_t control;
+
+  DEF_SUBFIELD(vrprotect_and_dpo_and_bytchk, 7, 5, vrprotect);
+  DEF_SUBBIT(vrprotect_and_dpo_and_bytchk, 4, dpo);
+  DEF_SUBFIELD(vrprotect_and_dpo_and_bytchk, 2, 1, bytchk);
+  DEF_SUBFIELD(group_num, 5, 0, group_number);
+} __PACKED;
+
+static_assert(sizeof(Verify10CDB) == 10, "Verify 10 CDB must be 10 bytes");
 
 struct Write10CDB {
   Opcode opcode;
