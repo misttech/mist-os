@@ -31,6 +31,7 @@ devicetree_visitor_collection("all-driver-visitors") {
     "//sdk/lib/driver/devicetree/visitors/drivers/pwm-controllers/pwm:pwm-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/registers:registers-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/thermal/thermal-zones:thermal-zones-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/usb/aml-usb-phy:aml-usb-phy-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/usb/dwc2:dwc2-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/usb/usb-phy:usb-phy-visitor",

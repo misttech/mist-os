@@ -101,6 +101,24 @@
 			};
 		};
 
+		cpu_temp: temperature-sensor@ff634800 {
+			compatible = "amlogic,g12a-thermal";
+			reg = <0x0 A311D_TEMP_SENSOR_PLL_BASE 0x0 A311D_TEMP_SENSOR_PLL_LENGTH>,
+				<0x0 A311D_TEMP_SENSOR_PLL_TRIM 0x0 A311D_TEMP_SENSOR_TRIM_LENGTH>;
+			interrupts = <GIC_SPI 35 GIC_IRQ_MODE_EDGE_RISING>;
+			assigned-clocks = <&clock 0x1000d>;
+			#thermal-sensor-cells = <0>;
+		};
+
+		ddr_temp: temperature-sensor@ff634c00 {
+			compatible = "amlogic,g12a-thermal";
+			reg = <0x0 A311D_TEMP_SENSOR_DDR_BASE 0x0 A311D_TEMP_SENSOR_DDR_LENGTH>,
+				<0x0 A311D_TEMP_SENSOR_DDR_TRIM 0x0 A311D_TEMP_SENSOR_TRIM_LENGTH>;
+			interrupts = <GIC_SPI 36 GIC_IRQ_MODE_EDGE_RISING>;
+			assigned-clocks = <&clock 0x1000d>;
+			#thermal-sensor-cells = <0>;
+		};
+
 		audio: audio-controller@ff642000 {
 			compatible = "amlogic,audio-controller";
 			reg = <0x0 0xff642000 0x0 0x2000>;
@@ -294,5 +312,29 @@
 		interrupts = <GIC_SPI 147 GIC_IRQ_MODE_LEVEL_HIGH>;
 		iommus = <&dummy_iommu 3>;
 		registers = <&reset A311D_RESET2_LEVEL 4 0x0 0x1000>;
+	};
+
+	thermal-zones {
+		cpu_thermal: cpu-thermal {
+			thermal-sensors = <&cpu_temp>;
+
+			trips {
+				cpu_critical: cpu-critical {
+					temperature = <101000>; /* millicelsius */
+					type = "critical";
+				};
+			};
+		};
+
+		ddr_thermal: ddr-thermal {
+			thermal-sensors = <&ddr_temp>;
+
+			trips {
+				ddr_critical: ddr-critical {
+					temperature = <110000>; /* millicelsius */
+					type = "critical";
+				};
+			};
+		};
 	};
 };

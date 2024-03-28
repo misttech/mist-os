@@ -88,11 +88,6 @@ board_configuration("vim3-devicetree") {
 }
 
 board_input_bundle("main_bundle") {
-  configuration = {
-    power_manager =
-        "//src/power/power-manager/node_config/vim3_node_config.json5"
-    thermal = "//src/power/power-manager/thermal_config/vim3.json5"
-  }
   base_packages = [ "//src/graphics/bin/vulkan_loader" ]
   drivers = [
     {
@@ -320,6 +315,11 @@ board_input_bundle("main_bundle") {
 }
 
 board_input_bundle("board_driver") {
+  configuration = {
+    power_manager =
+        "//src/power/power-manager/node_config/vim3_node_config.json5"
+    thermal = "//src/power/power-manager/thermal_config/vim3.json5"
+  }
   drivers = [
     {
       package_target = "//src/devices/board/drivers/vim3:package"
@@ -330,6 +330,10 @@ board_input_bundle("board_driver") {
 }
 
 board_input_bundle("devicetree_board_driver") {
+  configuration = {
+    power_manager = "//src/power/power-manager/node_config/vim3_devicetree_node_config.json5"
+    thermal = "//src/power/power-manager/thermal_config/vim3_devicetree.json5"
+  }
   drivers = [
     {
       package_target =
