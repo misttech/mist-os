@@ -7,33 +7,18 @@
 //! - acquire related data files, such as disk partition images (data)
 
 use ::gcs::client::{Client, ProgressResponse, ProgressState};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Context};
 use async_fs::rename;
 use async_trait::async_trait;
-use errors::ffx_bail;
+use ffx_product::{CommandStatus, MachineOutput, MachineUi};
 use ffx_product_download_args::DownloadCommand;
 use ffx_product_list::pb_list_impl;
-use fho::{FfxMain, FfxTool, MachineWriter};
+use fho::{bug, return_user_error, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use pbms::{make_way_for_output, transfer_download, AuthFlowChoice};
-use std::{cell::RefCell, path::Path, rc::Rc};
-use structured_ui::{Interface, Presentation, Response};
-
-pub struct MachineUi<'a> {
-    writer: Rc<RefCell<&'a mut MachineWriter<Presentation>>>,
-}
-
-impl<'a> Interface for MachineUi<'a> {
-    fn present(&self, output: &structured_ui::Presentation) -> Result<structured_ui::Response> {
-        match output {
-            Presentation::Notice(_) => self.writer.borrow_mut().machine(&output)?,
-            Presentation::Progress(_) => (),
-            Presentation::StringPrompt(_) => (),
-            Presentation::Table(_) => self.writer.borrow_mut().machine(&output)?,
-        };
-
-        Ok(Response::Default)
-    }
-}
+use std::{
+    io::{stdin, stdout},
+    path::Path,
+};
 
 #[derive(FfxTool)]
 pub struct PbDownloadTool {
@@ -43,18 +28,74 @@ pub struct PbDownloadTool {
 
 #[async_trait(?Send)]
 impl FfxMain for PbDownloadTool {
-    type Writer = MachineWriter<Presentation>;
-    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+    type Writer = VerifiedMachineWriter<MachineOutput<String>>;
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         let client = Client::initial()?;
 
-        let ui = MachineUi { writer: Rc::new(RefCell::new(&mut writer)) };
+        if writer.is_machine() {
+            self.do_machine_main(&client, writer).await
+        } else {
+            self.do_text_main(&client, writer).await
+        }
+    }
+}
 
-        let cmd = preprocess_cmd(self.cmd, &ui).await?;
+impl PbDownloadTool {
+    async fn do_machine_main(
+        &self,
+        client: &Client,
+        writer: <PbDownloadTool as fho::FfxMain>::Writer,
+    ) -> fho::Result<()> {
+        let ui = MachineUi::new(writer);
+
+        let cmd = match preprocess_cmd(&self.cmd, &ui).await {
+            Ok(c) => c,
+            Err(e) => {
+                ui.machine(MachineOutput::CommandStatus(CommandStatus::UserError {
+                    message: e.to_string(),
+                }))?;
+                return Err(e.into());
+            }
+        };
+
+        match pb_download_impl(
+            &cmd.auth,
+            cmd.force,
+            &cmd.manifest_url,
+            &cmd.product_dir,
+            &client,
+            &ui,
+        )
+        .await
+        {
+            Ok(_) => {
+                ui.machine(MachineOutput::CommandStatus(CommandStatus::Ok { message: None }))?;
+                return Ok(());
+            }
+            Err(e) => {
+                ui.machine(MachineOutput::CommandStatus(CommandStatus::UnexpectedError {
+                    message: e.to_string(),
+                }))?;
+                return Err(e.into());
+            }
+        }
+    }
+
+    async fn do_text_main(
+        &self,
+        client: &Client,
+        mut writer: <PbDownloadTool as fho::FfxMain>::Writer,
+    ) -> fho::Result<()> {
+        let mut output = stdout();
+        let mut err_out = writer.stderr();
+        let mut input = stdin();
+        let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+
+        let cmd = preprocess_cmd(&self.cmd, &ui).await?;
 
         pb_download_impl(&cmd.auth, cmd.force, &cmd.manifest_url, &cmd.product_dir, &client, &ui)
             .await
-            .map_err(|e| <anyhow::Error as Into<fho::Error>>::into(e))?;
-        Ok(())
+            .map_err(|e| e.into())
     }
 }
 
@@ -67,19 +108,22 @@ pub async fn pb_download_impl<I: structured_ui::Interface>(
     product_dir: &Path,
     client: &Client,
     ui: &I,
-) -> Result<()> {
+) -> fho::Result<()> {
     let start = std::time::Instant::now();
     tracing::info!("---------------------- Begin ----------------------------");
     tracing::debug!("transfer_manifest_url Url::parse");
     let transfer_manifest_url = match url::Url::parse(manifest_url) {
         Ok(p) => p,
-        _ => ffx_bail!("The source location must be a URL, failed to parse {:?}", manifest_url),
+        _ => return_user_error!(
+            "The source location must be a URL, failed to parse {:?}",
+            manifest_url
+        ),
     };
     tracing::debug!("make_way_for_output {:?}", product_dir);
     make_way_for_output(&product_dir, force).await?;
 
     let parent_dir = product_dir.parent().ok_or_else(|| anyhow!("local dir has no parent"))?;
-    let temp_dir = tempfile::TempDir::new_in(&parent_dir)?;
+    let temp_dir = tempfile::TempDir::new_in(&parent_dir).map_err(|e| bug!("{e}"))?;
     tracing::debug!("transfer_manifest, transfer_manifest_url {:?}", transfer_manifest_url);
     transfer_download(
         &transfer_manifest_url,
@@ -125,12 +169,12 @@ pub async fn pb_download_impl<I: structured_ui::Interface>(
 }
 
 pub async fn preprocess_cmd<I: structured_ui::Interface>(
-    cmd: DownloadCommand,
+    cmd: &DownloadCommand,
     ui: &I,
-) -> Result<DownloadCommand> {
+) -> fho::Result<DownloadCommand> {
     // If the manifest_url is a transfer url, we don't need to preprocess.
     if let Ok(_) = url::Url::parse(&cmd.manifest_url) {
-        return Ok(cmd);
+        return Ok(cmd.clone());
     };
 
     // If the manifest_url look like a product name, we try to convert it into a
@@ -144,14 +188,14 @@ pub async fn preprocess_cmd<I: structured_ui::Interface>(
             .collect::<Vec<_>>();
 
     if products.len() != 1 {
-        ffx_bail!(
+        return_user_error!(
             "Expected a single product entry while trying to download a product by name, found {}",
             products.len()
         );
     }
 
     let processed_cmd =
-        DownloadCommand { manifest_url: products[0].transfer_manifest_url.clone(), ..cmd };
+        DownloadCommand { manifest_url: products[0].transfer_manifest_url.clone(), ..cmd.clone() };
     Ok(processed_cmd)
 }
 
@@ -165,7 +209,7 @@ mod test {
     use std::io::Write;
     use temp_test_env::TempTestEnv;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_gcs_pb_download_impl() {
         let test_dir = tempfile::TempDir::new().expect("temp dir");
         let server = TestServer::builder()
@@ -202,7 +246,7 @@ mod test {
             .expect("testing download");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_http_download() {
         let server = TestServer::builder()
             .handler(ForPath::new(
@@ -240,7 +284,7 @@ mod test {
         assert!(download_dir.join("foo").join("payload.txt").exists());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_preprocess_cmd() {
         let test_dir = tempfile::TempDir::new().expect("temp dir");
         let test_env = TempTestEnv::new().expect("test_env");
@@ -273,7 +317,8 @@ mod test {
             branch: None,
         };
 
-        let processed_cmd = preprocess_cmd(cmd.clone(), &ui).await.expect("testing preprocess cmd");
+        let processed_cmd =
+            preprocess_cmd(&cmd.clone(), &ui).await.expect("testing preprocess cmd");
 
         assert_eq!(
             DownloadCommand { manifest_url: String::from("fake_url"), ..cmd },

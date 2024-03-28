@@ -19,10 +19,12 @@ use maplit::hashmap;
 use omaha_client::version::Version;
 use pbms::AuthFlowChoice;
 use pbms::{list_from_gcs, string_from_url};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{stderr, stdin, stdout, Write};
 use std::str::FromStr;
+use structured_ui::{Notice, Presentation};
 
 const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
 const CONFIG_BASE_URLS: &'static str = "pbms.base_urls";
@@ -38,7 +40,7 @@ lazy_static! {
     "f18" => "18.20240225.3"};
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct ProductBundle {
     pub name: String,
     pub product_version: String,
@@ -187,7 +189,9 @@ where
 
     for base_url in &base_urls {
         let prods = pb_gather_from_url(base_url, auth, ui, &client).await.unwrap_or_else(|_| {
-            println!("Failed to fetch from base_url: {}", &base_url);
+            let mut notice: Notice = Notice::builder();
+            notice.message(format!("Failed to fetch from base_url: {base_url}"));
+            ui.present(&Presentation::Notice(notice)).expect("presenting to work");
             Vec::new()
         });
         products.extend(prods);

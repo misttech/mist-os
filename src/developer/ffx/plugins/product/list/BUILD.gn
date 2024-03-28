@@ -25,6 +25,7 @@ ffx_plugin("ffx_product_list") {
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:omaha_client",
+    "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",

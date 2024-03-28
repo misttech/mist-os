@@ -14,9 +14,9 @@ ffx_plugin("ffx_product_download") {
   sources = [ "src/lib.rs" ]
 
   deps = [
-    "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pbms:lib",
+    "//src/developer/ffx/plugins/product/common:lib",
     "//src/developer/ffx/plugins/product/list:ffx_product_list",
     "//src/lib/gcs",
     "//src/lib/structured_ui",
@@ -29,7 +29,7 @@ ffx_plugin("ffx_product_download") {
   ]
 
   test_deps = [
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//src/lib/testing/fuchsia-hyper-test-support",
     "//src/lib/testing/temp_test_env",
     "//third_party/rust_crates:tempfile",
