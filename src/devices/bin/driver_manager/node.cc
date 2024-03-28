@@ -1111,6 +1111,12 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
           return;
         }
 
+        // IF the driver fails to bind to the node, don't remove the node.
+        if (node->driver_component_->state == DriverState::kBinding) {
+          LOGF(WARNING, "The driver for node %s failed to bind.", node->name().c_str());
+          return;
+        }
+
         if (node->GetNodeState() == NodeState::kRunning) {
           // If the node is running but this node closure has happened, then we want to restart
           // the node if it has the host_restart_on_crash_ enabled on it.
