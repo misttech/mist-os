@@ -376,6 +376,7 @@ pub struct CapabilityBuilder {
     storage_source: Option<cm_rust::StorageDirectorySource>,
     storage_id: fdecl::StorageId,
     value: Option<cm_rust::ConfigValue>,
+    delivery: cm_rust::DeliveryType,
 }
 
 impl CapabilityBuilder {
@@ -451,6 +452,7 @@ impl CapabilityBuilder {
             storage_source: None,
             storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
             value: None,
+            delivery: Default::default(),
         }
     }
 
@@ -514,13 +516,19 @@ impl CapabilityBuilder {
         self
     }
 
+    pub fn delivery(mut self, delivery: cm_rust::DeliveryType) -> Self {
+        assert_matches!(self.type_, CapabilityTypeName::Protocol);
+        self.delivery = delivery;
+        self
+    }
+
     pub fn build(self) -> cm_rust::CapabilityDecl {
         match self.type_ {
             CapabilityTypeName::Protocol => {
                 cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
                     name: self.name.expect("name not set"),
                     source_path: Some(self.path.expect("path not set")),
-                    delivery: Default::default(),
+                    delivery: self.delivery,
                 })
             }
             CapabilityTypeName::Service => cm_rust::CapabilityDecl::Service(cm_rust::ServiceDecl {

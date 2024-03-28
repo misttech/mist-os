@@ -117,6 +117,12 @@ impl From<Sender> for Open {
     }
 }
 
+impl Sendable for Sender {
+    fn send(&self, message: Message) -> Result<(), ()> {
+        self.send(message)
+    }
+}
+
 impl CapabilityTrait for Sender {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Ok(vfs::service::endpoint(move |_scope, server_end| {

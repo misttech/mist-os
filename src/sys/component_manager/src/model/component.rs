@@ -37,7 +37,7 @@ use {
             start::Start,
             token::{InstanceToken, InstanceTokenState},
         },
-        sandbox_util::DictExt,
+        sandbox_util::{DictExt, SendableExt},
     },
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
@@ -62,7 +62,7 @@ use {
     cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
     cm_rust::{
-        CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl,
+        CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
         FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
     },
     cm_types::Name,
@@ -1635,7 +1635,8 @@ pub struct ResolvedInstanceState {
     instance_token_state: InstanceTokenState,
 
     /// The ExecutionScope for this component. Pseudo directories should be hosted with this
-    /// scope to tie their life-time to that of the component.
+    /// scope to tie their life-time to that of the component. The scope is shut down when
+    /// the component is unresolved.
     execution_scope: ExecutionScope,
 
     /// Result of resolving the component.
@@ -1759,7 +1760,7 @@ impl ResolvedInstanceState {
         let mut state = Self {
             weak_component,
             instance_token_state,
-            execution_scope,
+            execution_scope: execution_scope.clone(),
             resolved_component,
             children: HashMap::new(),
             next_dynamic_instance_id: 1,
@@ -1784,6 +1785,7 @@ impl ResolvedInstanceState {
         let mut child_inputs = HashMap::new();
         build_component_sandbox(
             component,
+            &execution_scope,
             &state.children,
             &decl,
             &state.component_input,
@@ -1805,6 +1807,7 @@ impl ResolvedInstanceState {
         component_decl: &ComponentDecl,
         capability_decl: &cm_rust::CapabilityDecl,
         path: &cm_types::Path,
+        execution_scope: &ExecutionScope,
     ) -> Router {
         if component_decl.program.is_none() {
             return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable);
@@ -1819,14 +1822,24 @@ impl ResolvedInstanceState {
                 ComponentCapability::from(capability_decl.clone()).type_name().into(),
             )
             .expect("get_outgoing must return a directory node");
+        let mut delivery = DeliveryType::Immediate;
         let capability: Capability = match capability_decl {
-            CapabilityDecl::Protocol(_) => sandbox::Sender::new_sendable(open).into(),
+            CapabilityDecl::Protocol(p) => {
+                let sender = sandbox::Sender::new_sendable(open);
+                delivery = p.delivery;
+                match p.delivery {
+                    DeliveryType::Immediate => sender,
+                    DeliveryType::OnReadable => sender.on_readable(execution_scope.clone()),
+                }
+                .into()
+            }
             _ => open.into(),
         };
         Router::new(CapabilityRequestedHook {
             source: component.as_weak(),
             name: name.clone(),
             capability,
+            delivery,
         })
     }
 
@@ -2585,18 +2598,12 @@ struct CapabilityRequestedHook {
     source: WeakComponentInstance,
     name: Name,
     capability: Capability,
+    delivery: DeliveryType,
 }
 
 #[async_trait]
 impl Routable for CapabilityRequestedHook {
     async fn route(&self, request: Request) -> Result<Capability, bedrock_error::BedrockError> {
-        // If the component is already started, this will be a no-op.
-        self.source
-            .ensure_started(&StartReason::AccessCapability {
-                target: request.target.moniker.clone(),
-                name: self.name.clone(),
-            })
-            .await?;
         let source = self.source.upgrade().map_err(RoutingError::from)?;
         let target = request.target.upgrade().map_err(RoutingError::from)?;
         let (receiver, sender) = CapabilityReceiver::new();
@@ -2615,6 +2622,21 @@ impl Routable for CapabilityRequestedHook {
             resolve_completed.await.unwrap();
         }
         source.hooks.dispatch(&event).await;
+        match self.delivery {
+            // TODO(https://fxbug.dev/319754472): If a component uses the CapabilityRequested event
+            // for a capability and the latter declares `delivery: "on_readable"`, then the event
+            // should be sent, and the component started, only after the channel becomes readable.
+            DeliveryType::OnReadable if !receiver.is_taken() => {}
+            DeliveryType::Immediate | DeliveryType::OnReadable => {
+                // If the component is already started, this will be a no-op.
+                self.source
+                    .ensure_started(&StartReason::AccessCapability {
+                        target: request.target.moniker.clone(),
+                        name: self.name.clone(),
+                    })
+                    .await?;
+            }
+        }
         if receiver.is_taken() {
             Ok(sender.into())
         } else {

@@ -28,6 +28,7 @@ use {
     sandbox::{Capability, Dict, Unit},
     std::{collections::HashMap, iter, sync::Arc},
     tracing::warn,
+    vfs::execution_scope::ExecutionScope,
 };
 
 /// The dicts a component receives from its parent.
@@ -107,6 +108,7 @@ impl ComponentEnvironment {
 /// various dicts the component needs based on the contents of its manifest.
 pub fn build_component_sandbox(
     component: &Arc<ComponentInstance>,
+    execution_scope: &ExecutionScope,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     decl: &cm_rust::ComponentDecl,
     component_input: &ComponentInput,
@@ -168,6 +170,7 @@ pub fn build_component_sandbox(
     for capability in &decl.capabilities {
         extend_dict_with_capability(
             component,
+            execution_scope,
             children,
             decl,
             capability,
@@ -246,6 +249,7 @@ pub fn build_component_sandbox(
 /// is a dict of routers, keyed by capability name.
 fn extend_dict_with_capability(
     component: &Arc<ComponentInstance>,
+    execution_scope: &ExecutionScope,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     decl: &cm_rust::ComponentDecl,
     capability: &cm_rust::CapabilityDecl,
@@ -261,7 +265,11 @@ fn extend_dict_with_capability(
         | CapabilityDecl::Resolver(_) => {
             let path = capability.path().expect("must have path");
             let router = ResolvedInstanceState::make_program_outgoing_router(
-                component, decl, capability, path,
+                component,
+                decl,
+                capability,
+                path,
+                execution_scope,
             );
             let router = router.with_policy_check(
                 CapabilitySource::Component {

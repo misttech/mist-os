@@ -50,7 +50,12 @@ use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{channel::mpsc, channel::oneshot, join, lock::Mutex, StreamExt},
+    futures::{
+        channel::{mpsc, oneshot},
+        join,
+        lock::Mutex,
+        StreamExt,
+    },
     maplit::btreemap,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     routing::component_instance::ComponentInstanceInterface,
@@ -3771,6 +3776,104 @@ fn slow_resolve_races_with_capability_requested() {
                             fcomponent::CapabilityRequestedPayload { name: Some(name), .. })), ..
             } if *name == "foo_svc".to_string()
         );
+    });
+    executor.run_until_stalled(&mut test_body).unwrap();
+}
+
+// `b` exposes `echo` with [`DeliveryType::OnReadable`]. `a` uses this capability.
+async fn build_realm_for_on_readable_tests() -> RoutingTest {
+    let components = vec![
+        (
+            "a",
+            ComponentDeclBuilder::new()
+                .use_(UseBuilder::protocol().name("echo").source(UseSource::Child("b".into())))
+                .child(ChildBuilder::new().name("b"))
+                .build(),
+        ),
+        (
+            "b",
+            ComponentDeclBuilder::new()
+                .capability(
+                    CapabilityBuilder::protocol().name("echo").delivery(DeliveryType::OnReadable),
+                )
+                .expose(ExposeBuilder::protocol().name("echo").source(ExposeSource::Self_))
+                .build(),
+        ),
+    ];
+    RoutingTestBuilder::new("a", components).build().await
+}
+
+#[fuchsia::test]
+fn protocol_delivery_on_readable() {
+    // Building the `RoutingTest` may stall so we run it outside of `run_until_stalled`.
+    let mut executor = fasync::TestExecutor::new();
+    let test = executor.run_singlethreaded(build_realm_for_on_readable_tests());
+
+    let mut test_body = Box::pin(async move {
+        let (_, component_name) =
+            test.start_and_get_instance(&Moniker::root(), StartReason::Eager, true).await.unwrap();
+        let component_resolved_url = RoutingTest::resolved_url(&component_name);
+        let namespace = test.mock_runner.get_namespace(&component_resolved_url).unwrap();
+
+        // `b` is stopped.
+        let b = test.model.root().find_and_maybe_resolve(&"b".parse().unwrap()).await.unwrap();
+        _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+        assert!(!b.is_started());
+
+        // Open the capability.
+        let echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
+            &namespace,
+            &"/svc/echo".parse().unwrap(),
+        )
+        .await;
+
+        // `b` is still stopped.
+        _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+        assert!(!b.is_started());
+
+        // Make a request. `b` should only then start.
+        capability_util::call_echo_and_validate_result(echo_proxy, ExpectedResult::Ok).await;
+        _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+        assert!(b.is_started());
+    });
+    executor.run_until_stalled(&mut test_body).unwrap();
+}
+
+#[fuchsia::test]
+fn protocol_delivery_on_readable_bail_when_unresolve() {
+    // Building the `RoutingTest` may stall so we run it outside of `run_until_stalled`.
+    let mut executor = fasync::TestExecutor::new();
+    let test = executor.run_singlethreaded(build_realm_for_on_readable_tests());
+
+    let mut test_body = Box::pin(async move {
+        let (_, component_name) =
+            test.start_and_get_instance(&Moniker::root(), StartReason::Eager, true).await.unwrap();
+        let component_resolved_url = RoutingTest::resolved_url(&component_name);
+        let namespace = test.mock_runner.get_namespace(&component_resolved_url).unwrap();
+
+        // `b` is stopped.
+        let b = test.model.root().find_and_maybe_resolve(&"b".parse().unwrap()).await.unwrap();
+        _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+        assert!(!b.is_started());
+
+        // Open the capability.
+        let echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
+            &namespace,
+            &"/svc/echo".parse().unwrap(),
+        )
+        .await;
+
+        // `b` is still stopped.
+        _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+        assert!(!b.is_started());
+
+        // Unresolve b. This should drop the request from `a`.
+        b.unresolve().await.unwrap();
+
+        // Make a request which should fail.
+        echo_proxy.echo_string(Some("hippos")).await.expect_err("FIDL call should fail");
+        _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+        assert!(!b.is_started());
     });
     executor.run_until_stalled(&mut test_body).unwrap();
 }

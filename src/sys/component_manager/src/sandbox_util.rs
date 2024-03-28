@@ -23,7 +23,7 @@ use {
         epitaph::ChannelEpitaphExt,
         AsyncChannel,
     },
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx},
     futures::future::BoxFuture,
     futures::FutureExt,
@@ -31,6 +31,7 @@ use {
     std::iter,
     std::sync::Arc,
     tracing::warn,
+    vfs::execution_scope::ExecutionScope,
 };
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
@@ -335,13 +336,56 @@ impl Routable for Arc<LaunchTaskOnReceive> {
     }
 }
 
+/// Porcelain methods on [`Sendable`] objects.
+pub trait SendableExt: Sendable {
+    /// Returns a sender that waits until the channel is readable, then
+    /// sends the channel using the underlying sender. The wait is performed
+    /// in the provided `scope`.
+    fn on_readable(self, scope: ExecutionScope) -> Sender;
+}
+
+impl<T: Sendable + 'static> SendableExt for T {
+    fn on_readable(self, scope: ExecutionScope) -> Sender {
+        #[derive(Debug)]
+        struct OnReadableSender {
+            scope: ExecutionScope,
+            sender: Sender,
+        }
+
+        impl Sendable for OnReadableSender {
+            fn send(&self, message: Message) -> Result<(), ()> {
+                let sender = self.sender.clone();
+                self.scope.spawn(async move {
+                    let signals = fasync::OnSignals::new(
+                        &message.channel,
+                        zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,
+                    )
+                    .await;
+                    let Ok(signals) = signals else { return };
+                    // If readable, send the channel.
+                    // If peer-closed, there is no point sending the channel.
+                    if signals.contains(zx::Signals::CHANNEL_READABLE) {
+                        _ = sender.send(message);
+                    }
+                });
+                Ok(())
+            }
+        }
+
+        Sender::new_sendable(OnReadableSender { scope, sender: Sender::new_sendable(self) })
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use bedrock_error::DowncastErrorForTest;
     use cm_rust::Availability;
+    use fasync::pin_mut;
+    use fuchsia_async::TestExecutor;
     use sandbox::{Data, Receiver};
+    use std::task::Poll;
 
     #[fuchsia::test]
     async fn get_capability() {
@@ -507,5 +551,47 @@ pub mod tests {
             )
             .await;
         assert_matches!(cap, Ok(None));
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn on_readable_client_writes() {
+        let (receiver, sender) = Receiver::new();
+        let scope = ExecutionScope::new();
+        let sender = sender.on_readable(scope.clone());
+        let (client_end, server_end) = zx::Channel::create();
+        sender.send(sandbox::Message { channel: server_end }).unwrap();
+
+        let receive = receiver.receive();
+        pin_mut!(receive);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
+        assert_matches!(
+            TestExecutor::poll_until_stalled(Box::pin(scope.wait())).await,
+            Poll::Pending
+        );
+
+        client_end.write(&[0], &mut []).unwrap();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Ready(Some(_)));
+        scope.wait().await;
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn on_readable_client_closes() {
+        let (receiver, sender) = Receiver::new();
+        let scope = ExecutionScope::new();
+        let sender = sender.on_readable(scope.clone());
+        let (client_end, server_end) = zx::Channel::create();
+        sender.send(sandbox::Message { channel: server_end }).unwrap();
+
+        let receive = receiver.receive();
+        pin_mut!(receive);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
+        assert_matches!(
+            TestExecutor::poll_until_stalled(Box::pin(scope.clone().wait())).await,
+            Poll::Pending
+        );
+
+        drop(client_end);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
+        scope.wait().await;
     }
 }
