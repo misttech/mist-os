@@ -50,16 +50,20 @@ async fn test_budget() {
     env.create_puppet(VICTIM_PUPPET_ID).await;
     let expected = env.running_puppets[VICTIM_PUPPET_ID].emit_packet().await;
     let mut observed_logs = env.log_reader.snapshot_then_subscribe::<Logs>().unwrap();
-    let mut observed_logs_2 = env.log_reader.snapshot_then_subscribe::<Logs>().unwrap();
+    // split_streams is needed here to ensure parallel execution.
+    // If this isn't ran in parallel, the ordering required by this
+    // test never happens.
+    let (mut observed_logs_2, _errors) =
+        env.log_reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
     let msg_a = observed_logs.next().await.unwrap().unwrap();
-    let msg_a_2 = observed_logs_2.next().await.unwrap().unwrap();
+    let msg_a_2 = observed_logs_2.next().await.unwrap();
     assert_eq!(expected, msg_a);
     assert_eq!(expected, msg_a_2);
     for _ in 0..SPAM_COUNT {
         let last_msg = env.running_puppets[SPAM_PUPPET_ID].emit_packet().await;
         assert_eq!(last_msg, observed_logs.next().await.unwrap().unwrap());
     }
-    let log = observed_logs_2.skip(33).next().await.unwrap().unwrap();
+    let log = observed_logs_2.skip(33).next().await.unwrap();
     assert_eq!(log.rolled_out_logs(), Some(8907));
     let mut observed_logs = env.log_reader.snapshot::<Logs>().await.unwrap().into_iter();
     let msg_b = observed_logs.next().unwrap();

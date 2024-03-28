@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_data::{Data, LogsField};
-use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Logs, Subscription};
+use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Logs, SubscriptionResultsStream};
 use fidl_fuchsia_diagnostics::Severity;
 use fuchsia_async::{Task, Timer};
 use fuchsia_zircon::AsHandleRef as _;
@@ -123,15 +123,19 @@ impl LogEvent {
 }
 
 struct EventsFromLogs {
-    logs: Subscription<Data<Logs>>,
+    logs: SubscriptionResultsStream<Data<Logs>>,
     pid: u64,
 }
 
 impl EventsFromLogs {
     async fn new() -> Self {
         let reader = ArchiveReader::new();
+        // split_streams is needed here to ensure parallel execution.
+        // If this isn't ran in parallel, the ordering required by this
+        // test never happens.
+        let (logs, _errors) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
         let mut events = EventsFromLogs {
-            logs: reader.snapshot_then_subscribe::<Logs>().unwrap(),
+            logs,
             pid: fuchsia_runtime::process_self().get_koid().unwrap().raw_koid(),
         };
 
@@ -153,7 +157,7 @@ impl EventsFromLogs {
         let next = loop {
             // skip over logs from other processes. this ensures that logs messages from other test
             // cases do not interfere with the current test case.
-            let next = self.logs.next().await.unwrap().unwrap();
+            let next = self.logs.next().await.unwrap();
             if next.metadata.pid.unwrap() == self.pid {
                 break next;
             }

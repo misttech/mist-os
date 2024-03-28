@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use async_stream::stream;
 use bitflags::bitflags;
 use diagnostics_data::{DiagnosticsData, Metadata, MetadataError};
 use fidl_fuchsia_diagnostics::{
@@ -9,20 +10,20 @@ use fidl_fuchsia_diagnostics::{
     ClientSelectorConfiguration, Format, FormattedContent, PerformanceConfiguration, ReaderError,
     Selector, SelectorArgument, StreamMode, StreamParameters,
 };
-use fuchsia_async::{self as fasync, DurationExt, Task, TimeoutExt};
+use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_component::client;
+use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, Duration, DurationNum};
 use futures::{channel::mpsc, prelude::*, sink::SinkExt, stream::FusedStream};
 use pin_project::pin_project;
 use serde::Deserialize;
 use std::{
+    future::ready,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
 use thiserror::Error;
-
-use fuchsia_sync::Mutex;
 
 pub use diagnostics_data::{Data, Inspect, Logs, Severity};
 pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, Property};
@@ -430,13 +431,11 @@ impl ArchiveReader {
         T: for<'a> Deserialize<'a> + CheckResponse,
     {
         loop {
-            let mut result = Vec::new();
             let iterator = self.batch_iterator::<D>(StreamMode::Snapshot, format)?;
-            drain_batch_iterator(iterator, |d: T| {
-                result.push(d);
-                async {}
-            })
-            .await?;
+            let result = drain_batch_iterator::<T>(iterator)
+                .filter_map(|value| ready(value.ok()))
+                .collect::<Vec<_>>()
+                .await;
 
             if (self.retry_config.on_empty() && result.len() < self.minimum_schema_count)
                 || (self.retry_config.on_fully_filtered()
@@ -504,43 +503,42 @@ enum OneOrMany<T> {
     One(T),
 }
 
-async fn drain_batch_iterator<T, Fut>(
-    iterator: BatchIteratorProxy,
-    mut send: impl FnMut(T) -> Fut,
-) -> Result<(), Error>
+fn drain_batch_iterator<T>(iterator: BatchIteratorProxy) -> impl Stream<Item = Result<T, Error>>
 where
-    Fut: Future<Output = ()>,
     T: for<'a> Deserialize<'a>,
 {
-    loop {
-        let next_batch = iterator
-            .get_next()
-            .await
-            .map_err(Error::GetNextCall)?
-            .map_err(Error::GetNextReaderError)?;
-        if next_batch.is_empty() {
-            return Ok(());
-        }
-        for formatted_content in next_batch {
-            let output: OneOrMany<T> = match formatted_content {
-                FormattedContent::Json(data) => {
-                    let mut buf = vec![0; data.size as usize];
-                    data.vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
-                    serde_json::from_slice(&buf).map_err(Error::ReadJson)?
-                }
-                FormattedContent::Cbor(vmo) => {
-                    let mut buf =
-                        vec![0; vmo.get_content_size().expect("Always returns Ok") as usize];
-                    vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
-                    serde_cbor::from_slice(&buf).map_err(Error::ReadCbor)?
-                }
-                _ => OneOrMany::Many(vec![]),
-            };
-            match output {
-                OneOrMany::One(data) => send(data).await,
-                OneOrMany::Many(datas) => {
-                    for data in datas {
-                        send(data).await;
+    stream! {
+        loop {
+            let next_batch = iterator
+                .get_next()
+                .await
+                .map_err(Error::GetNextCall)?
+                .map_err(Error::GetNextReaderError)?;
+            if next_batch.is_empty() {
+                // End of stream
+                return;
+            }
+            for formatted_content in next_batch {
+                let output: OneOrMany<T> = match formatted_content {
+                    FormattedContent::Json(data) => {
+                        let mut buf = vec![0; data.size as usize];
+                        data.vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
+                        serde_json::from_slice(&buf).map_err(Error::ReadJson)?
+                    }
+                    FormattedContent::Cbor(vmo) => {
+                        let mut buf =
+                            vec![0; vmo.get_content_size().expect("Always returns Ok") as usize];
+                        vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
+                        serde_cbor::from_slice(&buf).map_err(Error::ReadCbor)?
+                    }
+                    _ => OneOrMany::Many(vec![]),
+                };
+                match output {
+                    OneOrMany::One(data) => yield Ok(data),
+                    OneOrMany::Many(datas) => {
+                        for data in datas {
+                            yield Ok(data);
+                        }
                     }
                 }
             }
@@ -551,8 +549,7 @@ where
 #[pin_project]
 pub struct Subscription<T> {
     #[pin]
-    recv: mpsc::Receiver<Result<T, Error>>,
-    _drain_task: Task<()>,
+    recv: Pin<Box<dyn FusedStream<Item = Result<T, Error>> + Send>>,
 }
 
 const DATA_CHANNEL_SIZE: usize = 32;
@@ -565,22 +562,7 @@ where
     /// Creates a new subscription stream to a batch iterator.
     /// The stream will return diagnostics data structures.
     pub fn new(iterator: BatchIteratorProxy) -> Self {
-        let (mut sender, recv) = mpsc::channel(DATA_CHANNEL_SIZE);
-        let _drain_task = Task::spawn(async move {
-            let drain_result = drain_batch_iterator(iterator, |d| {
-                let mut sender = sender.clone();
-                async move {
-                    sender.send(Ok(d)).await.ok();
-                }
-            })
-            .await;
-
-            if let Err(e) = drain_result {
-                sender.send(Err(e)).await.ok();
-            }
-        });
-
-        Subscription { recv, _drain_task }
+        Subscription { recv: Box::pin(drain_batch_iterator::<T>(iterator).fuse()) }
     }
 
     /// Splits the subscription into two separate streams: results and errors.
