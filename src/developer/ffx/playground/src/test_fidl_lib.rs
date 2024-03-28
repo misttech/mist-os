@@ -3,3 +3,4 @@
 // found in the LICENSE file.
 
 pub static TEST_FIDL: &'static str = include_str!("fidl.fidl.json");
+pub static FUCHSIA_IO_FIDL: &'static str = include_str!("fuchsia.io.fidl.json");

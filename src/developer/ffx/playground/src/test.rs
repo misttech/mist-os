@@ -2,19 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::{ClientEnd, Proxy};
 use fidl_codec::library as lib;
+use fidl_fuchsia_io as fio;
+use std::sync::Arc;
+use vfs::directory::helper::DirectlyMutable;
 
 use crate::interpreter::Interpreter;
 use crate::value::{PlaygroundValue, Value, ValueExt};
 
 /// Get an interpreter, optionally loaded up with the test FIDL info, and with
 /// its background task handed over to the executor and polling.
-async fn test_interpreter(with_fidl: bool) -> Interpreter {
+async fn test_interpreter(
+    with_fidl: bool,
+    with_dirs: Option<ClientEnd<fio::DirectoryMarker>>,
+) -> Interpreter {
     let mut ns = lib::Namespace::new();
     if with_fidl {
         ns.load(test_fidl::TEST_FIDL).unwrap();
+        ns.load(test_fidl::FUCHSIA_IO_FIDL).unwrap();
     }
-    let (fs_root, _server) = fidl::endpoints::create_endpoints();
+    let fs_root = with_dirs.unwrap_or_else(|| fidl::endpoints::create_endpoints().0);
     let (interpreter, fut) = Interpreter::new(ns, fs_root).await;
     fuchsia_async::Task::spawn(fut).detach();
 
@@ -23,31 +31,60 @@ async fn test_interpreter(with_fidl: bool) -> Interpreter {
 
 /// Helper for quickly testing a code snippet to see if it returns the correct
 /// value.
-struct Test {
-    test: &'static str,
+pub struct Test<T> {
+    test: T,
     with_fidl: bool,
+    with_dirs: Option<fidl::endpoints::ClientEnd<fio::DirectoryMarker>>,
 }
 
-impl Test {
+impl<T: AsRef<str>> Test<T> {
     /// Create a new test which will run the given Playground code.
-    fn test(test: &'static str) -> Self {
-        Test { test, with_fidl: false }
+    pub fn test(test: T) -> Self {
+        Test { test, with_fidl: false, with_dirs: None }
     }
 
     /// Load the FIDL test data into the interpreter before this test runs.
-    fn _with_fidl(mut self) -> Self {
+    pub fn with_fidl(mut self) -> Self {
         self.with_fidl = true;
         self
     }
 
+    /// Set `$fs_root` with a set of standard test directories.
+    pub fn with_standard_test_dirs(mut self) -> Self {
+        let simple = vfs::directory::mutable::simple();
+        let proxy = vfs::directory::spawn_directory(Arc::clone(&simple));
+        let test_subdir = vfs::directory::mutable::simple();
+        let foo_subdir = vfs::directory::mutable::simple();
+        test_subdir.add_entry("foo", foo_subdir).unwrap();
+        simple.add_entry("test", test_subdir).unwrap();
+        assert!(
+            self.with_dirs.replace(proxy.into_client_end().unwrap()).is_none(),
+            "Set directory root twice!"
+        );
+        self
+    }
+
     /// Run this test, check the output with the given closure.
-    async fn check(self, eval: impl Fn(Value)) {
-        eval(test_interpreter(self.with_fidl).await.run(self.test).await.unwrap())
+    pub async fn check(self, eval: impl Fn(Value)) {
+        eval(
+            test_interpreter(self.with_fidl, self.with_dirs)
+                .await
+                .run(self.test.as_ref())
+                .await
+                .unwrap(),
+        )
     }
 
     /// Run this test, check the output with the given closure, which may be a future.
-    async fn check_async<F: std::future::Future<Output = ()>>(self, eval: impl Fn(Value) -> F) {
-        eval(test_interpreter(self.with_fidl).await.run(self.test).await.unwrap()).await
+    pub async fn check_async<F: std::future::Future<Output = ()>>(self, eval: impl Fn(Value) -> F) {
+        eval(
+            test_interpreter(self.with_fidl, self.with_dirs)
+                .await
+                .run(self.test.as_ref())
+                .await
+                .unwrap(),
+        )
+        .await
     }
 }
 

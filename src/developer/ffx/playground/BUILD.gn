@@ -10,6 +10,7 @@ rustc_library("playground") {
   edition = "2021"
   with_unit_tests = true
   sources = [
+    "src/builtins.rs",
     "src/compiler.rs",
     "src/error.rs",
     "src/frame.rs",
@@ -36,11 +37,15 @@ rustc_library("playground") {
   test_deps = [
     ":test_fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-fs",
+    "//src/storage/lib/vfs/rust:vfs",
   ]
 }
 
 _test_fidl = get_label_info("//src/lib/fidl_codec:fidl($fidl_toolchain)",
                             "target_gen_dir")
+_io_fidl =
+    get_label_info("//sdk/fidl/fuchsia.io($fidl_toolchain)", "target_gen_dir")
 _test_fidl_gen_dir = get_label_info(":test_fidl", "target_gen_dir")
 
 copy("test_fidl_json") {
@@ -48,6 +53,12 @@ copy("test_fidl_json") {
   sources = [ "${_test_fidl}/fidl.fidl.json" ]
   outputs = [ "${_test_fidl_gen_dir}/fidl.fidl.json" ]
   deps = [ "//src/lib/fidl_codec:fidl($fidl_toolchain)" ]
+}
+
+copy("io_fidl_json") {
+  sources = [ "${_io_fidl}/fuchsia.io.fidl.json" ]
+  outputs = [ "${_test_fidl_gen_dir}/fuchsia.io.fidl.json" ]
+  deps = [ "//sdk/fidl/fuchsia.io($fidl_toolchain)" ]
 }
 
 copy("test_fidl_src") {
@@ -63,8 +74,12 @@ rustc_library("test_fidl") {
   source_root = "${_test_fidl_gen_dir}/test_fidl_lib.rs"
 
   sources = [ "${_test_fidl_gen_dir}/test_fidl_lib.rs" ]
-  inputs = [ "${_test_fidl_gen_dir}/fidl.fidl.json" ]
+  inputs = [
+    "${_test_fidl_gen_dir}/fidl.fidl.json",
+    "${_test_fidl_gen_dir}/fuchsia.io.fidl.json",
+  ]
   deps = [
+    ":io_fidl_json",
     ":test_fidl_json",
     ":test_fidl_src",
   ]

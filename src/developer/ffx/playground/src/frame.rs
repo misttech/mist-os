@@ -125,7 +125,7 @@ impl GlobalVariables {
     }
 
     /// Get the value of a global variable.
-    pub fn _get(&self, name: &str) -> impl Future<Output = Option<Result<Value>>> + 'static {
+    pub fn get(&self, name: &str) -> impl Future<Output = Option<Result<Value>>> + 'static {
         let fut =
             self.entries.get(name).map(|slot| FrameValue::get(Arc::clone(&slot.0.lock().unwrap())));
 
@@ -404,7 +404,7 @@ mod test {
             x.await;
         }
 
-        assert!(matches!(globals._get("foo").await.unwrap().unwrap(), Value::U8(5)));
-        assert!(matches!(globals._get("baz").await.unwrap().unwrap(), Value::U8(3)));
+        assert!(matches!(globals.get("foo").await.unwrap().unwrap(), Value::U8(5)));
+        assert!(matches!(globals.get("baz").await.unwrap().unwrap(), Value::U8(3)));
     }
 }

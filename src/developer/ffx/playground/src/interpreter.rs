@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::anyhow;
+use fidl::endpoints::Proxy;
 use fidl_codec::{library as lib, Value as FidlValue};
+use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded as unbounded_channel, UnboundedSender};
 use futures::channel::oneshot::{channel as oneshot_channel, Sender as OneshotSender};
 use futures::future::BoxFuture;
@@ -11,7 +13,7 @@ use futures::{Future, FutureExt, Stream, StreamExt};
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 
 use crate::compiler::Visitor;
 use crate::error::{Error, Result};
@@ -263,10 +265,117 @@ impl InterpreterInner {
             Ok(Value::Null)
         }
     }
+
+    /// Open a file in this interpreter's namespace.
+    pub async fn open(&self, path: String, fs_root: Value, pwd: Value) -> Result<Value> {
+        let Some(fs_root) = fs_root.to_in_use_handle() else {
+            return Err(error!("$fs_root is not a handle"));
+        };
+
+        let Value::String(pwd) = pwd else {
+            return Err(error!("$pwd is not a string"));
+        };
+
+        if !pwd.starts_with("/") {
+            return Err(error!("$pwd is not an absolute path"));
+        }
+
+        let sep = if pwd.ends_with("/") { "" } else { "/" };
+        let path = if path.starts_with("/") { path } else { format!("{pwd}{sep}{path}") };
+
+        if !fs_root
+            .get_client_protocol()
+            .ok()
+            .map(|x| self.lib_namespace().inherits(&x, "fuchsia.io/Directory"))
+            .unwrap_or(false)
+        {
+            return Err(error!("$fs_root is not a directory"));
+        }
+
+        let mut flags = fio::OpenFlags::DESCRIBE;
+        loop {
+            let (node, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>()?;
+
+            let request = FidlValue::Object(vec![
+                ("flags".to_owned(), FidlValue::U32(flags.bits())),
+                ("mode".to_owned(), FidlValue::U32(fio::ModeType::empty().bits())),
+                ("path".to_owned(), FidlValue::String(path.clone())),
+                (
+                    "object".to_owned(),
+                    FidlValue::ServerEnd(server.into_channel(), "fuchsia.io/Node".to_owned()),
+                ),
+            ]);
+
+            let (bytes, mut handles) = fidl_codec::encode_request(
+                self.lib_namespace(),
+                0,
+                "fuchsia.io/Directory",
+                "Open",
+                request,
+            )?;
+            fs_root.write_channel_etc(&bytes, &mut handles)?;
+
+            let event = node
+                .take_event_stream()
+                .next()
+                .await
+                .transpose()?
+                .ok_or_else(|| error!("Node shut down without sending any info"))?;
+
+            let fio::NodeEvent::OnOpen_ { s: _, info } = event else {
+                return Err(error!("Unexpected node event"));
+            };
+
+            let Some(info) = info else {
+                // Usually this precedes an error. Poll the channel and see if we can get the epitaph.
+                let ch = node.into_channel().unwrap();
+                let mut pumpkin1 = Vec::new();
+                let mut pumpkin2 = Vec::new();
+                futures::future::poll_fn(|cx| ch.read(cx, &mut pumpkin1, &mut pumpkin2)).await?;
+
+                // No error on the channel. No idea how we got here.
+                return Err(error!("OnOpen contained no node info"));
+            };
+
+            let proto = match &*info {
+                fio::NodeInfoDeprecated::File(_) => {
+                    if !flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+                        flags |= fio::OpenFlags::RIGHT_READABLE;
+                        continue;
+                    }
+                    "fuchsia.io/File".to_owned()
+                }
+                fio::NodeInfoDeprecated::Directory(_) => "fuchsia.io/Directory".to_owned(),
+                fio::NodeInfoDeprecated::Service(fio::Service) => {
+                    let end = path.rfind('/');
+
+                    if let Some(end) = end {
+                        let name = &path[end + 1..];
+                        if name.starts_with("fuchsia.") {
+                            let mut ret = name.to_owned();
+                            let dot = ret.rfind('.').unwrap();
+                            ret.replace_range(dot..dot + 1, "/");
+                            ret
+                        } else {
+                            "fuchsia.io/Node".to_owned()
+                        }
+                    } else {
+                        "fuchsia.io/Node".to_owned()
+                    }
+                }
+                fio::NodeInfoDeprecated::Symlink(_) => todo!(),
+            };
+
+            return Ok(Value::ClientEnd(
+                node.into_channel().expect("Could not tear down proxy").into_zx_channel(),
+                proto,
+            ));
+        }
+    }
 }
 
 pub struct Interpreter {
-    inner: Arc<InterpreterInner>,
+    pub(crate) inner: Arc<InterpreterInner>,
     global_variables: Mutex<GlobalVariables>,
 }
 
@@ -282,24 +391,27 @@ impl Interpreter {
     ) -> (Self, impl Future<Output = ()>) {
         let (task_sender, task_receiver) = unbounded_channel();
 
-        let inner = Arc::new(InterpreterInner {
-            lib_namespace,
-            task_sender,
-            channel_servers: Mutex::new(HashMap::new()),
-            tx_id_pool: AtomicU32::new(1),
-        });
-        let inner_weak = Arc::downgrade(&inner);
-
         let fs_root = Value::ClientEnd(fs_root.into_channel(), "fuchsia.io/Directory".to_owned());
-        let inner_weak_clone = inner_weak.clone();
         let mut global_variables = GlobalVariables::default();
         global_variables.define("fs_root".to_owned(), Ok(fs_root), Mutability::Mutable);
-        add_builtins(&mut global_variables, inner_weak_clone).await;
+        global_variables.define(
+            "pwd".to_owned(),
+            Ok(Value::String("/".to_owned())),
+            Mutability::Mutable,
+        );
+        let interpreter = Interpreter {
+            inner: Arc::new(InterpreterInner {
+                lib_namespace,
+                task_sender,
+                channel_servers: Mutex::new(HashMap::new()),
+                tx_id_pool: AtomicU32::new(1),
+            }),
+            global_variables: Mutex::new(global_variables),
+        };
+        let mut executor = task_receiver.for_each_concurrent(None, |x| x);
+        interpreter.add_builtins(&mut executor).await;
 
-        (
-            Interpreter { inner, global_variables: Mutex::new(global_variables) },
-            task_receiver.for_each_concurrent(None, |x| x),
-        )
+        (interpreter, executor)
     }
 
     /// Take a [`ReplayableIterator`], which is how the playground [`Value`]
@@ -331,6 +443,22 @@ impl Interpreter {
         receiver
     }
 
+    /// Compile the given code as an anonymous callable value in this
+    /// interpreter's scope, then return it as a Rust closure so you can call
+    /// the code repeatedly.
+    pub async fn get_runnable(
+        &self,
+        code: &str,
+    ) -> Result<impl (Fn() -> BoxFuture<'static, Result<Value>>) + Clone> {
+        let Value::OutOfLine(PlaygroundValue::Invocable(program)) =
+            self.run(format!("\\() {{ {code} }}").as_str()).await?
+        else {
+            unreachable!("Preamble didn't compile to invocable");
+        };
+
+        Ok(move || program.clone().invoke(vec![], None).boxed())
+    }
+
     /// Add a new command to the global environment.
     ///
     /// Creates a global variable with the given `name` in this interpreter's
@@ -338,13 +466,13 @@ impl Interpreter {
     /// given in `cmd`. The closure takes a list of arguments as [`Value`]s and
     /// an optional `Value` which is the current value of `$_`
     pub async fn add_command<
-        F: Fn(Box<[Value]>, Option<Value>) -> R + Send + Sync + 'static,
-        R: Future<Output = Result<Value>> + Send + Sync + 'static,
+        F: Fn(Vec<Value>, Option<Value>) -> R + Send + Sync + 'static,
+        R: Future<Output = Result<Value>> + Send + 'static,
     >(
         &self,
         name: &str,
         cmd: F,
-    ) {
+    ) -> Result<()> {
         let cmd = Arc::new(cmd);
         let cmd = move |args: Vec<Value>, underscore: Option<Value>| {
             let cmd = Arc::clone(&cmd);
@@ -357,6 +485,7 @@ impl Interpreter {
             Ok(Value::OutOfLine(PlaygroundValue::Invocable(Invocable::new(Arc::new(cmd))))),
             Mutability::Constant,
         );
+        Ok(())
     }
 
     /// Parse and run the given program in the context of this interpreter.
@@ -418,6 +547,13 @@ impl Interpreter {
         }
     }
 
+    /// Performs tab completion. Takes in a command string and the cursor
+    /// position (as a *character* offset) and returns a list of tuples of
+    /// strings to be inserted and where in the string they begin (as a
+    /// character offset again). The characters between the cursor position and
+    /// the beginning position given with the completion should be deleted
+    /// before the completion text is inserted in their place, and the cursor
+    /// should end up at the end of the completion text.
     pub async fn complete(&self, cmd: String, cursor_pos: usize) -> Vec<(String, usize)> {
         let mut ret = Vec::new();
         if cursor_pos != cmd.len() {
@@ -434,172 +570,16 @@ impl Interpreter {
 
         ret
     }
-}
 
-/// Adds built-in commands to the global scope of this interpreter.
-async fn add_builtins(root: &mut GlobalVariables, inner_weak: Weak<InterpreterInner>) {
-    use fidl::endpoints::Proxy;
-    use fidl_fuchsia_io as fio;
-    let frame = root.as_frame(1, |name| if name == "fs_root" { Some(0) } else { None });
-    let frame = Arc::new(frame);
-    let open = {
-        let inner_weak = inner_weak.clone();
-        Value::OutOfLine(PlaygroundValue::Invocable(Invocable::new(Arc::new(
-            move |mut args, _| {
-                let frame = Arc::clone(&frame);
-                let inner_weak = inner_weak.clone();
-                async move {
-                    let Some(inner) = inner_weak.upgrade() else {
-                        return Err(error!("Interpreter gone"));
-                    };
-                    let Some(arg) = args.pop() else {
-                        return Err(error!("open requires exactly one argument"));
-                    };
-                    if !args.is_empty() {
-                        return Err(error!("open requires exactly one argument"));
-                    }
+    /// Open a file in this interpreter's namespace.
+    pub async fn open(&self, path: String) -> Result<Value> {
+        let (fs_root, pwd) = {
+            let globals = self.global_variables.lock().unwrap();
+            (globals.get("fs_root"), globals.get("pwd"))
+        };
+        let fs_root = fs_root.await.ok_or_else(|| error!("$fs_root undefined"))??;
+        let pwd = pwd.await.ok_or_else(|| error!("$pwd undefined"))??;
 
-                    let path = match arg {
-                        Value::String(path) => path,
-                        _ => return Err(error!("open argument must be a path")),
-                    };
-
-                    let fs_root = frame.get(0).await?;
-
-                    let Some(fs_root) = fs_root.to_in_use_handle() else {
-                        return Err(error!("$fs_root is not a handle"));
-                    };
-
-                    if !fs_root
-                        .get_client_protocol()
-                        .ok()
-                        .map(|x| inner.lib_namespace().inherits(&x, "fuchsia.io/Directory"))
-                        .unwrap_or(false)
-                    {
-                        return Err(error!("$fs_root is not a directory"));
-                    }
-
-                    let mut flags = fio::OpenFlags::DESCRIBE;
-                    loop {
-                        let (node, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>()?;
-
-                        let request = FidlValue::Object(vec![
-                            ("flags".to_owned(), FidlValue::U32(flags.bits())),
-                            ("mode".to_owned(), FidlValue::U32(fio::ModeType::empty().bits())),
-                            ("path".to_owned(), FidlValue::String(path.clone())),
-                            (
-                                "object".to_owned(),
-                                FidlValue::ServerEnd(
-                                    server.into_channel(),
-                                    "fuchsia.io/Node".to_owned(),
-                                ),
-                            ),
-                        ]);
-
-                        let (bytes, mut handles) = fidl_codec::encode_request(
-                            inner.lib_namespace(),
-                            0,
-                            "fuchsia.io/Directory",
-                            "Open",
-                            request,
-                        )?;
-                        fs_root.write_channel_etc(&bytes, &mut handles)?;
-
-                        let event = node
-                            .take_event_stream()
-                            .next()
-                            .await
-                            .transpose()?
-                            .ok_or_else(|| error!("Node shut down without sending any info"))?;
-
-                        let fio::NodeEvent::OnOpen_ { s: _, info } = event else {
-                            return Err(error!("Unexpected node event"));
-                        };
-
-                        let Some(info) = info else {
-                            // Usually this precedes an error. Poll the channel and see if we can get the epitaph.
-                            let ch = node.into_channel().unwrap();
-                            let mut pumpkin1 = Vec::new();
-                            let mut pumpkin2 = Vec::new();
-                            futures::future::poll_fn(|cx| {
-                                ch.read(cx, &mut pumpkin1, &mut pumpkin2)
-                            })
-                            .await?;
-
-                            // No error on the channel. No idea how we got here.
-                            return Err(error!("OnOpen contained no node info"));
-                        };
-
-                        let proto = match &*info {
-                            fio::NodeInfoDeprecated::File(_) => {
-                                if !flags.contains(fio::OpenFlags::RIGHT_READABLE) {
-                                    flags |= fio::OpenFlags::RIGHT_READABLE;
-                                    continue;
-                                }
-                                "fuchsia.io/File".to_owned()
-                            }
-                            fio::NodeInfoDeprecated::Directory(_) => {
-                                "fuchsia.io/Directory".to_owned()
-                            }
-                            fio::NodeInfoDeprecated::Service(fio::Service) => {
-                                let end = path.rfind('/');
-
-                                if let Some(end) = end {
-                                    let name = &path[end + 1..];
-                                    if name.starts_with("fuchsia.") {
-                                        let mut ret = name.to_owned();
-                                        let dot = ret.rfind('.').unwrap();
-                                        ret.replace_range(dot..dot + 1, "/");
-                                        ret
-                                    } else {
-                                        "fuchsia.io/Node".to_owned()
-                                    }
-                                } else {
-                                    "fuchsia.io/Node".to_owned()
-                                }
-                            }
-                            fio::NodeInfoDeprecated::Symlink(_) => todo!(),
-                        };
-
-                        return Ok(Value::ClientEnd(
-                            node.into_channel()
-                                .expect("Could not tear down proxy")
-                                .into_zx_channel(),
-                            proto,
-                        ));
-                    }
-                }
-                .boxed()
-            },
-        ))))
-    };
-    root.define("open", Ok(open), Mutability::Constant);
-
-    let req = {
-        let inner_weak = inner_weak.clone();
-        Value::OutOfLine(PlaygroundValue::Invocable(Invocable::new(Arc::new(
-            move |mut args, under| {
-                let inner_weak = inner_weak.clone();
-                async move {
-                    let Some(inner) = inner_weak.upgrade() else {
-                        return Err(error!("Interpreter died"));
-                    };
-
-                    if args.len() != 1 {
-                        return Err(error!("req takes exactly one argument"));
-                    }
-
-                    let closure = args.pop().unwrap();
-
-                    let (server, client) = InUseHandle::new_endpoints();
-                    let server = Value::OutOfLine(PlaygroundValue::InUseHandle(server));
-                    let client = Value::OutOfLine(PlaygroundValue::InUseHandle(client));
-                    let _ = inner.invoke_value(closure, vec![server], under).await?;
-                    Ok(client)
-                }
-                .boxed()
-            },
-        ))))
-    };
-    root.define("req", Ok(req), Mutability::Constant);
+        self.inner.open(path, fs_root, pwd).await
+    }
 }
