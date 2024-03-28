@@ -1100,6 +1100,10 @@ where
             driver_state.set_dhcpv6_pd_enabled(dhcpv6_pd_enabled);
         }
 
+        if let Some(dns_upstream_query_enabled) = config.dns_upstream_query_enabled {
+            driver_state.ot_instance.dnssd_upstream_query_set_enabled(dns_upstream_query_enabled);
+        }
+
         if let Err(e) = driver_state.detailed_logging.process_detailed_logging_set(
             config.detailed_logging_enabled,
             config.detailed_logging_level.map(|level| level.into()),

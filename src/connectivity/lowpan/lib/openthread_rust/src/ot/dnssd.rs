@@ -311,6 +311,10 @@ pub trait Dnssd {
     /// Functional equivalent of
     /// [`otsys::otDnssdUpstreamQueryIsEnabled`](crate::otsys::otDnssdUpstreamQueryIsEnabled)
     fn dnssd_upstream_query_is_enabled(&self) -> bool;
+
+    /// Functional equivalent of
+    /// [`otsys::otDnssdUpstreamQuerySetEnabled`](crate::otsys::otDnssdUpstreamQuerySetEnabled)
+    fn dnssd_upstream_query_set_enabled(&self, enabled: bool);
 }
 
 impl<T: Dnssd + Boxable> Dnssd for ot::Box<T> {
@@ -365,6 +369,10 @@ impl<T: Dnssd + Boxable> Dnssd for ot::Box<T> {
 
     fn dnssd_upstream_query_is_enabled(&self) -> bool {
         self.as_ref().dnssd_upstream_query_is_enabled()
+    }
+
+    fn dnssd_upstream_query_set_enabled(&self, enabled: bool) {
+        self.as_ref().dnssd_upstream_query_set_enabled(enabled)
     }
 }
 
@@ -504,6 +512,10 @@ impl Dnssd for Instance {
 
     fn dnssd_upstream_query_is_enabled(&self) -> bool {
         unsafe { otDnssdUpstreamQueryIsEnabled(self.as_ot_ptr()) }
+    }
+
+    fn dnssd_upstream_query_set_enabled(&self, enabled: bool) {
+        unsafe { otDnssdUpstreamQuerySetEnabled(self.as_ot_ptr(), enabled) }
     }
 }
 
