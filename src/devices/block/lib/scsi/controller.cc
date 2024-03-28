@@ -329,6 +329,25 @@ zx_status_t Controller::StartStopUnit(uint8_t target, uint16_t lun, bool immed,
   return status;
 }
 
+zx_status_t Controller::FormatUnit(uint8_t target, uint16_t lun) {
+  FormatUnitCDB cdb = {};
+  cdb.opcode = Opcode::FORMAT_UNIT;
+  cdb.set_fmtpinfo(0);      // Currently, only supports type 0 protection.
+  cdb.set_fmtdata(false);   // Currently, we do not send the parameter list.
+  cdb.set_longlist(false);  // If the FMTDATA is set to zero, then the LONGLIST shall be ignored.
+  cdb.set_cmplst(false);    // If the FMTDATA is set to zero, then the CMPLST shall be ignored.
+  // If the FMTDATA is set to zero, then the DEFECT_LIST_FORMAT is not available.
+  cdb.set_defect_list_format(0);
+
+  zx_status_t status =
+      ExecuteCommandSync(target, lun, {&cdb, sizeof(cdb)}, /*is_write=*/false, {nullptr, 0});
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "FORMAT UNIT failed for target %u, lun %u: %s", target, lun,
+           zx_status_get_string(status));
+  }
+  return status;
+}
+
 zx::result<uint32_t> Controller::ScanAndBindLogicalUnits(zx_device_t* device, uint8_t target,
                                                          uint32_t max_transfer_bytes,
                                                          uint16_t max_lun, LuCallback lu_callback,

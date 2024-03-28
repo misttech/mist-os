@@ -669,6 +669,96 @@ struct WriteBufferCDB {
 
 static_assert(sizeof(WriteBufferCDB) == 10, "Write Buffer CDB must be 10 bytes");
 
+// SBC-3, section 5.3 "FORMAT UNIT command".
+struct FormatUnitCDB {
+  Opcode opcode;
+  uint8_t parameters;
+  uint8_t vendor_specific;
+  uint16_t obsolete;
+  uint8_t control;
+
+  DEF_SUBFIELD(parameters, 7, 6, fmtpinfo);  // Format protection information
+  DEF_SUBBIT(parameters, 5, longlist);       // Long list
+  DEF_SUBBIT(parameters, 4, fmtdata);        // Format data
+  DEF_SUBBIT(parameters, 3, cmplst);         // Complete list
+  DEF_SUBFIELD(parameters, 2, 0, defect_list_format);
+} __PACKED;
+
+static_assert(sizeof(FormatUnitCDB) == 6, "Format Unit CDB must be 6 bytes");
+
+struct FormatUnitShortParameterListHeader {
+  uint8_t reserved_and_protection_field_usage;
+  // fov_and_format_option_bits  (7) is 'FOV (Format options valid)'
+  // fov_and_format_option_bits  (6) is 'DPRY (Disable primary)'
+  // fov_and_format_option_bits  (5) is 'DCRT (Disable certification)'
+  // fov_and_format_option_bits  (4) is 'STPF (Stop format)'
+  // fov_and_format_option_bits  (3) is 'IP (Initialization pattern)'
+  // fov_and_format_option_bits  (2) is 'Obsolete'
+  // fov_and_format_option_bits  (1) is 'Immed'
+  // fov_and_format_option_bits  (0) is 'Vendor specific'
+  uint8_t fov_and_format_option_bits;
+  uint16_t defect_list_length;
+
+  DEF_SUBFIELD(reserved_and_protection_field_usage, 2, 0, protection_field_usage);
+  DEF_SUBBIT(fov_and_format_option_bits, 7, fov);
+  DEF_SUBBIT(fov_and_format_option_bits, 6, dpry);
+  DEF_SUBBIT(fov_and_format_option_bits, 5, dcrt);
+  DEF_SUBBIT(fov_and_format_option_bits, 4, stpf);
+  DEF_SUBBIT(fov_and_format_option_bits, 3, ip);
+  DEF_SUBBIT(fov_and_format_option_bits, 2, obsolete);
+  DEF_SUBBIT(fov_and_format_option_bits, 1, immed);
+  DEF_SUBBIT(fov_and_format_option_bits, 0, vendor_specific);
+} __PACKED;
+
+static_assert(sizeof(FormatUnitShortParameterListHeader) == 4,
+              "Format Unit Short Parameter List Header must be 4 bytes");
+
+struct FormatUnitLongParameterListHeader {
+  uint8_t reserved_and_protection_field_usage;
+  // fov_and_format_option_bits  (7) is 'FOV (Format options valid)'
+  // fov_and_format_option_bits  (6) is 'DPRY (Disable primary)'
+  // fov_and_format_option_bits  (5) is 'DCRT (Disable certification)'
+  // fov_and_format_option_bits  (4) is 'STPF (Stop format)'
+  // fov_and_format_option_bits  (3) is 'IP (Initialization pattern)'
+  // fov_and_format_option_bits  (2) is 'Obsolete'
+  // fov_and_format_option_bits  (1) is 'Immed'
+  // fov_and_format_option_bits  (0) is 'Vendor specific'
+  uint8_t fov_and_format_option_bits;
+  uint8_t reserved;
+  // information_and_protection_interval_exponent (7 downto 4) is 'P_I_INFORMATION'
+  // information_and_protection_interval_exponent (3 downto 0) is 'PROTECTION INTERVAL EXPONENT'
+  uint8_t information_and_protection_interval_exponent;
+  uint32_t defect_list_length;
+
+  DEF_SUBFIELD(reserved_and_protection_field_usage, 2, 0, protection_field_usage);
+  DEF_SUBBIT(fov_and_format_option_bits, 7, fov);
+  DEF_SUBBIT(fov_and_format_option_bits, 6, dpry);
+  DEF_SUBBIT(fov_and_format_option_bits, 5, dcrt);
+  DEF_SUBBIT(fov_and_format_option_bits, 4, stpf);
+  DEF_SUBBIT(fov_and_format_option_bits, 3, ip);
+  DEF_SUBBIT(fov_and_format_option_bits, 2, obsolete);
+  DEF_SUBBIT(fov_and_format_option_bits, 1, immed);
+  DEF_SUBBIT(fov_and_format_option_bits, 0, vendor_specific);
+  DEF_SUBFIELD(information_and_protection_interval_exponent, 7, 4, p_i_information);
+  DEF_SUBFIELD(information_and_protection_interval_exponent, 3, 0, protection_interval_exponent);
+} __PACKED;
+
+static_assert(sizeof(FormatUnitLongParameterListHeader) == 8,
+              "Format Unit Long Parameter List Header must be 8 bytes");
+
+struct FormatUnitInitializationPatternDescriptor {
+  // security_initialize (5) is 'SI (Security initialize)'
+  uint8_t security_initialize;
+  uint8_t initialization_pattern_type;
+  uint16_t initialization_pattern_length;
+  uint8_t initialization_pattern[];
+
+  DEF_SUBBIT(security_initialize, 5, si);
+} __PACKED;
+
+static_assert(sizeof(FormatUnitInitializationPatternDescriptor) == 4,
+              "Format Unit Initialization Pattern Descriptor must be 4 bytes");
+
 struct DiskOp;
 struct DiskOptions;
 
@@ -745,6 +835,10 @@ class Controller {
   zx_status_t StartStopUnit(uint8_t target, uint16_t lun, bool immed,
                             PowerCondition power_condition, uint8_t modifier = 0,
                             std::optional<bool> load_or_unload = std::nullopt);
+
+  // Format the selected LU. Currently only supports type 0 protection, FMTDATA=0 (mandatory), and
+  // does not send a parameter list.
+  zx_status_t FormatUnit(uint8_t target, uint16_t lun);
 
   // Check the status of each LU and bind it. This function returns the number of LUs found.
   zx::result<uint32_t> ScanAndBindLogicalUnits(zx_device_t* device, uint8_t target,
