@@ -15,7 +15,7 @@ TOUCH_APP = (
 )
 
 
-class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
+class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
     """Input Benchmarks.
 
     Attributes:

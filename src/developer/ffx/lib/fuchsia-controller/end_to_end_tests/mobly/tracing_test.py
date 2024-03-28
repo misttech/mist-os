@@ -20,7 +20,7 @@ from mobly_controller.fuchsia_device import asynctest
 TRACE2JSON = "tracing_runtime_deps/trace2json"
 
 
-class FuchsiaControllerTests(base_test.BaseTestClass):  # type: ignore
+class FuchsiaControllerTests(base_test.BaseTestClass):
     def setup_class(self) -> None:
         self.fuchsia_devices: list[
             fuchsia_device.FuchsiaDevice

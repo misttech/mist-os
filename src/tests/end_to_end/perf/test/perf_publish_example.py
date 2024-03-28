@@ -13,7 +13,7 @@ from mobly import test_runner
 import perf_publish.publish as publish
 
 
-class ExampleMetricPublishing(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
+class ExampleMetricPublishing(fuchsia_base_test.FuchsiaBaseTest):
     """Example perf metric publishing tests"""
 
     def test_example_metric_publishing(self) -> None:

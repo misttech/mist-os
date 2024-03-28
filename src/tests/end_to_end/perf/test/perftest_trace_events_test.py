@@ -10,7 +10,7 @@ from mobly import asserts, test_runner
 from trace_processing import trace_importing, trace_utils, trace_model
 
 
-class PerfTestTraceEventsTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
+class PerfTestTraceEventsTest(fuchsia_base_test.FuchsiaBaseTest):
     def setup_test(self) -> None:
         super().setup_test()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]

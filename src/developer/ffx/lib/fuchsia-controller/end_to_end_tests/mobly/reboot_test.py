@@ -13,7 +13,7 @@ from mobly_controller import fuchsia_device
 from mobly_controller.fuchsia_device import asynctest
 
 
-class FuchsiaControllerTests(base_test.BaseTestClass):  # type: ignore
+class FuchsiaControllerTests(base_test.BaseTestClass):
     def setup_class(self) -> None:
         self.fuchsia_devices: typing.List[
             fuchsia_device.FuchsiaDevice

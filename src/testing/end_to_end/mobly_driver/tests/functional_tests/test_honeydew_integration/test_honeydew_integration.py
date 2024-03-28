@@ -14,7 +14,7 @@ from mobly import test_runner
 from mobly_controller import fuchsia_device
 
 
-class MoblyDriverHoneydewIntegrationTest(base_test.BaseTestClass):  # type: ignore[misc]
+class MoblyDriverHoneydewIntegrationTest(base_test.BaseTestClass):
     """Mobly Driver Honeydew integration tests."""
 
     def test_mobly_controller_init(self) -> None:

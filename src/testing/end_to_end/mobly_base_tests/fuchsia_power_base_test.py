@@ -22,7 +22,7 @@ from mobly import test_runner
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
+class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
     """Fuchsia power measurement base test class.
 
     Single device test with power measurement.

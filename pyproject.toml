@@ -34,19 +34,16 @@ ignore_missing_imports = true
 # type checking. Re enable this flag for stricter checking in the future.
 warn_return_any = false
 
+# TODO(b/331504010): Address subclass Type Errors in Tests
+# To handle `error: Class cannot subclass "FuchsiaBaseTest" (has type "Any")  [misc]`
+# More info @ https://github.com/python/mypy/issues/9318
+disallow_subclassing_any = false
+
 # 'yaml' module imports aren't working with the global
 # 'ignore_missing_imports' flag. Overriding using overridesr entry.
 [[tool.mypy.overrides]]
 module = "yaml"
 ignore_missing_imports = true
-
-# The below overrides are for Honeydew modules.
-[[tool.mypy.overrides]]
-# TODO(b/326472322):  Investigate Honeydew module import failure with full path
-module = "tests.functional_tests.*"
-# To handle `error: Class cannot subclass "FuchsiaBaseTest" (has type "Any")  [misc]`
-# More info @ https://github.com/python/mypy/issues/9318
-disallow_subclassing_any = false
 
 [[tool.mypy.overrides]]
 # TODO(b/326472322):  Investigate Honeydew module import failure with full path

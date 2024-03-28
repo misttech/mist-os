@@ -49,7 +49,7 @@ ITERATIONS_PER_TEST_PER_PROCESS: int = 120
 PROCESS_RUNS: int = 6
 
 
-class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
+class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
     def setup_test(self) -> None:
         super().setup_test()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]

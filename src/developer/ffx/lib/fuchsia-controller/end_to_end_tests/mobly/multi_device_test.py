@@ -110,7 +110,7 @@ class BluetoothDevice(object):
         self.peer_update_task = None
 
 
-class MultiDeviceTest(base_test.BaseTestClass):  # type: ignore
+class MultiDeviceTest(base_test.BaseTestClass):
     def _setup_device(
         self, device: fuchsia_device.FuchsiaDevice
     ) -> BluetoothDevice:

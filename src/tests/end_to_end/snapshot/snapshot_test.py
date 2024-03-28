@@ -23,7 +23,7 @@ from fuchsia_base_test import fuchsia_base_test
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class SnapshotTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
+class SnapshotTest(fuchsia_base_test.FuchsiaBaseTest):
     def setup_class(self) -> None:
         """Initialize all DUT(s)"""
         super().setup_class()

@@ -214,7 +214,7 @@ class IperfServer:
             f.write(output)
 
 
-class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
+class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
     def setup_test(self) -> None:
         super().setup_test()
         self._device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]

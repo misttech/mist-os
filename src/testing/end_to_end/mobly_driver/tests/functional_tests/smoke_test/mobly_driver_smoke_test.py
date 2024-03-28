@@ -25,7 +25,7 @@ from mobly import test_runner
 import fuchsia_device
 
 
-class MoblyDriverSmokeTest(base_test.BaseTestClass):  # type: ignore[misc]
+class MoblyDriverSmokeTest(base_test.BaseTestClass):
     """Mobly Driver smoke tests."""
 
     def test_mobly_controller_init(self) -> None:

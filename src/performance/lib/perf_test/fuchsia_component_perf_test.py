@@ -15,7 +15,7 @@ from perf_test_utils import utils
 from mobly import test_runner
 
 
-class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
+class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
     """
     Mobly test class allowing to run a test component and publish its fuchsiaperf data.
 

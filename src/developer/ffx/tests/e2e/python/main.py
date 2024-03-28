@@ -17,7 +17,7 @@ import honeydew
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class FfxTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
+class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
     """FFX host tool E2E test."""
 
     def setup_class(self) -> None:

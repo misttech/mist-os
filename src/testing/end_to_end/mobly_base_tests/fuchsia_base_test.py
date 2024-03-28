@@ -31,7 +31,7 @@ class SnapshotOn(enum.Enum):
     ON_FAIL = enum.auto()
 
 
-class FuchsiaBaseTest(base_test.BaseTestClass):  # type: ignore[misc]
+class FuchsiaBaseTest(base_test.BaseTestClass):
     """Fuchsia base test class.
 
     Attributes:
