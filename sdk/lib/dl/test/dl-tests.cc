@@ -27,9 +27,15 @@ using TestTypes = ::testing::Types<
 #ifdef __Fuchsia__
     dl::testing::DlImplTests<dl::testing::TestFuchsia>,
 #endif
+// TODO(https://fxbug.dev/324650368): Test fixtures currently retrieve files
+// from different prefixed locations depending on the platform. Find a way
+// to use a singular API to return the prefixed path specific to the platform so
+// that the TestPosix fixture can run on Fuchsia as well.
+#ifndef __Fuchsia__
     // libdl's POSIX test fixture can also be tested on Fuchsia and is included
     // for any ELF supported host.
     dl::testing::DlImplTests<dl::testing::TestPosix>,
+#endif
 #endif
     dl::testing::DlSystemTests>;
 
@@ -132,6 +138,15 @@ TYPED_TEST(DlTests, InvalidMode) {
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value().take_str(), "invalid mode parameter")
       << "for mode argument " << bad_mode;
+}
+
+TYPED_TEST(DlTests, Basic) {
+  // TODO(https://fxbug.dev/323418587): For now, just check that we got a
+  // non-null pointer back from dlopen. A subsequent CL will check that the
+  // module was loaded correctly with dlsym().
+  auto result = this->DlOpen("libld-dep-c.so", RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.value());
 }
 
 }  // namespace

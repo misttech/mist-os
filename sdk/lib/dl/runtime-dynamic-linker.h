@@ -65,14 +65,14 @@ class RuntimeDynamicLinker {
       return fit::ok(already_loaded.value());
     }
 
-    // TODO(https://fxbug.dev/323418587): This will eventually be moved into a
-    // Module::Load() function, which will create the permanent Module data
-    // structure in association with a LoadModule. For now, just create a new
-    // module so we can return it from this function.
+    // A Module for `file` does not yet exist, so allocate one now to be passed
+    // to the LoadModule created below. This allocation occurs before retrieving
+    // the file and initializing a diagnostics object so as to return an
+    // OutOfMemory error early if one occurs.
     fbl::AllocChecker ac;
     auto module = Module::Create(Soname{file}, ac);
-    if (module.is_error()) [[unlikely]] {
-      return module.take_error();
+    if (!module) [[unlikely]] {
+      return Error::OutOfMemory();
     }
 
     // TODO(https://fxbug.dev/324650368): implement file retrieval interfaces.
@@ -80,13 +80,24 @@ class RuntimeDynamicLinker {
     // are generated on this module directly, its name does not need to be
     // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
     dl::Diagnostics diag;
-    auto lookup = OSImpl::RetrieveFile(diag, module.value()->name().str());
+    auto lookup = OSImpl::RetrieveFile(diag, file);
     if (!lookup) [[unlikely]] {
       return diag.take_error();
     }
 
-    loaded_modules_.push_back(*std::move(module));
-    return diag.ok(&loaded_modules_.back());
+    LoadModule<OSImpl> load_module{*std::move(module)};
+    if (!load_module.Load(diag, std::move(lookup.value()))) [[unlikely]] {
+      return diag.take_error();
+    }
+
+    // TODO(caslyn): these are actions needed to finish loading the module and
+    // return its reference back to the caller, but are not meant to be invoked
+    // directly by this function. These will be abstracted away eventually.
+    auto loaded_module = std::move(load_module).take_module();
+    Module* module_ref = loaded_module.get();
+    loaded_modules_.push_back(std::move(loaded_module));
+
+    return diag.ok(module_ref);
   }
 
  private:

@@ -52,6 +52,16 @@ class DiagnosticsReport : public ld::ModuleDiagnosticsPrintfReportBase<Diagnosti
   }
 
  private:
+  friend class Diagnostics;
+
+  // Report an out of memory error in the event of an allocation failure.
+  // Similar to `ok(...)`, this asserts no prior Diagnostics API calls have been
+  // made and the object is considered moved-from after this call.
+  auto OutOfMemory() {
+    error_.DisarmAndAssertUnused();
+    return Error::OutOfMemory();
+  }
+
   Error error_;
 };
 
@@ -72,7 +82,7 @@ class Diagnostics : public elfldltl::Diagnostics<DiagnosticsReport, DiagnosticsF
 
   // If something using the Diagnostics template API has returned false to
   // propagate a Diagnostics return, then this can be called to close out the
-  // Diagnostics object as in DiagnosticsReport (above(.
+  // Diagnostics object as in DiagnosticsReport (above).
   auto take_error() { return report().take_error(); }
 
   // This is used in lieu of plain fit::ok(...) to indicate the state has been
@@ -89,6 +99,10 @@ class Diagnostics : public elfldltl::Diagnostics<DiagnosticsReport, DiagnosticsF
   std::true_type FormatWarning(Args&&... args) {
     return {};
   }
+
+  // Reports an out of memory error and makes it safe to destroy this object,
+  // as in DiagnosticsReport.
+  auto OutOfMemory() { return report().OutOfMemory(); }
 };
 
 }  // namespace dl
