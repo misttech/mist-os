@@ -14,16 +14,17 @@ ffx_plugin("ffx_product_lookup") {
   sources = [ "src/lib.rs" ]
 
   deps = [
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pbms:lib",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/plugins/product/common:lib",
     "//src/developer/ffx/plugins/product/list:ffx_product_list",
     "//src/lib/structured_ui",
-    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//src/lib/testing/temp_test_env",
     "//third_party/rust_crates:serde_json",
   ]

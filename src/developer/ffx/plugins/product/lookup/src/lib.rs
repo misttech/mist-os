@@ -5,43 +5,82 @@
 //! A tool to:
 //! - lookup product bundle description information to find the transfer URL.
 
-use anyhow::Result;
-use ffx_core::ffx_plugin;
+use ffx_product::{CommandStatus, MachineOutput, MachineUi};
 use ffx_product_list::{pb_list_impl, ProductBundle};
 use ffx_product_lookup_args::LookupCommand;
-use ffx_writer::Writer;
+use fho::{bug, return_user_error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter};
 use pbms::AuthFlowChoice;
-use std::io::{stderr, stdin, stdout, Write};
+use std::io::{stdin, stdout, Write};
 
-/// `ffx product lookup` sub-command.
-#[ffx_plugin()]
-pub async fn pb_lookup(
+#[derive(FfxTool)]
+pub struct PbLookupTool {
+    #[command]
     cmd: LookupCommand,
-    #[ffx(machine = ProductBundle)] mut writer: Writer,
-) -> Result<()> {
-    let mut input = stdin();
-    // Emit machine progress info to stderr so users can redirect it to /dev/null.
-    let mut output = if writer.is_machine() {
-        Box::new(stderr()) as Box<dyn Write + Send + Sync>
-    } else {
-        Box::new(stdout())
-    };
-    let mut err_out = stderr();
-    let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    let product = pb_lookup_impl(&cmd.auth, cmd.base_url, &cmd.name, &cmd.version, &ui).await?;
-    // Don't emit progress information if we're writing a machine
-    // representation.
-    if writer.is_machine() {
-        writer.machine(&product)?;
-    } else {
-        writeln!(writer, "{}", product.transfer_manifest_url)?;
+}
+
+fho::embedded_plugin!(PbLookupTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for PbLookupTool {
+    type Writer = VerifiedMachineWriter<MachineOutput<ProductBundle>>;
+    async fn main(self, writer: Self::Writer) -> Result<()> {
+        if writer.is_machine() {
+            self.do_machine_main(writer).await
+        } else {
+            self.do_text_main(writer).await
+        }
     }
-    Ok(())
+}
+
+impl PbLookupTool {
+    async fn do_machine_main(&self, writer: <PbLookupTool as fho::FfxMain>::Writer) -> Result<()> {
+        let ui = MachineUi::new(writer);
+
+        match pb_lookup_impl(
+            &self.cmd.auth,
+            &self.cmd.base_url,
+            &self.cmd.name,
+            &self.cmd.version,
+            &ui,
+        )
+        .await
+        {
+            Ok(product_bundle) => {
+                ui.machine(MachineOutput::Data(product_bundle))?;
+                return Ok(());
+            }
+
+            Err(e) => {
+                ui.machine(MachineOutput::CommandStatus(CommandStatus::UnexpectedError {
+                    message: e.to_string(),
+                }))?;
+                return Err(e.into());
+            }
+        }
+    }
+
+    async fn do_text_main(&self, mut writer: <PbLookupTool as fho::FfxMain>::Writer) -> Result<()> {
+        let mut output = stdout();
+        let mut err_out = writer.stderr();
+        let mut input = stdin();
+        let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+        let product = pb_lookup_impl(
+            &self.cmd.auth,
+            &self.cmd.base_url,
+            &self.cmd.name,
+            &self.cmd.version,
+            &ui,
+        )
+        .await?;
+
+        writeln!(writer, "{}", product.transfer_manifest_url).map_err(|e| bug!("{e}"))?;
+        Ok(())
+    }
 }
 
 pub async fn pb_lookup_impl<I>(
     auth: &AuthFlowChoice,
-    override_base_url: Option<String>,
+    override_base_url: &Option<String>,
     name: &str,
     version: &str,
     ui: &I,
@@ -53,7 +92,7 @@ where
     tracing::info!("---------------------- Lookup Begin ----------------------------");
 
     let products =
-        pb_list_impl(auth, override_base_url, Some(version.to_string()), None, ui).await?;
+        pb_list_impl(auth, override_base_url.clone(), Some(version.to_string()), None, ui).await?;
 
     tracing::debug!("Looking for product bundle {}, version {}", name, version);
     let mut products = products
@@ -64,16 +103,14 @@ where
 
     let Some(product) = products.next() else {
         tracing::debug!("products {:?}", products);
-        eprintln!("Error: No product matching name {}, version {} found.", name, version);
-        std::process::exit(1);
+        return_user_error!("Error: No product matching name {}, version {} found.", name, version);
     };
 
     if products.next().is_some() {
         tracing::debug!("products {:?}", products);
-        eprintln!(
+        return_user_error!(
             "More than one matching product found. The base-url may have poorly formed data."
         );
-        std::process::exit(1);
     }
 
     tracing::debug!("Total ffx product lookup runtime {} seconds.", start.elapsed().as_secs_f32());
@@ -84,11 +121,15 @@ where
 
 #[cfg(test)]
 mod test {
-    use {super::*, ffx_writer::Format, temp_test_env::TempTestEnv};
+    use {
+        super::*,
+        fho::{Format, TestBuffers},
+        temp_test_env::TempTestEnv,
+    };
 
     const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_pb_lookup_impl() {
         let test_env = TempTestEnv::new().expect("test_env");
         let mut f =
@@ -106,7 +147,7 @@ mod test {
         let ui = structured_ui::MockUi::new();
         let product = pb_lookup_impl(
             &AuthFlowChoice::Default,
-            Some(format!("file:{}", test_env.home.display())),
+            &Some(format!("file:{}", test_env.home.display())),
             "fake_name",
             "fake_version",
             &ui,
@@ -124,7 +165,7 @@ mod test {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_bp_lookup_machine_mode() {
         let test_env = TempTestEnv::new().expect("test_env");
         let mut f =
@@ -139,27 +180,25 @@ mod test {
         )
         .expect("write_all");
 
-        let writer = Writer::new_test(Some(Format::Json));
-        let () = pb_lookup(
-            LookupCommand {
+        let buffers = TestBuffers::default();
+        let writer = VerifiedMachineWriter::new_test(Some(Format::Json), &buffers);
+        let tool = PbLookupTool {
+            cmd: LookupCommand {
                 auth: AuthFlowChoice::Default,
                 base_url: Some(format!("file:{}", test_env.home.display())),
                 name: "fake_name".into(),
                 version: "fake_version".into(),
             },
-            writer.clone(),
-        )
-        .await
-        .expect("testing lookup");
+        };
 
-        let product: ProductBundle = serde_json::from_str(&writer.test_output().unwrap()).unwrap();
-        assert_eq!(
-            product,
-            ProductBundle {
-                name: "fake_name".into(),
-                product_version: "fake_version".into(),
-                transfer_manifest_url: "fake_url".into(),
-            },
-        );
+        tool.main(writer).await.expect("testing lookup");
+
+        let expected = serde_json::to_string(&MachineOutput::Data(ProductBundle {
+            name: "fake_name".into(),
+            product_version: "fake_version".into(),
+            transfer_manifest_url: "fake_url".into(),
+        }))
+        .expect("serialize data");
+        assert_eq!(buffers.into_stdout_str(), format!("{expected}\n"));
     }
 }
