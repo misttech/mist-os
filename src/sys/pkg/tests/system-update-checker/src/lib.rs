@@ -39,7 +39,7 @@ use {
 };
 
 struct Mounts {
-    pkgfs_system: TempDir,
+    system: TempDir,
 }
 
 struct Proxies {
@@ -53,7 +53,7 @@ struct Proxies {
 
 impl Mounts {
     fn new() -> Self {
-        Self { pkgfs_system: tempfile::tempdir().expect("/tmp to exist") }
+        Self { system: tempfile::tempdir().expect("/tmp to exist") }
     }
 }
 
@@ -84,19 +84,19 @@ impl TestEnvBuilder {
     async fn build(self) -> TestEnv {
         let mounts = Mounts::new();
         std::fs::write(
-            mounts.pkgfs_system.path().join("meta"),
+            mounts.system.path().join("meta"),
             "0000000000000000000000000000000000000000000000000000000000000001",
         )
-        .expect("write pkgfs/system/meta");
+        .expect("write system/meta");
 
         let mut fs = ServiceFs::new();
         // Add fake directories.
-        let pkgfs_system = fuchsia_fs::directory::open_in_namespace(
-            mounts.pkgfs_system.path().to_str().unwrap(),
+        let system = fuchsia_fs::directory::open_in_namespace(
+            mounts.system.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
         .unwrap();
-        fs.dir("pkgfs").add_remote("system", pkgfs_system);
+        fs.add_remote("system", system);
 
         let mut svc = fs.dir("svc");
 
@@ -243,9 +243,7 @@ impl TestEnvBuilder {
                     .capability(Capability::protocol::<fidl_fuchsia_pkg_rewrite::EngineMarker>())
                     .capability(Capability::protocol::<fspace::ManagerMarker>())
                     .capability(
-                        Capability::directory("pkgfs-system")
-                            .path("/pkgfs/system")
-                            .rights(fio::R_STAR_DIR),
+                        Capability::directory("system").path("/system").rights(fio::R_STAR_DIR),
                     )
                     .from(&fake_capabilities)
                     .to(&system_update_checker),

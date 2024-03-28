@@ -40,10 +40,10 @@
             path: "/config/data",
         },
         {
-            directory: "pkgfs-system",
+            directory: "system",
             from: "parent",
             rights: [ "r*" ],
-            path: "/pkgfs/system",
+            path: "/system",
         },
     ],
     expose: [

@@ -4,10 +4,10 @@
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("reading /pkgfs/system/meta")]
+    #[error("reading /system/meta")]
     ReadSystemMeta(#[source] std::io::Error),
 
-    #[error("parsing /pkgfs/system/meta merkle")]
+    #[error("parsing /system/meta merkle")]
     ParseSystemMeta(#[source] fuchsia_hash::ParseHashError),
 
     #[error("connecting to PackageResolver")]
