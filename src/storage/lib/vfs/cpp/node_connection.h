@@ -26,9 +26,10 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
 
  private:
   std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) final;
-  zx::result<fs::VnodeRepresentation> NodeGetRepresentation() const final {
-    return zx::ok(fuchsia_io::ConnectorInfo{});
-  }
+  zx::result<> WithRepresentation(fit::callback<void(fuchsia_io::wire::Representation)> handler,
+                                  std::optional<fuchsia_io::NodeAttributesQuery> query) const final;
+  zx::result<> WithNodeInfoDeprecated(
+      fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const final;
 
   //
   // |fuchsia.io/Node| operations.

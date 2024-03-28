@@ -29,15 +29,18 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
 
   ~FileConnection() override;
 
-  zx::result<fs::VnodeRepresentation> NodeGetRepresentation() const override;
-
  protected:
   bool& append() { return append_; }
   bool append() const { return append_; }
+  virtual const zx::stream* stream() const { return nullptr; }
   fuchsia_io::OpenFlags NodeGetFlags() const final;
 
  private:
   std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) final;
+  zx::result<> WithRepresentation(fit::callback<void(fuchsia_io::wire::Representation)> handler,
+                                  std::optional<fuchsia_io::NodeAttributesQuery> query) const final;
+  zx::result<> WithNodeInfoDeprecated(
+      fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const final;
 
   //
   // |fuchsia.io/Node| operations.

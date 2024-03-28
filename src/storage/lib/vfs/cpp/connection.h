@@ -71,8 +71,15 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   // |RegisterConnection|. Cannot be called more than once in the lifetime of the connection.
   void StartDispatching(zx::channel channel, OnUnbound on_unbound);
 
-  // Get the representation of this connection.
-  virtual zx::result<fs::VnodeRepresentation> NodeGetRepresentation() const = 0;
+  // Invokes |handler| with the Representation event for this connection. |query| specifies which
+  // attributes, if any, should be included with the event.
+  virtual zx::result<> WithRepresentation(
+      fit::callback<void(fuchsia_io::wire::Representation)> handler,
+      std::optional<fuchsia_io::NodeAttributesQuery> query) const = 0;
+
+  // Invokes |handler| with the NodeInfoDeprecated event for this connection.
+  virtual zx::result<> WithNodeInfoDeprecated(
+      fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const = 0;
 
   fbl::RefPtr<fs::Vnode>& vnode() { return vnode_; }
   const fbl::RefPtr<fs::Vnode>& vnode() const { return vnode_; }

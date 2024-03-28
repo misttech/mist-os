@@ -93,6 +93,31 @@ void NodeConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) 
                       : nullptr);
 }
 
+zx::result<> NodeConnection::WithRepresentation(
+    fit::callback<void(fuchsia_io::wire::Representation)> handler,
+    std::optional<fuchsia_io::NodeAttributesQuery> query) const {
+  // TODO(https://fxbug.dev/324112857): Handle |query|.
+  if (query) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  fidl::WireTableFrame<fuchsia_io::wire::ConnectorInfo> info_frame;
+  auto info_builder = fuchsia_io::wire::ConnectorInfo::ExternalBuilder(
+      fidl::ObjectView<fidl::WireTableFrame<fuchsia_io::wire::ConnectorInfo>>::FromExternal(
+          &info_frame));
+  auto info = info_builder.Build();
+  auto representation = fuchsia_io::wire::Representation::WithConnector(
+      fidl::ObjectView<fuchsia_io::wire::ConnectorInfo>::FromExternal(&info));
+  handler(std::move(representation));
+  return zx::ok();
+}
+
+zx::result<> NodeConnection::WithNodeInfoDeprecated(
+    fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const {
+  // In io1, node reference connections are mapped to the service variant of NodeInfoDeprecated.
+  handler(fuchsia_io::wire::NodeInfoDeprecated::WithService({}));
+  return zx::ok();
+}
+
 }  // namespace internal
 
 }  // namespace fs

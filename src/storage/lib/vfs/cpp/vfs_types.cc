@@ -64,40 +64,4 @@ fio::wire::NodeAttributes VnodeAttributes::ToIoV1NodeAttributes() const {
                                    .modification_time = modification_time};
 }
 
-void HandleAsNodeInfoDeprecated(VnodeRepresentation representation,
-                                fit::callback<void(fio::wire::NodeInfoDeprecated)> handler) {
-  using fio::wire::NodeInfoDeprecated;
-
-  // Visitor to convert an |fs::VnodeRepresentation| to an equivalent io1 NodeInfoDeprecated
-  // response. The io2 types are suffixed with "Info" and the io1 types are suffixed wih "Object".
-  struct RepresentationToNodeInfoVisitor {
-    void operator()(const fio::ConnectorInfo&) { handler(NodeInfoDeprecated::WithService({})); }
-
-    void operator()(const fio::DirectoryInfo&) { handler(NodeInfoDeprecated::WithDirectory({})); }
-
-    void operator()(fio::FileInfo file_info) {
-      fio::wire::FileObject file_object;
-      file_object.stream = std::move(file_info.stream()).value_or(zx::stream{});
-      file_object.event = std::move(file_info.observer()).value_or(zx::event{});
-      handler(NodeInfoDeprecated::WithFile(
-          fidl::ObjectView<fio::wire::FileObject>::FromExternal(&file_object)));
-    }
-
-#if __Fuchsia_API_level__ >= 18
-    void operator()(fio::SymlinkInfo symlink_info) {
-      fio::wire::SymlinkObject symlink_object;
-      if (symlink_info.target()) {
-        symlink_object.target = fidl::VectorView<uint8_t>::FromExternal(*symlink_info.target());
-      }
-      handler(NodeInfoDeprecated::WithSymlink(
-          fidl::ObjectView<fio::wire::SymlinkObject>::FromExternal(&symlink_object)));
-    }
-#endif
-
-    fit::callback<void(NodeInfoDeprecated)>& handler;
-  };
-
-  std::visit(RepresentationToNodeInfoVisitor{handler}, std::move(representation));
-}
-
 }  // namespace fs

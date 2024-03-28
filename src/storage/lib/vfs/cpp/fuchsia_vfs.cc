@@ -383,21 +383,20 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
   // Send an |fuchsia.io/OnOpen| event if requested. At this point we know the connection is either
   // a Node connection, or a File/Directory that composes the node protocol.
   if (options.flags & fuchsia_io::OpenFlags::kDescribe) {
-    zx::result representation = connection->NodeGetRepresentation();
-    if (representation.is_error()) {
-      // Ignore errors since there is nothing we can do if this fails.
+    zx::result sent_describe =
+        connection->WithNodeInfoDeprecated([&node](fio::wire::NodeInfoDeprecated info) {
+          // We ignore any errors sending the OnOpen event. Even if there are errors below, it's
+          // possible that a client may have already sent messages into the channel and closed their
+          // end without processing the response.
+          [[maybe_unused]] fidl::Status status =
+              fidl::WireSendEvent(node)->OnOpen(ZX_OK, std::move(info));
+        });
+    if (sent_describe.is_error()) {
+      // Ignore errors since there is nothing we can do if sending this fails.
       [[maybe_unused]] fidl::Status status =
-          fidl::WireSendEvent(node)->OnOpen(representation.status_value(), {});
-      return representation.status_value();
+          fidl::WireSendEvent(node)->OnOpen(sent_describe.error_value(), {});
+      return sent_describe.error_value();
     }
-
-    fs::HandleAsNodeInfoDeprecated(*std::move(representation), [&node](auto info) {
-      // We ignore any errors sending the OnOpen event. Even if there are errors below, it's
-      // possible that a client may have already sent messages into the channel and closed their end
-      // without processing the response.
-      [[maybe_unused]] fidl::Status status =
-          fidl::WireSendEvent(node)->OnOpen(ZX_OK, std::move(info));
-    });
   }
 
   return RegisterConnection(std::move(connection), node.TakeChannel());

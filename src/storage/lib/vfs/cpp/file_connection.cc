@@ -65,27 +65,69 @@ void FileConnection::Query(QueryCompleter::Sync& completer) {
   completer.Reply(Connection::NodeQuery());
 }
 
-zx::result<fs::VnodeRepresentation> FileConnection::NodeGetRepresentation() const {
-  fuchsia_io::FileInfo info;
+zx::result<> FileConnection::WithNodeInfoDeprecated(
+    fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const {
+  fio::wire::FileObject file_object;
   zx::result<zx::event> observer = vnode()->GetObserver();
   if (observer.is_ok()) {
-    info.observer() = std::move(*observer);
+    file_object.event = std::move(*observer);
   } else if (observer.error_value() != ZX_ERR_NOT_SUPPORTED) {
     return observer.take_error();
   }
-  return zx::ok(std::move(info));
+  if (stream()) {
+    if (zx_status_t status = stream()->duplicate(ZX_RIGHT_SAME_RIGHTS, &file_object.stream);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+  }
+  handler(fuchsia_io::wire::NodeInfoDeprecated::WithFile(
+      fidl::ObjectView<fio::wire::FileObject>::FromExternal(&file_object)));
+  return zx::ok();
+}
+
+zx::result<> FileConnection::WithRepresentation(
+    fit::callback<void(fuchsia_io::wire::Representation)> handler,
+    std::optional<fuchsia_io::NodeAttributesQuery> query) const {
+  // TODO(https://fxbug.dev/324112857): Handle |query|.
+  if (query) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  fidl::WireTableFrame<fuchsia_io::wire::FileInfo> frame;
+  auto builder = fuchsia_io::wire::FileInfo::ExternalBuilder(
+      fidl::ObjectView<fidl::WireTableFrame<fuchsia_io::wire::FileInfo>>::FromExternal(&frame));
+  builder.is_append(append());
+  zx::result<zx::event> observer = vnode()->GetObserver();
+  if (observer.is_ok()) {
+    builder.observer(std::move(*observer));
+  } else if (observer.error_value() != ZX_ERR_NOT_SUPPORTED) {
+    return observer.take_error();
+  }
+  if (stream()) {
+    zx::stream stream;
+    if (zx_status_t status = this->stream()->duplicate(ZX_RIGHT_SAME_RIGHTS, &stream);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+    builder.stream(std::move(stream));
+  }
+  auto info = builder.Build();
+  auto representation = fuchsia_io::wire::Representation::WithFile(
+      fidl::ObjectView<fuchsia_io::wire::FileInfo>::FromExternal(&info));
+  handler(std::move(representation));
+  return zx::ok();
 }
 
 void FileConnection::Describe(DescribeCompleter::Sync& completer) {
-  zx::result representation = NodeGetRepresentation();
-  if (representation.is_error()) {
-    completer.Close(representation.status_value());
+  zx::result sent_describe = WithRepresentation(
+      [&](fio::wire::Representation representation) {
+        ZX_DEBUG_ASSERT(representation.is_file() && representation.file().has_is_append());
+        completer.Reply(representation.file());
+      },
+      std::nullopt);
+  if (sent_describe.is_error()) {
+    completer.Close(sent_describe.error_value());
     return;
   }
-  fuchsia_io::FileInfo* info = std::get_if<fuchsia_io::FileInfo>(&*representation);
-  ZX_DEBUG_ASSERT(info);
-  fidl::Arena arena;
-  completer.Reply(fidl::ToWire(arena, std::move(*info)));
 }
 
 void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {

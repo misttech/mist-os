@@ -350,6 +350,30 @@ void DirectoryConnection::AdvisoryLock(AdvisoryLockRequestView request,
   advisory_lock(koid_, vnode(), false, request->request, std::move(callback));
 }
 
+zx::result<> DirectoryConnection::WithRepresentation(
+    fit::callback<void(fuchsia_io::wire::Representation)> handler,
+    std::optional<fuchsia_io::NodeAttributesQuery> query) const {
+  // TODO(https://fxbug.dev/324112857): Handle |query|.
+  if (query) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  fidl::WireTableFrame<fuchsia_io::wire::DirectoryInfo> frame;
+  auto builder = fuchsia_io::wire::DirectoryInfo::ExternalBuilder(
+      fidl::ObjectView<fidl::WireTableFrame<fuchsia_io::wire::DirectoryInfo>>::FromExternal(
+          &frame));
+  auto info = builder.Build();
+  auto representation = fuchsia_io::wire::Representation::WithDirectory(
+      fidl::ObjectView<fuchsia_io::wire::DirectoryInfo>::FromExternal(&info));
+  handler(std::move(representation));
+  return zx::ok();
+}
+
+zx::result<> DirectoryConnection::WithNodeInfoDeprecated(
+    fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const {
+  handler(fuchsia_io::wire::NodeInfoDeprecated::WithDirectory({}));
+  return zx::ok();
+}
+
 }  // namespace internal
 
 }  // namespace fs
