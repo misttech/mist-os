@@ -12,6 +12,9 @@
 
 set -e
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+FUCHSIA_DIR="$(dirname $(dirname $(dirname $(dirname "${script_dir}"))))"
+
 PREBUILT_DIR="${FUCHSIA_DIR}/prebuilt/ctf"
 DESTINATION="${FUCHSIA_DIR}/sdk/ctf/build/internal/ctf_releases.gni"
 
