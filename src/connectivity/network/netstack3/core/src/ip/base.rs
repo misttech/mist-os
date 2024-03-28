@@ -888,7 +888,8 @@ impl<
             + device::IpDeviceConfigurationContext<I, BC>
             + IpDeviceStateContext<I, BC>
             + NonTestCtxMarker
-            + IpDeviceSendContext<I, BC>,
+            + IpDeviceSendContext<I, BC>
+            + FilterHandlerProvider<I, BC>,
     > IpSocketContext<I, BC> for CC
 {
     fn lookup_route(

@@ -625,6 +625,20 @@ pub(crate) mod testutil {
         }
     }
 
+    impl crate::filter::InterfaceProperties<()> for FakeDeviceId {
+        fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
+            unimplemented!()
+        }
+
+        fn name_matches(&self, _: &str) -> bool {
+            unimplemented!()
+        }
+
+        fn device_class_matches(&self, _: &()) -> bool {
+            unimplemented!()
+        }
+    }
+
     #[cfg(test)]
     pub trait FakeStrongDeviceId: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord {}
 
@@ -717,6 +731,21 @@ pub(crate) mod testutil {
     #[cfg(test)]
     impl StrongId for MultipleDevicesId {
         type Weak = FakeWeakDeviceId<Self>;
+    }
+
+    #[cfg(test)]
+    impl crate::filter::InterfaceProperties<()> for MultipleDevicesId {
+        fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
+            unimplemented!()
+        }
+
+        fn name_matches(&self, _: &str) -> bool {
+            unimplemented!()
+        }
+
+        fn device_class_matches(&self, _: &()) -> bool {
+            unimplemented!()
+        }
     }
 }
 

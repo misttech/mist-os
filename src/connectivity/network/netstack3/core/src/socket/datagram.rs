@@ -24,7 +24,7 @@ use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6},
     MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
 };
-use packet::{BufferMut, Serializer};
+use packet::BufferMut;
 use packet_formats::ip::IpProtoExt;
 use thiserror::Error;
 
@@ -35,6 +35,7 @@ use crate::{
     device::{self, AnyDevice, DeviceIdContext},
     error::ExistsError,
     error::{LocalAddressError, NotFoundError, RemoteAddressError, SocketError, ZonedAddressError},
+    filter::TransportPacketSerializer,
     inspect::Inspector,
     ip::{
         socket::{
@@ -1218,7 +1219,7 @@ pub trait DatagramSocketSpec: Sized {
 
     /// The type of serializer returned by [`DatagramSocketSpec::make_packet`]
     /// for a given IP version and buffer type.
-    type Serializer<I: IpExt, B: BufferMut>: Serializer<Buffer = B>;
+    type Serializer<I: IpExt, B: BufferMut>: TransportPacketSerializer<Buffer = B>;
     /// The potential error for serializing a packet. For example, in UDP, this
     /// should be infallible but for ICMP, there will be an error if the input
     /// is not an echo request.
@@ -4850,7 +4851,7 @@ mod test {
         ip::{Ipv4Addr, Ipv6Addr},
         Witness,
     };
-    use packet::Buf;
+    use packet::{Buf, Serializer as _};
     use packet_formats::ip::{Ipv4Proto, Ipv6Proto};
     use test_case::test_case;
 
@@ -4860,7 +4861,9 @@ mod test {
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         ip::{
             device::state::{IpDeviceState, IpDeviceStateIpExt},
-            socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeIpSocketCtx},
+            socket::testutil::{
+                FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeFilterDeviceId, FakeIpSocketCtx,
+            },
             testutil::{DualStackSendIpPacketMeta, FakeIpDeviceIdCtx},
             IpLayerIpExt, DEFAULT_HOP_LIMITS,
         },
@@ -4992,7 +4995,7 @@ mod test {
             I::into_dual_stack_bound_socket_id(s.clone())
         }
 
-        type Serializer<I: IpExt, B: BufferMut> = B;
+        type Serializer<I: IpExt, B: BufferMut> = packet::Nested<B, ()>;
         type SerializeError = Never;
         fn make_packet<I: IpExt, B: BufferMut>(
             body: B,
@@ -5002,7 +5005,7 @@ mod test {
                 <FakeAddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
             >,
         ) -> Result<Self::Serializer<I, B>, Never> {
-            Ok(body)
+            Ok(body.encapsulate(()))
         }
         fn try_alloc_listen_identifier<I: Ip, D: device::WeakId>(
             _bindings_ctx: &mut impl RngContext,
@@ -5233,7 +5236,7 @@ mod test {
         }
     }
 
-    impl<D: FakeStrongDeviceId, I: DatagramIpExt<D> + IpLayerIpExt>
+    impl<D: FakeFilterDeviceId<()>, I: DatagramIpExt<D> + IpLayerIpExt>
         DatagramStateContext<I, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
         for FakeCoreCtx<I, D>
     {
@@ -5331,7 +5334,7 @@ mod test {
         ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext>;
     }
 
-    impl<D: FakeStrongDeviceId> DualStackContextsIpExt<D> for Ipv4 {
+    impl<D: FakeFilterDeviceId<()>> DualStackContextsIpExt<D> for Ipv4 {
         type DualStackContext =
             UninstantiableWrapper<Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>>;
         type NonDualStackContext = Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>;
@@ -5342,7 +5345,7 @@ mod test {
         }
     }
 
-    impl<D: FakeStrongDeviceId> DualStackContextsIpExt<D> for Ipv6 {
+    impl<D: FakeFilterDeviceId<()>> DualStackContextsIpExt<D> for Ipv6 {
         type DualStackContext = Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>;
         type NonDualStackContext =
             UninstantiableWrapper<Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>>;
@@ -5353,8 +5356,10 @@ mod test {
         }
     }
 
-    impl<D: FakeStrongDeviceId, I: Ip + IpExt + IpDeviceStateIpExt + DualStackContextsIpExt<D>>
-        DatagramBoundStateContext<I, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
+    impl<
+            D: FakeFilterDeviceId<()>,
+            I: Ip + IpExt + IpDeviceStateIpExt + DualStackContextsIpExt<D>,
+        > DatagramBoundStateContext<I, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
         for Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>
     {
         type IpSocketsCtx<'a> = FakeInnerCoreCtx<D>;
@@ -5423,7 +5428,7 @@ mod test {
         }
     }
 
-    impl<D: FakeStrongDeviceId>
+    impl<D: FakeFilterDeviceId<()>>
         DualStackDatagramBoundStateContext<Ipv6, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
         for Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>
     {

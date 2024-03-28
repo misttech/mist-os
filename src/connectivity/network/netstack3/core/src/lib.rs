@@ -108,13 +108,16 @@ pub mod filter {
     pub(crate) mod integration;
 
     pub(crate) use integration::FilterHandlerProvider;
+    #[cfg(test)]
+    pub(crate) use netstack3_filter::testutil::NoopImpl;
     pub use netstack3_filter::{
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsTypes, Hook,
         InterfaceMatcher, InterfaceProperties, IpRoutines, NatRoutines, PacketMatcher, PortMatcher,
         Routine, Rule, State, TransportProtocolMatcher, UninstalledRoutine, ValidationError,
     };
     pub(crate) use netstack3_filter::{
-        FilterContext, FilterHandler, FilterImpl, FilterIpContext, RxPacket, ValidState, Verdict,
+        FilterContext, FilterHandler, FilterImpl, FilterIpContext, MaybeTransportPacket, RxPacket,
+        TransportPacketSerializer, TxPacket, ValidState, Verdict,
     };
 }
 

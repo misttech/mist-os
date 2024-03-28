@@ -15,8 +15,8 @@ use fidl_fuchsia_net_filter_ext::{
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use net_types::ip::{Ip, IpInvariant};
 
-use crate::ingress::{
-    IcmpSocket, IrrelevantToTest, Ports, SocketType, Subnets, TcpSocket, UdpSocket,
+use crate::ip_hooks::{
+    IcmpSocket, Interfaces, IrrelevantToTest, Ports, SocketType, Subnets, TcpSocket, UdpSocket,
 };
 
 pub(crate) trait Matcher: Copy + Debug {
@@ -24,7 +24,7 @@ pub(crate) trait Matcher: Copy + Debug {
 
     async fn matcher<I: Ip>(
         &self,
-        interface: &netemul::TestInterface<'_>,
+        interfaces: Interfaces<'_>,
         subnets: Subnets,
         ports: Ports,
     ) -> Matchers;
@@ -44,7 +44,7 @@ impl Matcher for AllTraffic {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         _subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
@@ -60,16 +60,22 @@ impl Matcher for InterfaceId {
 
     async fn matcher<I: Ip>(
         &self,
-        interface: &netemul::TestInterface<'_>,
+        interfaces: Interfaces<'_>,
         _subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
-        // NOTE: these tests are for the INGRESS and LOCAL_INGRESS hooks, so we are
-        // doing interface matching on the input interface.
+        let Interfaces { ingress, egress } = interfaces;
         Matchers {
-            in_interface: Some(InterfaceMatcher::Id(
-                NonZeroU64::new(interface.id()).expect("interface ID should be nonzero"),
-            )),
+            in_interface: ingress.map(|interface| {
+                InterfaceMatcher::Id(
+                    NonZeroU64::new(interface.id()).expect("interface ID should be nonzero"),
+                )
+            }),
+            out_interface: egress.map(|interface| {
+                InterfaceMatcher::Id(
+                    NonZeroU64::new(interface.id()).expect("interface ID should be nonzero"),
+                )
+            }),
             ..Default::default()
         }
     }
@@ -83,18 +89,26 @@ impl Matcher for InterfaceName {
 
     async fn matcher<I: Ip>(
         &self,
-        interface: &netemul::TestInterface<'_>,
+        interfaces: Interfaces<'_>,
         _subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
-        // NOTE: these tests are for the INGRESS and LOCAL_INGRESS hooks, so we are
-        // doing interface matching on the input interface.
-        Matchers {
-            in_interface: Some(InterfaceMatcher::Name(
+        async fn get_interface_name(interface: &netemul::TestInterface<'_>) -> InterfaceMatcher {
+            InterfaceMatcher::Name(
                 interface.get_interface_name().await.expect("get interface name"),
-            )),
-            ..Default::default()
+            )
         }
+
+        let Interfaces { ingress, egress } = interfaces;
+        let in_interface = match ingress {
+            Some(ingress) => Some(get_interface_name(ingress).await),
+            None => None,
+        };
+        let out_interface = match egress {
+            Some(egress) => Some(get_interface_name(egress).await),
+            None => None,
+        };
+        Matchers { in_interface, out_interface, ..Default::default() }
     }
 }
 
@@ -106,23 +120,31 @@ impl Matcher for InterfaceDeviceClass {
 
     async fn matcher<I: Ip>(
         &self,
-        interface: &netemul::TestInterface<'_>,
+        interfaces: Interfaces<'_>,
         _subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
-        Matchers {
-            // NOTE: these tests are for the INGRESS and LOCAL_INGRESS hooks, so we are
-            // doing interface matching on the input interface.
-            in_interface: Some(InterfaceMatcher::DeviceClass(
+        async fn get_device_class(interface: &netemul::TestInterface<'_>) -> InterfaceMatcher {
+            InterfaceMatcher::DeviceClass(
                 match interface.get_device_class().await.expect("get device class") {
                     fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}) => {
                         DeviceClass::Loopback
                     }
                     fnet_interfaces::DeviceClass::Device(device) => DeviceClass::Device(device),
                 },
-            )),
-            ..Default::default()
+            )
         }
+
+        let Interfaces { ingress, egress } = interfaces;
+        let in_interface = match ingress {
+            Some(ingress) => Some(get_device_class(ingress).await),
+            None => None,
+        };
+        let out_interface = match egress {
+            Some(egress) => Some(get_device_class(egress).await),
+            None => None,
+        };
+        Matchers { in_interface, out_interface, ..Default::default() }
     }
 }
 
@@ -134,7 +156,7 @@ impl Matcher for SrcAddressSubnet {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
@@ -171,7 +193,7 @@ impl Matcher for SrcAddressRange {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
@@ -210,7 +232,7 @@ impl Matcher for DstAddressSubnet {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
@@ -247,7 +269,7 @@ impl Matcher for DstAddressRange {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
@@ -297,7 +319,7 @@ impl Matcher for Tcp {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         _subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
@@ -319,7 +341,7 @@ impl Matcher for TcpSrcPort {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         _subnets: Subnets,
         ports: Ports,
     ) -> Matchers {
@@ -354,7 +376,7 @@ impl Matcher for TcpDstPort {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         _subnets: Subnets,
         ports: Ports,
     ) -> Matchers {
@@ -389,7 +411,7 @@ impl Matcher for Udp {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         _subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
@@ -411,7 +433,7 @@ impl Matcher for UdpSrcPort {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         _subnets: Subnets,
         ports: Ports,
     ) -> Matchers {
@@ -446,7 +468,7 @@ impl Matcher for UdpDstPort {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         _subnets: Subnets,
         ports: Ports,
     ) -> Matchers {
@@ -481,7 +503,7 @@ impl Matcher for Icmp {
 
     async fn matcher<I: Ip>(
         &self,
-        _interface: &netemul::TestInterface<'_>,
+        _interfaces: Interfaces<'_>,
         _subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {

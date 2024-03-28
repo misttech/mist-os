@@ -23,8 +23,14 @@ pub use matchers::{
     AddressMatcher, AddressMatcherType, InterfaceMatcher, InterfaceProperties, PacketMatcher,
     PortMatcher, TransportProtocolMatcher,
 };
-pub use packets::{IpPacket, RxPacket, TransportPacket};
+pub use packets::{IpPacket, MaybeTransportPacket, RxPacket, TransportPacketSerializer, TxPacket};
 pub use state::{
     validation::{ValidState, ValidationError},
     Action, Hook, IpRoutines, NatRoutines, Routine, Rule, State, UninstalledRoutine,
 };
+
+/// Testing-related utilities for use by other crates.
+#[cfg(feature = "testutils")]
+pub mod testutil {
+    pub use crate::logic::testutil::NoopImpl;
+}

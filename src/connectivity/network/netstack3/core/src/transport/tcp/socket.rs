@@ -4897,8 +4897,8 @@ mod tests {
             icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
             socket::testutil::FakeDualStackIpSocketCtx,
             socket::{
-                testutil::FakeDeviceConfig, IpSocketBindingsContext, IpSocketContext, MmsError,
-                SendOptions,
+                testutil::{FakeDeviceConfig, FakeFilterDeviceId},
+                IpSocketBindingsContext, IpSocketContext, MmsError, SendOptions,
             },
             testutil::DualStackSendIpPacketMeta,
             types::{ResolvedRoute, RoutableIpAddr},
@@ -5062,7 +5062,7 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId> FakeNetworkContext for TcpCtx<D> {
+    impl<D: FakeFilterDeviceId<()>> FakeNetworkContext for TcpCtx<D> {
         type TimerId = TimerId<D::Weak, TcpBindingsCtx<D>>;
         type SendMeta = DualStackSendIpPacketMeta<D>;
         type RecvMeta = DualStackSendIpPacketMeta<D>;
@@ -5258,7 +5258,7 @@ mod tests {
     impl<I, D, BC> TransportIpContext<I, BC> for TcpCoreCtx<D, BC>
     where
         I: TcpTestIpExt,
-        D: FakeStrongDeviceId,
+        D: FakeFilterDeviceId<BC::DeviceClass>,
         BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
         FakeDualStackIpSocketCtx<D>: TransportIpContext<I, BC, DeviceId = Self::DeviceId>,
     {
@@ -5335,7 +5335,7 @@ mod tests {
 
     impl<D, BC> TcpDemuxContext<Ipv4, D::Weak, BC> for TcpCoreCtx<D, BC>
     where
-        D: FakeStrongDeviceId,
+        D: FakeFilterDeviceId<BC::DeviceClass>,
         BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
     {
         type IpTransportCtx<'a> = Self;
@@ -5365,7 +5365,7 @@ mod tests {
 
     impl<D, BC> TcpDemuxContext<Ipv6, D::Weak, BC> for TcpCoreCtx<D, BC>
     where
-        D: FakeStrongDeviceId,
+        D: FakeFilterDeviceId<BC::DeviceClass>,
         BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
     {
         type IpTransportCtx<'a> = Self;
@@ -5404,8 +5404,10 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId, BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext>
-        TcpContext<Ipv6, BC> for TcpCoreCtx<D, BC>
+    impl<
+            D: FakeFilterDeviceId<BC::DeviceClass>,
+            BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
+        > TcpContext<Ipv6, BC> for TcpCoreCtx<D, BC>
     {
         type ThisStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackIpTransportAndDemuxCtx<'a> = UninstantiableWrapper<Self>;
@@ -5477,8 +5479,10 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId, BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext>
-        TcpContext<Ipv4, BC> for TcpCoreCtx<D, BC>
+    impl<
+            D: FakeFilterDeviceId<BC::DeviceClass>,
+            BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
+        > TcpContext<Ipv4, BC> for TcpCoreCtx<D, BC>
     {
         type ThisStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
@@ -5551,8 +5555,10 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId, BT: TcpTestBindingsTypes<D> + IpSocketBindingsContext>
-        TcpDualStackContext<Ipv6, FakeWeakDeviceId<D>, BT> for TcpCoreCtx<D, BT>
+    impl<
+            D: FakeFilterDeviceId<BT::DeviceClass>,
+            BT: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
+        > TcpDualStackContext<Ipv6, FakeWeakDeviceId<D>, BT> for TcpCoreCtx<D, BT>
     {
         type Converter = Ipv6SocketIdToIpv4DemuxIdConverter;
         type DualStackIpTransportCtx<'a> = Self;

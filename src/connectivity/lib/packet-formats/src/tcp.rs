@@ -735,6 +735,18 @@ where
     }
 }
 
+impl<A: IpAddress, O> TcpSegmentBuilderWithOptions<A, O> {
+    /// Returns the source port for the builder.
+    pub fn src_port(&self) -> Option<NonZeroU16> {
+        self.prefix_builder.src_port
+    }
+
+    /// Returns the destination port for the builder.
+    pub fn dst_port(&self) -> Option<NonZeroU16> {
+        self.prefix_builder.dst_port
+    }
+}
+
 impl<A: IpAddress, O: InnerPacketBuilder> TcpSegmentBuilderWithOptions<A, O> {
     fn aligned_options_len(&self) -> usize {
         // Round up to the next 4-byte boundary.

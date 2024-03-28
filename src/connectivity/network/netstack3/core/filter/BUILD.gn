@@ -45,6 +45,10 @@ rustc_library_with_features("netstack3-filter") {
     {
       features = []
     },
+    {
+      target_name = "netstack3-filter-testutils"
+      features = [ "testutils" ]
+    },
   ]
   if (is_host) {
     feature_sets += [

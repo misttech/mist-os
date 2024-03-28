@@ -11,7 +11,7 @@ use packet_formats::ip::IpExt;
 
 use crate::{
     logic::Interfaces,
-    packets::{IpPacket, TransportPacket},
+    packets::{IpPacket, MaybeTransportPacket, TransportPacket},
 };
 
 /// Matches on metadata of packets that come through the filtering framework.
@@ -146,14 +146,18 @@ pub struct TransportProtocolMatcher<P> {
     pub dst_port: Option<PortMatcher>,
 }
 
-impl<P: PartialEq, T: TransportPacket> Matcher<(P, Option<T>)> for TransportProtocolMatcher<P> {
-    fn matches(&self, actual: &(P, Option<T>)) -> bool {
+impl<P: PartialEq, T: MaybeTransportPacket> Matcher<(P, T)> for TransportProtocolMatcher<P> {
+    fn matches(&self, actual: &(P, T)) -> bool {
         let Self { proto, src_port, dst_port } = self;
         let (packet_proto, packet) = actual;
 
         proto == packet_proto
-            && src_port.required_matches(packet.as_ref().map(TransportPacket::src_port).as_ref())
-            && dst_port.required_matches(packet.as_ref().map(TransportPacket::dst_port).as_ref())
+            && src_port.required_matches(
+                packet.transport_packet().as_ref().map(TransportPacket::src_port).as_ref(),
+            )
+            && dst_port.required_matches(
+                packet.transport_packet().as_ref().map(TransportPacket::dst_port).as_ref(),
+            )
     }
 }
 
@@ -251,7 +255,7 @@ mod tests {
     use super::{testutil::*, *};
     use crate::{
         context::testutil::FakeDeviceClass,
-        packets::testutil::{
+        packets::testutil::internal::{
             ArbitraryValue, FakeIcmpEchoRequest, FakeIpPacket, FakeTcpSegment, FakeUdpPacket,
             TestIpExt, TransportPacketExt,
         },

@@ -186,6 +186,61 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
     }
 }
 
+#[cfg(feature = "testutils")]
+pub mod testutil {
+    use super::*;
+
+    /// A no-op implementation of packet filtering that accepts any packet that
+    /// passes through it, useful for unit tests of other modules where trait bounds
+    /// require that a `FilterHandler` is available but no filtering logic is under
+    /// test.
+    ///
+    /// Provides an implementation of [`FilterHandler`].
+    pub struct NoopImpl;
+
+    impl<I: IpExt, BT: FilterBindingsTypes> FilterHandler<I, BT> for NoopImpl {
+        fn ingress_hook<B, P, D>(&mut self, _: &mut P, _: &D) -> Verdict
+        where
+            P: IpPacket<B, I>,
+            D: InterfaceProperties<BT::DeviceClass>,
+        {
+            Verdict::Accept
+        }
+
+        fn local_ingress_hook<B, P, D>(&mut self, _: &mut P, _: &D) -> Verdict
+        where
+            P: IpPacket<B, I>,
+            D: InterfaceProperties<BT::DeviceClass>,
+        {
+            Verdict::Accept
+        }
+
+        fn forwarding_hook<B, P, D>(&mut self, _: &mut P, _: &D, _: &D) -> Verdict
+        where
+            P: IpPacket<B, I>,
+            D: InterfaceProperties<BT::DeviceClass>,
+        {
+            Verdict::Accept
+        }
+
+        fn local_egress_hook<B, P, D>(&mut self, _: &mut P, _: &D) -> Verdict
+        where
+            P: IpPacket<B, I>,
+            D: InterfaceProperties<BT::DeviceClass>,
+        {
+            Verdict::Accept
+        }
+
+        fn egress_hook<B, P, D>(&mut self, _: &mut P, _: &D) -> Verdict
+        where
+            P: IpPacket<B, I>,
+            D: InterfaceProperties<BT::DeviceClass>,
+        {
+            Verdict::Accept
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::vec;
@@ -200,7 +255,7 @@ mod tests {
             testutil::{ethernet_interface, wlan_interface, FakeDeviceId},
             InterfaceMatcher, PacketMatcher, PortMatcher, TransportProtocolMatcher,
         },
-        packets::testutil::{
+        packets::testutil::internal::{
             ArbitraryValue, FakeIpPacket, FakeTcpSegment, TestIpExt, TransportPacketExt,
         },
         state::IpRoutines,

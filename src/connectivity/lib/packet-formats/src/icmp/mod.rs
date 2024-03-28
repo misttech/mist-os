@@ -600,6 +600,11 @@ impl<I: IcmpIpExt, M: IcmpMessage<I>> IcmpPacketBuilder<I, M> {
     ) -> IcmpPacketBuilder<I, M> {
         IcmpPacketBuilder { src_ip: src_ip.into(), dst_ip: dst_ip.into(), code, msg }
     }
+
+    /// Returns the message in the ICMP packet.
+    pub fn message(&self) -> &M {
+        &self.msg
+    }
 }
 
 // TODO(joshlf): Figure out a way to split body and non-body message types by

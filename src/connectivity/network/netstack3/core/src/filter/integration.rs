@@ -13,7 +13,7 @@ use crate::{
     BindingsContext, CoreCtx, StackState,
 };
 
-pub(crate) trait FilterHandlerProvider<I: IpExt, BC: FilterBindingsTypes> {
+pub trait FilterHandlerProvider<I: IpExt, BC: FilterBindingsTypes> {
     type Handler<'a>: FilterHandler<I, BC>
     where
         Self: 'a;

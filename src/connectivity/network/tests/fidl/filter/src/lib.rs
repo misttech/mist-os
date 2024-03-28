@@ -4,7 +4,8 @@
 
 #![cfg(test)]
 
-mod ingress;
+mod ip_hooks;
+mod matchers;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::Proxy as _;

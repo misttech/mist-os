@@ -52,6 +52,7 @@ use crate::{
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
     device::{self, AnyDevice, DeviceIdContext, FrameDestination},
+    filter::{MaybeTransportPacket, TransportPacketSerializer},
     ip::{
         device::{
             nud::{ConfirmationFlags, NudIpHandler},
@@ -1940,7 +1941,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
 ) where
     I: crate::ip::IpExt,
     CC: IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
-    S: Serializer,
+    S: TransportPacketSerializer,
     S::Buffer: BufferMut,
     F: FnOnce(SpecifiedAddr<I::Addr>) -> S,
 {
@@ -2722,7 +2723,7 @@ fn send_icmpv6_dest_unreachable<
 
 fn send_icmpv4_error_message<
     B: BufferMut,
-    M: IcmpMessage<Ipv4>,
+    M: IcmpMessage<Ipv4> + MaybeTransportPacket,
     BC: IcmpBindingsContext<Ipv4, CC::DeviceId>,
     CC: InnerIcmpv4Context<BC> + CounterContext<IcmpTxCounters<Ipv4>>,
 >(
@@ -2781,7 +2782,7 @@ fn send_icmpv4_error_message<
 
 fn send_icmpv6_error_message<
     B: BufferMut,
-    M: IcmpMessage<Ipv6>,
+    M: IcmpMessage<Ipv6> + MaybeTransportPacket,
     BC: IcmpBindingsContext<Ipv6, CC::DeviceId>,
     CC: InnerIcmpv6Context<BC> + CounterContext<IcmpTxCounters<Ipv6>>,
 >(

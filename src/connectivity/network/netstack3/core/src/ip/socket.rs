@@ -18,6 +18,9 @@ use thiserror::Error;
 use crate::{
     context::{CounterContext, InstantContext, NonTestCtxMarker, TracingContext},
     device::{AnyDevice, DeviceIdContext},
+    filter::{
+        FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider, TransportPacketSerializer,
+    },
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceAddr},
         types::{NextHop, ResolvedRoute, RoutableIpAddr},
@@ -74,7 +77,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         mtu: Option<u32>,
     ) -> Result<(), (S, IpSockSendError)>
     where
-        S: Serializer,
+        S: TransportPacketSerializer,
         S::Buffer: BufferMut,
         O: SendOptions<I>;
 
@@ -112,7 +115,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         mtu: Option<u32>,
     ) -> Result<(), SendOneShotIpPacketError<O, E>>
     where
-        S: Serializer,
+        S: TransportPacketSerializer,
         S::Buffer: BufferMut,
         F: FnOnce(SocketIpAddr<I::Addr>) -> Result<S, E>,
         O: SendOptions<I>,
@@ -144,7 +147,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         mtu: Option<u32>,
     ) -> Result<(), (IpSockCreateAndSendError, O)>
     where
-        S: Serializer,
+        S: TransportPacketSerializer,
         S::Buffer: BufferMut,
         F: FnOnce(SocketIpAddr<I::Addr>) -> S,
         O: SendOptions<I>,
@@ -367,14 +370,15 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
 // raw IP sockets once we support those.
 
 /// The bindings execution context for IP sockets.
-pub trait IpSocketBindingsContext: InstantContext + TracingContext {}
-impl<BC: InstantContext + TracingContext> IpSocketBindingsContext for BC {}
+pub trait IpSocketBindingsContext: InstantContext + TracingContext + FilterBindingsTypes {}
+impl<BC: InstantContext + TracingContext + FilterBindingsTypes> IpSocketBindingsContext for BC {}
 
 /// The context required in order to implement [`IpSocketHandler`].
 ///
 /// Blanket impls of `IpSocketHandler` are provided in terms of
 /// `IpSocketContext`.
-pub trait IpSocketContext<I, BC: IpSocketBindingsContext>: DeviceIdContext<AnyDevice>
+pub trait IpSocketContext<I, BC: IpSocketBindingsContext>:
+    DeviceIdContext<AnyDevice> + FilterHandlerProvider<I, BC>
 where
     I: IpDeviceStateIpExt + IpExt,
 {
@@ -402,11 +406,12 @@ where
         S::Buffer: BufferMut;
 }
 
-impl<
-        I: IpLayerIpExt + IpDeviceStateIpExt,
-        BC: IpSocketBindingsContext,
-        CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>>,
-    > IpSocketHandler<I, BC> for CC
+impl<I, BC, CC> IpSocketHandler<I, BC> for CC
+where
+    I: IpLayerIpExt + IpDeviceStateIpExt,
+    BC: IpSocketBindingsContext,
+    CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>>,
+    CC::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
 {
     fn new_ip_socket<O>(
         &mut self,
@@ -470,7 +475,7 @@ impl<
         mtu: Option<u32>,
     ) -> Result<(), (S, IpSockSendError)>
     where
-        S: Serializer,
+        S: TransportPacketSerializer,
         S::Buffer: BufferMut,
         O: SendOptions<I>,
     {
@@ -522,10 +527,11 @@ fn send_ip_packet<I, S, BC, CC, O>(
 ) -> Result<(), (S, IpSockSendError)>
 where
     I: IpExt + IpDeviceStateIpExt + packet_formats::ip::IpExt,
-    S: Serializer,
+    S: TransportPacketSerializer,
     S::Buffer: BufferMut,
     BC: IpSocketBindingsContext,
     CC: IpSocketContext<I, BC>,
+    CC::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
     O: SendOptions<I>,
 {
     trace_duration!(bindings_ctx, c"ip::send_packet");
@@ -548,6 +554,14 @@ where
             Err(e) => return Err((body, IpSockSendError::Unroutable(e))),
         };
     assert_eq!(local_ip, &got_local_ip);
+
+    // TODO(https://fxbug.dev/318717702): when we implement NAT, perform re-routing
+    // after the LOCAL_EGRESS hook since the packet may have been changed.
+    let mut packet = crate::filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &body);
+    match core_ctx.filter_handler().local_egress_hook(&mut packet, &device) {
+        crate::filter::Verdict::Drop => return Ok(()),
+        crate::filter::Verdict::Accept => {}
+    }
 
     let remote_ip: SpecifiedAddr<_> = (*remote_ip).into();
     let local_ip: SpecifiedAddr<_> = (*local_ip).into();
@@ -966,6 +980,16 @@ pub(crate) mod testutil {
         pub(crate) counters: IpCounters<I>,
     }
 
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D, BC: FilterBindingsTypes>
+        FilterHandlerProvider<I, BC> for FakeIpSocketCtx<I, D>
+    {
+        type Handler<'a> = crate::filter::NoopImpl where Self: 'a;
+
+        fn filter_handler(&mut self) -> Self::Handler<'_> {
+            crate::filter::NoopImpl
+        }
+    }
+
     impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> CounterContext<IpCounters<I>>
         for FakeIpSocketCtx<I, D>
     {
@@ -1006,10 +1030,24 @@ pub(crate) mod testutil {
         }
     }
 
+    // TODO(https://fxbug.dev/331777445): remove this marker trait once tests in the
+    // transport-layer modules use a fake implementation of IpSocketHandler rather
+    // than the blanket impl, which requires the `InterfaceProperties` trait on the
+    // device ID for filtering purposes.
+    pub(crate) trait FakeFilterDeviceId<DeviceClass>:
+        FakeStrongDeviceId + crate::filter::InterfaceProperties<DeviceClass>
+    {
+    }
+
+    impl<DeviceClass, D: FakeStrongDeviceId + crate::filter::InterfaceProperties<DeviceClass>>
+        FakeFilterDeviceId<DeviceClass> for D
+    {
+    }
+
     impl<
             I: IpLayerIpExt + IpDeviceStateIpExt,
-            BC: InstantContext + TracingContext,
-            DeviceId: FakeStrongDeviceId,
+            BC: InstantContext + TracingContext + FilterBindingsTypes,
+            DeviceId: FakeFilterDeviceId<BC::DeviceClass>,
         > TransportIpContext<I, BC> for FakeIpSocketCtx<I, DeviceId>
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
@@ -1102,8 +1140,8 @@ pub(crate) mod testutil {
 
     impl<
             I: IpLayerIpExt + IpDeviceStateIpExt,
-            BC: InstantContext + TracingContext,
-            DeviceId: FakeStrongDeviceId,
+            BC: InstantContext + TracingContext + FilterBindingsTypes,
+            DeviceId: FakeFilterDeviceId<BC::DeviceClass>,
         > IpSocketContext<I, BC> for FakeIpSocketCtx<I, DeviceId>
     {
         fn lookup_route(
@@ -1135,7 +1173,7 @@ pub(crate) mod testutil {
             Id,
             Meta,
             Event: Debug,
-            DeviceId: FakeStrongDeviceId,
+            DeviceId: FakeFilterDeviceId<()>,
             BindingsCtxState,
         > IpSocketContext<I, FakeBindingsCtx<Id, Event, BindingsCtxState, ()>>
         for FakeCoreCtx<S, Meta, DeviceId>
@@ -1306,8 +1344,8 @@ pub(crate) mod testutil {
 
     impl<
             I: IpLayerIpExt + IpDeviceStateIpExt,
-            BC: InstantContext + TracingContext,
-            D: FakeStrongDeviceId,
+            BC: InstantContext + TracingContext + FilterBindingsTypes,
+            D: FakeFilterDeviceId<BC::DeviceClass>,
             State: TransportIpContext<I, BC, DeviceId = D> + CounterContext<IpCounters<I>>,
             Meta,
         > TransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
@@ -1526,6 +1564,16 @@ pub(crate) mod testutil {
         }
     }
 
+    impl<I: IpExt, D, BC: FilterBindingsTypes> FilterHandlerProvider<I, BC>
+        for FakeDualStackIpSocketCtx<D>
+    {
+        type Handler<'a> = crate::filter::NoopImpl where Self: 'a;
+
+        fn filter_handler(&mut self) -> Self::Handler<'_> {
+            crate::filter::NoopImpl
+        }
+    }
+
     impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> CounterContext<IpCounters<I>>
         for FakeDualStackIpSocketCtx<D>
     {
@@ -1741,8 +1789,8 @@ pub(crate) mod testutil {
 
     impl<
             I: IpLayerIpExt + IpDeviceStateIpExt,
-            BC: InstantContext + TracingContext,
-            DeviceId: FakeStrongDeviceId,
+            BC: InstantContext + TracingContext + FilterBindingsTypes,
+            DeviceId: FakeFilterDeviceId<BC::DeviceClass>,
         > TransportIpContext<I, BC> for FakeDualStackIpSocketCtx<DeviceId>
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {

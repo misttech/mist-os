@@ -2673,7 +2673,7 @@ mod tests {
         error::RemoteAddressError,
         ip::{
             device::state::IpDeviceStateIpExt,
-            socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
+            socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeFilterDeviceId},
             testutil::{DualStackSendIpPacketMeta, FakeIpDeviceIdCtx},
             ResolveRouteError, SendIpPacketMeta,
         },
@@ -2871,7 +2871,7 @@ mod tests {
 
     impl<
             I: TestIpExt,
-            D: FakeStrongDeviceId,
+            D: FakeFilterDeviceId<()>,
             Outer: Borrow<UdpSocketSet<I, FakeWeakDeviceId<D>, FakeUdpBindingsCtx<D>>>
                 + BorrowMut<UdpSocketSet<I, FakeWeakDeviceId<D>, FakeUdpBindingsCtx<D>>>,
         > StateContext<I, FakeUdpBindingsCtx<D>> for Wrapped<Outer, FakeUdpInnerCoreCtx<D>>
@@ -2954,7 +2954,7 @@ mod tests {
         }
     }
 
-    impl<I: TestIpExt, D: FakeStrongDeviceId> BoundStateContext<I, FakeUdpBindingsCtx<D>>
+    impl<I: TestIpExt, D: FakeFilterDeviceId<()>> BoundStateContext<I, FakeUdpBindingsCtx<D>>
         for FakeUdpInnerCoreCtx<D>
     {
         type IpSocketsCtx<'a> = FakeBufferCoreCtx<D>;
@@ -3000,14 +3000,14 @@ mod tests {
         fn dual_stack_context(
             &mut self,
         ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
-            struct Wrap<'a, I: Ip + TestIpExt, D: FakeStrongDeviceId + 'static>(
+            struct Wrap<'a, I: Ip + TestIpExt, D: FakeFilterDeviceId<()> + 'static>(
                 MaybeDualStack<
                     &'a mut I::UdpDualStackBoundStateContext<D>,
                     &'a mut I::UdpNonDualStackBoundStateContext<D>,
                 >,
             );
             // TODO(https://fxbug.dev/42082123): Replace this with a derived impl.
-            impl<'a, I: TestIpExt, NewIp: TestIpExt, D: FakeStrongDeviceId + 'static>
+            impl<'a, I: TestIpExt, NewIp: TestIpExt, D: FakeFilterDeviceId<()> + 'static>
                 GenericOverIp<NewIp> for Wrap<'a, I, D>
             {
                 type Type = Wrap<'a, NewIp, D>;
@@ -3029,7 +3029,7 @@ mod tests {
     {
     }
 
-    impl<D: FakeStrongDeviceId> DualStackBoundStateContext<Ipv6, FakeUdpBindingsCtx<D>>
+    impl<D: FakeFilterDeviceId<()>> DualStackBoundStateContext<Ipv6, FakeUdpBindingsCtx<D>>
         for FakeUdpInnerCoreCtx<D>
     {
         type IpSocketsCtx<'a> = FakeBufferCoreCtx<D>;
@@ -3075,7 +3075,7 @@ mod tests {
     }
 
     /// Ip packet delivery for the [`FakeUdpCoreCtx`].
-    impl<I: IpExt + IpDeviceStateIpExt + TestIpExt, D: FakeStrongDeviceId>
+    impl<I: IpExt + IpDeviceStateIpExt + TestIpExt, D: FakeFilterDeviceId<()>>
         IpTransportContext<I, FakeUdpBindingsCtx<D>, FakeUdpCoreCtx<D>> for UdpIpTransportContext
     {
         fn receive_icmp_error(
@@ -3182,18 +3182,18 @@ mod tests {
     }
 
     trait TestIpExt: crate::testutil::TestIpExt + IpExt + IpDeviceStateIpExt {
-        type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static>:
+        type UdpDualStackBoundStateContext<D: FakeFilterDeviceId<()> + 'static>:
             DualStackDatagramBoundStateContext<Self, FakeUdpBindingsCtx<D>, Udp<FakeUdpBindingsCtx<D>>, DeviceId=D, WeakDeviceId=D::Weak>;
-        type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static>:
+        type UdpNonDualStackBoundStateContext<D: FakeFilterDeviceId<()> + 'static>:
             NonDualStackDatagramBoundStateContext<Self, FakeUdpBindingsCtx<D>, Udp<FakeUdpBindingsCtx<D>>, DeviceId=D, WeakDeviceId=D::Weak>;
         fn try_into_recv_src_addr(addr: Self::Addr) -> Option<Self::RecvSrcAddr>;
     }
 
     impl TestIpExt for Ipv4 {
-        type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
+        type UdpDualStackBoundStateContext<D: FakeFilterDeviceId<()> + 'static> =
             UninstantiableWrapper<FakeUdpInnerCoreCtx<D>>;
 
-        type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
+        type UdpNonDualStackBoundStateContext<D: FakeFilterDeviceId<()> + 'static> =
             FakeUdpInnerCoreCtx<D>;
 
         fn try_into_recv_src_addr(addr: Ipv4Addr) -> Option<Ipv4Addr> {
@@ -3202,9 +3202,9 @@ mod tests {
     }
 
     impl TestIpExt for Ipv6 {
-        type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
+        type UdpDualStackBoundStateContext<D: FakeFilterDeviceId<()> + 'static> =
             FakeUdpInnerCoreCtx<D>;
-        type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
+        type UdpNonDualStackBoundStateContext<D: FakeFilterDeviceId<()> + 'static> =
             UninstantiableWrapper<FakeUdpInnerCoreCtx<D>>;
 
         fn try_into_recv_src_addr(addr: Ipv6Addr) -> Option<Ipv6SourceAddr> {

@@ -471,6 +471,7 @@ pub(crate) mod testutil {
     #[cfg(test)]
     use crate::{
         device::{EthernetDeviceId, EthernetWeakDeviceId},
+        filter::FilterHandlerProvider,
         testutil::DispatchedFrame,
     };
 
@@ -1537,6 +1538,28 @@ pub(crate) mod testutil {
     impl<S, Meta, DeviceId> AsMut<FakeCoreCtx<S, Meta, DeviceId>> for FakeCoreCtx<S, Meta, DeviceId> {
         fn as_mut(&mut self) -> &mut FakeCoreCtx<S, Meta, DeviceId> {
             self
+        }
+    }
+
+    #[cfg(test)]
+    impl<I: packet_formats::ip::IpExt, BC: FilterBindingsTypes, S, Meta, DeviceId>
+        FilterHandlerProvider<I, BC> for FakeCoreCtx<S, Meta, DeviceId>
+    {
+        type Handler<'a> = crate::filter::NoopImpl where Self: 'a;
+
+        fn filter_handler(&mut self) -> Self::Handler<'_> {
+            crate::filter::NoopImpl
+        }
+    }
+
+    #[cfg(test)]
+    impl<Outer, I: packet_formats::ip::IpExt, BC: FilterBindingsTypes, S, Meta, DeviceId>
+        FilterHandlerProvider<I, BC> for Wrapped<Outer, FakeCoreCtx<S, Meta, DeviceId>>
+    {
+        type Handler<'a> = crate::filter::NoopImpl where Self: 'a;
+
+        fn filter_handler(&mut self) -> Self::Handler<'_> {
+            crate::filter::NoopImpl
         }
     }
 

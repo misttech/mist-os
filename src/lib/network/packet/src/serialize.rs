@@ -832,6 +832,11 @@ impl<I, O> Nested<I, O> {
     pub fn into_outer(self) -> O {
         self.outer
     }
+
+    #[inline]
+    pub fn outer(&self) -> &O {
+        &self.outer
+    }
 }
 
 /// A [`PacketBuilder`] which has no header or footer, but which imposes a

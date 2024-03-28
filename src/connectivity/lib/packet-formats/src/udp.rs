@@ -422,6 +422,16 @@ impl<A: IpAddress> UdpPacketBuilder<A> {
     ) -> UdpPacketBuilder<A> {
         UdpPacketBuilder { src_ip, dst_ip, src_port, dst_port: Some(dst_port) }
     }
+
+    /// Returns the source port for the builder.
+    pub fn src_port(&self) -> Option<NonZeroU16> {
+        self.src_port
+    }
+
+    /// Returns the destination port for the builder.
+    pub fn dst_port(&self) -> Option<NonZeroU16> {
+        self.dst_port
+    }
 }
 
 impl<A: IpAddress> PacketBuilder for UdpPacketBuilder<A> {

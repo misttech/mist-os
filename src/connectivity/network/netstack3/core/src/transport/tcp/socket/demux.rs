@@ -26,6 +26,7 @@ use crate::{
     convert::BidirectionalConverter as _,
     device,
     error::NotFoundError,
+    filter::TransportPacketSerializer,
     ip::{
         socket::{DefaultSendOptions, IpSocketHandler, MmsError},
         EitherDeviceId, IpTransportContext, TransportIpContext, TransportReceiveError,
@@ -1059,7 +1060,7 @@ impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
 pub(super) fn tcp_serialize_segment<'a, S, A>(
     segment: S,
     conn_addr: ConnIpAddr<A, NonZeroU16, NonZeroU16>,
-) -> impl Serializer<Buffer = EmptyBuf> + Debug + 'a
+) -> impl TransportPacketSerializer<Buffer = EmptyBuf> + Debug + 'a
 where
     S: Into<Segment<SendPayload<'a>>>,
     A: IpAddress,
