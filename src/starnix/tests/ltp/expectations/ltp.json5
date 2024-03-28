@@ -202,9 +202,6 @@
                 // Skip to handle transition from passing to failing.
                 "cve-2018-19854",
 
-                // https://fxbug.dev/42085930
-                "fgetxattr01",
-
                 // Skip to handle transition from passing to failing.
                 "gettimeofday01",
 
