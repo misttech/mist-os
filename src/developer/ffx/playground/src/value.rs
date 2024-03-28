@@ -170,6 +170,13 @@ pub trait ValueExt: Sized {
     /// Convert this value to a `usize` if possible.
     fn try_usize(self) -> Result<usize, Self>;
 
+    /// If this object is a client with the given protocol, return the raw channel.
+    fn try_client_channel(
+        self,
+        ns: &lib::Namespace,
+        expected_protocol: &str,
+    ) -> Result<fidl::Channel, Self>;
+
     /// Convert a playground value to one that is ready for transfer via FIDL by
     /// converting playground-specific types. This performs *minimal* type checking; only
     /// what happens in the course of figuring out what conversion is appropriate.
@@ -266,6 +273,24 @@ impl ValueExt for Value {
                 })
             }
             _ => Err(self),
+        }
+    }
+
+    fn try_client_channel(
+        self,
+        ns: &lib::Namespace,
+        expected_protocol: &str,
+    ) -> Result<fidl::Channel, Self> {
+        match self {
+            Value::ClientEnd(c, proto) if ns.inherits(&proto, expected_protocol) => Ok(c),
+            Value::OutOfLine(PlaygroundValue::InUseHandle(ref i)) => {
+                if let Ok(FidlValue::ClientEnd(c, _)) = i.take_client(expected_protocol) {
+                    Ok(c)
+                } else {
+                    Err(self)
+                }
+            }
+            other => Err(other),
         }
     }
 

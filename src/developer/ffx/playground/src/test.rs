@@ -29,6 +29,10 @@ async fn test_interpreter(
     interpreter
 }
 
+/// A test string.
+pub const NEILS_PHILOSOPHY: &'static [u8] =
+    b"It's not about the walls, Max, it's about what's outside of them.";
+
 /// Helper for quickly testing a code snippet to see if it returns the correct
 /// value.
 pub struct Test<T> {
@@ -55,7 +59,9 @@ impl<T: AsRef<str>> Test<T> {
         let proxy = vfs::directory::spawn_directory(Arc::clone(&simple));
         let test_subdir = vfs::directory::mutable::simple();
         let foo_subdir = vfs::directory::mutable::simple();
+        let test_file = vfs::file::read_only(NEILS_PHILOSOPHY);
         test_subdir.add_entry("foo", foo_subdir).unwrap();
+        test_subdir.add_entry("neils_philosophy", test_file).unwrap();
         simple.add_entry("test", test_subdir).unwrap();
         assert!(
             self.with_dirs.replace(proxy.into_client_end().unwrap()).is_none(),
