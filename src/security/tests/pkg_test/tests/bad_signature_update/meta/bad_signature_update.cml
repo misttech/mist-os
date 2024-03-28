@@ -191,7 +191,7 @@
             ],
         },
         {
-            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
+            protocol: [ "fuchsia.scheduler.deprecated.ProfileProvider" ],
             from: "parent",
             to: [ "#netstack" ],
         },

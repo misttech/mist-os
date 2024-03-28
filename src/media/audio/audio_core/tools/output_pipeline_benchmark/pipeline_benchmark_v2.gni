@@ -81,7 +81,7 @@ template("audio_pipeline_benchmark") {
     ]
 
     deps = [
-      "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
+      "//sdk/fidl/fuchsia.scheduler.deprecated:fuchsia.scheduler.deprecated_hlcpp",
       "//src/lib/fxl:fxl_cli",
       "//src/media/audio/audio_core/v1:audio_core_lib",
       "//src/media/audio/audio_core/v1/testing",

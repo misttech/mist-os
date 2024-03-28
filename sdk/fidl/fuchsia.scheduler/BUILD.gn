@@ -5,10 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.scheduler") {
-  sources = [
-    "profile.fidl",
-    "role.fidl",
-  ]
+  sources = [ "role.fidl" ]
   sdk_category = "internal"
   public_deps = [ "//zircon/vdso/zx" ]
 

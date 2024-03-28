@@ -10,7 +10,7 @@ test("profile") {
   output_name = "profile-test"
   sources = [ "profile.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
+    "//sdk/fidl/fuchsia.scheduler.deprecated:fuchsia.scheduler.deprecated_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/scheduler/cpp",
     "//zircon/system/ulib/profile",

@@ -101,7 +101,7 @@
                 "fuchsia.pkg.RepositoryManager",
                 "fuchsia.pkg.rewrite.Engine",
                 "fuchsia.posix.socket.Provider",
-                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmExplorer.root",

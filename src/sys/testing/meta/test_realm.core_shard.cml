@@ -215,7 +215,7 @@
                 "fuchsia.kernel.SmcResource",
                 "fuchsia.kernel.Stats",
                 "fuchsia.process.Launcher",
-                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",

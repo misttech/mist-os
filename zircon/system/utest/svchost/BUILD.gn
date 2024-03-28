@@ -11,7 +11,7 @@ test("svchost") {
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
+    "//sdk/fidl/fuchsia.scheduler.deprecated:fuchsia.scheduler.deprecated_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

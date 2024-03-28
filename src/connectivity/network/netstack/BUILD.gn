@@ -168,7 +168,7 @@ go_library("lib") {
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_go($go_toolchain)",
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_go($go_toolchain)",
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_go($go_toolchain)",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_go($go_toolchain)",
+    "//sdk/fidl/fuchsia.scheduler.deprecated:fuchsia.scheduler.deprecated_go($go_toolchain)",
     "//sdk/fidl/fuchsia.stash:fuchsia.stash_go($go_toolchain)",
     "//src/diagnostics/persistence/fidl:persist_go($go_toolchain)",
     "//src/lib/component",

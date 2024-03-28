@@ -34,7 +34,7 @@ where
         netstack_testing_common::realms::KnownServiceProvider::Netstack(
             match N::VERSION {
                 // The prod ns2 has a route for
-                // fuchsia.scheduler.ProfileProvider which is needed for tests
+                // fuchsia.scheduler.deprecated.ProfileProvider which is needed for tests
                 // in this suite.
                 NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => NetstackVersion::ProdNetstack2,
                 v @ NetstackVersion::Netstack3 => v,
@@ -89,11 +89,11 @@ where
 async fn ns_sets_thread_profiles<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let (_realm, mut fs) = create_netstack_with_mock_endpoint::<
-        fidl_fuchsia_scheduler::ProfileProviderRequestStream,
+        fidl_fuchsia_scheduler_deprecated::ProfileProviderRequestStream,
         N,
     >(
         &sandbox,
-        fidl_fuchsia_scheduler::ProfileProviderMarker::PROTOCOL_NAME.to_string(),
+        fidl_fuchsia_scheduler_deprecated::ProfileProviderMarker::PROTOCOL_NAME.to_string(),
         name,
     );
 

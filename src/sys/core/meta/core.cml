@@ -176,7 +176,7 @@
         },
         {
             protocol: [
-                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/scheduler/cpp/fidl.h>
+#include <fuchsia/scheduler/deprecated/cpp/fidl.h>
 #include <lib/syslog/cpp/log_settings.h>
 
 #include <vector>
@@ -165,7 +165,7 @@ Options ParseCommandLine(int argc, char** argv) {
 void RegisterDeadlineProfile(sys::ComponentContext& context,
                              const MixProfileConfig& mix_profile_config,
                              const std::string& prog_name) {
-  fuchsia::scheduler::ProfileProviderSyncPtr profile_provider;
+  fuchsia::scheduler::deprecated::ProfileProviderSyncPtr profile_provider;
   if (auto status = context.svc()->Connect(profile_provider.NewRequest()); status != ZX_OK) {
     FX_PLOGS(FATAL, status) << "could not connect to profile provider";
   }

@@ -47,7 +47,7 @@ import (
 	"fidl/fuchsia/posix/socket"
 	packetsocket "fidl/fuchsia/posix/socket/packet"
 	rawsocket "fidl/fuchsia/posix/socket/raw"
-	"fidl/fuchsia/scheduler"
+	scheduler "fidl/fuchsia/scheduler/deprecated"
 	"fidl/fuchsia/stash"
 	"fidl/fuchsia/update/verify"
 

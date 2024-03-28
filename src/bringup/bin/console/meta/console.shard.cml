@@ -140,7 +140,7 @@
         {
             protocol: [
                 "fuchsia.kernel.DebugBroker",
-                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],

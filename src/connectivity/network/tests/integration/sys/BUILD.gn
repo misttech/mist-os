@@ -12,7 +12,7 @@ rustc_test("sys") {
     ":persistence-configuration",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
+    "//sdk/fidl/fuchsia.scheduler.deprecated:fuchsia.scheduler.deprecated_rust",
     "//src/connectivity/network/testing/netemul/fidl:fuchsia.netemul_rust",
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",

@@ -1,0 +1,26 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.scheduler.deprecated") {
+  sources = [ "profile.fidl" ]
+  sdk_category = "internal"
+  public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
+  visibility = [
+    # Needed by netstack 2 and its integration tests.
+    "//src/connectivity/network/netstack:lib",
+    "//src/connectivity/network/tests/integration/sys:*",
+
+    # Needed by the audio output pipeline benchmarks.
+    "//src/media/audio/audio_core/tools/output_pipeline_benchmark:*",
+    "//vendor/google/media/*",
+
+    # Needed by the ProfileProvider service and its tests.
+    "//src/zircon/tests/profile",
+    "//zircon/system/ulib/profile",
+    "//zircon/system/utest/svchost",
+  ]
+}

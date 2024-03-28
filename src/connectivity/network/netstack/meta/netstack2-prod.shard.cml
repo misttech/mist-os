@@ -8,7 +8,7 @@
     use: [
         {
             protocol: [
-                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.stash.SecureStore",
             ],

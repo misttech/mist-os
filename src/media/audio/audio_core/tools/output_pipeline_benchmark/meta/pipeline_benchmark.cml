@@ -13,7 +13,7 @@
             path: "/custom_artifacts",
         },
         {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            protocol: [ "fuchsia.scheduler.deprecated.ProfileProvider" ],
             from: "parent",
             availability: "optional",
         },

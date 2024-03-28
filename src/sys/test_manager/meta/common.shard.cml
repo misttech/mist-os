@@ -298,7 +298,7 @@
                 // Dart runners allow connections from the Dart Observatory,
                 // for debugging.
                 "fuchsia.posix.socket.Provider",
-                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",

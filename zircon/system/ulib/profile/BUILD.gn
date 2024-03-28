@@ -5,16 +5,13 @@
 import("//build/zircon/zx_library.gni")
 
 zx_library("profile") {
-  sources = [
-    "config.cc",
-    "config.h",
-    "profile.cc",
-  ]
+  sources = [ "profile.cc" ]
   sdk = "source"
   sdk_headers = [ "lib/profile/profile.h" ]
   public_deps = [ "//zircon/system/ulib/svc" ]
   deps = [
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
+    ":config",
+    "//sdk/fidl/fuchsia.scheduler.deprecated:fuchsia.scheduler.deprecated_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/lib/files",

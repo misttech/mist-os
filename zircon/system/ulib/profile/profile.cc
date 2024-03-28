@@ -4,7 +4,7 @@
 
 #include "zircon/syscalls/profile.h"
 
-#include <fidl/fuchsia.scheduler/cpp/wire.h>
+#include <fidl/fuchsia.scheduler.deprecated/cpp/wire.h>
 #include <lib/fit/result.h>
 #include <lib/profile/profile.h>
 #include <lib/syslog/cpp/macros.h>
@@ -32,12 +32,12 @@ constexpr char kConfigPath[] = "/config/profiles";
 using zircon_profile::ConfiguredProfiles;
 using zircon_profile::Role;
 
-class ProfileProvider : public fidl::WireServer<fuchsia_scheduler::ProfileProvider> {
+class ProfileProvider : public fidl::WireServer<fuchsia_scheduler_deprecated::ProfileProvider> {
  public:
   static zx::result<ProfileProvider*> Create(zx::resource profile_rsrc);
 
   void OnConnect(async_dispatcher_t* dispatcher,
-                 fidl::ServerEnd<fuchsia_scheduler::ProfileProvider> server_end) {
+                 fidl::ServerEnd<fuchsia_scheduler_deprecated::ProfileProvider> server_end) {
     bindings_.AddBinding(dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure);
   }
 
@@ -56,7 +56,7 @@ class ProfileProvider : public fidl::WireServer<fuchsia_scheduler::ProfileProvid
   void SetProfileByRole(SetProfileByRoleRequestView request,
                         SetProfileByRoleCompleter::Sync& completer) override;
 
-  fidl::ServerBindingGroup<fuchsia_scheduler::ProfileProvider> bindings_;
+  fidl::ServerBindingGroup<fuchsia_scheduler_deprecated::ProfileProvider> bindings_;
   zx::resource profile_rsrc_;
   ConfiguredProfiles profiles_;
 };
@@ -224,7 +224,7 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
 }
 
 constexpr const char* profile_svc_names[] = {
-    fidl::DiscoverableProtocolName<fuchsia_scheduler::ProfileProvider>,
+    fidl::DiscoverableProtocolName<fuchsia_scheduler_deprecated::ProfileProvider>,
     nullptr,
 };
 
@@ -287,9 +287,10 @@ zx_status_t init(void** out_ctx) {
 zx_status_t connect(void* ctx, async_dispatcher_t* dispatcher, const char* service_name,
                     zx_handle_t request) {
   if (std::string_view{service_name} ==
-      fidl::DiscoverableProtocolName<fuchsia_scheduler::ProfileProvider>) {
+      fidl::DiscoverableProtocolName<fuchsia_scheduler_deprecated::ProfileProvider>) {
     static_cast<ProfileProvider*>(ctx)->OnConnect(
-        dispatcher, fidl::ServerEnd<fuchsia_scheduler::ProfileProvider>{zx::channel{request}});
+        dispatcher,
+        fidl::ServerEnd<fuchsia_scheduler_deprecated::ProfileProvider>{zx::channel{request}});
     return ZX_OK;
   }
 
