@@ -28,6 +28,7 @@ Time ConsumeTime(FuzzedDataProvider& provider, Time max = Time::Max()) {
 }
 
 Duration ConsumeDuration(FuzzedDataProvider& provider, Duration max = Duration::Max()) {
+  ZX_ASSERT(max > 0);
   return Duration{provider.ConsumeIntegralInRange<zx_duration_t>(1, max.raw_value())};
 }
 
@@ -35,7 +36,7 @@ TestThread* AllocateNewThread(FuzzedDataProvider& provider,
                               std::vector<std::unique_ptr<TestThread>>& threads,
                               Time max_start = Time::Max()) {
   Time start = ConsumeTime(provider, max_start);
-  Duration period = ConsumeDuration(provider, Time::Max() - start);
+  Duration period = ConsumeDuration(provider, (Time::Max() - start) + Time{1});
   Duration firm_capacity = ConsumeDuration(provider, period);
   threads.emplace_back(std::make_unique<TestThread>(
       sched::BandwidthParameters{
