@@ -288,8 +288,9 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
             &[
                 KnownServiceProvider::Manager {
                     agent: ManagementAgent::NetCfg(NetCfgVersion::Advanced),
-                    use_dhcp_server: false,
                     config: ManagerConfig::Empty,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
@@ -534,8 +535,9 @@ async fn dhcpv4_client_started<N: Netstack>(name: &str) {
             &[
                 KnownServiceProvider::Manager {
                     agent: ManagementAgent::NetCfg(NetCfgVersion::Advanced),
-                    use_dhcp_server: false,
                     config: ManagerConfig::Empty,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,

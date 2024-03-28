@@ -902,20 +902,22 @@ pub enum WaitForRoutesError<I: FidlRouteIpExt> {
     StreamEnded,
 }
 
-/// Wait for a condition on routing state to be satisfied.
+/// Wait for a condition on routing state to be satisfied, yielding a result
+/// from the predicate.
 ///
 /// With the given `initial_state`, take events from `event_stream` and update
-/// the state, calling `predicate` whenever the state changes. When predicates
-/// returns `True` yield `Ok(())`.
-pub async fn wait_for_routes<
+/// the state, calling `predicate` whenever the state changes. When predicate
+/// returns `Some(T)` yield `Ok(T)`.
+pub async fn wait_for_routes_map<
     I: FidlRouteIpExt,
     S: futures::Stream<Item = Result<Event<I>, WatchError>> + Unpin,
-    F: Fn(&HashSet<InstalledRoute<I>>) -> bool,
+    T,
+    F: Fn(&HashSet<InstalledRoute<I>>) -> Option<T>,
 >(
     event_stream: S,
     initial_state: &mut HashSet<InstalledRoute<I>>,
     predicate: F,
-) -> Result<(), WaitForRoutesError<I>> {
+) -> Result<T, WaitForRoutesError<I>> {
     fold::try_fold_while(
         event_stream.map_err(WaitForRoutesError::ErrorInStream),
         initial_state,
@@ -933,12 +935,9 @@ pub async fn wait_for_routes<
                     Event::Idle => Ok(()),
                     Event::Unknown => Err(WaitForRoutesError::UnknownEvent),
                 }
-                .map(|()| {
-                    if predicate(&accumulated_routes) {
-                        fold::FoldWhile::Done(())
-                    } else {
-                        fold::FoldWhile::Continue(accumulated_routes)
-                    }
+                .map(|()| match predicate(&accumulated_routes) {
+                    Some(t) => fold::FoldWhile::Done(t),
+                    None => fold::FoldWhile::Continue(accumulated_routes),
                 })
             })
         },
@@ -948,6 +947,26 @@ pub async fn wait_for_routes<
     .map_err(|_accumulated_thus_far: &mut HashSet<InstalledRoute<I>>| {
         WaitForRoutesError::StreamEnded
     })
+}
+
+/// Wait for a condition on routing state to be satisfied.
+///
+/// With the given `initial_state`, take events from `event_stream` and update
+/// the state, calling `predicate` whenever the state changes. When predicates
+/// returns `True` yield `Ok(())`.
+pub async fn wait_for_routes<
+    I: FidlRouteIpExt,
+    S: futures::Stream<Item = Result<Event<I>, WatchError>> + Unpin,
+    F: Fn(&HashSet<InstalledRoute<I>>) -> bool,
+>(
+    event_stream: S,
+    initial_state: &mut HashSet<InstalledRoute<I>>,
+    predicate: F,
+) -> Result<(), WaitForRoutesError<I>> {
+    wait_for_routes_map::<I, S, (), _>(event_stream, initial_state, |routes| {
+        predicate(routes).then_some(())
+    })
+    .await
 }
 
 #[cfg(test)]

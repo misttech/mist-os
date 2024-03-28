@@ -12,6 +12,7 @@
         {
             type: "expect_pass_with_err_logs",
             matchers: [
+                "dhcpv4_client_restarts_after_delay",
                 "test_oir_interface_name_conflict_uninstall_existing_netcfg_advanced_ns3",
                 "test_oir_interface_name_conflict_uninstall_existing_netcfg_basic_ns3",
                 "test_oir_interface_name_conflict_reject_netcfg_basic_ns2::*",

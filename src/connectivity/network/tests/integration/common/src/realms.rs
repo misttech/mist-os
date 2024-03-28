@@ -200,13 +200,22 @@ impl ManagerConfig {
 #[allow(missing_docs)]
 pub enum KnownServiceProvider {
     Netstack(NetstackVersion),
-    Manager { agent: ManagementAgent, use_dhcp_server: bool, config: ManagerConfig },
+    Manager {
+        agent: ManagementAgent,
+        config: ManagerConfig,
+        use_dhcp_server: bool,
+        use_out_of_stack_dhcp_client: bool,
+    },
     SecureStash,
-    DhcpServer { persistent: bool },
+    DhcpServer {
+        persistent: bool,
+    },
     DhcpClient,
     Dhcpv6Client,
     DnsResolver,
-    Reachability { eager: bool },
+    Reachability {
+        eager: bool,
+    },
     NetworkTestRealm,
     FakeClock,
 }
@@ -323,7 +332,12 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                 )),
                 ..Default::default()
             },
-            KnownServiceProvider::Manager { agent, use_dhcp_server, config } => {
+            KnownServiceProvider::Manager {
+                agent,
+                use_dhcp_server,
+                config,
+                use_out_of_stack_dhcp_client,
+            } => {
                 let enable_dhcpv6 = match config {
                     ManagerConfig::Dhcpv6 => true,
                     ManagerConfig::Forwarding
@@ -370,6 +384,13 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                                     })
                                     .into_iter(),
                             )
+                            .chain(use_out_of_stack_dhcp_client.then(|| {
+                                fnetemul::Capability::ChildDep(protocol_dep::<
+                                    fnet_dhcp::ClientProviderMarker,
+                                >(
+                                    constants::dhcp_client::COMPONENT_NAME,
+                                ))
+                            }))
                             .chain(
                                 [
                                     fnetemul::Capability::LogSink(fnetemul::Empty {}),

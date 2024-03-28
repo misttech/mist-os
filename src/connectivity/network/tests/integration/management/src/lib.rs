@@ -6,7 +6,11 @@
 
 pub mod virtualization;
 
-use std::{collections::HashMap, net::SocketAddr, num::NonZeroU16};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+    num::NonZeroU16,
+};
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
@@ -17,7 +21,12 @@ use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_masquerade as fnet_masquerade;
+use fidl_fuchsia_net_root as fnet_root;
+use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
+use fidl_fuchsia_netemul_network as fnetemul_network;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 
@@ -30,14 +39,20 @@ use futures::{
     stream::{self, StreamExt as _, TryStreamExt as _},
 };
 use futures_util::AsyncWriteExt;
-use net_declare::{fidl_ip, fidl_ip_v4, fidl_subnet, net_ip_v6, net_subnet_v6, std_ip};
-use net_types::{ethernet::Mac, ip as net_types_ip};
+use net_declare::{
+    fidl_ip, fidl_ip_v4, fidl_subnet, net_ip_v6, net_prefix_length_v4, net_subnet_v6, std_ip,
+};
+use net_types::{
+    ethernet::Mac,
+    ip::{self as net_types_ip, Ipv4},
+};
 use netemul::{RealmTcpListener, RealmTcpStream};
 use netstack_testing_common::{
+    dhcpv4 as dhcpv4_helper,
     interfaces::{self, TestInterfaceExt as _},
     realms::{
-        KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgVersion, Netstack,
-        TestRealmExt as _, TestSandboxExt,
+        KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgBasic, NetCfgVersion,
+        Netstack, Netstack3, TestRealmExt as _, TestSandboxExt,
     },
     try_all, try_any, wait_for_component_stopped, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
@@ -65,11 +80,13 @@ async fn with_netcfg_owned_device<
         &'a netemul::TestNetwork<'a>,
         &'a fnet_interfaces::StateProxy,
         &'a netemul::TestRealm<'a>,
+        &'a netemul::TestSandbox,
     ) -> LocalBoxFuture<'a, ()>,
 >(
     name: &str,
     manager_config: ManagerConfig,
-    with_dhcpv6_client: bool,
+    use_out_of_stack_dhcp_client: bool,
+    extra_known_service_providers: impl IntoIterator<Item = KnownServiceProvider>,
     after_interface_up: F,
 ) -> String {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -80,13 +97,14 @@ async fn with_netcfg_owned_device<
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client,
                     config: manager_config,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
             ]
-            .iter()
-            .chain(with_dhcpv6_client.then_some(&KnownServiceProvider::Dhcpv6Client)),
+            .into_iter()
+            .chain(extra_known_service_providers),
         )
         .expect("create netstack realm");
 
@@ -116,7 +134,7 @@ async fn with_netcfg_owned_device<
     .await
     .expect("wait for non loopback interface");
 
-    let () = after_interface_up(if_id, &network, &interface_state, &realm).await;
+    let () = after_interface_up(if_id, &network, &interface_state, &realm, &sandbox).await;
 
     // Wait for orderly shutdown of the test realm to complete before allowing
     // test interfaces to be cleaned up.
@@ -138,11 +156,13 @@ async fn test_oir<M: Manager, N: Netstack>(name: &str, config: ManagerConfig, pr
     let if_name = with_netcfg_owned_device::<M, N, _>(
         name,
         config,
-        false, /* with_dhcpv6_client */
+        false, /* use_out_of_stack_dhcp_client */
+        [],
         |_if_id: u64,
          _: &netemul::TestNetwork<'_>,
          _: &fnet_interfaces::StateProxy,
-         _: &netemul::TestRealm<'_>| async {}.boxed_local(),
+         _: &netemul::TestRealm<'_>,
+         _: &netemul::TestSandbox| async {}.boxed_local(),
     )
     .await;
 
@@ -168,11 +188,13 @@ async fn test_install_only_no_provisioning<M: Manager, N: Netstack>(name: &str) 
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::AllDelegated,
-        true, /* with_dhcpv6_client */
+        false, /* use_out_of_stack_dhcp_client */
+        [KnownServiceProvider::Dhcpv6Client],
         |_if_id: u64,
          network: &netemul::TestNetwork<'_>,
          _: &fnet_interfaces::StateProxy,
-         _: &netemul::TestRealm<'_>| {
+         _: &netemul::TestRealm<'_>,
+         _: &netemul::TestSandbox| {
             async {
                 let fake_ep = network.create_fake_endpoint().expect("error creating fake ep");
                 let stream = fake_ep
@@ -288,8 +310,9 @@ async fn test_oir_interface_name_conflict_uninstall_existing<M: Manager, N: Nets
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
                     config: ManagerConfig::Empty,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
@@ -426,8 +449,9 @@ async fn test_oir_interface_name_conflict_reject<M: Manager, N: Netstack>(
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
                     config: ManagerConfig::DuplicateNames,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
@@ -839,8 +863,9 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: true,
                     config: ManagerConfig::Empty,
+                    use_dhcp_server: true,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::DhcpServer { persistent: false },
@@ -883,8 +908,9 @@ async fn observes_stop_events<M: Manager, N: Netstack>(name: &str) {
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
                     config: ManagerConfig::Empty,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
@@ -928,8 +954,13 @@ async fn test_forwarding<M: Manager, N: Netstack>(name: &str) {
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::Forwarding,
-        false, /* with_dhcpv6_client */
-        |if_id, _: &netemul::TestNetwork<'_>, _: &fnet_interfaces::StateProxy, realm| {
+        false, /* use_out_of_stack_dhcp_client */
+        [],
+        |if_id,
+         _: &netemul::TestNetwork<'_>,
+         _: &fnet_interfaces::StateProxy,
+         realm,
+         _test_sandbox| {
             async move {
                 let control = realm
                     .interface_control(if_id)
@@ -967,8 +998,9 @@ async fn test_prefix_provider_not_supported<M: Manager, N: Netstack>(name: &str)
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
                     config: ManagerConfig::Empty,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
@@ -1009,8 +1041,9 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
                     config: ManagerConfig::Dhcpv6,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
@@ -1112,8 +1145,9 @@ async fn test_prefix_provider_config_error<M: Manager, N: Netstack>(
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
                     config: ManagerConfig::Dhcpv6,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
@@ -1147,8 +1181,9 @@ async fn test_prefix_provider_double_watch<M: Manager, N: Netstack>(name: &str) 
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
                     config: ManagerConfig::Dhcpv6,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
@@ -1362,8 +1397,9 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::Dhcpv6,
-        true, /* with_dhcpv6_client */
-        |if_id, network, interface_state, realm| {
+        false, /* use_out_of_stack_dhcp_client */
+        [KnownServiceProvider::Dhcpv6Client],
+        |if_id, network, interface_state, realm, _sandbox| {
             async move {
                 // Fake endpoint to inject server packets and intercept client packets.
                 let fake_ep = network.create_fake_endpoint().expect("create fake endpoint");
@@ -1555,8 +1591,9 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
             &[
                 KnownServiceProvider::Manager {
                     agent: ManagementAgent::NetCfg(NetCfgVersion::Advanced),
-                    use_dhcp_server: false,
                     config: ManagerConfig::Empty,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
@@ -1694,4 +1731,261 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
     // Ensure that we can turn off masquerade again.
     assert!(masq_control.set_enabled(false).await.expect("set enabled fidl").expect("set enabled"));
     check_source_ip(client_ip, SocketAddr::from((server_ip, 8082)), &client, &server).await;
+}
+
+#[fuchsia::test]
+async fn dhcpv4_client_restarts_after_delay() {
+    const SERVER_MAC: net_types::ethernet::Mac = net_declare::net_mac!("02:02:02:02:02:02");
+
+    let _name = with_netcfg_owned_device::<NetCfgBasic, Netstack3, _>(
+        "dhcpv4_client_restarts_after_delay",
+        ManagerConfig::Empty,
+        true, /* use_out_of_stack_dhcp_client */
+        [KnownServiceProvider::DhcpClient],
+        |client_interface_id, network, client_state, client_realm, sandbox| {
+            async move {
+                let server_realm: netemul::TestRealm<'_> = sandbox
+                    .create_netstack_realm_with::<Netstack3, _, _>(
+                        "server-realm",
+                        &[KnownServiceProvider::DhcpServer { persistent: false }],
+                    )
+                    .expect("create realm should succeed");
+
+                let server_iface = server_realm
+                    .join_network_with(
+                        &network,
+                        "serveriface",
+                        fnetemul_network::EndpointConfig {
+                            mtu: netemul::DEFAULT_MTU,
+                            mac: Some(Box::new(
+                                fnet_ext::MacAddress { octets: SERVER_MAC.bytes() }.into(),
+                            )),
+                        },
+                        netemul::InterfaceConfig {
+                            name: Some("serveriface".into()),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .expect("join network with realm should succeed");
+                server_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
+
+                let server_proxy = server_realm
+                    .connect_to_protocol::<fnet_dhcp::Server_Marker>()
+                    .expect("connect to Server_ protocol should succeed");
+
+                let config = dhcpv4_helper::TestConfig {
+                    // Intentionally put the server_addr outside the subnet of the
+                    // address assigned to the client. That way, the server won't be reachable
+                    // via the subnet route associated with the DHCP-acquired address.
+                    server_addr: fnet::Ipv4Address { addr: [192, 168, 0, 1] },
+                    managed_addrs: dhcpv4::configuration::ManagedAddresses {
+                        mask: dhcpv4::configuration::SubnetMask::new(net_prefix_length_v4!(24)),
+                        pool_range_start: std::net::Ipv4Addr::new(192, 168, 1, 1),
+                        pool_range_stop: std::net::Ipv4Addr::new(192, 168, 1, 7),
+                    },
+                };
+
+                server_iface
+                    .add_address_and_subnet_route(config.server_addr_with_prefix().into_ext())
+                    .await
+                    .expect("add address should succeed");
+
+                // Because we're not putting the server on the same subnet as its address pool,
+                // we need to explicitly configure it with a route to its address pool's subnet.
+                server_iface
+                    .add_subnet_route(fnet::Subnet {
+                        addr: fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr: [192, 168, 1, 0] }),
+                        prefix_len: 24,
+                    })
+                    .await
+                    .expect("add subnet route");
+
+                dhcpv4_helper::set_server_settings(
+                    &server_proxy,
+                    config.dhcp_parameters().into_iter().chain([
+                        fnet_dhcp::Parameter::BoundDeviceNames(vec![server_iface
+                            .get_interface_name()
+                            .await
+                            .expect("get interface name should succeed")]),
+                        fnet_dhcp::Parameter::Lease(fnet_dhcp::LeaseLength {
+                            // short enough to expire during this test, which
+                            // will prompt the client to go into Renewing state,
+                            // from which it can observe a NetworkUnreachable
+                            // once we later remove the default route.
+                            default: Some(10),
+                            ..Default::default()
+                        }),
+                    ]),
+                    [fnet_dhcp::Option_::Router(vec![config.server_addr])],
+                )
+                .await;
+
+                server_proxy
+                    .start_serving()
+                    .await
+                    .expect("start_serving should not encounter FIDL error")
+                    .expect("start_serving should succeed");
+
+                let if_event_stream = fnet_interfaces_ext::event_stream_from_state(
+                    client_state,
+                    fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+                )
+                .expect("event stream from state");
+                futures::pin_mut!(if_event_stream);
+
+                let mut client_if_state =
+                    fnet_interfaces_ext::InterfaceState::Unknown(client_interface_id);
+
+                let find_ipv4_addr = |properties: &fnet_interfaces_ext::Properties| {
+                    properties.addresses.iter().find_map(|addr| match addr.addr.addr {
+                        fnet::IpAddress::Ipv4(_) => Some(addr.clone()),
+                        fnet::IpAddress::Ipv6(_) => None,
+                    })
+                };
+
+                let dhcp_acquired_addr = fnet_interfaces_ext::wait_interface_with_id(
+                    if_event_stream.by_ref(),
+                    &mut client_if_state,
+                    |fnet_interfaces_ext::PropertiesAndState { properties, state: () }| {
+                        find_ipv4_addr(properties)
+                    },
+                )
+                .await
+                .expect("wait for DHCP-acquired addr");
+
+                assert_eq!(
+                    dhcp_acquired_addr.addr,
+                    fnet::Subnet {
+                        addr: fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr: [192, 168, 1, 1] }),
+                        prefix_len: 24
+                    }
+                );
+
+                let routes_state: fnet_routes::StateV4Proxy = client_realm
+                    .connect_to_protocol::<fnet_routes::StateV4Marker>()
+                    .expect("connect to routes state");
+
+                let routes_event_stream =
+                    fnet_routes_ext::event_stream_from_state::<Ipv4>(&routes_state)
+                        .expect("routes event stream");
+                futures::pin_mut!(routes_event_stream);
+
+                let mut routes = fnet_routes_ext::collect_routes_until_idle::<Ipv4, HashSet<_>>(
+                    routes_event_stream.by_ref(),
+                )
+                .await
+                .expect("collect routes until idle");
+
+                let find_default_route =
+                    |routes: &HashSet<fnet_routes_ext::InstalledRoute<Ipv4>>| {
+                        routes.iter().find_map(
+                            |fnet_routes_ext::InstalledRoute { route, effective_properties: _ }| {
+                                (route.destination.prefix() == 0).then_some(route.clone())
+                            },
+                        )
+                    };
+
+                // The DHCP client discovers a default route from the DHCP server, and netcfg
+                // should install that default route.
+                let default_route = fnet_routes_ext::wait_for_routes_map::<Ipv4, _, _, _>(
+                    routes_event_stream.by_ref(),
+                    &mut routes,
+                    |routes| find_default_route(routes),
+                )
+                .await
+                .expect("should install default route");
+
+                // Removing the default route should cause the DHCP client to exit with a
+                // NetworkUnreachable error due to having no route to the DHCP server. This
+                // causes us to lose the DHCP-acquired address.
+
+                let root_routes = client_realm
+                    .connect_to_protocol::<fnet_root::RoutesV4Marker>()
+                    .expect("connect to fuchsia.net.root.RoutesV4");
+
+                let (global_route_set, server_end) =
+                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
+                        .expect("create RouteSetV4 proxy");
+                root_routes.global_route_set(server_end).expect("create global RouteSetV4");
+
+                let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+                    client_realm
+                        .interface_control(client_interface_id)
+                        .expect("get client interface Control")
+                        .get_authorization_for_interface()
+                        .await
+                        .expect("get authorization");
+
+                global_route_set
+                    .authenticate_for_interface(
+                        fnet_interfaces_admin::ProofOfInterfaceAuthorization {
+                            interface_id,
+                            token,
+                        },
+                    )
+                    .await
+                    .expect("authenticate for interface should not see FIDL error")
+                    .expect("authenticate for interface should succeed");
+
+                // If we're particularly unlucky with CQ timing flakes, the DHCP
+                // client can actually try to renew before the default route is
+                // even originally installed, and observe a NetworkUnreachable.
+                // That's fine for the purposes of the test, so we just ignore
+                // whether the default route was still present at the time that
+                // we tried to remove it.
+                let _: bool = fnet_routes_ext::admin::remove_route::<Ipv4>(
+                    &global_route_set,
+                    &default_route.try_into().expect("convert to FIDL route"),
+                )
+                .await
+                .expect("should not see RouteSet FIDL error")
+                .expect("should not see RouteSet error");
+
+                // Observe the default route removal.
+                fnet_routes_ext::wait_for_routes::<Ipv4, _, _>(
+                    routes_event_stream.by_ref(),
+                    &mut routes,
+                    |routes| find_default_route(routes).is_none(),
+                )
+                .await
+                .expect("should remove default route");
+
+                // Observe the address disappearance.
+                fnet_interfaces_ext::wait_interface_with_id(
+                    if_event_stream.by_ref(),
+                    &mut client_if_state,
+                    |fnet_interfaces_ext::PropertiesAndState { properties, state: () }| {
+                        find_ipv4_addr(properties).is_none().then_some(())
+                    },
+                )
+                .await
+                .expect("wait for DHCP-acquired addr to disappear");
+
+                // Eventually, the DHCP client should be restarted, and we should acquire an IPv4
+                // address and default route again.
+                let new_dhcp_acquired_addr = fnet_interfaces_ext::wait_interface_with_id(
+                    if_event_stream.by_ref(),
+                    &mut client_if_state,
+                    |fnet_interfaces_ext::PropertiesAndState { properties, state: () }| {
+                        find_ipv4_addr(properties)
+                    },
+                )
+                .await
+                .expect("wait for DHCP-acquired addr");
+
+                assert_eq!(dhcp_acquired_addr.addr, new_dhcp_acquired_addr.addr);
+
+                fnet_routes_ext::wait_for_routes::<Ipv4, _, _>(
+                    routes_event_stream.by_ref(),
+                    &mut routes,
+                    |routes| find_default_route(routes).is_some(),
+                )
+                .await
+                .expect("should reinstall default route");
+            }
+            .boxed_local()
+        },
+    )
+    .await;
 }

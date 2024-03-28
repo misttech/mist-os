@@ -190,8 +190,9 @@ async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
                 // configure the DNS resolver accordingly.
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
                     config: ManagerConfig::Empty,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
@@ -328,8 +329,9 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str) {
                 // and configure the DNS resolver accordingly.
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
                     config: ManagerConfig::Dhcpv6,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
                 },
                 KnownServiceProvider::Dhcpv6Client,
                 KnownServiceProvider::DnsResolver,

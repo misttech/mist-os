@@ -391,7 +391,7 @@ mod tests {
                 interface_naming_id,
                 control,
                 config: InterfaceConfigState::Host(HostInterfaceState {
-                    dhcpv4_client: None,
+                    dhcpv4_client: crate::Dhcpv4ClientState::NotRunning,
                     dhcpv6_client_state,
                     dhcpv6_pd_config,
                 }),

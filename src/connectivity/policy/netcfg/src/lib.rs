@@ -38,7 +38,7 @@ use fidl_fuchsia_net_masquerade as fnet_masquerade;
 use fidl_fuchsia_net_name as fnet_name;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_virtualization as fnet_virtualization;
-use fuchsia_async::DurationExt as _;
+use fuchsia_async::{self as fasync, DurationExt as _};
 use fuchsia_component::client::{clone_namespace_svc, new_protocol_connector_in_dir};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_fs::directory as fvfs_watcher;
@@ -49,7 +49,7 @@ use async_trait::async_trait;
 use async_utils::stream::{TryFlattenUnorderedExt as _, WithTag as _};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
 use fuchsia_fs::OpenFlags;
-use futures::{stream::BoxStream, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use futures::{stream::BoxStream, FutureExt, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip_v4, net::prefix_length_v4};
 use net_types::ip::{IpAddress as _, Ipv4, PrefixLength};
 use serde::{Deserialize, Serialize};
@@ -467,8 +467,15 @@ enum InterfaceConfigState {
 }
 
 #[derive(Debug)]
+enum Dhcpv4ClientState {
+    NotRunning,
+    Running(dhcpv4::ClientState),
+    ScheduledRestart(fasync::Timer),
+}
+
+#[derive(Debug)]
 struct HostInterfaceState {
-    dhcpv4_client: Option<dhcpv4::ClientState>,
+    dhcpv4_client: Dhcpv4ClientState,
     dhcpv6_client_state: Option<dhcpv6::ClientState>,
     // The PD configuration to use for the DHCPv6 client on this interface.
     dhcpv6_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
@@ -489,7 +496,7 @@ impl InterfaceState {
             interface_naming_id,
             control,
             config: InterfaceConfigState::Host(HostInterfaceState {
-                dhcpv4_client: None,
+                dhcpv4_client: Dhcpv4ClientState::NotRunning,
                 dhcpv6_client_state: None,
                 dhcpv6_pd_config,
             }),
@@ -769,11 +776,17 @@ impl std::fmt::Debug for RequestStream {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum AllowClientRestart {
+    No,
+    Yes,
+}
+
 #[must_use]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Dhcpv4ConfigurationHandlerResult {
     ContinueOperation,
-    ClientStopped,
+    ClientStopped(AllowClientRestart),
 }
 
 // Events associated with provisioning a device.
@@ -790,6 +803,7 @@ enum ProvisioningEvent {
     Dhcpv4Configuration(
         Option<(NonZeroU64, Result<fnet_dhcp_ext::Configuration, fnet_dhcp_ext::Error>)>,
     ),
+    Dhcpv4ClientDelayedStart(NonZeroU64),
     Dhcpv6PrefixProviderRequest(Result<fnet_dhcpv6::PrefixProviderRequest, fidl::Error>),
     Dhcpv6PrefixControlRequest(
         Option<Result<Option<fnet_dhcpv6::PrefixControlRequest>, fidl::Error>>,
@@ -798,6 +812,11 @@ enum ProvisioningEvent {
     VirtualizationEvent(virtualization::Event),
     MasqueradeEvent(masquerade::Event),
 }
+
+// Per RFC 2131 "The client SHOULD wait a minimum of ten seconds before
+// restarting the configuration process to avoid excessive network traffic in
+// case of looping."
+const DHCP_CLIENT_RESTART_WAIT_TIME: std::time::Duration = std::time::Duration::from_secs(10);
 
 impl<'a> NetCfg<'a> {
     async fn new(
@@ -1093,6 +1112,22 @@ impl<'a> NetCfg<'a> {
                     .as_mut()
                     .map(dhcpv6::PrefixProviderHandler::try_next_prefix_control_request),
             );
+            let mut delayed_dhcpv4_client_starts = self
+                .interface_states
+                .iter_mut()
+                .filter_map(|(id, InterfaceState { config, .. })| match config {
+                    InterfaceConfigState::Host(HostInterfaceState {
+                        dhcpv4_client,
+                        dhcpv6_client_state: _,
+                        dhcpv6_pd_config: _,
+                    }) => match dhcpv4_client {
+                        Dhcpv4ClientState::NotRunning => None,
+                        Dhcpv4ClientState::Running(_) => None,
+                        Dhcpv4ClientState::ScheduledRestart(timer) => Some(timer.map(|()| *id)),
+                    },
+                    InterfaceConfigState::WlanAp(_) => None,
+                })
+                .collect::<futures::stream::FuturesUnordered<_>>();
             let event = futures::select! {
                 netdev_res = netdev_stream.try_next() => {
                     Event::NetworkDeviceResult(netdev_res)
@@ -1118,6 +1153,11 @@ impl<'a> NetCfg<'a> {
                 dhcpv4_configuration = self.dhcpv4_configuration_streams.next() => {
                     Event::ProvisioningEvent(
                         ProvisioningEvent::Dhcpv4Configuration(dhcpv4_configuration)
+                    )
+                }
+                interface_id = delayed_dhcpv4_client_starts.select_next_some() => {
+                    Event::ProvisioningEvent(
+                        ProvisioningEvent::Dhcpv4ClientDelayedStart(interface_id)
                     )
                 }
                 dhcpv6_prefix_req = dhcpv6_prefix_provider_requests.select_next_some() => {
@@ -1148,6 +1188,10 @@ impl<'a> NetCfg<'a> {
                 }
                 complete => return Err(anyhow::anyhow!("eventloop ended unexpectedly")),
             };
+
+            // `delayed_dhcpv4_client_starts` mutably borrows the delayed-start timers from `self`'s
+            // InterfaceState map, so we have to drop it here to regain access to `self`.
+            drop(delayed_dhcpv4_client_starts);
             match event {
                 Event::NetworkDeviceResult(netdev_res) => {
                     let instance =
@@ -1287,7 +1331,7 @@ impl<'a> NetCfg<'a> {
                     config.expect("DHCPv4 configuration stream is never exhausted");
                 match self.handle_dhcpv4_configuration(interface_id, config).await {
                     Dhcpv4ConfigurationHandlerResult::ContinueOperation => (),
-                    Dhcpv4ConfigurationHandlerResult::ClientStopped => {
+                    Dhcpv4ConfigurationHandlerResult::ClientStopped(allow_restart) => {
                         let interface_name = self
                             .interface_properties
                             .get(&interface_id)
@@ -1350,10 +1394,24 @@ impl<'a> NetCfg<'a> {
                                     dhcpv4::AlreadyObservedClientExit::Yes,
                                 )
                                 .await;
+
+                                match allow_restart {
+                                    AllowClientRestart::No => (),
+                                    AllowClientRestart::Yes => {
+                                        // The client exited due to an unexpected error. Schedule it
+                                        // to be restarted after waiting a backoff period.
+                                        *dhcpv4_client = Dhcpv4ClientState::ScheduledRestart(
+                                            fasync::Timer::new(DHCP_CLIENT_RESTART_WAIT_TIME),
+                                        );
+                                    }
+                                }
                             }
                         }
                     }
                 }
+            }
+            ProvisioningEvent::Dhcpv4ClientDelayedStart(interface_id) => {
+                self.on_delayed_dhcpv4_client_start(interface_id).await;
             }
             ProvisioningEvent::Dhcpv6PrefixProviderRequest(res) => {
                 match res {
@@ -1423,7 +1481,7 @@ impl<'a> NetCfg<'a> {
     async fn handle_dhcpv4_client_stop(
         id: NonZeroU64,
         name: &str,
-        dhcpv4_client: &mut Option<dhcpv4::ClientState>,
+        dhcpv4_client: &mut Dhcpv4ClientState,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dns_servers: &mut DnsServers,
         control: &fnet_interfaces_ext::admin::Control,
@@ -1431,39 +1489,46 @@ impl<'a> NetCfg<'a> {
         lookup_admin: &fnet_name::LookupAdminProxy,
         already_observed_client_exit: dhcpv4::AlreadyObservedClientExit,
     ) {
-        if let Some(fut) = dhcpv4_client.take().map(|c| {
-            dhcpv4::stop_client(
-                id,
-                name,
-                c,
-                configuration_streams,
-                dns_servers,
-                control,
-                stack,
-                lookup_admin,
-                already_observed_client_exit,
-            )
-        }) {
-            fut.await
+        match std::mem::replace(dhcpv4_client, Dhcpv4ClientState::NotRunning) {
+            Dhcpv4ClientState::NotRunning => (),
+            Dhcpv4ClientState::Running(c) => {
+                dhcpv4::stop_client(
+                    id,
+                    name,
+                    c,
+                    configuration_streams,
+                    dns_servers,
+                    control,
+                    stack,
+                    lookup_admin,
+                    already_observed_client_exit,
+                )
+                .await;
+            }
+            Dhcpv4ClientState::ScheduledRestart(_) => (),
         }
     }
 
     fn handle_dhcpv4_client_start(
         id: NonZeroU64,
         name: &str,
-        dhcpv4_client: &mut Option<dhcpv4::ClientState>,
+        dhcpv4_client: &mut Dhcpv4ClientState,
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
     ) {
-        *dhcpv4_client = dhcpv4_client_provider
-            .map(|p| dhcpv4::start_client(id, name, p, configuration_streams));
+        *dhcpv4_client = match dhcpv4_client_provider {
+            None => Dhcpv4ClientState::NotRunning,
+            Some(p) => {
+                Dhcpv4ClientState::Running(dhcpv4::start_client(id, name, p, configuration_streams))
+            }
+        };
     }
 
     async fn handle_dhcpv4_client_update(
         id: NonZeroU64,
         name: &str,
         online: bool,
-        dhcpv4_client: &mut Option<dhcpv4::ClientState>,
+        dhcpv4_client: &mut Dhcpv4ClientState,
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dns_servers: &mut DnsServers,
@@ -1493,6 +1558,58 @@ impl<'a> NetCfg<'a> {
             )
             .await
         }
+    }
+
+    async fn on_delayed_dhcpv4_client_start(&mut self, interface_id: NonZeroU64) {
+        let Self {
+            dhcpv4_client_provider,
+            interface_states,
+            interface_properties,
+            dhcpv4_configuration_streams,
+            ..
+        } = self;
+
+        let dhcpv4_client = match interface_states.get_mut(&interface_id).and_then(
+            |InterfaceState { config, .. }| match config {
+                InterfaceConfigState::Host(HostInterfaceState {
+                    dhcpv4_client,
+                    dhcpv6_client_state: _,
+                    dhcpv6_pd_config: _,
+                }) => Some(dhcpv4_client),
+                InterfaceConfigState::WlanAp(_) => None,
+            },
+        ) {
+            Some(state) => state,
+            None => {
+                // It's fine for the interface to have been removed before we
+                // got around to restarting the client.
+                return;
+            }
+        };
+
+        match dhcpv4_client {
+            Dhcpv4ClientState::NotRunning => (),
+            Dhcpv4ClientState::Running(_) => {
+                // We already restarted the client before reaching this point.
+                return;
+            }
+            Dhcpv4ClientState::ScheduledRestart(_) => {
+                *dhcpv4_client = Dhcpv4ClientState::NotRunning;
+            }
+        };
+
+        let properties = match interface_properties.get(&interface_id) {
+            Some(fnet_interfaces_ext::PropertiesAndState { properties, state: () }) => properties,
+            None => return,
+        };
+
+        Self::handle_dhcpv4_client_start(
+            properties.id,
+            &properties.name,
+            dhcpv4_client,
+            dhcpv4_client_provider.as_ref(),
+            dhcpv4_configuration_streams,
+        );
     }
 
     /// Handles an interface watcher event (existing, added, changed, or removed).
@@ -2806,7 +2923,7 @@ impl<'a> NetCfg<'a> {
     ) -> Dhcpv4ConfigurationHandlerResult {
         let configuration = match res {
             Err(error) => {
-                match error {
+                let allow_restart = match error {
                     fnet_dhcp_ext::Error::UnexpectedExit(reason) => match reason {
                         Some(reason) => match reason {
                             fnet_dhcp::ClientExitReason::AddressRemovedByUser => {
@@ -2814,6 +2931,9 @@ impl<'a> NetCfg<'a> {
                                     "DHCP client exited because its \
                                     bound address was removed (iface={interface_id})"
                                 );
+                                // The user intentionally removed the DHCP client's address, so we
+                                // shouldn't automatically restart the client.
+                                AllowClientRestart::No
                             }
                             reason @ (
                                 fnet_dhcp::ClientExitReason::ClientAlreadyExistsOnInterface
@@ -2827,6 +2947,8 @@ impl<'a> NetCfg<'a> {
                             ) => {
                                 tracing::error!("DHCP client unexpectedly exited \
                                                 (iface={interface_id}, reason={reason:?})");
+                                // The exit was unexpected, so we should restart the client.
+                                AllowClientRestart::Yes
                             }
                         },
                         None => {
@@ -2834,6 +2956,7 @@ impl<'a> NetCfg<'a> {
                                 "DHCP client unexpectedly exited without \
                                 giving a reason (iface={interface_id})"
                             );
+                            AllowClientRestart::Yes
                         }
                     },
                     error @ (fnet_dhcp_ext::Error::ApiViolation(_)
@@ -2843,9 +2966,10 @@ impl<'a> NetCfg<'a> {
                     | fnet_dhcp_ext::Error::MissingExitReason) => {
                         tracing::error!("DHCP client exited due to error \
                                         (iface={interface_id}, error={error:?})");
+                                        AllowClientRestart::Yes
                     }
                 };
-                return Dhcpv4ConfigurationHandlerResult::ClientStopped;
+                return Dhcpv4ConfigurationHandlerResult::ClientStopped(allow_restart);
             }
             Ok(configuration) => configuration,
         };
@@ -2862,9 +2986,15 @@ impl<'a> NetCfg<'a> {
                     dhcpv6_client_state: _,
                     dhcpv6_pd_config: _,
                 }) => (
-                    dhcpv4_client.as_mut().unwrap_or_else(|| {
-                        panic!("interface {} does not have a running DHCPv4 client", interface_id)
-                    }),
+                    match dhcpv4_client {
+                        Dhcpv4ClientState::Running(client) => client,
+                        Dhcpv4ClientState::NotRunning | Dhcpv4ClientState::ScheduledRestart(_) => {
+                            panic!(
+                                "interface {} does not have a running DHCPv4 client",
+                                interface_id
+                            )
+                        }
+                    },
                     control,
                 ),
                 InterfaceConfigState::WlanAp(wlan_ap_state) => {
@@ -3958,8 +4088,15 @@ mod tests {
         responder.send(Ok(())).expect("send set dns servers response");
     }
 
+    #[test_case(Some(fnet_dhcp::ClientExitReason::UnableToOpenSocket), AllowClientRestart::Yes)]
+    #[test_case(Some(fnet_dhcp::ClientExitReason::NetworkUnreachable), AllowClientRestart::Yes)]
+    #[test_case(None, AllowClientRestart::Yes)]
+    #[test_case(Some(fnet_dhcp::ClientExitReason::AddressRemovedByUser), AllowClientRestart::No)]
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn dhcpv4_handles_client_exit() {
+    async fn dhcpv4_handles_client_exit(
+        exit_reason: Option<fnet_dhcp::ClientExitReason>,
+        expected_allow_restart: AllowClientRestart,
+    ) {
         let (
             mut netcfg,
             ServerEnds {
@@ -3993,7 +4130,7 @@ mod tests {
         );
 
         // Make sure the DHCPv4 client is created on interface up.
-        let (_client_stream, control_handle, _responder) = {
+        let (client_stream, control_handle, responder) = {
             netcfg
                 .handle_interface_watcher_event(
                     fnet_interfaces::Event::Added(fnet_interfaces::Properties {
@@ -4042,9 +4179,14 @@ mod tests {
         };
 
         // Simulate the client exiting with an error.
-        control_handle
-            .send_on_exit(fnet_dhcp::ClientExitReason::UnableToOpenSocket)
-            .expect("sending OnExit should succeed");
+        match exit_reason {
+            Some(reason) => {
+                control_handle.send_on_exit(reason).expect("sending OnExit should succeed");
+            }
+            None => {}
+        }
+
+        drop((client_stream, control_handle, responder));
 
         let (got_interface_id, got_response) = netcfg
             .dhcpv4_configuration_streams
@@ -4055,7 +4197,10 @@ mod tests {
 
         let dhcpv4_result =
             netcfg.handle_dhcpv4_configuration(got_interface_id, got_response).await;
-        assert_matches!(dhcpv4_result, Dhcpv4ConfigurationHandlerResult::ClientStopped);
+        assert_eq!(
+            dhcpv4_result,
+            Dhcpv4ConfigurationHandlerResult::ClientStopped(expected_allow_restart)
+        );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
