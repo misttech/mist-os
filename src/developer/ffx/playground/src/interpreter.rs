@@ -338,7 +338,13 @@ impl InterpreterInner {
                     }
                     "fuchsia.io/File".to_owned()
                 }
-                fio::NodeInfoDeprecated::Directory(_) => "fuchsia.io/Directory".to_owned(),
+                fio::NodeInfoDeprecated::Directory(_) => {
+                    if !flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+                        flags |= fio::OpenFlags::RIGHT_READABLE;
+                        continue;
+                    }
+                    "fuchsia.io/Directory".to_owned()
+                }
                 fio::NodeInfoDeprecated::Service(fio::Service) => {
                     let end = path.rfind('/');
 

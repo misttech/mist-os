@@ -30,6 +30,7 @@ impl Interpreter {
             let inner_weak = Arc::downgrade(&self.inner);
             let fs_root_getter =
                 self.get_runnable("$fs_root").await.expect("Could not compile fs_root getter");
+            let fs_root_getter_clone = fs_root_getter.clone();
             let pwd_getter = self.get_runnable("$pwd").await.expect("Could not compile pwd getter");
             let pwd_getter_clone = pwd_getter.clone();
             self.add_command("open", move |mut args, underscore| {
@@ -131,7 +132,7 @@ impl Interpreter {
             else {
                 unreachable!("cd setter wasn't an invocable");
             };
-            let pwd_getter = pwd_getter_clone;
+            let pwd_getter = pwd_getter_clone.clone();
             self.add_command("cd", move |args, _| {
                 let pwd_setter = pwd_setter.clone();
                 let pwd_getter = pwd_getter.clone();
@@ -157,6 +158,115 @@ impl Interpreter {
             })
             .await
             .expect("Failed to install `cd` command");
+
+            let inner_weak = Arc::downgrade(&self.inner);
+            let pwd_getter = pwd_getter_clone.clone();
+            let fs_root_getter = fs_root_getter_clone.clone();
+            let fs_root_copy_getter = self
+                .get_runnable(&format!(
+                    "req \\o fs_root @Open {{ flags: {}, mode: 0, path: \".\", object: $o }}",
+                    fio::OpenFlags::RIGHT_READABLE.bits()
+                ))
+                .await
+                .expect("fs_root open call failed to compile");
+            // Returns an iterator of objects of the form
+            // { "name": Value::String, "kind": Value::String }
+            self.add_command("ls", move |args, _| {
+                let pwd_getter = pwd_getter.clone();
+                let fs_root_copy_getter = fs_root_copy_getter.clone();
+                let inner_weak = inner_weak.clone();
+                let fs_root_getter = fs_root_getter.clone();
+                async move {
+                    let Some(inner) = inner_weak.upgrade() else {
+                        return Err(error!("Interpreter died"));
+                    };
+
+                    let mut pwd = pwd_getter().await?;
+
+                    let path = if args.is_empty() {
+                        ".".to_owned()
+                    } else if args.len() > 1 {
+                        return Err(error!("ls takes at most one argument"));
+                    } else {
+                        let [path] = args.try_into().unwrap();
+
+                        let Value::String(path) = path else {
+                            return Err(error!("path must be a string"));
+                        };
+
+                        path
+                    };
+
+                    let path = canonicalize_path(path, pwd.duplicate())?;
+                    let fs_root = fs_root_getter().await?;
+
+                    let (parent_path, name) = path.rsplit_once("/").unwrap_or(("", path.as_str()));
+
+                    let dir = if parent_path.is_empty() {
+                        fs_root_copy_getter()
+                            .await?
+                            .try_client_channel(inner.lib_namespace(), "fuchsia.io/Node")
+                            .map_err(|_| error!("{parent_path} is not a directory"))?
+                    } else {
+                        inner
+                            .open(parent_path.to_owned(), fs_root, pwd)
+                            .await?
+                            .try_client_channel(inner.lib_namespace(), "fuchsia.io/Directory")
+                            .map_err(|_| error!("{parent_path} is not a directory"))?
+                    };
+
+                    let dir = fuchsia_async::Channel::from_channel(dir);
+                    let dir = fio::DirectoryProxy::from_channel(dir);
+
+                    let dir = if name.is_empty() {
+                        dir
+                    } else {
+                        let entry = fuchsia_fs::directory::readdir(&dir)
+                            .await?
+                            .into_iter()
+                            .find(|x| x.name == name)
+                            .ok_or_else(|| {
+                                error!(
+                                    "No file named `{name}` in `{}`",
+                                    if parent_path.is_empty() { "/" } else { parent_path }
+                                )
+                            })?;
+
+                        if entry.kind == fuchsia_fs::directory::DirentKind::Directory {
+                            let (client, server) =
+                                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+                            let server = fidl::endpoints::ServerEnd::new(server.into_channel());
+                            dir.open(
+                                fio::OpenFlags::RIGHT_READABLE,
+                                fio::ModeType::empty(),
+                                name,
+                                server,
+                            )?;
+                            client
+                        } else {
+                            return Ok(Value::Object(vec![
+                                ("name".to_owned(), Value::String(name.to_owned())),
+                                ("kind".to_owned(), Value::String(format!("{:?}", entry.kind))),
+                            ]));
+                        }
+                    };
+
+                    Ok(Value::List(
+                        fuchsia_fs::directory::readdir(&dir)
+                            .await?
+                            .into_iter()
+                            .map(|x| {
+                                Value::Object(vec![
+                                    ("name".to_owned(), Value::String(x.name)),
+                                    ("kind".to_owned(), Value::String(format!("{:?}", x.kind))),
+                                ])
+                            })
+                            .collect(),
+                    ))
+                }
+            })
+            .await
+            .expect("Failed to install `ls` command");
         };
 
         let Either::Left(_) = futures::future::select(pin!(fut), executor_fut).await else {
@@ -276,6 +386,7 @@ mod test {
     use fidl_codec::Value as FidlValue;
     use fidl_fuchsia_io as fio;
     use futures::StreamExt;
+    use std::collections::HashMap;
 
     #[fuchsia::test]
     async fn open() {
@@ -379,6 +490,92 @@ mod test {
                 assert_eq!("/test", &a);
                 assert_eq!("/test/foo", &b);
                 assert_eq!("/", &c);
+            }).await
+    }
+
+    #[fuchsia::test]
+    async fn ls() {
+        Test::test("ls /test")
+            .with_fidl()
+            .with_standard_test_dirs()
+            .check(|value| {
+                let Value::List(value) = value else {
+                    panic!();
+                };
+                let [Value::Object(a), Value::Object(b)]: [Value; 2] = value.try_into().unwrap()
+                else {
+                    panic!();
+                };
+                let mut a: HashMap<_, _> = a.into_iter().collect();
+                let mut b: HashMap<_, _> = b.into_iter().collect();
+
+                let a_name = a.get("name").unwrap();
+                let Value::String(a_name) = a_name else {
+                    panic!();
+                };
+
+                if a_name != "foo" {
+                    std::mem::swap(&mut a, &mut b);
+                }
+
+                let a_name = a.remove("name").unwrap();
+                let a_kind = a.remove("kind").unwrap();
+                let b_name = b.remove("name").unwrap();
+                let b_kind = b.remove("kind").unwrap();
+
+                assert!(a.is_empty());
+                assert!(b.is_empty());
+
+                let Value::String(a_name) = a_name else {
+                    panic!();
+                };
+
+                let Value::String(b_name) = b_name else {
+                    panic!();
+                };
+
+                let Value::String(a_kind) = a_kind else {
+                    panic!();
+                };
+
+                let Value::String(b_kind) = b_kind else {
+                    panic!();
+                };
+
+                assert_eq!(&a_name, "foo");
+                assert_eq!(&b_name, "neils_philosophy");
+                assert_eq!(&a_kind, "Directory");
+                assert_eq!(&b_kind, "File");
+            })
+            .await
+    }
+
+    #[fuchsia::test]
+    async fn ls_file() {
+        Test::test("ls /test/neils_philosophy")
+            .with_fidl()
+            .with_standard_test_dirs()
+            .check(|value| {
+                let Value::Object(value) = value else {
+                    panic!();
+                };
+                let mut value: HashMap<_, _> = value.into_iter().collect();
+
+                let name = value.remove("name").unwrap();
+                let kind = value.remove("kind").unwrap();
+
+                assert!(value.is_empty());
+
+                let Value::String(name) = name else {
+                    panic!();
+                };
+
+                let Value::String(kind) = kind else {
+                    panic!();
+                };
+
+                assert_eq!(&name, "neils_philosophy");
+                assert_eq!(&kind, "File");
             })
             .await
     }
