@@ -34,9 +34,13 @@ class VulkanTest {
   static bool ExecUsingQueue(VulkanTest* t1, VulkanTest* t2, bool temporary);
 
  private:
+  static constexpr uint32_t kSemaphoreCount = 2;
+
   bool InitVulkan();
   bool InitImage();
   void VerifyZirconEventSemaphoresAreAvailable() const;
+  static bool Export(VulkanTest* t,
+                     std::array<zx_handle_t, kSemaphoreCount>* exported_event_handles);
 
   bool is_initialized_ = false;
 
@@ -50,7 +54,6 @@ class VulkanTest {
   VkDevice vk_device_{};
   VkQueue vk_queue_{};
 
-  static constexpr uint32_t kSemaphoreCount = 2;
   std::array<VkSemaphore, kSemaphoreCount> vk_semaphores_{};
 };
 
@@ -306,28 +309,34 @@ void VulkanTest::VerifyZirconEventSemaphoresAreAvailable() const {
                 VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT_KHR);
 }
 
-bool VulkanTest::Exec(VulkanTest* t1, VulkanTest* t2, bool temporary) {
-  VkResult result;
-
-  std::vector<uint32_t> exported_event_handles(kSemaphoreCount);
-
-  // Create and take ownership of Zircon event handles from the semaphores under |t1|
+bool VulkanTest::Export(VulkanTest* t,
+                        std::array<zx_handle_t, kSemaphoreCount>* exported_event_handles) {
+  // Create and take ownership of Zircon event handles from the semaphores under |t|
   // that were configured for export.
   for (uint32_t i = 0; i < kSemaphoreCount; i++) {
     VkSemaphoreGetZirconHandleInfoFUCHSIA info{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_ZIRCON_HANDLE_INFO_FUCHSIA,
         .pNext = nullptr,
-        .semaphore = t1->vk_semaphores_[i],
-        .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA};
-    result =
-        t1->vkGetSemaphoreZirconHandleFUCHSIA_(t1->vk_device_, &info, &exported_event_handles[i]);
+        .semaphore = t->vk_semaphores_[i],
+        .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA,
+    };
+    VkResult result =
+        t->vkGetSemaphoreZirconHandleFUCHSIA_(t->vk_device_, &info, &(*exported_event_handles)[i]);
     RTN_IF_VK_ERR(false, result, "vkGetSemaphoreZirconHandleFUCHSIA");
   }
 
-  std::vector<std::unique_ptr<magma::PlatformSemaphore>> platform_semaphore_exports;
+  return true;
+}
+
+bool VulkanTest::Exec(VulkanTest* t1, VulkanTest* t2, bool temporary) {
+  std::array<zx_handle_t, kSemaphoreCount> exported_event_handles;
+  if (!Export(t1, &exported_event_handles))
+    return false;
 
   // Transfer the ownership of the exported semaphore event handles
   // (the exported semaphore's payload) to Vulkan by importing them into |t2->vk_semaphores_|.
+  VkResult result;
+  std::vector<std::unique_ptr<magma::PlatformSemaphore>> platform_semaphore_exports;
   for (uint32_t i = 0; i < kSemaphoreCount; i++) {
     platform_semaphore_exports.emplace_back(
         magma::PlatformSemaphore::Import(exported_event_handles[i], 0 /* flags */));
@@ -347,19 +356,12 @@ bool VulkanTest::Exec(VulkanTest* t1, VulkanTest* t2, bool temporary) {
   }
 
   // Test semaphores.
+  std::fill(exported_event_handles.begin(), exported_event_handles.end(), ZX_HANDLE_INVALID);
+  if (!Export(t2, &exported_event_handles))
+    return false;
+
   for (uint32_t i = 0; i < kSemaphoreCount; i++) {
     auto& platform_semaphore_export = platform_semaphore_exports[i];
-
-    // Create and take ownership of Zircon event handles from the semaphores now under |t2|
-    // that were initialized by the import operation from |t1| above.
-    VkSemaphoreGetZirconHandleInfoFUCHSIA info{
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_ZIRCON_HANDLE_INFO_FUCHSIA,
-        .pNext = nullptr,
-        .semaphore = t2->vk_semaphores_[i],
-        .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA};
-    result =
-        t1->vkGetSemaphoreZirconHandleFUCHSIA_(t2->vk_device_, &info, &exported_event_handles[i]);
-    RTN_IF_VK_ERR(false, result, "vkGetSemaphoreZirconHandleFUCHSIA");
 
     // Transfer handle ownership into magma::PlatformSemaphore (zx_event wrapper).
     std::shared_ptr<magma::PlatformSemaphore> platform_semaphore_import =
@@ -383,21 +385,13 @@ bool VulkanTest::Exec(VulkanTest* t1, VulkanTest* t2, bool temporary) {
 bool VulkanTest::ExecUsingQueue(VulkanTest* t1, VulkanTest* t2, bool temporary) {
   VkResult result;
 
-  std::vector<uint32_t> handle(kSemaphoreCount);
+  std::array<zx_handle_t, kSemaphoreCount> exported_event_handles;
+  if (!Export(t1, &exported_event_handles))
+    return false;
 
-  // Export semaphores
-  for (uint32_t i = 0; i < kSemaphoreCount; i++) {
-    VkSemaphoreGetZirconHandleInfoFUCHSIA info{
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_ZIRCON_HANDLE_INFO_FUCHSIA,
-        .pNext = nullptr,
-        .semaphore = t1->vk_semaphores_[i],
-        .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA,
-    };
-    result = t1->vkGetSemaphoreZirconHandleFUCHSIA_(t1->vk_device_, &info, &handle[i]);
-    RTN_IF_VK_ERR(false, result, "vkGetSemaphoreZirconHandleFUCHSIA");
-  }
-
-  // Import semaphores
+  // Create and take ownership of Zircon event handles from the semaphores under |t1|
+  // Transfer the ownership of the exported semaphore event handles
+  // (the exported semaphore's payload) to Vulkan by importing them into |t2->vk_semaphores_|.
   for (uint32_t i = 0; i < kSemaphoreCount; i++) {
     uint32_t flags = temporary ? VK_SEMAPHORE_IMPORT_TEMPORARY_BIT_KHR : 0;
     VkImportSemaphoreZirconHandleInfoFUCHSIA import_info = {
@@ -406,9 +400,9 @@ bool VulkanTest::ExecUsingQueue(VulkanTest* t1, VulkanTest* t2, bool temporary) 
         .semaphore = t2->vk_semaphores_[i],
         .flags = flags,
         .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA,
-        .zirconHandle = handle[i]};
+        .zirconHandle = exported_event_handles[i]};
 
-    result = t1->vkImportSemaphoreZirconHandleFUCHSIA_(t2->vk_device_, &import_info);
+    result = t2->vkImportSemaphoreZirconHandleFUCHSIA_(t2->vk_device_, &import_info);
     RTN_IF_VK_ERR(false, result, "vkImportSemaphoreZirconHandleFUCHSIA");
   }
 
