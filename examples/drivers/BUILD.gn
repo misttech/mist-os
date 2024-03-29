@@ -11,6 +11,7 @@ group("drivers") {
     "simple/dfv1:pkg",
     "simple/dfv2:pkg",
     "skeleton:pkg",
+    "template:bazel_package",
     "transport",
   ]
 }
@@ -21,6 +22,7 @@ group("hermetic_tests") {
     "demo-number:hermetic_tests",
     "driver_test_realm:hermetic_tests",
     "simple/dfv2/tests:simple-driver-hermetic-test-pkg",
+    "template:template-test",
     "transport:hermetic_tests",
   ]
 }

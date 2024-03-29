@@ -211,6 +211,10 @@ group("non_hermetic_deps") {
     "//src/tests/early-boot-coverage/*",
     "//zircon/kernel/lib/userabi/userboot/tests:*",
   ]
+
+  # TODO(https://fxbug.dev/331492588): Template driver example wraps Bazel output in Ninja, and
+  # depends on non_hermetic_deps.
+  visibility += [ "////examples/drivers/template:*" ]
 }
 
 # Build targets that use the legacy zx_library and zx_host_tool templates
