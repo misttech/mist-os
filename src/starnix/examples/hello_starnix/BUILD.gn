@@ -14,6 +14,8 @@ executable("bin") {
     sources = [ "hello_x64.S" ]
   } else if (current_cpu == "arm64") {
     sources = [ "hello_aarch64.S" ]
+  } else if (current_cpu == "riscv64") {
+    sources = [ "hello_riscv64.S" ]
   }
 
   disable_syslog_backend = true
