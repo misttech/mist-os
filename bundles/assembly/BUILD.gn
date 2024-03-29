@@ -3352,6 +3352,16 @@ assembly_input_bundle("power_framework") {
     "//src/power/broker:package",
     "//src/power/system-activity-governor:package",
   ]
+  base_packages = [ "//src/devices/hrtimer/bin:hrtimer-ctl" ]
+
+  # When power framework becomes available on user builds,
+  # this tool should be moved to core_realm_development_access
+  shell_commands = [
+    {
+      package = "hrtimer-ctl"
+      components = [ "hrtimer-ctl" ]
+    },
+  ]
 }
 
 # Example assembly input bundle for testing
