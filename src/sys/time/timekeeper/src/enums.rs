@@ -152,6 +152,9 @@ pub enum ClockCorrectionStrategy {
     /// The clock will be slewed to the new value by applying whatever rate change is necessary to
     /// complete the correction within the maximum allowed duration.
     MaxDurationSlew,
+    /// The clock error bound will be set to maximum value. This means we lost the information
+    /// about clock correctness.
+    MaxErrorBound,
 }
 
 // Required to instantiate a circular buffer of clock corrections in inspect.
@@ -167,6 +170,7 @@ impl Into<CobaltTrackEvent> for ClockCorrectionStrategy {
             Self::Step => CobaltTrackEvent::CorrectionByStep,
             Self::NominalRateSlew => CobaltTrackEvent::CorrectionByNominalRateSlew,
             Self::MaxDurationSlew => CobaltTrackEvent::CorrectionByMaxDurationSlew,
+            Self::MaxErrorBound => CobaltTrackEvent::MaxErrorBoundSet,
         }
     }
 }

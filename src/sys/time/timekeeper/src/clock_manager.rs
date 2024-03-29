@@ -58,11 +58,16 @@ const ERROR_BOUND_UPDATE: u64 = 100_000_000; // 100ms
 /// The interval at which the error bound will be refreshed while no other events are in progress.
 const ERROR_REFRESH_INTERVAL: zx::Duration = zx::Duration::from_minutes(6);
 
+/// Denotes an unknown clock error bound
+const ZX_CLOCK_UNKNOWN_ERROR_BOUND: u64 = std::u64::MAX;
+
 /// Describes how a correction will be made to a clock.
 enum ClockCorrection {
     Step(Step),
     MaxDurationSlew(Slew),
     NominalRateSlew(Slew),
+    /// Set the error bound to maximum known.
+    MaxErrorBound,
 }
 
 impl ClockCorrection {
@@ -104,6 +109,9 @@ impl ClockCorrection {
                     (slew.duration.into_nanos() * slew.slew_rate_adjust as i64) / MILLION,
                 )
             }
+            // Setting max error bound does not result in a clock change, only the clock
+            // errro bound change.
+            ClockCorrection::MaxErrorBound => zx::Duration::ZERO,
         }
     }
 
@@ -113,6 +121,7 @@ impl ClockCorrection {
             ClockCorrection::Step(_) => ClockCorrectionStrategy::Step,
             ClockCorrection::NominalRateSlew(_) => ClockCorrectionStrategy::NominalRateSlew,
             ClockCorrection::MaxDurationSlew(_) => ClockCorrectionStrategy::MaxDurationSlew,
+            ClockCorrection::MaxErrorBound => ClockCorrectionStrategy::MaxErrorBound,
         }
     }
 }
@@ -393,14 +402,20 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                 zx::Duration::from_millis(10)
             };
             select! {
-                // TODO: b/304805834 - Add actual command processing here.
-                // Respond to a command.
                 command = receiver.next() => {
                     debug!("received command: {:?}", &command);
+
+                    // If a signal is received, set the error bound to unknown.
+                    if let Some(_) = command {
+                        self.record_correction(
+                            ClockCorrection::MaxErrorBound, &Default::default(), zx::Time::ZERO);
+                    }
+
+                    // If a test signaler is present, acknowledge command receipt.
+                    // The signaller will send a message when the channel is closed too.
                     if let Some(ref mut test_signaler) = self.test_signaler {
                         if let Err(ref e) = test_signaler.send(()).await {
-                            warn!("could not acknowledge error: {:?}, command: {:?}",
-                                &e, &command);
+                            warn!("could not acknowledge error: {:?}, command: {:?}",  &e, &command);
                         }
                     }
                 },
@@ -430,8 +445,6 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
     /// Applies a correction to the clock to reach the requested monotonic->utc transform, selecting
     /// and applying the most appropriate strategy and recording diagnostic events.
     async fn apply_clock_correction(&mut self, estimate_transform: &Transform) {
-        let track = self.track;
-
         // Any pending clock updates will be superseded by the handling of this one.
         if let Some(task) = self.delayed_updates.take() {
             task.cancel().await;
@@ -442,6 +455,16 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
 
         let correction =
             ClockCorrection::for_transition(mono, &current_transform, estimate_transform);
+        self.record_correction(correction, estimate_transform, mono);
+    }
+
+    /// Records this particular clock correction.
+    fn record_correction(
+        &mut self,
+        correction: ClockCorrection,
+        estimate_transform: &Transform,
+        mono: zx::Time,
+    ) {
         self.record_clock_correction(correction.difference(), correction.strategy());
         match correction {
             ClockCorrection::MaxDurationSlew(slew) | ClockCorrection::NominalRateSlew(slew) => {
@@ -451,7 +474,12 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                 self.update_clock(clock_update);
                 self.record_clock_update(reason);
 
-                info!("started {:?} {:?} with {} scheduled updates", track, slew, updates.len());
+                info!(
+                    "started {:?} {:?} with {} scheduled updates",
+                    self.track,
+                    slew,
+                    updates.len()
+                );
 
                 // Create a task to asynchronously apply all the remaining updates and then increase
                 // error bound over time.
@@ -467,6 +495,12 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
 
                 // Create a task to asynchronously increase error bound over time.
                 self.set_delayed_update_task(vec![], estimate_transform);
+            }
+            ClockCorrection::MaxErrorBound => {
+                let update =
+                    zx::ClockUpdate::builder().error_bounds(ZX_CLOCK_UNKNOWN_ERROR_BOUND).build();
+                self.update_clock(update);
+                info!("set clock error bound to maximum for track: {:?}", self.track);
             }
         };
     }
@@ -954,9 +988,18 @@ mod tests {
     fn verify_asynchronous_signal_honored() {
         let mut executor = fasync::LocalExecutor::new();
         let (test_sender, mut test_received) = mpsc::channel(1);
-        let (_, r) = mpsc::channel(1);
+        let (mut s, r) = mpsc::channel(1);
+        let clock = create_clock();
+        clock.update(zx::ClockUpdate::builder().error_bounds(0).build()).unwrap();
+
+        let clock_clone = clock.clone();
+
+        // At the start, the clock is set to no error.
+        let details = clock_clone.get_details().unwrap();
+        assert_eq!(0, details.error_bounds);
+
         let _t = fasync::Task::local(async move {
-            let clock = create_clock();
+            // Set zero bound.
             let rtc = FakeRtc::valid(BACKSTOP_TIME);
             let diagnostics = Arc::new(FakeDiagnostics::new());
             let config = make_test_config();
@@ -974,9 +1017,18 @@ mod tests {
             clock_manager.maintain_clock(r).boxed().await;
         });
 
-        let ret = executor.run_singlethreaded(async move { test_received.next().await });
+        // Signal that clock update is needed.
+        let _s = fasync::Task::local(async move {
+            s.send(()).await.unwrap();
+        });
 
+        // Wait until the signal propagates.
+        let ret = executor.run_singlethreaded(async move { test_received.next().await });
         assert_eq!(Some(()), ret);
+
+        // Verify that clock now has a large error bound.
+        let details = clock_clone.get_details().unwrap();
+        assert_eq!(ZX_CLOCK_UNKNOWN_ERROR_BOUND, details.error_bounds);
     }
 
     #[fuchsia::test]
