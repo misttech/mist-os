@@ -190,7 +190,7 @@ pub struct CoreCtxWithDeviceId<
     pub(crate) device_id: &'a CC::DeviceId,
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>>
     NudContext<Ipv6, EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
     type ConfigCtx<'a> =

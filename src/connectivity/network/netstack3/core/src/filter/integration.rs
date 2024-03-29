@@ -21,7 +21,6 @@ pub trait FilterHandlerProvider<I: IpExt, BC: FilterBindingsTypes> {
     fn filter_handler(&mut self) -> Self::Handler<'_>;
 }
 
-#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
     FilterHandlerProvider<I, BC> for CoreCtx<'a, BC, L>
 {
@@ -32,7 +31,6 @@ impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::Filt
     }
 }
 
-#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
     FilterIpContext<I, BC> for CoreCtx<'_, BC, L>
 {

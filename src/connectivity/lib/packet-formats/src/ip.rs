@@ -250,6 +250,9 @@ pub trait IpPacketBuilder<I: IpExt>: PacketBuilder + Clone + Debug {
 
     /// Returns the destination IP address for the builder.
     fn dst_ip(&self) -> I::Addr;
+
+    /// Returns the IP protocol number for the builder.
+    fn proto(&self) -> I::Proto;
 }
 
 /// An IPv4 or IPv6 protocol number.

@@ -12,7 +12,7 @@ use net_types::{
     ip::{Ip, Ipv6Addr, Ipv6SourceAddr, Mtu},
     SpecifiedAddr,
 };
-use packet::{BufferMut, SerializeError, Serializer};
+use packet::{BufferMut, SerializeError};
 use thiserror::Error;
 
 use crate::{
@@ -402,7 +402,7 @@ where
         body: S,
     ) -> Result<(), S>
     where
-        S: Serializer,
+        S: TransportPacketSerializer,
         S::Buffer: BufferMut;
 }
 
@@ -942,6 +942,7 @@ pub(crate) mod testutil {
         ip::{GenericOverIp, IpAddr, IpInvariant, Ipv4, Ipv6},
         MulticastAddr,
     };
+    use packet::Serializer;
 
     use super::*;
     use crate::{
@@ -1858,7 +1859,7 @@ mod tests {
         ip::{AddrSubnet, GenericOverIp, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6},
         Witness,
     };
-    use packet::{Buf, InnerPacketBuilder, ParseBuffer};
+    use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer as _};
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
         icmp::{IcmpIpExt, IcmpUnusedCode},

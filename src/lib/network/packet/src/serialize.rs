@@ -834,6 +834,11 @@ impl<I, O> Nested<I, O> {
     }
 
     #[inline]
+    pub fn inner(&self) -> &I {
+        &self.inner
+    }
+
+    #[inline]
     pub fn outer(&self) -> &O {
         &self.outer
     }

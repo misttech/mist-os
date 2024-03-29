@@ -116,8 +116,9 @@ pub mod filter {
         Routine, Rule, State, TransportProtocolMatcher, UninstalledRoutine, ValidationError,
     };
     pub(crate) use netstack3_filter::{
-        FilterContext, FilterHandler, FilterImpl, FilterIpContext, MaybeTransportPacket, RxPacket,
-        TransportPacketSerializer, TxPacket, ValidState, Verdict,
+        FilterContext, FilterHandler, FilterImpl, FilterIpContext, ForwardedPacket, IpPacket,
+        MaybeTransportPacket, NestedWithInnerIpPacket, RxPacket, TransportPacketSerializer,
+        TxPacket, ValidState, Verdict,
     };
 }
 

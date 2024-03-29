@@ -735,6 +735,10 @@ where
     fn dst_ip(&self) -> Ipv4Addr {
         self.prefix_builder.dst_ip
     }
+
+    fn proto(&self) -> Ipv4Proto {
+        self.prefix_builder.proto
+    }
 }
 
 /// A builder for IPv4 packets.
@@ -896,6 +900,10 @@ impl IpPacketBuilder<Ipv4> for Ipv4PacketBuilder {
 
     fn dst_ip(&self) -> Ipv4Addr {
         self.dst_ip
+    }
+
+    fn proto(&self) -> Ipv4Proto {
+        self.proto
     }
 }
 

@@ -15,8 +15,7 @@ use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext::{
     Action, Change, Controller, ControllerId, Domain, InstalledIpRoutine, InterfaceMatcher, IpHook,
-    Matchers, Namespace, NamespaceId, Resource, ResourceId, Routine, RoutineId, RoutineType, Rule,
-    RuleId,
+    Namespace, NamespaceId, Resource, ResourceId, Routine, RoutineId, RoutineType, Rule, RuleId,
 };
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
@@ -88,12 +87,6 @@ macro_rules! generate_test_cases_for_all_matchers {
 }
 
 const NEGATIVE_CHECK_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(1);
-
-#[derive(Debug)]
-enum IncomingHook {
-    Ingress,
-    LocalIngress,
-}
 
 #[derive(Clone, Copy)]
 pub(crate) enum ExpectedConnectivity {
@@ -564,6 +557,7 @@ impl<I: ping::IpExt> From<SockAddrs> for SockAddrsIpSpecific<I> {
 }
 
 /// Interfaces traffic is expected to traverse at a given IP filtering hook.
+#[derive(Clone, Copy)]
 pub(crate) struct Interfaces<'a> {
     pub ingress: Option<&'a netemul::TestInterface<'a>>,
     pub egress: Option<&'a netemul::TestInterface<'a>>,
@@ -827,6 +821,12 @@ const LOW_RULE_PRIORITY: u32 = 2;
 const MEDIUM_RULE_PRIORITY: u32 = 1;
 const HIGH_RULE_PRIORITY: u32 = 0;
 
+#[derive(Debug)]
+enum IncomingHook {
+    Ingress,
+    LocalIngress,
+}
+
 async fn drop_incoming<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
     name: &str,
     hook: IncomingHook,
@@ -938,6 +938,7 @@ generate_test_cases_for_all_matchers!(drop_incoming, IncomingHook::LocalIngress,
 
 enum OutgoingHook {
     LocalEgress,
+    Egress,
 }
 
 async fn drop_outgoing<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
@@ -955,6 +956,7 @@ async fn drop_outgoing<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
         &name,
         match hook {
             OutgoingHook::LocalEgress => IpHook::LocalEgress,
+            OutgoingHook::Egress => IpHook::Egress,
         },
     )
     .await;
@@ -1046,6 +1048,7 @@ async fn drop_outgoing<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
 }
 
 generate_test_cases_for_all_matchers!(drop_outgoing, OutgoingHook::LocalEgress, local_egress);
+generate_test_cases_for_all_matchers!(drop_outgoing, OutgoingHook::Egress, egress);
 
 // TODO(https://github.com/rust-lang/rustfmt/issues/5321): remove when rustfmt
 // handles these supertrait bounds correctly.
@@ -1289,18 +1292,24 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         controller: &mut Controller,
         rule_id: RuleId,
         matcher: &M,
-        interface: &netemul::TestInterface<'_>,
+        interfaces: Interfaces<'_>,
         subnets: Subnets,
         ports: Ports,
     ) {
-        let id = NonZeroU64::new(interface.id()).expect("interface ID should be nonzero");
-        let matcher = Matchers {
-            // Only filter traffic that is arriving on this particular interface.
-            in_interface: Some(InterfaceMatcher::Id(id)),
-            ..matcher
-                .matcher::<I>(Interfaces { ingress: Some(interface), egress: None }, subnets, ports)
-                .await
+        let mut matcher = matcher.matcher::<I>(interfaces, subnets, ports).await;
+        // Only filter traffic that is arriving on this particular interface.
+        let interface_matcher = |interface: &netemul::TestInterface<'_>| {
+            Some(InterfaceMatcher::Id(
+                NonZeroU64::new(interface.id()).expect("interface ID should be nonzero"),
+            ))
         };
+        let Interfaces { ingress, egress } = interfaces;
+        match (ingress, egress) {
+            (Some(interface), None) => matcher.in_interface = interface_matcher(interface),
+            (None, Some(interface)) => matcher.out_interface = interface_matcher(interface),
+            (Some(_), Some(_)) => panic!("this test only exercises outgoing or incoming traffic"),
+            (None, None) => panic!("one of ingress or egress interface must be specified"),
+        }
         controller
             .push_changes(vec![Change::Create(Resource::Rule(Rule {
                 id: rule_id,
@@ -1322,7 +1331,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
             controller,
             RuleId { routine: self.routine.clone(), index: Self::CLIENT_FILTER_RULE_INDEX },
             matcher,
-            router_server_interface,
+            Interfaces { ingress: Some(router_server_interface), egress: None },
             Subnets {
                 src: I::SERVER_ADDR_WITH_PREFIX,
                 dst: I::CLIENT_ADDR_WITH_PREFIX,
@@ -1343,7 +1352,49 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
             controller,
             RuleId { routine: self.routine.clone(), index: Self::SERVER_FILTER_RULE_INDEX },
             matcher,
-            router_client_interface,
+            Interfaces { ingress: Some(router_client_interface), egress: None },
+            Subnets {
+                src: I::CLIENT_ADDR_WITH_PREFIX,
+                dst: I::SERVER_ADDR_WITH_PREFIX,
+                other: I::OTHER_SUBNET,
+            },
+            ports.client_ports(),
+        )
+        .await;
+    }
+
+    async fn install_filter_for_traffic_to_client<M: Matcher>(
+        &mut self,
+        matcher: &M,
+        ports: SockAddrs,
+    ) {
+        let Self { controller, router_client_interface, .. } = self;
+        Self::drop_traffic_on_interface::<M>(
+            controller,
+            RuleId { routine: self.routine.clone(), index: Self::CLIENT_FILTER_RULE_INDEX },
+            matcher,
+            Interfaces { ingress: None, egress: Some(router_client_interface) },
+            Subnets {
+                src: I::SERVER_ADDR_WITH_PREFIX,
+                dst: I::CLIENT_ADDR_WITH_PREFIX,
+                other: I::OTHER_SUBNET,
+            },
+            ports.server_ports(),
+        )
+        .await;
+    }
+
+    async fn install_filter_for_traffic_to_server<M: Matcher>(
+        &mut self,
+        matcher: &M,
+        ports: SockAddrs,
+    ) {
+        let Self { controller, router_server_interface, .. } = self;
+        Self::drop_traffic_on_interface::<M>(
+            controller,
+            RuleId { routine: self.routine.clone(), index: Self::SERVER_FILTER_RULE_INDEX },
+            matcher,
+            Interfaces { ingress: None, egress: Some(router_server_interface) },
             Subnets {
                 src: I::CLIENT_ADDR_WITH_PREFIX,
                 dst: I::SERVER_ADDR_WITH_PREFIX,
@@ -1481,4 +1532,86 @@ generate_test_cases_for_all_matchers!(
     forwarded_traffic_skips_local_ingress,
     IncomingHook::LocalIngress,
     local_ingress
+);
+
+async fn forwarded_traffic_skips_local_egress<
+    I: net_types::ip::Ip + RouterTestIpExt,
+    M: Matcher,
+>(
+    name: &str,
+    hook: OutgoingHook,
+    matcher: M,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
+
+    // Set up a network with two hosts (client and server) and a router. The client
+    // and server are both link-layer neighbors with the router but on isolated L2
+    // networks.
+    let mut net = TestRouterNet::<I>::new(
+        &sandbox,
+        &name,
+        match hook {
+            OutgoingHook::LocalEgress => IpHook::LocalEgress,
+            OutgoingHook::Egress => IpHook::Egress,
+        },
+    )
+    .await;
+
+    // Send from the client to server and back; assert that we have two-way
+    // connectivity when no filtering has been configured.
+    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+
+    // Install a rule on either the egress or local egress hook on the router that
+    // drops traffic from the server to the client. If the rule was installed on the
+    // local egress hook, this should have no effect on connectivity because all of
+    // this traffic is being forwarded. If the rule was installed on the egress
+    // hook, this should still allow traffic to go from the client to the server,
+    // but not the reverse.
+    net.run_test_with::<M::SocketType, _>(
+        match hook {
+            OutgoingHook::LocalEgress => ExpectedConnectivity::TwoWay,
+            OutgoingHook::Egress => ExpectedConnectivity::ClientToServerOnly,
+        },
+        |net, addrs, ()| {
+            Box::pin(async move {
+                net.install_filter_for_traffic_to_client(&matcher, addrs).await;
+            })
+        },
+    )
+    .await;
+
+    // Install a similar rule on the same hook, but which drops traffic from the
+    // client to the server. For local ingress, this should again have no effect.
+    // For ingress, this should result in neither host being able to reach each
+    // other.
+    net.run_test_with::<M::SocketType, _>(
+        match hook {
+            OutgoingHook::LocalEgress => ExpectedConnectivity::TwoWay,
+            OutgoingHook::Egress => ExpectedConnectivity::None,
+        },
+        |net, addrs, ()| {
+            Box::pin(async move {
+                net.install_filter_for_traffic_to_server(&matcher, addrs).await;
+            })
+        },
+    )
+    .await;
+
+    // Remove all filtering rules; two-way connectivity should now be possible
+    // again.
+    net.clear_filter().await;
+    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+}
+
+generate_test_cases_for_all_matchers!(
+    forwarded_traffic_skips_local_egress,
+    OutgoingHook::LocalEgress,
+    local_egress
+);
+
+generate_test_cases_for_all_matchers!(
+    forwarded_traffic_skips_local_egress,
+    OutgoingHook::Egress,
+    egress
 );

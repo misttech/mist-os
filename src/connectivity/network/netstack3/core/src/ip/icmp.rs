@@ -1246,7 +1246,7 @@ where
     CC: IpLayerHandler<Ipv6, BC>,
     S: Serializer,
     S::Buffer: BufferMut,
-    M: IcmpMessage<Ipv6>,
+    M: IcmpMessage<Ipv6> + MaybeTransportPacket,
 {
     // TODO(https://fxbug.dev/42177356): Send through ICMPv6 send path.
     IpLayerHandler::<Ipv6, _>::send_ip_packet_from_device(
@@ -4046,7 +4046,7 @@ mod tests {
             body: S,
         ) -> Result<(), S>
         where
-            S: Serializer,
+            S: Serializer + MaybeTransportPacket,
             S::Buffer: BufferMut,
         {
             crate::ip::socket::IpSocketContext::<_, _>::send_ip_packet(

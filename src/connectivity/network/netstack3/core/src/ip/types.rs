@@ -353,7 +353,7 @@ impl<'a, A: IpAddress, D> From<&'a EntryAndGeneration<A, D>> for OrderedEntry<'a
 }
 
 /// `Ip` extension trait to assist in defining [`NextHop`].
-pub trait IpTypesIpExt: Ip {
+pub trait IpTypesIpExt: packet_formats::ip::IpExt {
     /// A marker type carried by the [`NextHop::Broadcast`] variant to indicate
     /// that it is uninhabited for IPv6.
     type BroadcastMarker: Debug + Copy + Clone + PartialEq + Eq;

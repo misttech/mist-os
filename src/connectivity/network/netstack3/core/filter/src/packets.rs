@@ -5,14 +5,23 @@
 use core::{convert::Infallible as Never, num::NonZeroU16};
 
 use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
-use packet::{Buf, Nested, ParseBuffer, Serializer};
+use packet::{
+    Buf, BufferMut, EitherSerializer, EmptyBuf, InnerSerializer, Nested, ParseBuffer,
+    ParseMetadata, Serializer,
+};
 use packet_formats::{
     icmp::{
+        mld::{MulticastListenerDone, MulticastListenerReport},
+        ndp::{
+            options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
+            RouterSolicitation,
+        },
         IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder,
         IcmpParseArgs, IcmpTimeExceeded, Icmpv4Packet, Icmpv4ParameterProblem,
         Icmpv4TimestampReply, Icmpv6Packet, Icmpv6PacketTooBig, Icmpv6ParameterProblem,
     },
-    ip::{IpExt, IpPacket as _, IpProto, Ipv4Proto, Ipv6Proto},
+    igmp::{self, IgmpPacketBuilder},
+    ip::{IpExt, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto},
     ipv4::Ipv4Packet,
     ipv6::Ipv6Packet,
     tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilderWithOptions},
@@ -255,6 +264,181 @@ impl<S: MaybeTransportPacket, I: IpExt> IpPacket<I> for TxPacket<'_, S, I> {
     }
 }
 
+/// An incoming IP packet that is being forwarded.
+///
+/// NB: this type is distinct from [`RxPacket`] (used on ingress) and
+/// [`TxPacket`] (used on egress) in that it implements `Serializer` by holding
+/// the parse metadata from parsing the IP header and undoing that parsing when
+/// it is serialized. This allows the buffer to be reused on the egress path in
+/// its entirety.
+#[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub struct ForwardedPacket<B, I: IpExt> {
+    src_addr: I::Addr,
+    dst_addr: I::Addr,
+    protocol: I::Proto,
+    meta: ParseMetadata,
+    body: B,
+}
+
+impl<B: BufferMut, I: IpExt> ForwardedPacket<B, I> {
+    /// Create a new [`ForwardedPacket`] from its IP header fields and payload.
+    pub fn new(
+        src_addr: I::Addr,
+        dst_addr: I::Addr,
+        protocol: I::Proto,
+        meta: ParseMetadata,
+        body: B,
+    ) -> Self {
+        Self { src_addr, dst_addr, protocol, meta, body }
+    }
+
+    /// Discard the metadata carried by the [`ForwardedPacket`] and return the
+    /// inner buffer.
+    pub fn into_buffer(self) -> B {
+        self.body
+    }
+}
+
+impl<B: BufferMut, I: IpExt> Serializer for ForwardedPacket<B, I> {
+    type Buffer = <B as Serializer>::Buffer;
+
+    fn serialize<G: packet::GrowBufferMut, P: packet::BufferProvider<Self::Buffer, G>>(
+        self,
+        outer: packet::PacketConstraints,
+        provider: P,
+    ) -> Result<G, (packet::SerializeError<P::Error>, Self)> {
+        let Self { src_addr, dst_addr, protocol, meta, mut body } = self;
+        body.undo_parse(meta);
+        body.serialize(outer, provider)
+            .map_err(|(err, body)| (err, Self { src_addr, dst_addr, protocol, meta, body }))
+    }
+}
+
+impl<B: BufferMut, I: IpExt> IpPacket<I> for ForwardedPacket<B, I> {
+    type TransportPacket<'a> = Option<ParsedTransportHeader>  where Self : 'a;
+
+    fn src_addr(&self) -> I::Addr {
+        self.src_addr
+    }
+
+    fn dst_addr(&self) -> I::Addr {
+        self.dst_addr
+    }
+
+    fn protocol(&self) -> I::Proto {
+        self.protocol
+    }
+
+    fn transport_packet(&self) -> Self::TransportPacket<'_> {
+        I::map_ip(
+            self,
+            |ForwardedPacket { src_addr, dst_addr, protocol, meta: _, body }| {
+                parse_transport_header_in_ipv4_packet(
+                    *src_addr,
+                    *dst_addr,
+                    *protocol,
+                    Buf::new(body, ..),
+                )
+            },
+            |ForwardedPacket { src_addr, dst_addr, protocol, meta: _, body }| {
+                parse_transport_header_in_ipv6_packet(
+                    *src_addr,
+                    *dst_addr,
+                    *protocol,
+                    Buf::new(body, ..),
+                )
+            },
+        )
+    }
+}
+
+impl<I: IpExt, S: MaybeTransportPacket, B: IpPacketBuilder<I>> IpPacket<I> for Nested<S, B> {
+    type TransportPacket<'a> = &'a S where Self: 'a;
+
+    fn src_addr(&self) -> I::Addr {
+        self.outer().src_ip()
+    }
+
+    fn dst_addr(&self) -> I::Addr {
+        self.outer().dst_ip()
+    }
+
+    fn protocol(&self) -> I::Proto {
+        self.outer().proto()
+    }
+
+    fn transport_packet(&self) -> Self::TransportPacket<'_> {
+        self.inner()
+    }
+}
+
+/// A nested serializer whose inner serializer implements `IpPacket`.
+///
+/// [`packet::Nested`] is often used to represent an outer IP packet serializer
+/// and an inner payload contained by the IP packet. However, in some cases, a
+/// type that implements `IpPacket` may itself be wrapped in an outer
+/// serializer, such as (for example) a [`packet::LimitedSizePacketBuilder`] for
+/// enforcing an MTU. In that scenario, the `Nested` serializer can be wrapped
+/// in this type to indicate that the `IpPacket` implementation should be
+/// delegated to the inner serializer.
+pub struct NestedWithInnerIpPacket<Inner, Outer>(Nested<Inner, Outer>);
+
+impl<Inner, Outer> NestedWithInnerIpPacket<Inner, Outer> {
+    /// Creates a new [`NestedWithInnerIpPacket`] wrapping the provided nested
+    /// serializer.
+    pub fn new(nested: Nested<Inner, Outer>) -> Self {
+        Self(nested)
+    }
+
+    /// Calls [`Nested::into_inner`] on the contained nested serializer.
+    pub fn into_inner(self) -> Inner {
+        let Self(nested) = self;
+        nested.into_inner()
+    }
+
+    fn inner(&self) -> &Inner {
+        let Self(nested) = self;
+        nested.inner()
+    }
+}
+
+impl<Inner, Outer> Serializer for NestedWithInnerIpPacket<Inner, Outer>
+where
+    Nested<Inner, Outer>: Serializer,
+{
+    type Buffer = <Nested<Inner, Outer> as Serializer>::Buffer;
+
+    fn serialize<G: packet::GrowBufferMut, P: packet::BufferProvider<Self::Buffer, G>>(
+        self,
+        outer: packet::PacketConstraints,
+        provider: P,
+    ) -> Result<G, (packet::SerializeError<P::Error>, Self)> {
+        let Self(nested) = self;
+        nested.serialize(outer, provider).map_err(|(err, nested)| (err, Self(nested)))
+    }
+}
+
+impl<I: IpExt, Inner: IpPacket<I>, Outer> IpPacket<I> for NestedWithInnerIpPacket<Inner, Outer> {
+    type TransportPacket<'a> = Inner::TransportPacket<'a> where Inner: 'a, Outer: 'a;
+
+    fn src_addr(&self) -> I::Addr {
+        self.inner().src_addr()
+    }
+
+    fn dst_addr(&self) -> I::Addr {
+        self.inner().dst_addr()
+    }
+
+    fn protocol(&self) -> I::Proto {
+        self.inner().protocol()
+    }
+
+    fn transport_packet(&self) -> Self::TransportPacket<'_> {
+        self.inner().transport_packet()
+    }
+}
+
 impl<T: ?Sized> TransportPacket for &T
 where
     T: TransportPacket,
@@ -265,6 +449,24 @@ where
 
     fn dst_port(&self) -> u16 {
         (*self).dst_port()
+    }
+}
+
+impl MaybeTransportPacket for Never {
+    type TransportPacket = Never;
+
+    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        match *self {}
+    }
+}
+
+impl TransportPacket for Never {
+    fn src_port(&self) -> u16 {
+        match *self {}
+    }
+
+    fn dst_port(&self) -> u16 {
+        match *self {}
     }
 }
 
@@ -360,16 +562,6 @@ impl TransportPacket for IcmpEchoRequest {
     }
 }
 
-impl TransportPacket for Never {
-    fn src_port(&self) -> u16 {
-        match *self {}
-    }
-
-    fn dst_port(&self) -> u16 {
-        match *self {}
-    }
-}
-
 // TODO(https://fxbug.dev/328057704): parse the IP packet contained in the ICMP
 // error message payload so NAT can be applied to it.
 impl MaybeTransportPacket for Icmpv4TimestampReply {
@@ -406,6 +598,69 @@ icmp_error_message!(Icmpv4ParameterProblem);
 icmp_error_message!(Icmpv6ParameterProblem);
 
 icmp_error_message!(Icmpv6PacketTooBig);
+
+impl MaybeTransportPacket for NeighborSolicitation {
+    type TransportPacket = Never;
+
+    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        None
+    }
+}
+
+impl MaybeTransportPacket for NeighborAdvertisement {
+    type TransportPacket = Never;
+
+    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        None
+    }
+}
+
+impl MaybeTransportPacket for RouterSolicitation {
+    type TransportPacket = Never;
+
+    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        None
+    }
+}
+
+impl MaybeTransportPacket for MulticastListenerDone {
+    type TransportPacket = Never;
+
+    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        None
+    }
+}
+
+impl MaybeTransportPacket for MulticastListenerReport {
+    type TransportPacket = Never;
+
+    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        None
+    }
+}
+
+impl<M: igmp::MessageType<EmptyBuf>> MaybeTransportPacket
+    for InnerSerializer<IgmpPacketBuilder<EmptyBuf, M>, EmptyBuf>
+{
+    type TransportPacket = Never;
+
+    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        None
+    }
+}
+
+impl<I> MaybeTransportPacket
+    for EitherSerializer<
+        EmptyBuf,
+        InnerSerializer<packet::records::RecordSequenceBuilder<NdpOptionBuilder<'_>, I>, EmptyBuf>,
+    >
+{
+    type TransportPacket = Never;
+
+    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        None
+    }
+}
 
 #[derive(GenericOverIp)]
 #[generic_over_ip()]
@@ -516,9 +771,16 @@ fn parse_icmpv6_header<B: ParseBuffer>(
 
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
-    use packet::{BufferMut, EmptyBuf, InnerSerializer};
+    use alloc::vec::Vec;
 
     use super::*;
+
+    // Note that we could choose to implement `MaybeTransportPacket` for these
+    // opaque byte buffer types by parsing them as we do incoming buffers, but since
+    // these implementations are only for use in netstack3_core unit tests, there is
+    // no expectation that filtering or connection tracking actually be performed.
+    // If that changes at some point, we could replace these with "real"
+    // implementations.
 
     impl<B: BufferMut> MaybeTransportPacket for Nested<B, ()> {
         type TransportPacket = Never;
@@ -529,6 +791,14 @@ pub mod testutil {
     }
 
     impl MaybeTransportPacket for InnerSerializer<&[u8], EmptyBuf> {
+        type TransportPacket = Never;
+
+        fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+            None
+        }
+    }
+
+    impl MaybeTransportPacket for Buf<Vec<u8>> {
         type TransportPacket = Never;
 
         fn transport_packet(&self) -> Option<&Self::TransportPacket> {

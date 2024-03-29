@@ -32,6 +32,7 @@ use crate::{
     context::{CounterContext, InstantContext},
     device::{AnyDevice, DeviceId, DeviceIdContext},
     error::{ExistsError, NotFoundError},
+    filter::MaybeTransportPacket,
     ip::{
         self,
         device::{
@@ -743,7 +744,8 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>> DadAddressContext<BC>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>>
+    DadAddressContext<BC>
     for CoreCtxWithIpDeviceConfiguration<'_, &'_ Ipv6DeviceConfiguration, L, BC>
 {
     fn with_address_assigned<O, F: FnOnce(&mut bool) -> O>(
@@ -925,7 +927,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
     /// The callback is called with a source address suitable for an outgoing
     /// router solicitation message and returns the message body.
     fn send_rs_packet<
-        S: Serializer<Buffer = EmptyBuf>,
+        S: Serializer<Buffer = EmptyBuf> + MaybeTransportPacket,
         F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
     >(
         &mut self,
@@ -1299,7 +1301,7 @@ impl<
         'a,
         Config: Borrow<Ipv6DeviceConfiguration>,
         BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IpState<Ipv6>>,
+        L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>,
     > MldContext<BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
     fn with_mld_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<BC::Instant>>) -> O>(

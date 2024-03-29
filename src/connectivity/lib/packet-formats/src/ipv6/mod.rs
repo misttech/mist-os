@@ -1117,6 +1117,10 @@ impl IpPacketBuilder<Ipv6> for Ipv6PacketBuilder {
     fn dst_ip(&self) -> Ipv6Addr {
         self.dst_ip
     }
+
+    fn proto(&self) -> Ipv6Proto {
+        self.proto
+    }
 }
 
 impl<'a, I> PacketBuilder for Ipv6PacketBuilderWithHbhOptions<'a, I>
@@ -1175,7 +1179,12 @@ where
     fn dst_ip(&self) -> Ipv6Addr {
         self.prefix_builder.dst_ip
     }
+
+    fn proto(&self) -> Ipv6Proto {
+        self.prefix_builder.proto
+    }
 }
+
 /// Reassembles a fragmented packet into a parsed IP packet.
 pub(crate) fn reassemble_fragmented_packet<
     B: ByteSliceMut,

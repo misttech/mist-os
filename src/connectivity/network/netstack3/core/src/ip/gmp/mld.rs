@@ -37,6 +37,7 @@ use zerocopy::ByteSlice;
 use crate::{
     context::{RngContext, TimerContext, TimerHandler},
     device::{AnyDevice, DeviceIdContext},
+    filter::MaybeTransportPacket,
     ip::{
         device::IpDeviceSendContext,
         gmp::{
@@ -394,7 +395,7 @@ impl<BC: MldBindingsContext<CC::DeviceId>, CC: MldContext<BC>>
 fn send_mld_packet<
     BC: MldBindingsContext<CC::DeviceId>,
     CC: MldContext<BC>,
-    M: IcmpMldv1MessageType,
+    M: IcmpMldv1MessageType + MaybeTransportPacket,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -428,6 +429,7 @@ fn send_mld_packet<
             )
             .unwrap(),
         );
+
     core_ctx
         .send_ip_frame(bindings_ctx, &device, dst_ip.into_specified(), body, None)
         .map_err(|_| MldError::SendFailure { addr: group_addr.into() })

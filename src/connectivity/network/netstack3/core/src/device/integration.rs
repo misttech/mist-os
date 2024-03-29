@@ -42,6 +42,7 @@ use crate::{
         PureIpDeviceCounters, RecvIpFrameMeta, WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
+    filter::{FilterHandler as _, FilterHandlerProvider as _, IpPacket},
     for_any_device_id,
     ip::{
         device::{
@@ -161,7 +162,7 @@ where
 }
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<I: IpTypesIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<I>>>
+impl<I: IpTypesIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
     IpDeviceSendContext<I, BC> for CoreCtx<'_, BC, L>
 {
     fn send_ip_frame<S>(
@@ -173,7 +174,7 @@ impl<I: IpTypesIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::I
         broadcast: Option<<I as IpTypesIpExt>::BroadcastMarker>,
     ) -> Result<(), S>
     where
-        S: Serializer,
+        S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut,
     {
         send_ip_frame(self, bindings_ctx, device, local_addr, body, broadcast)
@@ -185,7 +186,7 @@ impl<
         I: IpTypesIpExt,
         Config,
         BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IpState<I>>,
+        L: LockBefore<crate::lock_ordering::FilterState<I>>,
     > IpDeviceSendContext<I, BC> for CoreCtxWithIpDeviceConfiguration<'_, Config, L, BC>
 {
     fn send_ip_frame<S>(
@@ -197,7 +198,7 @@ impl<
         broadcast: Option<<I as IpTypesIpExt>::BroadcastMarker>,
     ) -> Result<(), S>
     where
-        S: Serializer,
+        S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut,
     {
         let Self { config: _, core_ctx } = self;
@@ -1103,15 +1104,15 @@ fn send_ip_frame<BC, S, A, L>(
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
     local_addr: SpecifiedAddr<A>,
-    body: S,
+    mut body: S,
     broadcast: Option<<A::Version as IpTypesIpExt>::BroadcastMarker>,
 ) -> Result<(), S>
 where
     BC: BindingsContext,
-    S: Serializer,
+    S: Serializer + IpPacket<A::Version>,
     S::Buffer: BufferMut,
     A: IpAddress,
-    L: LockBefore<crate::lock_ordering::IpState<A::Version>>
+    L: LockBefore<crate::lock_ordering::FilterState<A::Version>>
         + LockBefore<crate::lock_ordering::LoopbackTxQueue>
         + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,
     A::Version: EthernetIpExt + IpTypesIpExt,
@@ -1119,6 +1120,11 @@ where
         + NudHandler<A::Version, EthernetLinkDevice, BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>,
 {
+    match core_ctx.filter_handler().egress_hook(&mut body, device) {
+        crate::filter::Verdict::Drop => return Ok(()),
+        crate::filter::Verdict::Accept => {}
+    }
+
     match device {
         DeviceId::Ethernet(id) => ethernet::send_ip_frame::<_, _, A, _>(
             core_ctx,

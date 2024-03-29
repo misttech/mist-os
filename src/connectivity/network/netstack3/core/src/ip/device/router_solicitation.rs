@@ -18,6 +18,7 @@ use rand::Rng as _;
 use crate::{
     context::{RngContext, TimerContext, TimerHandler},
     device::{AnyDevice, DeviceIdContext},
+    filter::MaybeTransportPacket,
 };
 
 /// Amount of time to wait after sending `MAX_RTR_SOLICITATIONS` Router
@@ -90,7 +91,7 @@ pub(super) trait RsContext<BC>: DeviceIdContext<AnyDevice> {
     /// The callback is called with a source address suitable for an outgoing
     /// router solicitation message and returns the message body.
     fn send_rs_packet<
-        S: Serializer<Buffer = EmptyBuf>,
+        S: Serializer<Buffer = EmptyBuf> + MaybeTransportPacket,
         F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
     >(
         &mut self,

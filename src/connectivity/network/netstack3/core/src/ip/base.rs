@@ -32,7 +32,7 @@ use net_types::{
 use packet::{Buf, BufferMut, ParseMetadata, Serializer};
 use packet_formats::{
     error::IpParseError,
-    ip::{IpPacket, IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto},
+    ip::{IpPacket as _, IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto},
     ipv4::{Ipv4FragmentType, Ipv4Packet},
     ipv6::Ipv6Packet,
 };
@@ -47,7 +47,10 @@ use crate::{
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
     device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
-    filter::{FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider},
+    filter::{
+        FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider, ForwardedPacket,
+        MaybeTransportPacket, NestedWithInnerIpPacket,
+    },
     inspect::{Inspectable, Inspector},
     ip::{
         device::{
@@ -913,7 +916,7 @@ impl<
         body: S,
     ) -> Result<(), S>
     where
-        S: Serializer,
+        S: Serializer + MaybeTransportPacket,
         S::Buffer: BufferMut,
     {
         send_ip_packet_from_device(self, bindings_ctx, meta.into(), body)
@@ -2077,19 +2080,19 @@ pub(crate) fn receive_ipv4_packet<
                 trace!("receive_ipv4_packet: forwarding");
 
                 packet.set_ttl(ttl - 1);
-                let _: (Ipv4Addr, Ipv4Addr, Ipv4Proto, ParseMetadata) =
-                    drop_packet_and_undo_parse!(packet, buffer);
+                let (src, dst, proto, meta) = packet.into_metadata();
+                let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
                 match IpDeviceSendContext::<Ipv4, _>::send_ip_frame(
                     core_ctx,
                     bindings_ctx,
                     &dst_device,
                     next_hop,
-                    buffer,
+                    packet,
                     broadcast,
                 ) {
                     Ok(()) => (),
-                    Err(b) => {
-                        let _: B = b;
+                    Err(p) => {
+                        let _: ForwardedPacket<B, _> = p;
                         core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.mtu_exceeded);
                         // TODO(https://fxbug.dev/42167236): Encode the MTU error
                         // more obviously in the type system.
@@ -2383,14 +2386,14 @@ pub(crate) fn receive_ipv6_packet<
                     NextHop::Broadcast(never) => match never {},
                 };
                 packet.set_ttl(ttl - 1);
-                let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
-                    drop_packet_and_undo_parse!(packet, buffer);
-                if let Err(buffer) = IpDeviceSendContext::<Ipv6, _>::send_ip_frame(
+                let (src, dst, proto, meta) = packet.into_metadata();
+                let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
+                if let Err(packet) = IpDeviceSendContext::<Ipv6, _>::send_ip_frame(
                     core_ctx,
                     bindings_ctx,
                     &dst_device,
                     next_hop,
-                    buffer,
+                    packet,
                     None,
                 ) {
                     // TODO(https://fxbug.dev/42167236): Encode the MTU error more
@@ -2416,7 +2419,7 @@ pub(crate) fn receive_ipv6_packet<
                             frame_dst,
                             *src_ip,
                             dst_ip,
-                            buffer,
+                            packet.into_buffer(),
                             Icmpv6ErrorKind::PacketTooBig {
                                 proto,
                                 header_len: meta.header_len(),
@@ -2780,7 +2783,7 @@ pub(crate) trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         body: S,
     ) -> Result<(), S>
     where
-        S: Serializer,
+        S: Serializer + MaybeTransportPacket,
         S::Buffer: BufferMut;
 }
 
@@ -2797,7 +2800,7 @@ impl<
         body: S,
     ) -> Result<(), S>
     where
-        S: Serializer,
+        S: Serializer + MaybeTransportPacket,
         S::Buffer: BufferMut,
     {
         send_ip_packet_from_device(self, bindings_ctx, meta, body)
@@ -2824,7 +2827,7 @@ where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
     CC: IpDeviceStateContext<I, BC> + IpDeviceSendContext<I, BC>,
-    S: Serializer,
+    S: Serializer + MaybeTransportPacket,
     S::Buffer: BufferMut,
 {
     let SendIpPacketMeta { device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu } = meta;
@@ -2857,7 +2860,7 @@ where
     let body = body.encapsulate(builder);
 
     if let Some(mtu) = mtu {
-        let body = body.with_size_limit(mtu as usize);
+        let body = NestedWithInnerIpPacket::new(body.with_size_limit(mtu as usize));
         core_ctx
             .send_ip_frame(bindings_ctx, device, next_hop, body, broadcast)
             .map_err(|ser| ser.into_inner().into_inner())
