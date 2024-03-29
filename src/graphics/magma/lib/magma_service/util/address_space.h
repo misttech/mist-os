@@ -11,9 +11,12 @@
 #include <lib/magma/util/utils.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 
 #include "accessor.h"
 

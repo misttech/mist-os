@@ -12,7 +12,9 @@
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_handle.h>
 
+#include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace magma {
 
