@@ -24,6 +24,7 @@
 #include "src/developer/debug/zxdb/symbols/dwarf_binary_impl.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_expr_eval.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_symbol_factory.h"
+#include "src/developer/debug/zxdb/symbols/dwo_info.h"
 #include "src/developer/debug/zxdb/symbols/elf_symbol.h"
 #include "src/developer/debug/zxdb/symbols/file_line.h"
 #include "src/developer/debug/zxdb/symbols/find_line.h"
@@ -147,60 +148,6 @@ bool HasOnlySupportedSpecialIdentifierTypes(const Identifier& ident) {
 }
 
 }  // namespace
-
-// Holds the per-DWO file state. Each DWO file has its own binary and associated symbol factory.
-// This class glues everything together for the DWO via the DwarfSymbolFactory::Delegate interface.
-class ModuleSymbolsImpl::DwoInfo final : public DwarfSymbolFactory::Delegate {
- public:
-  // Must call Load() which must succeed before using.
-  DwoInfo(SkeletonUnit skeleton, fxl::WeakPtr<ModuleSymbols> module_symbols)
-      : skeleton_(std::move(skeleton)),
-        module_symbols_(std::move(module_symbols)),
-        weak_factory_(this) {}
-
-  Err Load(const std::string& name, const std::string& binary_name) {
-    binary_ = std::make_unique<DwarfBinaryImpl>(name, binary_name, std::string());
-    if (Err err = binary_->Load(weak_factory_.GetWeakPtr(), DwarfSymbolFactory::kDWO);
-        err.has_error()) {
-      binary_.reset();
-      return err;
-    }
-    return Err();
-  }
-
-  DwarfBinaryImpl* binary() { return binary_.get(); }
-  const SkeletonUnit& skeleton() const { return skeleton_; }
-  const SymbolFactory* symbol_factory() { return binary_->GetSymbolFactory(); }
-
-  // DwarfSymbolFactory::Delegate implementation.
-  std::string GetBuildDirForSymbolFactory() override { return skeleton_.comp_dir; }
-  fxl::WeakPtr<ModuleSymbols> GetModuleSymbols() override { return module_symbols_; }
-  CompileUnit* GetSkeletonCompileUnit() override {
-    if (!skeleton_unit_) {
-      // The skeleton DIE offset refers into the MAIN BINARY so we must use the main binary's symbol
-      // factory to create it, not our symbol_factory_ (for the .dwo file).
-      //
-      // This must not be a temporary because it will own the pointers for the duration of this fn.
-      LazySymbol lazy_skeleton =
-          module_symbols_->GetSymbolFactory()->MakeLazy(skeleton_.skeleton_die_offset);
-      if (const CompileUnit* unit = lazy_skeleton.Get()->As<CompileUnit>()) {
-        skeleton_unit_ = RefPtrTo<CompileUnit>(unit);
-      }
-    }
-    // Returns a pointer to our cached value. This assumes the cache is not cleared.
-    return skeleton_unit_.get();
-  }
-
- private:
-  std::unique_ptr<DwarfBinaryImpl> binary_;  // Guaranteed non-null after Load() succeeds.
-  SkeletonUnit skeleton_;  // Refers to the skeleton in the main binary corresponding to this DWO.
-  fxl::WeakPtr<ModuleSymbols> module_symbols_;
-
-  // Lazily constructed & cached unit corresponding to the skeleton.
-  fxl::RefPtr<CompileUnit> skeleton_unit_;
-
-  fxl::WeakPtrFactory<DwarfSymbolFactory::Delegate> weak_factory_;
-};
 
 ModuleSymbolsImpl::ModuleSymbolsImpl(std::unique_ptr<DwarfBinaryImpl> binary,
                                      const std::string& build_dir)

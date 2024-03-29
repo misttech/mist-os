@@ -36,6 +36,7 @@ namespace zxdb {
 
 class DwarfBinaryImpl;
 class DwarfSymbolFactory;
+class DwoInfo;
 class Variable;
 
 // Represents the symbol interface for a module (executable or shared library). See ModuleSymbols.
@@ -178,7 +179,6 @@ class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory:
   // .dwo files are separate per-source symbols that are referenced by the main binary. Populated
   // by CreateIndex(). The dwo_skeleton_offset_to_index_ maps the SkeletonUnit's skeleton_die_offset
   // to the index of the DWO in the dwos_ array.
-  class DwoInfo;
   std::vector<std::unique_ptr<DwoInfo>> dwos_;
   std::unordered_map<uint64_t, size_t> dwo_skeleton_offset_to_index_;
 

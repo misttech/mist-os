@@ -114,6 +114,8 @@ static_library("symbols") {
     "dwarf_tag.cc",
     "dwarf_unit_impl.cc",
     "dwarf_unit_impl.h",
+    "dwo_info.cc",
+    "dwo_info.h",
     "elf_symbol.cc",
     "elf_symbol_record.cc",
     "enumeration.cc",
