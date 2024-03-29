@@ -8,5 +8,6 @@ group("tests") {
     "runtime:tests",
     "ta:tests",
     "tee_internal_api:tests",
+    "tests",
   ]
 }

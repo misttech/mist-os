@@ -13,6 +13,8 @@ the TEE Internal Core API.
 The `runtime` directory contains the TA runtime binary connecting the TEE
 bindings with the fuchsia.tee.Application FIDL protocol.
 
+The `tests` directory contains integration tests for the TA runtime.
+
 ## Glossary
 
 * TEE - Trusted Execution Environment. This is an environment suitable for

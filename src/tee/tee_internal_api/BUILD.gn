@@ -44,6 +44,15 @@ rustc_library("tee_internal_impl") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
+# Trusted Applications link against an ifs specification that says that
+# "libtee_internal.so" exports the TEE_ entry points. They actually are exported
+# by the ta_runtime binary, but TAs will have "libtee_internal.so" in their
+# DT_NEEDED list. This is an empty stub library that satisfies this requirement
+# at TA load time.
+shared_library("tee_internal_stub_so") {
+  output_name = "tee_internal"
+}
+
 group("tests") {
   testonly = true
   deps = [ "tests" ]

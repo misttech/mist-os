@@ -63,6 +63,7 @@ template("fuchsia_ta_package") {
     deps = [
       ":${library_target}",
       ":${ta_name_resource_target}",
+      "//src/tee/runtime:runtime-component",
     ]
   }
 }
