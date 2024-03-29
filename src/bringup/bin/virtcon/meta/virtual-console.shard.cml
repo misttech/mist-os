@@ -1,0 +1,74 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "virtual_console",
+            url: "fuchsia-boot:///virtual-console#meta/virtual-console.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.boot.ReadOnlyLog",
+                "fuchsia.boot.WriteOnlyLog",
+            ],
+            from: "parent",
+            to: "#virtual_console",
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: "#virtual_console",
+            availability: "optional",
+        },
+        {
+            directory: "boot",
+            from: "parent",
+            as: "boot-data",
+            to: [ "#virtual_console" ],
+            rights: [ "r*" ],
+            subdir: "data",
+        },
+        {
+            protocol: [ "fuchsia.sysmem.Allocator" ],
+            from: "#miscsvc",
+            to: "#virtual_console",
+        },
+        {
+            directory: "dev-class",
+            from: "#devfs-with-pkg",
+            as: "input-report",
+            to: "#virtual_console",
+            subdir: "input-report",
+        },
+        {
+            directory: "dev-class",
+            from: "#devfs-with-pkg",
+            as: "display-coordinator",
+            to: "#virtual_console",
+            subdir: "display-coordinator",
+        },
+        {
+            protocol: "fuchsia.hardware.pty.Device",
+            from: "#ptysvc",
+            to: "#virtual_console",
+        },
+        {
+            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            from: "#shutdown_shim",
+            to: "#virtual_console",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#virtual_console",
+        },
+    ],
+    expose: [],
+}

@@ -78,10 +78,6 @@
             url: "fuchsia-boot:///cpu-manager#meta/cpu-manager.cm",
             on_terminate: "reboot",
         },
-        {
-            name: "virtual_console",
-            url: "fuchsia-boot:///virtual-console#meta/virtual-console.cm",
-        },
 
         // TODO(https://fxbug.dev/42180879): Remove need for separate full_resolver component here.
         // Full resolver clone to be used by the full-pkg-drivers collection
@@ -121,15 +117,6 @@
             availability: "optional",
         },
         {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.boot.WriteOnlyLog",
-            ],
-            from: "parent",
-            to: "#virtual_console",
-        },
-        {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: [
@@ -138,7 +125,6 @@
                 "#fshost",
                 "#pkg-cache",
                 "#power_manager",
-                "#virtual_console",
             ],
             availability: "optional",
         },
@@ -166,14 +152,6 @@
             to: "#role_manager",
             rights: [ "r*" ],
             subdir: "config/profiles",
-        },
-        {
-            directory: "boot",
-            from: "parent",
-            as: "boot-data",
-            to: [ "#virtual_console" ],
-            rights: [ "r*" ],
-            subdir: "data",
         },
         {
             directory: "boot",
@@ -303,11 +281,6 @@
             to: [ "#fshost" ],
         },
         {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
-            from: "#miscsvc",
-            to: "#virtual_console",
-        },
-        {
             directory: "dev-topological",
             from: "#devfs",
             to: [ "#fshost" ],
@@ -344,32 +317,12 @@
             subdir: "suspend",
         },
         {
-            directory: "dev-class",
-            from: "#devfs-with-pkg",
-            as: "input-report",
-            to: "#virtual_console",
-            subdir: "input-report",
-        },
-        {
-            directory: "dev-class",
-            from: "#devfs-with-pkg",
-            as: "display-coordinator",
-            to: "#virtual_console",
-            subdir: "display-coordinator",
-        },
-        {
-            protocol: "fuchsia.hardware.pty.Device",
-            from: "#ptysvc",
-            to: "#virtual_console",
-        },
-        {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
             to: [
                 "#pkg-cache",
                 "#pwrbtn-monitor",
                 "#svchost",
-                "#virtual_console",
             ],
         },
 
@@ -432,7 +385,6 @@
                 "#svchost",
                 "#sysinfo",
                 "#system-activity-governor",
-                "#virtual_console",
             ],
         },
         {
@@ -623,6 +575,7 @@
         {
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],
             from: "#virtual_console",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",

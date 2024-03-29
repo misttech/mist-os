@@ -270,13 +270,15 @@
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
                 "fuchsia.update.verify.BlobfsVerifier",
-                "fuchsia.virtualconsole.SessionManager",
             ],
             from: "#bootstrap",
             to: "#core",
         },
         {
-            protocol: [ "fuchsia.tpm.cr50.Cr50" ],
+            protocol: [
+                "fuchsia.tpm.cr50.Cr50",
+                "fuchsia.virtualconsole.SessionManager",
+            ],
             from: "#bootstrap",
             to: "#core",
             availability: "optional",

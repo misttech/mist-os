@@ -151,6 +151,7 @@
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],
             from: "#virtual_console",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.driver.development.Manager" ],

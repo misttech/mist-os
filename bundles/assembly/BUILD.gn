@@ -433,6 +433,19 @@ assembly_input_bundle("virtcon") {
   ]
 
   bootfs_packages = [ "//src/bringup/bin/virtcon:package" ]
+  compiled_packages = [
+    {
+      name = "bootstrap"
+      component_shards = [
+        {
+          component_name = "bootstrap"
+          shards = rebase_path(
+                  [ "//src/bringup/bin/virtcon/meta/virtual-console.shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 assembly_input_bundle("virtcon_disable") {

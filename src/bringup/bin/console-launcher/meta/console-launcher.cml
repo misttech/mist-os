@@ -65,7 +65,6 @@
                 "fuchsia.kernel.RootJob",
                 "fuchsia.process.Launcher",
                 "fuchsia.process.Resolver",
-                "fuchsia.virtualconsole.SessionManager",
             ],
         },
         {
@@ -146,6 +145,13 @@
             protocol: "fuchsia.tpm.cr50.Cr50",
 
             // The source of this protocol, cr50,
+            // may not be available on all products.
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.virtualconsole.SessionManager",
+
+            // The source of this protocol, virtual-console,
             // may not be available on all products.
             availability: "optional",
         },
