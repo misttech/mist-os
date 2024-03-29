@@ -253,6 +253,7 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
     zxlogf(WARNING, "Cannot import BufferCollection to display driver: %s",
            zx_status_get_string(import_status));
     completer.ReplyError(ZX_ERR_INTERNAL);
+    return;
   }
 
   collection_map_[buffer_collection_id] = Collections{
