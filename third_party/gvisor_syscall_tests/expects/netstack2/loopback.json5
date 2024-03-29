@@ -47,30 +47,6 @@
         {
             type: "skip",
             matchers: [
-                // https://fxbug.dev/329727993
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Any_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Any_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Loopback_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Loopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Loopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedAny_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedAny_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedAny_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedAny_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedLoopback_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedLoopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedLoopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Any_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Any_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Any_ConnectV6Any",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Any_ConnectV6Loopback",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Loopback_ConnectV6Any",
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Loopback_ConnectV6Loopback",
-
                 // https://fxbug.dev/42063908
                 "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4Any_ConnectV4Any",
                 "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4Any_ConnectV4Loopback",
