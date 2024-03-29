@@ -22,6 +22,7 @@
 
 #include <gtest/gtest.h>
 
+#include "lib/syslog/cpp/macros.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/service.h"
@@ -66,6 +67,51 @@ class FakeAudioCodec : public fidl::testing::TestBase<CodecConnector>,
   async_dispatcher_t* dispatcher_;
   std::optional<fidl::ServerBindingRef<CodecConnector>> connector_binding_;
   std::optional<fidl::ServerBindingRef<Codec>> binding_;
+};
+
+using fuchsia_hardware_audio::Composite;
+// TODO(https://fxbug.dev/304551042): Convert VirtualAudioComposite to DFv2; remove Connector.
+using fuchsia_hardware_audio::CompositeConnector;
+class FakeAudioComposite : public fidl::testing::TestBase<Composite>,
+                           public fidl::testing::TestBase<CompositeConnector> {
+ public:
+  explicit FakeAudioComposite(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    ADD_FAILURE() << "Method not implemented: '" << name << "";
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetProperties(GetPropertiesCompleter::Sync& completer) override { completer.Reply({}); }
+
+  fbl::RefPtr<fs::Service> AsService() {
+    // TODO(https://fxbug.dev/304551042): Convert VirtualAudioComposite to DFv2; remove 'else'.
+    if constexpr (kDetectDFv2CompositeDevices) {
+      return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<Composite> c) {
+        binding_ = fidl::BindServer(dispatcher(), std::move(c), this);
+        return ZX_OK;
+      });
+    } else {
+      return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<CompositeConnector> c) {
+        connector_binding_ = fidl::BindServer(dispatcher(), std::move(c), this);
+        return ZX_OK;
+      });
+    }
+  }
+
+  bool is_bound() const { return binding_.has_value(); }
+  async_dispatcher_t* dispatcher() { return dispatcher_; }
+
+ private:
+  // FIDL method for fuchsia.hardware.audio.CompositeConnector.
+  // TODO(https://fxbug.dev/304551042): Convert VirtualAudioComposite to DFv2; remove this.
+  void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override {
+    binding_ = fidl::BindServer(dispatcher(), std::move(request.composite_protocol()), this);
+  }
+
+  async_dispatcher_t* dispatcher_;
+  std::optional<fidl::ServerBindingRef<CompositeConnector>> connector_binding_;
+  std::optional<fidl::ServerBindingRef<Composite>> binding_;
 };
 
 using fuchsia_hardware_audio::StreamConfig;
@@ -147,6 +193,13 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
     ASSERT_EQ(fdio_ns_get_installed(&ns_), ZX_OK);
     zx::channel channel0, channel1;
 
+    // Serve up the emulated audio-composite directory
+    ASSERT_EQ(zx::channel::create(0, &channel0, &channel1), ZX_OK);
+    ASSERT_EQ(
+        vfs_.Serve(composite_dir_, std::move(channel0), fs::VnodeConnectionOptions::ReadOnly()),
+        ZX_OK);
+    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/audio-composite", channel1.release()), ZX_OK);
+
     // Serve up the emulated audio-input directory
     ASSERT_EQ(zx::channel::create(0, &channel0, &channel1), ZX_OK);
     ASSERT_EQ(vfs_.Serve(input_dir_, std::move(channel0), fs::VnodeConnectionOptions::ReadOnly()),
@@ -171,6 +224,7 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
     bool task_has_run = false;
     async::PostTask(dispatcher(), [this, &task_has_run]() {
       codec_dir_->RemoveAllEntries();
+      composite_dir_->RemoveAllEntries();
       input_dir_->RemoveAllEntries();
       output_dir_->RemoveAllEntries();
       task_has_run = true;
@@ -178,12 +232,15 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
     while (!task_has_run) {
       RunLoopUntilIdle();
     }
-    ASSERT_TRUE(codec_dir_->IsEmpty() && input_dir_->IsEmpty() && output_dir_->IsEmpty())
-        << "codec_dir is " << (codec_dir_->IsEmpty() ? "" : "NOT ") << "empty; input_dir is "
+    ASSERT_TRUE(codec_dir_->IsEmpty() && composite_dir_->IsEmpty() && input_dir_->IsEmpty() &&
+                output_dir_->IsEmpty())
+        << "codec_dir is " << (codec_dir_->IsEmpty() ? "" : "NOT ") << "empty; composite_dir is "
+        << (composite_dir_->IsEmpty() ? "" : "NOT ") << "empty; input_dir is "
         << (input_dir_->IsEmpty() ? "" : "NOT ") << "empty; output_dir is "
         << (output_dir_->IsEmpty() ? "" : "NOT ") << "empty";
 
     ASSERT_NE(ns_, nullptr);
+    ASSERT_EQ(fdio_ns_unbind(ns_, "/dev/class/audio-composite"), ZX_OK);
     ASSERT_EQ(fdio_ns_unbind(ns_, "/dev/class/audio-input"), ZX_OK);
     ASSERT_EQ(fdio_ns_unbind(ns_, "/dev/class/audio-output"), ZX_OK);
     ASSERT_EQ(fdio_ns_unbind(ns_, "/dev/class/codec"), ZX_OK);
@@ -212,6 +269,21 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
       RunLoopUntilIdle();
     }
     return {name, codec_dir_, dispatcher()};
+  }
+
+  // Adds a `FakeAudioComposite` to the emulated 'composite' directory that has been installed in
+  // the local namespace at /dev/class/audio-composite.
+  ScopedDirent AddCompositeDevice(std::shared_ptr<FakeAudioComposite> device) {
+    auto name = std::to_string(next_device_number_++);
+    bool task_has_run = false;
+    async::PostTask(dispatcher(), [this, name, device = std::move(device), &task_has_run]() {
+      task_has_run = true;
+      ASSERT_EQ(ZX_OK, composite_dir_->AddEntry(name, device->AsService()));
+    });
+    while (!task_has_run) {
+      RunLoopUntilIdle();
+    }
+    return {name, composite_dir_, dispatcher()};
   }
 
   // Adds a `FakeAudioStreamConfig` to the emulated 'audio-input' directory that has been installed
@@ -252,6 +324,7 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
 
   // Note these _must_ be RefPtrs since vfs_ will try to AdoptRef on the raw pointer passed to it.
   fbl::RefPtr<fs::PseudoDir> codec_dir_{fbl::MakeRefCounted<fs::PseudoDir>()};
+  fbl::RefPtr<fs::PseudoDir> composite_dir_{fbl::MakeRefCounted<fs::PseudoDir>()};
   fbl::RefPtr<fs::PseudoDir> input_dir_{fbl::MakeRefCounted<fs::PseudoDir>()};
   fbl::RefPtr<fs::PseudoDir> output_dir_{fbl::MakeRefCounted<fs::PseudoDir>()};
 };
@@ -260,45 +333,54 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
 TEST_F(DeviceDetectorTest, DetectExistingDevices) {
   // Add some devices that will exist before the plug detector is created.
   auto input0 = std::make_shared<FakeAudioStreamConfig>(dispatcher());
+  auto composite0 = std::make_shared<FakeAudioComposite>(dispatcher());
   auto output0 = std::make_shared<FakeAudioStreamConfig>(dispatcher());
   auto codec0 = std::make_shared<FakeAudioCodec>(dispatcher());
   auto input1 = std::make_shared<FakeAudioStreamConfig>(dispatcher());
+  auto composite1 = std::make_shared<FakeAudioComposite>(dispatcher());
   auto output1 = std::make_shared<FakeAudioStreamConfig>(dispatcher());
   auto codec1 = std::make_shared<FakeAudioCodec>(dispatcher());
 
   [[maybe_unused]] auto dev0 = AddStreamConfigInputDevice(input0);
-  [[maybe_unused]] auto dev1 = AddStreamConfigOutputDevice(output0);
-  [[maybe_unused]] auto dev2 = AddCodecDevice(codec0);
-  [[maybe_unused]] auto dev3 = AddStreamConfigInputDevice(input1);
-  [[maybe_unused]] auto dev4 = AddStreamConfigOutputDevice(output1);
-  [[maybe_unused]] auto dev5 = AddCodecDevice(codec1);
+  [[maybe_unused]] auto dev1 = AddCompositeDevice(composite0);
+  [[maybe_unused]] auto dev2 = AddStreamConfigOutputDevice(output0);
+  [[maybe_unused]] auto dev3 = AddCodecDevice(codec0);
+  [[maybe_unused]] auto dev4 = AddStreamConfigInputDevice(input1);
+  [[maybe_unused]] auto dev5 = AddCompositeDevice(composite1);
+  [[maybe_unused]] auto dev6 = AddStreamConfigOutputDevice(output1);
+  [[maybe_unused]] auto dev7 = AddCodecDevice(codec1);
 
   auto tracker = std::make_shared<DeviceTracker>(dispatcher(), true);
   RunLoopUntilIdle();
   ASSERT_EQ(0u, tracker->size());
   {
-    // Create the detector; expect 6 events (1 for each device above);
+    // Create the detector; expect 8 events (1 for each device above);
     auto device_detector = DeviceDetector::Create(tracker->handler(), dispatcher());
     zx::time deadline = zx::clock::get_monotonic() + kCommandTimeout;
     while (zx::clock::get_monotonic() < deadline) {
       // A fake audio device could still be setting up its server end, by the time the
       // tracker adds it. We wait for the tracker AND the server-ends, to avoid a race.
-      if (input0->is_bound() && input1->is_bound() && output0->is_bound() && output1->is_bound() &&
-          codec0->is_bound() && codec1->is_bound() && tracker->size() >= 6) {
+      if (input0->is_bound() && input1->is_bound() && composite0->is_bound() &&
+          composite1->is_bound() && output0->is_bound() && output1->is_bound() &&
+          codec0->is_bound() && codec1->is_bound() && tracker->size() >= 8) {
         break;
       }
       RunLoopUntilIdle();
     }
     RunLoopUntilIdle();  // Allow erroneous extra device additions to reveal themselves.
-    ASSERT_EQ(tracker->size(), 6u) << "Timed out waiting for preexisting devices to be detected";
+    ASSERT_EQ(tracker->size(), 8u) << "Timed out waiting for preexisting devices to be detected";
 
-    int num_inputs = 0, num_outputs = 0, num_codecs = 0;
+    int num_inputs = 0, num_composites = 0, num_outputs = 0, num_codecs = 0;
     for (auto dev_num = 0u; dev_num < tracker->size(); ++dev_num) {
       auto& device = tracker->devices()[dev_num];
       if (device.device_type == DeviceType::kInput) {
         EXPECT_EQ(device.client.Which(), DriverClient::Tag::kStreamConfig);
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         ++num_inputs;
+      } else if (device.device_type == DeviceType::kComposite) {
+        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kComposite);
+        EXPECT_TRUE(device.client.composite()->is_valid());
+        ++num_composites;
       } else if (device.device_type == DeviceType::kOutput) {
         EXPECT_EQ(device.client.Which(), DriverClient::Tag::kStreamConfig);
         EXPECT_TRUE(device.client.stream_config()->is_valid());
@@ -312,6 +394,7 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
       }
     }
     EXPECT_EQ(num_inputs, 2);
+    EXPECT_EQ(num_composites, 2);
     EXPECT_EQ(num_outputs, 2);
     EXPECT_EQ(num_codecs, 2);
   }
@@ -324,11 +407,13 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
       case DeviceType::kCodec:
         EXPECT_TRUE(device.client.codec()->is_valid());
         break;
+      case DeviceType::kComposite:
+        EXPECT_TRUE(device.client.composite()->is_valid());
+        break;
       case DeviceType::kInput:
       case DeviceType::kOutput:
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         break;
-      case DeviceType::kComposite:
       case DeviceType::kDai:
       default:
         ADD_FAILURE() << "Unknown device_type after test";
@@ -338,6 +423,8 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
 
   EXPECT_TRUE(input0->is_bound());
   EXPECT_TRUE(input1->is_bound());
+  EXPECT_TRUE(composite0->is_bound());
+  EXPECT_TRUE(composite1->is_bound());
   EXPECT_TRUE(output0->is_bound());
   EXPECT_TRUE(output1->is_bound());
   EXPECT_TRUE(codec0->is_bound());
@@ -348,6 +435,7 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
 TEST_F(DeviceDetectorTest, DetectHotplugDevices) {
   auto output = std::make_shared<FakeAudioStreamConfig>(dispatcher());
   auto input = std::make_shared<FakeAudioStreamConfig>(dispatcher());
+  auto composite = std::make_shared<FakeAudioComposite>(dispatcher());
   auto codec = std::make_shared<FakeAudioCodec>(dispatcher());
 
   auto tracker = std::make_shared<DeviceTracker>(dispatcher(), true);
@@ -382,21 +470,34 @@ TEST_F(DeviceDetectorTest, DetectHotplugDevices) {
     RunLoopUntilIdle();  // Allow erroneous extra device additions to reveal themselves.
     ASSERT_EQ(tracker->size(), 2u) << "Timed out waiting for input device to be detected";
 
-    [[maybe_unused]] auto dev2 = AddCodecDevice(codec);
+    [[maybe_unused]] auto dev2 = AddCompositeDevice(composite);
     deadline = zx::clock::get_monotonic() + kCommandTimeout;
     while (zx::clock::get_monotonic() < deadline) {
       // Wait for both tracker and device, same as above.
-      if (tracker->size() >= 3u && codec->is_bound()) {
+      if (tracker->size() >= 3u && composite->is_bound()) {
         break;
       }
       RunLoopUntilIdle();
     }
     RunLoopUntilIdle();  // Allow erroneous extra device additions to reveal themselves.
-    ASSERT_EQ(tracker->size(), 3u) << "Timed out waiting for codec device to be detected";
+    ASSERT_EQ(tracker->size(), 3u) << "Timed out waiting for composite device to be detected";
+
+    [[maybe_unused]] auto dev3 = AddCodecDevice(codec);
+    deadline = zx::clock::get_monotonic() + kCommandTimeout;
+    while (zx::clock::get_monotonic() < deadline) {
+      // Wait for both tracker and device, same as above.
+      if (tracker->size() >= 4u && codec->is_bound()) {
+        break;
+      }
+      RunLoopUntilIdle();
+    }
+    RunLoopUntilIdle();  // Allow erroneous extra device additions to reveal themselves.
+    ASSERT_EQ(tracker->size(), 4u) << "Timed out waiting for codec device to be detected";
 
     EXPECT_EQ(tracker->devices()[0].device_type, DeviceType::kOutput);
     EXPECT_EQ(tracker->devices()[1].device_type, DeviceType::kInput);
-    EXPECT_EQ(tracker->devices()[2].device_type, DeviceType::kCodec);
+    EXPECT_EQ(tracker->devices()[2].device_type, DeviceType::kComposite);
+    EXPECT_EQ(tracker->devices()[3].device_type, DeviceType::kCodec);
   }
 
   // After the device detector is gone, dynamically-detected devices should still be bound.
@@ -407,11 +508,13 @@ TEST_F(DeviceDetectorTest, DetectHotplugDevices) {
       case DeviceType::kCodec:
         EXPECT_TRUE(device.client.codec()->is_valid());
         break;
+      case DeviceType::kComposite:
+        EXPECT_TRUE(device.client.composite()->is_valid());
+        break;
       case DeviceType::kInput:
       case DeviceType::kOutput:
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         break;
-      case DeviceType::kComposite:
       case DeviceType::kDai:
       default:
         ADD_FAILURE() << "Unknown device_type after test";
@@ -421,12 +524,14 @@ TEST_F(DeviceDetectorTest, DetectHotplugDevices) {
 
   EXPECT_TRUE(output->is_bound());
   EXPECT_TRUE(input->is_bound());
+  EXPECT_TRUE(composite->is_bound());
   EXPECT_TRUE(codec->is_bound());
 }
 
 // Ensure that once the plug detector is destroyed, detection handlers are no longer called.
 TEST_F(DeviceDetectorTest, NoDanglingDetectors) {
   auto codec = std::make_shared<FakeAudioCodec>(dispatcher());
+  auto composite = std::make_shared<FakeAudioComposite>(dispatcher());
   auto input = std::make_shared<FakeAudioStreamConfig>(dispatcher());
   auto output = std::make_shared<FakeAudioStreamConfig>(dispatcher());
   auto tracker = std::make_shared<DeviceTracker>(dispatcher(), false);
@@ -441,12 +546,14 @@ TEST_F(DeviceDetectorTest, NoDanglingDetectors) {
   // Hotplug an input device, an output device and a codec device.
   // If a device-detection handler is still in place, these will be inserted into tracker's list.
   [[maybe_unused]] auto dev0 = AddCodecDevice(codec);
-  [[maybe_unused]] auto dev1 = AddStreamConfigInputDevice(input);
-  [[maybe_unused]] auto dev2 = AddStreamConfigOutputDevice(output);
+  [[maybe_unused]] auto dev1 = AddCompositeDevice(composite);
+  [[maybe_unused]] auto dev2 = AddStreamConfigInputDevice(input);
+  [[maybe_unused]] auto dev3 = AddStreamConfigOutputDevice(output);
 
   RunLoopUntilIdle();  // Allow erroneous device handler callbacks to reveal themselves.
   EXPECT_EQ(0u, tracker->size());
   EXPECT_FALSE(codec->is_bound());
+  EXPECT_FALSE(composite->is_bound());
   EXPECT_FALSE(input->is_bound());
   EXPECT_FALSE(output->is_bound());
 }

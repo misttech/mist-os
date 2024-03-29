@@ -53,10 +53,10 @@ zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
             FX_CHECK(driver_client.stream_config()->is_valid());
             break;
           case fuchsia_audio_device::DriverClient::Tag::kComposite:
-            ADR_WARN_OBJECT() << "Composite device detection not yet supported";
+            ADR_WARN_OBJECT() << "Composite device detected but not yet supported";
             return;
           case fuchsia_audio_device::DriverClient::Tag::kDai:
-            ADR_WARN_OBJECT() << "Dai device detection not yet supported";
+            ADR_WARN_OBJECT() << "Dai device detected but not yet supported";
             return;
           default:
             FX_CHECK(!driver_client.IsUnknown());

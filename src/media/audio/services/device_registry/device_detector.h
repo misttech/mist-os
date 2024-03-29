@@ -20,12 +20,17 @@
 
 namespace media_audio {
 
+// If true, we detect Composite devices directly (without CompositeConnector).
+// If false, we detect Composite devices via the "trampoline" CompositeConnector.
+// TODO(https://fxbug.dev/304551042): Convert VirtualAudioComposite to DFv2 and remove this flag.
+constexpr bool kDetectDFv2CompositeDevices = true;
+
 using DeviceDetectionHandler = std::function<void(
     std::string_view, fuchsia_audio_device::DeviceType, fuchsia_audio_device::DriverClient)>;
 
-// This class detects devices and invokes the provided handler for those devices. It uses two
+// This class detects devices and invokes the provided handler for those devices. It uses multiple
 // file-system watchers that focus on the device file system (devfs), specifically the locations
-// where registered audio devices are exposed (dev/class/audio-input and dev/class/audio-output).
+// where registered audio devices are exposed (dev/class/audio-input, etc).
 class DeviceDetector {
  public:
   // Immediately kick off watchers in 'devfs' directories where audio devices are found.
@@ -41,8 +46,8 @@ class DeviceDetector {
 
   zx_status_t StartDeviceWatchers();
 
-  // Open a devnode at the given path; use its FDIO device channel as a Connector to
-  // connect (retrieve) the device's primary protocol (StreamConfig, etc).
+  // Open a devnode at the given path; use its FDIO device channel to connect (retrieve) the
+  // device's primary protocol (StreamConfig, etc).
   void DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
                              const std::string& name, fuchsia_audio_device::DeviceType device_type);
 

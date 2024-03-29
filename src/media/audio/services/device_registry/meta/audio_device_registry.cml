@@ -28,6 +28,11 @@
             path: "/dev/class/audio-output",
         },
         {
+            directory: "dev-audio-composite",
+            rights: [ "r*" ],
+            path: "/dev/class/audio-composite",
+        },
+        {
             directory: "dev-codec",
             rights: [ "r*" ],
             path: "/dev/class/codec",

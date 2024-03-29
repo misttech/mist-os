@@ -6,7 +6,6 @@
         {
             name: "audio_device_registry",
             url: "fuchsia-pkg://fuchsia.com/audio_device_registry#meta/audio_device_registry.cm",
-            startup: "eager",
             environment: "#core-env",
         },
     ],
@@ -24,6 +23,13 @@
             as: "dev-audio-output",
             to: "#audio_device_registry",
             subdir: "audio-output",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-audio-composite",
+            to: "#audio_device_registry",
+            subdir: "audio-composite",
         },
         {
             directory: "dev-class",
