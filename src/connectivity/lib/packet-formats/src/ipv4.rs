@@ -655,7 +655,7 @@ type Options<B> = packet::records::options::Options<B, Ipv4OptionsImpl>;
 pub struct Ipv4OptionsTooLongError;
 
 /// A PacketBuilder for Ipv4 Packets but with options.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ipv4PacketBuilderWithOptions<'a, I> {
     prefix_builder: Ipv4PacketBuilder,
     options: OptionSequenceBuilder<Ipv4Option<'a>, I>,
@@ -711,6 +711,29 @@ where
         let Ipv4PacketBuilderWithOptions { prefix_builder, options } = self;
         options.serialize_into(opts);
         prefix_builder.serialize(target, body);
+    }
+}
+
+impl<'a, Item> IpPacketBuilder<Ipv4>
+    for Ipv4PacketBuilderWithOptions<'a, core::slice::Iter<'a, Item>>
+where
+    Item: Debug,
+    &'a Item: Borrow<Ipv4Option<'a>>,
+{
+    fn new(src_ip: Ipv4Addr, dst_ip: Ipv4Addr, ttl: u8, proto: Ipv4Proto) -> Self {
+        Ipv4PacketBuilderWithOptions::new(
+            Ipv4PacketBuilder::new(src_ip, dst_ip, ttl, proto),
+            [].iter(),
+        )
+        .expect("packet builder with no options should be valid")
+    }
+
+    fn src_ip(&self) -> Ipv4Addr {
+        self.prefix_builder.src_ip
+    }
+
+    fn dst_ip(&self) -> Ipv4Addr {
+        self.prefix_builder.dst_ip
     }
 }
 
@@ -863,7 +886,7 @@ impl PacketBuilder for Ipv4PacketBuilder {
 }
 
 impl IpPacketBuilder<Ipv4> for Ipv4PacketBuilder {
-    fn new(src_ip: Ipv4Addr, dst_ip: Ipv4Addr, ttl: u8, proto: Ipv4Proto) -> Ipv4PacketBuilder {
+    fn new(src_ip: Ipv4Addr, dst_ip: Ipv4Addr, ttl: u8, proto: Ipv4Proto) -> Self {
         Ipv4PacketBuilder::new(src_ip, dst_ip, ttl, proto)
     }
 
@@ -956,7 +979,7 @@ pub mod options {
     ///
     /// [Wikipedia]: https://en.wikipedia.org/wiki/IPv4#Options
     /// [RFC 791]: https://tools.ietf.org/html/rfc791#page-15
-    #[derive(PartialEq, Eq, Debug)]
+    #[derive(PartialEq, Eq, Debug, Clone)]
     pub struct Ipv4Option<'a> {
         /// Whether this option needs to be copied into all fragments of a
         /// fragmented packet.
@@ -971,7 +994,7 @@ pub mod options {
     /// `Ipv4OptionData` represents the variable-length data field of an IPv4 header
     /// option.
     #[allow(missing_docs)]
-    #[derive(PartialEq, Eq, Debug)]
+    #[derive(PartialEq, Eq, Debug, Clone)]
     pub enum Ipv4OptionData<'a> {
         /// Used to tell routers to inspect the packet.
         ///

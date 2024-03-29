@@ -239,9 +239,6 @@ impl<B: ByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
 }
 
 /// A builder for IP packets.
-///
-/// `IpPacketBuilder` is implemented by `Ipv4PacketBuilder` and
-/// `Ipv6PacketBuilder`.
 pub trait IpPacketBuilder<I: IpExt>: PacketBuilder + Clone + Debug {
     /// Returns a new packet builder for an associated IP version with the given
     /// given source and destination IP addresses, TTL (IPv4)/Hop Limit (IPv4)

@@ -489,7 +489,7 @@ pub trait AlignedRecordBuilder: RecordBuilder {
 /// be any type which implements `Borrow<R>` for `R: RecordBuilder`.
 ///
 /// `RecordSequenceBuilder` implements [`InnerPacketBuilder`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RecordSequenceBuilder<R, I> {
     records: I,
     _marker: PhantomData<R>,
@@ -561,7 +561,7 @@ where
 /// AlignedRecordBuilder`.
 ///
 /// `AlignedRecordSequenceBuilder` implements [`InnerPacketBuilder`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AlignedRecordSequenceBuilder<R, I> {
     start_pos: usize,
     records: I,

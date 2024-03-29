@@ -525,7 +525,7 @@ const HBH_OPTION_RTRALRT_LEN: usize = 2;
 
 /// HopByHop Options Extension header data.
 #[allow(missing_docs)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum HopByHopOptionData<'a> {
     Unrecognized { kind: u8, len: u8, data: &'a [u8] },
     RouterAlert { data: u16 },
@@ -1092,7 +1092,7 @@ impl From<ExtensionHeaderOptionAction> for u8 {
 /// Generic Extension header option type that has extension header specific
 /// option data (`data`) defined by an `O`. The common option format is defined in
 /// section 4.2 of RFC 8200, outlining actions and mutability for option types.
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ExtensionHeaderOption<O> {
     /// Action to take if the option type is unrecognized.
     pub action: ExtensionHeaderOptionAction,

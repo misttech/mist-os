@@ -1017,7 +1017,7 @@ impl Ipv6PacketBuilder {
 }
 
 /// A builder for Ipv6 packets with HBH Options.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ipv6PacketBuilderWithHbhOptions<'a, I> {
     prefix_builder: Ipv6PacketBuilder,
     hbh_options: AlignedRecordSequenceBuilder<HopByHopOption<'a>, I>,
@@ -1106,7 +1106,7 @@ impl PacketBuilder for Ipv6PacketBuilder {
 }
 
 impl IpPacketBuilder<Ipv6> for Ipv6PacketBuilder {
-    fn new(src_ip: Ipv6Addr, dst_ip: Ipv6Addr, ttl: u8, proto: Ipv6Proto) -> Ipv6PacketBuilder {
+    fn new(src_ip: Ipv6Addr, dst_ip: Ipv6Addr, ttl: u8, proto: Ipv6Proto) -> Self {
         Ipv6PacketBuilder::new(src_ip, dst_ip, ttl, proto)
     }
 
@@ -1154,6 +1154,28 @@ where
     }
 }
 
+impl<'a, Item> IpPacketBuilder<Ipv6>
+    for Ipv6PacketBuilderWithHbhOptions<'a, core::slice::Iter<'a, Item>>
+where
+    Item: Debug,
+    &'a Item: Borrow<HopByHopOption<'a>>,
+{
+    fn new(src_ip: Ipv6Addr, dst_ip: Ipv6Addr, ttl: u8, proto: Ipv6Proto) -> Self {
+        Ipv6PacketBuilderWithHbhOptions::new(
+            Ipv6PacketBuilder::new(src_ip, dst_ip, ttl, proto),
+            [].iter(),
+        )
+        .expect("packet builder with no options should be valid")
+    }
+
+    fn src_ip(&self) -> Ipv6Addr {
+        self.prefix_builder.src_ip
+    }
+
+    fn dst_ip(&self) -> Ipv6Addr {
+        self.prefix_builder.dst_ip
+    }
+}
 /// Reassembles a fragmented packet into a parsed IP packet.
 pub(crate) fn reassemble_fragmented_packet<
     B: ByteSliceMut,
