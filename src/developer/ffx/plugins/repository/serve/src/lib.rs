@@ -127,16 +127,15 @@ async fn connect_to_rcs(
 }
 
 async fn connect_to_target(
-    target_spec: String,
+    target_spec: Option<String>,
     aliases: Option<Vec<String>>,
     storage_type: Option<RepositoryStorageType>,
     repo_server_listen_addr: std::net::SocketAddr,
     repo_manager: Arc<RepositoryManager>,
     target_collection_proxy: &TargetCollectionProxy,
     alias_conflict_mode: FfxRepositoryRegistrationAliasConflictMode,
-) -> Result<(), anyhow::Error> {
-    let target_query =
-        FfxTargetQuery { string_matcher: Some(target_spec.clone()), ..Default::default() };
+) -> Result<Option<String>, anyhow::Error> {
+    let target_query = FfxTargetQuery { string_matcher: target_spec.clone(), ..Default::default() };
 
     let rcs_proxy = connect_to_rcs(target_collection_proxy, &target_query).await?;
 
@@ -167,7 +166,7 @@ async fn connect_to_target(
     for (repo_name, repo) in repo_manager.repositories() {
         let repo_target = FfxCliRepositoryTarget {
             repo_name: Some(repo_name),
-            target_identifier: Some(target_spec.clone()),
+            target_identifier: target_spec.clone(),
             aliases: aliases.clone(),
             storage_type,
             ..Default::default()
@@ -189,7 +188,7 @@ async fn connect_to_target(
         .await
         .map_err(|e| anyhow!("Failed to register repository: {:?}", e))?;
     }
-    Ok(())
+    Ok(target.nodename.clone())
 }
 
 #[async_trait(?Send)]
@@ -280,15 +279,17 @@ impl FfxMain for ServeTool {
             tracing::info!("Getting target specifier");
             let target_spec = timeout(Duration::from_secs(1), get_target_specifier(&self.context))
                 .await
-                .context("getting target specifier")??
-                .context("resolving target specifier")?;
+                .context("getting target specifier")??;
 
             let mut server_stop_tx = server_stop_tx.clone();
             let _conn_loop_task = fasync::Task::local(async move {
                'conn: loop {
                     // This blocks until the default target becomes available
                     // if a connection is possible.
-                    tracing::info!("Attempting connection to default target: {target_spec}");
+                    match target_spec {
+                        Some(ref s) => tracing::info!("Attempting connection to target: {s}"),
+                        None => tracing::info!("Attempting connection to first target if unambiguously detectable"),
+                    }
                     let connection = connect_to_target(
                         target_spec.clone(),
                         Some(self.cmd.alias.clone()),
@@ -301,11 +302,15 @@ impl FfxMain for ServeTool {
                     .await;
 
                     match connection {
-                        Ok(()) => {
-                            let s = format!(
-                                "Serving repository '{repo_path}' to target '{target_spec}' over address '{}'.",
-                                server_addr
-                            );
+                        Ok(target) => {
+                            let s = match target {
+                                Some(t) => format!(
+                                    "Serving repository '{repo_path}' to target '{t}' over address '{}'.",
+                                    server_addr),
+                                None => format!(
+                                    "Serving repository '{repo_path}' over address '{}'.",
+                                    server_addr),
+                            };
                             if let Err(e) = writeln!(writer, "{}", s) {
                                 tracing::error!("Failed to write to output: {:?}", e);
                             }
@@ -318,7 +323,7 @@ impl FfxMain for ServeTool {
                                     break 'conn;
                                 }
                                 if let Err(e) = knock_target_by_name(
-                                    &Some(target_spec.clone()),
+                                    &target_spec.clone(),
                                     &self.target_collection_proxy,
                                     SERVE_KNOCK_TIMEOUT,
                                     SERVE_KNOCK_TIMEOUT,
