@@ -169,21 +169,21 @@ impl<B: ByteSliceMut + ParseBuffer> IpPacket<Ipv6> for Ipv6Packet<B> {
 /// either local delivery or forwarding.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub struct RxPacket<'a, B, I: IpExt> {
+pub struct RxPacket<'a, I: IpExt, B> {
     src_addr: I::Addr,
     dst_addr: I::Addr,
     protocol: I::Proto,
     body: &'a B,
 }
 
-impl<'a, B: ParseBuffer, I: IpExt> RxPacket<'a, B, I> {
+impl<'a, I: IpExt, B: ParseBuffer> RxPacket<'a, I, B> {
     /// Create a new [`RxPacket`] from its IP header fields and payload.
     pub fn new(src_addr: I::Addr, dst_addr: I::Addr, protocol: I::Proto, body: &'a B) -> Self {
         Self { src_addr, dst_addr, protocol, body }
     }
 }
 
-impl<B: ParseBuffer, I: IpExt> IpPacket<I> for RxPacket<'_, B, I> {
+impl<I: IpExt, B: ParseBuffer> IpPacket<I> for RxPacket<'_, I, B> {
     type TransportPacket<'a> = Option<ParsedTransportHeader> where Self: 'a;
 
     fn src_addr(&self) -> I::Addr {
@@ -225,14 +225,14 @@ impl<B: ParseBuffer, I: IpExt> IpPacket<I> for RxPacket<'_, B, I> {
 /// type.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub struct TxPacket<'a, S: MaybeTransportPacket, I: IpExt> {
+pub struct TxPacket<'a, I: IpExt, S: MaybeTransportPacket> {
     src_addr: I::Addr,
     dst_addr: I::Addr,
     protocol: I::Proto,
     serializer: &'a S,
 }
 
-impl<'a, S: MaybeTransportPacket, I: IpExt> TxPacket<'a, S, I> {
+impl<'a, I: IpExt, S: MaybeTransportPacket> TxPacket<'a, I, S> {
     /// Create a new [`TxPacket`] from its IP header fields and payload.
     pub fn new(
         src_addr: I::Addr,
@@ -244,7 +244,7 @@ impl<'a, S: MaybeTransportPacket, I: IpExt> TxPacket<'a, S, I> {
     }
 }
 
-impl<S: MaybeTransportPacket, I: IpExt> IpPacket<I> for TxPacket<'_, S, I> {
+impl<I: IpExt, S: MaybeTransportPacket> IpPacket<I> for TxPacket<'_, I, S> {
     type TransportPacket<'a> = &'a S where Self: 'a;
 
     fn src_addr(&self) -> I::Addr {
@@ -273,7 +273,7 @@ impl<S: MaybeTransportPacket, I: IpExt> IpPacket<I> for TxPacket<'_, S, I> {
 /// its entirety.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub struct ForwardedPacket<B, I: IpExt> {
+pub struct ForwardedPacket<I: IpExt, B> {
     src_addr: I::Addr,
     dst_addr: I::Addr,
     protocol: I::Proto,
@@ -281,7 +281,7 @@ pub struct ForwardedPacket<B, I: IpExt> {
     body: B,
 }
 
-impl<B: BufferMut, I: IpExt> ForwardedPacket<B, I> {
+impl<I: IpExt, B: BufferMut> ForwardedPacket<I, B> {
     /// Create a new [`ForwardedPacket`] from its IP header fields and payload.
     pub fn new(
         src_addr: I::Addr,
@@ -300,7 +300,7 @@ impl<B: BufferMut, I: IpExt> ForwardedPacket<B, I> {
     }
 }
 
-impl<B: BufferMut, I: IpExt> Serializer for ForwardedPacket<B, I> {
+impl<I: IpExt, B: BufferMut> Serializer for ForwardedPacket<I, B> {
     type Buffer = <B as Serializer>::Buffer;
 
     fn serialize<G: packet::GrowBufferMut, P: packet::BufferProvider<Self::Buffer, G>>(
@@ -315,7 +315,7 @@ impl<B: BufferMut, I: IpExt> Serializer for ForwardedPacket<B, I> {
     }
 }
 
-impl<B: BufferMut, I: IpExt> IpPacket<I> for ForwardedPacket<B, I> {
+impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
     type TransportPacket<'a> = Option<ParsedTransportHeader>  where Self : 'a;
 
     fn src_addr(&self) -> I::Addr {

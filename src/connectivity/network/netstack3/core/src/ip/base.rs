@@ -2092,7 +2092,7 @@ pub(crate) fn receive_ipv4_packet<
                 ) {
                     Ok(()) => (),
                     Err(p) => {
-                        let _: ForwardedPacket<B, _> = p;
+                        let _: ForwardedPacket<_, B> = p;
                         core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.mtu_exceeded);
                         // TODO(https://fxbug.dev/42167236): Encode the MTU error
                         // more obviously in the type system.
