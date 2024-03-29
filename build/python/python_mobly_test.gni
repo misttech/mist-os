@@ -22,7 +22,6 @@ import("//build/testing/host_test_data.gni")
 # Example
 # ```
 # python_mobly_test("hello_world_test") {
-#   enable_mypy = true
 #   main_source = "my_mobly_test.py"
 #   sources = [
 #     "test_helpers_foo.py",
@@ -138,7 +137,7 @@ import("//build/testing/host_test_data.gni")
 #   enable_mypy (optional)
 #     If true, enable MyPy type checking on the target and respective deps.
 #     Type: boolean
-#     Default: False
+#     Default: True
 #
 #   testonly (optional)
 #     GN Usual. Allow option to set to false for IDK inclusion.
@@ -169,6 +168,11 @@ template("python_mobly_test") {
     _testonly = invoker.testonly
   }
 
+  _enable_mypy = true
+  if (defined(invoker.enable_mypy)) {
+    _enable_mypy = invoker.enable_mypy
+  }
+
   #
   # Define Mobly test python_binary().
   #
@@ -183,9 +187,9 @@ template("python_mobly_test") {
                            [
                              "main_source",
                              "sources",
-                             "enable_mypy",
                            ])
     testonly = _testonly
+    enable_mypy = _enable_mypy
     visibility = [ ":*" ]
 
     output_name = _test_binary_name
