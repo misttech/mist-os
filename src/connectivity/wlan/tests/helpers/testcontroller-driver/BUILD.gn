@@ -19,6 +19,7 @@ fuchsia_driver("testcontroller_driver-driver") {
   deps = [
     ":driver_bind",
     "./fidl:test.wlan.testcontroller_cpp",
+    "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",
     "//src/devices/lib/driver:driver_runtime",

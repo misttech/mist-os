@@ -1,0 +1,103 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
+    test_realm_helpers::constants::DEFAULT_CLIENT_STA_ADDR, wlan_common::ie::fake_ht_capabilities,
+    zerocopy::AsBytes,
+};
+
+/// Contains all the configuration required for the fullmac driver.
+/// These are primarily used to respond to SME query requests.
+/// By default, the configuration is a client with DEFAULT_CLIENT_STA_ADDR that
+/// supports 2.4 GHz bands and HT capabilities.
+#[derive(Debug)]
+pub struct FullmacDriverConfig {
+    pub query_info: fidl_fullmac::WlanFullmacQueryInfo,
+    pub mac_sublayer_support: fidl_common::MacSublayerSupport,
+    pub security_support: fidl_common::SecuritySupport,
+    pub spectrum_management_support: fidl_common::SpectrumManagementSupport,
+    pub sme_legacy_privacy_support: fidl_sme::LegacyPrivacySupport,
+}
+
+impl Default for FullmacDriverConfig {
+    fn default() -> Self {
+        Self {
+            query_info: default_fullmac_query_info(),
+            mac_sublayer_support: default_mac_sublayer_support(),
+            security_support: default_security_support(),
+            spectrum_management_support: default_spectrum_management_support(),
+            sme_legacy_privacy_support: default_sme_legacy_privacy_support(),
+        }
+    }
+}
+
+pub fn default_fullmac_query_info() -> fidl_fullmac::WlanFullmacQueryInfo {
+    fidl_fullmac::WlanFullmacQueryInfo {
+        sta_addr: DEFAULT_CLIENT_STA_ADDR,
+        role: fidl_common::WlanMacRole::Client,
+        band_cap_list: default_fullmac_band_capability_array(),
+        band_cap_count: 1,
+    }
+}
+
+pub fn default_mac_sublayer_support() -> fidl_common::MacSublayerSupport {
+    fidl_common::MacSublayerSupport {
+        rate_selection_offload: fidl_common::RateSelectionOffloadExtension { supported: false },
+        data_plane: fidl_common::DataPlaneExtension {
+            data_plane_type: fidl_common::DataPlaneType::GenericNetworkDevice,
+        },
+        device: fidl_common::DeviceExtension {
+            is_synthetic: false,
+            mac_implementation_type: fidl_common::MacImplementationType::Fullmac,
+            tx_status_report_supported: false,
+        },
+    }
+}
+
+pub fn default_security_support() -> fidl_common::SecuritySupport {
+    fidl_common::SecuritySupport {
+        sae: fidl_common::SaeFeature {
+            driver_handler_supported: false,
+            sme_handler_supported: false,
+        },
+        mfp: fidl_common::MfpFeature { supported: false },
+    }
+}
+
+pub fn default_sme_legacy_privacy_support() -> fidl_sme::LegacyPrivacySupport {
+    fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false }
+}
+
+fn default_spectrum_management_support() -> fidl_common::SpectrumManagementSupport {
+    fidl_common::SpectrumManagementSupport { dfs: fidl_common::DfsFeature { supported: false } }
+}
+
+fn default_fullmac_band_capability() -> fidl_fullmac::WlanFullmacBandCapability {
+    let mut cap = fidl_fullmac::WlanFullmacBandCapability {
+        band: fidl_common::WlanBand::TwoGhz,
+        basic_rate_count: 12,
+        basic_rate_list: [2, 4, 11, 22, 12, 18, 24, 36, 48, 72, 96, 108],
+        ht_supported: true,
+        ht_caps: fidl_ieee80211::HtCapabilities {
+            bytes: fake_ht_capabilities().as_bytes().try_into().unwrap(),
+        },
+        vht_supported: false,
+        vht_caps: fidl_ieee80211::VhtCapabilities { bytes: [0; 12] },
+        operating_channel_count: 14,
+        operating_channel_list: [0; 256],
+    };
+
+    for i in 0..14 {
+        cap.operating_channel_list[i] = (i + 1) as u8;
+    }
+    cap
+}
+
+// It's difficult to initialize an array of WlanFullmacBandCapability directly since
+// WlanFullmacBandCapability doesn't implement Copy.
+fn default_fullmac_band_capability_array() -> [fidl_fullmac::WlanFullmacBandCapability; 16] {
+    (0..16).map(|_| default_fullmac_band_capability()).collect::<Vec<_>>().try_into().unwrap()
+}

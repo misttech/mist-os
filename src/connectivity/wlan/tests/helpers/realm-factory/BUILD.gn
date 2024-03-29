@@ -60,6 +60,7 @@ fuchsia_package("realm-factory") {
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
     "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
     "//src/connectivity/network/drivers/network-device",
+    "//src/connectivity/wlan/drivers/wlanif:wlanif_driver",
     "//src/connectivity/wlan/drivers/wlanphy:wlanphy_driver",
     "//src/connectivity/wlan/drivers/wlansoftmac:wlansoftmac_driver",
     "//src/devices/misc/drivers/test-parent",

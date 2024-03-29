@@ -22,6 +22,7 @@ rustc_library("test-realm-helpers") {
   ]
 
   sources = [
+    "src/constants.rs",
     "src/lib.rs",
     "src/tracing.rs",
   ]
