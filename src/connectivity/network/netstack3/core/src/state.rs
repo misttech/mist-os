@@ -22,7 +22,7 @@ use crate::{
     },
     socket::datagram,
     sync::RwLock,
-    transport::{self, udp::UdpCounters, TransportLayerState},
+    transport::{self, tcp::TcpCounters, udp::UdpCounters, TransportLayerState},
     BindingsContext, BindingsTypes, CoreCtx,
 };
 
@@ -137,6 +137,10 @@ impl<BT: BindingsTypes> StackState<BT> {
 
     pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
         &self.transport.udp_counters::<I>()
+    }
+
+    pub(crate) fn tcp_counters<I: Ip>(&self) -> &TcpCounters<I> {
+        &self.transport.tcp_counters::<I>()
     }
 
     pub(crate) fn slaac_counters(&self) -> &SlaacCounters {

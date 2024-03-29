@@ -13,11 +13,11 @@
 use core::{convert::Infallible as Never, marker::PhantomData};
 
 use explicit::UnreachableExt as _;
-use net_types::SpecifiedAddr;
+use net_types::{ip::Ip, SpecifiedAddr};
 use packet::{BufferMut, Serializer};
 
 use crate::{
-    context::{CoreTimerContext, TimerBindingsTypes},
+    context::{CoreTimerContext, CounterContext, TimerBindingsTypes},
     convert::BidirectionalConverter,
     device::{self, Device, DeviceIdContext},
     ip::{
@@ -33,7 +33,10 @@ use crate::{
         },
         MaybeDualStack,
     },
-    transport::tcp::socket::{self as tcp_socket, TcpBindingsTypes},
+    transport::tcp::{
+        socket::{self as tcp_socket, TcpBindingsTypes},
+        TcpCounters,
+    },
 };
 
 /// An uninstantiable type.
@@ -355,6 +358,8 @@ impl<
         BT: TcpBindingsTypes,
         P: tcp_socket::TcpDualStackContext<I::OtherVersion, D, BT>,
     > tcp_socket::TcpDualStackContext<I, D, BT> for UninstantiableWrapper<P>
+where
+    for<'a> P::DualStackIpTransportCtx<'a>: CounterContext<TcpCounters<I>>,
 {
     type Converter = Uninstantiable;
     type DualStackIpTransportCtx<'a> = P::DualStackIpTransportCtx<'a>;
@@ -394,6 +399,12 @@ impl<
         &mut self,
         _cb: F,
     ) -> O {
+        self.uninstantiable_unreachable()
+    }
+}
+
+impl<I: Ip, P> CounterContext<TcpCounters<I>> for UninstantiableWrapper<P> {
+    fn with_counters<O, F: FnOnce(&TcpCounters<I>) -> O>(&self, _cb: F) -> O {
         self.uninstantiable_unreachable()
     }
 }

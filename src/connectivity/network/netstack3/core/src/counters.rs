@@ -18,7 +18,10 @@ use crate::{
         },
         IpCounters, IpLayerIpExt,
     },
-    transport::udp::{UdpCounters, UdpCountersInner},
+    transport::{
+        tcp::{TcpCounters, TcpCountersInner},
+        udp::{UdpCounters, UdpCountersInner},
+    },
 };
 
 pub use netstack3_base::Counter;
@@ -39,6 +42,8 @@ where
         + CounterContext<IpCounters<Ipv6>>
         + CounterContext<UdpCounters<Ipv4>>
         + CounterContext<UdpCounters<Ipv6>>
+        + CounterContext<TcpCounters<Ipv4>>
+        + CounterContext<TcpCounters<Ipv6>>
         + CounterContext<IcmpRxCounters<Ipv4>>
         + CounterContext<IcmpRxCounters<Ipv6>>
         + CounterContext<IcmpTxCounters<Ipv4>>
@@ -121,6 +126,14 @@ where
             });
             inspector.record_child("V6", |inspector| {
                 self.core_ctx().with_counters(|udp| inspect_udp_counters::<Ipv6>(inspector, udp))
+            });
+        });
+        inspector.record_child("TCP", |inspector| {
+            inspector.record_child("V4", |inspector| {
+                self.core_ctx().with_counters(|tcp| inspect_tcp_counters::<Ipv4>(inspector, tcp))
+            });
+            inspector.record_child("V6", |inspector| {
+                self.core_ctx().with_counters(|tcp| inspect_tcp_counters::<Ipv6>(inspector, tcp))
             });
         });
     }
@@ -344,4 +357,39 @@ fn inspect_udp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &UdpCou
         inspector.record_counter("Errors", tx_error);
     });
     inspector.record_counter("IcmpErrors", rx_icmp_error);
+}
+
+fn inspect_tcp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &TcpCounters<I>) {
+    let TcpCountersInner {
+        invalid_ip_addrs_received,
+        invalid_ip_packets_received,
+        invalid_segments_received,
+        valid_segments_received,
+        received_segments_dispatched,
+        received_segments_no_dispatch,
+        listener_queue_overflow,
+        segment_send_errors,
+        segments_sent,
+        passive_open_no_route_errors,
+        passive_connection_openings,
+    } = counters.as_ref();
+    inspector.record_child("Rx", |inspector| {
+        inspector.record_counter("ValidSegmentsReceived", valid_segments_received);
+        inspector.record_counter("ReceivedSegmentsDispatched", received_segments_dispatched);
+        inspector.record_child("Errors", |inspector| {
+            inspector.record_counter("InvalidIpAddrsReceived", invalid_ip_addrs_received);
+            inspector.record_counter("InvalidIpPacketsReceived", invalid_ip_packets_received);
+            inspector.record_counter("InvalidSegmentsReceived", invalid_segments_received);
+            inspector.record_counter("ReceivedSegmentsNoDispatch", received_segments_no_dispatch);
+            inspector.record_counter("ListenerQueueOverflow", listener_queue_overflow);
+            inspector.record_counter("PassiveOpenNoRouteErrors", passive_open_no_route_errors);
+        })
+    });
+    inspector.record_child("Tx", |inspector| {
+        inspector.record_counter("SegmentsSent", segments_sent);
+        inspector.record_child("Errors", |inspector| {
+            inspector.record_counter("SegmentSendErrors", segment_send_errors);
+        });
+    });
+    inspector.record_counter("PassiveConnectionOpenings", passive_connection_openings);
 }

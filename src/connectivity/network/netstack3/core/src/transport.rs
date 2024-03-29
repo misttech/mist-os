@@ -72,7 +72,7 @@ use crate::{
     ip::EitherDeviceId,
     socket::datagram,
     transport::{
-        tcp::TcpState,
+        tcp::{TcpCounters, TcpState},
         udp::{UdpCounters, UdpState, UdpStateBuilder},
     },
     BindingsContext, BindingsTypes,
@@ -125,6 +125,10 @@ impl<BT: BindingsTypes> TransportLayerState<BT> {
 
     pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
         I::map_ip((), |()| &self.udpv4.counters, |()| &self.udpv6.counters)
+    }
+
+    pub(crate) fn tcp_counters<I: Ip>(&self) -> &TcpCounters<I> {
+        I::map_ip((), |()| &self.tcpv4.counters, |()| &self.tcpv6.counters)
     }
 }
 

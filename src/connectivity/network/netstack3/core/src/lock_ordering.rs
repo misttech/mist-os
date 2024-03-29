@@ -143,6 +143,8 @@ pub enum EthernetDeviceCounters {}
 pub enum PureIpDeviceCounters {}
 // Provides unlocked access of ArpCounters.
 pub enum ArpCounters {}
+// Provides unlocked access of TcpCounters.
+pub struct TcpCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of UdpCounters.
 pub struct UdpCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of SlaacCounters.

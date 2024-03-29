@@ -633,6 +633,50 @@ async fn inspect_counters(name: &str) {
                     IcmpErrors: 0u64,
                 },
             },
+            "TCP": {
+                "V4": {
+                    PassiveConnectionOpenings: 0u64,
+                    "Rx": {
+                        ValidSegmentsReceived: 0u64,
+                        ReceivedSegmentsDispatched: 0u64,
+                        "Errors": {
+                            InvalidIpAddrsReceived: 0u64,
+                            InvalidIpPacketsReceived: 0u64,
+                            InvalidSegmentsReceived: 0u64,
+                            ReceivedSegmentsNoDispatch: 0u64,
+                            ListenerQueueOverflow: 0u64,
+                            PassiveOpenNoRouteErrors: 0u64,
+                        },
+                    },
+                    "Tx": {
+                        SegmentsSent: 0u64,
+                        "Errors": {
+                            SegmentSendErrors: 0u64,
+                        }
+                    },
+                },
+                "V6": {
+                    PassiveConnectionOpenings: 0u64,
+                    "Rx": {
+                        ValidSegmentsReceived: 0u64,
+                        ReceivedSegmentsDispatched: 0u64,
+                        "Errors": {
+                            InvalidIpAddrsReceived: 0u64,
+                            InvalidIpPacketsReceived: 0u64,
+                            InvalidSegmentsReceived: 0u64,
+                            ReceivedSegmentsNoDispatch: 0u64,
+                            ListenerQueueOverflow: 0u64,
+                            PassiveOpenNoRouteErrors: 0u64,
+                        },
+                    },
+                    "Tx": {
+                        SegmentsSent: 0u64,
+                        "Errors": {
+                            SegmentSendErrors: 0u64,
+                        }
+                    },
+                },
+            },
         }
     })
 }

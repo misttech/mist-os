@@ -18,7 +18,7 @@ use core::{
 };
 
 use const_unwrap::const_unwrap_option;
-use net_types::ip::{GenericOverIp, Ip, IpVersion};
+use net_types::ip::{GenericOverIp, Ip, IpMarked, IpVersion};
 use packet_formats::{
     icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
     utils::NonZeroDuration,
@@ -26,6 +26,7 @@ use packet_formats::{
 use rand::RngCore;
 
 use crate::{
+    counters::Counter,
     device,
     ip::{
         icmp::{IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode},
@@ -180,11 +181,16 @@ impl From<IcmpErrorCode> for Option<ConnectionError> {
 pub(crate) struct TcpState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     pub(crate) isn_generator: IsnGenerator<BT::Instant>,
     pub(crate) sockets: Sockets<I, D, BT>,
+    pub(crate) counters: TcpCounters<I>,
 }
 
 impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpState<I, D, BT> {
     pub(crate) fn new(now: BT::Instant, rng: &mut impl RngCore) -> Self {
-        Self { isn_generator: IsnGenerator::new(now, rng), sockets: Sockets::new() }
+        Self {
+            isn_generator: IsnGenerator::new(now, rng),
+            sockets: Sockets::new(),
+            counters: Default::default(),
+        }
     }
 }
 
@@ -347,6 +353,50 @@ impl Default for KeepAlive {
             enabled: false,
         }
     }
+}
+
+/// TCP Counters.
+///
+/// Accrued for the entire stack, rather than on a per connection basis.
+///
+/// Note that for dual stack sockets, all events will be attributed to the IPv6
+/// counters.
+pub type TcpCounters<I> = IpMarked<I, TcpCountersInner>;
+
+/// The IP agnostic version of [`TcpCounters`].
+#[derive(Default)]
+pub struct TcpCountersInner {
+    /// Count of received IP packets that were dropped because they had
+    /// unexpected IP addresses (either src or dst).
+    pub invalid_ip_addrs_received: Counter,
+    /// Count of received IP packets that were dropped because they could not be
+    /// parsed.
+    pub invalid_ip_packets_received: Counter,
+    /// Count of received TCP segments that were dropped because they could not
+    /// be parsed.
+    pub invalid_segments_received: Counter,
+    /// Count of received TCP segments that were valid.
+    pub valid_segments_received: Counter,
+    /// Count of received TCP segments that were successfully dispatched to a
+    /// socket.
+    pub received_segments_dispatched: Counter,
+    /// Count of received TCP segments that were not associated with any
+    /// existing sockets.
+    pub received_segments_no_dispatch: Counter,
+    /// Count of received TCP segments that were dropped because the listener
+    /// queue was full.
+    pub listener_queue_overflow: Counter,
+    /// Count of TCP segments that failed to send.
+    pub segment_send_errors: Counter,
+    /// Count of TCP segments that were sent.
+    pub segments_sent: Counter,
+    /// Count of passive open attempts that failed because the stack doesn't
+    /// have route to the peer.
+    pub passive_open_no_route_errors: Counter,
+    /// Count of passive connections that have been opened.
+    pub passive_connection_openings: Counter,
+    // TODO(https://fxbug.dev/42052879): Add additional counters to achieve
+    // parity with Netstack2.
 }
 
 #[cfg(test)]

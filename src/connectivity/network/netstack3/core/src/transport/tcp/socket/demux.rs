@@ -22,14 +22,15 @@ use packet_formats::{
 use thiserror::Error;
 
 use crate::{
-    context::CtxPair,
+    context::{CounterContext, CtxPair},
     convert::BidirectionalConverter as _,
     device,
     error::NotFoundError,
     filter::TransportPacketSerializer,
     ip::{
         socket::{DefaultSendOptions, IpSocketHandler, MmsError},
-        EitherDeviceId, IpTransportContext, TransportIpContext, TransportReceiveError,
+        EitherDeviceId, IpSockCreationError, IpTransportContext, TransportIpContext,
+        TransportReceiveError,
     },
     socket::{
         address::{
@@ -53,7 +54,7 @@ use crate::{
             TcpSocketSetEntry, TcpSocketState, TcpSocketStateInner,
         },
         state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
-        BufferSizes, ConnectionError, Control, Mss, SocketOptions,
+        BufferSizes, ConnectionError, Control, Mss, SocketOptions, TcpCounters,
     },
 };
 
@@ -80,7 +81,10 @@ where
             ActiveOpen = <BC as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    CC: TcpContext<I, BC> + TcpContext<I::OtherVersion, BC>,
+    CC: TcpContext<I, BC>
+        + TcpContext<I::OtherVersion, BC>
+        + CounterContext<TcpCounters<I>>
+        + CounterContext<TcpCounters<I::OtherVersion>>,
 {
     fn receive_icmp_error(
         core_ctx: &mut CC,
@@ -122,7 +126,7 @@ where
     ) -> Result<(), (B, TransportReceiveError)> {
         let remote_ip = match SpecifiedAddr::new(remote_ip.into()) {
             None => {
-                // TODO(https://fxbug.dev/42052879): Increment the counter.
+                core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_ip_addrs_received);
                 debug!("tcp: source address unspecified, dropping the packet");
                 return Ok(());
             }
@@ -131,7 +135,7 @@ where
         let remote_ip: SocketIpAddr<_> = match remote_ip.try_into() {
             Ok(remote_ip) => remote_ip,
             Err(AddrIsMappedError {}) => {
-                // TODO(https://fxbug.dev/42052879): Increment the counter.
+                core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_ip_addrs_received);
                 debug!("tcp: source address is mapped (ipv4-mapped-ipv6), dropping the packet");
                 return Ok(());
             }
@@ -139,7 +143,7 @@ where
         let local_ip: SocketIpAddr<_> = match local_ip.try_into() {
             Ok(local_ip) => local_ip,
             Err(AddrIsMappedError {}) => {
-                // TODO(https://fxbug.dev/42052879): Increment the counter.
+                core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_ip_addrs_received);
                 debug!("tcp: local address is mapped (ipv4-mapped-ipv6), dropping the packet");
                 return Ok(());
             }
@@ -149,7 +153,8 @@ where
         {
             Ok(packet) => packet,
             Err(err) => {
-                // TODO(https://fxbug.dev/42052879): Increment the counter.
+                core_ctx
+                    .increment(|counters: &TcpCounters<I>| &counters.invalid_ip_packets_received);
                 debug!("tcp: failed parsing incoming packet {:?}", err);
                 return Ok(());
             }
@@ -159,7 +164,7 @@ where
         let incoming = match Segment::try_from(packet) {
             Ok(segment) => segment,
             Err(err) => {
-                // TODO(https://fxbug.dev/42052879): Increment the counter.
+                core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_segments_received);
                 debug!("tcp: malformed segment {:?}", err);
                 return Ok(());
             }
@@ -167,6 +172,7 @@ where
         let conn_addr =
             ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) };
 
+        core_ctx.increment(|counters: &TcpCounters<I>| &counters.valid_segments_received);
         handle_incoming_packet::<I, _, _>(core_ctx, bindings_ctx, conn_addr, device, incoming);
         Ok(())
     }
@@ -188,7 +194,10 @@ fn handle_incoming_packet<WireI, BC, CC>(
             ActiveOpen = <BC as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    CC: TcpContext<WireI, BC> + TcpContext<WireI::OtherVersion, BC>,
+    CC: TcpContext<WireI, BC>
+        + TcpContext<WireI::OtherVersion, BC>
+        + CounterContext<TcpCounters<WireI>>
+        + CounterContext<TcpCounters<WireI::OtherVersion>>,
 {
     trace_duration!(bindings_ctx, c"tcp::handle_incoming_packet");
     let mut tw_reuse = None;
@@ -346,6 +355,8 @@ fn handle_incoming_packet<WireI, BC, CC>(
 
     let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = conn_addr;
     if !found_socket {
+        core_ctx.increment(|counters: &TcpCounters<WireI>| &counters.received_segments_no_dispatch);
+
         // There is no existing TCP state, pretend it is closed
         // and generate a RST if needed.
         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-21):
@@ -364,13 +375,18 @@ fn handle_incoming_packet<WireI, BC, CC>(
                 |_addr| tcp_serialize_segment(seg, conn_addr),
                 None,
             ) {
-                Ok(()) => {}
+                Ok(()) => {
+                    core_ctx.increment(|counters: &TcpCounters<WireI>| &counters.segments_sent);
+                }
                 Err((err, DefaultSendOptions)) => {
-                    // TODO(https://fxbug.dev/42052879): Increment the counter.
+                    core_ctx
+                        .increment(|counters: &TcpCounters<WireI>| &counters.segment_send_errors);
                     debug!("cannot construct an ip socket to respond RST: {:?}, ignoring", err);
                 }
             }
         }
+    } else {
+        core_ctx.increment(|counters: &TcpCounters<WireI>| &counters.received_segments_dispatched);
     }
 }
 
@@ -448,7 +464,7 @@ where
             ActiveOpen = <BC as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    CC: TcpContext<SockI, BC>,
+    CC: TcpContext<SockI, BC> + CounterContext<TcpCounters<SockI>>,
 {
     core_ctx.with_socket_mut_transport_demux(conn_id, |core_ctx, socket_state| {
         let TcpSocketState { socket_state, ip_options: _ } = socket_state;
@@ -553,7 +569,8 @@ where
     CC: TcpContext<SockI, BC>,
     DC: TransportIpContext<WireI, BC, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
         + DeviceIpSocketHandler<SockI, BC>
-        + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
+        + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
+        + CounterContext<TcpCounters<SockI>>,
 {
     let Connection {
         accept_queue,
@@ -657,9 +674,9 @@ where
     if let Some(seg) = reply {
         let body = tcp_serialize_segment(seg, conn_addr.ip);
         match core_ctx.send_ip_packet(bindings_ctx, &ip_sock, body, None) {
-            Ok(()) => {}
+            Ok(()) => core_ctx.increment(|counters| &counters.segments_sent),
             Err((body, err)) => {
-                // TODO(https://fxbug.dev/42052879): Increment the counter.
+                core_ctx.increment(|counters| &counters.segment_send_errors);
                 debug!("tcp: failed to send ip packet {:?}: {:?}", body, err)
             }
         }
@@ -695,7 +712,10 @@ fn try_handle_listener_incoming_disposition<SockI, WireI, CC, BC, Addr>(
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    CC: TcpContext<SockI, BC> + TcpContext<WireI, BC> + TcpContext<WireI::OtherVersion, BC>,
+    CC: TcpContext<SockI, BC>
+        + TcpContext<WireI, BC>
+        + TcpContext<WireI::OtherVersion, BC>
+        + CounterContext<TcpCounters<SockI>>,
     BC: TcpBindingsContext<SockI, CC::WeakDeviceId>
         + TcpBindingsContext<WireI, CC::WeakDeviceId>
         + TcpBindingsContext<WireI::OtherVersion, CC::WeakDeviceId>,
@@ -768,6 +788,7 @@ where
             if let Some(to_destroy) = to_destroy {
                 tcp::socket::destroy_socket(core_ctx, bindings_ctx, to_destroy);
             }
+            core_ctx.increment(|counters| &counters.passive_connection_openings);
             true
         }
     }
@@ -811,7 +832,8 @@ where
     CC: TcpContext<SockI, BC>,
     DC: TransportIpContext<WireI, BC, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
         + DeviceIpSocketHandler<WireI, BC>
-        + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
+        + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
+        + CounterContext<TcpCounters<SockI>>,
 {
     let (maybe_listener, sharing, listener_addr) = assert_matches!(
         socket_state,
@@ -834,7 +856,7 @@ where
     // reuse the connection in TIME-WAIT, this is because we need to store the
     // reused connection in the accept queue so we have to respect its limit.
     if accept_queue.len() == backlog.get() {
-        // TODO(https://fxbug.dev/42052879): Increment the counter.
+        core_ctx.increment(|counters| &counters.listener_queue_overflow);
         debug!("incoming SYN dropped because of the full backlog of the listener");
         return ListenerIncomingSegmentDisposition::FoundSocket;
     }
@@ -858,8 +880,8 @@ where
         DefaultSendOptions,
     ) {
         Ok(ip_sock) => ip_sock,
-        Err(err) => {
-            // TODO(https://fxbug.dev/42052879): Increment the counter.
+        err @ Err((IpSockCreationError::Route(_), DefaultSendOptions)) => {
+            core_ctx.increment(|counters| &counters.passive_open_no_route_errors);
             debug!("cannot construct an ip socket to the SYN originator: {:?}, ignoring", err);
             return ListenerIncomingSegmentDisposition::NoMatchingSocket;
         }
@@ -1013,9 +1035,9 @@ where
     if let Some(seg) = reply {
         let body = tcp_serialize_segment(seg, incoming_addrs);
         match core_ctx.send_ip_packet(bindings_ctx, &ip_sock, body, None) {
-            Ok(()) => {}
+            Ok(()) => core_ctx.increment(|counters| &counters.segments_sent),
             Err((body, err)) => {
-                // TODO(https://fxbug.dev/42052879): Increment the counter.
+                core_ctx.increment(|counters| &counters.segment_send_errors);
                 debug!("tcp: failed to send ip packet {:?}: {:?}", body, err)
             }
         }

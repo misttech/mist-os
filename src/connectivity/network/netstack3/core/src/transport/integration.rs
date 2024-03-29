@@ -10,7 +10,7 @@ use lock_order::{
 use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 
 use crate::{
-    context::CoreTimerContext,
+    context::{CoreTimerContext, CounterContext},
     device::{self, WeakDeviceId},
     socket::{datagram, MaybeDualStack},
     transport::{
@@ -19,6 +19,7 @@ use crate::{
             socket::{
                 isn::IsnGenerator, TcpSocketId, TcpSocketSet, TcpSocketState, WeakTcpSocketId,
             },
+            TcpCounters,
         },
         udp::{self, UdpSocketId, UdpSocketSet, UdpSocketState},
         TransportLayerTimerId,
@@ -641,5 +642,22 @@ impl<I: datagram::IpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpA
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.transport.udp_state::<I>().sockets.all_sockets.write()
+    }
+}
+
+impl<BC: crate::BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::TcpCounters<I>>
+    for StackState<BC>
+{
+    type Data = TcpCounters<I>;
+    type Guard<'l> = &'l TcpCounters<I> where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.tcp_counters()
+    }
+}
+
+impl<BC: crate::BindingsContext, I: Ip, L> CounterContext<TcpCounters<I>> for CoreCtx<'_, BC, L> {
+    fn with_counters<O, F: FnOnce(&TcpCounters<I>) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::TcpCounters<I>>())
     }
 }
