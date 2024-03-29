@@ -8,6 +8,8 @@ use futures::channel::oneshot::channel as oneshot_channel;
 use futures::future::{ready, BoxFuture};
 use futures::FutureExt;
 use num::bigint::BigInt;
+use num::rational::BigRational;
+use num::{CheckedDiv, FromPrimitive};
 use std::collections::HashMap;
 use std::iter::repeat_with;
 use std::sync::{Arc, Mutex};
@@ -30,16 +32,24 @@ macro_rules! error {
 fn try_numeric_math(
     a: Value,
     b: Value,
-    f: impl FnOnce(BigInt, BigInt) -> Result<Value>,
+    f: impl FnOnce(BigRational, BigRational) -> Result<Value>,
 ) -> Option<Result<Value>> {
-    let a: Option<BigInt> = a.try_big_num().ok();
-    let b: Option<BigInt> = b.try_big_num().ok();
+    let a: Option<BigRational> = a.try_big_num().ok();
+    let b: Option<BigRational> = b.try_big_num().ok();
 
     if let (Some(a), Some(b)) = (a, b) {
         Some(f(a, b))
     } else {
         None
     }
+}
+
+/// Parse an integer.
+fn parse_integer(string: &str) -> BigInt {
+    let string = string.replace("_", "");
+
+    let (data, radix) = string.strip_prefix("0x").map(|x| (x, 16)).unwrap_or((string.as_str(), 10));
+    BigInt::parse_bytes(data.as_bytes(), radix).unwrap()
 }
 
 /// Used to walk through the parse tree and create a closure which can be used
@@ -248,7 +258,7 @@ impl Visitor {
             Node::Pipe(a, b) => Arc::new(self.visit_pipe(*a, *b)),
             Node::Program(v) => Arc::new(self.visit_program(v)),
             Node::Range(a, b, i) => Arc::new(self.visit_range(*a, *b, i)),
-            Node::Real(_) => unimplemented!(),
+            Node::Real(a) => Arc::new(self.visit_real(*a.fragment())),
             Node::String(s) => Arc::new(self.visit_string(*s.fragment())),
             Node::Subtract(x, y) => Arc::new(self.visit_subtract(*x, *y)),
             Node::VariableDecl { identifier, value, mutability } => {
@@ -597,15 +607,11 @@ impl Visitor {
         string: &str,
     ) -> impl for<'f> Fn(&Arc<InterpreterInner>, &'f Mutex<Frame>) -> BoxFuture<'f, Result<Value>>
     {
-        let string = string.replace("_", "");
-
-        let (data, radix) =
-            string.strip_prefix("0x").map(|x| (x, 16)).unwrap_or((string.as_str(), 10));
-        let value = BigInt::parse_bytes(data.as_bytes(), radix).unwrap();
+        let value = parse_integer(string);
 
         move |_, _| {
             let value = value.clone();
-            async move { Ok(Value::OutOfLine(PlaygroundValue::Num(value))) }.boxed()
+            async move { Ok(Value::OutOfLine(PlaygroundValue::Num(BigRational::from_integer(value)))) }.boxed()
         }
     }
 
@@ -973,7 +979,7 @@ impl Visitor {
                 let a = a(&inner, frame).await?;
 
                 a.try_big_num()
-                    .map(|x: BigInt| Value::OutOfLine(PlaygroundValue::Num(-x)))
+                    .map(|x: BigRational| Value::OutOfLine(PlaygroundValue::Num(-x)))
                     .map_err(|_| error!("Type Mismatch: Cannot negate non-numeric value"))
             }
             .boxed()
@@ -1110,13 +1116,13 @@ impl Visitor {
             async move {
                 let a: Option<BigInt> = if let Some(a) = a {
                     let a = a(&inner, frame).await?;
-                    Some(a.try_big_num().map_err(|_| error!("Range bound must be an integer"))?)
+                    Some(a.try_big_int().map_err(|_| error!("Range bound must be an integer"))?)
                 } else {
                     None
                 };
                 let b: Option<BigInt> = if let Some(b) = b {
                     let b = b(&inner, frame).await?;
-                    Some(b.try_big_num().map_err(|_| error!("Range bound must be an integer"))?)
+                    Some(b.try_big_int().map_err(|_| error!("Range bound must be an integer"))?)
                 } else {
                     None
                 };
@@ -1128,6 +1134,30 @@ impl Visitor {
                 Ok(Value::OutOfLine(PlaygroundValue::Iterator(range_cursor.into())))
             }
             .boxed()
+        }
+    }
+
+    fn visit_real(
+        &mut self,
+        string: &str,
+    ) -> impl for<'f> Fn(&Arc<InterpreterInner>, &'f Mutex<Frame>) -> BoxFuture<'f, Result<Value>>
+    {
+        let (whole, decimal) = string.split_once('.').expect("Parser yielded invalid real!");
+
+        let denom_size = decimal.chars().filter(|x| "0123456789".contains(*x)).count();
+        let denom = BigInt::from_u8(10).unwrap().pow(
+            denom_size
+                .try_into()
+                .expect("Tried to use a 4-million digit decimal, which seems excessive really."),
+        );
+        let whole = parse_integer(whole);
+        let decimal = parse_integer(decimal);
+        let numerator = whole * denom.clone() + decimal;
+        let value = BigRational::new(numerator, denom);
+
+        move |_, _| {
+            let value = value.clone();
+            async move { Ok(Value::OutOfLine(PlaygroundValue::Num(value))) }.boxed()
         }
     }
 

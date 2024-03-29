@@ -5,7 +5,9 @@
 use anyhow::anyhow;
 use fidl_codec::{library as lib, Value as FidlValue};
 use futures::future::BoxFuture;
-use num::{bigint::BigInt, bigint::TryFromBigIntError, traits::ToPrimitive as _};
+use num::rational::BigRational;
+use num::traits::ToPrimitive;
+use num::BigInt;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -164,8 +166,11 @@ pub trait ValueExt: Sized {
     /// Clones this value. May modify the original value to introduce reference counting.
     fn duplicate(&mut self) -> Self;
 
-    /// Convert this value to a raw `BigInt` if possible.
-    fn try_big_num(self) -> Result<BigInt, Self>;
+    /// Convert this value to a raw `BigRational` if possible.
+    fn try_big_num(self) -> Result<BigRational, Self>;
+
+    /// Convert this value to a `num::BigInt` if possible.
+    fn try_big_int(self) -> Result<BigInt, Value>;
 
     /// Convert this value to a `usize` if possible.
     fn try_usize(self) -> Result<usize, Self>;
@@ -245,19 +250,41 @@ impl ValueExt for Value {
         }
     }
 
-    fn try_big_num(self) -> Result<BigInt, Value> {
+    fn try_big_num(self) -> Result<BigRational, Value> {
         match self {
-            Value::U8(i) => Ok(i.into()),
-            Value::U16(i) => Ok(i.into()),
-            Value::U32(i) => Ok(i.into()),
-            Value::U64(i) => Ok(i.into()),
-            Value::I8(i) => Ok(i.into()),
-            Value::I16(i) => Ok(i.into()),
-            Value::I32(i) => Ok(i.into()),
-            Value::I64(i) => Ok(i.into()),
+            Value::U8(i) => Ok(BigRational::from_integer(i.into())),
+            Value::U16(i) => Ok(BigRational::from_integer(i.into())),
+            Value::U32(i) => Ok(BigRational::from_integer(i.into())),
+            Value::U64(i) => Ok(BigRational::from_integer(i.into())),
+            Value::I8(i) => Ok(BigRational::from_integer(i.into())),
+            Value::I16(i) => Ok(BigRational::from_integer(i.into())),
+            Value::I32(i) => Ok(BigRational::from_integer(i.into())),
+            Value::I64(i) => Ok(BigRational::from_integer(i.into())),
             Value::Bits(s, v) => v.try_big_num().map_err(|v| Value::Bits(s, Box::new(v))),
             Value::Enum(s, v) => v.try_big_num().map_err(|v| Value::Enum(s, Box::new(v))),
             Value::OutOfLine(PlaygroundValue::Num(s)) => Ok(s),
+            _ => Err(self),
+        }
+    }
+
+    fn try_big_int(self) -> Result<BigInt, Value> {
+        match self {
+            Value::U8(i) => Ok(i.into()),
+            Value::U16(i) => Ok(i.into()),
+            Value::U32(i) => i.try_into().map_err(|_| Value::U32(i)),
+            Value::U64(i) => i.try_into().map_err(|_| Value::U64(i)),
+            Value::I8(i) => i.try_into().map_err(|_| Value::I8(i)),
+            Value::I16(i) => i.try_into().map_err(|_| Value::I16(i)),
+            Value::I32(i) => i.try_into().map_err(|_| Value::I32(i)),
+            Value::I64(i) => i.try_into().map_err(|_| Value::I64(i)),
+            Value::Bits(s, v) => v.try_big_int().map_err(|v| Value::Bits(s, Box::new(v))),
+            Value::Enum(s, v) => v.try_big_int().map_err(|v| Value::Enum(s, Box::new(v))),
+            Value::OutOfLine(PlaygroundValue::Num(s)) => {
+                if s.is_integer() {
+                    return Ok(s.to_integer());
+                }
+                Err(Value::OutOfLine(PlaygroundValue::Num(s)))
+            }
             _ => Err(self),
         }
     }
@@ -275,9 +302,12 @@ impl ValueExt for Value {
             Value::Bits(s, v) => v.try_usize().map_err(|v| Value::Bits(s, Box::new(v))),
             Value::Enum(s, v) => v.try_usize().map_err(|v| Value::Enum(s, Box::new(v))),
             Value::OutOfLine(PlaygroundValue::Num(s)) => {
-                s.try_into().map_err(|x: TryFromBigIntError<BigInt>| {
-                    Value::OutOfLine(PlaygroundValue::Num(x.into_original()))
-                })
+                if s.is_integer() {
+                    if let Ok(x) = s.to_integer().try_into() {
+                        return Ok(x);
+                    }
+                }
+                Err(Value::OutOfLine(PlaygroundValue::Num(s)))
             }
             _ => Err(self),
         }
@@ -479,7 +509,7 @@ pub enum PlaygroundValue {
     /// A handle which can have multiple owners.
     InUseHandle(InUseHandle),
     /// A number with no precision limits.
-    Num(BigInt),
+    Num(BigRational),
     /// An iterator.
     Iterator(ReplayableIterator),
     /// A value with a type hint associated with it.
@@ -606,16 +636,16 @@ impl PlaygroundValue {
 
 /// Compares two playground values. Automatically handles some niceties like upcasting integers etc.
 pub fn playground_semantic_compare(this: &Value, other: &Value) -> Option<Ordering> {
-    fn try_promote(a: &Value) -> Option<BigInt> {
+    fn try_promote(a: &Value) -> Option<BigRational> {
         match a {
-            Value::U8(x) => Some((*x).into()),
-            Value::U16(x) => Some((*x).into()),
-            Value::U32(x) => Some((*x).into()),
-            Value::U64(x) => Some((*x).into()),
-            Value::I8(x) => Some((*x).into()),
-            Value::I16(x) => Some((*x).into()),
-            Value::I32(x) => Some((*x).into()),
-            Value::I64(x) => Some((*x).into()),
+            Value::U8(x) => Some(BigRational::from_integer((*x).into())),
+            Value::U16(x) => Some(BigRational::from_integer((*x).into())),
+            Value::U32(x) => Some(BigRational::from_integer((*x).into())),
+            Value::U64(x) => Some(BigRational::from_integer((*x).into())),
+            Value::I8(x) => Some(BigRational::from_integer((*x).into())),
+            Value::I16(x) => Some(BigRational::from_integer((*x).into())),
+            Value::I32(x) => Some(BigRational::from_integer((*x).into())),
+            Value::I64(x) => Some(BigRational::from_integer((*x).into())),
             Value::OutOfLine(PlaygroundValue::Num(x)) => Some(x.clone()),
             _ => None,
         }
@@ -625,14 +655,30 @@ pub fn playground_semantic_compare(this: &Value, other: &Value) -> Option<Orderi
         match (a, b) {
             (a, Value::Bits(_, b)) => cmp_to_fidl(a, b),
             (a, Value::Enum(_, b)) => cmp_to_fidl(a, b),
-            (PlaygroundValue::Num(a), Value::U8(b)) => PartialOrd::partial_cmp(a, &(*b).into()),
-            (PlaygroundValue::Num(a), Value::U16(b)) => PartialOrd::partial_cmp(a, &(*b).into()),
-            (PlaygroundValue::Num(a), Value::U32(b)) => PartialOrd::partial_cmp(a, &(*b).into()),
-            (PlaygroundValue::Num(a), Value::U64(b)) => PartialOrd::partial_cmp(a, &(*b).into()),
-            (PlaygroundValue::Num(a), Value::I8(b)) => PartialOrd::partial_cmp(a, &(*b).into()),
-            (PlaygroundValue::Num(a), Value::I16(b)) => PartialOrd::partial_cmp(a, &(*b).into()),
-            (PlaygroundValue::Num(a), Value::I32(b)) => PartialOrd::partial_cmp(a, &(*b).into()),
-            (PlaygroundValue::Num(a), Value::I64(b)) => PartialOrd::partial_cmp(a, &(*b).into()),
+            (PlaygroundValue::Num(a), Value::U8(b)) => {
+                PartialOrd::partial_cmp(a, &BigRational::from_integer((*b).into()))
+            }
+            (PlaygroundValue::Num(a), Value::U16(b)) => {
+                PartialOrd::partial_cmp(a, &BigRational::from_integer((*b).into()))
+            }
+            (PlaygroundValue::Num(a), Value::U32(b)) => {
+                PartialOrd::partial_cmp(a, &BigRational::from_integer((*b).into()))
+            }
+            (PlaygroundValue::Num(a), Value::U64(b)) => {
+                PartialOrd::partial_cmp(a, &BigRational::from_integer((*b).into()))
+            }
+            (PlaygroundValue::Num(a), Value::I8(b)) => {
+                PartialOrd::partial_cmp(a, &BigRational::from_integer((*b).into()))
+            }
+            (PlaygroundValue::Num(a), Value::I16(b)) => {
+                PartialOrd::partial_cmp(a, &BigRational::from_integer((*b).into()))
+            }
+            (PlaygroundValue::Num(a), Value::I32(b)) => {
+                PartialOrd::partial_cmp(a, &BigRational::from_integer((*b).into()))
+            }
+            (PlaygroundValue::Num(a), Value::I64(b)) => {
+                PartialOrd::partial_cmp(a, &BigRational::from_integer((*b).into()))
+            }
             _ => None,
         }
     }
@@ -717,7 +763,30 @@ impl std::fmt::Display for PlaygroundValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PlaygroundValue::Invocable(Invocable(a)) => write!(f, "<function@{:p}>", a),
-            PlaygroundValue::Num(x) => std::fmt::Display::fmt(x, f),
+            PlaygroundValue::Num(x) => {
+                let mut x = x.clone();
+                if x.numer() < &0.into() || x.denom() < &0.into() {
+                    write!(f, "-")?;
+                    x *= &BigInt::from(-1);
+                }
+                let int_part = x.to_integer();
+                std::fmt::Display::fmt(&x.to_integer(), f)?;
+                if x.is_integer() {
+                    return Ok(());
+                }
+                x -= &int_part;
+                write!(f, ".")?;
+                for _ in 0..100 {
+                    x *= &BigInt::from(10);
+                    let int_part = x.to_integer();
+                    write!(f, "{int_part}")?;
+                    if x.is_integer() {
+                        break;
+                    }
+                    x -= &int_part;
+                }
+                Ok(())
+            }
             PlaygroundValue::Iterator(_) => write!(f, "<iterator>"),
             PlaygroundValue::InUseHandle(_) => write!(f, "<handle in use>"),
             PlaygroundValue::TypeHinted(hint, v) => write!(f, "@{hint} {v}"),
@@ -1165,5 +1234,19 @@ mod test {
         assert_eq!(socket.id().unwrap(), socket_dup.id().unwrap());
         assert_eq!(Some(fidl::ObjectType::SOCKET), socket.object_type());
         assert_eq!(Some(fidl::ObjectType::SOCKET), socket_dup.object_type());
+    }
+
+    #[test]
+    fn display_real() {
+        assert_eq!(
+            "1.5 -6.75 0.5 -0.25",
+            &format!(
+                "{} {} {} {}",
+                Value::OutOfLine(PlaygroundValue::Num(BigRational::new(3.into(), 2.into()))),
+                Value::OutOfLine(PlaygroundValue::Num(BigRational::new((-27).into(), 4.into()))),
+                Value::OutOfLine(PlaygroundValue::Num(BigRational::new(1.into(), 2.into()))),
+                Value::OutOfLine(PlaygroundValue::Num(BigRational::new((-1).into(), 4.into()))),
+            )
+        );
     }
 }

@@ -823,7 +823,10 @@ async fn ne_false() {
 async fn negate() {
     Test::test("-(2 + 2)")
         .check(|value| {
-            assert_eq!(num::BigInt::from(-4), value.try_big_num().unwrap());
+            assert_eq!(
+                num::rational::BigRational::from_integer(num::BigInt::from(-4)),
+                value.try_big_num().unwrap()
+            );
         })
         .await;
 }

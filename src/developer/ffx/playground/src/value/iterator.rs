@@ -5,6 +5,7 @@
 use async_lock::Mutex as AsyncMutex;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use num::bigint::BigInt;
+use num::rational::BigRational;
 use std::sync::Arc;
 
 use crate::error::Result;
@@ -102,7 +103,12 @@ impl ReplayableIteratorCursor for RangeCursor {
         } else {
             let start = self.start.clone();
             (
-                async move { Ok(Some(Value::OutOfLine(PlaygroundValue::Num(start)))) }.boxed(),
+                async move {
+                    Ok(Some(Value::OutOfLine(PlaygroundValue::Num(BigRational::from_integer(
+                        start,
+                    )))))
+                }
+                .boxed(),
                 Arc::new(RangeCursor {
                     start: self.start.clone() + 1,
                     end: self.end.clone(),
@@ -148,29 +154,29 @@ mod test {
         let mut iter_mapped = iter.clone().map(|x| {
             async move {
                 let x = x.try_big_num().unwrap();
-                let x = x + 2;
+                let x = x + BigRational::from_integer(2.into());
                 Ok(Value::OutOfLine(PlaygroundValue::Num(x)))
             }
             .boxed()
         });
 
         let a = iter.next().await.unwrap().unwrap().try_big_num().unwrap();
-        assert_eq!(a, 5.into());
+        assert_eq!(a, BigRational::from_integer(5.into()));
         let a = iter.next().await.unwrap().unwrap().try_big_num().unwrap();
-        assert_eq!(a, 6.into());
+        assert_eq!(a, BigRational::from_integer(6.into()));
         let a = iter.next().await.unwrap().unwrap().try_big_num().unwrap();
-        assert_eq!(a, 7.into());
+        assert_eq!(a, BigRational::from_integer(7.into()));
         let a = iter_mapped.next().await.unwrap().unwrap().try_big_num().unwrap();
-        assert_eq!(a, 7.into());
+        assert_eq!(a, BigRational::from_integer(7.into()));
         let a = iter_mapped.next().await.unwrap().unwrap().try_big_num().unwrap();
-        assert_eq!(a, 8.into());
+        assert_eq!(a, BigRational::from_integer(8.into()));
         let a = iter.next().await.unwrap().unwrap().try_big_num().unwrap();
-        assert_eq!(a, 8.into());
+        assert_eq!(a, BigRational::from_integer(8.into()));
         assert!(!check_end || iter.next().await.unwrap().is_none());
         let a = iter_mapped.next().await.unwrap().unwrap().try_big_num().unwrap();
-        assert_eq!(a, 9.into());
+        assert_eq!(a, BigRational::from_integer(9.into()));
         let a = iter_mapped.next().await.unwrap().unwrap().try_big_num().unwrap();
-        assert_eq!(a, 10.into());
+        assert_eq!(a, BigRational::from_integer(10.into()));
         assert!(!check_end || iter_mapped.next().await.unwrap().is_none());
     }
 
