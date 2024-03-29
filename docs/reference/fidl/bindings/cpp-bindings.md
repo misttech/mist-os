@@ -227,7 +227,7 @@ enum class Tag : fidl_xunion_tag_t {
 ```
 
 Each member of `Tag` has a value matching its ordinal specified in the `union`
-definition. Reserved fields do not have any generated code.
+definition.
 
 `JsonValue` provides the following methods:
 

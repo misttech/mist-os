@@ -106,9 +106,7 @@ struct-layout-member = ( attribute-list ) , member-field ;
 
 ordinal-layout =  "{" , ( ordinal-layout-member , ";" )* , "}" ; [NOTE 5]
 
-ordinal-layout-member = ( attribute-list ) , ordinal , ":" , ordinal-layout-member-body ; [NOTE 6]
-
-ordinal-layout-member-body = member-field | "reserved" ;
+ordinal-layout-member = ( attribute-list ) , ordinal , ":" , member-field ; [NOTE 6]
 
 protocol-declaration = ( attribute-list ) , "protocol" , IDENTIFIER ,
                        "{" , ( protocol-member , ";" )*  , "}" ;
@@ -224,13 +222,10 @@ the compiler limits the values the `constant` may take:
 
 ### NOTE 5
 
-The `ordinal-layout` grammar allows any number of members, but unions
-specifically must at least one non-reserved member.
+The `ordinal-layout` grammar allows any number of members, but strict unions
+specifically must at least one member.
 
 ### NOTE 6
-
-<!-- TODO(https://fxbug.dev/42158030): remove when complete -->
-Attributes cannot be placed on a reserved member.
 
 Also, though ordinals can be any numeric literal, the compiler enforces that
 the specified ordinals for any union or table cover a contiguous range starting

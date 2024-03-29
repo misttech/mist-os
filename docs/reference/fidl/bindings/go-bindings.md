@@ -290,7 +290,7 @@ Given the following [table][lang-tables] definition:
 ```
 
 The FIDL toolchain generates a `User` struct that with presence fields for each
-non-reserved field:
+field:
 
 ```golang
 type User struct {

@@ -42,8 +42,7 @@ The following are keywords in FIDL.
 
 ```
 alias, as, bits, compose, const, enum, error, flexible, library, optional,
-protocol, reserved, resource, service, strict, struct, table, type, union,
-using.
+protocol, resource, service, strict, struct, table, type, union, using.
 ```
 
 ### Identifiers {#identifiers}
@@ -469,11 +468,10 @@ type Profile = table {
 * Reference may be optional.
 * Unions can either be [`strict` or `flexible`](#strict-vs-flexible).
 * Unions default to `flexible`.
-* `strict` unions must contain one or more non-reserved members. A union with no
-  members would have no inhabitants and thus would make little sense in a wire
-  format. However, memberless `flexible` unions are allowed, as it is still
-  possible to decode an memberless union (the contained data is always
-  "unknown").
+* `strict` unions must contain one or more members. A union with no members
+  would have no inhabitants and thus would make little sense in a wire format.
+  However, memberless `flexible` unions are allowed, as it is still possible to
+  decode an memberless union (the contained data is always "unknown").
 
 #### Declaration
 

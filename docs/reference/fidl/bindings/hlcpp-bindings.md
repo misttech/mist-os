@@ -264,9 +264,8 @@ enum Tag : fidl_xunion_tag_t {
 ```
 
 Each member of `Tag` has a value matching its [ordinal][union-lexicon] specified
-in the `union` definition. Reserved fields do not have any generated code. In
-addition, there is an `Invalid` field, which is the initial value used for a
-`JsonValue` that has no variant set yet.
+in the `union` definition. In addition, there is an `Invalid` field, which is
+the initial value used for a `JsonValue` that has no variant set yet.
 
 `JsonValue` provides the following methods:
 
