@@ -170,7 +170,7 @@ async fn assignment() {
 
 #[fuchsia::test]
 async fn bare_string() {
-    Test::test("def f x -> $x; f abc123")
+    Test::test("def f (x) $x; f abc123")
         .check(|value| {
             let Value::String(value) = value else {
                 panic!();
@@ -229,7 +229,7 @@ async fn function_decl() {
         r#"
     def f a b? c.. {
         [$a, $b, $c]
-    };
+    }
 
     let a = f 1;
     let b = f 2 3;
@@ -545,7 +545,7 @@ async fn and_short_circuit() {
     def y {
         $x = 1;
         $true
-    };
+    }
     $false && {y};
     $x
     "#,
@@ -564,7 +564,7 @@ async fn and_short_pass() {
     def y {
         $x = 1;
         $true
-    };
+    }
     $true && {y};
     $x
     "#,
@@ -583,7 +583,7 @@ async fn or_short_circuit() {
     def y {
         $x = 1;
         $true
-    };
+    }
     $false || {y};
     $x
     "#,
@@ -602,7 +602,7 @@ async fn or_short_pass() {
     def y {
         $x = 1;
         $true
-    };
+    }
     $true || {y};
     $x
     "#,

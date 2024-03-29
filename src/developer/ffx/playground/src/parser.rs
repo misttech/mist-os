@@ -23,7 +23,7 @@ use nom::character::complete::{
     alphanumeric1, anychar, char as chr, digit1, hex_digit1, none_of, one_of,
 };
 use nom::combinator::{
-    all_consuming, flat_map, map, map_parser, not, opt, peek, recognize, rest, verify,
+    all_consuming, cond, flat_map, map, map_parser, not, opt, peek, recognize, rest, verify,
 };
 use nom::error as nom_error;
 use nom::multi::{
@@ -708,15 +708,13 @@ fn parameter_list<'a>(input: ESpan<'a>) -> IResult<'a, ParameterList<'a>> {
 /// Function declarations are defined as follows:
 ///
 /// ```
-/// FunctionDecl ←⊔ "def" Identifier ParameterList ( '->' Expression / Block)
+/// FunctionDecl ←⊔ 'def' Identifier ParameterList Block
 /// ```
 ///
 /// Valid function declarations might include:
 ///
 /// ```
-/// def frob a b -> $a + $b
-/// def jim -> cmd arg argtwo
-/// def dothing c d { do_other $c; $d * 7 }
+/// def dothing (c d) { do_other $c; $d * 7 }
 /// def variadic a b.. { print $a; print_list $b }
 /// def optional a b? { print $a; print_maybe_null $b }
 /// def optional_variadic a b? c.. { etc a b c }
@@ -727,14 +725,46 @@ fn function_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             kw("def"),
             tuple((
                 ws_before(identifier),
-                ws_around(parameter_list),
-                alt((preceded(tag("->"), ws_before(expression)), block)),
+                delimited(opt(tag("(")), ws_around(parameter_list), opt(tag(")"))),
+                block,
             )),
         ),
         |(identifier, parameters, body)| Node::FunctionDecl {
             identifier: identifier.strip_parse_state(),
             parameters,
             body: Box::new(body.into()),
+        },
+    )(input)
+}
+
+/// Short function declarations are defined as follows:
+///
+/// ```
+/// ShortFunctionDecl ←⊔ 'def' Identifier '(' ParameterList ')' Expression
+/// ```
+///
+/// Valid function declarations might include:
+///
+/// ```
+/// def frob (a b)  $a + $b
+/// def jim () cmd arg argtwo ;
+/// def wembly (a..) cmd &
+/// def variadic (a b..) { print $a; print_list $b }
+/// ```
+fn short_function_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
+    map(
+        preceded(
+            kw("def"),
+            tuple((
+                ws_before(identifier),
+                delimited(ws_around(tag("(")), parameter_list, ws_around(tag(")"))),
+                expression,
+            )),
+        ),
+        |(identifier, parameters, body)| Node::FunctionDecl {
+            identifier: identifier.strip_parse_state(),
+            parameters,
+            body: Box::new(body),
         },
     )(input)
 }
@@ -864,7 +894,7 @@ fn lambda<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     map(
         pair(
             alt((
-                terminated(preceded(tag("\\("), ws_before(parameter_list)), ws_around(tag(")"))),
+                delimited(tag("\\("), ws_before(parameter_list), ws_around(tag(")"))),
                 map(preceded(tag("\\"), ws_around(identifier)), |parameter| ParameterList {
                     parameters: vec![parameter.strip_parse_state()],
                     optional_parameters: Vec::new(),
@@ -1258,36 +1288,41 @@ fn simple_expression<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// A program is defined as:
 ///
 /// ```
-/// Program ←⊔ ( ( VariableDecl / ShortFunctionDecl ) ( [;&] Program )? /
-///            BlockFunctionDecl Program / Expression ( [;&] Program )? )?
+/// Program ←⊔ ( ( FunctionDecl Program? ) / ( ( VariableDecl / ShortFunctionDecl / Expression ) ( [;&] Program )? ) )?
 /// ```
 fn program<'a>(input: ESpan<'a>) -> IResult<'a, Vec<Node<'a>>> {
-    // TODO: We don't yet elide breaks after block expressions, so function
-    // definitions need to end in ; to be followed by more code. We should fix
-    // that.
-    let mut input_start = input;
+    let mut input_next = input;
     let mut vec = Vec::new();
 
-    loop {
-        if let Ok((input, (node, terminator))) = pair(
-            alt((variable_decl, function_decl, expression)),
-            opt(ws_around(one_of(";&"))),
-        )(input_start.clone())
-        {
-            let node = if let Some('&') = terminator { Node::Async(Box::new(node)) } else { node };
-
-            vec.push(node);
-            input_start = input;
-
-            if terminator.is_none() {
-                break;
+    while let Ok((tail, (node, terminator))) = preceded(
+        cond(!vec.is_empty(), opt(whitespace)),
+        alt((
+            pair(function_decl, map(opt(ws_before(one_of(";&"))), |x| x.or(Some(';')))),
+            pair(
+                alt((variable_decl, short_function_decl, expression)),
+                opt(ws_before(one_of(";&"))),
+            ),
+        )),
+    )(input_next.clone())
+    {
+        let node = if let Some('&') = terminator {
+            if let Node::FunctionDecl { identifier, parameters, body } = node {
+                Node::FunctionDecl { identifier, parameters, body: Box::new(Node::Async(body)) }
+            } else {
+                Node::Async(Box::new(node))
             }
         } else {
+            node
+        };
+
+        input_next = tail;
+        vec.push(node);
+        if terminator.is_none() {
             break;
         }
     }
 
-    Ok((input_start, vec))
+    Ok((input_next, vec))
 }
 
 #[cfg(test)]
@@ -1394,7 +1429,7 @@ mod test {
     #[test]
     fn function_decl() {
         test_parse(
-            r#"def foo -> bar"#,
+            r#"def foo() bar"#,
             Node::Program(vec![Node::FunctionDecl {
                 identifier: sp("foo"),
                 parameters: ParameterList {
@@ -1424,9 +1459,44 @@ mod test {
     }
 
     #[test]
+    fn function_decl_block_terminated() {
+        test_parse(
+            r#"def foo { bar };"#,
+            Node::Program(vec![Node::FunctionDecl {
+                identifier: sp("foo"),
+                parameters: ParameterList {
+                    parameters: vec![],
+                    optional_parameters: vec![],
+                    variadic: None,
+                },
+                body: Box::new(Node::Block(vec![Node::Invocation(sp("bar"), vec![])])),
+            }]),
+        );
+    }
+
+    #[test]
+    fn function_decl_block_async() {
+        test_parse(
+            r#"def foo { bar }&"#,
+            Node::Program(vec![Node::FunctionDecl {
+                identifier: sp("foo"),
+                parameters: ParameterList {
+                    parameters: vec![],
+                    optional_parameters: vec![],
+                    variadic: None,
+                },
+                body: Box::new(Node::Async(Box::new(Node::Block(vec![Node::Invocation(
+                    sp("bar"),
+                    vec![],
+                )])))),
+            }]),
+        );
+    }
+
+    #[test]
     fn function_decl_args() {
         test_parse(
-            r#"def foo a -> bar"#,
+            r#"def foo (a) bar"#,
             Node::Program(vec![Node::FunctionDecl {
                 identifier: sp("foo"),
                 parameters: ParameterList {
@@ -1442,7 +1512,7 @@ mod test {
     #[test]
     fn function_decl_opt_args() {
         test_parse(
-            r#"def foo a? -> bar"#,
+            r#"def foo (a?) bar"#,
             Node::Program(vec![Node::FunctionDecl {
                 identifier: sp("foo"),
                 parameters: ParameterList {
@@ -1458,7 +1528,7 @@ mod test {
     #[test]
     fn function_decl_variadic_arg() {
         test_parse(
-            r#"def foo a.. -> bar"#,
+            r#"def foo (a..) bar"#,
             Node::Program(vec![Node::FunctionDecl {
                 identifier: sp("foo"),
                 parameters: ParameterList {
@@ -1474,7 +1544,7 @@ mod test {
     #[test]
     fn function_decl_all_arg() {
         test_parse(
-            r#"def foo a b? c.. -> bar"#,
+            r#"def foo (a b? c..) bar"#,
             Node::Program(vec![Node::FunctionDecl {
                 identifier: sp("foo"),
                 parameters: ParameterList {
