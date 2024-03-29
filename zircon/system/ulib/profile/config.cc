@@ -620,15 +620,15 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
 
   auto log_profiles = [](ProfileMap& profiles) {
     for (const auto& [key, value] : profiles) {
-      FX_SLOG(INFO, "Loaded profile.", FX_KV("key", key.name()),
+      FX_SLOG(DEBUG, "Loaded profile.", FX_KV("key", key.name()),
               FX_KV("scope", ToString(value.scope)), FX_KV("info", ToString(value.info)),
               FX_KV("tag", "ProfileProvider"),
               FX_KV("output_parameters", ToString(value.output_parameters)));
     }
   };
-  FX_SLOG(INFO, "Loaded thread profiles:");
+  FX_SLOG(DEBUG, "Loaded thread profiles:");
   log_profiles(profiles.thread);
-  FX_SLOG(INFO, "Defined memory profiles:");
+  FX_SLOG(DEBUG, "Defined memory profiles:");
   log_profiles(profiles.memory);
 
   return fit::ok(std::move(profiles));
