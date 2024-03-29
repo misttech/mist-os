@@ -227,7 +227,6 @@
 
                 // These tests hang
                 "aio01",
-                "creat07",
                 "fork14",
 
                 // TODO(https://fxbug.dev/322874889) requires a working sched_setaffinity
