@@ -133,7 +133,7 @@ network_unified_binary("bin") {
   # on ThinLTO builders.
   _is_thinlto = select_variant + [ "thinlto" ] - [ "thinlto" ] != select_variant
   if (_is_thinlto) {
-    bin_add_configs += [ ":disable-rbe" ]
+    add_configs = [ ":disable-rbe" ]
   }
 }
 
