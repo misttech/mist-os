@@ -245,6 +245,10 @@ impl Repl {
         const DOWN_ARROW: &[u8] = b"\x1b[B";
         const RIGHT_ARROW: &[u8] = b"\x1b[C";
         const LEFT_ARROW: &[u8] = b"\x1b[D";
+        const HOME: &[u8] = b"\x1b[H";
+        const END: &[u8] = b"\x1b[F";
+        const PGUP: &[u8] = b"\x1b[5~";
+        const PGDN: &[u8] = b"\x1b[6~";
         let mut buf = [0; 4];
         let mut ret = None;
         let mut tab_time: Option<Instant> = None;
@@ -327,6 +331,14 @@ impl Repl {
                     if inner.cursor_pos > 0 {
                         inner.cursor_pos -= 1;
                     }
+                } else if try_strip_prefix(&mut buf, HOME) {
+                    inner.cursor_pos = 0;
+                } else if try_strip_prefix(&mut buf, END) {
+                    inner.cursor_pos = inner.cmd_buf.len();
+                } else if try_strip_prefix(&mut buf, PGUP) {
+                    // Ignore
+                } else if try_strip_prefix(&mut buf, PGDN) {
+                    // Ignore
                 } else {
                     let byte = buf[0];
                     buf = &buf[1..];
