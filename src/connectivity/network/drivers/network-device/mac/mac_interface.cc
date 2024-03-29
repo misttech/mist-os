@@ -198,10 +198,16 @@ void MacInterface::CloseClient(MacClientInstance* client) {
   fbl::AutoLock lock(&lock_);
   clients_.erase(*client);
   Consolidate([this]() {
-    fbl::AutoLock lock(&lock_);
-    if (clients_.is_empty() && teardown_callback_) {
-      teardown_callback_();
-      impl_ = {};
+    fit::callback<void()> teardown;
+    {
+      fbl::AutoLock lock(&lock_);
+      if (clients_.is_empty() && teardown_callback_) {
+        teardown = std::move(teardown_callback_);
+        impl_ = {};
+      }
+    }
+    if (teardown) {
+      teardown();
     }
   });
 }
