@@ -42,6 +42,7 @@
                 "cve-2017-7472",
                 "cve-2018-1000199",
                 "cve-2018-11508",
+                "cve-2018-19854",
                 "cve-2018-5803",
                 "cve-2018-8897",
                 "cve-2018-9568",
@@ -51,6 +52,10 @@
                 "delete_module02",
                 "epoll_wait06",
                 "fallocate04",
+
+                // Fails due to: "No supported filesystems"
+                "getxattr03",
+                "gettimeofday01",
                 "mmap08",
                 "readlinkat01",
 
@@ -115,6 +120,7 @@
                 "mmap20",
                 "mmapstress07",
                 "mount02",
+                "mount04",
                 "mount06",
                 "mprotect01",
                 "mprotect05",
@@ -199,18 +205,6 @@
         {
             type: "skip",
             matchers: [
-                // Skip to handle transition from passing to failing.
-                "cve-2018-19854",
-
-                // Skip to handle transition from passing to failing.
-                "gettimeofday01",
-
-                // Skip to handle transition from passing to failing. It fails due to: "No supported filesystems"
-                "getxattr03",
-
-                // Skip to handle transition from passing to failing.
-                "mount04",
-
                 // https://fxbug.dev/42085553
                 "open04",
 
