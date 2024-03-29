@@ -6,7 +6,10 @@
 
 #![cfg(test)]
 
-use std::num::NonZeroU64;
+use std::{
+    num::NonZeroU64,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 use assert_matches::assert_matches;
 use fidl::endpoints::ProtocolMarker;
@@ -49,38 +52,58 @@ use crate::matchers::{
     TcpSrcPort, Udp, UdpDstPort, UdpSrcPort,
 };
 
+macro_rules! __generate_test_cases_for_all_matchers_inner {
+    ($test:item) => {
+        #[netstack_test]
+        #[test_case(AllTraffic; "all traffic")]
+        #[test_case(InterfaceId; "incoming interface id")]
+        #[test_case(InterfaceName; "incoming interface name")]
+        #[test_case(InterfaceDeviceClass; "incoming interface device class")]
+        #[test_case(SrcAddressSubnet(Inversion::Default); "src address within subnet")]
+        #[test_case(SrcAddressSubnet(Inversion::InverseMatch); "src address outside subnet")]
+        #[test_case(SrcAddressRange(Inversion::Default); "src address within range")]
+        #[test_case(SrcAddressRange(Inversion::InverseMatch); "src address outside range")]
+        #[test_case(DstAddressSubnet(Inversion::Default); "dst address within subnet")]
+        #[test_case(DstAddressSubnet(Inversion::InverseMatch); "dst address outside subnet")]
+        #[test_case(DstAddressRange(Inversion::Default); "dst address within range")]
+        #[test_case(DstAddressRange(Inversion::InverseMatch); "dst address outside range")]
+        #[test_case(Tcp; "tcp traffic")]
+        #[test_case(TcpSrcPort(Inversion::Default); "tcp src port within range")]
+        #[test_case(TcpSrcPort(Inversion::InverseMatch); "tcp src port outside range")]
+        #[test_case(TcpDstPort(Inversion::Default); "tcp dst port within range")]
+        #[test_case(TcpDstPort(Inversion::InverseMatch); "tcp dst port outside range")]
+        #[test_case(Udp; "udp traffic")]
+        #[test_case(UdpSrcPort(Inversion::Default); "udp src port within range")]
+        #[test_case(UdpSrcPort(Inversion::InverseMatch); "udp src port outside range")]
+        #[test_case(UdpDstPort(Inversion::Default); "udp dst port within range")]
+        #[test_case(UdpDstPort(Inversion::InverseMatch); "udp dst port outside range")]
+        #[test_case(Icmp; "ping")]
+        $test
+    };
+}
+
 macro_rules! generate_test_cases_for_all_matchers {
-    ($test:ident, $hook:path, $suffix:ident) => {
+    ($test:ident) => {
         paste::paste! {
-            #[netstack_test]
-            #[test_case(AllTraffic; "all traffic")]
-            #[test_case(InterfaceId; "incoming interface id")]
-            #[test_case(InterfaceName; "incoming interface name")]
-            #[test_case(InterfaceDeviceClass; "incoming interface device class")]
-            #[test_case(SrcAddressSubnet(Inversion::Default); "src address within subnet")]
-            #[test_case(SrcAddressSubnet(Inversion::InverseMatch); "src address outside subnet")]
-            #[test_case(SrcAddressRange(Inversion::Default); "src address within range")]
-            #[test_case(SrcAddressRange(Inversion::InverseMatch); "src address outside range")]
-            #[test_case(DstAddressSubnet(Inversion::Default); "dst address within subnet")]
-            #[test_case(DstAddressSubnet(Inversion::InverseMatch); "dst address outside subnet")]
-            #[test_case(DstAddressRange(Inversion::Default); "dst address within range")]
-            #[test_case(DstAddressRange(Inversion::InverseMatch); "dst address outside range")]
-            #[test_case(Tcp; "tcp traffic")]
-            #[test_case(TcpSrcPort(Inversion::Default); "tcp src port within range")]
-            #[test_case(TcpSrcPort(Inversion::InverseMatch); "tcp src port outside range")]
-            #[test_case(TcpDstPort(Inversion::Default); "tcp dst port within range")]
-            #[test_case(TcpDstPort(Inversion::InverseMatch); "tcp dst port outside range")]
-            #[test_case(Udp; "udp traffic")]
-            #[test_case(UdpSrcPort(Inversion::Default); "udp src port within range")]
-            #[test_case(UdpSrcPort(Inversion::InverseMatch); "udp src port outside range")]
-            #[test_case(UdpDstPort(Inversion::Default); "udp dst port within range")]
-            #[test_case(UdpDstPort(Inversion::InverseMatch); "udp dst port outside range")]
-            #[test_case(Icmp; "ping")]
-            async fn [<$test _ $suffix>]<I: net_types::ip::Ip + TestIpExt + RouterTestIpExt, M: Matcher>(
-                name: &str,
-                matcher: M,
-            ) {
-                $test::<I, M>(name, $hook, matcher).await;
+            __generate_test_cases_for_all_matchers_inner! {
+                async fn [<$test _>]<I: net_types::ip::Ip + TestIpExt + RouterTestIpExt, M: Matcher>(
+                    name: &str,
+                    matcher: M,
+                ) {
+                    $test::<I, M>(name, matcher).await;
+                }
+            }
+        }
+    };
+    ($test:ident, $hook:expr, $suffix:ident) => {
+        paste::paste! {
+            __generate_test_cases_for_all_matchers_inner! {
+                async fn [<$test _ $suffix>]<I: net_types::ip::Ip + TestIpExt + RouterTestIpExt, M: Matcher>(
+                    name: &str,
+                    matcher: M,
+                ) {
+                    $test::<I, M>(name, $hook, matcher).await;
+                }
             }
         }
     };
@@ -498,6 +521,7 @@ impl SocketType for IcmpSocket {
     }
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct Realms<'a> {
     client: &'a netemul::TestRealm<'a>,
     server: &'a netemul::TestRealm<'a>,
@@ -568,6 +592,7 @@ pub(crate) struct Interfaces<'a> {
 /// that is expected to include the destination address, and `other` is expected
 /// to be a third non-overlapping subnet, used for the purpose of exercising
 /// inverse match functionality.
+#[derive(Clone, Copy)]
 pub(crate) struct Subnets {
     pub src: fnet::Subnet,
     pub dst: fnet::Subnet,
@@ -1103,7 +1128,7 @@ impl RouterTestIpExt for Ipv6 {
 struct TestRouterNet<'a, I: RouterTestIpExt> {
     // Router resources. We keep handles around to the test realm and networks
     // so that they are not torn down for the lifetime of the test.
-    _router: netemul::TestRealm<'a>,
+    router: netemul::TestRealm<'a>,
     _router_client_net: netemul::TestNetwork<'a>,
     router_client_interface: netemul::TestInterface<'a>,
     _router_server_net: netemul::TestNetwork<'a>,
@@ -1271,7 +1296,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         controller.commit().await.expect("commit changes");
 
         Self {
-            _router: router,
+            router,
             router_client_interface,
             _router_client_net: client_net,
             router_server_interface,
@@ -1288,7 +1313,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         }
     }
 
-    async fn drop_traffic_on_interface<M: Matcher>(
+    async fn drop_traffic<M: Matcher>(
         controller: &mut Controller,
         rule_id: RuleId,
         matcher: &M,
@@ -1304,11 +1329,11 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
             ))
         };
         let Interfaces { ingress, egress } = interfaces;
-        match (ingress, egress) {
-            (Some(interface), None) => matcher.in_interface = interface_matcher(interface),
-            (None, Some(interface)) => matcher.out_interface = interface_matcher(interface),
-            (Some(_), Some(_)) => panic!("this test only exercises outgoing or incoming traffic"),
-            (None, None) => panic!("one of ingress or egress interface must be specified"),
+        if let Some(interface) = ingress {
+            matcher.in_interface = interface_matcher(interface);
+        }
+        if let Some(interface) = egress {
+            matcher.out_interface = interface_matcher(interface);
         }
         controller
             .push_changes(vec![Change::Create(Resource::Rule(Rule {
@@ -1321,15 +1346,15 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         controller.commit().await.expect("commit changes");
     }
 
-    async fn install_filter_for_traffic_from_server<M: Matcher>(
+    async fn install_filter_incoming_server_to_client<M: Matcher>(
         &mut self,
         matcher: &M,
         ports: SockAddrs,
     ) {
-        let Self { controller, router_server_interface, .. } = self;
-        Self::drop_traffic_on_interface::<M>(
+        let Self { controller, routine, router_server_interface, .. } = self;
+        Self::drop_traffic::<M>(
             controller,
-            RuleId { routine: self.routine.clone(), index: Self::CLIENT_FILTER_RULE_INDEX },
+            RuleId { routine: routine.clone(), index: Self::CLIENT_FILTER_RULE_INDEX },
             matcher,
             Interfaces { ingress: Some(router_server_interface), egress: None },
             Subnets {
@@ -1342,15 +1367,15 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         .await;
     }
 
-    async fn install_filter_for_traffic_from_client<M: Matcher>(
+    async fn install_filter_incoming_client_to_server<M: Matcher>(
         &mut self,
         matcher: &M,
         ports: SockAddrs,
     ) {
-        let Self { controller, router_client_interface, .. } = self;
-        Self::drop_traffic_on_interface::<M>(
+        let Self { controller, routine, router_client_interface, .. } = self;
+        Self::drop_traffic::<M>(
             controller,
-            RuleId { routine: self.routine.clone(), index: Self::SERVER_FILTER_RULE_INDEX },
+            RuleId { routine: routine.clone(), index: Self::SERVER_FILTER_RULE_INDEX },
             matcher,
             Interfaces { ingress: Some(router_client_interface), egress: None },
             Subnets {
@@ -1363,15 +1388,15 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         .await;
     }
 
-    async fn install_filter_for_traffic_to_client<M: Matcher>(
+    async fn install_filter_outgoing_server_to_client<M: Matcher>(
         &mut self,
         matcher: &M,
         ports: SockAddrs,
     ) {
-        let Self { controller, router_client_interface, .. } = self;
-        Self::drop_traffic_on_interface::<M>(
+        let Self { controller, routine, router_client_interface, .. } = self;
+        Self::drop_traffic::<M>(
             controller,
-            RuleId { routine: self.routine.clone(), index: Self::CLIENT_FILTER_RULE_INDEX },
+            RuleId { routine: routine.clone(), index: Self::CLIENT_FILTER_RULE_INDEX },
             matcher,
             Interfaces { ingress: None, egress: Some(router_client_interface) },
             Subnets {
@@ -1384,17 +1409,66 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         .await;
     }
 
-    async fn install_filter_for_traffic_to_server<M: Matcher>(
+    async fn install_filter_outgoing_client_to_server<M: Matcher>(
         &mut self,
         matcher: &M,
         ports: SockAddrs,
     ) {
-        let Self { controller, router_server_interface, .. } = self;
-        Self::drop_traffic_on_interface::<M>(
+        let Self { controller, routine, router_server_interface, .. } = self;
+        Self::drop_traffic::<M>(
             controller,
-            RuleId { routine: self.routine.clone(), index: Self::SERVER_FILTER_RULE_INDEX },
+            RuleId { routine: routine.clone(), index: Self::SERVER_FILTER_RULE_INDEX },
             matcher,
             Interfaces { ingress: None, egress: Some(router_server_interface) },
+            Subnets {
+                src: I::CLIENT_ADDR_WITH_PREFIX,
+                dst: I::SERVER_ADDR_WITH_PREFIX,
+                other: I::OTHER_SUBNET,
+            },
+            ports.client_ports(),
+        )
+        .await;
+    }
+    async fn install_filter_forwarded_server_to_client<M: Matcher>(
+        &mut self,
+        matcher: &M,
+        ports: SockAddrs,
+    ) {
+        let Self { controller, routine, router_client_interface, router_server_interface, .. } =
+            self;
+        Self::drop_traffic::<M>(
+            controller,
+            RuleId { routine: routine.clone(), index: Self::CLIENT_FILTER_RULE_INDEX },
+            matcher,
+            Interfaces {
+                ingress: Some(router_server_interface),
+                egress: Some(router_client_interface),
+            },
+            Subnets {
+                src: I::SERVER_ADDR_WITH_PREFIX,
+                dst: I::CLIENT_ADDR_WITH_PREFIX,
+                other: I::OTHER_SUBNET,
+            },
+            ports.server_ports(),
+        )
+        .await;
+    }
+
+    async fn install_filter_forwarded_client_to_server<M: Matcher>(
+        &mut self,
+        matcher: &M,
+        ports: SockAddrs,
+    ) {
+        let Self { controller, routine, router_client_interface, router_server_interface, .. } =
+            self;
+        Self::drop_traffic::<M>(
+            controller,
+            RuleId { routine: routine.clone(), index: Self::SERVER_FILTER_RULE_INDEX },
+            matcher,
+            Interfaces {
+                ingress: Some(router_client_interface),
+                egress: Some(router_server_interface),
+            },
             Subnets {
                 src: I::CLIENT_ADDR_WITH_PREFIX,
                 dst: I::SERVER_ADDR_WITH_PREFIX,
@@ -1494,7 +1568,7 @@ async fn forwarded_traffic_skips_local_ingress<
         },
         |net, addrs, ()| {
             Box::pin(async move {
-                net.install_filter_for_traffic_from_server(&matcher, addrs).await;
+                net.install_filter_incoming_server_to_client(&matcher, addrs).await;
             })
         },
     )
@@ -1511,7 +1585,7 @@ async fn forwarded_traffic_skips_local_ingress<
         },
         |net, addrs, ()| {
             Box::pin(async move {
-                net.install_filter_for_traffic_from_client(&matcher, addrs).await;
+                net.install_filter_incoming_client_to_server(&matcher, addrs).await;
             })
         },
     )
@@ -1575,7 +1649,7 @@ async fn forwarded_traffic_skips_local_egress<
         },
         |net, addrs, ()| {
             Box::pin(async move {
-                net.install_filter_for_traffic_to_client(&matcher, addrs).await;
+                net.install_filter_outgoing_server_to_client(&matcher, addrs).await;
             })
         },
     )
@@ -1592,7 +1666,7 @@ async fn forwarded_traffic_skips_local_egress<
         },
         |net, addrs, ()| {
             Box::pin(async move {
-                net.install_filter_for_traffic_to_server(&matcher, addrs).await;
+                net.install_filter_outgoing_client_to_server(&matcher, addrs).await;
             })
         },
     )
@@ -1615,3 +1689,163 @@ generate_test_cases_for_all_matchers!(
     OutgoingHook::Egress,
     egress
 );
+
+async fn drop_forwarded<I: net_types::ip::Ip + RouterTestIpExt, M: Matcher>(
+    name: &str,
+    matcher: M,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
+
+    // Set up a network with two hosts (client and server) and a router. The client
+    // and server are both link-layer neighbors with the router but on isolated L2
+    // networks.
+    let mut net = TestRouterNet::<I>::new(&sandbox, &name, IpHook::Forwarding).await;
+
+    // Send from the client to server and back; assert that we have two-way
+    // connectivity when no filtering has been configured.
+    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+
+    // Install a rule on the forwarding hook on the router that drops traffic
+    // from the server to the client. This should still allow traffic to go from
+    // the client to the server, but not the reverse.
+    net.run_test_with::<M::SocketType, _>(
+        ExpectedConnectivity::ClientToServerOnly,
+        |net, addrs, ()| {
+            Box::pin(async move {
+                net.install_filter_forwarded_server_to_client(&matcher, addrs).await;
+            })
+        },
+    )
+    .await;
+
+    // Install a similar rule on the same hook, but which drops traffic from the
+    // client to the server. This should result in neither host being able to
+    // reach each other.
+    net.run_test_with::<M::SocketType, _>(ExpectedConnectivity::None, |net, addrs, ()| {
+        Box::pin(async move {
+            net.install_filter_forwarded_client_to_server(&matcher, addrs).await;
+        })
+    })
+    .await;
+
+    // Remove all filtering rules; two-way connectivity should now be possible
+    // again.
+    net.clear_filter().await;
+    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+}
+
+generate_test_cases_for_all_matchers!(drop_forwarded);
+
+async fn local_traffic_skips_forwarding<I: net_types::ip::Ip + RouterTestIpExt, M: Matcher>(
+    name: &str,
+    matcher: M,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
+
+    // Set up a network with two hosts (client and server) and a router. The client
+    // and server are both link-layer neighbors with the router but on isolated L2
+    // networks.
+    let mut net = TestRouterNet::<I>::new(&sandbox, &name, IpHook::Forwarding).await;
+
+    // Send from the client to server and back; assert that we have two-way
+    // connectivity when no filtering has been configured. Having client-server
+    // connectivity implies that client-router and server-router connectivity is
+    // also established.
+    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+
+    async fn drop_traffic_between_realms<I: RouterTestIpExt, M: Matcher>(
+        controller: &mut Controller,
+        routine: RoutineId,
+        matcher: &M,
+        subnets: Subnets,
+        sock_addrs: SockAddrs,
+    ) {
+        static INDEX: AtomicU32 = AtomicU32::new(0);
+
+        TestRouterNet::<I>::drop_traffic::<M>(
+            controller,
+            RuleId { routine: routine.clone(), index: INDEX.fetch_add(1, Ordering::SeqCst) },
+            matcher,
+            Interfaces { ingress: None, egress: None },
+            subnets,
+            sock_addrs.client_ports(),
+        )
+        .await;
+
+        TestRouterNet::<I>::drop_traffic::<M>(
+            controller,
+            RuleId { routine, index: INDEX.fetch_add(1, Ordering::SeqCst) },
+            matcher,
+            Interfaces { ingress: None, egress: None },
+            Subnets { src: subnets.dst, dst: subnets.src, other: subnets.other },
+            sock_addrs.server_ports(),
+        )
+        .await;
+    }
+
+    async fn drop_forwarded_traffic_and_assert_connectivity<I: RouterTestIpExt, M: Matcher>(
+        controller: &mut Controller,
+        routine: RoutineId,
+        matcher: &M,
+        realms: Realms<'_>,
+        subnets: Subnets,
+    ) {
+        let (sockets, sock_addrs) = M::SocketType::bind_sockets(
+            realms,
+            Addrs { client: subnets.src.addr, server: subnets.dst.addr },
+        )
+        .await;
+
+        drop_traffic_between_realms::<I, M>(
+            controller,
+            routine.clone(),
+            &matcher,
+            subnets,
+            sock_addrs,
+        )
+        .await;
+
+        M::SocketType::run_test::<I>(realms, sockets, sock_addrs, ExpectedConnectivity::TwoWay)
+            .await;
+    }
+
+    let TestRouterNet {
+        ref mut controller, ref routine, ref client, ref server, ref router, ..
+    } = net;
+
+    // Dropping traffic between the client and router in the forwarding hook
+    // should not affect client-router connectivity, because this traffic is
+    // never forwarded; it is always locally-generated and locally-delivered.
+    drop_forwarded_traffic_and_assert_connectivity::<I, M>(
+        controller,
+        routine.clone(),
+        &matcher,
+        Realms { client, server: router },
+        Subnets {
+            src: I::CLIENT_ADDR_WITH_PREFIX,
+            dst: I::ROUTER_CLIENT_ADDR_WITH_PREFIX,
+            other: I::OTHER_SUBNET,
+        },
+    )
+    .await;
+
+    // Dropping traffic between the server and router in the forwarding hook
+    // should not affect server-router connectivity, because this traffic is
+    // never forwarded; it is always locally-generated and locally-delivered.
+    drop_forwarded_traffic_and_assert_connectivity::<I, M>(
+        controller,
+        routine.clone(),
+        &matcher,
+        Realms { client: server, server: router },
+        Subnets {
+            src: I::SERVER_ADDR_WITH_PREFIX,
+            dst: I::ROUTER_SERVER_ADDR_WITH_PREFIX,
+            other: I::OTHER_SUBNET,
+        },
+    )
+    .await;
+}
+
+generate_test_cases_for_all_matchers!(local_traffic_skips_forwarding);
