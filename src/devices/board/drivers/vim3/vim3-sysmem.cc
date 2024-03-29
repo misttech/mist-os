@@ -38,7 +38,7 @@ static const sysmem_metadata_t sysmem_metadata = {
     // whether all loaned pages are being used by pager-backed VMOs.
     //
     // TODO(https://fxbug.dev/42072489): This should be configured elsewhere.
-    .contiguous_memory_size = int64_t{384} * 1024 * 1024,
+    .contiguous_memory_size = int64_t{200} * 1024 * 1024,
 };
 
 static const std::vector<fpbus::Metadata> sysmem_metadata_list{
