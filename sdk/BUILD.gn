@@ -820,8 +820,9 @@ copy("idk_build_tools") {
   ]
 }
 
-# Firmware IDK. See /src/firmware/README.md
+# Firmware IDK. See //src/firmware/README.md
 group("firmware") {
+  visibility += [ "//build/input:build_only" ]
   deps = [
     ":firmware.archive",
     ":firmware.exported",

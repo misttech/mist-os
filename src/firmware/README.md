@@ -11,6 +11,13 @@ when bringing up a new board.
 The Firmware SDK build rules live in `//sdk/BUILD.gn`. The SDK is not built
 in the normal flow, but can be built manually as follows:
 
+1. Run `fx set minimal.x64` or similar.
+   * Note: There is nothing special about this product or architecture. It was
+     selected because it is a relatively small standard build capable of
+     producing the necessary artifacts.
+1. Run `fx args` and add the following: `build_only_labels = [ "//sdk:firmware" ]`
+   * Note: This must be done manually because `fx set` does not currently
+     support setting `build_only_labels`.
 1. Run `fx build sdk:firmware`
 1. Find the resulting SDK archive at `<build_dir>/sdk/archive/firmware.tar.gz`
    or its content at `<build_dir>/sdk/exported/firmware/`
