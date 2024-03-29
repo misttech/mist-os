@@ -233,7 +233,14 @@ impl ValueExt for Value {
                 *self = Value::OutOfLine(playground_value.duplicate());
                 Value::OutOfLine(playground_value)
             }
-            Value::Handle(_, _) => todo!(),
+            Value::Handle(_, _) => {
+                let Value::Handle(a, b) = std::mem::replace(self, Value::Null) else {
+                    unreachable!();
+                };
+                let mut playground_value = PlaygroundValue::InUseHandle(InUseHandle::handle(a, b));
+                *self = Value::OutOfLine(playground_value.duplicate());
+                Value::OutOfLine(playground_value)
+            }
             Value::OutOfLine(a) => Value::OutOfLine(a.duplicate()),
         }
     }
@@ -721,6 +728,7 @@ impl std::fmt::Display for PlaygroundValue {
 #[cfg(test)]
 mod test {
     use super::*;
+    use fidl::HandleBased;
     use futures::FutureExt;
 
     #[test]
@@ -1141,5 +1149,21 @@ mod test {
         let Value::OutOfLine(PlaygroundValue::InUseHandle(server)) = server else { panic!() };
 
         assert!(server.take_server("test.fidlcodec.examples/FidlCodecTestProtocol").is_err());
+    }
+
+    #[test]
+    fn duplicate_raw_handle() {
+        let (socket, _b) = fidl::Socket::create_stream();
+        let socket = socket.into_handle();
+        let mut socket = Value::Handle(socket, fidl::ObjectType::SOCKET);
+        let socket_dup = socket.duplicate();
+        let Value::OutOfLine(PlaygroundValue::InUseHandle(socket)) = socket else { panic!() };
+        let Value::OutOfLine(PlaygroundValue::InUseHandle(socket_dup)) = socket_dup else {
+            panic!()
+        };
+
+        assert_eq!(socket.id().unwrap(), socket_dup.id().unwrap());
+        assert_eq!(Some(fidl::ObjectType::SOCKET), socket.object_type());
+        assert_eq!(Some(fidl::ObjectType::SOCKET), socket_dup.object_type());
     }
 }

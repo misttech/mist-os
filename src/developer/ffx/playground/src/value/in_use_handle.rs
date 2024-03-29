@@ -82,6 +82,17 @@ impl InUseHandle {
         }
     }
 
+    /// Get the type of this handle. Returns `None` if the handle has been consumed.
+    pub fn object_type(&self) -> Option<fidl::ObjectType> {
+        match &*self.handle.lock().unwrap() {
+            HandleObject::Handle(_, ty) => Some(*ty),
+            HandleObject::ClientEnd(_, _) | HandleObject::ServerEnd(_, _) => {
+                Some(fidl::ObjectType::CHANNEL)
+            }
+            HandleObject::Defunct => None,
+        }
+    }
+
     /// Create a new [`InUseHandle`] for a server end channel.
     pub fn server_end(channel: fidl::Channel, identifier: String) -> Self {
         let channel = fasync::Channel::from_channel(channel);
