@@ -11,6 +11,7 @@ use {
         TriangleCommand, WhiteNoiseCommand,
     },
     fho::{FfxMain, FfxTool, SimpleWriter},
+    fuchsia_audio::Format,
     rand::{rngs::ThreadRng, thread_rng, Rng},
     std::{f64::consts::PI, io, io::Write, time::Duration},
 };
@@ -56,7 +57,7 @@ struct GenericSignal {
     pub duration: Duration,
     pub frequency: Option<u64>,
     pub amplitude: Option<f64>,
-    pub format: format_utils::Format,
+    pub format: Format,
     pub signal_type: SignalType,
     pub duty_cycle: Option<f64>,
 }
@@ -338,7 +339,7 @@ pub mod test {
                 duration: Duration::from_millis(10),
                 frequency: Some(250),
                 amplitude: Some(1.0),
-                format: format_utils::Format {
+                format: Format {
                     frames_per_second: 48000,
                     sample_type: fidl_fuchsia_media::AudioSampleFormat::Unsigned8,
                     channels: 1,
@@ -350,7 +351,7 @@ pub mod test {
                 duration: Duration::from_millis(10),
                 frequency: Some(250),
                 amplitude: Some(0.5),
-                format: format_utils::Format {
+                format: Format {
                     frames_per_second: 48000,
                     sample_type: fidl_fuchsia_media::AudioSampleFormat::Unsigned8,
                     channels: 1,
@@ -363,7 +364,7 @@ pub mod test {
                 duration: Duration::from_millis(10),
                 frequency: Some(0),
                 amplitude: Some(0.0),
-                format: format_utils::Format {
+                format: Format {
                     frames_per_second: 48000,
                     sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed16,
                     channels: 1,
@@ -375,7 +376,7 @@ pub mod test {
                 duration: Duration::from_millis(100),
                 frequency: Some(500),
                 amplitude: Some(1.0),
-                format: format_utils::Format {
+                format: Format {
                     frames_per_second: 48000,
                     sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed16,
                     channels: 1,
@@ -387,7 +388,7 @@ pub mod test {
                 duration: Duration::from_millis(100),
                 frequency: Some(10),
                 amplitude: Some(1.0),
-                format: format_utils::Format {
+                format: Format {
                     frames_per_second: 48000,
                     sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed24In32,
                     channels: 1,
@@ -399,7 +400,7 @@ pub mod test {
                 duration: Duration::from_millis(100),
                 frequency: Some(250),
                 amplitude: Some(1.0),
-                format: format_utils::Format {
+                format: Format {
                     frames_per_second: 48000,
                     sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed16,
                     channels: 1,
@@ -411,7 +412,7 @@ pub mod test {
                 duration: Duration::from_millis(100),
                 frequency: Some(250),
                 amplitude: Some(1.0),
-                format: format_utils::Format {
+                format: Format {
                     frames_per_second: 48000,
                     sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed24In32,
                     channels: 1,
@@ -423,7 +424,7 @@ pub mod test {
                 duration: Duration::from_millis(100),
                 frequency: Some(250),
                 amplitude: Some(0.5),
-                format: format_utils::Format {
+                format: Format {
                     frames_per_second: 48000,
                     sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed24In32,
                     channels: 2,
@@ -435,7 +436,7 @@ pub mod test {
                 duration: Duration::from_millis(100),
                 frequency: Some(250),
                 amplitude: Some(0.5),
-                format: format_utils::Format {
+                format: Format {
                     frames_per_second: 48000,
                     sample_type: fidl_fuchsia_media::AudioSampleFormat::Float,
                     channels: 1,
@@ -447,7 +448,7 @@ pub mod test {
                 duration: Duration::from_millis(100),
                 frequency: Some(250),
                 amplitude: Some(1.0),
-                format: format_utils::Format {
+                format: Format {
                     frames_per_second: 48000,
                     sample_type: fidl_fuchsia_media::AudioSampleFormat::Float,
                     channels: 2,
@@ -858,7 +859,7 @@ pub mod test {
             duration: Duration::from_millis(10),
             frequency: Some(0),
             amplitude: Some(0.0),
-            format: format_utils::Format {
+            format: Format {
                 frames_per_second: 48000,
                 sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed16,
                 channels: 1,

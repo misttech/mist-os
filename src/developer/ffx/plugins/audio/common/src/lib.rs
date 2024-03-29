@@ -164,8 +164,8 @@ pub mod tests {
     use fidl_fuchsia_hardware_audio::{
         CompositeProperties, DeviceType, StreamProperties, SupportedFormats,
     };
+    use fuchsia_audio::stop_listener;
     use futures::AsyncWriteExt;
-    use listener_utils::stop_listener;
     use timeout::timeout;
 
     use super::*;

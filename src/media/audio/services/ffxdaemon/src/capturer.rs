@@ -9,8 +9,8 @@ use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_media as fmedia;
 use fidl_fuchsia_media_audio as fmedia_audio;
 use fidl_fuchsia_ultrasound as fultrasound;
-use format_utils::Format;
 use fuchsia_async as fasync;
+use fuchsia_audio::{stop_listener, Format};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx, HandleBased};
 use futures::{AsyncWriteExt, TryStreamExt};
@@ -203,11 +203,9 @@ pub async fn record_capturer(
     };
 
     if let Some(cancel_server) = cancel_server {
-        let (_cancel_res, packet_res) = futures::future::try_join(
-            listener_utils::stop_listener(cancel_server, &stop_signal),
-            packet_fut,
-        )
-        .await?;
+        let (_cancel_res, packet_res) =
+            futures::future::try_join(stop_listener(cancel_server, &stop_signal), packet_fut)
+                .await?;
         Ok(packet_res)
     } else {
         Ok(packet_fut.await?)

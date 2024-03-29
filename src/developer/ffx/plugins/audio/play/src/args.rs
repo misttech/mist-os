@@ -101,5 +101,5 @@ fn str_to_usage(src: &str) -> Result<AudioRenderUsageExtended, String> {
 }
 
 fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_controller::ClockType, String> {
-    format_utils::str_to_clock(src)
+    fuchsia_audio::str_to_clock(src)
 }

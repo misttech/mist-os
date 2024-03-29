@@ -6,7 +6,7 @@ use {
     anyhow::Result,
     argh::{ArgsInfo, FromArgs},
     ffx_core::ffx_command,
-    format_utils::Format,
+    fuchsia_audio::Format,
     std::time::Duration,
 };
 
@@ -154,5 +154,5 @@ pub struct PinkNoiseCommand {
 
 /// Parses a Duration from string.
 fn parse_duration(value: &str) -> Result<Duration, String> {
-    format_utils::parse_duration(value)
+    fuchsia_audio::parse_duration(value)
 }

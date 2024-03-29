@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_audio as fhaudio;
-use format_utils::Format;
+use fuchsia_audio::Format;
 use fuchsia_runtime::vmar_root_self;
 use fuchsia_zircon::{self as zx};
 use thiserror::Error;

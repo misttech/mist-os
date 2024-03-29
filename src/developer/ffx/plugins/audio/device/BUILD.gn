@@ -13,7 +13,7 @@ ffx_plugin("ffx_audio_device") {
 
   args_deps = [
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
-    "//src/media/audio/services/ffxdaemon:format-utils",
+    "//src/media/audio/lib/rust",
   ]
   args_sources = [ "src/args.rs" ]
 
@@ -37,7 +37,7 @@ ffx_plugin("ffx_audio_device") {
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia",
-    "//src/media/audio/services/ffxdaemon:format-utils",
+    "//src/media/audio/lib/rust",
     "//third_party/rust_crates:tempfile",
   ]
 }

@@ -7,7 +7,7 @@ use {
     argh::{ArgsInfo, FromArgs},
     ffx_core::ffx_command,
     fidl_fuchsia_media::AudioCaptureUsage,
-    format_utils::Format,
+    fuchsia_audio::Format,
     std::time::Duration,
 };
 
@@ -102,9 +102,9 @@ fn str_to_usage(src: &str) -> Result<AudioCaptureUsageExtended, String> {
 }
 
 fn parse_duration(value: &str) -> Result<Duration, String> {
-    format_utils::parse_duration(value)
+    fuchsia_audio::parse_duration(value)
 }
 
 fn str_to_clock(value: &str) -> Result<fidl_fuchsia_audio_controller::ClockType, String> {
-    format_utils::str_to_clock(value)
+    fuchsia_audio::str_to_clock(value)
 }

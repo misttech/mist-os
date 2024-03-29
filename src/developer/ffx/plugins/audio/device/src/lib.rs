@@ -372,7 +372,7 @@ mod tests {
     use ffx_audio_device_args::{DevicePlayCommand, DeviceRecordCommand, InfoCommand};
     use ffx_core::macro_deps::futures::AsyncWriteExt;
     use ffx_writer::{SimpleWriter, TestBuffer, TestBuffers};
-    use format_utils::Format;
+    use fuchsia_audio::Format;
     use std::fs;
     use std::io::Write;
     use std::os::unix::fs::PermissionsExt;

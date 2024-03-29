@@ -6,6 +6,7 @@
 
 use anyhow::{anyhow, Error};
 use byteorder::ByteOrder;
+use fuchsia_audio::Format;
 use futures::{AsyncReadExt, AsyncWriteExt};
 use std::io::Cursor;
 
@@ -15,7 +16,7 @@ impl WavSocket {
     pub async fn write_header(
         &mut self,
         duration: Option<std::time::Duration>,
-        format: &format_utils::Format,
+        format: &Format,
     ) -> Result<(), Error> {
         let spec = hound::WavSpec::from(format);
         let header = match duration {

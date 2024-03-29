@@ -12,7 +12,7 @@ ffx_plugin("ffx_audio_gen") {
   args_with_unit_tests = true
 
   args_deps = [
-    "//src/media/audio/services/ffxdaemon:format-utils",
+    "//src/media/audio/lib/rust",
     "//third_party/rust_crates:anyhow",
   ]
 
@@ -20,7 +20,7 @@ ffx_plugin("ffx_audio_gen") {
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/media/audio/services/ffxdaemon:format-utils",
+    "//src/media/audio/lib/rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:hound",

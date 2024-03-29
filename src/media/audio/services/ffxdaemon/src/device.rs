@@ -5,7 +5,6 @@
 use crate::{
     error::ControllerError,
     ring_buffer::{HardwareRingBuffer, RingBuffer},
-    stop_listener,
     wav_socket::WavSocket,
     SECONDS_PER_NANOSECOND,
 };
@@ -16,8 +15,8 @@ use fidl::endpoints::{create_proxy, Proxy, ServerEnd};
 use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fidl_fuchsia_io as fio;
-use format_utils::Format;
 use fuchsia_async as fasync;
+use fuchsia_audio::{device_id_for_path, path_for_selector, stop_listener, Format};
 use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_zircon::{self as zx};
 use futures::{AsyncWriteExt, StreamExt};
@@ -144,7 +143,7 @@ impl DeviceControl for CompositeDevice {
 }
 
 fn validate_format(
-    requested_format: &format_utils::Format,
+    requested_format: &Format,
     supported_formats: Formats,
 ) -> Result<(), ControllerError> {
     match supported_formats {
@@ -206,7 +205,7 @@ pub struct Device {
 impl Device {
     pub fn new_from_selector(selector: &fac::DeviceSelector) -> Result<Self, Error> {
         let device_controller = connect_to_device_controller(
-            format_utils::path_for_selector(&selector)?,
+            path_for_selector(&selector)?,
             selector.device_type.ok_or(anyhow!("Device type not specified"))?,
         )?;
         Ok(Self { device_controller })
@@ -262,7 +261,7 @@ impl Device {
     ) -> Result<fac::PlayerPlayResponse, Error> {
         let mut socket = WavSocket(data_socket);
         let spec = socket.read_header().await?;
-        let format = format_utils::Format::from(&spec);
+        let format = Format::from(&spec);
 
         let supported_formats = self.device_controller.get_supported_formats().await?;
         validate_format(&format, supported_formats)?;
@@ -416,7 +415,7 @@ impl Device {
 
     pub async fn record(
         &mut self,
-        format: format_utils::Format,
+        format: Format,
         data_socket: fasync::Socket,
         duration: Option<std::time::Duration>,
         cancel_server: Option<ServerEnd<fac::RecordCancelerMarker>>,
@@ -603,8 +602,8 @@ pub async fn get_entries(
 
     let device_selectors = full_paths
         .map(|path| fac::DeviceSelector {
-            is_input: is_input,
-            id: format_utils::device_id_for_path(std::path::Path::new(&path)).ok(),
+            is_input,
+            id: device_id_for_path(std::path::Path::new(&path)).ok(),
             device_type: Some(device_type),
             ..Default::default()
         })

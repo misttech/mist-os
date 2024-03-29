@@ -8,6 +8,7 @@ use {
     ffx_audio_listdevices_args::ListDevicesCommand,
     fho::{moniker, FfxMain, FfxTool, MachineWriter},
     fidl_fuchsia_audio_controller::DeviceControlProxy,
+    fuchsia_audio::path_for_selector,
     fuchsia_zircon_status::Status,
     itertools::Itertools,
     serde::{Deserialize, Serialize},
@@ -73,7 +74,7 @@ async fn list_devices_impl(
                             // TODO(https://fxbug.dev/327490666): Fix incorrect STREAMCONFIG device_type
                             device_type: DeviceTypeWrapper::STREAMCONFIG,
                             is_input: device.is_input,
-                            path: format_utils::path_for_selector(&device).map(String::from).ok(),
+                            path: path_for_selector(&device).map(String::from).ok(),
                         })
                         .collect(),
                 },
@@ -94,7 +95,7 @@ async fn list_devices_impl(
 
                             format!(
                                 "{:?} Device id: {:?}, Device type: {:?}, {in_out}",
-                                format_utils::path_for_selector(&device),
+                                path_for_selector(&device),
                                 device.id,
                                 device.device_type
                             )

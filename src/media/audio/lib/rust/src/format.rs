@@ -349,21 +349,19 @@ pub fn str_to_clock(src: &str) -> Result<fac::ClockType, String> {
                     ..Default::default()
                 }))
             } else {
-                return Err(format!("Invalid clock argument: {}.", src));
+                Err(format!("Invalid clock argument: {}.", src))
             }
         }
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// tests
 #[cfg(test)]
 pub mod test {
     use super::*;
 
     #[test]
     fn test_format_parse() {
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             Format {
                 frames_per_second: 48000,
                 sample_type: fmedia::AudioSampleFormat::Unsigned8,
@@ -372,7 +370,7 @@ pub mod test {
             Format::from_str("48000,uint8,2ch").unwrap()
         );
 
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             Format {
                 frames_per_second: 44100,
                 sample_type: fmedia::AudioSampleFormat::Float,

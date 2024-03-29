@@ -6,6 +6,7 @@ use {
     camino::Utf8PathBuf,
     fidl_fuchsia_audio_controller::{DeviceInfo, DeviceSelector},
     fidl_fuchsia_hardware_audio::{ChannelSet, PlugDetectCapabilities, SampleFormat},
+    fuchsia_audio::path_for_selector,
     serde::{Deserialize, Serialize},
     std::fmt::Display,
 };
@@ -336,7 +337,7 @@ impl From<(DeviceInfo, &DeviceSelector)> for DeviceInfoResult {
 
                 match stream_properties {
                     Some(stream_properties) => Self {
-                        device_path: format_utils::path_for_selector(device_selector).ok(),
+                        device_path: path_for_selector(device_selector).ok(),
                         manufacturer: stream_properties.manufacturer.clone(),
                         product_name: stream_properties.product.clone(),
                         current_gain_db: gain_state.clone().and_then(|g| g.gain_db),
@@ -404,7 +405,7 @@ impl From<(DeviceInfo, &DeviceSelector)> for DeviceInfoResult {
                         clock_domain: None,
                     },
                     None => Self {
-                        device_path: format_utils::path_for_selector(device_selector).ok(),
+                        device_path: path_for_selector(device_selector).ok(),
                         ..Default::default()
                     },
                 }
@@ -413,14 +414,14 @@ impl From<(DeviceInfo, &DeviceSelector)> for DeviceInfoResult {
                 let composite_properties = composite_info.composite_properties;
                 match composite_properties {
                     Some(composite_properties) => Self {
-                        device_path: format_utils::path_for_selector(device_selector).ok(),
+                        device_path: path_for_selector(device_selector).ok(),
                         manufacturer: composite_properties.manufacturer,
                         product_name: composite_properties.product,
                         clock_domain: composite_properties.clock_domain,
                         ..Default::default()
                     },
                     None => Self {
-                        device_path: format_utils::path_for_selector(device_selector).ok(),
+                        device_path: path_for_selector(device_selector).ok(),
                         ..Default::default()
                     },
                 }

@@ -5,7 +5,7 @@
 use {
     argh::{ArgsInfo, FromArgs},
     ffx_core::ffx_command,
-    format_utils::Format,
+    fuchsia_audio::Format,
     std::str::FromStr,
 };
 
@@ -191,5 +191,5 @@ fn parse_device_type(value: &str) -> Result<fidl_fuchsia_hardware_audio::DeviceT
 }
 
 fn parse_duration(value: &str) -> Result<std::time::Duration, String> {
-    format_utils::parse_duration(value)
+    fuchsia_audio::parse_duration(value)
 }
