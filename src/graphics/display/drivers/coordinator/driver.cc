@@ -88,7 +88,7 @@ config_check_result_t Driver::CheckConfiguration(
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
   if (use_engine_) {
-    return 0;
+    return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
@@ -137,7 +137,7 @@ void Driver::ResetDisplayControllerInterface() {
 zx_status_t Driver::ImportImage(image_t* image, DriverBufferCollectionId collection_id,
                                 uint32_t index) {
   if (use_engine_) {
-    return ZX_OK;
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
@@ -179,7 +179,7 @@ zx_status_t Driver::ImportImageForCapture(DriverBufferCollectionId collection_id
 zx_status_t Driver::ImportBufferCollection(DriverBufferCollectionId collection_id,
                                            zx::channel collection_token) {
   if (use_engine_) {
-    return ZX_OK;
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
@@ -189,7 +189,7 @@ zx_status_t Driver::ImportBufferCollection(DriverBufferCollectionId collection_i
 
 zx_status_t Driver::ReleaseBufferCollection(DriverBufferCollectionId collection_id) {
   if (use_engine_) {
-    return ZX_OK;
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
@@ -199,7 +199,7 @@ zx_status_t Driver::ReleaseBufferCollection(DriverBufferCollectionId collection_
 zx_status_t Driver::SetBufferCollectionConstraints(const image_buffer_usage_t& usage,
                                                    DriverBufferCollectionId collection_id) {
   if (use_engine_) {
-    return ZX_OK;
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
@@ -217,7 +217,7 @@ bool Driver::IsCaptureSupported() {
 
 zx_status_t Driver::StartCapture(DriverCaptureImageId driver_capture_image_id) {
   if (use_engine_) {
-    return ZX_OK;
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
@@ -226,7 +226,7 @@ zx_status_t Driver::StartCapture(DriverCaptureImageId driver_capture_image_id) {
 
 zx_status_t Driver::SetDisplayPower(DisplayId display_id, bool power_on) {
   if (use_engine_) {
-    return ZX_OK;
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
@@ -235,7 +235,7 @@ zx_status_t Driver::SetDisplayPower(DisplayId display_id, bool power_on) {
 
 zx_status_t Driver::SetMinimumRgb(uint8_t minimum_rgb) {
   if (use_engine_) {
-    return ZX_OK;
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
@@ -244,7 +244,7 @@ zx_status_t Driver::SetMinimumRgb(uint8_t minimum_rgb) {
 
 zx_status_t Driver::GetSysmemConnection(zx::channel sysmem_handle) {
   if (use_engine_) {
-    return ZX_OK;
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
