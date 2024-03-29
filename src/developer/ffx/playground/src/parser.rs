@@ -57,7 +57,7 @@ enum Error<'a> {
 
 impl<'a> nom_error::ParseError<ESpan<'a>> for Error<'a> {
     fn from_error_kind(input: ESpan<'a>, kind: nom_error::ErrorKind) -> Self {
-        Error::Nom(input.strip_error(), kind)
+        Error::Nom(input.strip_parse_state(), kind)
     }
 
     fn append(_input: ESpan<'a>, _kind: nom_error::ErrorKind, other: Self) -> Self {
@@ -67,29 +67,29 @@ impl<'a> nom_error::ParseError<ESpan<'a>> for Error<'a> {
 
 type IResult<'a, O> = nom::IResult<ESpan<'a>, O, Error<'a>>;
 
-/// Wrapper parser which allows some backtracking to occur when error recovery is necessary.
+/// Global parser state which keeps track of backtracking as well as tab completion.
 #[derive(Debug, Clone)]
-struct ErrorRecovery<'a> {
+struct ParseState<'a> {
     errors_accepted: Vec<(Span<'a>, String)>,
     trying: Option<(Span<'a>, String)>,
     errors_new: Vec<(Span<'a>, String)>,
 }
 
-impl<'a> ErrorRecovery<'a> {
+impl<'a> ParseState<'a> {
     fn new() -> Self {
-        ErrorRecovery { errors_accepted: Vec::new(), trying: None, errors_new: Vec::new() }
+        ParseState { errors_accepted: Vec::new(), trying: None, errors_new: Vec::new() }
     }
 }
 
 pub type Span<'a> = LocatedSpan<&'a str>;
-type ESpan<'a> = LocatedSpan<&'a str, Rc<RefCell<ErrorRecovery<'a>>>>;
+type ESpan<'a> = LocatedSpan<&'a str, Rc<RefCell<ParseState<'a>>>>;
 
-trait StripError<'a> {
-    fn strip_error(self) -> Span<'a>;
+trait StripParseState<'a> {
+    fn strip_parse_state(self) -> Span<'a>;
 }
 
-impl<'a> StripError<'a> for ESpan<'a> {
-    fn strip_error(self) -> Span<'a> {
+impl<'a> StripParseState<'a> for ESpan<'a> {
+    fn strip_parse_state(self) -> Span<'a> {
         // Safe because we're basically just stripping away unrelated fields from the
         // safety-sensitive state and leaving it unchanged.
         // TODO: A later version of nom_locate has map_extra which will let us
@@ -283,7 +283,7 @@ pub struct ParseResult<'a> {
 
 impl<'a> From<&'a str> for ParseResult<'a> {
     fn from(text: &'a str) -> ParseResult<'a> {
-        let text = ESpan::new_extra(text, Rc::new(RefCell::new(ErrorRecovery::new())));
+        let text = ESpan::new_extra(text, Rc::new(RefCell::new(ParseState::new())));
         let (end_pos, tree) = recover(alt((
             terminated(
                 map(ws_around(program), Node::Program),
@@ -307,7 +307,7 @@ fn recover<'a, F: Fn(ESpan<'a>) -> IResult<'a, X>, X>(
     f: F,
 ) -> impl Fn(ESpan<'a>) -> IResult<'a, X> {
     move |mut input| {
-        input.extra = Rc::new(RefCell::new(ErrorRecovery::new()));
+        input.extra = Rc::new(RefCell::new(ParseState::new()));
         let mut to_try = VecDeque::new();
 
         loop {
@@ -362,7 +362,7 @@ fn err_skip<'a, F: Fn(ESpan<'a>) -> IResult<'a, X>, S: ToString + 'a, X>(
     move |input| {
         let (out_span, result) = recognize(&f)(input)?;
         let message = msg.to_string().replace("{}", *result.fragment());
-        let err = (result.strip_error(), message);
+        let err = (result.strip_parse_state(), message);
         let mut recovery = out_span.extra.borrow_mut();
 
         if recovery.errors_accepted.iter().any(|x| x == &err)
@@ -563,7 +563,7 @@ fn integer<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             recognize(tuple((tag("0x"), separated_nonempty_list(chr('_'), hex_digit1)))),
             terminated(tag("0"), not(digit1)),
         )),
-        |x: ESpan<'a>| Node::Integer(x.strip_error()),
+        |x: ESpan<'a>| Node::Integer(x.strip_parse_state()),
     )(input)
 }
 
@@ -582,7 +582,7 @@ fn integer<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// ```
 fn real<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     map(recognize(tuple((integer, chr('.'), digit1, many0(pair(chr('_'), digit1))))), |x| {
-        Node::Real(x.strip_error())
+        Node::Real(x.strip_parse_state())
     })(input)
 }
 
@@ -632,7 +632,7 @@ fn normal_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             many0(alt((recognize(none_of("\\\"\n")), escape_sequence))),
             ex_tag("\""),
         ))),
-        |x| Node::String(x.strip_error()),
+        |x| Node::String(x.strip_parse_state()),
     )(input)
 }
 
@@ -660,7 +660,7 @@ fn variable_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             ws_before(expression),
         )),
         |(keyword, identifier, _, value)| Node::VariableDecl {
-            identifier: identifier.strip_error(),
+            identifier: identifier.strip_parse_state(),
             value: Box::new(value),
             mutability: if *keyword.fragment() == "const" {
                 Mutability::Constant
@@ -695,12 +695,12 @@ fn parameter_list<'a>(input: ESpan<'a>) -> IResult<'a, ParameterList<'a>> {
             opt(ws_before(terminated(identifier, tag("..")))),
         )),
         |(parameters, optional_parameters, variadic)| ParameterList {
-            parameters: parameters.into_iter().map(StripError::strip_error).collect(),
+            parameters: parameters.into_iter().map(StripParseState::strip_parse_state).collect(),
             optional_parameters: optional_parameters
                 .into_iter()
-                .map(StripError::strip_error)
+                .map(StripParseState::strip_parse_state)
                 .collect(),
-            variadic: variadic.map(StripError::strip_error),
+            variadic: variadic.map(StripParseState::strip_parse_state),
         },
     )(input)
 }
@@ -732,7 +732,7 @@ fn function_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             )),
         ),
         |(identifier, parameters, body)| Node::FunctionDecl {
-            identifier: identifier.strip_error(),
+            identifier: identifier.strip_parse_state(),
             parameters,
             body: Box::new(body.into()),
         },
@@ -759,7 +759,7 @@ fn function_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 fn object<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     fn field<'a>(input: ESpan<'a>) -> IResult<'a, (Node<'a>, Node<'a>)> {
         separated_pair(
-            alt((normal_string, map(identifier, |x| Node::Identifier(x.strip_error())))),
+            alt((normal_string, map(identifier, |x| Node::Identifier(x.strip_parse_state())))),
             ws_around(alt((
                 tag(":"),
                 recognize(err_skip(
@@ -803,7 +803,7 @@ fn object<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             opt(ws_after(preceded(chr('@'), identifier))),
             delimited(chr('{'), ws_around(object_body), ex_tag("}")),
         ),
-        |(name, body)| Node::Object(name.map(|x| x.strip_error()), body),
+        |(name, body)| Node::Object(name.map(|x| x.strip_parse_state()), body),
     )(input)
 }
 
@@ -866,7 +866,7 @@ fn lambda<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             alt((
                 terminated(preceded(tag("\\("), ws_before(parameter_list)), ws_around(tag(")"))),
                 map(preceded(tag("\\"), ws_around(identifier)), |parameter| ParameterList {
-                    parameters: vec![parameter.strip_error()],
+                    parameters: vec![parameter.strip_parse_state()],
                     optional_parameters: Vec::new(),
                     variadic: None,
                 }),
@@ -895,7 +895,10 @@ fn lookup<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         pair(
             value,
             many0(alt((
-                preceded(ws_around(tag(".")), map(identifier, |x| Node::Label(x.strip_error()))),
+                preceded(
+                    ws_around(tag(".")),
+                    map(identifier, |x| Node::Label(x.strip_parse_state())),
+                ),
                 delimited(chr('['), ws_around(expression), chr(']')),
             ))),
         ),
@@ -951,7 +954,9 @@ fn value<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         parenthetical,
         block,
         conditional,
-        map(preceded(ex_tag("$"), unescaped_identifier), |x| Node::Identifier(x.strip_error())),
+        map(preceded(ex_tag("$"), unescaped_identifier), |x| {
+            Node::Identifier(x.strip_parse_state())
+        }),
         string,
         real,
         integer,
@@ -1143,7 +1148,7 @@ fn invocation<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                 not(alt((recognize(whitespace), recognize(one_of("@{}|&;()"))))),
                 anychar,
             ))),
-            |x| Node::BareString(x.strip_error()),
+            |x| Node::BareString(x.strip_parse_state()),
         )(input)
     }
 
@@ -1165,7 +1170,10 @@ fn invocation<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                 )))),
             ),
             |(first, args)| {
-                Node::Invocation(first.strip_error(), args.into_iter().map(Node::from).collect())
+                Node::Invocation(
+                    first.strip_parse_state(),
+                    args.into_iter().map(Node::from).collect(),
+                )
             },
         ),
         map(simple_expression, Node::from),
