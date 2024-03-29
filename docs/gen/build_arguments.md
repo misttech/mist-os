@@ -3200,7 +3200,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:123
+From //build/bazel/legacy_ninja_build_outputs.gni:124
 
 ### extra_package_labels
 
