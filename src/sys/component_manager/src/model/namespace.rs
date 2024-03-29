@@ -21,7 +21,6 @@ use {
         route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
     },
     cm_rust::{ComponentDecl, UseDecl, UseStorageDecl},
-    cm_types::IterablePath,
     cm_util::TaskGroup,
     fidl::{
         endpoints::{ClientEnd, ServerEnd},
@@ -344,7 +343,7 @@ fn service_or_protocol_use(
                 target: component.clone(),
             };
             let Some(capability) =
-                program_input_dict.get_capability(use_protocol_decl.target_path.iter_segments())
+                program_input_dict.get_capability(&use_protocol_decl.target_path)
             else {
                 panic!("router for capability {:?} is missing from program input dictionary for component {}", use_protocol_decl.target_path, component.moniker);
             };

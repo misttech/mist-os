@@ -111,7 +111,7 @@ use {
     fuchsia_zircon::{self as zx, Clock, HandleBased, Resource},
     futures::{future::BoxFuture, FutureExt, StreamExt},
     moniker::{Moniker, MonikerBase},
-    std::{iter, sync::Arc},
+    std::sync::Arc,
     tracing::{info, warn},
 };
 
@@ -432,7 +432,7 @@ impl RootComponentInputBuilder {
         );
 
         self.input.insert_capability(
-            iter::once(&P::PROTOCOL_NAME.parse().unwrap()),
+            &P::PROTOCOL_NAME.parse::<Name>().unwrap(),
             launch.into_router().into(),
         );
     }
@@ -466,7 +466,7 @@ impl RootComponentInputBuilder {
                 fut.boxed()
             }),
         );
-        self.input.insert_capability(iter::once(&protocol.name), launch.into_router().into());
+        self.input.insert_capability(&protocol.name, launch.into_router().into());
     }
 
     fn build(self) -> ComponentInput {
@@ -1390,7 +1390,7 @@ impl BuiltinEnvironment {
                 task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
             }),
         );
-        self.root_component_input.insert_capability(iter::once(&name), launch.into_router().into());
+        self.root_component_input.insert_capability(&name, launch.into_router().into());
     }
 
     #[cfg(test)]

@@ -7,7 +7,7 @@ use crate::{capability::CapabilitySource, sandbox_util::DictExt};
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
 use bedrock_error::{BedrockError, Explain};
-use cm_types::{Availability, Name};
+use cm_types::{Availability, IterablePath, RelativePath};
 use cm_util::TaskGroup;
 use fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt};
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -117,23 +117,22 @@ impl Router {
     /// Returns an router that requests capabilities from the specified `path` relative
     /// to the base router, i.e. attenuates the base router to the subset of capabilities
     /// that live under `path`.
-    pub fn with_path<'a>(self, path: impl DoubleEndedIterator<Item = &'a Name>) -> Router {
-        let segments: Vec<_> = path.map(|s| s.clone()).collect();
-        if segments.is_empty() {
+    pub fn with_path(self, path: RelativePath) -> Router {
+        if path.is_dot() {
             return self;
         }
         let route_fn = move |request: Request| {
             let router = self.clone();
-            let segments = segments.clone();
+            let path = path.clone();
             async move {
                 match router.route(request.clone()).await? {
                     Capability::Dictionary(dict) => {
-                        match dict.get_with_request(segments.iter(), request.clone()).await? {
+                        match dict.get_with_request(&path, request.clone()).await? {
                             Some(cap) => cap.route(request).await,
                             None => Err(RoutingError::BedrockNotPresentInDictionary {
-                                name: segments
-                                    .into_iter()
-                                    .map(|s| s.to_string())
+                                name: path
+                                    .iter_segments()
+                                    .map(|s| s.as_str())
                                     .collect::<Vec<_>>()
                                     .join("/"),
                             }
@@ -443,7 +442,6 @@ mod tests {
     use assert_matches::assert_matches;
     use bedrock_error::DowncastErrorForTest;
     use sandbox::{Data, Message, Receiver};
-    use std::iter;
 
     #[fuchsia::test]
     async fn availability_good() {
@@ -520,7 +518,7 @@ mod tests {
         dict1.lock_entries().insert("source".parse().unwrap(), source);
 
         let base_router = Router::new_ok(dict1);
-        let downscoped_router = base_router.with_path(iter::once(&"source".parse().unwrap()));
+        let downscoped_router = base_router.with_path(RelativePath::new("source").unwrap());
 
         let capability = downscoped_router
             .route(Request {
@@ -549,15 +547,8 @@ mod tests {
         dict4.lock_entries().insert("dict3".parse().unwrap(), Capability::Dictionary(dict3));
 
         let base_router = Router::new_ok(dict4);
-        let downscoped_router = base_router.with_path(
-            vec![
-                &"dict3".parse().unwrap(),
-                &"dict2".parse().unwrap(),
-                &"dict1".parse().unwrap(),
-                &"source".parse().unwrap(),
-            ]
-            .into_iter(),
-        );
+        let downscoped_router =
+            base_router.with_path(RelativePath::new("dict3/dict2/dict1/source").unwrap());
 
         let capability = downscoped_router
             .route(Request {

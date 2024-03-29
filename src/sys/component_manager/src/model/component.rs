@@ -85,7 +85,7 @@ use {
     std::{
         clone::Clone,
         collections::{HashMap, HashSet},
-        fmt, iter,
+        fmt,
         sync::{Arc, Weak},
         time::Duration,
     },
@@ -1987,7 +1987,7 @@ impl ResolvedInstanceState {
                 None => continue,
             };
             let open = Open::new(RouteEntry::new(component.clone(), request, type_name.into()));
-            target_dict.insert_capability(iter::once(target_name), open.into());
+            target_dict.insert_capability(target_name, open.into());
         }
     }
 

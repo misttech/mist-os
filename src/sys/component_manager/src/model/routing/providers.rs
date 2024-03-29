@@ -20,7 +20,7 @@ use {
     cm_util::{channel, TaskGroup},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::{iter, path::PathBuf, sync::Arc},
+    std::{path::PathBuf, sync::Arc},
     vfs::{
         directory::{entry::OpenRequest, entry_container::Directory},
         execution_scope::ExecutionScope,
@@ -59,7 +59,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             .get_program_output_dict()
             .await?
             .get_with_request(
-                iter::once(&self.name),
+                &self.name,
                 // Routers in `program_output_dict` do not check availability but we need a
                 // request to run hooks.
                 Request { availability: Availability::Transitional, target: self.target.clone() },

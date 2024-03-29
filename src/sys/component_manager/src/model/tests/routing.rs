@@ -43,6 +43,7 @@ use {
     bedrock_error::{BedrockError, DowncastErrorForTest},
     cm_rust::*,
     cm_rust_testing::*,
+    cm_types::RelativePath,
     fasync::TestExecutor,
     fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd},
     fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
@@ -67,7 +68,7 @@ use {
         collections::HashSet,
         sync::{Arc, Weak},
     },
-    std::{iter, pin::pin, task::Poll},
+    std::{pin::pin, task::Poll},
     tracing::warn,
     vfs::{execution_scope::ExecutionScope, pseudo_directory, service},
 };
@@ -3420,7 +3421,7 @@ async fn source_component_stopping_when_routing() {
     let route_and_open_fut = async {
         // Route the capability.
         let entry = output
-            .get_capability(iter::once(&"foo".parse().unwrap()))
+            .get_capability(&RelativePath::new("foo").unwrap())
             .unwrap()
             .route(crate::model::routing::router::Request {
                 availability: Availability::Required,
@@ -3482,7 +3483,7 @@ async fn source_component_stopped_after_routing_before_open() {
     let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
     let open: Open = Open::new(
         output
-            .get_capability(iter::once(&"foo".parse().unwrap()))
+            .get_capability(&RelativePath::new("foo").unwrap())
             .unwrap()
             .route(crate::model::routing::router::Request {
                 availability: Availability::Required,
@@ -3551,7 +3552,7 @@ async fn source_component_shutdown_after_routing_before_open() {
     let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
     let open: Open = Open::new(
         output
-            .get_capability(iter::once(&"foo".parse().unwrap()))
+            .get_capability(&RelativePath::new("foo").unwrap())
             .unwrap()
             .route(crate::model::routing::router::Request {
                 availability: Availability::Required,

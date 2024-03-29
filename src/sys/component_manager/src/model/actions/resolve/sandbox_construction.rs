@@ -26,7 +26,7 @@ use {
     itertools::Itertools,
     moniker::{ChildName, ChildNameBase, MonikerBase},
     sandbox::{Capability, Dict, Unit},
-    std::{collections::HashMap, iter, sync::Arc},
+    std::{collections::HashMap, sync::Arc},
     tracing::warn,
     vfs::execution_scope::ExecutionScope,
 };
@@ -78,11 +78,7 @@ impl ComponentInput {
         &self.environment
     }
 
-    pub fn insert_capability<'a>(
-        &self,
-        path: impl Iterator<Item = &'a Name>,
-        capability: Capability,
-    ) {
+    pub fn insert_capability(&self, path: &impl IterablePath, capability: Capability) {
         self.capabilities.insert_capability(path, capability.into())
     }
 }
@@ -278,7 +274,7 @@ fn extend_dict_with_capability(
                 },
                 component.policy_checker().clone(),
             );
-            program_output_dict.insert_capability(iter::once(capability.name()), router.into());
+            program_output_dict.insert_capability(capability.name(), router.into());
         }
         cm_rust::CapabilityDecl::Dictionary(d) => {
             extend_dict_with_dictionary(
@@ -313,7 +309,7 @@ fn extend_dict_with_dictionary(
             .expect("source_dictionary must be set if source is set");
         let source_dict_router = match &source {
             cm_rust::DictionarySource::Parent => component_input.capabilities.get_router_or_error(
-                source_path.iter_segments(),
+                source_path,
                 RoutingError::use_from_parent_not_found(
                     &component.moniker,
                     source_path.iter_segments().join("/"),
@@ -321,7 +317,7 @@ fn extend_dict_with_dictionary(
                 .into(),
             ),
             cm_rust::DictionarySource::Self_ => program_output_dict.get_router_or_error(
-                source_path.iter_segments(),
+                source_path,
                 RoutingError::use_from_self_not_found(
                     &component.moniker,
                     source_path.iter_segments().join("/"),
@@ -353,8 +349,8 @@ fn extend_dict_with_dictionary(
     } else {
         Router::new_ok(dict.clone())
     };
-    declared_dictionaries.insert_capability(iter::once(&decl.name), dict.into());
-    program_output_dict.insert_capability(iter::once(&decl.name), router.into());
+    declared_dictionaries.insert_capability(&decl.name, dict.into());
+    program_output_dict.insert_capability(&decl.name, router.into());
 }
 
 fn build_environment(
@@ -379,7 +375,7 @@ fn build_environment(
                 use_from_parent_router(component_input, source_path, component.as_weak())
             }
             cm_rust::RegistrationSource::Self_ => program_output_dict.get_router_or_error(
-                source_path.iter_segments(),
+                &source_path,
                 RoutingError::use_from_self_not_found(
                     &component.moniker,
                     source_path.iter_segments().join("/"),
@@ -403,7 +399,7 @@ fn build_environment(
         };
         environment
             .debug_capabilities
-            .insert_capability(iter::once(&debug_protocol.target_name), router.into());
+            .insert_capability(&debug_protocol.target_name, router.into());
     }
     environment
 }
@@ -504,7 +500,7 @@ fn extend_dict_with_use(
             use_from_parent_router(component_input, source_path.to_owned(), component.as_weak())
         }
         cm_rust::UseSource::Self_ => program_output_dict.get_router_or_error(
-            source_path.iter_segments(),
+            &source_path,
             RoutingError::use_from_self_not_found(
                 &component.moniker,
                 source_path.iter_segments().join("/"),
@@ -560,7 +556,7 @@ fn extend_dict_with_use(
         }
         cm_rust::UseSource::Debug => {
             component_input.environment.debug_capabilities.get_router_or_error(
-                iter::once(&use_protocol.source_name),
+                &use_protocol.source_name,
                 RoutingError::use_from_environment_not_found(
                     &component.moniker,
                     "protocol",
@@ -572,7 +568,7 @@ fn extend_dict_with_use(
         cm_rust::UseSource::Environment => return,
     };
     program_input_dict.insert_capability(
-        use_protocol.target_path.iter_segments(),
+        &use_protocol.target_path,
         router.with_availability(*use_.availability()).into(),
     );
 }
@@ -587,7 +583,7 @@ fn use_from_parent_router(
     weak_component: WeakComponentInstance,
 ) -> Router {
     let component_input_capability = component_input.capabilities.get_router_or_error(
-        source_path.iter_segments(),
+        &source_path,
         RoutingError::use_from_parent_not_found(
             &weak_component.moniker,
             source_path.iter_segments().join("/"),
@@ -631,7 +627,7 @@ fn use_from_parent_router(
                 state
                     .program_input_dict_additions
                     .as_ref()
-                    .and_then(|dict| match dict.get_capability(source_path.iter_segments()) {
+                    .and_then(|dict| match dict.get_capability(&source_path) {
                         Some(Capability::Open(o)) => Some(Router::new_ok(o)),
                         _ => None,
                     })
@@ -663,24 +659,24 @@ fn extend_dict_with_offer(
     }
     let source_path = offer.source_path();
     let target_name = offer.target_name();
-    if target_dict.get_capability(source_path.iter_segments()).is_some() {
+    if target_dict.get_capability(&source_path).is_some() {
         warn!(
             "duplicate sources for protocol {} in a dict, unable to populate dict entry",
             target_name
         );
-        target_dict.remove_capability(iter::once(target_name));
+        target_dict.remove_capability(target_name);
         return;
     }
     let router = match offer.source() {
         cm_rust::OfferSource::Parent => component_input.capabilities.get_router_or_error(
-            source_path.iter_segments(),
+            &source_path,
             RoutingError::offer_from_parent_not_found(
                 &component.moniker,
                 source_path.iter_segments().join("/"),
             ),
         ),
         cm_rust::OfferSource::Self_ => program_output_dict.get_router_or_error(
-            source_path.iter_segments(),
+            &source_path,
             RoutingError::offer_from_self_not_found(
                 &component.moniker,
                 source_path.iter_segments().join("/"),
@@ -736,10 +732,8 @@ fn extend_dict_with_offer(
         // This is only relevant for services, so this arm is never reached.
         cm_rust::OfferSource::Collection(_name) => return,
     };
-    target_dict.insert_capability(
-        iter::once(target_name),
-        router.with_availability(*offer.availability()).into(),
-    );
+    target_dict
+        .insert_capability(target_name, router.with_availability(*offer.availability()).into());
 }
 
 pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
@@ -765,7 +759,7 @@ fn extend_dict_with_expose(
 
     let router = match expose.source() {
         cm_rust::ExposeSource::Self_ => program_output_dict.get_router_or_error(
-            source_path.iter_segments(),
+            &source_path,
             RoutingError::expose_from_self_not_found(
                 &component.moniker,
                 source_path.iter_segments().join("/"),
@@ -824,10 +818,8 @@ fn extend_dict_with_expose(
         // This is only relevant for services, so this arm is never reached.
         cm_rust::ExposeSource::Collection(_name) => return,
     };
-    target_dict.insert_capability(
-        iter::once(target_name),
-        router.with_availability(*expose.availability()).into(),
-    );
+    target_dict
+        .insert_capability(target_name, router.with_availability(*expose.availability()).into());
 }
 
 fn new_unit_router() -> Router {
@@ -866,7 +858,7 @@ async fn forward_request_to_child(
         })?;
         child_state
             .component_output_dict
-            .get_router_or_error(capability_path.iter_segments(), expose_not_found_error.clone())
+            .get_router_or_error(&capability_path, expose_not_found_error.clone())
     };
     router.route(request).await
 }
