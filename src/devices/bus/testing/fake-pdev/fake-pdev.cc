@@ -146,8 +146,13 @@ void FakePDevFidl::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
 }
 
 void FakePDevFidl::GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) {
-  // TODO(jmatt) provide mock implementation after API is in
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  static fidl::Arena arena;
+  fidl::VectorView<fuchsia_hardware_power::wire::PowerElementConfiguration> value;
+  value.Allocate(arena, config_.power_elements.size());
+  for (size_t i = 0; i < config_.power_elements.size(); i++) {
+    value[i] = fidl::ToWire(arena, config_.power_elements[i]);
+  }
+  completer.ReplySuccess(value);
 }
 
 void FakePDevFidl::handle_unknown_method(

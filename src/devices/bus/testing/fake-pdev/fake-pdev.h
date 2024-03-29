@@ -5,6 +5,7 @@
 #define SRC_DEVICES_BUS_TESTING_FAKE_PDEV_FAKE_PDEV_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async/default.h>
 #include <lib/mmio/mmio.h>
@@ -42,6 +43,7 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
 
     std::optional<pdev_device_info_t> device_info;
     std::optional<pdev_board_info_t> board_info;
+    std::vector<fuchsia_hardware_power::PowerElementConfiguration> power_elements;
   };
 
   FakePDevFidl() = default;

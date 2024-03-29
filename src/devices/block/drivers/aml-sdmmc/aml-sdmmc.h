@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <lib/ddk/metadata.h>
@@ -44,6 +45,12 @@ class AmlSdmmc : public fdf::DriverBase,
 
   // Limit maximum number of descriptors to 512 for now
   static constexpr size_t kMaxDmaDescriptors = 512;
+
+  static constexpr char kHardwarePowerElementName[] = "aml-sdmmc-hardware";
+  static constexpr char kSystemWakeOnRequestPowerElementName[] = "aml-sdmmc-system-wake-on-request";
+  // Common to hardware power and wake-on-request power elements.
+  static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOff = 0;
+  static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOn = 1;
 
   AmlSdmmc(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)),
@@ -112,10 +119,9 @@ class AmlSdmmc : public fdf::DriverBase,
   void Request(RequestRequestView request, fdf::Arena& arena,
                RequestCompleter::Sync& completer) override;
 
-  // TODO(b/309152899): Integrate with Power Framework.
   // TODO(b/309152899): Consider not reporting an error upon client calls while power_suspended_.
-  zx_status_t SuspendPower() TA_EXCL(lock_);
-  zx_status_t ResumePower() TA_EXCL(lock_);
+  zx_status_t SuspendPower() TA_REQ(lock_);
+  zx_status_t ResumePower() TA_REQ(lock_);
 
   // Visible for tests
   zx_status_t Init(const pdev_device_info_t& device_info) TA_EXCL(lock_);
@@ -183,6 +189,7 @@ class AmlSdmmc : public fdf::DriverBase,
     inspect::UintProperty longest_window_adj_delay;
     inspect::UintProperty distance_to_failing_point;
     inspect::BoolProperty power_suspended;
+    inspect::UintProperty wake_on_request_count;
 
     void Init(const pdev_device_info_t& device_info, inspect::Node& parent,
               bool is_power_suspended);
@@ -196,9 +203,28 @@ class AmlSdmmc : public fdf::DriverBase,
     TuneSettings original_settings;
   };
 
+  struct SdmmcRequestInfo {
+    RequestRequestView request;
+    fdf::Arena arena;
+    RequestCompleter::Async completer;
+  };
+
+  struct SdmmcHwResetInfo {
+    fdf::Arena arena;
+    HwResetCompleter::Async completer;
+  };
+
   using SdmmcVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
 
   zx::result<> InitResources(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client);
+  // TODO(b/309152899): Once fuchsia.power.SuspendEnabled config cap is available, have this method
+  // return failure if power management could not be configured. Use fuchsia.power.SuspendEnabled to
+  // ignore this failure when expected.
+  // Register power configs from the board driver with Power Broker, and begin the continuous
+  // power level adjustment of hardware. For boards/products that don't support the Power Framework,
+  // this method simply returns success.
+  zx::result<> ConfigurePowerManagement(
+      fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev);
 
   void Serve(fdf::ServerEnd<fuchsia_hardware_sdmmc::Sdmmc> request);
 
@@ -215,9 +241,11 @@ class AmlSdmmc : public fdf::DriverBase,
   zx_status_t SdmmcHwResetLocked() TA_REQ(lock_);
   zx_status_t SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_response[4]) TA_REQ(lock_);
 
-  void HwResetAndComplete(fdf::Arena& arena, HwResetCompleter::Sync& completer) TA_REQ(lock_);
-  void RequestAndComplete(RequestRequestView request, fdf::Arena& arena,
-                          RequestCompleter::Sync& completer) TA_REQ(lock_);
+  template <typename T>
+  void HwResetAndComplete(fdf::Arena& arena, T& completer) TA_REQ(lock_);
+  template <typename T>
+  void RequestAndComplete(RequestRequestView request, fdf::Arena& arena, T& completer)
+      TA_REQ(lock_);
 
   uint32_t DistanceToFailingPoint(TuneSettings point,
                                   cpp20::span<const TuneResults> adj_delay_results);
@@ -254,6 +282,21 @@ class AmlSdmmc : public fdf::DriverBase,
   zx::result<std::array<uint32_t, kResponseCount>> WaitForInterrupt(const sdmmc_req_t& req)
       TA_REQ(lock_);
 
+  // Acquires a lease on a power element via the supplied |lessor_client|, storing the resulting
+  // lease control client end in |lease_control_client_end|. That is unless
+  // |lease_control_client_end| is valid to begin with (i.e., a lease had already been acquired), in
+  // which case ZX_ERR_ALREADY_BOUND is returned instead.
+  zx_status_t AcquireLease(
+      const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client,
+      fidl::ClientEnd<fuchsia_power_broker::LeaseControl>& lease_control_client_end);
+
+  // Informs Power Broker of the updated |power_level| via the supplied |current_level_client|.
+  void UpdatePowerLevel(
+      const fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>& current_level_client,
+      fuchsia_power_broker::PowerLevel power_level);
+
+  void AdjustHardwarePowerLevel();
+
   std::optional<fdf::MmioBuffer> mmio_ TA_GUARDED(lock_);
 
   zx::bti bti_;
@@ -265,7 +308,26 @@ class AmlSdmmc : public fdf::DriverBase,
   sdmmc_host_info_t dev_info_;
   std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer_ TA_GUARDED(lock_);
   bool power_suspended_ TA_GUARDED(lock_) = false;
+  std::vector<std::variant<SdmmcRequestInfo, SdmmcHwResetInfo>> delayed_requests_;
   uint32_t clk_div_saved_ = 0;
+
+  // TODO(b/309152899): Export these to children drivers via the PowerTokenProvider protocol.
+  std::vector<zx::event> active_power_dep_tokens_;
+  std::vector<zx::event> passive_power_dep_tokens_;
+
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_end_;
+  fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;
+  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
+  fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
+
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl> wake_on_request_element_control_client_end_;
+  fidl::WireSyncClient<fuchsia_power_broker::Lessor> wake_on_request_lessor_client_;
+  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> wake_on_request_current_level_client_;
+  fidl::WireClient<fuchsia_power_broker::RequiredLevel> wake_on_request_required_level_client_;
+
+  fidl::WireClient<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_;
+  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> wake_on_request_lease_control_client_end_
+      TA_GUARDED(lock_);
 
   // TODO(https://fxbug.dev/42084501): Remove redundant locking when Banjo is removed.
   fbl::Mutex lock_ TA_ACQ_AFTER(tuning_lock_);
