@@ -5,6 +5,12 @@
 #ifndef SRC_LIB_UNWINDER_CFI_UNWINDER_H_
 #define SRC_LIB_UNWINDER_CFI_UNWINDER_H_
 
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <utility>
+#include <vector>
+
 #include "src/lib/unwinder/cfi_module.h"
 #include "src/lib/unwinder/memory.h"
 #include "src/lib/unwinder/module.h"
