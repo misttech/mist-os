@@ -555,6 +555,8 @@ zx_status_t Device::CreateNode() {
     }
     auto devfs_args = fdf::wire::DevfsAddArgs::Builder(arena)
                           .connector(std::move(connector.value()))
+                          .connector_supports(fuchsia_device_fs::ConnectionType::kDevice |
+                                              fuchsia_device_fs::ConnectionType::kController)
                           .controller_connector(std::move(controller_connector.value()));
     fidl::StringView class_name = ProtocolIdToClassName(device_server_.proto_id());
     if (!class_name.empty()) {

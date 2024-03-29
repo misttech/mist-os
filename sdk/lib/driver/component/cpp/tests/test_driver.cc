@@ -38,6 +38,8 @@ zx::result<> TestDriver::ExportDevfsNodeSync() {
 
   auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
                    .connector(std::move(connector.value()))
+                   .connector_supports(fuchsia_device_fs::ConnectionType::kDevice |
+                                       fuchsia_device_fs::ConnectionType::kController)
                    .Build();
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, "devfs_node")

@@ -64,7 +64,8 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>*> Driver::AddChild(
 
   auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
                    .connector(std::move(connector.value()))
-                   .connector_supports(fuchsia_device_fs::ConnectionType::kDevice)
+                   .connector_supports(fuchsia_device_fs::ConnectionType::kDevice |
+                                       fuchsia_device_fs::ConnectionType::kController)
                    .class_name(class_name);
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)

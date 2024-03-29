@@ -403,8 +403,10 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   ZX_ASSERT_MSG(primary->devfs_device_.topological_node().has_value(), "%s",
                 composite->MakeTopologicalPath().c_str());
 
+  // TODO(https://fxbug.dev/331779666): disable controller access for composite nodes
   primary->devfs_device_.topological_node().value().add_child(
-      composite->name_, std::nullopt, composite->CreateDevfsPassthrough(std::nullopt, std::nullopt),
+      composite->name_, std::nullopt,
+      composite->CreateDevfsPassthrough(std::nullopt, std::nullopt, true),
       composite->devfs_device_);
   composite->devfs_device_.publish();
   return zx::ok(std::move(composite));
@@ -867,11 +869,16 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     if (devfs_args->class_name().has_value()) {
       devfs_class_path = devfs_args->class_name();
     }
-
+    // We do not populate the connection to the controller unless it is specifically
+    // supported through the connector_supports argument.
+    bool allow_controller_connection = (devfs_args->connector_supports().has_value() &&
+                                        (devfs_args->connector_supports().value() &
+                                         fuchsia_device_fs::ConnectionType::kController));
     devfs_target = child->CreateDevfsPassthrough(std::move(devfs_args->connector()),
-                                                 std::move(devfs_args->controller_connector()));
+                                                 std::move(devfs_args->controller_connector()),
+                                                 allow_controller_connection);
   } else {
-    devfs_target = child->CreateDevfsPassthrough(std::nullopt, std::nullopt);
+    devfs_target = child->CreateDevfsPassthrough(std::nullopt, std::nullopt, false);
   }
   ZX_ASSERT(devfs_device_.topological_node().has_value());
   zx_status_t status = devfs_device_.topological_node()->add_child(
@@ -1430,7 +1437,8 @@ zx_status_t Node::ConnectDeviceInterface(zx::channel channel) {
 
 Devnode::Target Node::CreateDevfsPassthrough(
     std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
-    std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> controller_connector) {
+    std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> controller_connector,
+    bool allow_controller_connection) {
   devfs_connector_ = std::move(connector);
   devfs_controller_connector_ = std::move(controller_connector);
   return Devnode::PassThrough(
@@ -1442,8 +1450,15 @@ Devnode::Target Node::CreateDevfsPassthrough(
         }
         return locked_node->ConnectDeviceInterface(std::move(server_end));
       },
-      [node = weak_from_this(),
+      [node = weak_from_this(), allow_controller_connection,
        node_name = name_](fidl::ServerEnd<fuchsia_device::Controller> server_end) {
+        if (!allow_controller_connection) {
+          LOGF(ERROR,
+               "Connection to %s controller interface failed, as that node did not"
+               " include controller support in its DevAddArgs",
+               node_name.c_str());
+          return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
+        }
         std::shared_ptr locked_node = node.lock();
         if (!locked_node) {
           LOGF(ERROR, "Node was freed before it was used for %s.", node_name.c_str());

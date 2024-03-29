@@ -401,7 +401,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // type is not supported.
   Devnode::Target CreateDevfsPassthrough(
       std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
-      std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> controller_connector);
+      std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> controller_connector,
+      bool allow_controller_connection);
 
   zx_status_t ConnectControllerInterface(fidl::ServerEnd<fuchsia_device::Controller> server_end);
   zx_status_t ConnectDeviceInterface(zx::channel channel);

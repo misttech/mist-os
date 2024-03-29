@@ -34,8 +34,9 @@ class RebindChild : public fdf::DriverBase {
       return connector.take_error();
     }
 
-    auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena).connector(
-        std::move(connector.value()));
+    auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
+                     .connector(std::move(connector.value()))
+                     .connector_supports(fuchsia_device_fs::ConnectionType::kController);
 
     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                     .name(arena, name())

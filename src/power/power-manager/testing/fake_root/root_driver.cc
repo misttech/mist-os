@@ -77,6 +77,7 @@ class RootDriver : public fdf::DriverBase,
 
     auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
                      .connector(std::move(connector.value()))
+                     .connector_supports(fuchsia_device_fs::ConnectionType::kController)
                      .class_name("test");
 
     auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
