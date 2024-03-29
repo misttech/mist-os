@@ -4,8 +4,10 @@
 #ifndef SRC_CONNECTIVITY_WEAVE_ADAPTATION_WEAVE_CONFIG_MANAGER_H_
 #define SRC_CONNECTIVITY_WEAVE_ADAPTATION_WEAVE_CONFIG_MANAGER_H_
 
+#include <cstdint>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #pragma GCC diagnostic push
 #include <Weave/Core/WeaveError.h>
