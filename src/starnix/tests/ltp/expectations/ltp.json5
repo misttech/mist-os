@@ -205,9 +205,6 @@
         {
             type: "skip",
             matchers: [
-                // https://fxbug.dev/42085553
-                "open04",
-
                 // Flaky tests.
                 "cve-2017-17052",
                 "io_pgetevents01",
