@@ -197,11 +197,14 @@ bool OtRadioDevice::RunUnitTests(void* ctx, zx_device_t* parent, zx_handle_t cha
 }
 
 zx_status_t OtRadioDevice::Init() {
-  spi_ = ddk::SpiProtocolClient(parent(), "spi");
-  if (!spi_.is_valid()) {
+  const char* kSpiFragmentName = "spi";
+  zx::result spi = DdkConnectFragmentFidlProtocol<fuchsia_hardware_spi::Service::Device>(
+      parent(), kSpiFragmentName);
+  if (spi.is_error()) {
     zxlogf(ERROR, "ot-radio %s: failed to acquire spi", __func__);
     return ZX_ERR_NOT_SUPPORTED;
   }
+  spi_.Bind(std::move(spi.value()));
 
   const char* kInterruptGpioFragmentName = "gpio-int";
   zx::result gpio_int = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
@@ -309,7 +312,7 @@ zx_status_t OtRadioDevice::Init() {
   }
 
   spinel_framer_ = std::make_unique<ot::SpinelFramer>();
-  spinel_framer_->Init(spi_);
+  spinel_framer_->Init(&spi_);
   pending_tid_ = std::make_unique<std::vector<bool>>(kNumberOfTid, false);
   return ZX_OK;
 }

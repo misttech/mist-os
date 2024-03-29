@@ -122,19 +122,24 @@ uint8_t *SpinelFramer::GetRealRxFrameStart(void) {
 zx_status_t SpinelFramer::DoSpiXfer(uint16_t len) {
   TRACE_DURATION(kSpinelFramerTraceCategory, __func__, "len", len, "spi_rx_align_allowance_",
                  spi_rx_align_allowance_, "spi_frame_count_", spi_frame_count_);
-  zx_status_t status = ZX_OK;
-  size_t rx_actual = 0;
   uint16_t tot_len = len + kHeaderLen + spi_rx_align_allowance_;
 
-  status = spi_.Exchange(spi_tx_frame_buffer_, tot_len, spi_rx_frame_buffer_, tot_len, &rx_actual);
-
-  if (status == ZX_OK) {
-    LogDebugBuffer("SPI-TX", spi_tx_frame_buffer_, tot_len);
-    LogDebugBuffer("SPI-RX", spi_rx_frame_buffer_, tot_len);
-
-    spi_frame_count_++;
+  auto tx_buffer = fidl::VectorView<uint8_t>::FromExternal(spi_tx_frame_buffer_, tot_len);
+  auto result = (*spi_)->ExchangeVector(tx_buffer);
+  if (!result.ok()) {
+    return result.status();
   }
-  return status;
+  if (result->rxdata.count() != tot_len) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  memcpy(spi_rx_frame_buffer_, result->rxdata.data(), tot_len);
+
+  LogDebugBuffer("SPI-TX", spi_tx_frame_buffer_, tot_len);
+  LogDebugBuffer("SPI-RX", spi_rx_frame_buffer_, tot_len);
+
+  spi_frame_count_++;
+  return ZX_OK;
 }
 
 void SpinelFramer::DebugSpiHeader(const char *hint) {
@@ -339,7 +344,8 @@ bool SpinelFramer::CheckAndClearInterrupt(void) {
 /* ------------------------------------------------------------------------- */
 /* MARK: Public functions */
 
-void SpinelFramer::Init(ddk::SpiProtocolClient spi, uint16_t spi_rx_align_allowance) {
+void SpinelFramer::Init(fidl::WireSyncClient<fuchsia_hardware_spi::Device> *spi,
+                        uint16_t spi_rx_align_allowance) {
   spi_ = spi;
   spi_rx_align_allowance_ = spi_rx_align_allowance;  // Optional. Set to 0 by default.
   ClearStats();

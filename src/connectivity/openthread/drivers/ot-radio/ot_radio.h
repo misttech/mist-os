@@ -9,8 +9,8 @@
 #define _ALL_SOURCE  // Enables thrd_create_with_name in <threads.h>.
 #endif
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <fidl/fuchsia.hardware.spi/cpp/wire.h>
 #include <fidl/fuchsia.lowpan.spinel/cpp/wire.h>
-#include <fuchsia/hardware/spi/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
 #include <lib/sync/completion.h>
@@ -99,7 +99,7 @@ class OtRadioDevice : public DeviceType {
 
   zx::port port_;
   zx::interrupt interrupt_;
-  ddk::SpiProtocolClient spi_;
+  fidl::WireSyncClient<fuchsia_hardware_spi::Device> spi_;
   sync_completion_t spi_rx_complete_;
 
   uint8_t spi_rx_buffer_[kMaxFrameSize];

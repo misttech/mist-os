@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_SPINEL_FRAMER_SPINEL_FRAMER_H_
 #define SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_SPINEL_FRAMER_SPINEL_FRAMER_H_
 
-#include <fuchsia/hardware/spi/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.spi/cpp/wire.h>
 #include <zircon/types.h>
 
 #include "spinel_inspector.h"
@@ -15,7 +15,8 @@ namespace ot {
 class SpinelFramer {
  public:
   SpinelFramer() {}
-  void Init(ddk::SpiProtocolClient spi, uint16_t spi_rx_align_allowance = 0);
+  void Init(fidl::WireSyncClient<fuchsia_hardware_spi::Device>* spi,
+            uint16_t spi_rx_align_allowance = 0);
   void HandleInterrupt();
   uint32_t GetTimeoutMs(void);
   zx_status_t SendPacketToRadio(uint8_t* packet, uint16_t length);
@@ -34,7 +35,7 @@ class SpinelFramer {
   static constexpr uint8_t kSpiRxAllignAllowanceMax = 16;
   static constexpr uint8_t kDebugBytesPerLine = 16;
 
-  ddk::SpiProtocolClient spi_;
+  fidl::WireSyncClient<fuchsia_hardware_spi::Device>* spi_;
   bool interrupt_fired_ = false;
   uint16_t spi_rx_payload_size_ = 0;
   uint8_t spi_rx_frame_buffer_[kMaxFrameSize + kSpiRxAllignAllowanceMax];

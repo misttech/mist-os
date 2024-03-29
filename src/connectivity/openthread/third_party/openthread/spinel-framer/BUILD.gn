@@ -8,7 +8,8 @@ source_set("spinel-framer") {
     "spinel_inspector.cc",
   ]
   deps = [
-    "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
+    "//src/lib/ddk",
     "//zircon/system/ulib/inspect",
   ]
 }

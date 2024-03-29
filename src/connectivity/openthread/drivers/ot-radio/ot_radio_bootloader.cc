@@ -90,7 +90,9 @@ OtRadioBlResult OtRadioDeviceBootloader::SendSpiCmdAndGetResponse(uint8_t *cmd, 
   zxlogf(DEBUG, "ot-radio: Sending command:");
   PrintSpiCommand(reinterpret_cast<NlSpiBlBasicCmd *>(cmd)->cmd, cmd, cmd_size);
 
-  zx_status_t status = dev_handle_->spi_.Transmit(cmd, cmd_size);
+  auto cmd_buffer = fidl::VectorView<uint8_t>::FromExternal(cmd, cmd_size);
+  auto transmit_result = dev_handle_->spi_->TransmitVector(cmd_buffer);
+  zx_status_t status = transmit_result.ok() ? transmit_result->status : transmit_result.status();
   if (status != ZX_OK) {
     zxlogf(ERROR, "ot-radio: spi transmit failed with status : %d for cmd : %d", status,
            reinterpret_cast<NlSpiBlBasicCmd *>(cmd)->cmd);
@@ -123,9 +125,13 @@ OtRadioBlResult OtRadioDeviceBootloader::SendSpiCmdAndGetResponse(uint8_t *cmd, 
 
       // Read packet
       uint8_t i;
-      size_t rx_actual;
+      size_t rx_actual = 0;
       size_t read_length = exp_resp_size;
-      dev_handle_->spi_.Receive(read_length, dev_handle_->spi_rx_buffer_, read_length, &rx_actual);
+      auto receive_result = dev_handle_->spi_->ReceiveVector(read_length);
+      if (receive_result.ok() && receive_result->status == ZX_OK) {
+        rx_actual = receive_result->data.count();
+        memcpy(dev_handle_->spi_rx_buffer_, receive_result->data.data(), rx_actual);
+      }
       zxlogf(DEBUG, "ot-radio: rx_actual %lu expected : %lu", rx_actual, read_length);
       for (i = 0; i < read_length; i++) {
         zxlogf(DEBUG, "ot-radio: RX %2X %c", dev_handle_->spi_rx_buffer_[i],
