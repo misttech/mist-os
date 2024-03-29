@@ -200,6 +200,13 @@ function main {
     fx-warn "This warning will soon become an error."
   fi
 
+  if [[ "$(uname)" == [Dd]arwin ]]; then
+    fx-warn "Support for building Fuchsia on macOS will be removed by 2024-06-30."
+    fx-warn "This warning will soon become an error."
+    fx-warn "Please see http://go/local-platform-support-prd for details."
+    fx-warn "Contact dannyrosen@google.com with any concerns."
+  fi
+
   if [[ -n "${fint_params_path}" ]]; then
     if [[ ${#ninja_switches[@]} -gt 0 ]]; then
       fx-error "It's invalid to specify extra Ninja flags along with --fint-params-path."
