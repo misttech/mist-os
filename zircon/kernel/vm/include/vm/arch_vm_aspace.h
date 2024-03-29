@@ -22,11 +22,7 @@
 //
 // TODO(https://issues.fuchsia.dev/issues/42182886): Remove this flag which
 // `Upgrade` is the default page fault behavior on all architectures.
-#if defined(ARCH_X86)
-#define ENABLE_PAGE_FAULT_UPGRADE true
-#else
 #define ENABLE_PAGE_FAULT_UPGRADE false
-#endif
 
 // Flags
 const uint ARCH_MMU_FLAG_CACHED = (0u << 0);
