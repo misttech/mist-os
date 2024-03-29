@@ -509,7 +509,7 @@ impl HostDispatcher {
         let dispatcher_session =
             Arc::new(DiscoverySession { dispatcher_state: self.state.clone() });
 
-        self.state.read().inspect.discovery_sessions.add(1);
+        let _ = self.state.read().inspect.discovery_sessions.add(1);
 
         // Replace Pending state with new session and send session token to waiters
         if let DiscoveryState::Pending(client_queue) = std::mem::replace(

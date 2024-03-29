@@ -209,13 +209,13 @@ fn convert_bss_map(
 ) -> Vec<BssDescription> {
     let bss_description_list =
         bss_map.into_iter().filter_map(|(_bssid, (mut bss, mut ies_merger))| {
-            sme_inspect.scan_merge_ie_failures.add(ies_merger.merge_ie_failures() as u64);
+            let _ = sme_inspect.scan_merge_ie_failures.add(ies_merger.merge_ie_failures() as u64);
 
             let mut ies = ies_merger.finalize();
             std::mem::swap(&mut ies, &mut bss.ies);
             let bss: Option<BssDescription> = bss.try_into().ok();
             if bss.is_none() {
-                sme_inspect.scan_discard_fidl_bss.add(1);
+                let _ = sme_inspect.scan_discard_fidl_bss.add(1);
             }
             bss
         });

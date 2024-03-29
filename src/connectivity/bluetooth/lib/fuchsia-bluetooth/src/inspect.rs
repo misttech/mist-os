@@ -230,7 +230,7 @@ impl DataStreamInspect {
         };
 
         let transfer = DataTransferStats { time: at, elapsed, bytes: current_bytes };
-        self.total_bytes.add(bytes as u64);
+        let _ = self.total_bytes.add(bytes as u64);
         self.bytes_per_second_current.set(transfer.calculate_throughput());
         self.last_update = Some(transfer);
         if let Some(started) = &self.started {

@@ -302,7 +302,7 @@ impl Provider {
                 }
 
                 if matches!(request.action, KeyBasedPairingAction::SeekerInitiatesPairing { .. }) {
-                    self.inspect_node.pairing_request_count.add(1);
+                    let _ = self.inspect_node.pairing_request_count.add(1);
                 } else {
                     log_peer_request(&self.metrics, PeerRequestType::PersonalizedNameWrite);
                 }
@@ -1660,7 +1660,7 @@ mod tests {
         provider_inspect.fast_pair_enabled.set(true);
         provider_inspect.active_host.set(true);
         provider_inspect.set_personalized_name("foobar");
-        provider_inspect.pairing_request_count.add(1);
+        let _ = provider_inspect.pairing_request_count.add(1);
 
         assert_data_tree!(inspect, root: {
             provider: {

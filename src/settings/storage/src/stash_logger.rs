@@ -53,7 +53,7 @@ impl StashInspectLogger {
     pub fn record_flush_failure(&mut self, key: String) {
         let stash_inspect_info =
             self.flush_failure_counts.get_or_insert_with(key, StashInspectInfo::default);
-        stash_inspect_info.count.add(1u64);
+        let _ = stash_inspect_info.count.add(1u64);
     }
 }
 

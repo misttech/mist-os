@@ -73,7 +73,9 @@ impl InspectDiagnostics {
     fn failure(&self, error: &HttpsDateErrorType) {
         let mut failure_counts_lock = self.failure_counts.lock();
         match failure_counts_lock.get(error) {
-            Some(uint_property) => uint_property.add(1),
+            Some(uint_property) => {
+                let _ = uint_property.add(1);
+            }
             None => {
                 failure_counts_lock
                     .insert(*error, self.failure_node.create_uint(format!("{:?}_count", error), 1));

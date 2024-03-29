@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::writer::{Error, Inner, InnerValueType, InspectType, NumericProperty, Property};
+use crate::writer::{Inner, InnerValueType, InspectType, NumericProperty, Property};
 use tracing::error;
 
 /// Inspect int property data type.
@@ -37,35 +37,35 @@ impl<'t> Property<'t> for IntProperty {
 }
 
 impl NumericProperty<'_> for IntProperty {
-    fn add(&self, value: i64) {
+    fn add(&self, value: i64) -> Option<i64> {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
             inner_ref
                 .state
                 .try_lock()
                 .and_then(|mut state| state.add_int_metric(inner_ref.block_index, value))
+                .map(Option::from)
                 .unwrap_or_else(|err| {
                     error!(?err, "Failed to set property");
-                });
+                    None
+                })
+        } else {
+            None
         }
     }
 
-    fn subtract(&self, value: i64) {
+    fn subtract(&self, value: i64) -> Option<i64> {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
             inner_ref
                 .state
                 .try_lock()
                 .and_then(|mut state| state.subtract_int_metric(inner_ref.block_index, value))
+                .map(Option::from)
                 .unwrap_or_else(|err| {
                     error!(?err, "Failed to set property");
-                });
-        }
-    }
-
-    fn get(&self) -> Result<i64, Error> {
-        if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref.state.try_lock().and_then(|state| state.get_int_metric(inner_ref.block_index))
+                    None
+                })
         } else {
-            Err(Error::NoOp("Property"))
+            None
         }
     }
 }
@@ -103,14 +103,13 @@ mod tests {
             property.get_block(|property_block| {
                 assert_eq!(property_block.int_value().unwrap(), 2);
             });
-            assert_eq!(property.get().unwrap(), 2);
 
-            property.subtract(5);
+            assert_eq!(property.subtract(5).unwrap(), -3);
             property.get_block(|property_block| {
                 assert_eq!(property_block.int_value().unwrap(), -3);
             });
 
-            property.add(8);
+            assert_eq!(property.add(8).unwrap(), 5);
             property.get_block(|property_block| {
                 assert_eq!(property_block.int_value().unwrap(), 5);
             });

@@ -78,8 +78,8 @@ impl InspectConfigLogger {
         config_inspect_info
             .value
             .set(&format!("{:#?}", config::base::ConfigLoadInfo { status, contents }));
-        config_inspect_info.count.add(1u64);
-        config_inspect_info
+        let _ = config_inspect_info.count.add(1u64);
+        let _ = config_inspect_info
             .result_counts
             .get_or_insert_with(status_clone.into(), inspect::UintProperty::default)
             .add(1u64);

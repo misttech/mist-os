@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::writer::{Error, Inner, InnerValueType, InspectType, NumericProperty, Property};
+use crate::writer::{Inner, InnerValueType, InspectType, NumericProperty, Property};
 use tracing::error;
 
 /// Inspect uint property data type.
@@ -37,38 +37,35 @@ impl<'t> Property<'t> for UintProperty {
 }
 
 impl NumericProperty<'_> for UintProperty {
-    fn add(&self, value: u64) {
+    fn add(&self, value: u64) -> Option<u64> {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
             inner_ref
                 .state
                 .try_lock()
                 .and_then(|mut state| state.add_uint_metric(inner_ref.block_index, value))
+                .map(Option::from)
                 .unwrap_or_else(|err| {
                     error!(?err, "Failed to set property");
-                });
+                    None
+                })
+        } else {
+            None
         }
     }
 
-    fn subtract(&self, value: u64) {
+    fn subtract(&self, value: u64) -> Option<u64> {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
             inner_ref
                 .state
                 .try_lock()
                 .and_then(|mut state| state.subtract_uint_metric(inner_ref.block_index, value))
+                .map(Option::from)
                 .unwrap_or_else(|err| {
                     error!(?err, "Failed to set property");
-                });
-        }
-    }
-
-    fn get(&self) -> Result<u64, Error> {
-        if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|state| state.get_uint_metric(inner_ref.block_index))
+                    None
+                })
         } else {
-            Err(Error::NoOp("Property"))
+            None
         }
     }
 }
@@ -102,14 +99,13 @@ mod tests {
             property.get_block(|block| {
                 assert_eq!(block.uint_value().unwrap(), 5);
             });
-            assert_eq!(property.get().unwrap(), 5);
 
-            property.subtract(3);
+            assert_eq!(property.subtract(3).unwrap(), 2);
             property.get_block(|block| {
                 assert_eq!(block.uint_value().unwrap(), 2);
             });
 
-            property.add(8);
+            assert_eq!(property.add(8).unwrap(), 10);
             property.get_block(|block| {
                 assert_eq!(block.uint_value().unwrap(), 10);
             });

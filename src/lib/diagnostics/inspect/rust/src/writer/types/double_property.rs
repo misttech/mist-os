@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::writer::{Error, Inner, InnerValueType, InspectType, NumericProperty, Property};
+use crate::writer::{Inner, InnerValueType, InspectType, NumericProperty, Property};
 use tracing::error;
 
 /// Inspect double property type.
@@ -37,38 +37,35 @@ impl<'t> Property<'t> for DoubleProperty {
 }
 
 impl NumericProperty<'_> for DoubleProperty {
-    fn add(&self, value: f64) {
+    fn add(&self, value: f64) -> Option<f64> {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
             inner_ref
                 .state
                 .try_lock()
                 .and_then(|mut state| state.add_double_metric(inner_ref.block_index, value))
+                .map(Option::from)
                 .unwrap_or_else(|err| {
                     error!(?err, "Failed to set property");
-                });
+                    None
+                })
+        } else {
+            None
         }
     }
 
-    fn subtract(&self, value: f64) {
+    fn subtract(&self, value: f64) -> Option<f64> {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
             inner_ref
                 .state
                 .try_lock()
                 .and_then(|mut state| state.subtract_double_metric(inner_ref.block_index, value))
+                .map(Option::from)
                 .unwrap_or_else(|err| {
                     error!(?err, "Failed to set property");
-                });
-        }
-    }
-
-    fn get(&self) -> Result<f64, Error> {
-        if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|state| state.get_double_metric(inner_ref.block_index))
+                    None
+                })
         } else {
-            Err(Error::NoOp("Property"))
+            None
         }
     }
 }
@@ -105,14 +102,13 @@ mod tests {
             property.get_block(|property_block| {
                 assert_eq!(property_block.double_value().unwrap(), 2.0);
             });
-            assert_eq!(property.get().unwrap(), 2.0);
 
-            property.subtract(5.5);
+            assert_eq!(property.subtract(5.5).unwrap(), -3.5);
             property.get_block(|property_block| {
                 assert_eq!(property_block.double_value().unwrap(), -3.5);
             });
 
-            property.add(8.1);
+            assert_eq!(property.add(8.1).unwrap(), 4.6);
             property.get_block(|property_block| {
                 assert_eq!(property_block.double_value().unwrap(), 4.6);
             });

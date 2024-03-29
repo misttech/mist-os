@@ -141,9 +141,15 @@ impl Actor {
             }
             Action::AddNumber(AddNumber { id, value }) => {
                 match (self.find_property(id)?, value) {
-                    (Property::Int(p), Value::IntT(v)) => p.add(v),
-                    (Property::Uint(p), Value::UintT(v)) => p.add(v),
-                    (Property::Double(p), Value::DoubleT(v)) => p.add(v),
+                    (Property::Int(p), Value::IntT(v)) => {
+                        p.add(v);
+                    }
+                    (Property::Uint(p), Value::UintT(v)) => {
+                        p.add(v);
+                    }
+                    (Property::Double(p), Value::DoubleT(v)) => {
+                        p.add(v);
+                    }
                     unexpected => {
                         return Err(format_err!("Illegal types {:?} for AddNumber", unexpected))
                     }
@@ -151,9 +157,15 @@ impl Actor {
             }
             Action::SubtractNumber(SubtractNumber { id, value }) => {
                 match (self.find_property(id)?, value) {
-                    (Property::Int(p), Value::IntT(v)) => p.subtract(v),
-                    (Property::Uint(p), Value::UintT(v)) => p.subtract(v),
-                    (Property::Double(p), Value::DoubleT(v)) => p.subtract(v),
+                    (Property::Int(p), Value::IntT(v)) => {
+                        p.subtract(v);
+                    }
+                    (Property::Uint(p), Value::UintT(v)) => {
+                        p.subtract(v);
+                    }
+                    (Property::Double(p), Value::DoubleT(v)) => {
+                        p.subtract(v);
+                    }
                     unexpected => {
                         return Err(format_err!(
                             "Illegal types {:?} for SubtractNumber",

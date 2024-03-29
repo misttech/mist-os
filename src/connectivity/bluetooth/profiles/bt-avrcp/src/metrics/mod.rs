@@ -99,35 +99,35 @@ impl MetricsNodeInner {
     /// Checks if the `id` is a newly discovered peer and updates the metric count.
     fn check_distinct_peer(&mut self, id: PeerId) {
         if self.distinct_peers_set.insert(id) {
-            self.distinct_peers.add(1);
+            let _ = self.distinct_peers.add(1);
         }
     }
 
     fn controller_supporting_browsing(&mut self, id: PeerId) {
-        self.support_node.controller_peers_supporting_browsing.add(1);
+        let _ = self.support_node.controller_peers_supporting_browsing.add(1);
         if self.support_node.ct_browse_peers.insert(id) {
-            self.support_node.distinct_controller_peers_supporting_browsing.add(1);
+            let _ = self.support_node.distinct_controller_peers_supporting_browsing.add(1);
         }
     }
 
     fn controller_supporting_cover_art(&mut self, id: PeerId) {
-        self.support_node.controller_peers_supporting_cover_art.add(1);
+        let _ = self.support_node.controller_peers_supporting_cover_art.add(1);
         if self.support_node.ct_cover_art_peers.insert(id) {
-            self.support_node.distinct_controller_peers_supporting_cover_art.add(1);
+            let _ = self.support_node.distinct_controller_peers_supporting_cover_art.add(1);
         }
     }
 
     fn target_supporting_browsing(&mut self, id: PeerId) {
-        self.support_node.target_peers_supporting_browsing.add(1);
+        let _ = self.support_node.target_peers_supporting_browsing.add(1);
         if self.support_node.tg_browse_peers.insert(id) {
-            self.support_node.distinct_target_peers_supporting_browsing.add(1);
+            let _ = self.support_node.distinct_target_peers_supporting_browsing.add(1);
         }
     }
 
     fn target_supporting_cover_art(&mut self, id: PeerId) {
-        self.support_node.target_peers_supporting_cover_art.add(1);
+        let _ = self.support_node.target_peers_supporting_cover_art.add(1);
         if self.support_node.tg_cover_art_peers.insert(id) {
-            self.support_node.distinct_target_peers_supporting_cover_art.add(1);
+            let _ = self.support_node.distinct_target_peers_supporting_cover_art.add(1);
         }
     }
 
@@ -143,14 +143,22 @@ impl MetricsNodeInner {
         if prev_val.is_none() || prev_val.unwrap() != support_level {
             match support_level {
                 BrowseLevel::Browsable => {
-                    self.support_node.distinct_target_peers_with_players_support_browsing.add(1)
+                    let _ = self
+                        .support_node
+                        .distinct_target_peers_with_players_support_browsing
+                        .add(1);
                 }
-                BrowseLevel::OnlyBrowsableWhenAddressed => self
-                    .support_node
-                    .distinct_target_peers_with_players_only_browsable_when_addressed
-                    .add(1),
+                BrowseLevel::OnlyBrowsableWhenAddressed => {
+                    let _ = self
+                        .support_node
+                        .distinct_target_peers_with_players_only_browsable_when_addressed
+                        .add(1);
+                }
                 BrowseLevel::NotBrowsable => {
-                    self.support_node.distinct_target_peers_with_no_players_support_browsing.add(1)
+                    let _ = self
+                        .support_node
+                        .distinct_target_peers_with_no_players_support_browsing
+                        .add(1);
                 }
             };
             return true;
@@ -174,23 +182,23 @@ impl MetricsNode {
     }
 
     pub fn connection_error(&self) {
-        self.inner.lock().connection_errors.add(1);
+        let _ = self.inner.lock().connection_errors.add(1);
     }
 
     pub fn control_connection(&self) {
-        self.inner.lock().control_connections.add(1);
+        let _ = self.inner.lock().control_connections.add(1);
     }
 
     pub fn browse_connection(&self) {
-        self.inner.lock().browse_connections.add(1);
+        let _ = self.inner.lock().browse_connections.add(1);
     }
 
     pub fn control_collision(&self) {
-        self.inner.lock().control_channel_collisions.add(1);
+        let _ = self.inner.lock().control_channel_collisions.add(1);
     }
 
     pub fn browse_collision(&self) {
-        self.inner.lock().browse_channel_collisions.add(1);
+        let _ = self.inner.lock().browse_channel_collisions.add(1);
     }
 
     pub fn with_cobalt_logger(mut self, metrics_logger: MetricsLogger) -> Self {

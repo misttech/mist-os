@@ -51,7 +51,7 @@ impl PeerStats {
     }
 
     fn record_connected(&mut self) {
-        self.connection_count.add(1);
+        let _ = self.connection_count.add(1);
     }
 }
 

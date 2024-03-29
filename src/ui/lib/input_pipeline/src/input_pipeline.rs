@@ -498,14 +498,8 @@ impl InputPipeline {
             }
         }
         // Ensure inspect properties persist for debugging if device watch loop ends.
-        if let Ok(devices_discovered_val) = devices_discovered.get() {
-            std::mem::drop(devices_discovered);
-            input_devices_node.record_uint("devices_discovered", devices_discovered_val);
-        }
-        if let Ok(devices_connected_val) = devices_connected.get() {
-            std::mem::drop(devices_connected);
-            input_devices_node.record_uint("devices_connected", devices_connected_val);
-        }
+        input_devices_node.record(devices_discovered);
+        input_devices_node.record(devices_connected);
         Err(format_err!("Input pipeline stopped watching for new input devices."))
     }
 
@@ -625,7 +619,9 @@ async fn add_device_bindings(
             if input_device::is_device_type(&descriptor, *device_type).await {
                 matched_device_types.push(device_type);
                 match devices_connected {
-                    Some(dev_connected) => dev_connected.add(1),
+                    Some(dev_connected) => {
+                        let _ = dev_connected.add(1);
+                    }
                     None => (),
                 };
             }

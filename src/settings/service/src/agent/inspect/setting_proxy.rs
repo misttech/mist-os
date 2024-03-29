@@ -445,7 +445,7 @@ impl SettingProxyInspectAgent {
         let response_count = response_count_info
             .response_counts_by_type
             .get_or_insert_with(format!("{response_type:?}"), ResponseTypeCount::default);
-        response_count.count.add(1u64);
+        let _ = response_count.count.add(1u64);
     }
 }
 

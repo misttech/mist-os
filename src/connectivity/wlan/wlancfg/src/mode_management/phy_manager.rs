@@ -681,7 +681,7 @@ impl PhyManagerApi for PhyManager {
     }
 
     fn log_phy_add_failure(&mut self) {
-        self.phy_add_fail_count.add(1);
+        let _ = self.phy_add_fail_count.add(1);
     }
 
     async fn set_country_code(

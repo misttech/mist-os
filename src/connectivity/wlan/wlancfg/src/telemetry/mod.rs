@@ -991,7 +991,7 @@ impl Telemetry {
                         }
                         error => {
                             info!("Failed to get interface stats: {:?}", error);
-                            self.get_iface_stats_fail_count.add(1);
+                            let _ = self.get_iface_stats_fail_count.add(1);
                             *state.num_consecutive_get_counter_stats_failures.get_mut() += 1;
                             // Safe to unwrap: If we've exceeded 63 bits of consecutive failures,
                             // we have other things to worry about.

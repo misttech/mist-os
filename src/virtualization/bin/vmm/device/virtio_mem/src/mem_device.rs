@@ -152,6 +152,7 @@ pub struct MemDevice<B: MemBackend> {
     backend: B,
     control_handle: VirtioMemControlHandle,
     plugged_size_bytes: inspect::UintProperty,
+    plugged_size_bytes_value: u64,
     bitmap: MemBitmap,
 }
 
@@ -164,11 +165,14 @@ impl<B: MemBackend> MemDevice<B> {
         plugged_block_size: u64,
         region_size: u64,
     ) -> Self {
-        let plugged_size_bytes = inspect_node.create_uint("plugged_size_bytes", 0);
+        let plugged_size_bytes_value = 0;
+        let plugged_size_bytes =
+            inspect_node.create_uint("plugged_size_bytes", plugged_size_bytes_value);
         Self {
             backend,
             control_handle,
             plugged_size_bytes,
+            plugged_size_bytes_value,
             bitmap: MemBitmap::new(region_addr, plugged_block_size, region_size),
         }
     }
@@ -176,8 +180,11 @@ impl<B: MemBackend> MemDevice<B> {
     pub fn plug_memory(&mut self, request: wire::VirtioMemRequest) -> Result<u16, Error> {
         let req_num_blocks = request.nb_blocks.get() as u64;
         self.bitmap.set_blocks(request.addr.get(), req_num_blocks)?;
-        self.plugged_size_bytes.add(req_num_blocks * self.bitmap.plugged_block_size);
-        self.control_handle.send_on_config_changed(self.plugged_size_bytes.get()?)?;
+        self.plugged_size_bytes_value = self
+            .plugged_size_bytes
+            .add(req_num_blocks * self.bitmap.plugged_block_size)
+            .ok_or(inspect::Error::NoOp("plugged_size_bytes"))?;
+        self.control_handle.send_on_config_changed(self.plugged_size_bytes_value)?;
         Ok(wire::VIRTIO_MEM_RESP_ACK)
     }
 
@@ -188,16 +195,20 @@ impl<B: MemBackend> MemDevice<B> {
             u64::from(request.addr),
             req_num_blocks * self.bitmap.plugged_block_size,
         )?;
-        self.plugged_size_bytes.subtract(req_num_blocks * self.bitmap.plugged_block_size);
-        self.control_handle.send_on_config_changed(self.plugged_size_bytes.get()?)?;
+        self.plugged_size_bytes_value = self
+            .plugged_size_bytes
+            .subtract(req_num_blocks * self.bitmap.plugged_block_size)
+            .ok_or(inspect::Error::NoOp("plugged_size_bytes"))?;
+        self.control_handle.send_on_config_changed(self.plugged_size_bytes_value)?;
         Ok(wire::VIRTIO_MEM_RESP_ACK)
     }
 
     pub fn unplug_all_memory(&mut self) -> Result<u16, Error> {
         self.bitmap.clear_all();
-        self.plugged_size_bytes.set(0);
+        self.plugged_size_bytes_value = 0;
+        self.plugged_size_bytes.set(self.plugged_size_bytes_value);
         self.backend.decommit_range(self.bitmap.region_addr, self.bitmap.region_size)?;
-        self.control_handle.send_on_config_changed(self.plugged_size_bytes.get()?)?;
+        self.control_handle.send_on_config_changed(self.plugged_size_bytes_value)?;
         Ok(wire::VIRTIO_MEM_RESP_ACK)
     }
 
@@ -246,13 +257,11 @@ impl<B: MemBackend> MemDevice<B> {
 
         match response {
             Ok(state) => {
-                tracing::trace!(
-                    "ty = {} addr = {} nb_blocks = {} plugged_size_bytes={:?}",
-                    request.ty.get(),
-                    request.addr.get(),
-                    request.nb_blocks.get(),
-                    self.plugged_size_bytes.get().ok(),
-                );
+                let ty = request.ty.get();
+                let addr = request.addr.get();
+                let nb_blocks = request.nb_blocks.get();
+                let plugged_size_bytes = self.plugged_size_bytes_value;
+                tracing::trace!(?ty, ?addr, ?nb_blocks, ?plugged_size_bytes);
                 write_response(
                     chain,
                     wire::VirtioMemResponse {

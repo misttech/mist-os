@@ -149,7 +149,7 @@ impl SettingTypeUsageInspectAgent {
         let usage = setting_type_info
             .requests_by_type
             .get_or_insert_with(key.to_string(), UsageInfo::default);
-        usage.count.add(1);
+        let _ = usage.count.add(1);
     }
 }
 

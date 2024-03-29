@@ -76,17 +76,13 @@ macro_rules! locked_state_metric_fns {
             }
 
             pub fn [<add_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
-                -> Result<(), Error> {
+                -> Result<$type, Error> {
                 self.inner_lock.[<add_ $name _metric>](block_index, value)
             }
 
             pub fn [<subtract_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
-                -> Result<(), Error> {
+                -> Result<$type, Error> {
                 self.inner_lock.[<subtract_ $name _metric>](block_index, value)
-            }
-
-            pub fn [<get_ $name _metric>](&self, block_index: BlockIndex) -> Result<$type, Error> {
-                self.inner_lock.[<get_ $name _metric>](block_index)
             }
         }
     };
@@ -117,26 +113,21 @@ macro_rules! metric_fns {
             }
 
             fn [<add_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
-                -> Result<(), Error> {
+                -> Result<$type, Error> {
                 let mut block = self.heap.container.block_at_mut(block_index);
                 let current_value = block.[<$name _value>]()?;
-                block.[<set_ $name _value>](current_value.safe_add(value))?;
-                Ok(())
+                let new_value = current_value.safe_add(value);
+                block.[<set_ $name _value>](new_value)?;
+                Ok(new_value)
             }
 
             fn [<subtract_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
-                -> Result<(), Error> {
+                -> Result<$type, Error> {
                 let mut block = self.heap.container.block_at_mut(block_index);
                 let current_value = block.[<$name _value>]()?;
                 let new_value = current_value.safe_sub(value);
                 block.[<set_ $name _value>](new_value)?;
-                Ok(())
-            }
-
-            fn [<get_ $name _metric>](&self, block_index: BlockIndex) -> Result<$type, Error> {
-                let block = self.heap.container.block_at(block_index);
-                let current_value = block.[<$name _value>]()?;
-                Ok(current_value)
+                Ok(new_value)
             }
         }
     };
@@ -1394,7 +1385,6 @@ mod tests {
 
             assert!(state.set_int_metric(block_index, -6).is_ok());
             assert_eq!(state.get_block(block_index).int_value().unwrap(), -6);
-            assert_eq!(state.get_int_metric(block_index).unwrap(), -6);
 
             assert!(state.subtract_int_metric(block_index, std::i64::MAX).is_ok());
             assert_eq!(state.get_block(block_index).int_value().unwrap(), std::i64::MIN);
@@ -1452,7 +1442,6 @@ mod tests {
 
             assert!(state.set_uint_metric(block_index, 0).is_ok());
             assert_eq!(state.get_block(block_index).uint_value().unwrap(), 0);
-            assert_eq!(state.get_uint_metric(block_index).unwrap(), 0);
 
             assert!(state.subtract_uint_metric(block_index, std::u64::MAX).is_ok());
             assert_eq!(state.get_block(block_index).uint_value().unwrap(), 0);
@@ -1510,7 +1499,6 @@ mod tests {
 
             assert!(state.set_double_metric(block_index, -6.0).is_ok());
             assert_eq!(state.get_block(block_index).double_value().unwrap(), -6.0);
-            assert_eq!(state.get_double_metric(block_index).unwrap(), -6.0);
 
             // Free metric.
             assert!(state.free_value(block_index).is_ok());

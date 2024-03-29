@@ -182,7 +182,7 @@ impl RealTimeClockNode {
         match outcome {
             WriteRtcOutcome::Succeeded => self.write_success_counter.add(1),
             WriteRtcOutcome::Failed => self.write_failure_counter.add(1),
-        }
+        };
     }
 }
 
@@ -224,7 +224,9 @@ impl TimeSourceNode {
         self.status.set(&format!("Failed({:?})", error));
         self.status_change.set(monotonic_time());
         match self.failure_counters.get_mut(&error) {
-            Some(field) => field.add(1),
+            Some(field) => {
+                let _ = field.add(1);
+            }
             None => {
                 let property = self.node.create_uint(&format!("failure_count_{:?}", &error), 1);
                 self.failure_counters.insert(error, property);
@@ -235,7 +237,9 @@ impl TimeSourceNode {
     /// Records a rejection of a sample produced by the time source.
     pub fn sample_rejection(&mut self, error: SampleValidationError) {
         match self.rejection_counters.get_mut(&error) {
-            Some(field) => field.add(1),
+            Some(field) => {
+                let _ = field.add(1);
+            }
             None => {
                 let property = self.node.create_uint(&format!("rejection_count_{:?}", &error), 1);
                 self.rejection_counters.insert(error, property);
@@ -313,7 +317,9 @@ impl TrackNode {
     /// Records the discard of a frequency window.
     pub fn discard_frequency(&mut self, reason: FrequencyDiscardReason) {
         match self.frequency_discard_counters.get_mut(&reason) {
-            Some(field) => field.add(1),
+            Some(field) => {
+                let _ = field.add(1);
+            }
             None => {
                 let prop = self.node.create_uint(&format!("frequency_discard_{:?}", &reason), 1);
                 self.frequency_discard_counters.insert(reason, prop);
