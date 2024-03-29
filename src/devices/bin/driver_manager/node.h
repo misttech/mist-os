@@ -10,13 +10,16 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.driver.host/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
+#include <zircon/assert.h>
 
 #include <list>
 #include <memory>
-#include <stack>
+#include <utility>
 
+#include "lib/fidl/cpp/wire/client.h"
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/devices/bin/driver_manager/bind_result_tracker.h"
+#include "src/devices/bin/driver_manager/controller_allowlist_passthrough.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/inspect.h"
@@ -402,7 +405,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   Devnode::Target CreateDevfsPassthrough(
       std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
       std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> controller_connector,
-      bool allow_controller_connection);
+      bool allow_controller_connection, const std::string& class_name);
 
   zx_status_t ConnectControllerInterface(fidl::ServerEnd<fuchsia_device::Controller> server_end);
   zx_status_t ConnectDeviceInterface(zx::channel channel);
@@ -478,8 +481,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Connector to fuchsia_device/Controller exported to devfs.
   // This is only used by the compat shim to override the node's own controller
   // implementation.
-  std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> devfs_controller_connector_;
   fidl::ServerBindingGroup<fuchsia_device::Controller> dev_controller_bindings_;
+  std::unique_ptr<ControllerAllowlistPassthrough> controller_allowlist_passthrough_;
 };
 
 }  // namespace driver_manager
