@@ -478,7 +478,8 @@ function track-command-finished {
   timing=$1
   exit_status=$2
   subcommand=$3
-  shift 3
+  is_remote=$4
+  shift 4
   args="$*"
 
   metrics-read-config
@@ -501,6 +502,7 @@ function track-command-finished {
     --arg subcommand "${subcommand}" \
     --arg args "${args}" \
     --arg exit_status "${exit_status}" \
+    --arg is_remote "${is_remote}" \
     --argjson timing "${timing}" \
     '$ARGS.named')
 

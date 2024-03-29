@@ -388,7 +388,13 @@ declare -r end_time="$SECONDS"
 declare -r elapsed_time=$(( 1000 * (end_time - start_time) )) # milliseconds
 
 if [ -z "${iterative}" ]; then
-  track-command-finished "${elapsed_time}" "${retval}" "${command_name}" "$@" &
+  # is-remote-workflow-device returns 0 for true and 1 for false
+  # analytics requires it to be the opposite
+  declare is_remote=0
+  if is-remote-workflow-device; then
+    is_remote=1
+  fi
+  track-command-finished "${elapsed_time}" "${retval}" "${command_name}" "${is_remote}" "$@" &
   exit ${retval}
 elif which inotifywait >/dev/null; then
   monitor_source_changes() {
