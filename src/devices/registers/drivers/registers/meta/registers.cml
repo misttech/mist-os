@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 {
     include: [
-        "driver_component/driver.shard.cml",
+        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
-        binary: "driver/registers.so",
         bind: "meta/bind/registers.bindbc",
         colocate: "false",
+        compat: "driver/registers.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
@@ -19,12 +19,7 @@
         { service: "fuchsia.hardware.registers.Service" },
     ],
     use: [
-        {
-            service: [
-                "fuchsia.driver.compat.Service",
-                "fuchsia.hardware.platform.device.Service",
-            ],
-        },
+        { service: "fuchsia.hardware.platform.device.Service" },
     ],
     expose: [
         {
