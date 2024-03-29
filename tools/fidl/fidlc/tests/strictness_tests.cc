@@ -27,14 +27,14 @@ type Three = strict strict strict union { 1: b bool; };
 
 TEST(StrictnessTests, BadDuplicateModifierNonConsecutive) {
   TestLibrary library;
-  library.AddFile("bad/fi-0032.test.fidl");
+  library.AddFile("bad/fi-0032.noformat.test.fidl");
   library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kStrict));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StrictnessTests, BadConflictingModifiers) {
   TestLibrary library;
-  library.AddFile("bad/fi-0033.test.fidl");
+  library.AddFile("bad/fi-0033.noformat.test.fidl");
   library.ExpectFail(ErrConflictingModifier, Token::KindAndSubkind(Token::Subkind::kFlexible),
                      Token::KindAndSubkind(Token::Subkind::kStrict));
   library.ExpectFail(ErrConflictingModifier, Token::KindAndSubkind(Token::Subkind::kStrict),
@@ -112,7 +112,7 @@ type Foo = flexible bits {
 
 TEST(StrictnessTests, BadStrictnessStruct) {
   TestLibrary library;
-  library.AddFile("bad/fi-0030.test.fidl");
+  library.AddFile("bad/fi-0030.noformat.test.fidl");
   library.ExpectFail(ErrCannotSpecifyModifier, Token::KindAndSubkind(Token::Subkind::kStrict),
                      Token::KindAndSubkind(Token::Subkind::kStruct));
   ASSERT_COMPILER_DIAGNOSTICS(library);

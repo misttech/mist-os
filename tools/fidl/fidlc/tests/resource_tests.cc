@@ -170,7 +170,7 @@ resource_definition SomeResource : uint32 {
 
 TEST(ResourceTests, BadNoProperties) {
   TestLibrary library;
-  library.AddFile("bad/fi-0029.test.fidl");
+  library.AddFile("bad/fi-0029.noformat.test.fidl");
   library.ExpectFail(ErrMustHaveOneProperty);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

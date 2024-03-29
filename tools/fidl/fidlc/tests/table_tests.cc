@@ -81,14 +81,14 @@ type Foo = table {};
 
 TEST(TableTests, BadMissingOrdinals) {
   TestLibrary library;
-  library.AddFile("bad/fi-0016-a.test.fidl");
+  library.AddFile("bad/fi-0016-a.noformat.test.fidl");
   library.ExpectFail(ErrMissingOrdinalBeforeMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TableTests, BadOrdinalOutOfBoundsNegative) {
   TestLibrary library;
-  library.AddFile("bad/fi-0017-a.test.fidl");
+  library.AddFile("bad/fi-0017-a.noformat.test.fidl");
   library.ExpectFail(ErrOrdinalOutOfBound);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

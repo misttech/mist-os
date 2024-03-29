@@ -10,9 +10,9 @@ type CrossLibraryStruct = struct {
 };
 
 type TestingEnum = strict enum : int32 {
-   FLIPPED_OTHER_TEST = 2;
-   TEST = -1;
-   OTHER_TEST = -2;
+    FLIPPED_OTHER_TEST = 2;
+    TEST = -1;
+    OTHER_TEST = -2;
 };
 
 @discoverable

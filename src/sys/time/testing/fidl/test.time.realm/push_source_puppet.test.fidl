@@ -29,4 +29,3 @@ open protocol PushSourcePuppet {
         num_lifetime_connections uint32;
     });
 };
-

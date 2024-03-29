@@ -9,8 +9,8 @@ def _filter_fidl_files(files):
         f
         for f in files
         if f.endswith(".fidl") and
-           # FIDL test files are often purposefully invalid.
-           not f.endswith(".test.fidl")
+           # These files intentionally test parsing failures.
+           not f.endswith(".noformat.test.fidl")
     ]
 
 def _fidl_format(ctx):

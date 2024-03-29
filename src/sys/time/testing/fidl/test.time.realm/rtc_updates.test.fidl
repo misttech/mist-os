@@ -18,21 +18,17 @@ const MAX_TIME_UPDATES uint64 = 100;
 /// complex, set `RealmOptions.rtc.rtc_handle` instead.
 open protocol RtcUpdates {
     /// Reads the RTC updates that the clock received so far.
-    flexible Get(@generated_name("GetRequest") resource table {}) -> (
-        @generated_name("GetResponse") resource struct {
-           /// List the RTC updates that happened since the last call.
-           ///
-           /// If more than the maximum number of updates happened, an
-           /// error `OperationError.FAILED` will be returned instead.
-           ///
-           /// This behavior *may* be modified if we regularly start encountering
-           /// more than a maximum number of allowed updates.
-           updates vector<fuchsia.hardware.rtc.Time>:MAX_TIME_UPDATES;
+    flexible Get(@generated_name("GetRequest") resource table {}) -> (@generated_name("GetResponse") resource struct {
+        /// List the RTC updates that happened since the last call.
+        ///
+        /// If more than the maximum number of updates happened, an
+        /// error `OperationError.FAILED` will be returned instead.
+        ///
+        /// This behavior *may* be modified if we regularly start encountering
+        /// more than a maximum number of allowed updates.
+        updates vector<fuchsia.hardware.rtc.Time>:MAX_TIME_UPDATES;
 
-           /// Optionals, added for expansion.
-           opts @generated_name("GetResponseOpts") resource table {};
-        }
-    ) error fuchsia.testing.harness.OperationError;
+        /// Optionals, added for expansion.
+        opts @generated_name("GetResponseOpts") resource table {};
+    }) error fuchsia.testing.harness.OperationError;
 };
-
-

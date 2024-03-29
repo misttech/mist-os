@@ -53,7 +53,7 @@ GOOD_TEMPLATE = (
 REGEX_INDEX_ENTRY = r"^<<error-catalog/_fi-(\d+)\.md>>"
 REGEX_REDIRECT_ENTRY = r"^- from: /fuchsia-src/error/fi-(\d+)"
 REGEX_ERRCAT_TXT_LINE = r"^_fi-(\d+)\.md$"
-REGEX_FIDL_TXT_LINE = r"^fi-(\d+)(?:-[a-z])?\.test.fidl$"
+REGEX_FIDL_TXT_LINE = r"^fi-(\d+)(?:-[a-z])?(?:\.noformat)?\.test.fidl$"
 REGEX_GOOD_TEST = r"TEST\(ErrcatGoodTests, Good(\d+)"
 
 # Use this weird string concatenation so that this string literal does not show

@@ -197,7 +197,7 @@ type ForgotTheSemicolon = table {}
 
 TEST(ErrorsTests, BadIncorrectIdentifier) {
   TestLibrary library;
-  library.AddFile("bad/fi-0009.test.fidl");
+  library.AddFile("bad/fi-0009.noformat.test.fidl");
   library.ExpectFail(ErrUnexpectedIdentifier, Token::KindAndSubkind(Token::Subkind::kUsing),
                      Token::KindAndSubkind(Token::Subkind::kLibrary));
   ASSERT_COMPILER_DIAGNOSTICS(library);

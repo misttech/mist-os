@@ -78,7 +78,7 @@ TEST(UnionTests, GoodStrictUnion) {
 
 TEST(UnionTests, BadMustHaveExplicitOrdinals) {
   TestLibrary library;
-  library.AddFile("bad/fi-0016-b.test.fidl");
+  library.AddFile("bad/fi-0016-b.noformat.test.fidl");
   library.ExpectFail(ErrMissingOrdinalBeforeMember);
   library.ExpectFail(ErrMissingOrdinalBeforeMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -179,7 +179,7 @@ type Foo = strict union {
 
 TEST(UnionTests, BadOrdinalOutOfBoundsNegative) {
   TestLibrary library;
-  library.AddFile("bad/fi-0017-b.test.fidl");
+  library.AddFile("bad/fi-0017-b.noformat.test.fidl");
   library.ExpectFail(ErrOrdinalOutOfBound);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -219,7 +219,7 @@ type MyUnion = strict union {
 
 TEST(UnionTests, BadCannotStartAtZero) {
   TestLibrary library;
-  library.AddFile("bad/fi-0018.test.fidl");
+  library.AddFile("bad/fi-0018.noformat.test.fidl");
   library.ExpectFail(ErrOrdinalsMustStartAtOne);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

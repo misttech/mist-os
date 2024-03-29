@@ -12,7 +12,7 @@ namespace {
 
 TEST(RecoverableParsingTests, BadUnexpectedToken) {
   TestLibrary library;
-  library.AddFile("bad/fi-0007.test.fidl");
+  library.AddFile("bad/fi-0007.noformat.test.fidl");
   library.ExpectFail(ErrUnexpectedToken);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -399,21 +399,21 @@ type TypeDecl = struct {
 
 TEST(RecoverableParsingTests, UnexpectedLineBreakInLiteral) {
   TestLibrary library;
-  library.AddFile("bad/fi-0002.test.fidl");
+  library.AddFile("bad/fi-0002.noformat.test.fidl");
   library.ExpectFail(ErrUnexpectedLineBreak);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, UnexpectedControlCharacter) {
   TestLibrary library;
-  library.AddFile("bad/fi-0184.test.fidl");
+  library.AddFile("bad/fi-0184.noformat.test.fidl");
   library.ExpectFail(ErrUnexpectedControlCharacter, "9");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, InvalidEscapeSequenceInLiteral) {
   TestLibrary library;
-  library.AddFile("bad/fi-0003.test.fidl");
+  library.AddFile("bad/fi-0003.noformat.test.fidl");
   // TODO(https://fxbug.dev/42063301): fidlc should recover from all three failures
   library.ExpectFail(ErrInvalidEscapeSequence, "\\ ");
   library.ExpectFail(ErrInvalidEscapeSequence, "\\i");
@@ -422,14 +422,14 @@ TEST(RecoverableParsingTests, InvalidEscapeSequenceInLiteral) {
 
 TEST(RecoverableParsingTests, InvalidHexDigit) {
   TestLibrary library;
-  library.AddFile("bad/fi-0004.test.fidl");
+  library.AddFile("bad/fi-0004.noformat.test.fidl");
   library.ExpectFail(ErrInvalidHexDigit, 'G');
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, UnicodeEscapeMissingBraces) {
   TestLibrary library;
-  library.AddFile("bad/fi-0185.test.fidl");
+  library.AddFile("bad/fi-0185.noformat.test.fidl");
   library.ExpectFail(ErrUnicodeEscapeMissingBraces);
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "\\u");
@@ -437,7 +437,7 @@ TEST(RecoverableParsingTests, UnicodeEscapeMissingBraces) {
 
 TEST(RecoverableParsingTests, UnicodeEscapeUnterminated) {
   TestLibrary library;
-  library.AddFile("bad/fi-0186.test.fidl");
+  library.AddFile("bad/fi-0186.noformat.test.fidl");
   library.ExpectFail(ErrUnicodeEscapeUnterminated);
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "\\u{1F600");
@@ -445,7 +445,7 @@ TEST(RecoverableParsingTests, UnicodeEscapeUnterminated) {
 
 TEST(RecoverableParsingTests, UnicodeEscapeEmpty) {
   TestLibrary library;
-  library.AddFile("bad/fi-0187.test.fidl");
+  library.AddFile("bad/fi-0187.noformat.test.fidl");
   library.ExpectFail(ErrUnicodeEscapeEmpty);
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "\\u{}");
@@ -453,7 +453,7 @@ TEST(RecoverableParsingTests, UnicodeEscapeEmpty) {
 
 TEST(RecoverableParsingTests, UnicodeEscapeTooLong) {
   TestLibrary library;
-  library.AddFile("bad/fi-0188.test.fidl");
+  library.AddFile("bad/fi-0188.noformat.test.fidl");
   library.ExpectFail(ErrUnicodeEscapeTooLong);
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "001F600");
@@ -461,7 +461,7 @@ TEST(RecoverableParsingTests, UnicodeEscapeTooLong) {
 
 TEST(RecoverableParsingTests, UnicodeEscapeTooLarge) {
   TestLibrary library;
-  library.AddFile("bad/fi-0189.test.fidl");
+  library.AddFile("bad/fi-0189.noformat.test.fidl");
   library.ExpectFail(ErrUnicodeEscapeTooLarge, "110000");
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "110000");
@@ -469,7 +469,7 @@ TEST(RecoverableParsingTests, UnicodeEscapeTooLarge) {
 
 TEST(RecoverableParsingTests, ExpectedDeclaration) {
   TestLibrary library;
-  library.AddFile("bad/fi-0006.test.fidl");
+  library.AddFile("bad/fi-0006.noformat.test.fidl");
   library.ExpectFail(ErrExpectedDeclaration, "cosnt");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

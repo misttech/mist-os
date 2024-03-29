@@ -26,7 +26,7 @@ open protocol Puppet {
     // Causes the puppet to crash with an optional error message.
     //
     // The connection will be closed after this is called.
-    flexible Crash(struct{
+    flexible Crash(struct {
         message LogMessage;
     });
 };

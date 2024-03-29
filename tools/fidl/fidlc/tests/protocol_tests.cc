@@ -444,7 +444,7 @@ protocol NoMoreOrdinals {
 
 TEST(ProtocolTests, BadEmptyNamedItem) {
   TestLibrary library;
-  library.AddFile("bad/fi-0020.test.fidl");
+  library.AddFile("bad/fi-0020.noformat.test.fidl");
   library.ExpectFail(ErrInvalidProtocolMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

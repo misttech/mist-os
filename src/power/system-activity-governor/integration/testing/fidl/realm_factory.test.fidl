@@ -13,7 +13,7 @@ open protocol RealmFactory {
     flexible CreateRealm(resource struct {
         realm_server server_end:fuchsia.testing.harness.RealmProxy;
     }) -> (resource struct {
-      activity_governor_moniker string:MAX;
-      suspend_control client_end:test.suspendcontrol.Device;
+        activity_governor_moniker string:MAX;
+        suspend_control client_end:test.suspendcontrol.Device;
     }) error fuchsia.testing.harness.OperationError;
 };

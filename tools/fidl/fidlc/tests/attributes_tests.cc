@@ -700,7 +700,7 @@ protocol ExampleProtocol {
 
 TEST(AttributesTests, BadDuplicateAttributePlacement) {
   TestLibrary library;
-  library.AddFile("bad/fi-0023.test.fidl");
+  library.AddFile("bad/fi-0023.noformat.test.fidl");
   library.ExpectFail(ErrRedundantAttributePlacement);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -741,7 +741,7 @@ protocol MyProtocol {
 
 TEST(AttributesTests, BadNoArgumentsEmptyParens) {
   TestLibrary library;
-  library.AddFile("bad/fi-0014.test.fidl");
+  library.AddFile("bad/fi-0014.noformat.test.fidl");
   library.ExpectFail(ErrAttributeWithEmptyParens);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -766,7 +766,7 @@ type MyStruct = struct {};
 
 TEST(AttributesTests, BadMultipleArgumentsWithNoNames) {
   TestLibrary library;
-  library.AddFile("bad/fi-0015.test.fidl");
+  library.AddFile("bad/fi-0015.noformat.test.fidl");
   library.ExpectFail(ErrAttributeArgsMustAllBeNamed);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
