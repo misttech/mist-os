@@ -2087,6 +2087,9 @@ assembly_input_bundle("testing_support") {
     "//src/sys/fuzzing:fuzz-registry",
     "//src/sys/fuzzing/fuzzctl",
     "//src/sys/run_test_suite",
+
+    # CPU profiler
+    "//src/performance/experimental/profiler",
   ]
   compiled_packages = [
     {
@@ -2096,6 +2099,7 @@ assembly_input_bundle("testing_support") {
           component_name = "core"
           shards = rebase_path(
                   [
+                    "//src/performance/experimental/profiler/meta/profiler.core_shard.cml",
                     # These should only be added by this AIB, because their
                     # packages are only added by this AIB, however due to many
                     # routing issues, they are included in a wider set of

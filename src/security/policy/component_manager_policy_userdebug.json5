@@ -32,6 +32,7 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/console",
+                    "/core/profiler",
                     "/core/trace_manager/cpuperf_provider/cpu-trace",
 
                     // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this

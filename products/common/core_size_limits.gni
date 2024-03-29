@@ -211,6 +211,7 @@ size_checker_input = {
         "inspect-test-runner",
         "legacy-test-runner",
         "lib_loader_runner_cache",
+        "profiler",
         "rust-test-create-raw-processes-runner",
         "rust-test-next-vdso-runner",
         "rust-test-runner",
@@ -224,7 +225,7 @@ size_checker_input = {
         "fuzzctl",
         "run_test_suite",
       ]
-      limit = 12058624  # 11.5 MiB
+      limit = 12582912  # 12 MiB
       creep_limit = 122880  # 120.0 KiB
     },
     {

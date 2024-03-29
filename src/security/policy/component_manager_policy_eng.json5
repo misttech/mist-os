@@ -71,6 +71,7 @@
                 source_name: "fuchsia.kernel.DebugResource",
                 capability: "protocol",
                 target_monikers: [
+                    "/core/profiler",
                     "/core/testing/vfs-compliance-tests:**",
                     "/core/trace_manager/cpuperf_provider/cpu-trace",
 
