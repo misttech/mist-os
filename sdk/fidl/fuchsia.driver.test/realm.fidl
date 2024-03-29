@@ -85,21 +85,21 @@ type RealmArgs = resource table {
 
     /// Specify the board name that drivers are aware of.
     /// Default: driver-integration-test
-   10: board_name string:MAX;
+    10: board_name string:MAX;
 
     // TODO(https://fxbug.dev/42073139): This parameter should either be updated
     // or removed.
     /// Specify additional offers from the test to a driver collection
     /// Default: empty
     @available(added=HEAD)
-   11: offers vector<Offer>:MAX;
+    11: offers vector<Offer>:MAX;
 
     // TODO(https://fxbug.dev/42073139): This parameter should either be updated
     // or removed.
     /// Specify services to expose from the test to a driver collection
     /// Default: empty
     @available(added=HEAD)
-   12: exposes vector<Expose>:MAX;
+    12: exposes vector<Expose>:MAX;
 
     /// The driver test realm can load drivers packaged with the test suite
     /// through this directory. Note that this directory must be readable
@@ -115,7 +115,7 @@ type RealmArgs = resource table {
     ///
     /// Default: DriverTestRealm's package directory.
     @available(added=HEAD)
-   13: pkg client_end:fuchsia.io.Directory;
+    13: pkg client_end:fuchsia.io.Directory;
 };
 
 /// This protocol is for the DriverTestRealm. It is an integration test

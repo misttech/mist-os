@@ -26,46 +26,46 @@ type ResourceArgs = strict resource union {
     7: rectangle RectangleArgs;
     8: rounded_rectangle RoundedRectangleArgs;
     9: circle CircleArgs;
-   10: mesh MeshArgs;
+    10: mesh MeshArgs;
 
     // Nodes (see nodes.fidl).
-   11: shape_node ShapeNodeArgs;
-   12: clip_node ClipNodeArgs;
-   13: entity_node EntityNodeArgs;
-   14: opacity_node OpacityNodeArgsHACK;
+    11: shape_node ShapeNodeArgs;
+    12: clip_node ClipNodeArgs;
+    13: entity_node EntityNodeArgs;
+    14: opacity_node OpacityNodeArgsHACK;
 
     // Materials.
-   15: material MaterialArgs;
+    15: material MaterialArgs;
 
     // Layers.
-   16: compositor CompositorArgs;
-   17: display_compositor DisplayCompositorArgs;
-   18: reserved;
-   19: layer_stack LayerStackArgs;
-   20: layer LayerArgs;
+    16: compositor CompositorArgs;
+    17: display_compositor DisplayCompositorArgs;
+    18: reserved;
+    19: layer_stack LayerStackArgs;
+    20: layer LayerArgs;
 
     // Scene representation and display.
-   21: scene SceneArgs;
-   22: camera CameraArgs;
-   23: stereo_camera StereoCameraArgs;
-   24: renderer RendererArgs;
+    21: scene SceneArgs;
+    22: camera CameraArgs;
+    23: stereo_camera StereoCameraArgs;
+    24: renderer RendererArgs;
 
     // Lighting.
-   25: ambient_light AmbientLightArgs;
-   26: directional_light DirectionalLightArgs;
+    25: ambient_light AmbientLightArgs;
+    26: directional_light DirectionalLightArgs;
 
     // A value that can be used in place of a constant value.
-   27: variable VariableArgs;
+    27: variable VariableArgs;
 
     // TODO(https://fxbug.dev/42098623): Move these where they belong.  They're added to the end
     // of the struct temporarily until we transition to xunions.
-   28: point_light PointLightArgs;
-   29: reserved;
-   30: reserved;
-   31: view3 ViewArgs3;
-   32: image_pipe2 ImagePipe2Args;
-   33: image2 ImageArgs2;
-   34: image3 ImageArgs3;
+    28: point_light PointLightArgs;
+    29: reserved;
+    30: reserved;
+    31: view3 ViewArgs3;
+    32: image_pipe2 ImagePipe2Args;
+    33: image2 ImageArgs2;
+    34: image3 ImageArgs3;
 };
 
 /// `ImagePipe2` is a `Resource` that can be used as a `Texture` for a `Material`.

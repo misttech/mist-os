@@ -27,8 +27,8 @@ type Event = strict union {
     7: view_attached_to_scene ViewAttachedToSceneEvent;
     8: view_detached_from_scene ViewDetachedFromSceneEvent;
     9: view_properties_changed ViewPropertiesChangedEvent;
-   10: view_state_changed ViewStateChangedEvent;
-   11: view_holder_connected ViewHolderConnectedEvent;
+    10: view_state_changed ViewStateChangedEvent;
+    11: view_holder_connected ViewHolderConnectedEvent;
 };
 
 /// Provides rendering target metrics information about the specified node.

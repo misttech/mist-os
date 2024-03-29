@@ -79,7 +79,7 @@ type StreamProperties = table {
     /// UI string for the product name. If not included, the product name is unspecified.
     ///
     /// Optional.
-   10: product string:MAX_UI_STRING_SIZE;
+    10: product string:MAX_UI_STRING_SIZE;
 
     /// An identifier for the clock domain in which this hardware operates. If
     /// two hardware devices have the same clock domain, their clock rates are
@@ -101,7 +101,7 @@ type StreamProperties = table {
     /// notification updates to recover the hardware's clock.
     ///
     /// Required.
-   11: clock_domain ClockDomain;
+    11: clock_domain ClockDomain;
 };
 
 /// For an overview see

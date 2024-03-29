@@ -160,7 +160,7 @@ type NodeAttributes2 = struct {
 
         /// True if this file is verity-enabled.
         @available(added=HEAD)
-       10: verity_enabled bool;
+        10: verity_enabled bool;
     };
 };
 

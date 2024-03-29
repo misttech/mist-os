@@ -94,7 +94,7 @@ type ServiceInstance = table {
 
     /// Text strings describing the instance.
     @available(added=9)
-   10: text_strings vector<txt_character_string>:MAX_TEXT_STRINGS;
+    10: text_strings vector<txt_character_string>:MAX_TEXT_STRINGS;
 };
 
 const MAX_TEXT_STRINGS uint32 = 256;

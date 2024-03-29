@@ -386,8 +386,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v10",
-            "start_offset": 861,
-            "end_offset": 864
+            "start_offset": 862,
+            "end_offset": 865
           },
           "type": {
             "kind": "primitive"
@@ -400,8 +400,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v11",
-            "start_offset": 879,
-            "end_offset": 882
+            "start_offset": 881,
+            "end_offset": 884
           },
           "type": {
             "kind": "primitive"
@@ -414,8 +414,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v12",
-            "start_offset": 897,
-            "end_offset": 900
+            "start_offset": 900,
+            "end_offset": 903
           },
           "type": {
             "kind": "primitive"
@@ -428,8 +428,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v13",
-            "start_offset": 915,
-            "end_offset": 918
+            "start_offset": 919,
+            "end_offset": 922
           },
           "type": {
             "kind": "primitive"
@@ -442,8 +442,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v14",
-            "start_offset": 933,
-            "end_offset": 936
+            "start_offset": 938,
+            "end_offset": 941
           },
           "type": {
             "kind": "primitive"
@@ -456,8 +456,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v15",
-            "start_offset": 951,
-            "end_offset": 954
+            "start_offset": 957,
+            "end_offset": 960
           },
           "type": {
             "kind": "primitive"
@@ -470,8 +470,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v16",
-            "start_offset": 969,
-            "end_offset": 972
+            "start_offset": 976,
+            "end_offset": 979
           },
           "type": {
             "kind": "primitive"
@@ -484,8 +484,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v17",
-            "start_offset": 987,
-            "end_offset": 990
+            "start_offset": 995,
+            "end_offset": 998
           },
           "type": {
             "kind": "primitive"
@@ -498,8 +498,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v18",
-            "start_offset": 1005,
-            "end_offset": 1008
+            "start_offset": 1014,
+            "end_offset": 1017
           },
           "type": {
             "kind": "primitive"
@@ -512,8 +512,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v19",
-            "start_offset": 1023,
-            "end_offset": 1026
+            "start_offset": 1033,
+            "end_offset": 1036
           },
           "type": {
             "kind": "primitive"
@@ -526,8 +526,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v20",
-            "start_offset": 1041,
-            "end_offset": 1044
+            "start_offset": 1052,
+            "end_offset": 1055
           },
           "type": {
             "kind": "primitive"
@@ -540,8 +540,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v21",
-            "start_offset": 1059,
-            "end_offset": 1062
+            "start_offset": 1071,
+            "end_offset": 1074
           },
           "type": {
             "kind": "primitive"
@@ -554,8 +554,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v22",
-            "start_offset": 1077,
-            "end_offset": 1080
+            "start_offset": 1090,
+            "end_offset": 1093
           },
           "type": {
             "kind": "primitive"
@@ -568,8 +568,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v23",
-            "start_offset": 1095,
-            "end_offset": 1098
+            "start_offset": 1109,
+            "end_offset": 1112
           },
           "type": {
             "kind": "primitive"
@@ -582,8 +582,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v24",
-            "start_offset": 1113,
-            "end_offset": 1116
+            "start_offset": 1128,
+            "end_offset": 1131
           },
           "type": {
             "kind": "primitive"
@@ -596,8 +596,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v25",
-            "start_offset": 1131,
-            "end_offset": 1134
+            "start_offset": 1147,
+            "end_offset": 1150
           },
           "type": {
             "kind": "primitive"
@@ -610,8 +610,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v26",
-            "start_offset": 1149,
-            "end_offset": 1152
+            "start_offset": 1166,
+            "end_offset": 1169
           },
           "type": {
             "kind": "primitive"
@@ -624,8 +624,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v27",
-            "start_offset": 1167,
-            "end_offset": 1170
+            "start_offset": 1185,
+            "end_offset": 1188
           },
           "type": {
             "kind": "primitive"
@@ -638,8 +638,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v28",
-            "start_offset": 1185,
-            "end_offset": 1188
+            "start_offset": 1204,
+            "end_offset": 1207
           },
           "type": {
             "kind": "primitive"
@@ -652,8 +652,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v29",
-            "start_offset": 1203,
-            "end_offset": 1206
+            "start_offset": 1223,
+            "end_offset": 1226
           },
           "type": {
             "kind": "primitive"
@@ -666,8 +666,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v30",
-            "start_offset": 1221,
-            "end_offset": 1224
+            "start_offset": 1242,
+            "end_offset": 1245
           },
           "type": {
             "kind": "primitive"
@@ -680,8 +680,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v31",
-            "start_offset": 1239,
-            "end_offset": 1242
+            "start_offset": 1261,
+            "end_offset": 1264
           },
           "type": {
             "kind": "primitive"
@@ -694,8 +694,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v32",
-            "start_offset": 1257,
-            "end_offset": 1260
+            "start_offset": 1280,
+            "end_offset": 1283
           },
           "type": {
             "kind": "primitive"
@@ -708,8 +708,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v33",
-            "start_offset": 1275,
-            "end_offset": 1278
+            "start_offset": 1299,
+            "end_offset": 1302
           },
           "type": {
             "kind": "primitive"
@@ -722,8 +722,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v34",
-            "start_offset": 1293,
-            "end_offset": 1296
+            "start_offset": 1318,
+            "end_offset": 1321
           },
           "type": {
             "kind": "primitive"
@@ -736,8 +736,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v35",
-            "start_offset": 1311,
-            "end_offset": 1314
+            "start_offset": 1337,
+            "end_offset": 1340
           },
           "type": {
             "kind": "primitive"
@@ -750,8 +750,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v36",
-            "start_offset": 1329,
-            "end_offset": 1332
+            "start_offset": 1356,
+            "end_offset": 1359
           },
           "type": {
             "kind": "primitive"
@@ -764,8 +764,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v37",
-            "start_offset": 1347,
-            "end_offset": 1350
+            "start_offset": 1375,
+            "end_offset": 1378
           },
           "type": {
             "kind": "primitive"
@@ -778,8 +778,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v38",
-            "start_offset": 1365,
-            "end_offset": 1368
+            "start_offset": 1394,
+            "end_offset": 1397
           },
           "type": {
             "kind": "primitive"
@@ -792,8 +792,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v39",
-            "start_offset": 1383,
-            "end_offset": 1386
+            "start_offset": 1413,
+            "end_offset": 1416
           },
           "type": {
             "kind": "primitive"
@@ -806,8 +806,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v40",
-            "start_offset": 1401,
-            "end_offset": 1404
+            "start_offset": 1432,
+            "end_offset": 1435
           },
           "type": {
             "kind": "primitive"
@@ -820,8 +820,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v41",
-            "start_offset": 1419,
-            "end_offset": 1422
+            "start_offset": 1451,
+            "end_offset": 1454
           },
           "type": {
             "kind": "primitive"
@@ -834,8 +834,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v42",
-            "start_offset": 1437,
-            "end_offset": 1440
+            "start_offset": 1470,
+            "end_offset": 1473
           },
           "type": {
             "kind": "primitive"
@@ -848,8 +848,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v43",
-            "start_offset": 1455,
-            "end_offset": 1458
+            "start_offset": 1489,
+            "end_offset": 1492
           },
           "type": {
             "kind": "primitive"
@@ -862,8 +862,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v44",
-            "start_offset": 1473,
-            "end_offset": 1476
+            "start_offset": 1508,
+            "end_offset": 1511
           },
           "type": {
             "kind": "primitive"
@@ -876,8 +876,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v45",
-            "start_offset": 1491,
-            "end_offset": 1494
+            "start_offset": 1527,
+            "end_offset": 1530
           },
           "type": {
             "kind": "primitive"
@@ -890,8 +890,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v46",
-            "start_offset": 1509,
-            "end_offset": 1512
+            "start_offset": 1546,
+            "end_offset": 1549
           },
           "type": {
             "kind": "primitive"
@@ -904,8 +904,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v47",
-            "start_offset": 1527,
-            "end_offset": 1530
+            "start_offset": 1565,
+            "end_offset": 1568
           },
           "type": {
             "kind": "primitive"
@@ -918,8 +918,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v48",
-            "start_offset": 1545,
-            "end_offset": 1548
+            "start_offset": 1584,
+            "end_offset": 1587
           },
           "type": {
             "kind": "primitive"
@@ -932,8 +932,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v49",
-            "start_offset": 1563,
-            "end_offset": 1566
+            "start_offset": 1603,
+            "end_offset": 1606
           },
           "type": {
             "kind": "primitive"
@@ -946,8 +946,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v50",
-            "start_offset": 1581,
-            "end_offset": 1584
+            "start_offset": 1622,
+            "end_offset": 1625
           },
           "type": {
             "kind": "primitive"
@@ -960,8 +960,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v51",
-            "start_offset": 1599,
-            "end_offset": 1602
+            "start_offset": 1641,
+            "end_offset": 1644
           },
           "type": {
             "kind": "primitive"
@@ -974,8 +974,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v52",
-            "start_offset": 1617,
-            "end_offset": 1620
+            "start_offset": 1660,
+            "end_offset": 1663
           },
           "type": {
             "kind": "primitive"
@@ -988,8 +988,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v53",
-            "start_offset": 1635,
-            "end_offset": 1638
+            "start_offset": 1679,
+            "end_offset": 1682
           },
           "type": {
             "kind": "primitive"
@@ -1002,8 +1002,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v54",
-            "start_offset": 1653,
-            "end_offset": 1656
+            "start_offset": 1698,
+            "end_offset": 1701
           },
           "type": {
             "kind": "primitive"
@@ -1016,8 +1016,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v55",
-            "start_offset": 1671,
-            "end_offset": 1674
+            "start_offset": 1717,
+            "end_offset": 1720
           },
           "type": {
             "kind": "primitive"
@@ -1030,8 +1030,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v56",
-            "start_offset": 1689,
-            "end_offset": 1692
+            "start_offset": 1736,
+            "end_offset": 1739
           },
           "type": {
             "kind": "primitive"
@@ -1044,8 +1044,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v57",
-            "start_offset": 1707,
-            "end_offset": 1710
+            "start_offset": 1755,
+            "end_offset": 1758
           },
           "type": {
             "kind": "primitive"
@@ -1058,8 +1058,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v58",
-            "start_offset": 1725,
-            "end_offset": 1728
+            "start_offset": 1774,
+            "end_offset": 1777
           },
           "type": {
             "kind": "primitive"
@@ -1072,8 +1072,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v59",
-            "start_offset": 1743,
-            "end_offset": 1746
+            "start_offset": 1793,
+            "end_offset": 1796
           },
           "type": {
             "kind": "primitive"
@@ -1086,8 +1086,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v60",
-            "start_offset": 1761,
-            "end_offset": 1764
+            "start_offset": 1812,
+            "end_offset": 1815
           },
           "type": {
             "kind": "primitive"
@@ -1100,8 +1100,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v61",
-            "start_offset": 1779,
-            "end_offset": 1782
+            "start_offset": 1831,
+            "end_offset": 1834
           },
           "type": {
             "kind": "primitive"
@@ -1114,8 +1114,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v62",
-            "start_offset": 1797,
-            "end_offset": 1800
+            "start_offset": 1850,
+            "end_offset": 1853
           },
           "type": {
             "kind": "primitive"
@@ -1128,8 +1128,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v63",
-            "start_offset": 1815,
-            "end_offset": 1818
+            "start_offset": 1869,
+            "end_offset": 1872
           },
           "type": {
             "kind": "primitive"
@@ -1142,8 +1142,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
             "data": "v64",
-            "start_offset": 1833,
-            "end_offset": 1836
+            "start_offset": 1888,
+            "end_offset": 1891
           },
           "type": {
             "kind": "identifier",
@@ -1153,8 +1153,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/table.test.fidl",
               "data": "ExtensionTable",
-              "start_offset": 1837,
-              "end_offset": 1851
+              "start_offset": 1892,
+              "end_offset": 1906
             }
           }
         }

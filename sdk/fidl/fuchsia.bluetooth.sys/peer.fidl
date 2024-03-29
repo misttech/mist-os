@@ -60,18 +60,18 @@ type Peer = table {
     9: rssi int8;
 
     /// The most recently obtained transmission power for this peer. Present if known.
-   10: tx_power int8;
+    10: tx_power int8;
 
     /// The list of service UUIDs known to be available on this peer.
     ///
     /// This is a legacy field that should not be depended on for new code.
     @deprecated
-   11: services vector<bt.Uuid>:MAX_PEER_SERVICES;
+    11: services vector<bt.Uuid>:MAX_PEER_SERVICES;
 
     /// The list of service UUIDs known to be available on the LE transport.
     ///
     /// Never present if technology is CLASSIC.
-   12: le_services vector<bt.Uuid>:MAX_PEER_SERVICES;
+    12: le_services vector<bt.Uuid>:MAX_PEER_SERVICES;
 
     /// The cached list of service UUIDs previously discovered on the BR/EDR transport.
     /// Services are not removed if peer is disconnected if subsequent searches don't find them.
@@ -80,5 +80,5 @@ type Peer = table {
     ///
     /// This is a legacy field that should not be depended on for new code.
     @deprecated
-   13: bredr_services vector<bt.Uuid>:MAX_PEER_SERVICES;
+    13: bredr_services vector<bt.Uuid>:MAX_PEER_SERVICES;
 };

@@ -10,7 +10,9 @@ def _filter_fidl_files(files):
         for f in files
         if f.endswith(".fidl") and
            # These files intentionally test parsing failures.
-           not f.endswith(".noformat.test.fidl")
+           not f.endswith(".noformat.test.fidl") and
+           # TODO(https://fxbug.dev/327031370): Remove after soft transition.
+           "vendor/google/" not in f
     ]
 
 def _fidl_format(ctx):

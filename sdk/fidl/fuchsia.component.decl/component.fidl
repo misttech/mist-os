@@ -55,5 +55,5 @@ type Component = table {
     9: facets fuchsia.data.Dictionary;
 
     /// (Optional) The schema of the component's configuration interface.
-   10: config ConfigSchema;
+    10: config ConfigSchema;
 };

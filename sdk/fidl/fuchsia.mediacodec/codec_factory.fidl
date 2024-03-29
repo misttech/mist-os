@@ -208,7 +208,7 @@ type CreateDecoder_Params = table {
     /// on input by closing the StreamProcessor channel.
     ///
     /// If secure_input_mode ON, secure_output_mode must also be ON.
-   10: secure_input_mode SecureMemoryMode;
+    10: secure_input_mode SecureMemoryMode;
 
     /// If true, require that the returned codec is entirely SW-based, not
     /// HW-accelerated (other than possibly using vector CPU instructions).
@@ -218,7 +218,7 @@ type CreateDecoder_Params = table {
     /// `require_hw`.
     ///
     /// If not set, interpreted as false.
-   11: require_sw bool;
+    11: require_sw bool;
 };
 
 /// Parameters used to request an encoder.
@@ -443,7 +443,7 @@ type DecoderProfileDescription = table {
     /// If set to true, the decoder can resynchronize with the input stream (eventually) despite a
     /// missing input chunk, and can handle partial input chunks without failing the stream or the
     /// StreamProcessor control connection.
-   10: can_re_sync bool;
+    10: can_re_sync bool;
 
     /// If set to true, the decoder makes efforts to indicate partial or detected-as-missing or
     /// detected-as-corrupt input chunks by setting error_detected_before and/or
@@ -452,7 +452,7 @@ type DecoderProfileDescription = table {
     /// corruptions, as codecs generally aren't inclined to include error detection bits within the
     /// stream.  This is not a replacment for a real (as in robust with high probability against
     /// random bit flips and bit insertion/deletion) data integrity check.
-   11: will_report_all_detected_errors bool;
+    11: will_report_all_detected_errors bool;
 
     /// If set to true, the decoder can handle the bytes of any header being split across packet
     /// boundaries.  If false or un-set, the decoder requires all header bytes of a header to be
@@ -487,7 +487,7 @@ type DecoderProfileDescription = table {
     /// Audio decoders shouldn't set split_header_handling to true unless they also set
     /// can_stream_bytes_input to true, since for an audio decoder, allowing splitting header bytes
     /// is meaningless (for audio decoders) unless also allowing splitting an input chunk.
-   12: split_header_handling bool;
+    12: split_header_handling bool;
 };
 
 @available(added=11)

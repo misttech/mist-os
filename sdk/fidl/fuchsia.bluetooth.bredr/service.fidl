@@ -26,11 +26,11 @@ type DataElement = strict union {
     7: uint32 uint32;
     8: uint64 uint64;
     9: str vector<uint8>:MAX_STRING_LENGTH;
-   10: url fuchsia.url.Url;
-   11: uuid fuchsia.bluetooth.Uuid;
-   12: b bool;
-   13: sequence vector<DataElement:optional>:MAX_SEQUENCE_LENGTH;
-   14: alternatives vector<DataElement:optional>:MAX_SEQUENCE_LENGTH;
+    10: url fuchsia.url.Url;
+    11: uuid fuchsia.bluetooth.Uuid;
+    12: b bool;
+    13: sequence vector<DataElement:optional>:MAX_SEQUENCE_LENGTH;
+    14: alternatives vector<DataElement:optional>:MAX_SEQUENCE_LENGTH;
 };
 
 /// Defined Protocol Identifiers for the Protocol Descriptor

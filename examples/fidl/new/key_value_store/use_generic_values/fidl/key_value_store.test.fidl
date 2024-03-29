@@ -31,14 +31,14 @@ type Value = flexible union {
     7: int16 int16;
     8: uint32 uint32;
     9: int32 int32;
-   10: float32 float32;
-   11: uint64 uint64;
-   12: int64 int64;
-   13: float64 float64;
+    10: float32 float32;
+    11: uint64 uint64;
+    12: int64 int64;
+    13: float64 float64;
 
     // FIDL does not natively support 128-bit integer types, so we have to define our own
     // representations.
-   14: uint128 array<uint64, 2>;
+    14: uint128 array<uint64, 2>;
 };
 
 // Because we now supoprt a richer range of types as values in our store, it is helpful to use a

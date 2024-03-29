@@ -20,12 +20,12 @@ type Protocols = resource table {
     7: thread_legacy_joining server_end:fuchsia.lowpan.experimental.LegacyJoining;
     8: thread_dataset server_end:fuchsia.lowpan.thread.Dataset;
     9: energy_scan server_end:fuchsia.lowpan.device.EnergyScan;
-   10: experimental_device server_end:fuchsia.lowpan.experimental.Device;
-   11: experimental_device_extra server_end:fuchsia.lowpan.experimental.DeviceExtra;
-   12: meshcop server_end:fuchsia.lowpan.thread.Meshcop;
-   13: telemetry_provider server_end:fuchsia.lowpan.experimental.TelemetryProvider;
-   14: thread_feature server_end:fuchsia.lowpan.thread.Feature;
-   15: capabilities server_end:fuchsia.lowpan.thread.ThreadCapabilities;
+    10: experimental_device server_end:fuchsia.lowpan.experimental.Device;
+    11: experimental_device_extra server_end:fuchsia.lowpan.experimental.DeviceExtra;
+    12: meshcop server_end:fuchsia.lowpan.thread.Meshcop;
+    13: telemetry_provider server_end:fuchsia.lowpan.experimental.TelemetryProvider;
+    14: thread_feature server_end:fuchsia.lowpan.thread.Feature;
+    15: capabilities server_end:fuchsia.lowpan.thread.ThreadCapabilities;
 };
 
 /// Protocol representing a LoWPAN driver instance.

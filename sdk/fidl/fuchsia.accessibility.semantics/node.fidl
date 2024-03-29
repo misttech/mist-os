@@ -247,17 +247,17 @@ type Attributes = table {
     9: table_attributes TableAttributes;
 
     /// The origin of the label of this element.
-   10: label_origin LabelOrigin;
+    10: label_origin LabelOrigin;
 
     /// Whether the element is part of a virtual keyboard. For example, a key
     /// on an onscreen keyboard.
-   11: is_keyboard_key bool;
+    11: is_keyboard_key bool;
 
     /// The table row attributes are filled when the element is a table row.
-   12: table_row_attributes TableRowAttributes;
+    12: table_row_attributes TableRowAttributes;
 
     /// The table cell attributes are filled when the element is a table cell.
-   13: table_cell_attributes TableCellAttributes;
+    13: table_cell_attributes TableCellAttributes;
 };
 
 /// Represents the state of a UI checkbox.
@@ -338,11 +338,11 @@ type States = table {
     /// Whether this element has the input focus. This corresponds to the
     /// system focus. Only one element can have this value set. The behavior is
     /// undetermined if more than one node sets this value to 'true'.
-   10: has_input_focus bool;
+    10: has_input_focus bool;
 
     /// State of an element with enabled/disabled state.
     @available(added=15)
-   11: enabled_state EnabledState;
+    11: enabled_state EnabledState;
 };
 
 /// The Node represents a semantic element on an interface. This may
@@ -407,7 +407,7 @@ type Node = table {
     ///
     ///  where Sx, Sy, and Sz are scale factors and Tx, Ty, Tz are the translation factors for
     ///  the x, y, and z components.
-   10: node_to_container_transform fuchsia.ui.gfx.mat4;
+    10: node_to_container_transform fuchsia.ui.gfx.mat4;
 
     /// Node ID of the ancestor of this node that is used as the target of |transform|.
     /// If not present, this is interpreted as this node's parent.

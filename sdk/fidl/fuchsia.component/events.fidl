@@ -88,7 +88,7 @@ type EventPayload = flexible resource union {
     9: debug_started DebugStartedPayload;
 
     /// Payload for Unresolved events
-   10: unresolved UnresolvedPayload;
+    10: unresolved UnresolvedPayload;
 };
 
 /// Payload for DirectoryReady events

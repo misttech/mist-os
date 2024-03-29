@@ -54,7 +54,7 @@ type ModuleData = resource table {
     /// Services passed to the module.
     ///
     /// This is only set for modules that represent elements.
-   10: additional_services fuchsia.sys.ServiceList;
+    10: additional_services fuchsia.sys.ServiceList;
 };
 
 type ModuleSource = strict enum {

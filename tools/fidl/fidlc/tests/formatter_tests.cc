@@ -2955,44 +2955,9 @@ type MyPopulatedTable_Abcdefgh = table {
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// This test is not technically valid FIDL (ordinals must be dense), but it does parse successfully,
-// which is sufficient for testing outdentation formatting.
-TEST(FormatterTests, TableOutdentation) {
+TEST(FormatterTests, TableOrdinalsMultipleDigits) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
-library foo.bar;
-
-type MyTable = table {
-1: reserved;
-12: field12 bool;
-// comment 1
-123: reserved;
-1234: field1234 bool;
-12345: reserved;
-123456: field123456 table {
-    1: reserved;
-    12: field12 bool;
-    123: reserved;
-
-    // comment 2
-    1234: field1234 bool;
-    12345: reserved;
-    123456: field123456 table {
-        1: reserved;
-        12: field12 bool;
-        123: reserved;
-        1234: field1234 bool;
-        // comment 3
-
-        12345: reserved;
-        123456: field123456 table {};
-    };
-};
-};
-)FIDL";
-
-  // ---------------40---------------- |
-  std::string formatted = R"FIDL(
 library foo.bar;
 
 type MyTable = table {
@@ -3019,6 +2984,40 @@ type MyTable = table {
 
         12345: reserved;
        123456: field123456
+                    table {};
+        };
+    };
+};
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library foo.bar;
+
+type MyTable = table {
+    1: reserved;
+    12: field12 bool;
+    // comment 1
+    123: reserved;
+    1234: field1234 bool;
+    12345: reserved;
+    123456: field123456 table {
+        1: reserved;
+        12: field12 bool;
+        123: reserved;
+
+        // comment 2
+        1234: field1234 bool;
+        12345: reserved;
+        123456: field123456 table {
+            1: reserved;
+            12: field12 bool;
+            123: reserved;
+            1234: field1234 bool;
+            // comment 3
+
+            12345: reserved;
+            123456: field123456
                     table {};
         };
     };
@@ -3274,44 +3273,9 @@ type MyUnion_A = strict resource union {
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// This test is not technically valid FIDL (ordinals must be dense), but it does parse successfully,
-// which is sufficient for testing outdentation formatting.
-TEST(FormatterTests, UnionOutdentation) {
+TEST(FormatterTests, UnionOrdinalsMultipleDigits) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
-library foo.bar;
-
-type MyUnion = flexible resource union {
-1: reserved;
-12: field12 bool;
-// comment 1
-123: reserved;
-1234: field1234 bool;
-12345: reserved;
-123456: field123456 flexible union {
-    1: reserved;
-    12: field12 bool;
-    123: reserved;
-
-    // comment 2
-    1234: field1234 bool;
-    12345: reserved;
-    123456: field123456 strict union {
-        1: reserved;
-        12: field12 bool;
-        123: reserved;
-        1234: field1234 bool;
-        // comment 3
-
-        12345: reserved;
-        123456: field123456 struct {};
-    };
-};
-};
-)FIDL";
-
-  // ---------------40---------------- |
-  std::string formatted = R"FIDL(
 library foo.bar;
 
 type MyUnion = flexible resource union {
@@ -3339,6 +3303,41 @@ type MyUnion = flexible resource union {
 
         12345: reserved;
        123456: field123456
+                    struct {};
+        };
+    };
+};
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library foo.bar;
+
+type MyUnion = flexible resource union {
+    1: reserved;
+    12: field12 bool;
+    // comment 1
+    123: reserved;
+    1234: field1234 bool;
+    12345: reserved;
+    123456: field123456 flexible union {
+        1: reserved;
+        12: field12 bool;
+        123: reserved;
+
+        // comment 2
+        1234: field1234 bool;
+        12345: reserved;
+        123456: field123456
+                strict union {
+            1: reserved;
+            12: field12 bool;
+            123: reserved;
+            1234: field1234 bool;
+            // comment 3
+
+            12345: reserved;
+            123456: field123456
                     struct {};
         };
     };

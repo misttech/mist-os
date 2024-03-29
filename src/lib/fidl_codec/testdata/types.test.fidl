@@ -360,9 +360,9 @@ type DataElement = strict union {
     7: uint32 uint32;
     8: uint64 uint64;
     9: str string:MAX_STRING_LENGTH;
-   10: b bool;
-   11: sequence vector<DataElement:optional>:MAX_SEQUENCE_LENGTH;
-   12: alternatives vector<DataElement:optional>:MAX_SEQUENCE_LENGTH;
+    10: b bool;
+    11: sequence vector<DataElement:optional>:MAX_SEQUENCE_LENGTH;
+    12: alternatives vector<DataElement:optional>:MAX_SEQUENCE_LENGTH;
 };
 
 type U8U16UnionStructType = struct {

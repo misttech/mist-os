@@ -135,10 +135,10 @@ type Profile = table {
     /// If true, bold characters will use the bright color variant as well.
     9: use_bright_for_bold bool;
 
-   10: ansi_colors array<fuchsia.ui.types.ColorRgb, 16>;
+    10: ansi_colors array<fuchsia.ui.types.ColorRgb, 16>;
 
     /// A struct representing the cursor.
-   11: cursor Cursor;
+    11: cursor Cursor;
 };
 
 /// A description of the terminal's cursor.

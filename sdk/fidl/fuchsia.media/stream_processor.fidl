@@ -35,7 +35,7 @@ type StreamBufferConstraints = table {
     1: buffer_constraints_version_ordinal uint64;
 
     @deprecated("Ignore. Obsolete.")
-   12: single_buffer_mode_allowed bool;
+    12: single_buffer_mode_allowed bool;
     @deprecated("Ignore. Use fuchsia.sysmem.BufferCollection.SetConstraints() ")
     2: default_settings StreamBufferSettings;
     @deprecated("Ignore. Use fuchsia.sysmem.BufferCollection.SetConstraints() ")
@@ -53,11 +53,11 @@ type StreamBufferConstraints = table {
     @deprecated("Ignore. Use fuchsia.sysmem.BufferCollection.SetConstraints() ")
     9: packet_count_for_server_max uint32;
     @deprecated("Ignore. Use fuchsia.sysmem.BufferCollection.SetConstraints() ")
-   10: packet_count_for_client_min uint32;
+    10: packet_count_for_client_min uint32;
     @deprecated("Ignore. Use fuchsia.sysmem.BufferCollection.SetConstraints() ")
-   11: packet_count_for_client_max uint32;
+    11: packet_count_for_client_max uint32;
     @deprecated("Ignore. Use fuchsia.sysmem.BufferCollection.SetConstraints() ")
-   13: is_physically_contiguous_required bool;
+    13: is_physically_contiguous_required bool;
 };
 
 /// The stream-processor-controlled output configuration, including both

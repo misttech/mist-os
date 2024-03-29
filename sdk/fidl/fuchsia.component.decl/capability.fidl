@@ -20,7 +20,7 @@ type Capability = flexible union {
     @available(added=HEAD)
     9: dictionary Dictionary;
     @available(added=HEAD)
-   10: config Configuration;
+    10: config Configuration;
 };
 
 /// Declares a service capability backed by this component.

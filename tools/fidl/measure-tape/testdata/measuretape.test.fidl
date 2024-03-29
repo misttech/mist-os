@@ -8,7 +8,7 @@ using zx;
 // 24 bytes + selected member size
 type TopLevelUnion = strict resource union {
     1: primitive8 uint64;
-   24: primitive4 uint32;
+    24: primitive4 uint32;
     2: handle zx.Handle;
     3: struct_with_string StructWithString;
     4: struct_with_opt_string StructWithOptString;
@@ -17,20 +17,20 @@ type TopLevelUnion = strict resource union {
     7: array_of_three_strings array<string, 3>;
     8: array_of_three_handles array<zx.Handle, 3>;
     9: array_of_two_tables array<Table, 2>;
-   10: array_of_two_unions array<Union, 2>;
-   11: struct_with_two_arrays StructWithTwoArrays;
-   12: array_of_three_structs_with_one_handle array<StructWithOneHandle, 3>;
-   21: array_of_three_structs_with_two_handles array<StructWithTwoHandles, 3>;
-   13: vector_of_bytes vector<byte>;
-   14: vector_of_strings vector<string>;
-   15: vector_of_handles vector<zx.Handle>;
-   16: vector_of_tables vector<Table>;
-   17: vector_of_unions vector<Union>;
-   18: struct_with_two_vectors StructWithTwoVectors;
-   19: vector_of_structs_with_one_handle vector<StructWithOneHandle>;
-   20: vector_of_structs_with_two_handles vector<StructWithTwoHandles>;
-   22: flexible_union FlexibleUnion;
-   23: struct_with_a_vector StructWithAVector;
+    10: array_of_two_unions array<Union, 2>;
+    11: struct_with_two_arrays StructWithTwoArrays;
+    12: array_of_three_structs_with_one_handle array<StructWithOneHandle, 3>;
+    21: array_of_three_structs_with_two_handles array<StructWithTwoHandles, 3>;
+    13: vector_of_bytes vector<byte>;
+    14: vector_of_strings vector<string>;
+    15: vector_of_handles vector<zx.Handle>;
+    16: vector_of_tables vector<Table>;
+    17: vector_of_unions vector<Union>;
+    18: struct_with_two_vectors StructWithTwoVectors;
+    19: vector_of_structs_with_one_handle vector<StructWithOneHandle>;
+    20: vector_of_structs_with_two_handles vector<StructWithTwoHandles>;
+    22: flexible_union FlexibleUnion;
+    23: struct_with_a_vector StructWithAVector;
 };
 
 // 8 bytes (i.e. 4 bytes, aligned to 8)

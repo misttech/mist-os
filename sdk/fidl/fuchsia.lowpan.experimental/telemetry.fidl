@@ -84,47 +84,47 @@ type BorderRoutingCounters = table {
     /// The number of RA packets successfully transmitted.
     ///
     /// Required.
-   10: ra_tx_success uint32;
+    10: ra_tx_success uint32;
 
     /// The number of RA packets failed to transmit.
     ///
     /// Required.
-   11: ra_tx_failure uint32;
+    11: ra_tx_failure uint32;
 
     /// The number of received RS packets.
     ///
     /// Required.
-   12: rs_rx uint32;
+    12: rs_rx uint32;
 
     /// The number of RS packets successfully transmitted.
     ///
     /// Required.
-   13: rs_tx_success uint32;
+    13: rs_tx_success uint32;
 
     /// The number of RS packets failed to transmit.
     ///
     /// Required.
-   14: rs_tx_failure uint32;
+    14: rs_tx_failure uint32;
 
     /// Inbound Internet packets when DHCPv6 PD enabled.
     ///
     /// Optional.
-   15: inbound_internet_packets uint64;
+    15: inbound_internet_packets uint64;
 
     /// Inbound Internet bytes when DHCPv6 PD enabled.
     ///
     /// Optional.
-   16: inbound_internet_bytes uint64;
+    16: inbound_internet_bytes uint64;
 
     /// Outbound Internet packets when DHCPv6 PD enabled.
     ///
     /// Optional.
-   17: outbound_internet_packets uint64;
+    17: outbound_internet_packets uint64;
 
     /// Outbound Internet bytes when DHCPv6 PD enabled.
     ///
     /// Optional.
-   18: outbound_internet_bytes uint64;
+    18: outbound_internet_bytes uint64;
 };
 
 /// Represents the count of queries, responses, failures handled by upstream DNS server
@@ -554,72 +554,72 @@ type Telemetry = table {
     /// The full network data version.
     ///
     /// Only present on Thread networks.
-   10: thread_network_data_version uint8;
+    10: thread_network_data_version uint8;
 
     /// The stable network data version.
     ///
     /// Only present on Thread networks.
-   11: thread_stable_network_data_version uint8;
+    11: thread_stable_network_data_version uint8;
 
     /// The current Thread network data, in raw binary form, as defined in section 5.13 of
     /// the Thread 1.1.1 specification.
     ///
     /// Only present on Thread networks.
-   12: thread_network_data vector<uint8>:255;
+    12: thread_network_data vector<uint8>:255;
 
     /// The current Thread stable network data, in raw binary form, as defined in section 5.13 of
     /// the Thread 1.1.1 specification.
     ///
     /// Only present on Thread networks.
-   13: thread_stable_network_data vector<uint8>:255;
+    13: thread_stable_network_data vector<uint8>:255;
 
     /// The counters associated with border routing messages.
     ///
     /// Only present on Thread networks.
-   14: thread_border_routing_counters BorderRoutingCounters;
+    14: thread_border_routing_counters BorderRoutingCounters;
 
     /// The SRP server information.
     ///
     /// Only present on Thread networks.
-   15: srp_server_info SrpServerInfo;
+    15: srp_server_info SrpServerInfo;
 
     /// The DNS-SD server counters.
     ///
     /// Only present on Thread networks.
-   16: dnssd_counters DnssdCounters;
+    16: dnssd_counters DnssdCounters;
 
     /// The data associated with the leader of the currently associated Thread network.
     ///
     /// Only present on Thread networks.
-   17: leader_data LeaderData;
+    17: leader_data LeaderData;
 
     /// The uptime of the current instance.
     ///
     /// Required.
-   18: uptime zx.Duration;
+    18: uptime zx.Duration;
 
     /// Information about the NAT64
     ///
     /// Only present on Thread networks.
-   19: nat64_info Nat64Info;
+    19: nat64_info Nat64Info;
 
     /// Information about the TREL interface, if available.
     ///
     /// Only present on Thread networks.
-   20: trel_counters TrelCounters;
+    20: trel_counters TrelCounters;
 
     /// Information about the TREL peers, if available.
     ///
     /// Only present on Thread networks.
-   21: trel_peers_info TrelPeersInfo;
+    21: trel_peers_info TrelPeersInfo;
 
     /// Information about the Upstream DNS feature, if available.
     ///
     /// Only present on Thread networks.
-   22: upstream_dns_info UpstreamDnsInfo;
+    22: upstream_dns_info UpstreamDnsInfo;
 
     /// Information about the DHCPv6 PD feature, if available.
     ///
     /// Only present on Thread networks.
-   23: dhcp6pd_info Dhcp6PdInfo;
+    23: dhcp6pd_info Dhcp6PdInfo;
 };

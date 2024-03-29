@@ -72,11 +72,11 @@ type TargetInfo = table {
     /// device over SSH, and will include a port number if a custom SSH
     /// port number has been set.
     9: ssh_address TargetAddrInfo;
-   10: fastboot_interface FastbootInterface;
+    10: fastboot_interface FastbootInterface;
     /// The address of the ssh host as seen by the target.
-   11: ssh_host_address SshHostAddrInfo;
+    11: ssh_host_address SshHostAddrInfo;
     /// Compatibility status between host tools and target.
-   12: compatibility rc.CompatibilityInfo;
+    12: compatibility rc.CompatibilityInfo;
 };
 
 type TargetRebootError = strict enum {

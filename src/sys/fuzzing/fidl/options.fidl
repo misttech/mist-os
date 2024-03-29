@@ -107,61 +107,61 @@ type Options = table {
 
     /// If non-zero, any allocation over this size in bytes will raise a
     /// BAD_MALLOC error. Use 0 to disable the limit. Defaults to 2 GB.
-   10: malloc_limit uint64;
+    10: malloc_limit uint64;
 
     /// If non-zero, any process that uses more than this amount of memory in
     /// bytes will raise an OOM error. Use 0 to disable the limit. Defaults to
     /// 2 GB.
-   11: oom_limit uint64;
+    11: oom_limit uint64;
 
     /// If non-zero, purge the sanitizer's allocator quarantine and reclaim
     /// memory periodically between runs after an interval of this many seconds.
     /// Use 0 to disable allocator purging. Defaults to 1 second.
-   12: purge_interval zx.Duration;
+    12: purge_interval zx.Duration;
 
     /// Exit code used by the instrumented process if it encounters a bad
     /// allocation. Set this if the target already uses the default for another
     /// reason. Defaults to 2000.
-   13: malloc_exitcode int32;
+    13: malloc_exitcode int32;
 
     /// Exit code used by the instrumented process if it encounters a sanitizer
     /// error. Set this if the target already uses the default for another
     /// reason. Defaults to 2001.
-   14: death_exitcode int32;
+    14: death_exitcode int32;
 
     /// Exit code used by the instrumented process if it encounters a leak. Set
     /// this if the target already uses the default for another reason. Defaults
     /// to 2002.
-   15: leak_exitcode int32;
+    15: leak_exitcode int32;
 
     /// Exit code used by the instrumented process if it exceeds the OOM limit.
     /// Set this if the target already uses the default for another reason.
     /// Defaults to 2003.
-   16: oom_exitcode int32;
+    16: oom_exitcode int32;
 
     /// If non-zero, the engine will periodically update any added monitors
     /// after this duration. Defaults to 20 seconds.
-   17: pulse_interval zx.Duration;
+    17: pulse_interval zx.Duration;
 
     /// If true, allow a debugger like `zxdb` to be attached to an instrumented
     /// process. This may interfere with the engine's ability to detect
     /// exceptions and is not recommended when fuzzing. It can be useful when
     /// reproducing an error with a known error-causing input. Defaults to
     /// false.
-   18: debug bool;
+    18: debug bool;
 
     /// If true, include ClusterFuzz-compatible final statistics in the output
     /// of a call to `fuchsia.fuzzer.Controller/WatchArtifact`.
-   19: print_final_stats bool;
+    19: print_final_stats bool;
 
     /// If true, also use data flow traces as part of the fuzzing coverage data.
     /// See https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-data-flow
     /// for more details.
-   20: use_value_profile bool;
+    20: use_value_profile bool;
 
     /// Sanitizer options. See `SanitizerOptions`.
-   21: sanitizer_options SanitizerOptions;
+    21: sanitizer_options SanitizerOptions;
 
     /// Output flags. See `OutputFlags`.
-   22: output_flags OutputFlags;
+    22: output_flags OutputFlags;
 };

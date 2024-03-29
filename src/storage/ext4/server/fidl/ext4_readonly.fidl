@@ -155,21 +155,21 @@ type ParseError = flexible union {
     7: invalid_extent_header InvalidExtentHeader;
     8: invalid_extent_header_magic InvalidExtentHeaderMagic;
     9: invalid_extent InvalidExtent;
-   10: extent_unexpected_length ExtentUnexpectedLength;
-   11: invalid_dir_entry_2 InvalidDirEntry2;
-   12: dir_entry_2_non_utf8 DirEntry2NonUtf8;
-   13: invalid_input_path InvalidInputPath;
-   14: path_not_found PathNotFound;
-   15: bad_entry_type BadEntryType;
-   16: incompatible Incompatible;
-   17: bad_file BadFile;
-   18: bad_directory BadDirectory;
-   19: reader_read_error ReaderReadError;
+    10: extent_unexpected_length ExtentUnexpectedLength;
+    11: invalid_dir_entry_2 InvalidDirEntry2;
+    12: dir_entry_2_non_utf8 DirEntry2NonUtf8;
+    13: invalid_input_path InvalidInputPath;
+    14: path_not_found PathNotFound;
+    15: bad_entry_type BadEntryType;
+    16: incompatible Incompatible;
+    17: bad_file BadFile;
+    18: bad_directory BadDirectory;
+    19: reader_read_error ReaderReadError;
     @deprecated
-   20: reader_out_of_bounds ReaderOutOfBounds;
-   21: required_feature_incompat RequiredFeatureIncompat;
-   22: banned_feature_incompat BannedFeatureIncompat;
-   23: invalid_address InvalidAddress;
+    20: reader_out_of_bounds ReaderOutOfBounds;
+    21: required_feature_incompat RequiredFeatureIncompat;
+    22: banned_feature_incompat BannedFeatureIncompat;
+    23: invalid_address InvalidAddress;
 };
 
 /// Result of an [`Ext4Server.MountVmo`] call.

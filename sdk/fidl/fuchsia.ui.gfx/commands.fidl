@@ -24,81 +24,81 @@ type Command = strict resource union {
     7: set_translation SetTranslationCmd;
     8: set_scale SetScaleCmd;
     9: set_rotation SetRotationCmd;
-   10: set_anchor SetAnchorCmd;
-   11: set_size SetSizeCmd;
-   12: set_opacity SetOpacityCmd;
+    10: set_anchor SetAnchorCmd;
+    11: set_size SetSizeCmd;
+    12: set_opacity SetOpacityCmd;
 
-   13: send_size_change_hint_hack SendSizeChangeHintCmdHACK;
+    13: send_size_change_hint_hack SendSizeChangeHintCmdHACK;
 
     /// Node-specific commands.
-   14: add_child AddChildCmd; // TODO: Should we require a DetachCmd before
+    14: add_child AddChildCmd; // TODO: Should we require a DetachCmd before
     /// re-parenting?
-   15: add_part AddPartCmd;
-   16: detach_children DetachChildrenCmd;
-   17: set_shape SetShapeCmd;
-   18: set_material SetMaterialCmd;
-   19: set_clip SetClipCmd;
-   20: set_hit_test_behavior SetHitTestBehaviorCmd;
-   21: set_view_properties SetViewPropertiesCmd;
-   22: take_snapshot_cmd TakeSnapshotCmdDEPRECATED;
+    15: add_part AddPartCmd;
+    16: detach_children DetachChildrenCmd;
+    17: set_shape SetShapeCmd;
+    18: set_material SetMaterialCmd;
+    19: set_clip SetClipCmd;
+    20: set_hit_test_behavior SetHitTestBehaviorCmd;
+    21: set_view_properties SetViewPropertiesCmd;
+    22: take_snapshot_cmd TakeSnapshotCmdDEPRECATED;
 
     /// Camera and lighting commands.
-   23: set_camera SetCameraCmd;
-   24: set_camera_transform SetCameraTransformCmd;
-   25: set_camera_projection SetCameraProjectionCmd;
-   26: set_stereo_camera_projection SetStereoCameraProjectionCmd;
-   27: set_camera_pose_buffer SetCameraPoseBufferCmd;
-   28: set_light_color SetLightColorCmd;
-   29: set_light_direction SetLightDirectionCmd;
-   30: add_light AddLightCmd;
-   31: detach_light DetachLightCmd;
-   32: detach_lights DetachLightsCmd;
+    23: set_camera SetCameraCmd;
+    24: set_camera_transform SetCameraTransformCmd;
+    25: set_camera_projection SetCameraProjectionCmd;
+    26: set_stereo_camera_projection SetStereoCameraProjectionCmd;
+    27: set_camera_pose_buffer SetCameraPoseBufferCmd;
+    28: set_light_color SetLightColorCmd;
+    29: set_light_direction SetLightDirectionCmd;
+    30: add_light AddLightCmd;
+    31: detach_light DetachLightCmd;
+    32: detach_lights DetachLightsCmd;
 
-   33: set_texture SetTextureCmd;
-   34: set_color SetColorCmd;
+    33: set_texture SetTextureCmd;
+    34: set_color SetColorCmd;
 
     /// Mesh commands.
-   35: bind_mesh_buffers BindMeshBuffersCmd;
+    35: bind_mesh_buffers BindMeshBuffersCmd;
 
     /// Layer and renderer commands.
-   36: add_layer AddLayerCmd;
-   37: remove_layer RemoveLayerCmd;
-   38: remove_all_layers RemoveAllLayersCmd;
-   39: set_layer_stack SetLayerStackCmd;
-   40: set_renderer SetRendererCmd;
-   41: set_renderer_param SetRendererParamCmd;
+    36: add_layer AddLayerCmd;
+    37: remove_layer RemoveLayerCmd;
+    38: remove_all_layers RemoveAllLayersCmd;
+    39: set_layer_stack SetLayerStackCmd;
+    40: set_renderer SetRendererCmd;
+    41: set_renderer_param SetRendererParamCmd;
 
     /// Events.
-   42: set_event_mask SetEventMaskCmd;
+    42: set_event_mask SetEventMaskCmd;
 
     /// Diagnostic commands.
-   43: set_label SetLabelCmd;
+    43: set_label SetLabelCmd;
 
     /// Debugging commands.
-   44: set_disable_clipping SetDisableClippingCmd;
-   45: set_import_focus SetImportFocusCmdDEPRECATED;
+    44: set_disable_clipping SetDisableClippingCmd;
+    45: set_import_focus SetImportFocusCmdDEPRECATED;
 
     // TODO(https://fxbug.dev/42098623): Move these where they belong.  They're added to the end of
     // the struct temporarily until we transition to xunions.
-   46: set_clip_planes SetClipPlanesCmd;
-   47: set_point_light_position SetPointLightPositionCmd;
-   48: set_point_light_falloff SetPointLightFalloffCmd;
-   49: scene__add_ambient_light SceneAddAmbientLightCmd;
-   50: scene__add_directional_light SceneAddDirectionalLightCmd;
-   51: scene__add_point_light SceneAddPointLightCmd;
+    46: set_clip_planes SetClipPlanesCmd;
+    47: set_point_light_position SetPointLightPositionCmd;
+    48: set_point_light_falloff SetPointLightFalloffCmd;
+    49: scene__add_ambient_light SceneAddAmbientLightCmd;
+    50: scene__add_directional_light SceneAddDirectionalLightCmd;
+    51: scene__add_point_light SceneAddPointLightCmd;
 
-   52: set_display_color_conversion SetDisplayColorConversionCmdHACK;
+    52: set_display_color_conversion SetDisplayColorConversionCmdHACK;
 
-   53: set_display_rotation SetDisplayRotationCmdHACK;
+    53: set_display_rotation SetDisplayRotationCmdHACK;
 
-   54: set_enable_view_debug_bounds SetEnableDebugViewBoundsCmd;
-   55: set_view_holder_bounds_color SetViewHolderBoundsColorCmd;
+    54: set_enable_view_debug_bounds SetEnableDebugViewBoundsCmd;
+    55: set_view_holder_bounds_color SetViewHolderBoundsColorCmd;
 
-   56: set_camera_clip_space_transform SetCameraClipSpaceTransformCmd;
+    56: set_camera_clip_space_transform SetCameraClipSpaceTransformCmd;
 
-   57: set_display_minimum_rgb SetDisplayMinimumRgbCmdHACK;
+    57: set_display_minimum_rgb SetDisplayMinimumRgbCmdHACK;
 
-   58: set_semantic_visibility SetSemanticVisibilityCmd;
+    58: set_semantic_visibility SetSemanticVisibilityCmd;
 };
 
 /// Instructs the compositor to create the specified `Resource`, and to register

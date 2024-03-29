@@ -31,11 +31,11 @@ type MemoryStatsExtended = table {
     7: vmo_pager_total_bytes uint64;
     8: vmo_pager_newest_bytes uint64;
     9: vmo_pager_oldest_bytes uint64;
-   10: vmo_discardable_locked_bytes uint64;
-   11: vmo_discardable_unlocked_bytes uint64;
-   12: mmu_overhead_bytes uint64;
-   13: ipc_bytes uint64;
-   14: other_bytes uint64;
+    10: vmo_discardable_locked_bytes uint64;
+    11: vmo_discardable_unlocked_bytes uint64;
+    12: mmu_overhead_bytes uint64;
+    13: ipc_bytes uint64;
+    14: other_bytes uint64;
 };
 
 // Similarly, this table mirrors zx_info_kmem_stats_compression_t.
@@ -51,11 +51,11 @@ type MemoryStatsCompression = table {
     7: failed_page_compression_attempts uint64;
     8: total_page_decompressions uint64;
     9: compressed_page_evictions uint64;
-   10: eager_page_compressions uint64;
-   11: memory_pressure_page_compressions uint64;
-   12: critical_memory_page_compressions uint64;
-   13: pages_decompressed_unit_ns uint64;
-   14: pages_decompressed_within_log_time array<uint64, 8>;
+    10: eager_page_compressions uint64;
+    11: memory_pressure_page_compressions uint64;
+    12: critical_memory_page_compressions uint64;
+    13: pages_decompressed_unit_ns uint64;
+    14: pages_decompressed_within_log_time array<uint64, 8>;
 };
 
 // Similarly, this table mirrors zx_info_cpu_stats_t.
@@ -70,12 +70,12 @@ type PerCpuStats = table {
     7: yields uint64;
     8: ints uint64;
     9: timer_ints uint64;
-   10: timers uint64;
-   11: page_faults uint64;
-   12: exceptions uint64;
-   13: syscalls uint64;
-   14: reschedule_ipis uint64;
-   15: generic_ipis uint64;
+    10: timers uint64;
+    11: page_faults uint64;
+    12: exceptions uint64;
+    13: syscalls uint64;
+    14: reschedule_ipis uint64;
+    15: generic_ipis uint64;
 };
 
 type CpuStats = struct {

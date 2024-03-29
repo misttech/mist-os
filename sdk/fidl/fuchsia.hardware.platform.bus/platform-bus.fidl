@@ -115,14 +115,14 @@ type Node = table {
     /// SMC calls.
     9: smc vector<Smc>:MAX;
     /// Metadata
-   10: metadata vector<Metadata>:MAX;
+    10: metadata vector<Metadata>:MAX;
     /// Boot metadata (from ZBI items)
-   11: boot_metadata vector<BootMetadata>:MAX;
+    11: boot_metadata vector<BootMetadata>:MAX;
 
     /// Other node properties beyond BIND_PLATFORM_DEV_VID, BIND_PLATFORM_DEV_PID, and BIND_PLATFORM_DEV_DID.
-   12: properties
+    12: properties
             vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
-   13: power_config
+    13: power_config
             vector<fuchsia.hardware.power.PowerElementConfiguration>:MAX_INFO_STRING_LENGTH;
 };
 

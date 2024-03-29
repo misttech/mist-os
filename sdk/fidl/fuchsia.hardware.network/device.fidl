@@ -75,7 +75,7 @@ type DeviceBaseInfo = table {
     /// `n` of `rx_accel` conveys the meaning of the `RX_ACCEL_n` flag.
     ///
     /// Interpreted as empty if not provided.
-   10: rx_accel vector<RxAcceleration>:MAX_ACCEL_FLAGS;
+    10: rx_accel vector<RxAcceleration>:MAX_ACCEL_FLAGS;
     /// Available tx acceleration flags for this device.
     ///
     /// `tx_accel` maps the `TX_ACCEL_*` flags in the frame descriptors with
@@ -83,7 +83,7 @@ type DeviceBaseInfo = table {
     /// `n` of `tx_accel` conveys the meaning of the `TX_ACCEL_n` flag.
     ///
     /// Interpreted as empty if not provided.
-   11: tx_accel vector<TxAcceleration>:MAX_ACCEL_FLAGS;
+    11: tx_accel vector<TxAcceleration>:MAX_ACCEL_FLAGS;
 };
 
 /// Network device information.

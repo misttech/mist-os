@@ -64,32 +64,32 @@ type Io1Config = table {
     9: supports_set_attr bool;
 
     /// GetToken is supported.
-   10: supports_get_token bool;
+    10: supports_get_token bool;
 
     /// Path handling conforms to in-tree behavior.
     // TODO(https://fxbug.dev/42070484): Remove this option when all harnesses have conformant path handling.
-   11: conformant_path_handling bool;
+    11: conformant_path_handling bool;
 
     /// Unlink is supported.
-   12: supports_unlink bool;
+    12: supports_unlink bool;
 
     /// Supports fuchsia.io's Open2 method.
-   13: supports_open2 bool;
+    13: supports_open2 bool;
 
     /// Supports fuchsia.io's GetAttributes method.
-   14: supports_get_attributes bool;
+    14: supports_get_attributes bool;
 
     /// Supports fuchsia.io's UpdateAttributes method.
-   15: supports_update_attributes bool;
+    15: supports_update_attributes bool;
 
     /// Supports fuchsia.io's LinkInto method.
-   16: supports_link_into bool;
+    16: supports_link_into bool;
 
     /// Supports directory watchers.
-   17: supports_directory_watchers bool;
+    17: supports_directory_watchers bool;
 
     /// Files can be opened in append mode.
-   18: supports_append bool;
+    18: supports_append bool;
 };
 
 /// Directory entries should support opening with any combination of read/write/execute rights.

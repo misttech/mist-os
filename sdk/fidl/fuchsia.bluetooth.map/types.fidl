@@ -40,14 +40,14 @@ type Message = table {
     9: priority bool;
     /// Whether or not message was read.
     /// If this information is missing, it would be set as unknown, not false.
-   10: read bool;
+    10: read bool;
     /// Whether or not meessage has already been sent to the recipient.
     /// If this information is missing, it would be set as unknown, not false.
-   11: sent bool;
+    11: sent bool;
     /// Whether or not message is protected by a DRM scheme.
-   12: protected bool;
+    12: protected bool;
     /// A 128 bit value that uniquely identifies a conversation within a single MAS instance.
-   13: conversation_id array<uint8, CONVERSATION_ID_LENGTH>;
+    13: conversation_id array<uint8, CONVERSATION_ID_LENGTH>;
 };
 
 type Audience = table {

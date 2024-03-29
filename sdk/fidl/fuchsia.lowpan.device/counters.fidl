@@ -106,69 +106,69 @@ type MacCounters = table {
     9: beacon uint32;
 
     /// The number of beacon request frames
-   10: beacon_request uint32;
+    10: beacon_request uint32;
 
     /// The number of other types of frames
-   11: other uint32;
+    11: other uint32;
 
     /// The number of frames filtered by address filter (allowlist
     /// or denylist).
-   12: address_filtered uint32;
+    12: address_filtered uint32;
 
     /// The number of retransmission attempts.
     /// TX only.
-   13: retries uint32;
+    13: retries uint32;
 
     /// The number of expired retransmission retries for direct message.
     /// TX only.
-   14: direct_max_retry_expiry uint32;
+    14: direct_max_retry_expiry uint32;
 
     /// The number of expired retransmission retries for indirect message
     /// TX only.
-   15: indirect_max_retry_expiry uint32;
+    15: indirect_max_retry_expiry uint32;
 
     /// The number of received frames filtered by destination check.
     /// RX only.
-   16: dest_addr_filtered uint32;
+    16: dest_addr_filtered uint32;
 
     /// The number of received duplicated frames.
     /// RX only.
-   17: duplicated uint32;
+    17: duplicated uint32;
 
     /// The number of received frames with no or malformed content.
     /// RX only.
-   18: err_no_frame uint32;
+    18: err_no_frame uint32;
 
     /// The number of received frames from unknown neighbor.
     /// RX only.
-   19: err_unknown_neighbor uint32;
+    19: err_unknown_neighbor uint32;
 
     /// The number of received frames whose source address is invalid.
     /// RX only.
-   20: err_invalid_src_addr uint32;
+    20: err_invalid_src_addr uint32;
 
     /// The number of received frames with security error.
     /// RX only.
-   21: err_sec uint32;
+    21: err_sec uint32;
 
     /// The number of received frames with FCS error.
     /// RX only.
-   22: err_fcs uint32;
+    22: err_fcs uint32;
 
     /// The number of CCA failures.
     /// TX only.
-   23: err_cca uint32;
+    23: err_cca uint32;
 
     /// The number of frame transmission failures due to abort error.
     /// TX only.
-   24: err_abort uint32;
+    24: err_abort uint32;
 
     /// The number of frames that were dropped due to a busy channel.
     /// TX only.
-   25: err_busy_channel uint32;
+    25: err_busy_channel uint32;
 
     /// The number of frames that encountered some other error.
-   26: err_other uint32;
+    26: err_other uint32;
 };
 
 /// Counters associated with RF Coexistance.

@@ -81,9 +81,9 @@ type DeviceInfo = table {
     9: min_tx_buffer_head uint16;
     /// The amount of bytes the device requests be free as `tail` space in a tx
     /// buffer. Required.
-   10: min_tx_buffer_tail uint16;
+    10: min_tx_buffer_tail uint16;
     /// Maximum descriptor chain length accepted by the device. Required.
-   11: max_buffer_parts uint8;
+    11: max_buffer_parts uint8;
     /// Available rx acceleration flags for this device.
     ///
     /// `rx_accel` maps the `RX_ACCEL_*` flags in the frame descriptors with
@@ -91,7 +91,7 @@ type DeviceInfo = table {
     /// `n` of `rx_accel` conveys the meaning of the `RX_ACCEL_n` flag.
     ///
     /// Interpreted as empty if not provided.
-   12: rx_accel vector<RxAcceleration>:MAX_ACCEL_FLAGS;
+    12: rx_accel vector<RxAcceleration>:MAX_ACCEL_FLAGS;
     /// Available tx acceleration flags for this device.
     ///
     /// `tx_accel` maps the `TX_ACCEL_*` flags in the frame descriptors with
@@ -99,7 +99,7 @@ type DeviceInfo = table {
     /// `n` of `tx_accel` conveys the meaning of the `TX_ACCEL_n` flag.
     ///
     /// Interpreted as empty if not provided.
-   13: tx_accel vector<TxAcceleration>:MAX_ACCEL_FLAGS;
+    13: tx_accel vector<TxAcceleration>:MAX_ACCEL_FLAGS;
 };
 
 /// A Network Device.

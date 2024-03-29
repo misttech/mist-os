@@ -211,7 +211,7 @@ type CreateContextParams = resource table {
 
     /// Specifies a set of header names for which [Cross-Origin Resource Sharing
     /// (CORS)](https://www.w3.org/TR/cors/) checks should not be enforced.
-   10: cors_exempt_headers vector<fuchsia.net.http.HeaderName>:MAX;
+    10: cors_exempt_headers vector<fuchsia.net.http.HeaderName>:MAX;
 
     /// Specifies the storage to use to persistent content licensing related data (e.g.
     /// provisioning data, persistent session data). By default these data will be placed under the
@@ -223,17 +223,17 @@ type CreateContextParams = resource table {
     ///
     /// Note that not all content licensing systems support persistent sessions, regardless of
     /// whether persistent storage is provided.
-   11: cdm_data_directory client_end:fuchsia.io.Directory;
+    11: cdm_data_directory client_end:fuchsia.io.Directory;
 
     /// Specifies a target maximum size for `cdm_data_directory` contents, in bytes. If the amount
     /// of persisted CDM data exceeds this threshold, then the [`Context`] will attempt to purge
     /// some data to meet the specified quota.
-   12: cdm_data_quota_bytes uint64;
+    12: cdm_data_quota_bytes uint64;
 
     /// Specifies a target maximum size for `data_directory` contents, in bytes.
     /// The [`Context`] will attempt to limit browsing state (e.g. cookies, LocalStorage) to
     /// not exceed the specified size.
-   13: data_quota_bytes uint64;
+    13: data_quota_bytes uint64;
 };
 
 /// Manages browsing state (e.g. LocalStorage, cookies, etc) associated with a set of [`Frame`].

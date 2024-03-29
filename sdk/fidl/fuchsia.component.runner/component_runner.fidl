@@ -140,7 +140,7 @@ type ComponentStartInfo = resource table {
     /// A dictionary containing data and handles that the component has escrowed
     /// during its previous execution via [`ComponentController.OnEscrow`].
     @available(added=HEAD)
-   10: escrowed_dictionary client_end:fuchsia.component.sandbox.Dictionary;
+    10: escrowed_dictionary client_end:fuchsia.component.sandbox.Dictionary;
 };
 
 /// A protocol for binding and controlling the lifetime of a component instance

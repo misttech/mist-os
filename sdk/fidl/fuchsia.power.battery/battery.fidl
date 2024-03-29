@@ -101,7 +101,7 @@ type BatteryInfo = table {
     9: present_voltage_mv uint32;
 
     /// Forward the battery capqacity in uAh
-   10: remaining_capacity_uah uint32;
+    10: remaining_capacity_uah uint32;
 };
 
 /// Provider interface used to obtain battery status details

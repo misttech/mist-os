@@ -75,12 +75,12 @@ type Info = table {
     //
     // TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
     // Going forward, gain will be handled by `SignalProcessing`.
-   10: gain_caps GainCapabilities;
+    10: gain_caps GainCapabilities;
 
     /// The device's hot-plug capabilities.
     ///
     /// Required.
-   11: plug_detect_caps PlugDetectCapabilities;
+    11: plug_detect_caps PlugDetectCapabilities;
 
     /// An identifier for the clock domain in which the device's clock hardware
     /// operates. Devices in the same clock domain remain perfectly
@@ -98,20 +98,20 @@ type Info = table {
     ///    other known clocks (even any other clocks in `CLOCK_DOMAIN_EXTERNAL`).
     ///
     /// Required for StreamConfig; absent for Codec.
-   12: clock_domain ClockDomain;
+    12: clock_domain ClockDomain;
 
     /// The vector of supported signal-processing elements.
     /// If present, must contain at least one element.
     ///
     /// Optional.
-   13: signal_processing_elements
+    13: signal_processing_elements
             vector<fuchsia.hardware.audio.signalprocessing.Element>:fuchsia.hardware.audio.signalprocessing.MAX_COUNT_PROCESSING_ELEMENTS;
 
     /// The vector of supported signal-processing topologies.
     /// If present, must contain at least one element.
     ///
     /// Optional.
-   14: signal_processing_topologies
+    14: signal_processing_topologies
             vector<fuchsia.hardware.audio.signalprocessing.Topology>:fuchsia.hardware.audio.signalprocessing.MAX_COUNT_TOPOLOGIES;
 };
 

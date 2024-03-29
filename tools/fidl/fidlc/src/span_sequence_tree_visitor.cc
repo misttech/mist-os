@@ -14,24 +14,6 @@ namespace fidlc {
 
 namespace {
 
-// Take the leftmost non-comment leaf (ie, the first printable TokenSpanSequence) of the
-// SpanSequence tree with its root at the provided SpanSequence and outdent it the specified amount.
-bool OutdentFirstChildToken(std::unique_ptr<SpanSequence>& span_sequence, size_t size) {
-  if (span_sequence->GetKind() == SpanSequence::Kind::kToken) {
-    span_sequence->SetOutdentation(size);
-    return true;
-  }
-  if (span_sequence->IsComposite()) {
-    auto& children = static_cast<CompositeSpanSequence*>(span_sequence.get())->EditChildren();
-    for (auto& child : children) {
-      if (OutdentFirstChildToken(child, size))
-        return true;
-    }
-  }
-
-  return false;
-}
-
 // Is the last leaf of the SpanSequence tree with its root at the provided SpanSequence a
 // CommentSpanSequence?
 bool EndsWithComment(const std::unique_ptr<SpanSequence>& span_sequence) {
@@ -708,7 +690,6 @@ void SpanSequenceTreeVisitor::OnOrdinaledLayoutMember(
     OnAttributeList(element->attributes);
   }
 
-  const auto ordinal_digits = element->ordinal->start_token.data().size();
   {
     const auto builder = StatementBuilder<DivisibleSpanSequence>(
         this, *element, SpanSequence::Position::kNewlineIndented);
@@ -729,13 +710,6 @@ void SpanSequenceTreeVisitor::OnOrdinaledLayoutMember(
     SetSpacesBetweenChildren(building_.top(), true);
     ClearBlankLinesAfterAttributeList(element->attributes, building_.top());
   }
-
-  // The closing of the previous scope means that the SpanSequence representing this ordinaled
-  // layout member has been added to the end of the currently building list.  If there is a non-zero
-  // indentation offset (as determined by the number of digits in the ordinal), make sure to apply
-  // it here.
-  if (ordinal_digits > 1 && !building_.top().empty())
-    OutdentFirstChildToken(building_.top().back(), ordinal_digits - 1);
 }
 
 void SpanSequenceTreeVisitor::OnParameterList(const std::unique_ptr<RawParameterList>& element) {

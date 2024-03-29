@@ -99,7 +99,7 @@ type ScoConnectionParameters = table {
     /// Indicates the maximum data buffer size that may be sent.
     /// Optional. Only present after a connection has successfully been connected. Ignored when
     /// requesting a connection.
-   10: max_tx_data_size uint16;
+    10: max_tx_data_size uint16;
 };
 
 /// Inbound SCO data has a RxPacketStatus that indicates possible data loss or corruption.

@@ -22,7 +22,7 @@ type Offer = flexible union {
     @available(added=HEAD)
     9: dictionary OfferDictionary;
     @available(added=HEAD)
-   10: config OfferConfiguration;
+    10: config OfferConfiguration;
 };
 
 /// Describes the type of dependency implied by the capability.

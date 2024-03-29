@@ -447,7 +447,7 @@ type ImageFormatConstraints = table {
     ///
     /// See also `pixel_format` for more comments relevant to multiple
     /// `PixelFormatAndModifier`s in a single `ImageFormatConstraints`.
-   15: pixel_format_and_modifiers
+    15: pixel_format_and_modifiers
             vector<PixelFormatAndModifier>:MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS;
 
     /// Empty is an error. Duplicate entries are an error. Arbitrary ordering is
@@ -593,7 +593,7 @@ type ImageFormatConstraints = table {
     /// * `display_rect.height % display_rect_alignment.height` must be 0.
     ///
     /// Un-set is treated as 1, 1.
-   10: display_rect_alignment fuchsia.math.SizeU;
+    10: display_rect_alignment fuchsia.math.SizeU;
 
     /// These fields can be used to ensure the aggregated constraints have
     /// `min_size` and `max_size` such that both `required_min_size` and
@@ -624,9 +624,9 @@ type ImageFormatConstraints = table {
     /// required_max_size aggregates by taking the max per component.
     ///
     /// Un-set is treated as 0xFFFFFFFF, 0xFFFFFFFF.
-   11: required_min_size fuchsia.math.SizeU;
+    11: required_min_size fuchsia.math.SizeU;
     /// See also `required_min_size`. Un-set is treated as 0, 0.
-   12: required_max_size fuchsia.math.SizeU;
+    12: required_max_size fuchsia.math.SizeU;
 
     /// `fuchsia_images2.ImageFormat.bytes_per_row % bytes_per_row_divisor` must
     /// be 0. Un-set is treated as 1.
@@ -654,7 +654,7 @@ type ImageFormatConstraints = table {
     /// also result in a "fake" `size.width`; this field exists to avoid that
     /// situation. Instead, the stride alignment requirement in bytes is
     /// specified directly here.
-   13: bytes_per_row_divisor uint32;
+    13: bytes_per_row_divisor uint32;
 
     /// `vmo_usable_start % start_offset_divisor` must be 0. Un-set is treated
     /// as 1.
@@ -662,7 +662,7 @@ type ImageFormatConstraints = table {
     /// Producer participants are discouraged from setting non-zero image start
     /// offset (from the buffer base) unless actually required, as not all
     /// participants correctly handle non-zero image start offset.
-   14: start_offset_divisor uint32;
+    14: start_offset_divisor uint32;
 
     /// Iff set and true, bytes_per_row_divisor in the resulting
     /// ImageFormatConstraints is guaranteed to be a value which requires
@@ -675,5 +675,5 @@ type ImageFormatConstraints = table {
     /// set to true, the resulting bytes_per_row_divisor will be a multiple of
     /// 3. In this example, if another participant sets `bytes_per_row_divisor`
     /// to 4, the resulting `bytes_per_row_divisor` will be a multiple of 12.
-   16: require_bytes_per_row_at_pixel_boundary bool;
+    16: require_bytes_per_row_at_pixel_boundary bool;
 };

@@ -511,18 +511,18 @@ type AllTypesTable = resource table {
     7: uint16_member uint16;
     8: uint32_member uint32;
     9: uint64_member uint64;
-   10: float32_member float32;
-   11: float64_member float64;
-   12: enum_member default_enum;
-   13: bits_member default_bits;
-   14: handle_member zx.Handle;
-   15: string_member string;
-   16: struct_member this_is_a_struct;
-   17: union_member this_is_a_union;
-   18: array_member array<uint32, arrays_size>;
-   19: vector_member vector<uint32>;
-   20: table_member this_is_a_table;
-   21: xunion_member this_is_a_xunion;
+    10: float32_member float32;
+    11: float64_member float64;
+    12: enum_member default_enum;
+    13: bits_member default_bits;
+    14: handle_member zx.Handle;
+    15: string_member string;
+    16: struct_member this_is_a_struct;
+    17: union_member this_is_a_union;
+    18: array_member array<uint32, arrays_size>;
+    19: vector_member vector<uint32>;
+    20: table_member this_is_a_table;
+    21: xunion_member this_is_a_xunion;
 };
 
 // This xunion has members all different FIDL types.
@@ -536,18 +536,18 @@ type AllTypesXunion = flexible resource union {
     7: uint16_member uint16;
     8: uint32_member uint32;
     9: uint64_member uint64;
-   10: float32_member float32;
-   11: float64_member float64;
-   12: enum_member default_enum;
-   13: bits_member default_bits;
-   14: handle_member zx.Handle;
-   15: string_member string;
-   16: struct_member this_is_a_struct;
-   17: union_member this_is_a_union;
-   18: array_member array<uint32, arrays_size>;
-   19: vector_member vector<uint32>;
-   20: table_member this_is_a_table;
-   21: xunion_member this_is_a_xunion;
+    10: float32_member float32;
+    11: float64_member float64;
+    12: enum_member default_enum;
+    13: bits_member default_bits;
+    14: handle_member zx.Handle;
+    15: string_member string;
+    16: struct_member this_is_a_struct;
+    17: union_member this_is_a_union;
+    18: array_member array<uint32, arrays_size>;
+    19: vector_member vector<uint32>;
+    20: table_member this_is_a_table;
+    21: xunion_member this_is_a_xunion;
 };
 
 type RespondWith = strict enum {

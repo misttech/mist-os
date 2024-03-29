@@ -30,7 +30,7 @@ type Config = table {
     4: namespace_capabilities vector<fuchsia.component.decl.Capability>:MAX;
 
     /// Capabilities offered from component manager as built-in capabilities.
-   17: builtin_capabilities vector<fuchsia.component.decl.Capability>:MAX;
+    17: builtin_capabilities vector<fuchsia.component.decl.Capability>:MAX;
 
     /// If true, component_manager will serve an instance of fuchsia.process.Launcher and use this
     /// launcher for the built-in ELF component runner. The root component can additionally
@@ -60,42 +60,42 @@ type Config = table {
     /// URL of the root component to launch. This field is used if the no URL
     /// is passed to component manager. If value is passed in both places, then
     /// an error is raised.
-   10: root_component_url string:fuchsia.component.MAX_URL_SCHEME_LENGTH;
+    10: root_component_url string:fuchsia.component.MAX_URL_SCHEME_LENGTH;
 
     /// Path to the component ID index. An empty value defaults to an empty index.
     /// An invalid index causes component_manager to abort.
-   11: component_id_index_path string:fuchsia.component.MAX_PATH_LENGTH;
+    11: component_id_index_path string:fuchsia.component.MAX_PATH_LENGTH;
 
     /// Where to log to.
-   12: log_destination LogDestination;
+    12: log_destination LogDestination;
 
     /// If true, component manager will log all events dispatched in the topology.
-   13: log_all_events bool;
+    13: log_all_events bool;
 
     /// Which builtin resolver to use for the fuchsia-boot scheme.
     /// If not present, interpreted as BuiltinBootResolver.NONE.
-   14: builtin_boot_resolver BuiltinBootResolver;
+    14: builtin_boot_resolver BuiltinBootResolver;
 
     /// Used to be reboot_on_terminate_enabled.
-   15: reserved;
+    15: reserved;
 
     /// If and how the realm builder resolver and runner will be used. Typically
     /// these capabilities from realm builder are available to a nested
     /// component manager that is undergoing an integration test.
-   16: realm_builder_resolver_and_runner RealmBuilderResolverAndRunner;
+    16: realm_builder_resolver_and_runner RealmBuilderResolverAndRunner;
 
     /// Enables Component Manager's introspection APIs (RealmQuery, RealmExplorer,
     /// RouteValidator, LifecycleController, etc.) for use by components.
-   18: enable_introspection bool;
+    18: enable_introspection bool;
 
     /// The enforcement and validation policy to apply to component target ABI
     /// revisions. If not present, defaults to
     /// `AbiRevisionPolicy::ENFORCE_PRESENCE_AND_COMPATIBILITY`.
-   19: abi_revision_policy AbiRevisionPolicy;
+    19: abi_revision_policy AbiRevisionPolicy;
 
     /// Where to obtain the vmex resource from, if this component_manager is hosting bootfs.
     /// If not present, defaults to `VmexSource::SYSTEM_RESOURCE`.
-   20: vmex_source VmexSource;
+    20: vmex_source VmexSource;
 };
 
 /// The enforcement and validation policy to apply to component target ABI revisions.

@@ -57,7 +57,7 @@ type Config = resource table {
     6: dispatch_policy DispatchPolicy;
 
     /// Range of X and Y motion by a mouse device.
-   10: relative_motion_range RelativeMotionRange;
+    10: relative_motion_range RelativeMotionRange;
 
     /// Range of vertical scroll values issued by the device.
     7: scroll_v_range fuchsia.input.report.Axis;

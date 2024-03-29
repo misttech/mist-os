@@ -478,14 +478,14 @@ type DeviceImplInfo = table {
     /// tx buffers will start at the beginning of the header space, and the
     /// header region will be informed.
     /// Required.
-   10: tx_head_length uint16;
+    10: tx_head_length uint16;
     /// Number of bytes requested as tail bytes on tx buffers.
     ///
     /// If set to zero, tx buffers will never contain tail space. Otherwise, tx
     /// buffers will end at the end of the tail space, and the tail region will
     /// be informed.
     /// Required.
-   11: tx_tail_length uint16;
+    11: tx_tail_length uint16;
     /// Available Rx acceleration flags for this device, as defined in
     /// [`fuchsia.hardware.network/RxAcceleration`].
     ///
@@ -493,7 +493,7 @@ type DeviceImplInfo = table {
     /// semantic acceleration features described by `RxAcceleration`. Position
     /// `n` of `rx_accel` conveys the meaning of the `RX_ACCEL_n` flag.
     /// Required.
-   12: rx_accel vector<fuchsia.hardware.network.RxAcceleration>:MAX;
+    12: rx_accel vector<fuchsia.hardware.network.RxAcceleration>:MAX;
     /// Available tx acceleration flags for this device, as defined in
     /// [`fuchsia.hardware.network/TxAcceleration`].
     ///
@@ -501,7 +501,7 @@ type DeviceImplInfo = table {
     /// semantic acceleration features described by `TxAcceleration`. Position
     /// `n` of `tx_accel` conveys the meaning of the `TX_ACCEL_n` flag.
     /// Required.
-   13: tx_accel vector<fuchsia.hardware.network.TxAcceleration>:MAX;
+    13: tx_accel vector<fuchsia.hardware.network.TxAcceleration>:MAX;
 };
 
 /// The maximum number of `TxBuffer` structs that could be sent in a single FIDL

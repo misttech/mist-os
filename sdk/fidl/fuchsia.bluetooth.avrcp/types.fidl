@@ -142,10 +142,10 @@ type Notification = table {
     9: device_connected bool;
 
     /// `AVAILABLE_PLAYERS_CHANGED` event data
-   10: available_players_changed bool;
+    10: available_players_changed bool;
 
     /// `ADDRESSED_PLAYER_CHANGED` event data
-   11: addressed_player uint16;
+    11: addressed_player uint16;
 };
 
 /// Defined by AVRCP 1.6.2 section 6.7.2 (RegisterNotification).

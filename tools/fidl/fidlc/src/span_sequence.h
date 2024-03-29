@@ -127,14 +127,12 @@ class SpanSequence {
       bool wrapped, AdjacentIndents adjacent_indents, std::string* out) const = 0;
 
   size_t GetLeadingBlankLines() const { return leading_blank_lines_; }
-  size_t GetOutdentation() const { return outdentation_; }
   size_t GetRequiredSize() const { return required_size_; }
   Kind GetKind() const { return kind_; }
   Position GetPosition() const { return position_; }
   bool HasTrailingSpace() const { return trailing_space_; }
   bool IsClosed() const { return closed_; }
   void SetLeadingBlankLines(size_t leading_blanks) { leading_blank_lines_ = leading_blanks; }
-  void SetOutdentation(size_t outdentation) { outdentation_ = outdentation; }
   void SetRequiredSize(size_t required_size) { required_size_ = required_size; }
   void SetTrailingSpace(bool trailing_space) { trailing_space_ = trailing_space; }
 
@@ -150,19 +148,6 @@ class SpanSequence {
   // Tracks the number of leading new lines to print before this SpanSequence is added to the
   // printer's output string,
   size_t leading_blank_lines_;
-
-  // The number of spaces to remove from the indentation when printing this SpanSequence.  As of
-  // now, it is only used for the purpose of vertically aligning ordinaled layout members, like so:
-  //
-  //   type MyTable = table {
-  //     1: reserved;
-  //     // ...
-  //    10: reserved;
-  //     // ...
-  //   100: reserved;
-  //     // etc...
-  //   };
-  size_t outdentation_ = 0;
 
   // Tracks how many characters of line space are needed to render this SpanSequence without
   // dividing it.  For example, if we have the DivisibleSpanSequence:

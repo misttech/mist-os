@@ -101,7 +101,7 @@ type SessionmgrConfig = table {
     /// Valid components to specify here are agents or the session shell.
     /// Services listed here are available in the incoming namespaces for
     /// modules, shells, and agents.
-   10: agent_service_index vector<AgentServiceIndexEntry>;
+    10: agent_service_index vector<AgentServiceIndexEntry>;
 
     /// A list of `fuchsia.modular.Agent` services, as provided to sessionmgr
     /// in `additional_services_for_agents`, mapped to a v1 agent URL.
@@ -116,23 +116,23 @@ type SessionmgrConfig = table {
     /// to connect to services with `DeprecatedConnectToAgentService` or
     /// from an agent namespace.
     @available(added=9)
-   13: v2_modular_agents vector<V2ModularAgentsEntry>;
+    13: v2_modular_agents vector<V2ModularAgentsEntry>;
 
     /// A list of agent URLs that will cause the session to be restarted
     /// when they terminate. If an agent is not in this list, sessionmgr will
     /// restart it individually, preserving the session.
     ///
     /// The session shell is automatically added to this list.
-   11: restart_session_on_agent_crash vector<fuchsia.io.Path>:MAX;
+    11: restart_session_on_agent_crash vector<fuchsia.io.Path>:MAX;
 
     /// If set to true, disables any automatic agent restarts when an agent is
     /// observed to have crashed.
-   12: disable_agent_restart_on_crash bool;
+    12: disable_agent_restart_on_crash bool;
 
     /// If set to true, module views are presented to the session shell as
     /// story shell views through GraphicalPresenter protocol, if available.
     @available(added=9)
-   14: present_mods_as_stories bool;
+    14: present_mods_as_stories bool;
 };
 
 /// Used to pass around configuration references to apps such as base shell,

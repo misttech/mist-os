@@ -226,18 +226,18 @@ type Action = flexible union {
     7: set_number SetNumber;
     8: set_string SetString;
     9: set_bytes SetBytes;
-   10: add_number AddNumber;
-   11: subtract_number SubtractNumber;
-   12: create_array_property CreateArrayProperty;
-   13: array_set ArraySet;
-   14: array_add ArrayAdd;
-   15: array_subtract ArraySubtract;
-   16: create_linear_histogram CreateLinearHistogram;
-   17: create_exponential_histogram CreateExponentialHistogram;
-   18: insert Insert;
-   19: insert_multiple InsertMultiple;
-   20: create_bool_property CreateBoolProperty;
-   21: set_bool SetBool;
+    10: add_number AddNumber;
+    11: subtract_number SubtractNumber;
+    12: create_array_property CreateArrayProperty;
+    13: array_set ArraySet;
+    14: array_add ArrayAdd;
+    15: array_subtract ArraySubtract;
+    16: create_linear_histogram CreateLinearHistogram;
+    17: create_exponential_histogram CreateExponentialHistogram;
+    18: insert Insert;
+    19: insert_multiple InsertMultiple;
+    20: create_bool_property CreateBoolProperty;
+    21: set_bool SetBool;
 };
 
 /// Tells the puppet to do something to modify a lazy node.

@@ -31,13 +31,13 @@ type ProductInfo = table {
     7: manufacturer string;
     8: build_date string;
     9: build_name string:MAX_VALUE_SIZE;
-   10: colorway string:MAX_VALUE_SIZE;
-   11: display string:MAX_VALUE_SIZE;
-   12: memory string:MAX_VALUE_SIZE;
-   13: nand_storage string:MAX_VALUE_SIZE;
-   14: emmc_storage string:MAX_VALUE_SIZE;
-   15: microphone string:MAX_VALUE_SIZE;
-   16: audio_amplifier string:MAX_VALUE_SIZE;
+    10: colorway string:MAX_VALUE_SIZE;
+    11: display string:MAX_VALUE_SIZE;
+    12: memory string:MAX_VALUE_SIZE;
+    13: nand_storage string:MAX_VALUE_SIZE;
+    14: emmc_storage string:MAX_VALUE_SIZE;
+    15: microphone string:MAX_VALUE_SIZE;
+    16: audio_amplifier string:MAX_VALUE_SIZE;
 };
 
 /// Collection of properties that are common among a set of devices based on

@@ -119,7 +119,7 @@ type WlanSoftmacBandCapability = table {
     /// represents all of the non-HT rates that the device supports for both
     /// transmitting and receiving.
     @available(added=15)
-   10: basic_rates vector<uint8>:ieee80211.MAX_SUPPORTED_BASIC_RATES;
+    10: basic_rates vector<uint8>:ieee80211.MAX_SUPPORTED_BASIC_RATES;
 
     /// Set of valid operating channels per regulatory information as determined
     /// by the device driver during iface creation. An operating channel refers
@@ -129,7 +129,7 @@ type WlanSoftmacBandCapability = table {
     /// requests to scan a subset of channels using the iface or to determine
     /// which operating channel to use when starting an AP.
     @available(added=15)
-   11: operating_channels vector<uint8>:ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS;
+    11: operating_channels vector<uint8>:ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS;
 };
 
 /// High-level information describing the state of a running softmac.
@@ -547,11 +547,11 @@ type WlanAssociationConfig = table {
     /// Rx MCS Bitmask in Supported MCS Set field represents the set of MCS
     /// the peer can receive at from this device, considering this device's Tx capability.
     9: ht_cap ieee80211.HtCapabilities;
-   10: ht_op ieee80211.HtOperation;
+    10: ht_op ieee80211.HtOperation;
 
     /// IEEE Std 802.11-2016, 9.4.2.158, 159
-   11: vht_cap ieee80211.VhtCapabilities;
-   12: vht_op ieee80211.VhtOperation;
+    11: vht_cap ieee80211.VhtCapabilities;
+    12: vht_op ieee80211.VhtOperation;
 };
 
 /// `WlanSoftmacBase` is a template protocol intended to be composed into

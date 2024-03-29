@@ -81,10 +81,10 @@ type Value = strict union {
     /// Degrees of counter-clockwise rotation in the XY plane.
     8: degrees float32;
     9: quaternion Quaternion;
-   10: transform FactoredTransform;
+    10: transform FactoredTransform;
     /// ID of a value-producing resource (an animation or an expression).
     /// The type of this value matches the type produced by the named resource.
-   11: variable_id uint32;
+    11: variable_id uint32;
 };
 
 /// A value that is specified explicitly by `value` if `variable_id` is zero,

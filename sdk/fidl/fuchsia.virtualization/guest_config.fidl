@@ -102,47 +102,47 @@ type GuestConfig = resource table {
     /// command-line.
     9: block_devices vector<BlockSpec>:MAX_BLOCK_DEVICES;
     /// A list of specifications for network devices.
-   10: net_devices vector<NetSpec>:MAX_NET_DEVICES;
+    10: net_devices vector<NetSpec>:MAX_NET_DEVICES;
     /// Optional virtio-wl device.
-   11: wayland_device WaylandDevice;
+    11: wayland_device WaylandDevice;
     /// Optional virtio-magma device.
-   12: magma_device MagmaDevice;
+    12: magma_device MagmaDevice;
 
     /// Whether to add a default network device.
-   13: default_net bool;
+    13: default_net bool;
     /// Enable virtio-balloon.
-   14: virtio_balloon bool;
+    14: virtio_balloon bool;
     /// Enable virtio-console.
-   15: virtio_console bool;
+    15: virtio_console bool;
     /// Enable virtio-gpu.
-   16: virtio_gpu bool;
+    16: virtio_gpu bool;
     /// Enable virtio-rng.
-   17: virtio_rng bool;
+    17: virtio_rng bool;
     /// Enable virtio-vsock.
-   18: virtio_vsock bool;
+    18: virtio_vsock bool;
     /// Enable virtio-sound.
-   19: virtio_sound bool;
+    19: virtio_sound bool;
     /// Enable input streams (capture) for virtio-sound.
-   20: virtio_sound_input bool;
+    20: virtio_sound_input bool;
 
     /// Host ports to listen for guest initiated vsock connections on. This can be used for
     /// simplicity if a Listener is known at config creation time, or if a Listener must be
     /// available at the moment of guest creation for timing reasons.
     ///
     /// To add a Listener after a guest starts, see HostVsockEndpoint::Listen.
-   21: vsock_listeners vector<Listener>:MAX;
+    21: vsock_listeners vector<Listener>:MAX;
     // TODO(https://fxbug.dev/42051237): Model this similar to the MagmaDevice by using
     // the resource table to bundle all of the virtio-mem parameters into a
     // single resource table
     /// Enable virtio-mem
-   22: virtio_mem bool;
+    22: virtio_mem bool;
     /// Size of the dynamically (un)pluggable memory block.
     /// Memory can be (un)plugged at this granularity.
     /// Smaller block size increases changes of successful unplug at the cost of increasing
     /// the size of tracking bitmap.
-   23: virtio_mem_block_size uint64;
+    23: virtio_mem_block_size uint64;
     /// Size of the entire dynamically pluggable memory region
-   24: virtio_mem_region_size uint64;
+    24: virtio_mem_region_size uint64;
     /// Required alignment of the dynamically pluggable memory region
-   25: virtio_mem_region_alignment uint64;
+    25: virtio_mem_region_alignment uint64;
 };

@@ -127,7 +127,7 @@ type CivilTime = table {
     /// Day of the year, in the closed range `[0, 365]`.
     9: year_day uint16;
     /// The time zone corresponding to this time. If omitted, the default is UTC.
-   10: time_zone_id TimeZoneId;
+    10: time_zone_id TimeZoneId;
 };
 
 /// Describes a Time Zone's properties at a particular moment in time.

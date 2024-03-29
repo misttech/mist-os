@@ -149,25 +149,25 @@ type State = strict union {
     ///
     /// **This is a terminal state**
     ///
-   10: fail_stage FailStageData;
+    10: fail_stage FailStageData;
 
     /// An error occurred while fetching the required artifacts.
     ///
     /// **This is a terminal state**
     ///
-   11: fail_fetch FailFetchData;
+    11: fail_fetch FailFetchData;
 
     /// An error occured while switching partitions.
     ///
     /// **This is a terminal state**
     ///
-   12: fail_commit FailCommitData;
+    12: fail_commit FailCommitData;
 
     /// The update is canceled.
     ///
     /// **This is a terminal state**
     ///
-   13: canceled CanceledData;
+    13: canceled CanceledData;
 };
 
 /// Data associated with [`State.prepare`].

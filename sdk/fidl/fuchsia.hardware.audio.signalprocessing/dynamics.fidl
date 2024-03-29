@@ -134,25 +134,25 @@ type DynamicsBandState = table {
     /// If not included, the output gain is unspecified.
     /// A client must not include this field in a `SetElement` if
     /// `DynamicsSupportedControls.OUTPUT_GAIN` is not set in `supported_controls`.
-   10: output_gain_db float32;
+    10: output_gain_db float32;
 
     /// input (a.k.a. pre) gain value in dB. Optional.
     /// If not included, the input gain is unspecified.
     /// A client must not include this field in a `SetElement` if
     /// `DynamicsSupportedControls.INPUT_GAIN` is not set in `supported_controls`.
-   11: input_gain_db float32;
+    11: input_gain_db float32;
 
     /// Level type (peak or RMS). Optional.
     /// If not included, the level type is unspecified.
     /// A client must not include this field in a `SetElement` if
     /// `DynamicsSupportedControls.LEVEL_TYPE` is not set in `supported_controls`.
-   12: level_type LevelType;
+    12: level_type LevelType;
 
     /// Look-ahead time. Optional.
     /// If not included, the look-ahead time is unspecified.
     /// A client must not include this field in a `SetElement` if
     /// `DynamicsSupportedControls.LOOKAHEAD` is not set in `supported_controls`.
-   13: lookahead zx.Duration;
+    13: lookahead zx.Duration;
 
     /// Linked channels (a.k.a. Stereo linked for 2-channel systems). Optional.
     /// If not included, the linked channels option is unspecified.
@@ -160,7 +160,7 @@ type DynamicsBandState = table {
     /// If false, each channel has its own dynamics response.
     /// A client must not include this field in a `SetElement` if
     /// `DynamicsSupportedControls.LINKED_CHANNELS` is not set in `supported_controls`.
-   14: linked_channels bool;
+    14: linked_channels bool;
 };
 
 /// State for an `Element` with `type` equal to `DYNAMICS`.
