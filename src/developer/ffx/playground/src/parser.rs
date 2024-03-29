@@ -23,7 +23,7 @@ use nom::character::complete::{
     alphanumeric1, anychar, char as chr, digit1, hex_digit1, none_of, one_of,
 };
 use nom::combinator::{
-    all_consuming, flat_map, map, map_parser, not, opt, recognize, rest, verify,
+    all_consuming, flat_map, map, map_parser, not, opt, peek, recognize, rest, verify,
 };
 use nom::error as nom_error;
 use nom::multi::{
@@ -1149,7 +1149,21 @@ fn invocation<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 
     alt((
         map(
-            pair(identifier, many0(ws_before(alt((simple_expression, bare_string))))),
+            pair(
+                identifier,
+                many0(ws_before(alt((
+                    delimited(
+                        not(tag(".")),
+                        simple_expression,
+                        peek(alt((
+                            recognize(whitespace),
+                            recognize(one_of("|&;)}")),
+                            recognize(not(anychar)),
+                        ))),
+                    ),
+                    bare_string,
+                )))),
+            ),
             |(first, args)| {
                 Node::Invocation(first.strip_error(), args.into_iter().map(Node::from).collect())
             },
@@ -1599,6 +1613,22 @@ mod test {
                     else_: Some(Box::new(Node::Block(vec![Node::Invocation(sp("e"), vec![])]))),
                 })),
             }]),
+        );
+    }
+
+    #[test]
+    fn bare_string_starts_with_numbers() {
+        test_parse(
+            r#"foo 123abc"#,
+            Node::Program(vec![Node::Invocation(sp("foo"), vec![Node::BareString(sp("123abc"))])]),
+        );
+    }
+
+    #[test]
+    fn args_that_start_with_dot_are_strings() {
+        test_parse(
+            r#"cd .."#,
+            Node::Program(vec![Node::Invocation(sp("cd"), vec![Node::BareString(sp(".."))])]),
         );
     }
 }
