@@ -23,11 +23,9 @@ use {
         epitaph::ChannelEpitaphExt,
         AsyncChannel,
     },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx},
-    futures::future::BoxFuture,
-    futures::FutureExt,
-    sandbox::{Capability, Dict, Message, Sendable, Sender},
+    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
+    futures::{future::BoxFuture, FutureExt},
+    sandbox::{Capability, Dict, Message, Open, Sendable, Sender},
     std::sync::Arc,
     tracing::warn,
     vfs::execution_scope::ExecutionScope,
@@ -317,7 +315,7 @@ impl Routable for Arc<LaunchTaskOnReceive> {
 }
 
 /// Porcelain methods on [`Sendable`] objects.
-pub trait SendableExt: Sendable {
+trait SendableExt: Sendable {
     /// Returns a sender that waits until the channel is readable, then
     /// sends the channel using the underlying sender. The wait is performed
     /// in the provided `scope`.
@@ -356,8 +354,64 @@ impl<T: Sendable + 'static> SendableExt for T {
     }
 }
 
+/// Porcelain methods on [`Routable`] objects.
+pub trait RoutableExt: Routable {
+    /// Returns a router that resolves with a [`sandbox::Sender`] that watches for
+    /// the channel to be readable, then delegates to the current router. The wait
+    /// is performed in the provided `scope`.
+    fn on_readable(self, scope: ExecutionScope, entry_type: fio::DirentType) -> Router;
+}
+
+impl<T: Routable + 'static> RoutableExt for T {
+    fn on_readable(self, scope: ExecutionScope, entry_type: fio::DirentType) -> Router {
+        #[derive(Debug)]
+        struct OnReadableRouter {
+            router: Router,
+            scope: ExecutionScope,
+            entry_type: fio::DirentType,
+        }
+
+        #[async_trait]
+        impl Routable for OnReadableRouter {
+            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+                let target = request.target.upgrade().map_err(RoutingError::from)?;
+                let entry = self.router.clone().into_directory_entry(
+                    request,
+                    self.entry_type,
+                    target.blocking_task_group(),
+                    move |err| {
+                        // TODO(https://fxbug.dev/319754472): Improve the fidelity of error logging.
+                        // This should log into the component's log sink using the proper
+                        // `report_routing_failure`, but that function requires a legacy
+                        // `RouteRequest` at the moment.
+                        let group = target.nonblocking_task_group();
+                        let target = target.clone();
+                        group.spawn(async move {
+                            target
+                                .with_logger_as_default(|| {
+                                    warn!(
+                                        "Request was not available for target component `{}`: `{}`",
+                                        target.moniker, err
+                                    );
+                                })
+                                .await;
+                        });
+                    },
+                );
+                let sender = sandbox::Sender::new_sendable(Open::new(entry));
+                Ok(sender.on_readable(self.scope.clone()).into())
+            }
+        }
+
+        let router = Router::new(self);
+        Router::new(OnReadableRouter { router, scope, entry_type })
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
+    use crate::model::{context::ModelContext, environment::Environment};
+
     use super::*;
     use assert_matches::assert_matches;
     use bedrock_error::DowncastErrorForTest;
@@ -366,7 +420,7 @@ pub mod tests {
     use fasync::pin_mut;
     use fuchsia_async::TestExecutor;
     use sandbox::{Data, Receiver};
-    use std::task::Poll;
+    use std::{sync::Weak, task::Poll};
 
     #[fuchsia::test]
     async fn get_capability() {
@@ -511,7 +565,7 @@ pub mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn on_readable_client_writes() {
+    async fn sender_on_readable_client_writes() {
         let (receiver, sender) = Receiver::new();
         let scope = ExecutionScope::new();
         let sender = sender.on_readable(scope.clone());
@@ -532,7 +586,7 @@ pub mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn on_readable_client_closes() {
+    async fn sender_on_readable_client_closes() {
         let (receiver, sender) = Receiver::new();
         let scope = ExecutionScope::new();
         let sender = sender.on_readable(scope.clone());
@@ -550,5 +604,109 @@ pub mod tests {
         drop(client_end);
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
         scope.wait().await;
+    }
+
+    #[derive(Debug, Clone)]
+    struct RouteCounter {
+        capability: Capability,
+        counter: Arc<test_util::Counter>,
+    }
+
+    impl RouteCounter {
+        fn new(capability: Capability) -> Self {
+            Self { capability, counter: Arc::new(test_util::Counter::new(0)) }
+        }
+
+        fn count(&self) -> usize {
+            self.counter.get()
+        }
+    }
+
+    #[async_trait]
+    impl Routable for RouteCounter {
+        async fn route(&self, _: Request) -> Result<Capability, BedrockError> {
+            self.counter.inc();
+            Ok(self.capability.clone())
+        }
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn router_on_readable_client_writes() {
+        let (receiver, sender) = Receiver::new();
+        let scope = ExecutionScope::new();
+        let (client_end, server_end) = zx::Channel::create();
+
+        let route_counter = RouteCounter::new(sender.into());
+        let router = route_counter.clone().on_readable(scope.clone(), fio::DirentType::Service);
+
+        let receive = receiver.receive();
+        pin_mut!(receive);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
+
+        let component = ComponentInstance::new_root(
+            Environment::empty(),
+            Arc::new(ModelContext::new_for_test()),
+            Weak::new(),
+            "test:///root".to_string(),
+        );
+        let capability = router
+            .route(Request { availability: Availability::Required, target: component.as_weak() })
+            .await
+            .unwrap();
+        let Capability::Sender(sender) = capability else {
+            panic!("Wrong type: {capability:?}");
+        };
+        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
+        assert_eq!(route_counter.count(), 0);
+
+        sender.send(sandbox::Message { channel: server_end }).unwrap();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
+        assert_eq!(route_counter.count(), 0);
+
+        client_end.write(&[0], &mut []).unwrap();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Ready(Some(_)));
+        scope.wait().await;
+        assert_eq!(route_counter.count(), 1);
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn router_on_readable_client_closes() {
+        let (receiver, sender) = Receiver::new();
+        let scope = ExecutionScope::new();
+        let (client_end, server_end) = zx::Channel::create();
+
+        let route_counter = RouteCounter::new(sender.into());
+        let router = route_counter.clone().on_readable(scope.clone(), fio::DirentType::Service);
+
+        let receive = receiver.receive();
+        pin_mut!(receive);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
+
+        let component = ComponentInstance::new_root(
+            Environment::empty(),
+            Arc::new(ModelContext::new_for_test()),
+            Weak::new(),
+            "test:///root".to_string(),
+        );
+        let capability = router
+            .route(Request { availability: Availability::Required, target: component.as_weak() })
+            .await
+            .unwrap();
+        let Capability::Sender(sender) = capability else {
+            panic!("Wrong type: {capability:?}");
+        };
+
+        sender.send(sandbox::Message { channel: server_end }).unwrap();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
+        assert_matches!(
+            TestExecutor::poll_until_stalled(Box::pin(scope.clone().wait())).await,
+            Poll::Pending
+        );
+        assert_eq!(route_counter.count(), 0);
+
+        drop(client_end);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
+        scope.wait().await;
+        assert_eq!(route_counter.count(), 0);
     }
 }

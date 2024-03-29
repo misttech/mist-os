@@ -44,7 +44,7 @@ use {
     cm_rust::*,
     cm_rust_testing::*,
     cm_types::RelativePath,
-    fasync::TestExecutor,
+    fasync::{pin_mut, TestExecutor},
     fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd},
     fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
@@ -66,9 +66,10 @@ use {
     sandbox::Open,
     std::{
         collections::HashSet,
+        pin::pin,
         sync::{Arc, Weak},
+        task::Poll,
     },
-    std::{pin::pin, task::Poll},
     tracing::warn,
     vfs::{execution_scope::ExecutionScope, pseudo_directory, service},
 };
@@ -3618,7 +3619,7 @@ impl Hook for BlockingResolvedHook {
     }
 }
 
-/// This is a regression test for the flake in https://fxbug.dev/320698181.
+/// Builds the following realm:
 ///
 ///         root
 ///        /    \
@@ -3627,6 +3628,85 @@ impl Hook for BlockingResolvedHook {
 /// root: offers `foo_svc` from provider to consumer, and capability_requested to provider
 /// provider: exposes `foo_svc` and capability_requested
 /// consumer: uses `foo_svc`
+async fn build_realm_for_capability_requested_tests(delivery: DeliveryType) -> RoutingTest {
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo_svc")
+                        .target_name("foo_svc")
+                        .source(OfferSource::static_child("provider".into()))
+                        .target(OfferTarget::static_child("consumer".to_string()))
+                        .build(),
+                )
+                .offer(
+                    OfferBuilder::event_stream()
+                        .name("capability_requested")
+                        .target_name("capability_requested")
+                        .scope(vec![EventScope::Child(ChildRef {
+                            name: "consumer".into(),
+                            collection: None,
+                        })])
+                        .source(OfferSource::Parent)
+                        .target(OfferTarget::static_child("provider".to_string())),
+                )
+                .child(ChildBuilder::new().name("provider"))
+                .child(ChildBuilder::new().name("consumer"))
+                .build(),
+        ),
+        (
+            "provider",
+            ComponentDeclBuilder::new()
+                .capability(
+                    CapabilityBuilder::protocol()
+                        .name("foo_svc")
+                        .path("/svc/foo")
+                        .delivery(delivery)
+                        .build(),
+                )
+                .use_(
+                    UseBuilder::event_stream()
+                        .source(UseSource::Parent)
+                        .name("capability_requested")
+                        .path("/events/capability_requested")
+                        .filter(btreemap! {
+                            "name".to_string() => DictionaryValue::Str("foo_svc".to_string())
+                        }),
+                )
+                // The protocol is exposed from self but in reality would be provided via
+                // CapabilityRequested, similar to how archivist exposes `fuchsia.logger.LogSink`.
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("foo_svc")
+                        .source(ExposeSource::Self_)
+                        .target_name("foo_svc")
+                        .target(ExposeTarget::Parent),
+                )
+                .build(),
+        ),
+        (
+            "consumer",
+            ComponentDeclBuilder::new()
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Parent)
+                        .name("foo_svc")
+                        .path("/svc/hippo"),
+                )
+                .build(),
+        ),
+    ];
+    RoutingTestBuilder::new("root", components)
+        .set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
+            name: "capability_requested".parse().unwrap(),
+        })])
+        .build()
+        .await
+}
+
+/// This is a regression test for the flake in https://fxbug.dev/320698181.
 ///
 /// Tests that a protocol capability is "routed" through a capability_requested event
 /// rather than the outgoing directory of a component when resolution is slow.
@@ -3639,79 +3719,8 @@ impl Hook for BlockingResolvedHook {
 fn slow_resolve_races_with_capability_requested() {
     // Building the `RoutingTest` may stall so we run it outside of `run_until_stalled`.
     let mut executor = fasync::TestExecutor::new();
-    let test = executor.run_singlethreaded(async move {
-        let components = vec![
-            (
-                "root",
-                ComponentDeclBuilder::new()
-                    .offer(
-                        OfferBuilder::protocol()
-                            .name("foo_svc")
-                            .target_name("foo_svc")
-                            .source(OfferSource::static_child("provider".into()))
-                            .target(OfferTarget::static_child("consumer".to_string()))
-                            .build(),
-                    )
-                    .offer(
-                        OfferBuilder::event_stream()
-                            .name("capability_requested")
-                            .target_name("capability_requested")
-                            .scope(vec![EventScope::Child(ChildRef {
-                                name: "consumer".into(),
-                                collection: None,
-                            })])
-                            .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("provider".to_string())),
-                    )
-                    .child(ChildBuilder::new().name("provider"))
-                    .child(ChildBuilder::new().name("consumer"))
-                    .build(),
-            ),
-            (
-                "provider",
-                ComponentDeclBuilder::new()
-                    .capability(
-                        CapabilityBuilder::protocol().name("foo_svc").path("/svc/foo").build(),
-                    )
-                    .use_(
-                        UseBuilder::event_stream()
-                            .source(UseSource::Parent)
-                            .name("capability_requested")
-                            .path("/events/capability_requested")
-                            .filter(btreemap! {
-                                "name".to_string() => DictionaryValue::Str("foo_svc".to_string())
-                            }),
-                    )
-                    // The protocol is exposed from self but in reality would be provided via
-                    // CapabilityRequested, similar to how archivist exposes `fuchsia.logger.LogSink`.
-                    .expose(
-                        ExposeBuilder::protocol()
-                            .name("foo_svc")
-                            .source(ExposeSource::Self_)
-                            .target_name("foo_svc")
-                            .target(ExposeTarget::Parent),
-                    )
-                    .build(),
-            ),
-            (
-                "consumer",
-                ComponentDeclBuilder::new()
-                    .use_(
-                        UseBuilder::protocol()
-                            .source(UseSource::Parent)
-                            .name("foo_svc")
-                            .path("/svc/hippo"),
-                    )
-                    .build(),
-            ),
-        ];
-        RoutingTestBuilder::new("root", components)
-            .set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
-                name: "capability_requested".parse().unwrap(),
-            })])
-            .build()
-            .await
-    });
+    let test = executor
+        .run_singlethreaded(build_realm_for_capability_requested_tests(DeliveryType::Immediate));
 
     let mut test_body = Box::pin(async move {
         // Add a hook that delays component resolution.
@@ -3875,6 +3884,92 @@ fn protocol_delivery_on_readable_bail_when_unresolve() {
         echo_proxy.echo_string(Some("hippos")).await.expect_err("FIDL call should fail");
         _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
         assert!(!b.is_started());
+    });
+    executor.run_until_stalled(&mut test_body).unwrap();
+}
+
+/// If a component provides a capability by monitoring "capability_requested" events,
+/// and the capability has declared `DeliveryType::OnReadable`, then the event should
+/// be sent to the component only when the client writes to the server endpoint.
+#[fuchsia::test]
+fn capability_requested_protocol_on_delivery_readable() {
+    // Building the `RoutingTest` may stall so we run it outside of `run_until_stalled`.
+    let mut executor = fasync::TestExecutor::new();
+    let test = executor
+        .run_singlethreaded(build_realm_for_capability_requested_tests(DeliveryType::OnReadable));
+
+    let mut test_body = Box::pin(async move {
+        test.model.root().resolve().await.unwrap();
+        let provider = test.model.root().find(&"provider".parse().unwrap()).await.unwrap();
+        let namespace_consumer = test.bind_and_get_namespace("consumer".parse().unwrap()).await;
+
+        let echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
+            &namespace_consumer,
+            &"/svc/hippo".parse().unwrap(),
+        )
+        .await;
+
+        // Provider should remain stopped.
+        _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+        assert!(!provider.is_started());
+
+        // Make a request by writing to the channel. Provider should only then start.
+        let echo_call = echo_proxy.echo_string(Some("hippos"));
+        pin_mut!(echo_call);
+        TestExecutor::poll_until_stalled(&mut echo_call)
+            .await
+            .expect_pending("Request should be buffered in the channel in the event stream");
+        _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+        assert!(provider.is_started());
+
+        // After starting, the provider should observe the request in its event stream.
+        let event_stream = {
+            let resolved_url = RoutingTest::resolved_url("provider");
+            let namespace = test.mock_runner.get_namespace(&resolved_url).unwrap();
+            capability_util::connect_to_svc_in_namespace::<fcomponent::EventStreamMarker>(
+                &namespace,
+                &"/events/capability_requested".parse().unwrap(),
+            )
+            .await
+        };
+
+        let event = event_stream.get_next().await.unwrap().into_iter().next().unwrap();
+
+        let fcomponent::Event {
+            header:
+                Some(fcomponent::EventHeader {
+                    moniker: Some(moniker),
+                    component_url: Some(component_url),
+                    ..
+                }),
+            payload:
+                Some(fcomponent::EventPayload::CapabilityRequested(
+                    fcomponent::CapabilityRequestedPayload {
+                        name: Some(name),
+                        capability: Some(server_end),
+                        ..
+                    },
+                )),
+            ..
+        } = event
+        else {
+            panic!("Unexpected event: {event:?}");
+        };
+
+        assert_eq!(&moniker, ".");
+        assert_eq!(&component_url, "test:///consumer");
+        assert_eq!(&name, "foo_svc");
+
+        // Reply to the echo call to test connectivity.
+        let server_end: ServerEnd<echo::EchoMarker> = server_end.into();
+        TestExecutor::poll_until_stalled(Box::pin(OutDir::echo_protocol_fn(
+            server_end.into_stream().unwrap(),
+        )))
+        .await
+        .expect_pending("Server should not finish");
+
+        // Receive the reply.
+        echo_call.await.unwrap();
     });
     executor.run_until_stalled(&mut test_body).unwrap();
 }

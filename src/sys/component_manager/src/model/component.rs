@@ -37,7 +37,7 @@ use {
             start::Start,
             token::{InstanceToken, InstanceTokenState},
         },
-        sandbox_util::{DictExt, SendableExt},
+        sandbox_util::{DictExt, RoutableExt},
     },
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
@@ -1815,32 +1815,24 @@ impl ResolvedInstanceState {
         let path = path.to_string();
         let name = capability_decl.name();
         let path = fuchsia_fs::canonicalize_path(&path);
+        let entry_type = ComponentCapability::from(capability_decl.clone()).type_name().into();
         let open = component
             .get_outgoing()
-            .downscope_path(
-                Path::validate_and_split(path).unwrap(),
-                ComponentCapability::from(capability_decl.clone()).type_name().into(),
-            )
+            .downscope_path(Path::validate_and_split(path).unwrap(), entry_type)
             .expect("get_outgoing must return a directory node");
-        let mut delivery = DeliveryType::Immediate;
         let capability: Capability = match capability_decl {
-            CapabilityDecl::Protocol(p) => {
-                let sender = sandbox::Sender::new_sendable(open);
-                delivery = p.delivery;
-                match p.delivery {
-                    DeliveryType::Immediate => sender,
-                    DeliveryType::OnReadable => sender.on_readable(execution_scope.clone()),
-                }
-                .into()
-            }
+            CapabilityDecl::Protocol(_) => sandbox::Sender::new_sendable(open).into(),
             _ => open.into(),
         };
-        Router::new(CapabilityRequestedHook {
-            source: component.as_weak(),
-            name: name.clone(),
-            capability,
-            delivery,
-        })
+        let hook =
+            CapabilityRequestedHook { source: component.as_weak(), name: name.clone(), capability };
+        match capability_decl {
+            CapabilityDecl::Protocol(p) => match p.delivery {
+                DeliveryType::Immediate => Router::new(hook),
+                DeliveryType::OnReadable => hook.on_readable(execution_scope.clone(), entry_type),
+            },
+            _ => Router::new(hook),
+        }
     }
 
     /// Returns a reference to the component's validated declaration.
@@ -2598,12 +2590,17 @@ struct CapabilityRequestedHook {
     source: WeakComponentInstance,
     name: Name,
     capability: Capability,
-    delivery: DeliveryType,
 }
 
 #[async_trait]
 impl Routable for CapabilityRequestedHook {
     async fn route(&self, request: Request) -> Result<Capability, bedrock_error::BedrockError> {
+        self.source
+            .ensure_started(&StartReason::AccessCapability {
+                target: request.target.moniker.clone(),
+                name: self.name.clone(),
+            })
+            .await?;
         let source = self.source.upgrade().map_err(RoutingError::from)?;
         let target = request.target.upgrade().map_err(RoutingError::from)?;
         let (receiver, sender) = CapabilityReceiver::new();
@@ -2622,21 +2619,6 @@ impl Routable for CapabilityRequestedHook {
             resolve_completed.await.unwrap();
         }
         source.hooks.dispatch(&event).await;
-        match self.delivery {
-            // TODO(https://fxbug.dev/319754472): If a component uses the CapabilityRequested event
-            // for a capability and the latter declares `delivery: "on_readable"`, then the event
-            // should be sent, and the component started, only after the channel becomes readable.
-            DeliveryType::OnReadable if !receiver.is_taken() => {}
-            DeliveryType::Immediate | DeliveryType::OnReadable => {
-                // If the component is already started, this will be a no-op.
-                self.source
-                    .ensure_started(&StartReason::AccessCapability {
-                        target: request.target.moniker.clone(),
-                        name: self.name.clone(),
-                    })
-                    .await?;
-            }
-        }
         if receiver.is_taken() {
             Ok(sender.into())
         } else {

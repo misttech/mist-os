@@ -85,6 +85,13 @@ where
     }
 }
 
+#[async_trait]
+impl Routable for Router {
+    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+        Router::route(self, request).await
+    }
+}
+
 impl Router {
     /// Package a [`Routable`] object into a [`Router`].
     pub fn new(routable: impl Routable + 'static) -> Self {

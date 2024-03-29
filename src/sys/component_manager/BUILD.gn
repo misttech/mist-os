@@ -112,6 +112,7 @@ rustc_binary("bin") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//src/lib/test_util",
     "//src/sys/lib/cm_config",
     "//src/sys/lib/cm_rust/testing",
     "//src/sys/lib/component_id_index",

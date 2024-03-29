@@ -89,7 +89,7 @@ impl OutDir {
     }
 
     /// Hosts a new protocol on `server_end` that implements `fidl.examples.routing.echo.Echo`.
-    async fn echo_protocol_fn(mut stream: EchoRequestStream) {
+    pub async fn echo_protocol_fn(mut stream: EchoRequestStream) {
         while let Some(EchoRequest::EchoString { value, responder }) =
             stream.try_next().await.unwrap()
         {
