@@ -8240,4 +8240,70 @@ mod tests {
             });
         }
     }
+
+    #[ip_test]
+    fn tcp_accept_queue_clean_up_closed<I: Ip + TcpTestIpExt>()
+    where
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
+    {
+        let mut net = new_test_net::<I>();
+        let backlog = NonZeroUsize::new(1).unwrap();
+        let server_port = NonZeroU16::new(1024).unwrap();
+        let server = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let server = api.create(Default::default());
+            api.bind(&server, None, Some(server_port)).expect("failed to bind the server socket");
+            api.listen(&server, backlog).expect("can listen");
+            server
+        });
+
+        let client = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let socket = api.create(ProvidedBuffers::Buffers(WriteBackClientBuffers::default()));
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), server_port)
+                .expect("failed to connect");
+            socket
+        });
+        // Step so that SYN is received by the server.
+        assert!(!net.step().is_idle());
+        // Make sure the server now has a pending socket in the accept queue.
+        assert_matches!(
+            &server.get().deref().socket_state,
+            TcpSocketStateInner::Bound(BoundSocketState::Listener((
+                MaybeListener::Listener(Listener {
+                    accept_queue,
+                    ..
+                }), ..))) => {
+                assert_eq!(accept_queue.ready_len(), 0);
+                assert_eq!(accept_queue.pending_len(), 1);
+            }
+        );
+        // Now close the client socket.
+        net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            api.close(client);
+        });
+        // Server's SYN-ACK will get a RST response because the connection is
+        // no longer there.
+        net.run_until_idle();
+        // We verify that no lingering socket in the accept_queue.
+        assert_matches!(
+            &server.get().deref().socket_state,
+            TcpSocketStateInner::Bound(BoundSocketState::Listener((
+                MaybeListener::Listener(Listener {
+                    accept_queue,
+                    ..
+                }), ..))) => {
+                assert_eq!(accept_queue.ready_len(), 0);
+                assert_eq!(accept_queue.pending_len(), 0);
+            }
+        );
+        // Server should be the only socket in `all_sockets`.
+        net.with_context(REMOTE, |ctx| {
+            ctx.core_ctx.with_all_sockets_mut(|all_sockets| {
+                assert_eq!(all_sockets.keys().collect::<Vec<_>>(), [&server]);
+            })
+        })
+    }
 }
