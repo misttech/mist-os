@@ -138,7 +138,7 @@ bool CpuRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
     return false;
   }
 
-  const zx::vmo& vmo = sysmem_info.buffers[0].vmo;
+  const zx::vmo& vmo = sysmem_info.buffers[metadata.vmo_index].vmo;
   zx::vmo dup;
   zx_status_t status = vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
   FX_DCHECK(status == ZX_OK);
