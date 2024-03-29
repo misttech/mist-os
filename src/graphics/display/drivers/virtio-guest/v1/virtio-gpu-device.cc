@@ -46,6 +46,29 @@ zx::result<uint32_t> VirtioGpuDevice::UpdateCursor() {
   }
 
   return zx::ok(command.resource_id);
+}
+
+zx::result<uint32_t> VirtioGpuDevice::SetCursorPosition(uint32_t scanout_id, uint32_t x, uint32_t y,
+                                                        uint32_t padding) {
+  const virtio_abi::UpdateCursorCommand command = {
+      .header = {.type = virtio_abi::ControlType::kMoveCursorCommand},
+      .pos = {.scanout_id = scanout_id, .x = x, .y = y, .padding = padding},
+      // The fields below are ignored by the Move Cursor command.
+      .resource_id = 0,
+      .hot_x = 0,
+      .hot_y = 0,
+      .padding = 0,
+  };
+
+  const auto& response =
+      virtio_device_->ExchangeCursorqRequestResponse<virtio_abi::EmptyResponse>(command);
+  if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
+    zxlogf(WARNING, "Unexpected response type: %s (0x%04" PRIx32 ")",
+           ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    return zx::error(ZX_ERR_IO);
+  }
+
+  return zx::ok(command.resource_id);
 }  // namespace virtio_display
 
 zx::result<fbl::Vector<DisplayInfo>> VirtioGpuDevice::GetDisplayInfo() {

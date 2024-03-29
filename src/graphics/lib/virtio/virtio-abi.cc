@@ -91,6 +91,9 @@ const char* ControlTypeToString(ControlType type) {
 
     case ControlType::kUpdateCursorCommand:
       return "Command: UpdateCursor";
+
+    case ControlType::kMoveCursorCommand:
+      return "Command: SetCursorPosition";
   }
 
   return "(unknown)";

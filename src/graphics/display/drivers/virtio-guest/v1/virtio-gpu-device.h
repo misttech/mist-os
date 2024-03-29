@@ -42,6 +42,13 @@ class VirtioGpuDevice {
   // VIRTIO_GPU_CMD_UPDATE_CURSOR.
   zx::result<uint32_t> UpdateCursor();
 
+  // Moves the cursor.
+  //
+  // virtio spec Section 5.7.6.10 "Device Operation: cursorq", operation
+  // VIRTIO_GPU_CMD_MOVE_CURSOR.
+  zx::result<uint32_t> SetCursorPosition(uint32_t scanout_id, uint32_t x, uint32_t y,
+                                         uint32_t padding);
+
   // Retrieves the current output configuration.
   //
   // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation

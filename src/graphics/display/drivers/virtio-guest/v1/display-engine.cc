@@ -603,10 +603,11 @@ zx_status_t DisplayEngine::Start() {
          current_display_.scanout_info.geometry.width,
          current_display_.scanout_info.geometry.height, current_display_.scanout_info.flags);
 
-  // Update mouse cursor; the result is not critical.
-  zx::result<uint32_t> update_cursor_result = gpu_device_->UpdateCursor();
-  if (update_cursor_result.is_error()) {
-    zxlogf(WARNING, "Failed to update cursor: %s", update_cursor_result.status_string());
+  // Set the mouse cursor position to (0,0); the result is not critical.
+  zx::result<uint32_t> move_cursor_result =
+      gpu_device_->SetCursorPosition(current_display_.scanout_id, 0, 0, 0);
+  if (move_cursor_result.is_error()) {
+    zxlogf(WARNING, "Failed to move cursor: %s", move_cursor_result.status_string());
   }
 
   // Run a worker thread to shove in flush events

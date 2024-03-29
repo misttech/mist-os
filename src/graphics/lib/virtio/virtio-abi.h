@@ -167,6 +167,11 @@ enum class ControlType : uint32_t {
   //
   // VIRTIO_GPU_CMD_UPDATE_CURSOR
   kUpdateCursorCommand = 0x0300,
+
+  // Command encoding reuses the `UpdateCursorCommand` structure.
+  //
+  // VIRTIO_GPU_CMD_MOVE_CURSOR
+  kMoveCursorCommand = 0x0301,
 };
 
 // Descriptor for logging and debugging.
@@ -334,10 +339,14 @@ struct Create2DResourceCommand {
 };
 
 // struct virtio_gpu_update_cursor in virtio12 5.7.6.10 "Device Operation:
-// cursorq", under the VIRTIO_GPU_CMD_UPDATE_CURSOR command description
+// cursorq", under the VIRTIO_GPU_CMD_UPDATE_CURSOR and
+// VIRTIO_GPU_CMD_MOVE_CURSOR command descriptions.
 struct UpdateCursorCommand {
+  // `type` must be `kUpdateCursorCommand` or `kMoveCursorCommand`.
   ControlHeader header;
   CursorPos pos;
+
+  // Ignored when `type` is `kMoveCursorCommand`
   uint32_t resource_id;
   uint32_t hot_x;
   uint32_t hot_y;
