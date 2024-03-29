@@ -50,39 +50,10 @@ async fn verify_routing_failure_messages() {
 
     let expected = EventSequence::new()
         .has_subset(
-            vec![
-                EventMatcher::ok()
-                    .r#type(events::Stopped::TYPE)
-                    .moniker("root/routing-tests/child")
-                    .stop(Some(ExitStatusMatcher::AnyCrash)),
-                EventMatcher::ok()
-                    .r#type(events::Stopped::TYPE)
-                    .moniker(
-                        "root/routing-tests/offers-to-children-unavailable/child-for-offer-from-parent",
-                    )
-                    .stop(Some(ExitStatusMatcher::AnyCrash)),
-                EventMatcher::ok()
-                    .r#type(events::Stopped::TYPE)
-                    .moniker(
-                        "root/routing-tests/offers-to-children-unavailable/child-for-offer-from-sibling",
-                    ).stop(Some(ExitStatusMatcher::AnyCrash)),
-                EventMatcher::ok()
-                    .r#type(events::Stopped::TYPE)
-                    .moniker(
-                        "root/routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-void",
-                    )
-                    .stop(Some(ExitStatusMatcher::AnyCrash)),
-                EventMatcher::ok()
-                    .r#type(events::Stopped::TYPE)
-                    .moniker(
-                        "root/routing-tests/offers-to-children-unavailable/child-open-unrequested",
-                    )
-                    .stop(Some(ExitStatusMatcher::AnyCrash)),
-                EventMatcher::ok()
-                    .r#type(events::Stopped::TYPE)
-                    .moniker("root/reader")
-                    .stop(Some(ExitStatusMatcher::Clean))
-            ],
+            vec![EventMatcher::ok()
+                .r#type(events::Stopped::TYPE)
+                .moniker("root/reader")
+                .stop(Some(ExitStatusMatcher::Clean))],
             sequence::Ordering::Unordered,
         )
         .expect(event_stream);

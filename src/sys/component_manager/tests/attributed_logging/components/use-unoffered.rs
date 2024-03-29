@@ -14,8 +14,10 @@ use {
 async fn main() {
     let trigger = match connect_to_protocol::<ftest::TriggerMarker>() {
         Ok(t) => t,
-        Err(_) => return,
+        Err(_) => panic!("failed to connect to Trigger"),
     };
 
-    let _ = trigger.run().await.unwrap();
+    let _ = trigger.run().await;
+
+    futures::future::pending::<()>().await;
 }

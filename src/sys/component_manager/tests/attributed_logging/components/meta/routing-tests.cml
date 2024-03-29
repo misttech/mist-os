@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         // This child tries to use the fidl.test.component.Trigger capability,
         // which the parent (this component) does not offer.
@@ -35,18 +38,6 @@
             name: "offers-to-children-unavailable-but-optional",
             url: "#meta/offers-to-children-unavailable-but-optional.cm",
             startup: "eager",
-        },
-    ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#child",
-                "#child-with-optional-use",
-                "#offers-to-children-unavailable",
-                "#offers-to-children-unavailable-but-optional",
-            ],
         },
     ],
 }

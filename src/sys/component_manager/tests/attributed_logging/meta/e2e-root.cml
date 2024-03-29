@@ -27,9 +27,12 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: "#archivist",
+            to: [
+                "#archivist",
+                "#reader",
+            ],
         },
         {
             protocol: "fuchsia.logger.LogSink",
@@ -37,23 +40,16 @@
             to: "#routing-tests",
         },
         {
-            event_stream: "directory_ready",
-            from: "parent",
-            to: "#archivist",
-        },
-        {
-            event_stream: "capability_requested",
+            event_stream: [
+                "capability_requested",
+                "directory_ready",
+            ],
             from: "parent",
             to: "#archivist",
         },
         {
             protocol: "fuchsia.diagnostics.ArchiveAccessor",
             from: "#archivist",
-            to: "#reader",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
             to: "#reader",
         },
     ],
