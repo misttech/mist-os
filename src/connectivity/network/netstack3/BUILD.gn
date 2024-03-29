@@ -128,6 +128,23 @@ network_unified_binary("bin") {
   sources = common_sources
 
   bin_add_configs = [ ":netstack3_configs" ]
+
+  # TODO(https://fxbug.dev/330735964): remove this when Netstack3 doesn't OOM
+  # on ThinLTO builders.
+  _is_thinlto = select_variant + [ "thinlto" ] - [ "thinlto" ] != select_variant
+  if (_is_thinlto) {
+    bin_add_configs += [ ":disable-rbe" ]
+  }
+}
+
+# TODO(https://fxbug.dev/330735964): remove this config when Netstack3 doesn't
+# OOM on ThinLTO builders.
+config("disable-rbe") {
+  if (rust_rbe_enable) {
+    # --remote-flag=* is a pseudo flag that is intercepted by
+    # build/rbe/rustc_remote_wrapper.py.
+    rustflags = [ "--remote-disable" ]
+  }
 }
 
 config("netstack3_configs") {
