@@ -40,6 +40,7 @@ rustc_library("playground") {
     ":test_fidl",
     "//src/lib/fuchsia",
     "//src/storage/lib/vfs/rust:vfs",
+    "//third_party/rust_crates:async-trait",
   ]
 }
 

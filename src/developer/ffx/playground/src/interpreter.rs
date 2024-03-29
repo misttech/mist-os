@@ -27,6 +27,9 @@ macro_rules! error {
     ($($data:tt)*) => { Error::from(anyhow!($($data)*)) };
 }
 
+/// Maximum number of symlinks we can follow on path lookup before exploding.
+pub(crate) const SYMLINK_RECURSION_LIMIT: usize = 40;
+
 /// Interior state of a channel server task. See [InterpreterInner::wait_tx_id].
 #[derive(Default)]
 struct ChannelServerState {
@@ -268,101 +271,106 @@ impl InterpreterInner {
         }
     }
 
+    /// Helper for [`InterpreterInner::open`] that sends a request given a value
+    /// of $fs_root and a path.
+    fn send_open_request(
+        &self,
+        fs_root: &InUseHandle,
+        path: &String,
+        flags: fio::OpenFlags,
+    ) -> Result<fio::NodeProxy> {
+        let (node, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>()?;
+
+        let request = FidlValue::Object(vec![
+            ("flags".to_owned(), FidlValue::U32(flags.bits())),
+            ("mode".to_owned(), FidlValue::U32(fio::ModeType::empty().bits())),
+            ("path".to_owned(), FidlValue::String(path.clone())),
+            (
+                "object".to_owned(),
+                FidlValue::ServerEnd(server.into_channel(), fio::NODE_PROTOCOL_NAME.to_owned()),
+            ),
+        ]);
+
+        let (bytes, mut handles) = fidl_codec::encode_request(
+            self.lib_namespace(),
+            0,
+            fio::DIRECTORY_PROTOCOL_NAME,
+            "Open",
+            request,
+        )?;
+        fs_root.write_channel_etc(&bytes, &mut handles)?;
+        Ok(node)
+    }
+
     /// Open a file in this interpreter's namespace.
     pub async fn open(&self, path: String, fs_root: Value, pwd: Value) -> Result<Value> {
         let Some(fs_root) = fs_root.to_in_use_handle() else {
             return Err(error!("$fs_root is not a handle"));
         };
 
-        let path = canonicalize_path(path, pwd)?;
+        let mut path = canonicalize_path(path, pwd)?;
 
         if !fs_root
             .get_client_protocol()
             .ok()
-            .map(|x| self.lib_namespace().inherits(&x, "fuchsia.io/Directory"))
+            .map(|x| self.lib_namespace().inherits(&x, fio::DIRECTORY_PROTOCOL_NAME))
             .unwrap_or(false)
         {
             return Err(error!("$fs_root is not a directory"));
         }
 
-        let mut flags = fio::OpenFlags::DESCRIBE;
-        loop {
-            let (node, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>()?;
+        for _ in 0..SYMLINK_RECURSION_LIMIT {
+            let send_open_request =
+                |flags: fio::OpenFlags| self.send_open_request(&fs_root, &path, flags);
 
-            let request = FidlValue::Object(vec![
-                ("flags".to_owned(), FidlValue::U32(flags.bits())),
-                ("mode".to_owned(), FidlValue::U32(fio::ModeType::empty().bits())),
-                ("path".to_owned(), FidlValue::String(path.clone())),
+            let node = send_open_request(fio::OpenFlags::NODE_REFERENCE)?;
+            let (_inode, attr) = node.get_attr().await?;
+
+            let (proto, node) = if attr.mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_DIRECTORY {
                 (
-                    "object".to_owned(),
-                    FidlValue::ServerEnd(server.into_channel(), "fuchsia.io/Node".to_owned()),
-                ),
-            ]);
+                    fio::DIRECTORY_PROTOCOL_NAME.to_owned(),
+                    send_open_request(fio::OpenFlags::RIGHT_READABLE)?,
+                )
+            } else if attr.mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_SYMLINK {
+                let node = send_open_request(fio::OpenFlags::RIGHT_READABLE)?;
+                let symlink = fio::SymlinkProxy::from_channel(
+                    node.into_channel().expect("Node proxy somehow cloned!"),
+                );
+                let symlink_info = symlink.describe().await?;
+                let Some(target) = symlink_info.target else {
+                    return Err(error!("Symlink at {path} did not contain a target"));
+                };
+                let target = String::from_utf8(target.clone())
+                    .map_err(|_| error!("Followed symlink to non-utf8 path"))?;
+                let end = path.rfind('/').expect("Canonicalized path wasn't absolute!");
+                let prefix = &path[..end];
+                let prefix = if prefix.is_empty() { "/" } else { prefix };
+                // Set the path to the new target, reset the flags, and
+                // basically start the whole circus over.
+                path = canonicalize_path_dont_check_pwd(target, prefix);
+                continue;
+            } else if (attr.mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_BLOCK_DEVICE)
+                || (attr.mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_FILE)
+            {
+                (
+                    fio::FILE_PROTOCOL_NAME.to_owned(),
+                    send_open_request(fio::OpenFlags::RIGHT_READABLE)?,
+                )
+            } else if attr.mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_SERVICE {
+                let node = send_open_request(fio::OpenFlags::empty())?;
+                let end = path.rfind('/').expect("Canonicalized path wasn't absolute!");
 
-            let (bytes, mut handles) = fidl_codec::encode_request(
-                self.lib_namespace(),
-                0,
-                "fuchsia.io/Directory",
-                "Open",
-                request,
-            )?;
-            fs_root.write_channel_etc(&bytes, &mut handles)?;
-
-            let event = node
-                .take_event_stream()
-                .next()
-                .await
-                .transpose()?
-                .ok_or_else(|| error!("Node shut down without sending any info"))?;
-
-            let fio::NodeEvent::OnOpen_ { s: _, info } = event else {
-                return Err(error!("Unexpected node event"));
-            };
-
-            let Some(info) = info else {
-                // Usually this precedes an error. Poll the channel and see if we can get the epitaph.
-                let ch = node.into_channel().unwrap();
-                let mut pumpkin1 = Vec::new();
-                let mut pumpkin2 = Vec::new();
-                futures::future::poll_fn(|cx| ch.read(cx, &mut pumpkin1, &mut pumpkin2)).await?;
-
-                // No error on the channel. No idea how we got here.
-                return Err(error!("OnOpen contained no node info"));
-            };
-
-            let proto = match &*info {
-                fio::NodeInfoDeprecated::File(_) => {
-                    if !flags.contains(fio::OpenFlags::RIGHT_READABLE) {
-                        flags |= fio::OpenFlags::RIGHT_READABLE;
-                        continue;
-                    }
-                    "fuchsia.io/File".to_owned()
+                let name = &path[end + 1..];
+                if name.starts_with("fuchsia.") {
+                    let mut ret = name.to_owned();
+                    let dot = ret.rfind('.').unwrap();
+                    ret.replace_range(dot..dot + 1, "/");
+                    (ret, node)
+                } else {
+                    (fio::NODE_PROTOCOL_NAME.to_owned(), node)
                 }
-                fio::NodeInfoDeprecated::Directory(_) => {
-                    if !flags.contains(fio::OpenFlags::RIGHT_READABLE) {
-                        flags |= fio::OpenFlags::RIGHT_READABLE;
-                        continue;
-                    }
-                    "fuchsia.io/Directory".to_owned()
-                }
-                fio::NodeInfoDeprecated::Service(fio::Service) => {
-                    let end = path.rfind('/');
-
-                    if let Some(end) = end {
-                        let name = &path[end + 1..];
-                        if name.starts_with("fuchsia.") {
-                            let mut ret = name.to_owned();
-                            let dot = ret.rfind('.').unwrap();
-                            ret.replace_range(dot..dot + 1, "/");
-                            ret
-                        } else {
-                            "fuchsia.io/Node".to_owned()
-                        }
-                    } else {
-                        "fuchsia.io/Node".to_owned()
-                    }
-                }
-                fio::NodeInfoDeprecated::Symlink(_) => todo!(),
+            } else {
+                return Err(error!("Unknown attributes {attr:?}"));
             };
 
             return Ok(Value::ClientEnd(
@@ -370,6 +378,8 @@ impl InterpreterInner {
                 proto,
             ));
         }
+
+        Err(error!("Symlink recursion depth exceeded attempting to open {path}"))
     }
 }
 
@@ -585,6 +595,19 @@ impl Interpreter {
 
 /// Turn a path into a dotless, absolute form.
 pub fn canonicalize_path(path: String, pwd: Value) -> Result<String> {
+    let Value::String(pwd) = pwd else {
+        return Err(error!("$pwd is not a string"));
+    };
+
+    if !pwd.starts_with("/") {
+        return Err(error!("$pwd is not an absolute path"));
+    }
+
+    Ok(canonicalize_path_dont_check_pwd(path, &pwd))
+}
+
+/// Turn a path into a dotless, absolute form. Don't validate the pwd string first.
+pub fn canonicalize_path_dont_check_pwd(path: String, pwd: &str) -> String {
     static MULTIPLE_SLASHES: OnceLock<Regex> = OnceLock::new();
     static SINGLE_DOT: OnceLock<Regex> = OnceLock::new();
     static DOUBLE_DOT_ELIMINATION: OnceLock<Regex> = OnceLock::new();
@@ -593,14 +616,6 @@ pub fn canonicalize_path(path: String, pwd: Value) -> Result<String> {
     let single_dot = SINGLE_DOT.get_or_init(|| Regex::new(r"/\.(?=/|$)").unwrap());
     let double_dot_elimination =
         DOUBLE_DOT_ELIMINATION.get_or_init(|| Regex::new(r"(^|[^/]+)/\.\.(/|$)").unwrap());
-
-    let Value::String(pwd) = pwd else {
-        return Err(error!("$pwd is not a string"));
-    };
-
-    if !pwd.starts_with("/") {
-        return Err(error!("$pwd is not an absolute path"));
-    }
 
     let sep = if pwd.ends_with("/") { "" } else { "/" };
     let path = if path.starts_with("/") { path } else { format!("{pwd}{sep}{path}") };
@@ -624,7 +639,7 @@ pub fn canonicalize_path(path: String, pwd: Value) -> Result<String> {
         path.push('/');
     }
 
-    Ok(path.to_string())
+    path.to_string()
 }
 
 #[cfg(test)]

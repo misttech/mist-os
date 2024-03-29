@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use async_trait::async_trait;
 use fidl::endpoints::{ClientEnd, Proxy};
 use fidl_codec::library as lib;
 use fidl_fuchsia_io as fio;
+use std::future::Future;
 use std::sync::Arc;
 use vfs::directory::helper::DirectlyMutable;
 
@@ -29,9 +31,57 @@ async fn test_interpreter(
     interpreter
 }
 
+/// A vfs directory entry for a simple symlink.
+struct TestSymlink(String);
+
+impl vfs::symlink::Symlink for TestSymlink {
+    fn read_target(&self) -> impl Future<Output = Result<Vec<u8>, fidl::Status>> + Send {
+        let got = self.0.as_bytes().to_vec();
+        async move { Ok(got) }
+    }
+}
+
+#[async_trait]
+impl vfs::node::Node for TestSymlink {
+    async fn get_attributes(
+        &self,
+        _requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, fidl::Status> {
+        unreachable!();
+    }
+
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, fidl::Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_SYMLINK
+                | vfs::common::rights_to_posix_mode_bits(
+                    /*r*/ true, /*w*/ false, /*x*/ false,
+                ),
+            id: fio::INO_UNKNOWN,
+            content_size: self.0.as_bytes().len() as u64,
+            storage_size: self.0.as_bytes().len() as u64,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+}
+
 /// A test string.
 pub const NEILS_PHILOSOPHY: &'static [u8] =
     b"It's not about the walls, Max, it's about what's outside of them.";
+
+impl vfs::directory::entry::DirectoryEntry for TestSymlink {
+    fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
+        vfs::directory::entry::EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Symlink)
+    }
+
+    fn open_entry(
+        self: Arc<Self>,
+        request: vfs::directory::entry::OpenRequest<'_>,
+    ) -> Result<(), fidl::Status> {
+        request.open_symlink(self)
+    }
+}
 
 /// Helper for quickly testing a code snippet to see if it returns the correct
 /// value.
@@ -60,6 +110,12 @@ impl<T: AsRef<str>> Test<T> {
         let test_subdir = vfs::directory::mutable::simple();
         let foo_subdir = vfs::directory::mutable::simple();
         let test_file = vfs::file::read_only(NEILS_PHILOSOPHY);
+        foo_subdir
+            .add_entry("relative_symlink", Arc::new(TestSymlink("../neils_philosophy".to_owned())))
+            .unwrap();
+        foo_subdir
+            .add_entry("absolute_symlink", Arc::new(TestSymlink("/test".to_owned())))
+            .unwrap();
         test_subdir.add_entry("foo", foo_subdir).unwrap();
         test_subdir.add_entry("neils_philosophy", test_file).unwrap();
         simple.add_entry("test", test_subdir).unwrap();
