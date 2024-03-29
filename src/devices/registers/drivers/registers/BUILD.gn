@@ -56,14 +56,13 @@ test("registers-test") {
 group("common") {
   public_deps = [
     ":registers_bind",
-    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bin/driver_runtime",
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
+    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
-    "//src/lib/ddk:ddk_metadata",
     "//zircon/system/ulib/fbl",
   ]
 }

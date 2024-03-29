@@ -243,6 +243,7 @@ sdk_static_library("ddk") {
     "//src/devices/pwm/drivers/aml-pwm-init:*",
     "//src/devices/pwm/drivers/pwm:*",
     "//src/devices/ram/drivers/aml-ram:*",
+    "//src/devices/registers/drivers/registers:*",
     "//src/devices/rtc/drivers/aml-rtc:*",
     "//src/devices/rtc/drivers/intel-rtc:*",
     "//src/devices/rtc/drivers/pl031-rtc:*",

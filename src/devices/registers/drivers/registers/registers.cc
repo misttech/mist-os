@@ -4,8 +4,8 @@
 
 #include "registers.h"
 
-#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/metadata.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
@@ -230,40 +230,26 @@ zx::result<> RegistersDevice::MapMmio(fuchsia_hardware_registers::wire::Mask::Ta
     FDF_LOG(ERROR, "Failed to open pdev service: %s", result.status_string());
     return result.take_error();
   }
-  fidl::WireSyncClient pdev(std::move(result.value()));
+  auto pdev = ddk::PDevFidl(std::move(result.value()));
   if (!pdev.is_valid()) {
     FDF_LOG(ERROR, "Failed to get pdev");
     return zx::error(ZX_ERR_NO_RESOURCES);
   }
 
-  auto device_info = pdev->GetNodeDeviceInfo();
-  if (!device_info.ok() || device_info->is_error()) {
-    FDF_LOG(ERROR, "Could not get device info %s", device_info.FormatDescription().c_str());
-    return zx::error(device_info.ok() ? device_info->error_value() : device_info.error().status());
+  pdev_device_info_t device_info = {};
+  if (zx_status_t status = pdev.GetDeviceInfo(&device_info); status != ZX_OK) {
+    FDF_LOG(ERROR, "Could not get device info %d", status);
+    return zx::error(status);
   }
 
-  ZX_ASSERT(device_info->value()->has_mmio_count());
-  for (uint32_t i = 0; i < device_info->value()->mmio_count(); i++) {
-    auto mmio = pdev->GetMmioById(i);
-    if (!mmio.ok() || mmio->is_error()) {
-      FDF_LOG(ERROR, "Could not get mmio regions %s", mmio.FormatDescription().c_str());
-      return zx::error(mmio.ok() ? mmio->error_value() : mmio.error().status());
+  for (uint32_t i = 0; i < device_info.mmio_count; i++) {
+    std::optional<fdf::MmioBuffer> mmio;
+    if (zx_status_t status = pdev.MapMmio(i, &mmio); status != ZX_OK) {
+      FDF_LOG(ERROR, "Could not get mmio regions %d", status);
+      return zx::error(status);
     }
 
-    if (!mmio->value()->has_vmo() || !mmio->value()->has_size() || !mmio->value()->has_offset()) {
-      FDF_LOG(ERROR, "GetMmioById(%d) returned invalid MMIO", i);
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-
-    zx::result mmio_buffer =
-        fdf::MmioBuffer::Create(mmio->value()->offset(), mmio->value()->size(),
-                                std::move(mmio->value()->vmo()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
-    if (mmio_buffer.is_error()) {
-      FDF_LOG(ERROR, "Failed to map MMIO: %s", mmio_buffer.status_string());
-      return zx::error(mmio_buffer.error_value());
-    }
-
-    zx::result<MmioInfo> mmio_info = SWITCH_BY_TAG(tag, MmioInfo::Create, std::move(*mmio_buffer));
+    zx::result<MmioInfo> mmio_info = SWITCH_BY_TAG(tag, MmioInfo::Create, std::move(*mmio));
     if (mmio_info.is_error()) {
       FDF_LOG(ERROR, "Could not create mmio info %d", mmio_info.error_value());
       return zx::error(mmio_info.take_error());
