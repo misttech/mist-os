@@ -972,7 +972,7 @@ AllocationResult LogicalBufferCollection::allocation_result() {
 }
 
 LogicalBufferCollection::LogicalBufferCollection(Device* parent_device)
-    : parent_device_(parent_device) {
+    : parent_device_(parent_device), create_time_monotonic_(zx::clock::get_monotonic()) {
   TRACE_DURATION("gfx", "LogicalBufferCollection::LogicalBufferCollection", "this", this);
   LogInfo(FROM_HERE, "LogicalBufferCollection::LogicalBufferCollection()");
 
@@ -1071,7 +1071,7 @@ void LogicalBufferCollection::FailDownFrom(NodeProperties* tree_to_fail, Error e
     // sufficient alone (clients must also close their VMO(s)).
     //
     // Clear out the result info since we won't be sending it again. This also clears out any
-    // children of strong_parent_vmos_ that LogicalBufferCollection may still be holding.
+    // children of strong_parent_vmo_ that LogicalBufferCollection may still be holding.
     allocation_result_info_.reset();
   }
   // ~self, which will delete "this" if there are no more references to "this".
@@ -3835,10 +3835,10 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
     return fpromise::error();
   }
 
-  // raw_vmo may itself be a child VMO of an allocator's overall contig VMO, but that's an internal
-  // detail of the allocator.  The ZERO_CHILDREN signal will only be set when all direct _and
-  // indirect_ child VMOs are fully gone (not just handles closed, but the kernel object is deleted,
-  // which avoids races with handle close, and means there also aren't any mappings left).
+  // raw_parent_vmo may itself be a child VMO of an allocator's overall contig VMO, but that's an
+  // internal detail of the allocator.  The ZERO_CHILDREN signal will only be set when all direct
+  // _and indirect_ child VMOs are fully gone (not just handles closed, but the kernel object is
+  // deleted, which avoids races with handle close, and means there also aren't any mappings left).
   zx::vmo raw_parent_vmo;
   std::optional<std::string> name;
   if (name_.has_value()) {
@@ -4534,26 +4534,26 @@ void LogicalBufferCollection::CheckForZeroStrongNodes() {
             // closed by clients.
             //
             // If we hadn't allocated by the time of posting, we can still handle this the same way,
-            // because the strong_parent_vmos_.empty() check elsewhere will take care of failing
-            // from the root_ down shortly after we reset() the vmo fields here (triggered async by
-            // ZX_VMO_ZERO_CHILDREN signal to strong_parent_vmos_).
+            // because CheckForZeroStrongParentVmoCount will take care of failing from the root_
+            // down shortly after we reset() the vmo fields here (triggered async by
+            // ZX_VMO_ZERO_CHILDREN signal to strong_parent_vmo_).
             for (auto& buffer : *allocation_result_info_->buffers()) {
               // The sysmem strong VMO handles in allocation_result_info_ are logically owned by
               // strong nodes. Once there are zero strong nodes, there can never be a strong node
               // again, so we reset the strong VMOs here. In some cases there can still be strong
-              // VMOs outstanding, and those still prevent strong_parent_vmos_ entries from
+              // VMOs outstanding, and those still prevent strong_parent_vmo_ entries from
               // disappearing until all the outstanding strong VMO handles are closed by clients.
               //
-              // Once all strong_parent_vmos_ entries are gone, the LogicalBufferCollection will
-              // fail from root_ down.
+              // Once all strong_parent_vmo_ entries are gone, the LogicalBufferCollection will fail
+              // from root_ down.
               buffer.vmo().reset();
             }
           } else {
             // Since we know we have zero strong VMOs outstanding (because no VMOs allocated yet),
             // this is conceptually skipping to the root_-down fail that we'd otherwise do elsewhere
-            // upon noticing strong_parent_vmos_.empty() becoming true, since we now know that
-            // strong_parent_vmos_.empty() never became false and will remain true from this point
-            // onward.
+            // upon CheckForZeroStrongParentVmoCount noticing zero strong VMOs, since we now know
+            // that strong_parent_vmo_count_ never became non-zero and will remain zero from this
+            // point onward.
             //
             // We also know in this path that we have zero weak VMOs outstanding (because no VMOs
             // allocated yet), so there's no need to signal any close_weak_asap(s) here since no
@@ -4695,6 +4695,85 @@ bool LogicalBufferCollection::FlattenPixelFormatAndModifiers(
   }
 
   return true;
+}
+
+void LogicalBufferCollection::LogSummary(IndentTracker& indent_tracker) {
+  auto indent = indent_tracker.Current();
+  LOG(INFO, "%*scollection %p:", indent.num_spaces(), "", this);
+  {
+    auto indent = indent_tracker.Nested();
+    auto maybe_name = name();
+    LOG(INFO, "%*sname: %s", indent.num_spaces(), "",
+        maybe_name.has_value() ? (*maybe_name).c_str() : "<none>");
+    if (!has_allocation_result_) {
+      LOG(INFO, "%*spending allocation", indent.num_spaces(), "");
+    } else {
+      size_t orig_count = 0;
+      std::optional<double> per_buffer_MiB;
+      if (buffer_collection_info_before_population_.has_value()) {
+        orig_count = buffer_collection_info_before_population_->buffers()->size();
+        LOG(INFO, "%*sorig buffer count: %" PRId64, indent.num_spaces(), "", orig_count);
+        per_buffer_MiB = static_cast<double>(*buffer_collection_info_before_population_->settings()
+                                                  ->buffer_settings()
+                                                  ->size_bytes()) /
+                         1024.0 / 1024.0;
+        LOG(INFO, "%*sper-buffer MiB: %g", indent.num_spaces(), "", *per_buffer_MiB);
+        LOG(INFO, "%*sis_contiguous: %u", indent.num_spaces(), "",
+            *buffer_collection_info_before_population_->settings()
+                 ->buffer_settings()
+                 ->is_physically_contiguous());
+        LOG(INFO, "%*sis_secure: %u", indent.num_spaces(), "",
+            *buffer_collection_info_before_population_->settings()->buffer_settings()->is_secure());
+      }
+      LOG(INFO, "%*sstrong_node_count_: %u allocation_result_info_.has_value(): %u",
+          indent.num_spaces(), "", strong_node_count_, allocation_result_info_.has_value());
+      uint32_t present_buffers = 0;
+      if (!has_allocation_result_) {
+        LOG(INFO, "%*spending allocation", indent.num_spaces(), "");
+      } else {
+        {
+          auto indent = indent_tracker.Nested();
+          for (uint32_t i = 0; i < orig_count; ++i) {
+            auto iter = buffers_.find(i);
+            if (iter == buffers_.end()) {
+              LOG(INFO, "%*s[%u] absent", indent.num_spaces(), "", i);
+            } else {
+              ++present_buffers;
+              auto& logical_buffer = iter->second;
+
+              ZX_ASSERT(!!logical_buffer->parent_vmo_);
+              zx_signals_t pending = 0;
+              ZX_ASSERT(ZX_ERR_TIMED_OUT == logical_buffer->parent_vmo_->vmo().wait_one(
+                                                0, zx::time::infinite_past(), &pending));
+              bool is_zero_children = !!(pending & ZX_VMO_ZERO_CHILDREN);
+              LOG(INFO, "%*s[%u] parent is_zero_children: %u", indent.num_spaces(), "", i,
+                  is_zero_children);
+
+              bool is_strong_parent_vmo_present = !!logical_buffer->strong_parent_vmo_;
+              LOG(INFO, "%*s[%u] strong_parent_vmo_ present: %u", indent.num_spaces(), "", i,
+                  is_strong_parent_vmo_present);
+              if (is_strong_parent_vmo_present) {
+                auto indent = indent_tracker.Nested();
+                zx_signals_t pending = 0;
+                ZX_ASSERT(ZX_ERR_TIMED_OUT == logical_buffer->strong_parent_vmo_->vmo().wait_one(
+                                                  0, zx::time::infinite_past(), &pending));
+                bool is_zero_children = !!(pending & ZX_VMO_ZERO_CHILDREN);
+                LOG(INFO, "%*s[%u] strong is_zero_children: %u", indent.num_spaces(), "", i,
+                    is_zero_children);
+                // Log koid saved in parent. The strong_child_vmo_ is reset by this point.
+                LOG(INFO, "%*s[%u] strong_child_vmo koid: %" PRIu64, indent.num_spaces(), "", i,
+                    logical_buffer->strong_parent_vmo_->child_koid().value());
+              }
+            }
+          }
+        }
+      }
+      LOG(INFO, "%*spresent_buffers: %u", indent.num_spaces(), "", present_buffers);
+      if (per_buffer_MiB.has_value()) {
+        LOG(INFO, "%*sMiB: %g", indent.num_spaces(), "", *per_buffer_MiB * present_buffers);
+      }
+    }
+  }
 }
 
 fit::result<zx_status_t, std::unique_ptr<LogicalBuffer>> LogicalBuffer::Create(

@@ -244,6 +244,9 @@ class Device final : public DdkDeviceType,
     ZX_ASSERT(ZX_OK == sync_completion_wait_deadline(&done, ZX_TIME_INFINITE));
   }
 
+  virtual void OnAllocationFailure() override { LogAllBufferCollections(); }
+  void LogAllBufferCollections();
+
  private:
   class SecureMemConnection {
    public:
@@ -272,6 +275,9 @@ class Device final : public DdkDeviceType,
       to_run(item);
     }
   }
+
+  void LogCollectionsTimer(async_dispatcher_t* dispatcher, async::TaskBase* task,
+                           zx_status_t status);
 
   Driver* parent_driver_ = nullptr;
   inspect::Inspector inspector_;
@@ -394,6 +400,8 @@ class Device final : public DdkDeviceType,
   bool cmdline_protected_ranges_disable_dynamic_ __TA_GUARDED(*loop_checker_) = false;
 
   bool is_secure_mem_ready_ __TA_GUARDED(*loop_checker_) = false;
+
+  async::TaskMethod<Device, &Device::LogCollectionsTimer> log_all_collections_{this};
 };
 
 class FidlDevice;

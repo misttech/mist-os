@@ -341,6 +341,10 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   fit::result<zx_status_t, std::optional<zx::eventpair>> DupCloseWeakAsapClientEnd(
       uint32_t buffer_index);
 
+  void LogSummary(IndentTracker& indent);
+
+  zx::time create_time_monotonic() const { return create_time_monotonic_; }
+
  private:
   friend class LogicalBuffer;
   friend class NodeProperties;
@@ -918,6 +922,8 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   uint32_t strong_node_count_ = 0;
   uint32_t strong_parent_vmo_count_ = 0;
+
+  const zx::time create_time_monotonic_ = zx::time::infinite_past();
 };
 
 }  // namespace sysmem_driver

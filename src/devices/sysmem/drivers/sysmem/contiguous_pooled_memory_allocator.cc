@@ -454,6 +454,10 @@ zx_status_t ContiguousPooledMemoryAllocator::Allocate(
   if (status != ZX_OK) {
     LOG(WARNING, "GetRegion failed (out of space?) - size: %" PRIu64 " status: %d", size, status);
     DumpPoolStats();
+    // Log buffer lifetime related info for existing buffers. This is via the owner since this
+    // allocator doesn't have all the relevant info; we only want to log this info if we're failing
+    // because we're out of limited space (this failure path).
+    parent_device_->OnAllocationFailure();
     allocations_failed_property_.Add(1);
     last_allocation_failed_timestamp_ns_property_.Set(zx::clock::get_monotonic().get());
     uint64_t unused_size = 0;

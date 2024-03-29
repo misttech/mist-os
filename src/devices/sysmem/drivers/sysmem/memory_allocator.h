@@ -39,6 +39,7 @@ class MemoryAllocator {
       ZX_PANIC("protected_ranges_core_control() not implemented by subclass");
     }
     virtual bool protected_ranges_disable_dynamic() const { return false; }
+    virtual void OnAllocationFailure() {}
   };
 
   explicit MemoryAllocator(fuchsia_hardware_sysmem::HeapProperties properties);

@@ -52,6 +52,9 @@ using sysmem_driver::MemoryAllocator;
 namespace sysmem_driver {
 namespace {
 
+constexpr bool kLogAllCollectionsPeriodically = false;
+constexpr zx::duration kLogAllCollectionsInterval = zx::sec(20);
+
 // These defaults only take effect if there is no SYSMEM_METADATA_TYPE, and also
 // neither of these kernel cmdline parameters set:
 // driver.sysmem.contiguous_memory_size
@@ -698,6 +701,11 @@ zx_status_t Device::Bind() {
     return status;
   }
 
+  if constexpr (kLogAllCollectionsPeriodically) {
+    ZX_ASSERT(ZX_OK ==
+              log_all_collections_.PostDelayed(loop_.dispatcher(), kLogAllCollectionsInterval));
+  }
+
   zxlogf(INFO, "sysmem finished initialization");
 
   return ZX_OK;
@@ -1202,6 +1210,33 @@ void Device::RemoveVmoKoid(zx_koid_t koid) {
   vmo_koids_.erase(koid);
 }
 
+void Device::LogAllBufferCollections() {
+  std::lock_guard checker(*loop_checker_);
+  IndentTracker indent_tracker(0);
+  auto indent = indent_tracker.Current();
+  LOG(INFO, "%*scollections.size: %" PRId64, indent.num_spaces(), "",
+      logical_buffer_collections_.size());
+  // We sort by create time to make it easier to figure out which VMOs are likely leaks, especially
+  // when running with kLogAllCollectionsPeriodically true.
+  std::vector<LogicalBufferCollection*> sort_by_create_time;
+  ForEachLogicalBufferCollection(
+      [&sort_by_create_time](LogicalBufferCollection* logical_buffer_collection) {
+        sort_by_create_time.push_back(logical_buffer_collection);
+      });
+  struct CompareByCreateTime {
+    bool operator()(const LogicalBufferCollection* a, const LogicalBufferCollection* b) {
+      return a->create_time_monotonic() < b->create_time_monotonic();
+    }
+  };
+  std::sort(sort_by_create_time.begin(), sort_by_create_time.end(), CompareByCreateTime{});
+  for (auto* logical_buffer_collection : sort_by_create_time) {
+    logical_buffer_collection->LogSummary(indent_tracker);
+    // let output catch up so we don't drop log lines, hopefully; if there were a way to flush/wait
+    // the logger to avoid dropped lines, we could do that instead
+    zx::nanosleep(zx::deadline_after(zx::msec(20)));
+  };
+}
+
 Device::SecureMemConnection::SecureMemConnection(fidl::ClientEnd<fuchsia_sysmem::SecureMem> channel,
                                                  std::unique_ptr<async::Wait> wait_for_close)
     : connection_(std::move(channel)), wait_for_close_(std::move(wait_for_close)) {
@@ -1212,6 +1247,15 @@ const fidl::WireSyncClient<fuchsia_sysmem::SecureMem>& Device::SecureMemConnecti
     const {
   ZX_DEBUG_ASSERT(connection_);
   return connection_;
+}
+
+void Device::LogCollectionsTimer(async_dispatcher_t* dispatcher, async::TaskBase* task,
+                                 zx_status_t status) {
+  std::lock_guard checker(*loop_checker_);
+  LogAllBufferCollections();
+  ZX_ASSERT(kLogAllCollectionsPeriodically);
+  ZX_ASSERT(ZX_OK ==
+            log_all_collections_.PostDelayed(loop_.dispatcher(), kLogAllCollectionsInterval));
 }
 
 FidlDevice::FidlDevice(zx_device_t* parent, sysmem_driver::Device* sysmem_device,
