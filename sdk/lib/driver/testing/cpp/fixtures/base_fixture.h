@@ -28,6 +28,9 @@ namespace fdf_testing {
 // Arguments:
 //
 //   DriverType: The type of the driver under test. This must be an inheritor of fdf::DriverBase.
+//     If using a custom driver for the test, ensure the DriverType here contains a static function
+//     in the format below. This registration is what the test uses to manage the driver.
+//       `static DriverRegistration GetDriverRegistration()`
 //
 //   EnvironmentType: A class that contains custom dependencies for the driver under test.
 //   The environment will always live on a background dispatcher.

@@ -62,17 +62,32 @@ class EnvWrapper {
 
 template <typename DriverType, bool DriverOnForeground>
 class DriverWrapper {
+  template <typename T, typename = void>
+  struct HasGetDriverRegistration : public ::std::false_type {};
+  template <typename T>
+  struct HasGetDriverRegistration<T, std::void_t<decltype(T::GetDriverRegistration)>>
+      : public std::true_type {};
+  template <typename T>
+  constexpr static auto HasGetDriverRegistrationV = HasGetDriverRegistration<T>::value;
+
  public:
   // The runtime must outlive this class.
   explicit DriverWrapper(fdf_testing::DriverRuntime* runtime) : runtime_(runtime) {
+    DriverRegistration driver_registration_symbol;
+    if constexpr (HasGetDriverRegistrationV<DriverType>) {
+      driver_registration_symbol = DriverType::GetDriverRegistration();
+    } else {
+      driver_registration_symbol = __fuchsia_driver_registration__;
+    }
+
     if constexpr (DriverOnForeground) {
       dut_dispatcher_ = fdf::Dispatcher::GetCurrent();
-      dut_.template emplace<fdf_testing::DriverUnderTest<DriverType>>();
+      dut_.template emplace<fdf_testing::DriverUnderTest<DriverType>>(driver_registration_symbol);
     } else {
       dut_dispatcher_ = fdf::UnownedDispatcher(runtime->StartBackgroundDispatcher()->get());
       dut_.template emplace<
           async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<DriverType>>>(
-          dut_dispatcher_->async_dispatcher(), std::in_place);
+          dut_dispatcher_->async_dispatcher(), std::in_place, driver_registration_symbol);
     }
   }
 
