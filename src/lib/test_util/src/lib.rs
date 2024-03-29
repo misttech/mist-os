@@ -165,6 +165,12 @@ impl Counter {
     }
 }
 
+impl std::fmt::Debug for Counter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Counter").field("count", &self.get()).finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -416,5 +422,11 @@ mod tests {
             assert_eq!(*id, expected_id);
             expected_id += 1;
         }
+    }
+
+    #[test]
+    fn debug_format_counter() {
+        let counter = Counter::new(0);
+        assert_eq!(format!("{:?}", counter), "Counter { count: 0 }");
     }
 }
