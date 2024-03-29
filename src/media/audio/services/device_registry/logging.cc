@@ -642,13 +642,13 @@ void LogRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
   zx_info_handle_basic_t info;
   auto status = vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "vmo.get_info returned error:";
+    FX_PLOGS(WARNING, status) << "vmo.get_info returned error";
     return;
   }
   uint64_t size;
   status = vmo.get_size(&size);
   if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "vmo.get_size returned size " << size << ":";
+    FX_PLOGS(WARNING, status) << "vmo.get_size returned size " << size;
     return;
   }
   FX_LOGS(INFO) << "fuchsia_hardware_audio/Vmo:";

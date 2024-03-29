@@ -39,11 +39,17 @@ inline constexpr bool kLogMain = true;
 inline constexpr bool kLogDeviceDetection = false;
 inline constexpr bool kLogDeviceInitializationProgress = false;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
-inline constexpr bool kLogSummaryFinalDeviceInfo = false;
-inline constexpr bool kLogDetailedFinalDeviceInfo = true;
+inline constexpr bool kLogSummaryFinalDeviceInfo = true;
+inline constexpr bool kLogDetailedFinalDeviceInfo = false;
 
 inline constexpr bool kLogDeviceMethods = false;
 
+inline constexpr bool kLogObjectLifetimes = false;
+inline constexpr bool kLogDeviceState = false;
+inline constexpr bool kLogObjectCounts = false;
+inline constexpr bool kLogNotifyMethods = false;
+
+// Driver FIDL methods
 inline constexpr bool kLogStreamConfigFidlCalls = false;
 inline constexpr bool kLogStreamConfigFidlResponses = false;
 inline constexpr bool kLogStreamConfigFidlResponseValues = false;
@@ -57,11 +63,7 @@ inline constexpr bool kLogRingBufferFidlCalls = false;
 inline constexpr bool kLogRingBufferFidlResponses = false;
 inline constexpr bool kLogRingBufferFidlResponseValues = false;
 
-inline constexpr bool kLogObjectLifetimes = false;
-inline constexpr bool kLogDeviceState = false;
-inline constexpr bool kLogObjectCounts = false;
-inline constexpr bool kLogNotifyMethods = false;
-
+// FIDL server methods
 inline constexpr bool kLogControlCreatorServerMethods = false;
 inline constexpr bool kLogControlCreatorServerResponses = false;
 

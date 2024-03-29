@@ -160,8 +160,8 @@ zx_status_t ValidateStreamProperties(
     const fuchsia_hardware_audio::StreamProperties& stream_props,
     std::optional<const fuchsia_hardware_audio::GainState> gain_state,
     std::optional<const fuchsia_hardware_audio::PlugState> plug_state) {
-  LogStreamProperties(stream_props);
   ADR_LOG(kLogDeviceMethods);
+  LogStreamProperties(stream_props);
 
   if (!stream_props.is_input() || !stream_props.min_gain_db() || !stream_props.max_gain_db() ||
       !stream_props.gain_step_db() || !stream_props.plug_detect_capabilities() ||
@@ -235,8 +235,8 @@ zx_status_t ValidateStreamProperties(
 
 zx_status_t ValidateRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
-  LogRingBufferFormatSets(ring_buffer_format_sets);
   ADR_LOG(kLogDeviceMethods);
+  LogRingBufferFormatSets(ring_buffer_format_sets);
 
   if (ring_buffer_format_sets.empty()) {
     FX_LOGS(WARNING) << "GetRingBufferFormatSets: ring_buffer_format_sets[] is empty";
@@ -407,8 +407,8 @@ zx_status_t ValidateRingBufferFormatSets(
 zx_status_t ValidateCodecProperties(
     const fuchsia_hardware_audio::CodecProperties& codec_props,
     std::optional<const fuchsia_hardware_audio::PlugState> plug_state) {
-  LogCodecProperties(codec_props);
   ADR_LOG(kLogDeviceMethods);
+  LogCodecProperties(codec_props);
 
   if (!codec_props.plug_detect_capabilities()) {
     FX_LOGS(WARNING) << "Incomplete Codec/GetProperties response";
@@ -428,8 +428,8 @@ zx_status_t ValidateCodecProperties(
 
 zx_status_t ValidateDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
-  LogDaiFormatSets(dai_format_sets);
   ADR_LOG(kLogDeviceMethods);
+  LogDaiFormatSets(dai_format_sets);
 
   if (dai_format_sets.empty()) {
     FX_LOGS(WARNING) << "GetDaiSupportedFormats: response is empty";
@@ -519,8 +519,8 @@ zx_status_t ValidateDaiFormatSets(
 }
 
 zx_status_t ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format) {
-  LogDaiFormat(dai_format);
   ADR_LOG(kLogDeviceMethods);
+  LogDaiFormat(dai_format);
 
   if (dai_format.number_of_channels() == 0 ||
       dai_format.number_of_channels() >
@@ -590,8 +590,8 @@ zx_status_t ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_forma
 }
 
 zx_status_t ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInfo& format_info) {
-  LogCodecFormatInfo(format_info);
   ADR_LOG(kLogDeviceMethods);
+  LogCodecFormatInfo(format_info);
 
   if (format_info.external_delay() && *format_info.external_delay() < 0) {
     FX_LOGS(WARNING) << "Invalid Codec::SetDaiFormat response - external_delay cannot be negative";
@@ -611,8 +611,8 @@ zx_status_t ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInf
 zx_status_t ValidateGainState(
     const fuchsia_hardware_audio::GainState& gain_state,
     std::optional<const fuchsia_hardware_audio::StreamProperties> stream_props) {
-  LogGainState(gain_state);
   ADR_LOG(kLogDeviceMethods);
+  LogGainState(gain_state);
 
   if (!gain_state.gain_db()) {
     FX_LOGS(WARNING) << "Incomplete StreamConfig/WatchGainState response";
@@ -650,8 +650,8 @@ zx_status_t ValidateGainState(
 zx_status_t ValidatePlugState(
     const fuchsia_hardware_audio::PlugState& plug_state,
     std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities) {
-  LogPlugState(plug_state);
   ADR_LOG(kLogDeviceMethods);
+  LogPlugState(plug_state);
 
   if (!plug_state.plugged() || !plug_state.plug_state_time()) {
     FX_LOGS(WARNING) << "Incomplete StreamConfig/WatchPlugState response: required field missing";
@@ -678,8 +678,8 @@ zx_status_t ValidatePlugState(
 
 // Validate only DeviceInfo-specific aspects. For example, don't re-validate format correctness.
 bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
-  LogDeviceInfo(device_info);
   ADR_LOG(kLogDeviceMethods);
+  LogDeviceInfo(device_info);
 
   // Validate top-level required members.
   if (!device_info.token_id() || !device_info.device_type() || !device_info.device_name() ||
@@ -738,8 +738,8 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
 
 zx_status_t ValidateRingBufferProperties(
     const fuchsia_hardware_audio::RingBufferProperties& rb_props) {
-  LogRingBufferProperties(rb_props);
   ADR_LOG(kLogDeviceMethods);
+  LogRingBufferProperties(rb_props);
 
   if (!rb_props.needs_cache_flush_or_invalidate()) {
     FX_LOGS(WARNING) << "Reported RingBufferProperties.needs_cache_flush_or_invalidate is missing";
@@ -757,8 +757,8 @@ zx_status_t ValidateRingBufferProperties(
 }
 
 zx_status_t ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format) {
-  LogRingBufferFormat(ring_buffer_format);
   ADR_LOG(kLogDeviceMethods);
+  LogRingBufferFormat(ring_buffer_format);
   if (!ring_buffer_format.pcm_format()) {
     FX_LOGS(WARNING) << "ring_buffer_format must set pcm_format";
     return ZX_ERR_INVALID_ARGS;
@@ -835,8 +835,8 @@ zx_status_t ValidateSampleFormatCompatibility(uint8_t bytes_per_sample,
 
 zx_status_t ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
                                   const fuchsia_hardware_audio::Format& rb_format) {
-  LogRingBufferVmo(vmo, num_frames, rb_format);
   ADR_LOG(kLogDeviceMethods);
+  LogRingBufferVmo(vmo, num_frames, rb_format);
 
   uint64_t size;
   auto status = ValidateRingBufferFormat(rb_format);
@@ -863,8 +863,8 @@ zx_status_t ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
 }
 
 zx_status_t ValidateDelayInfo(const fuchsia_hardware_audio::DelayInfo& delay_info) {
-  LogDelayInfo(delay_info);
   ADR_LOG(kLogDeviceMethods);
+  LogDelayInfo(delay_info);
 
   if (!delay_info.internal_delay()) {
     FX_LOGS(WARNING) << "Reported DelayInfo.internal_delay is missing";

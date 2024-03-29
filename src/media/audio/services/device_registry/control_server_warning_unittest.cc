@@ -208,7 +208,7 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatWhenAlreadyPending) {
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
@@ -304,7 +304,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenAlreadyPending) {
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -315,7 +315,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenAlreadyPending) {
   control->client()->CodecStart().Then(
       [&received_callback](fidl::Result<Control::CodecStart>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
   control->client()->CodecStart().Then(
       [&received_callback2](fidl::Result<Control::CodecStart>& result) {
@@ -377,7 +377,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenStarted) {
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -386,7 +386,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenStarted) {
   control->client()->CodecStart().Then(
       [&received_callback](fidl::Result<Control::CodecStart>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -425,7 +425,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenAlreadyPending) {
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -434,7 +434,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenAlreadyPending) {
   control->client()->CodecStart().Then(
       [&received_callback](fidl::Result<Control::CodecStart>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -445,7 +445,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenAlreadyPending) {
   control->client()->CodecStop().Then(
       [&received_callback](fidl::Result<Control::CodecStop>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
   control->client()->CodecStop().Then(
       [&received_callback2](fidl::Result<Control::CodecStop>& result) {
@@ -507,7 +507,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenStopped) {
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
