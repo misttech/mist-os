@@ -19,7 +19,7 @@ use {
     },
     tempfile::NamedTempFile,
     tempfile_ext::NamedTempFileExt as _,
-    version_history::{AbiRevision, HISTORY},
+    version_history::HISTORY,
 };
 
 const META_FAR_NAME: &str = "meta.far";
@@ -36,7 +36,7 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
 
     let mut builder = PackageBuilder::from_package_build_manifest(
         &package_build_manifest,
-        get_abi_revision(&cmd)?,
+        HISTORY.check_api_level_for_build(cmd.api_level)?,
     )
     .with_context(|| {
         format!("creating package manifest from {}", cmd.package_build_manifest_path)
@@ -155,14 +155,6 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
     Ok(())
 }
 
-fn get_abi_revision(cmd: &PackageBuildCommand) -> Result<AbiRevision> {
-    if let Some(api_level) = cmd.api_level {
-        Ok(HISTORY.check_api_level_for_build(api_level)?)
-    } else {
-        Ok(HISTORY.get_default_abi_revision_for_swd())
-    }
-}
-
 #[cfg(test)]
 mod test {
     use {
@@ -177,6 +169,7 @@ mod test {
             convert::TryInto as _,
             fs::{read_dir, read_to_string},
         },
+        version_history::{AbiRevision, ApiLevel},
     };
 
     fn file_merkle(path: &Utf8Path) -> fuchsia_merkle::Hash {
@@ -211,7 +204,7 @@ mod test {
         let cmd = PackageBuildCommand {
             package_build_manifest_path: root.join("invalid path"),
             out: Utf8PathBuf::from("out"),
-            api_level: Some(8.into()),
+            api_level: 8.into(),
             repository: None,
             published_name: None,
             depfile: false,
@@ -235,7 +228,7 @@ mod test {
         let cmd = PackageBuildCommand {
             package_build_manifest_path,
             out,
-            api_level: Some(8.into()),
+            api_level: 8.into(),
             repository: None,
             published_name: None,
             depfile: false,
@@ -268,7 +261,7 @@ mod test {
         cmd_package_build(PackageBuildCommand {
             package_build_manifest_path,
             out: out.clone(),
-            api_level: Some(8.into()),
+            api_level: 8.into(),
             repository: None,
             published_name: None,
             depfile: false,
@@ -325,7 +318,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_generate_empty_package_manifest_latest_version() {
+    async fn test_generate_empty_package_manifest_api_level_head() {
         let tempdir = tempfile::tempdir().unwrap();
         let root = Utf8Path::from_path(tempdir.path()).unwrap();
         let out = root.join("out");
@@ -345,7 +338,7 @@ mod test {
         cmd_package_build(PackageBuildCommand {
             package_build_manifest_path,
             out: out.clone(),
-            api_level: None,
+            api_level: ApiLevel::HEAD,
             repository: None,
             published_name: None,
             depfile: false,
@@ -393,15 +386,15 @@ mod test {
             }),
         );
 
+        let head_abi_revision =
+            version_history::HISTORY.check_api_level_for_build(ApiLevel::HEAD).unwrap();
+
         assert_eq!(
             read_meta_far_contents(&out.join(META_FAR_NAME)),
             BTreeMap::from([
                 ("meta/contents".into(), "".into()),
                 ("meta/package".into(), r#"{"name":"my-package","version":"0"}"#.into()),
-                (
-                    "meta/fuchsia.abi/abi-revision".into(),
-                    version_history::HISTORY.get_default_abi_revision_for_swd().to_string(),
-                ),
+                ("meta/fuchsia.abi/abi-revision".into(), head_abi_revision.to_string(),),
             ]),
         );
     }
@@ -434,7 +427,7 @@ mod test {
         cmd_package_build(PackageBuildCommand {
             package_build_manifest_path,
             out: out.clone(),
-            api_level: Some(8.into()),
+            api_level: 8.into(),
             repository: Some("my-repository".into()),
             published_name: None,
             depfile: false,
@@ -586,7 +579,7 @@ mod test {
         cmd_package_build(PackageBuildCommand {
             package_build_manifest_path,
             out: out.clone(),
-            api_level: Some(supported_version.api_level),
+            api_level: supported_version.api_level,
             repository: None,
             published_name: Some("published-name".into()),
             depfile: true,
@@ -728,7 +721,7 @@ mod test {
         let err = cmd_package_build(PackageBuildCommand {
             package_build_manifest_path,
             out: out.clone(),
-            api_level: Some(supported_version.api_level),
+            api_level: supported_version.api_level,
             repository: None,
             published_name: Some("published-name".into()),
             depfile: true,

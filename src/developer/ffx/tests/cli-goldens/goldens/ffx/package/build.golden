@@ -29,7 +29,7 @@
           "arg_name": "api-level"
         }
       },
-      "optionality": "optional",
+      "optionality": "required",
       "long": "--api-level",
       "short": null,
       "description": "package API level",

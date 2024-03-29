@@ -22,13 +22,13 @@ pub struct ApiLevel(u64);
 impl ApiLevel {
     /// The `HEAD` pseudo-API level, representing the bleeding edge of
     /// development.
-    const HEAD: ApiLevel = ApiLevel(0xFFFF_FFFF_FFFF_FFFE);
+    pub const HEAD: ApiLevel = ApiLevel(0xFFFF_FFFF_FFFF_FFFE);
 
     /// The `LEGACY` pseudo-API level, which is used in platform builds.
     ///
     /// TODO: https://fxbug.dev/42085274 - Remove this once `LEGACY` is actually
     /// gone, and use `HEAD` instead.
-    const LEGACY: ApiLevel = ApiLevel(0xFFFF_FFFF_FFFF_FFFF);
+    pub const LEGACY: ApiLevel = ApiLevel(0xFFFF_FFFF_FFFF_FFFF);
 
     pub const fn from_u64(value: u64) -> Self {
         Self(value)
@@ -267,17 +267,6 @@ impl VersionHistory {
             .filter(|v| v.api_level != ApiLevel::HEAD && v.api_level != ApiLevel::LEGACY)
             .last()
             .unwrap()
-    }
-
-    /// The packaging tools currently stamp packages with a default ABI revision
-    /// if the API level or ABI revision were not included on the command line.
-    /// This is dangerous, because it'll be difficult to notice if the wrong ABI
-    /// stamp is being applied. We should remove this default, but until we do,
-    /// we'll use this ABI revision.
-    ///
-    /// TODO: https://fxbug.dev/326095332 - Remove this.
-    pub fn get_default_abi_revision_for_swd(&self) -> AbiRevision {
-        self.supported_versions().last().unwrap().abi_revision
     }
 
     /// API level to be used in tests that create components on the fly and need
@@ -832,10 +821,6 @@ The following API levels are supported: 5, 6, 7, HEAD, LEGACY"
     fn test_various_getters() {
         assert_eq!(
             FAKE_VERSION_HISTORY.get_abi_revision_for_platform_components(),
-            0x58ea445e942a0007.into()
-        );
-        assert_eq!(
-            FAKE_VERSION_HISTORY.get_default_abi_revision_for_swd(),
             0x58ea445e942a0007.into()
         );
         assert_eq!(

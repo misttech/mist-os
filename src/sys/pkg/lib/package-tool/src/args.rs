@@ -106,7 +106,7 @@ pub struct PackageBuildCommand {
 
     /// package API level
     #[argh(option)]
-    pub api_level: Option<ApiLevel>,
+    pub api_level: ApiLevel,
 
     /// name of the package
     #[argh(option)]
