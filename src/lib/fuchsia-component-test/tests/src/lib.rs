@@ -1126,6 +1126,76 @@ async fn echo_clients() -> Result<(), Error> {
 }
 
 #[fuchsia::test]
+async fn nested_component_manager_with_passthrough_directory() -> Result<(), Error> {
+    // The expose_dir_rights.cm component requires that the ELF runner be in its
+    // environment.
+    let builder = RealmBuilder::with_params(
+        RealmBuilderParams::new().from_relative_url("#meta/elf_runner_and_environment.cm"),
+    )
+    .await
+    .unwrap();
+    // We add expose_dir_rights.cm because it exposes directory capabilities
+    // that can be passed through the nested component manager.
+    let directory_server = builder
+        .add_child(
+            "directory-server",
+            "#meta/expose_dir_rights.cm",
+            ChildOptions::new().eager().environment("elf-env"),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(
+                    Capability::directory("read_write")
+                        .path("/read_write")
+                        .rights(fio::RW_STAR_DIR),
+                )
+                .from(&directory_server)
+                .to(Ref::parent()),
+        )
+        .await
+        .expect("failed to add route");
+    // The expose_dir_rights.cm component manifest is written such that we need
+    // to use it with the component_manager_for_rights_test.cm. We could write a
+    // new manifest, but that seems heavy weight for a single integration test.
+    let cm_instance = builder
+        .build_in_nested_component_manager("#meta/component_manager_for_rights_test.cm")
+        .await?;
+
+    // component_manager_for_rights_test.cm uses debug configuration, so
+    // manually start the component tree.
+    let lifecycle_controller = cm_instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_sys2::LifecycleControllerMarker>()
+        .unwrap();
+    let (_, binder_server) = fidl::endpoints::create_endpoints();
+    lifecycle_controller.start_instance(".", binder_server).await.unwrap().unwrap();
+
+    // Exercise the directory exposed by nested component manager passthrough.
+    let rw_dir_proxy = fuchsia_fs::directory::open_directory(
+        cm_instance.root.get_exposed_dir(),
+        "read_write",
+        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+    )
+    .await?;
+    let (name, _file_proxy) = fuchsia_fs::directory::create_randomly_named_file(
+        &rw_dir_proxy,
+        "test-file",
+        fuchsia_fs::OpenFlags::empty(),
+    )
+    .await?;
+    let entries = fuchsia_fs::directory::readdir(&rw_dir_proxy).await?;
+    assert!(entries.contains(&fuchsia_fs::directory::DirEntry {
+        name,
+        kind: fuchsia_fs::directory::DirentKind::File
+    }));
+
+    cm_instance.destroy().await?;
+    Ok(())
+}
+
+#[fuchsia::test]
 async fn nested_component_manager_with_passthrough() -> Result<(), Error> {
     let builder = RealmBuilder::new().await?;
     let (send_echo_server_called, mut receive_echo_server_called) = mpsc::channel(1);

@@ -23,6 +23,7 @@ rustc_test("fuchsia_component_test_tests_bin") {
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
@@ -172,6 +173,10 @@ fuchsia_test_package("fuchsia-component-test-tests") {
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
     "//src/sys/component_manager/testing/echo_client",
     "//src/sys/component_manager/testing/echo_server",
+    "//src/sys/component_manager/tests/rights:component_manager_debug_config",
+    "//src/sys/component_manager/tests/rights:component_manager_for_rights_test",
+    "//src/sys/component_manager/tests/rights:elf_runner_and_environment",
+    "//src/sys/component_manager/tests/rights:expose_dir_rights",
   ]
   test_components = [
     ":fuchsia_component_test_tests_component",
