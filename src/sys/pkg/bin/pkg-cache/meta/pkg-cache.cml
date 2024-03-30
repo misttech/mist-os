@@ -30,34 +30,34 @@
             path: "/pkgfs",
         },
         {
-            directory: "system",
-            rights: [ "rx*" ],
-            path: "/pkgfs/system",
-        },
-        {
             directory: "pkgfs-packages",
             rights: [ "rx*" ],
             path: "/pkgfs/packages",
         },
         {
+            directory: "build-info",
+            rights: [ "r*" ],
+            path: "/specific-base-packages/build-info/meta/fuchsia.domain_config/data",
+        },
+        {
             directory: "config-data",
             rights: [ "r*" ],
-            path: "/pkgfs/packages/config-data/0/meta/data",
+            path: "/specific-base-packages/config-data/meta/data",
         },
         {
             directory: "root-ssl-certificates",
             rights: [ "r*" ],
-            path: "/pkgfs/packages/root_ssl_certificates/0/data",
-        },
-        {
-            directory: "build-info",
-            rights: [ "r*" ],
-            path: "/pkgfs/packages/build-info/0/meta/fuchsia.domain_config/data",
+            path: "/specific-base-packages/root_ssl_certificates/data",
         },
         {
             directory: "shell-commands-bin",
             rights: [ "rx*" ],
-            path: "/shell-commands-bin",
+            path: "/specific-base-packages/shell-commands/bin",
+        },
+        {
+            directory: "system",
+            rights: [ "rx*" ],
+            path: "/specific-base-packages/system_image",
         },
     ],
     use: [

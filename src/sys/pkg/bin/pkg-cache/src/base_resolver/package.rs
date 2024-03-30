@@ -154,27 +154,36 @@ pub(super) async fn resolve_impl(
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
     scope: package_directory::ExecutionScope,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
-    let url_storage;
     let url = match url {
         fuchsia_url::AbsolutePackageUrl::Pinned(_) => {
             return Err(ResolverError::PackageHashNotSupported);
         }
-        fuchsia_url::AbsolutePackageUrl::Unpinned(url) => {
-            // TODO(https://fxbug.dev/42131375) Remove zero-variant fallback once variant concept is removed.
-            // Base packages must have a variant of zero, and the variant is cleared before adding
-            // the URL to the base_packages map. Clients are allowed to specify or omit the
-            // variant (clients generally omit so we minimize the number of allocations in that
-            // case).
-            match url.variant() {
-                Some(variant) if variant.is_zero() => {
-                    let mut url = url.clone();
-                    url.clear_variant();
-                    url_storage = url;
-                    &url_storage
-                }
-                _ => url,
-            }
+        fuchsia_url::AbsolutePackageUrl::Unpinned(url) => url,
+    };
+    let hash = resolve_base_package(url, dir, base_packages, open_packages, scope).await?;
+    Ok(authenticator.create(&hash))
+}
+
+pub(crate) async fn resolve_base_package(
+    url: &fuchsia_url::UnpinnedAbsolutePackageUrl,
+    dir: ServerEnd<fio::DirectoryMarker>,
+    base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
+    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    scope: package_directory::ExecutionScope,
+) -> Result<fuchsia_hash::Hash, ResolverError> {
+    // TODO(https://fxbug.dev/42131375) Remove zero-variant fallback once variant concept is gone.
+    // Base packages must have a variant of zero, and the variant is cleared before adding the URL
+    // to the base_packages map. Clients are allowed to specify or omit the variant (clients
+    // generally omit so we minimize the number of allocations in that case).
+    let url_storage;
+    let url = match url.variant() {
+        Some(variant) if variant.is_zero() => {
+            let mut url = url.clone();
+            url.clear_variant();
+            url_storage = url;
+            &url_storage
         }
+        _ => url,
     };
     let hash = base_packages
         .get(url)
@@ -189,7 +198,7 @@ pub(super) async fn resolve_impl(
             vfs::path::Path::dot(),
             dir.into_channel().into(),
         );
-    Ok(authenticator.create(hash))
+    Ok(*hash)
 }
 
 async fn resolve_subpackage(

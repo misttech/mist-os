@@ -333,11 +333,22 @@ async fn main_inner() -> Result<(), Error> {
             .context("adding fuchsia.space/Manager to /svc")?;
     }
 
+    let base_package_entry = |name: &'static str| {
+        serve_base_package_if_present(
+            fuchsia_url::UnpinnedAbsolutePackageUrl::new(
+                "fuchsia-pkg://fuchsia.com".parse().expect("valid repo url"),
+                name.parse().expect("valid package name"),
+                None,
+            ),
+            base_resolver_base_packages.as_ref(),
+            &open_packages,
+            scope.clone(),
+        )
+        .map(move |result| result.map(remote_dir).with_context(|| format!("getting {name} dir")))
+    };
+
     let out_dir = vfs::pseudo_directory! {
         "svc" => svc_dir,
-        "shell-commands-bin" => remote_dir(shell_commands_bin_dir(&base_resolver_base_packages, scope.clone(), blobfs.clone())
-            .await
-            .context("getting shell-commands-bin dir")?),
         "pkgfs" =>
             crate::compat::pkgfs::make_dir(
                 Arc::clone(&base_packages),
@@ -345,6 +356,13 @@ async fn main_inner() -> Result<(), Error> {
                 system_image,
             )
             .context("serve pkgfs compat directories")?,
+        "specific-base-packages" => vfs::pseudo_directory! {
+            "build-info" => base_package_entry("build-info").await?,
+            "config-data" => base_package_entry("config-data").await?,
+            "root_ssl_certificates" => base_package_entry("root_ssl_certificates").await?,
+            "shell-commands" => base_package_entry("shell-commands").await?,
+            "system_image" => base_package_entry("system_image").await?,
+        }
     };
 
     let _inspect_server_task =
@@ -367,31 +385,28 @@ async fn main_inner() -> Result<(), Error> {
     Ok(())
 }
 
-async fn shell_commands_bin_dir(
+async fn serve_base_package_if_present(
+    url: fuchsia_url::UnpinnedAbsolutePackageUrl,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
+    open_packages: &package_directory::RootDirCache<blobfs::Client>,
     scope: package_directory::ExecutionScope,
-    blobfs: blobfs::Client,
 ) -> anyhow::Result<fio::DirectoryProxy> {
-    let (client, server) =
+    let (proxy, server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().context("create proxy")?;
-    let Some(hash) =
-        base_packages.get(&"fuchsia-pkg://fuchsia.com/shell-commands".parse().expect("valid url"))
-    else {
-        tracing::warn!(
-            "no 'shell-commands' package in base, so exposed 'shell-commands-bin' directory will \
-             close connections"
-        );
-        return Ok(client);
-    };
-    package_directory::serve_path(
+    match base_resolver::package::resolve_base_package(
+        &url,
+        server,
+        base_packages,
+        open_packages,
         scope,
-        blobfs,
-        *hash,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        package_directory::VfsPath::validate_and_split("bin").expect("valid path"),
-        server.into_channel().into(),
     )
     .await
-    .context("serving shell-commands bin dir")?;
-    Ok(client)
+    {
+        Ok::<fuchsia_hash::Hash, _>(_) => (),
+        Err(base_resolver::ResolverError::PackageNotInBase(_)) => {
+            tracing::warn!(%url, "package not in base, so exposed directory will close connections")
+        }
+        Err(e) => Err(e).context("resolving specific base package")?,
+    }
+    Ok(proxy)
 }
