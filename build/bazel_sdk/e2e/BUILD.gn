@@ -1,0 +1,77 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_host_test.gni")
+import("//sdk/config.gni")
+
+action("generate_test_environment") {
+  script = "scripts/generate_test_environment.py"
+  outputs = [ "$target_gen_dir/test_workspace/BUILD.bazel" ]
+
+  inputs = [
+    # The bazel prebuilt is an implicit input for the script.
+    "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel-real",
+
+    # clang binary is needed for compilation test cases.
+    "//prebuilt/third_party/clang/${host_os}-${host_cpu}",
+
+    # googletest isn't currently used in the test, but it is expected to be there.
+    "//third_party/googletest/src",
+
+    "test_workspace/.bazelrc",
+    "test_workspace/.fuchsia-build-config.json",
+    "test_workspace/BUILD.bazel",
+    "test_workspace/WORKSPACE.bazel",
+    "test_workspace/fuchsia_env.toml",
+    "test_workspace/scripts/setup-config.sh",
+    "test_workspace/tests_dev_workflow/sdk_test_common.py",
+    "test_workspace/tests_dev_workflow/ffx_sdk_version_test.py",
+
+    # The real bootstrap_bazel.sh script downloads the bazel binary.
+    # We substitute our own no-op script to prevent accessing the internet during the test.
+    "test_workspace/third_party/fuchsia-infra-bazel-rules/scripts/bootstrap_bazel.sh",
+  ]
+
+  deps = [ "//build/bazel:generate_fuchsia_sdk_repository(//build/toolchain/fuchsia:x64)" ]
+  data_deps = [ "//build/bazel:generate_fuchsia_sdk_repository(//build/toolchain/fuchsia:x64)" ]
+
+  args = [
+    "--bazel-launcher",
+    rebase_path(inputs[0], root_build_dir),
+    "--clang-prebuilt-dir",
+    rebase_path(inputs[1], root_build_dir),
+    "--sdk-dir",
+    rebase_path(root_build_dir,
+                target_gen_dir + "/test_workspace/third_party") +
+        "/gen/build/bazel/fuchsia_sdk",
+    "--googletest-dir",
+    rebase_path(inputs[2], root_build_dir),
+    "--fuchsia-infra-dir",
+    rebase_path("//third_party/fuchsia-infra-bazel-rules/src", root_build_dir),
+    "--template-workspace-dir",
+    rebase_path("test_workspace", root_build_dir),
+    "--out-dir",
+    rebase_path(target_gen_dir, root_build_dir),
+  ]
+}
+
+if (is_host) {
+  python_host_test("ffx_sdk_version_test") {
+    main_source = "test_workspace/tests_dev_workflow/ffx_sdk_version_test.py"
+    sources = [ "test_workspace/tests_dev_workflow/sdk_test_common.py" ]
+    main_callable = "main"
+    extra_args = [
+      "--test_dir",
+      rebase_path(target_gen_dir, root_build_dir) + "/test_workspace",
+      "--sdk_id",
+      sdk_id,
+    ]
+    test_data_deps = [ ":generate_test_environment" ]
+  }
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":ffx_sdk_version_test($host_toolchain)" ]
+}

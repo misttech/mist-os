@@ -1,0 +1,7 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file
+
+# Leave this line at the top of this file. It will pull in various useful defaults
+# Any changes after this line will take precedence
+try-import %workspace%/third_party/fuchsia-infra-bazel-rules/config/common_config.bazelrc

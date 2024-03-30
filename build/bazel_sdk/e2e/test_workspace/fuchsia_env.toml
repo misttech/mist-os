@@ -1,0 +1,7 @@
+[fuchsia.project]
+build_out_dir = { path_ref = ".build-dir" }
+build_config_path = ".fuchsia-build-config.json"
+bootstrap_command = ["scripts/setup-config.sh"]
+
+[fuchsia.sdk]
+version_check_command = ["tools/bazel", "build", "@fuchsia_sdk//:fuchsia_toolchain_sdk"]

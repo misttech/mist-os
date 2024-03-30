@@ -1,0 +1,16 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+
+py_library(
+    name = "common",
+    srcs = ["sdk_test_common.py"],
+)
+
+py_test(
+    name = "ffx_sdk_version_test",
+    srcs = ["ffx_sdk_version_test.py"],
+    deps = [":common"],
+)

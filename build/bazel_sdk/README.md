@@ -60,3 +60,9 @@ command. However, if you are just iterating on the starlark rules that make up
 the SDK, you do not need to regenerate the SDK since these files are symlinked
 into the build. You can simply make the change to the files and then trigger a
 new build.
+
+## Executing E2E Developer Workflow Tests
+
+The `e2e` subdirectory contains a suite of tests for validating that an existing
+developer workflow continues to work with the given SDK. More information on how
+it works can be found in `e2e/README.md`.

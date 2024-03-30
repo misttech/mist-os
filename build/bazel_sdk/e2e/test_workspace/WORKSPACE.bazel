@@ -1,0 +1,76 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# Set up bazel skylib and its dependencies
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "f7be3474d42aae265405a592bb7da8e171919d74c16f082a5457840f06054728",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.2.1/bazel-skylib-1.2.1.tar.gz",
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.2.1/bazel-skylib-1.2.1.tar.gz",
+    ],
+)
+
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+
+bazel_skylib_workspace()
+
+# The fuchsia_infra repository provides rules which allow us to work inside of
+# fuchsia's infrastructure.
+local_repository(
+    name = "fuchsia_infra",
+    path = "third_party/fuchsia-infra-bazel-rules",
+)
+
+load("@fuchsia_infra//:workspace.bzl", "fuchsia_infra_workspace")
+
+fuchsia_infra_workspace()
+
+local_repository(
+    name = "fuchsia_sdk",
+    path = "third_party/fuchsia_sdk",
+)
+
+load(
+    "@fuchsia_sdk//fuchsia:deps.bzl",
+    "rules_fuchsia_deps",
+)
+
+rules_fuchsia_deps()
+
+# The fuchsia toolchain contains tools like ffx and fidlc.
+register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
+
+load(
+    "@fuchsia_sdk//fuchsia:clang.bzl",
+    "fuchsia_clang_repository",
+)
+
+# Set up our clang repository.
+fuchsia_clang_repository(
+    name = "fuchsia_clang",
+    local_path = "third_party/fuchsia_clang",
+    sdk_root_label = "@fuchsia_sdk",
+)
+
+load("@fuchsia_clang//:defs.bzl", "register_clang_toolchains")
+
+# Register a clang toolchain which will be used to compile fuchsia targets
+register_clang_toolchains()
+
+load("@fuchsia_infra//infra:host_toolchains.bzl", "configure_fuchsia_clang_host_toolchain")
+
+# Configure a host toolchain for local execution. This is not used to compile
+# fuchsia targets but is made available so we don't try to access the host gcc
+# which is not available in infrastructure builds. This call must happen after
+# you create a fuchsia_clang repository.
+configure_fuchsia_clang_host_toolchain(name = "host_clang_toolchain")
+
+# gTest.
+local_repository(
+    name = "com_google_googletest",
+    path = "third_party/googletest",
+)
