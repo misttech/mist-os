@@ -2019,6 +2019,27 @@ assembly_input_bundle("driver_framework") {
   ]
 }
 
+# Full Package Driver Support
+#
+# feature_set_levels: minimal
+# build-types: eng
+#
+assembly_input_bundle("full_package_drivers") {
+  compiled_packages = [
+    {
+      name = "bootstrap"
+      component_shards = [
+        {
+          component_name = "bootstrap"
+          shards = rebase_path(
+                  [ "//src/devices/bin/driver_framework/meta/full_package_drivers.shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # Core starnix support.
 #
 # optional: product must specify its inclusion

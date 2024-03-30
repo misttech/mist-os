@@ -50,13 +50,6 @@
             allowed_offers: "static_and_dynamic",
             allow_long_names: true,
         },
-        {
-            name: "full-pkg-drivers",
-            environment: "#full-pkg-driver-env",
-            durability: "single_run",
-            allowed_offers: "static_and_dynamic",
-            allow_long_names: true,
-        },
     ],
     offer: [
         {
@@ -87,7 +80,6 @@
             from: "parent",
             to: [
                 "#boot-drivers",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
             config: [ "fuchsia.power.SuspendEnabled" ],
@@ -99,7 +91,6 @@
                 "#boot-drivers",
                 "#driver-hosts",
                 "#driver_manager",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
             availability: "optional",
@@ -144,6 +135,7 @@
                 "#driver_manager",
             ],
             dependency: "weak",
+            source_availability: "unknown",
         },
         {
             directory: "boot",
@@ -219,7 +211,6 @@
             from: "parent",
             to: [
                 "#boot-drivers",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
         },
@@ -228,7 +219,6 @@
             from: "parent",
             to: [
                 "#boot-drivers",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
         },
@@ -238,7 +228,6 @@
             to: [
                 "#boot-drivers",
                 "#driver-hosts",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
         },
@@ -247,7 +236,6 @@
             from: "#driver_manager",
             to: [
                 "#boot-drivers",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
         },
@@ -299,6 +287,7 @@
             service: [ "bootstrap.full-pkg-drivers" ],
             from: "#full-pkg-drivers",
             to: [ "#devfs-with-pkg" ],
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
@@ -311,7 +300,6 @@
             from: "#miscsvc",
             to: [
                 "#boot-drivers",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
 
@@ -344,7 +332,6 @@
                 "#boot-drivers",
                 "#driver-hosts",
                 "#driver_manager",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
             source_availability: "unknown",
@@ -362,7 +349,6 @@
                 "#driver-hosts",
                 "#driver_index",
                 "#driver_manager",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
         },
@@ -371,7 +357,6 @@
             from: "#system-activity-governor",
             to: [
                 "#boot-drivers",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
 
@@ -385,7 +370,6 @@
             from: "#power-broker",
             to: [
                 "#boot-drivers",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
         },
@@ -403,7 +387,6 @@
             service: "fuchsia.hardware.rtc.Service",
             from: [
                 "#boot-drivers",
-                "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
         },
@@ -476,31 +459,6 @@
                 {
                     resolver: "base_resolver",
                     from: "#pkg-cache",
-                    scheme: "fuchsia-pkg",
-                },
-            ],
-
-            // 1 second
-            __stop_timeout_ms: 1000,
-        },
-        {
-            name: "full-pkg-driver-env",
-            extends: "none",
-            runners: [
-                {
-                    runner: "driver",
-                    from: "#driver_manager",
-                },
-            ],
-            resolvers: [
-                {
-                    resolver: "boot_resolver",
-                    from: "parent",
-                    scheme: "fuchsia-boot",
-                },
-                {
-                    resolver: "full-resolver",
-                    from: "#full_resolver",
                     scheme: "fuchsia-pkg",
                 },
             ],

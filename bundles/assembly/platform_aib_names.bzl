@@ -170,6 +170,7 @@ ENG_PLATFORM_AIB_NAMES = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_A
     "bluetooth_pandora",
     "core_realm_eng",
     "example_assembly_bundle",
+    "full_package_drivers",
     "standard_eng",
     "networking_test_collection",
     "pkgfs_disable_executability_restrictions",

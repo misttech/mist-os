@@ -21,6 +21,14 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
         disabled_drivers.push("fuchsia-boot:///#meta/da7219.cm".to_string());
         builder.platform_bundle("driver_framework");
 
+        let enable_ephemeral_drivers = match (context.build_type, context.feature_set_level) {
+            (BuildType::Eng, FeatureSupportLevel::Standard) => {
+                builder.platform_bundle("full_package_drivers");
+                true
+            }
+            (_, _) => false,
+        };
+
         let delay_fallback = !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
 
         let test_fuzzing_config =
@@ -32,7 +40,7 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
 
         builder.set_config_capability(
             "fuchsia.driver.EnableEphemeralDrivers",
-            Config::new(ConfigValueType::Bool, matches!(context.build_type, BuildType::Eng).into()),
+            Config::new(ConfigValueType::Bool, enable_ephemeral_drivers.into()),
         )?;
         builder.set_config_capability(
             "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",

@@ -61,14 +61,6 @@
             url: "fuchsia-boot:///pkg-cache#meta/pkg-cache.cm",
             on_terminate: "reboot",
         },
-
-        // TODO(https://fxbug.dev/42180879): Remove need for separate full_resolver component here.
-        // Full resolver clone to be used by the full-pkg-drivers collection
-        {
-            name: "full_resolver",
-            url: "fuchsia-pkg://fuchsia.com/full-resolver#meta/full-resolver.cm",
-            environment: "#base-resolver-env",
-        },
     ],
     offer: [
         {
@@ -381,23 +373,6 @@
             from: "parent",
             to: "#pkg-cache",
             dependency: "weak",
-        },
-
-        // Full resolver dependencies
-        {
-            protocol: "fuchsia.pkg.PackageResolver",
-            from: "parent",
-            to: "#full_resolver",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "#archivist",
-            to: "#full_resolver",
-        },
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "#archivist",
-            to: "#full_resolver",
         },
 
         // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
