@@ -520,7 +520,7 @@ pub enum LookupResult<'a> {
 /// A collection of loaded modules.
 pub struct Namespace {
     modules: HashMap<String, Module>,
-    methods_by_ordinal: HashMap<u64, Weak<Method>>,
+    methods_by_ordinal: HashMap<u64, (String, Weak<Method>)>,
 }
 
 impl Namespace {
@@ -535,7 +535,8 @@ impl Namespace {
 
         for protocol in new_mod.protocol_declarations.values() {
             for method in protocol.methods.values() {
-                self.methods_by_ordinal.insert(method.ordinal, Arc::downgrade(method));
+                self.methods_by_ordinal
+                    .insert(method.ordinal, (protocol.name(), Arc::downgrade(method)));
             }
         }
 
@@ -622,10 +623,10 @@ impl Namespace {
     }
 
     /// Look up a method ordinal in the loaded modules.
-    pub fn lookup_method_ordinal(&self, ordinal: u64) -> Result<Arc<Method>> {
+    pub fn lookup_method_ordinal(&self, ordinal: u64) -> Result<(String, Arc<Method>)> {
         self.methods_by_ordinal
             .get(&ordinal)
-            .and_then(|x| x.upgrade())
+            .and_then(|(x, y)| y.upgrade().map(|y| (x.clone(), y)))
             .ok_or(Error::LibraryError(format!("No method with ordinal {}", ordinal)))
     }
 }

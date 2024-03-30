@@ -4,19 +4,23 @@
 
 use anyhow::anyhow;
 use fidl::endpoints::Proxy;
+use fidl::MessageBufEtc;
 use fidl_fuchsia_io as fio;
-use futures::future::Either;
+use futures::future::{poll_fn, Either};
 use futures::FutureExt;
 use std::collections::{BTreeMap, VecDeque};
 use std::future::Future;
 use std::pin::pin;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, Weak};
+use std::task::{Poll, Waker};
 
 use crate::error::{Error, Result};
-use crate::interpreter::{canonicalize_path, Interpreter, SYMLINK_RECURSION_LIMIT};
+use crate::interpreter::{
+    canonicalize_path, Interpreter, InterpreterInner, SYMLINK_RECURSION_LIMIT,
+};
 use crate::value::{
-    InUseHandle, PlaygroundValue, ReplayableIterator, ReplayableIteratorCursor, Value, ValueExt,
+    InUseHandle, Invocable, PlaygroundValue, ReplayableIterator, ReplayableIteratorCursor, Value,
+    ValueExt,
 };
 
 macro_rules! error {
@@ -57,8 +61,7 @@ impl Interpreter {
                     inner.open(path, fs_root, pwd).await
                 }
             })
-            .await
-            .expect("Failed to install `open` command");
+            .await;
 
             let inner_weak = Arc::downgrade(&self.inner);
             self.add_command("req", move |mut args, under| {
@@ -81,8 +84,7 @@ impl Interpreter {
                     Ok(client)
                 }
             })
-            .await
-            .expect("Failed to install `req` command");
+            .await;
 
             let inner_weak = Arc::downgrade(&self.inner);
             self.add_command("read", move |mut args, under| {
@@ -123,8 +125,7 @@ impl Interpreter {
                     }
                 }
             })
-            .await
-            .expect("Failed to install `read` command");
+            .await;
 
             let Value::OutOfLine(PlaygroundValue::Invocable(pwd_setter)) =
                 self.run(r"\x {$pwd = $x}").await.expect("Could not build pwd setter")
@@ -155,8 +156,7 @@ impl Interpreter {
                     Ok(Value::Null)
                 }
             })
-            .await
-            .expect("Failed to install `cd` command");
+            .await;
 
             let inner_weak = Arc::downgrade(&self.inner);
             let pwd_getter = pwd_getter_clone.clone();
@@ -287,13 +287,205 @@ impl Interpreter {
                     Err(error!("Symlink recursion depth exceeded"))
                 }
             })
-            .await
-            .expect("Failed to install `ls` command");
+            .await;
+
+            let inner_weak = Arc::downgrade(&self.inner);
+            self.add_command("srv", move |mut args, underscore| {
+                let inner_weak = inner_weak.clone();
+                async move {
+                    let server = args
+                        .pop()
+                        .or(underscore)
+                        .ok_or_else(|| error!("Must supply an argument to serve"))?;
+                    if !args.is_empty() {
+                        return Err(error!("serve takes at most one argument"));
+                    }
+
+                    let ch = server
+                        .try_server_channel()
+                        .map_err(|_| error!("Value is not a FIDL server"))?;
+
+                    Ok(Value::OutOfLine(PlaygroundValue::Iterator(
+                        ServeCursor(Mutex::new(ServeCursorInner::Unpolled(
+                            Arc::new(fuchsia_async::Channel::from_channel(ch)),
+                            inner_weak.clone(),
+                        )))
+                        .into(),
+                    )))
+                }
+            })
+            .await;
         };
 
         let Either::Left(_) = futures::future::select(pin!(fut), executor_fut).await else {
             unreachable!("Executor hung up early");
         };
+    }
+}
+
+struct ServeCursor(Mutex<ServeCursorInner>);
+
+enum ServeCursorInner {
+    Unpolled(Arc<fuchsia_async::Channel>, Weak<InterpreterInner>),
+    Waiting(Vec<Waker>, Arc<ServeCursor>),
+    Stored(Result<Option<Value>>, Arc<ServeCursor>),
+}
+
+impl ReplayableIteratorCursor for ServeCursor {
+    fn next(
+        self: Arc<Self>,
+    ) -> (
+        futures::prelude::future::BoxFuture<'static, Result<Option<Value>>>,
+        Arc<dyn ReplayableIteratorCursor>,
+    ) {
+        enum NextAction<A, B, C, D> {
+            StartPoll(A, B, C),
+            WaitForPoll(D),
+        }
+
+        let next_action = match &mut *self.0.lock().unwrap() {
+            inner @ ServeCursorInner::Unpolled(_, _) => {
+                let ServeCursorInner::Unpolled(channel, weak_inner) = inner else { unreachable!() };
+                let next = Arc::new(ServeCursor(Mutex::new(ServeCursorInner::Unpolled(
+                    Arc::clone(channel),
+                    weak_inner.clone(),
+                ))));
+                let channel = Arc::clone(channel);
+                let weak_inner = weak_inner.clone();
+                *inner = ServeCursorInner::Waiting(Vec::new(), Arc::clone(&next));
+
+                NextAction::StartPoll(channel, weak_inner, next)
+            }
+            ServeCursorInner::Waiting(_, next) => NextAction::WaitForPoll(Arc::clone(next)),
+            ServeCursorInner::Stored(value, next) => {
+                let value = value
+                    .as_mut()
+                    .map(|x| x.as_mut().map(Value::duplicate))
+                    .map_err(|x| anyhow!("{x:?}").into());
+                return (
+                    async move { value }.boxed(),
+                    Arc::clone(next) as Arc<dyn ReplayableIteratorCursor>,
+                );
+            }
+        };
+
+        let (channel, weak_inner, next) = match next_action {
+            NextAction::StartPoll(a, b, c) => (a, b, c),
+            NextAction::WaitForPoll(next) => {
+                let fut = poll_fn(move |ctx| match &mut *self.0.lock().unwrap() {
+                    ServeCursorInner::Unpolled(_, _) => {
+                        unreachable!("Serve cursor went from waiting to unpolled!")
+                    }
+                    ServeCursorInner::Waiting(wakers, _) => {
+                        wakers.push(ctx.waker().clone());
+                        Poll::Pending
+                    }
+                    ServeCursorInner::Stored(value, _) => Poll::Ready(
+                        value
+                            .as_mut()
+                            .map(|x| x.as_mut().map(Value::duplicate))
+                            .map_err(|x| anyhow!("{x:?}").into()),
+                    ),
+                })
+                .boxed();
+                return (fut, next as Arc<dyn ReplayableIteratorCursor>);
+            }
+        };
+
+        let fetch_value = async move {
+            let mut buf = MessageBufEtc::new();
+            if let Err(e) = channel.recv_etc_msg(&mut buf).await {
+                return if e == fidl::Status::PEER_CLOSED { Ok(None) } else { Err(e.into()) };
+            }
+            let interpreter = weak_inner.upgrade().ok_or_else(|| error!("Interpreter died"))?;
+            let (bytes, handles) = buf.split();
+
+            let (header, value) =
+                fidl_codec::decode_request(interpreter.lib_namespace(), &bytes, handles)?;
+
+            let mut value = value.upcast();
+
+            let (protocol_name, method) =
+                interpreter.lib_namespace().lookup_method_ordinal(header.ordinal)?;
+            if let Some(ty) = method.response.clone() {
+                if !matches!(value, Value::Object(_)) {
+                    value = Value::Object(vec![("_".to_owned(), value)])
+                }
+
+                let Value::Object(fields) = &mut value else { unreachable!() };
+
+                let txid = header.tx_id;
+                let method_name = method.name.clone();
+
+                let state = Mutex::new(Some((channel, weak_inner, ty, protocol_name, method_name)));
+                fields.push((
+                    "@".to_owned(),
+                    Value::OutOfLine(PlaygroundValue::Invocable(Invocable::new(Arc::new(
+                        move |mut args, underscore| {
+                            let state = state.lock().unwrap().take();
+                            async move {
+                                let (channel, weak_inner, ty, protocol_name, method_name) = state
+                                    .ok_or_else(
+                                    || error!("Response already sent for transaction {txid}"),
+                                )?;
+                                let response = args
+                                    .pop()
+                                    .or(underscore)
+                                    .ok_or_else(|| error!("Responder takes one argument"))?;
+                                if !args.is_empty() {
+                                    return Err(error!("Responder takes one argument"));
+                                }
+                                let interpreter = weak_inner
+                                    .upgrade()
+                                    .ok_or_else(|| error!("Interpreter died"))?;
+                                let response =
+                                    response.to_fidl_value(interpreter.lib_namespace(), &ty)?;
+
+                                let (bytes, mut handles) = fidl_codec::encode_response(
+                                    interpreter.lib_namespace(),
+                                    txid,
+                                    &protocol_name,
+                                    &method_name,
+                                    response,
+                                )?;
+                                channel.write_etc(&bytes, &mut handles)?;
+                                Ok(Value::Null)
+                            }
+                            .boxed()
+                        },
+                    )))),
+                ))
+            }
+
+            Ok(Some(value))
+        };
+
+        (
+            async move {
+                let mut value = fetch_value.await;
+                let mut inner = self.0.lock().unwrap();
+
+                let ServeCursorInner::Waiting(_, next) = &*inner else {
+                    panic!("Race in Serve inner!");
+                };
+                let next = Arc::clone(next);
+                let value_dup = value
+                    .as_mut()
+                    .map(|x| x.as_mut().map(Value::duplicate))
+                    .map_err(|x| anyhow!("{x:?}").into());
+                let ServeCursorInner::Waiting(waiters, _) =
+                    std::mem::replace(&mut *inner, ServeCursorInner::Stored(value_dup, next))
+                else {
+                    unreachable!()
+                };
+
+                waiters.into_iter().for_each(Waker::wake);
+
+                value
+            }
+            .boxed(),
+            next,
+        )
     }
 }
 
@@ -405,8 +597,8 @@ impl ReplayableIteratorCursor for FileCursor {
 mod test {
     use super::*;
     use crate::test::*;
-    use fidl_codec::Value as FidlValue;
     use fidl_fuchsia_io as fio;
+    use fidl_test_fidlcodec_examples as fctest;
     use futures::StreamExt;
     use std::collections::HashMap;
 
@@ -444,8 +636,7 @@ mod test {
             let Value::OutOfLine(PlaygroundValue::InUseHandle(i)) = value else {
                 panic!();
             };
-            let endpoint = i.take_client("fuchsia.io/Node").unwrap();
-            let FidlValue::ClientEnd(endpoint, _) = endpoint else { unreachable!() };
+            let endpoint = i.take_client(Some("fuchsia.io/Node")).unwrap();
             let proxy =
                 fidl::endpoints::ClientEnd::<fio::NodeMarker>::from(endpoint).into_proxy().unwrap();
             let event = proxy.take_event_stream().next().await.unwrap().unwrap();
@@ -607,6 +798,119 @@ mod test {
 
                 assert_eq!(&name, "neils_philosophy");
                 assert_eq!(&kind, "File");
+            })
+            .await
+    }
+
+    #[fuchsia::test]
+    async fn serve() {
+        Test::test("\\x srv $x")
+            .with_fidl()
+            .check_async(|value| async move {
+                let Value::OutOfLine(PlaygroundValue::Invocable(value)) = value else {
+                    panic!();
+                };
+                let (echo, server) = fidl::endpoints::create_proxy::<fctest::EchoMarker>().unwrap();
+                let server = Value::ServerEnd(
+                    server.into_channel(),
+                    "test.fidlcodec.examples/Echo".to_owned(),
+                );
+                let mut requests = value.invoke(vec![server], None).await.unwrap();
+                let requests_dup = requests.duplicate();
+                let ((), ()) = futures::future::join(
+                    async move {
+                        let got = echo.echo_string(Some("Hello")).await.unwrap().unwrap();
+                        assert_eq!("Hello", got);
+                    },
+                    async move {
+                        let Value::OutOfLine(PlaygroundValue::Iterator(mut requests)) = requests
+                        else {
+                            panic!();
+                        };
+
+                        let next = requests.next().await.unwrap().unwrap();
+                        let Value::Object(next) = next else {
+                            panic!();
+                        };
+
+                        let [a, b] = next.try_into().unwrap();
+
+                        let (request, responder) = if &a.0 == "@" { (b, a) } else { (a, b) };
+
+                        assert_eq!("value", &request.0);
+                        let value = request.1;
+                        assert_eq!("@", &responder.0);
+                        let responder = responder.1;
+
+                        let Value::String(value) = value else { panic!() };
+                        assert_eq!("Hello", &value);
+
+                        let Value::OutOfLine(PlaygroundValue::Invocable(responder)) = responder
+                        else {
+                            panic!()
+                        };
+
+                        let responder_clone = responder.clone();
+                        let res = responder
+                            .invoke(
+                                vec![Value::Object(vec![(
+                                    "response".to_owned(),
+                                    Value::String(value.clone()),
+                                )])],
+                                None,
+                            )
+                            .await
+                            .unwrap();
+                        assert!(matches!(res, Value::Null));
+                        assert!(responder_clone
+                            .invoke(
+                                vec![Value::Object(vec![(
+                                    "response".to_owned(),
+                                    Value::String(value),
+                                )])],
+                                None,
+                            )
+                            .await
+                            .is_err());
+
+                        assert!(requests.next().await.unwrap().is_none());
+                    },
+                )
+                .await;
+
+                let Value::OutOfLine(PlaygroundValue::Iterator(mut requests)) = requests_dup else {
+                    panic!();
+                };
+
+                let next = requests.next().await.unwrap().unwrap();
+                let Value::Object(next) = next else {
+                    panic!();
+                };
+
+                let [a, b] = next.try_into().unwrap();
+
+                let (request, responder) = if &a.0 == "@" { (b, a) } else { (a, b) };
+
+                assert_eq!("value", &request.0);
+                let value = request.1;
+                assert_eq!("@", &responder.0);
+                let responder = responder.1;
+
+                let Value::String(value) = value else { panic!() };
+                assert_eq!("Hello", &value);
+
+                let Value::OutOfLine(PlaygroundValue::Invocable(responder)) = responder else {
+                    panic!()
+                };
+
+                let responder_clone = responder.clone();
+                assert!(responder_clone
+                    .invoke(
+                        vec![Value::Object(vec![("response".to_owned(), Value::String(value),)])],
+                        None,
+                    )
+                    .await
+                    .is_err());
             })
             .await
     }

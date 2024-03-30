@@ -481,7 +481,7 @@ impl Interpreter {
         &self,
         name: &str,
         cmd: F,
-    ) -> Result<()> {
+    ) {
         let cmd = Arc::new(cmd);
         let cmd = move |args: Vec<Value>, underscore: Option<Value>| {
             let cmd = Arc::clone(&cmd);
@@ -494,7 +494,6 @@ impl Interpreter {
             Ok(Value::OutOfLine(PlaygroundValue::Invocable(Invocable::new(Arc::new(cmd))))),
             Mutability::Constant,
         );
-        Ok(())
     }
 
     /// Parse and run the given program in the context of this interpreter.

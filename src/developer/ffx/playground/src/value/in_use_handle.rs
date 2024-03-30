@@ -63,13 +63,6 @@ impl EndpointType {
             EndpointType::Server => Endpoint::Server(channel, protocol),
         }
     }
-
-    fn construct_fidl(&self, channel: fidl::Channel, protocol: String) -> FidlValue {
-        match self {
-            EndpointType::Client => FidlValue::ClientEnd(channel, protocol),
-            EndpointType::Server => FidlValue::ServerEnd(channel, protocol),
-        }
-    }
 }
 
 /// Stores an actual handle along with state information about the type of handle it is.
@@ -163,19 +156,19 @@ impl InUseHandle {
 
     /// If this handle is a client end channel with the given protocol, steal it
     /// and return a raw FIDL value wrapping it.
-    pub fn take_client(&self, expect_proto: &str) -> Result<FidlValue> {
+    pub fn take_client(&self, expect_proto: Option<&str>) -> Result<fidl::Channel> {
         self.take_endpoint(EndpointType::Client, expect_proto)
     }
 
     /// If this handle is a server end channel with the given protocol, steal it
     /// and return a raw FIDL value wrapping it.
-    pub fn take_server(&self, expect_proto: &str) -> Result<FidlValue> {
+    pub fn take_server(&self, expect_proto: Option<&str>) -> Result<fidl::Channel> {
         self.take_endpoint(EndpointType::Server, expect_proto)
     }
 
     /// If this handle is a channel with the given protocol and endpoint type, steal it
     /// and return a raw FIDL value wrapping it.
-    fn take_endpoint(&self, ty: EndpointType, expect_proto: &str) -> Result<FidlValue> {
+    fn take_endpoint(&self, ty: EndpointType, expect_proto: Option<&str>) -> Result<fidl::Channel> {
         let mut this = self.handle.lock().unwrap();
         this.determine();
 
@@ -186,38 +179,43 @@ impl InUseHandle {
                 else {
                     unreachable!();
                 };
-                Ok(ty.construct_fidl(h.into(), expect_proto.to_owned()))
+                Ok(h.into())
             }
             HandleObject::Endpoint(e) => {
                 let Some((got_ty, proto)) = e.endpoint_type() else {
                     return Err(Error::from(anyhow!("Handle is not a channel")));
                 };
-                if got_ty != ty && proto != expect_proto {
+                let expect_proto_mismatched = expect_proto.filter(|x| *x != proto);
+                if got_ty != ty && expect_proto_mismatched.is_some() {
+                    let expect_proto = expect_proto_mismatched.unwrap();
                     return Err(Error::from(anyhow!(
                         "Handle is a {got_ty} for {proto} (need {ty} for {expect_proto})"
                     )));
                 } else if got_ty != ty {
                     return Err(Error::from(anyhow!("Handle is a {got_ty} (need {ty})")));
-                } else if proto != expect_proto {
+                } else if let Some(expect_proto) = expect_proto_mismatched {
                     return Err(Error::from(anyhow!(
                         "Handle is a {got_ty} for {proto} (need {expect_proto})"
                     )));
                 }
-                let HandleObject::Endpoint(Endpoint::Server(h, p) | Endpoint::Client(h, p)) =
+                let HandleObject::Endpoint(Endpoint::Server(h, _) | Endpoint::Client(h, _)) =
                     std::mem::replace(&mut *this, HandleObject::Defunct)
                 else {
                     unreachable!();
                 };
-                Ok(ty.construct_fidl(h.into(), p))
+                Ok(h.into())
             }
             HandleObject::Undetermined(e) => {
+                let Some(expect_proto) = expect_proto else {
+                    return Err(Error::from(anyhow!("Could not determine protocol for handle")));
+                };
                 let mut e = e.lock().unwrap();
                 assert!(e.is_none());
                 let (a, b) = fidl::Channel::create();
                 let a = fasync::Channel::from_channel(a);
                 *e = Some(ty.opposite().construct(a, expect_proto.to_owned()));
                 drop(e);
-                Ok(ty.construct_fidl(b, expect_proto.to_owned()))
+                Ok(b)
             }
             HandleObject::Defunct => Err(Error::from(anyhow!("Handle is closed"))),
             HandleObject::Handle(_, _) => Err(Error::from(anyhow!("Handle is not a {ty}"))),
@@ -367,14 +365,10 @@ mod test {
     #[fuchsia::test]
     async fn coerce() {
         let (a, b) = InUseHandle::new_endpoints();
-        let a = a.take_server("test_proto").unwrap();
+        let a = a.take_server(Some("test_proto")).unwrap();
         assert_eq!("test_proto", &b.get_client_protocol().unwrap());
         let test_str =
             b"Alas that we are themepark animatronics, and our existence is inherently whimsical";
-        let FidlValue::ServerEnd(a, a_proto) = a else {
-            panic!();
-        };
-        assert_eq!("test_proto", &a_proto);
         let a = fasync::Channel::from_channel(a);
         a.write_etc(test_str, &mut []).unwrap();
         let mut test_buf = fidl::MessageBufEtc::new();

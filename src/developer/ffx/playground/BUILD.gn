@@ -38,6 +38,7 @@ rustc_library("playground") {
   ]
   test_deps = [
     ":test_fidl",
+    "//src/lib/fidl_codec:fidl_rust",
     "//src/lib/fuchsia",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:async-trait",

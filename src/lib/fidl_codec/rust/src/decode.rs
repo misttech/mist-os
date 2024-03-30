@@ -801,7 +801,7 @@ fn decode_message<'a>(
 ) -> Result<(TransactionHeader, Value)> {
     let (bytes, header) = transaction_header(bytes)?;
 
-    let method = ns.lookup_method_ordinal(header.ordinal)?;
+    let (_, method) = ns.lookup_method_ordinal(header.ordinal)?;
 
     let (message, has) = match direction {
         Direction::Request => (method.request.as_ref(), method.has_request),

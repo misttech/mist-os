@@ -182,6 +182,9 @@ pub trait ValueExt: Sized {
         expected_protocol: &str,
     ) -> Result<fidl::Channel, Self>;
 
+    /// If this object is a server, return the raw channel and protocol name.
+    fn try_server_channel(self) -> Result<fidl::Channel, Self>;
+
     /// Convert a playground value to one that is ready for transfer via FIDL by
     /// converting playground-specific types. This performs *minimal* type checking; only
     /// what happens in the course of figuring out what conversion is appropriate.
@@ -321,7 +324,21 @@ impl ValueExt for Value {
         match self {
             Value::ClientEnd(c, proto) if ns.inherits(&proto, expected_protocol) => Ok(c),
             Value::OutOfLine(PlaygroundValue::InUseHandle(ref i)) => {
-                if let Ok(FidlValue::ClientEnd(c, _)) = i.take_client(expected_protocol) {
+                if let Ok(c) = i.take_client(Some(expected_protocol)) {
+                    Ok(c)
+                } else {
+                    Err(self)
+                }
+            }
+            other => Err(other),
+        }
+    }
+
+    fn try_server_channel(self) -> Result<fidl::Channel, Self> {
+        match self {
+            Value::ServerEnd(c, _) => Ok(c),
+            Value::OutOfLine(PlaygroundValue::InUseHandle(ref i)) => {
+                if let Ok(c) = i.take_server(None) {
                     Ok(c)
                 } else {
                     Err(self)
@@ -573,34 +590,20 @@ impl PlaygroundValue {
             (
                 LookupResultOrType::Type(lib::Type::Request { identifier, .. }),
                 PlaygroundValue::InUseHandle(h),
-            ) => {
-                let h = h.take_server(&identifier)?;
-                let FidlValue::ServerEnd(_, s) = &h else {
-                    return Err(error!("Cannot conver type to server for {identifier}"));
-                };
-                if &identifier == s {
-                    Ok(h)
-                } else {
-                    Err(error!("Cannot convert handle to {} to handle to {}", s, identifier))
-                }
-            }
+            ) => h
+                .take_server(Some(&identifier))
+                .map(|x| FidlValue::ServerEnd(x, identifier.to_owned()))
+                .map_err(|_| error!("Cannot conver type to server for {identifier}")),
             (
                 LookupResultOrType::LookupResult(lib::LookupResult::Protocol(lib::Protocol {
                     name,
                     ..
                 })),
                 PlaygroundValue::InUseHandle(h),
-            ) => {
-                let h = h.take_client(&name)?;
-                let FidlValue::ClientEnd(_, s) = &h else {
-                    return Err(error!("Cannot conver type to server for {name}"));
-                };
-                if name == s {
-                    Ok(h)
-                } else {
-                    Err(error!("Cannot convert handle to {} to handle to {}", s, name))
-                }
-            }
+            ) => h
+                .take_client(Some(&name))
+                .map(|x| FidlValue::ClientEnd(x, name.to_owned()))
+                .map_err(|_| error!("Cannot conver type to client for {name}")),
             (LookupResultOrType::Type(ty), PlaygroundValue::Invocable(_)) => {
                 Err(error!("Cannot convert invocable to {ty:?}"))
             }
@@ -1213,11 +1216,11 @@ mod test {
 
         let Value::OutOfLine(PlaygroundValue::InUseHandle(client)) = client else { panic!() };
 
-        assert!(client.take_client("test.fidlcodec.examples/FidlCodecTestProtocol").is_err());
+        assert!(client.take_client(Some("test.fidlcodec.examples/FidlCodecTestProtocol")).is_err());
 
         let Value::OutOfLine(PlaygroundValue::InUseHandle(server)) = server else { panic!() };
 
-        assert!(server.take_server("test.fidlcodec.examples/FidlCodecTestProtocol").is_err());
+        assert!(server.take_server(Some("test.fidlcodec.examples/FidlCodecTestProtocol")).is_err());
     }
 
     #[test]

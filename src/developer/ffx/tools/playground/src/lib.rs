@@ -134,8 +134,7 @@ pub async fn exec_playground(
 
             async move { Ok(Value::Null) }
         })
-        .await
-        .expect("Failed to install quit command");
+        .await;
 
     let mut line = String::new();
     if let Some(cmd) = command.command {
