@@ -659,10 +659,6 @@ where
                 },
             );
             let _: Option<_> = bindings_ctx.cancel_timer2(timer);
-            if let Some(accept_queue) = accept_queue {
-                accept_queue.remove(&conn_id);
-                *defunct = true;
-            }
             if *defunct {
                 // If the client has promised to not touch the socket again,
                 // we can destroy the socket finally.
