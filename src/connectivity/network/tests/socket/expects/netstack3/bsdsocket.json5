@@ -202,31 +202,19 @@
 
                 // SOL_SOCKET_SO_TIMESTAMP
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_SOL_SOCKET_SO_TIMESTAMP",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_SOL_SOCKET_SO_TIMESTAMP",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_SOL_SOCKET_SO_TIMESTAMP",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_SOL_SOCKET_SO_TIMESTAMP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_SOL_SOCKET_SO_TIMESTAMP",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_SOL_SOCKET_SO_TIMESTAMP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Stream_SOL_SOCKET_SO_TIMESTAMP",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Datagram_SOL_SOCKET_SO_TIMESTAMP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Stream_SOL_SOCKET_SO_TIMESTAMP",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_SOL_SOCKET_SO_TIMESTAMP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Stream_SOL_SOCKET_SO_TIMESTAMP",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_SOL_SOCKET_SO_TIMESTAMP",
 
                 // SOL_SOCKET_SO_TIMESTAMPNS
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_SOL_SOCKET_SO_TIMESTAMPNS",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_SOL_SOCKET_SO_TIMESTAMPNS",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_SOL_SOCKET_SO_TIMESTAMPNS",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_SOL_SOCKET_SO_TIMESTAMPNS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_SOL_SOCKET_SO_TIMESTAMPNS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_SOL_SOCKET_SO_TIMESTAMPNS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Stream_SOL_SOCKET_SO_TIMESTAMPNS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Datagram_SOL_SOCKET_SO_TIMESTAMPNS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Stream_SOL_SOCKET_SO_TIMESTAMPNS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_SOL_SOCKET_SO_TIMESTAMPNS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Stream_SOL_SOCKET_SO_TIMESTAMPNS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_SOL_SOCKET_SO_TIMESTAMPNS",
 
                 // IP_TTL
                 "LocalhostTest/SocketOptsTest.ResetTtlToDefault/IPv*_Stream",
@@ -243,7 +231,8 @@
                 "LocalhostTest/SocketOptsTest.CheckSkipECN*",
 
                 // SO_TIMESTAMP{NS}
-                "LocalhostTest/SocketOptsTest.UpdateAnyTimestampDisablesOtherTimestampOptions*",
+                "LocalhostTest/SocketOptsTest.UpdateAnyTimestampDisablesOtherTimestampOptions/IPv4_Stream",
+                "LocalhostTest/SocketOptsTest.UpdateAnyTimestampDisablesOtherTimestampOptions/IPv6_Stream",
 
                 // IP{V6}_MULTICAST_IF
                 "LocalhostTest/SocketOptsTest.SetUDPMulticastIfImrIfindex/IPv*_Datagram",

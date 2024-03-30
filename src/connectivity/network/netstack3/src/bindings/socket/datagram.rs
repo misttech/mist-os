@@ -20,6 +20,7 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use fidl::endpoints::RequestStream as _;
+use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
 use net_types::{
     ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv6},
@@ -500,6 +501,7 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             source_port: src_port.map_or(0, NonZeroU16::get),
             destination_addr: dst_ip,
             destination_port: dst_port.get(),
+            timestamp: fasync::Time::now(),
             data: body.as_ref().to_vec(),
         })
     }
@@ -823,6 +825,7 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             interface_id: device.bindings_id().id,
             destination_addr: dst_ip,
             destination_port: id,
+            timestamp: fasync::Time::now(),
             data: data.as_ref().to_vec(),
         })
     }
@@ -836,6 +839,7 @@ struct AvailableMessage<I: Ip> {
     source_port: u16,
     destination_addr: I::Addr,
     destination_port: u16,
+    timestamp: fasync::Time,
     data: Vec<u8>,
 }
 
@@ -894,6 +898,8 @@ struct BindingData<I: BindingsDataIpExt, T: Transport<I>> {
     /// modified using the SetIpReceiveOriginalDestinationAddress method (a.k.a. IP_RECVORIGDSTADDR)
     /// and is useful for transparent sockets (IP_TRANSPARENT).
     ip_receive_original_destination_address: bool,
+    /// SO_TIMESTAMP, SO_TIMESTAMPNS state.
+    timestamp_option: fposix_socket::TimestampOption,
 }
 
 impl<I, T> BindingData<I, T>
@@ -924,6 +930,7 @@ where
             info: SocketControlInfo { _properties: properties, id },
             version_specific_data: I::VersionSpecificData::default(),
             ip_receive_original_destination_address: false,
+            timestamp_option: fposix_socket::TimestampOption::Disabled,
         }
     }
 }
@@ -1136,12 +1143,11 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::RecvMsg {
                 want_addr,
                 data_len,
-                // TODO(brunodalbo) handle control
-                want_control: _,
+                want_control,
                 flags,
                 responder,
             } => {
-                let result = self.recv_msg(want_addr, data_len as usize, flags);
+                let result = self.recv_msg(want_addr, data_len as usize, want_control, flags);
                 maybe_log_error!("recvmsg", &result);
                 responder
                 .send(match result {
@@ -1174,13 +1180,21 @@ where
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetTimestamp { responder } => {
-                respond_not_supported!("syncudp::GetTimestamp", responder)
+                let result = self.get_timestamp_option();
+                maybe_log_error!("get_timestamp", &result);
+                responder
+                    .send(result)
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetTimestamp {
-                value: _,
+                value,
                 responder,
             } => {
-                respond_not_supported!("syncudp::SetTimestamp", responder)
+                let result = self.set_timestamp_option(value);
+                maybe_log_error!("set_timestamp", &result);
+                responder
+                    .send(result)
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetOriginalDestination {
                 responder
@@ -1659,16 +1673,7 @@ where
     ///
     /// [POSIX socket connect request]: fposix_socket::SynchronousDatagramSocketRequest::Connect
     fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties: _, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         let sockaddr =
             I::SocketAddress::from_sock_addr(<T as Transport<I>>::maybe_map_sock_addr(addr))?;
         trace!("connect sockaddr: {:?}", sockaddr);
@@ -1692,16 +1697,7 @@ where
         }?;
         trace!("bind sockaddr: {:?}", sockaddr);
 
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties: _, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         let (sockaddr, port) =
             TryFromFidlWithContext::try_from_fidl_with_ctx(ctx.bindings_ctx(), sockaddr)
                 .map_err(IntoErrno::into_errno)?;
@@ -1717,16 +1713,7 @@ where
     fn disconnect(self) -> Result<(), fposix::Errno> {
         trace!("disconnect socket");
 
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties: _, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::disconnect(ctx, id).map_err(IntoErrno::into_errno)?;
         Ok(())
     }
@@ -1735,16 +1722,7 @@ where
     ///
     /// [POSIX socket get_sock_name request]: fposix_socket::SynchronousDatagramSocketRequest::GetSockName
     fn get_sock_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties: _, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         let l: LocalAddress<_, _, _> = T::get_socket_info(ctx, id).into_fidl();
         l.try_into_fidl_with_ctx(ctx.bindings_ctx()).map(SockAddr::into_sock_addr)
     }
@@ -1771,16 +1749,7 @@ where
     ///
     /// [POSIX socket get_peer_name request]: fposix_socket::SynchronousDatagramSocketRequest::GetPeerName
     fn get_peer_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties: _, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_socket_info(ctx, id).try_into_fidl().and_then(|r: RemoteAddress<_, _, _>| {
             r.try_into_fidl_with_ctx(ctx.bindings_ctx()).map(SockAddr::into_sock_addr)
         })
@@ -1790,6 +1759,7 @@ where
         self,
         want_addr: bool,
         data_len: usize,
+        want_control: bool,
         recv_flags: fposix_socket::RecvMsgFlags,
     ) -> Result<
         (Option<fnet::SocketAddress>, Vec<u8>, fposix_socket::DatagramSocketRecvControlData, u32),
@@ -1801,10 +1771,11 @@ where
             ctx,
             data:
                 BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
+                    info: SocketControlInfo { id, .. },
                     version_specific_data,
                     ip_receive_original_destination_address,
+                    timestamp_option,
+                    ..
                 },
         } = self;
         let front = {
@@ -1822,6 +1793,7 @@ where
             source_port,
             destination_addr,
             destination_port,
+            timestamp,
             mut data,
         } = match front {
             None => {
@@ -1859,48 +1831,63 @@ where
         let truncated = data.len().saturating_sub(data_len);
         data.truncate(data_len);
 
-        let mut ip = None;
-        if *ip_receive_original_destination_address {
-            ip.get_or_insert_with(|| fposix_socket::IpRecvControlData::default())
-                .original_destination_address = Some(
-                I::SocketAddress::new(
-                    SpecifiedAddr::new(destination_addr).map(|a| ZonedAddr::Unzoned(a).into()),
-                    destination_port,
-                )
-                .into_sock_addr(),
+        let mut network: Option<fposix_socket::NetworkSocketRecvControlData> = None;
+        if want_control {
+            let mut ip = None;
+            if *ip_receive_original_destination_address {
+                ip.get_or_insert_with(|| fposix_socket::IpRecvControlData::default())
+                    .original_destination_address = Some(
+                    I::SocketAddress::new(
+                        SpecifiedAddr::new(destination_addr).map(|a| ZonedAddr::Unzoned(a).into()),
+                        destination_port,
+                    )
+                    .into_sock_addr(),
+                );
+            }
+
+            let IpInvariant(ipv6_control_data) = I::map_ip(
+                (version_specific_data, destination_addr, IpInvariant(interface_id)),
+                |(Ipv4BindingsData {}, _ipv4_dst_addr, _interface_id)| IpInvariant(None),
+                |(Ipv6BindingsData { recv_pkt_info }, ipv6_dst_addr, IpInvariant(interface_id))| {
+                    let mut ipv6_control_data = None;
+                    if *recv_pkt_info {
+                        ipv6_control_data
+                            .get_or_insert_with(|| fposix_socket::Ipv6RecvControlData::default())
+                            .pktinfo = Some(fposix_socket::Ipv6PktInfoRecvControlData {
+                            iface: interface_id.into(),
+                            header_destination_addr: ipv6_dst_addr.into_fidl(),
+                        })
+                    }
+                    // TODO(https://fxbug.dev/326102014): Support SOL_IPV6, IPV6_RECVTCLASS.
+                    // TODO(https://fxbug.dev/326102020): Support SOL_IPV6, IPV6_RECVHOPLIMIT.
+                    IpInvariant(ipv6_control_data)
+                },
             );
-        }
 
-        let IpInvariant(ipv6_control_data) = I::map_ip(
-            (version_specific_data, destination_addr, IpInvariant(interface_id)),
-            |(Ipv4BindingsData {}, _ipv4_dst_addr, _interface_id)| IpInvariant(None),
-            |(Ipv6BindingsData { recv_pkt_info }, ipv6_dst_addr, IpInvariant(interface_id))| {
-                let mut ipv6_control_data = None;
-                if *recv_pkt_info {
-                    ipv6_control_data
-                        .get_or_insert_with(|| fposix_socket::Ipv6RecvControlData::default())
-                        .pktinfo = Some(fposix_socket::Ipv6PktInfoRecvControlData {
-                        iface: interface_id.into(),
-                        header_destination_addr: ipv6_dst_addr.into_fidl(),
-                    })
-                }
-                // TODO(https://fxbug.dev/326102014): Support SOL_IPV6, IPV6_RECVTCLASS.
-                // TODO(https://fxbug.dev/326102020): Support SOL_IPV6, IPV6_RECVHOPLIMIT.
-                IpInvariant(ipv6_control_data)
-            },
-        );
+            let timestamp =
+                (*timestamp_option != fposix_socket::TimestampOption::Disabled).then(|| {
+                    fposix_socket::Timestamp {
+                        nanoseconds: timestamp.into_nanos(),
+                        requested: *timestamp_option,
+                    }
+                });
 
-        let mut network = None;
-        if let Some(ip) = ip {
-            network
-                .get_or_insert_with(|| fposix_socket::NetworkSocketRecvControlData::default())
-                .ip = Some(ip);
-        }
-        if let Some(ipv6_control_data) = ipv6_control_data {
-            network
-                .get_or_insert_with(|| fposix_socket::NetworkSocketRecvControlData::default())
-                .ipv6 = Some(ipv6_control_data);
-        }
+            if let Some(ip) = ip {
+                network.get_or_insert_with(Default::default).ip = Some(ip);
+            }
+
+            if let Some(ipv6_control_data) = ipv6_control_data {
+                network.get_or_insert_with(Default::default).ipv6 = Some(ipv6_control_data);
+            }
+
+            if let Some(timestamp) = timestamp {
+                network
+                    .get_or_insert_with(Default::default)
+                    .socket
+                    .get_or_insert_with(Default::default)
+                    .timestamp = Some(timestamp);
+            };
+        };
 
         let control_data =
             fposix_socket::DatagramSocketRecvControlData { network, ..Default::default() };
@@ -1919,16 +1906,7 @@ where
                 I::SocketAddress::from_sock_addr(<T as Transport<I>>::maybe_map_sock_addr(addr))
             })
             .transpose()?;
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         let remote = remote_addr
             .map(|remote_addr| {
                 let (remote_addr, port) =
@@ -1947,16 +1925,7 @@ where
     }
 
     fn bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         let device = device
             .map(|name| {
                 ctx.bindings_ctx().devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev)
@@ -1967,16 +1936,7 @@ where
     }
 
     fn get_bound_device(self) -> Result<Option<String>, fposix::Errno> {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         let device = match T::get_bound_device(ctx, id) {
             None => return Ok(None),
             Some(d) => d,
@@ -1991,30 +1951,12 @@ where
     }
 
     fn set_dual_stack_enabled(self, enabled: bool) -> Result<(), fposix::Errno> {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::set_dual_stack_enabled(ctx, id, enabled).map_err(IntoErrno::into_errno)
     }
 
     fn get_dual_stack_enabled(self) -> Result<bool, fposix::Errno> {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_dual_stack_enabled(ctx, id).map_err(IntoErrno::into_errno)
     }
 
@@ -2040,44 +1982,17 @@ where
     }
 
     fn set_reuse_port(self, reuse_port: bool) -> Result<(), fposix::Errno> {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::set_reuse_port(ctx, id, reuse_port).map_err(IntoErrno::into_errno)
     }
 
     fn get_reuse_port(self) -> bool {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_reuse_port(ctx, id)
     }
 
     fn shutdown(self, how: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
-        let Self {
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { id, _properties },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-            ctx,
-        } = self;
+        let Self { data: BindingData { info: SocketControlInfo { id, .. }, .. }, ctx } = self;
         let how = ShutdownType::from_send_receive(
             how.contains(fposix_socket::ShutdownMode::WRITE),
             how.contains(fposix_socket::ShutdownMode::READ),
@@ -2121,16 +2036,7 @@ where
         let interface = interface
             .map_or(MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute, Into::into);
 
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
 
         let interface =
             interface.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?;
@@ -2148,16 +2054,7 @@ where
         let hop_limit =
             hop_limit.map(|u| NonZeroU8::new(u).ok_or(fposix::Errno::Einval)).transpose()?;
 
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::set_unicast_hop_limit(ctx, id, hop_limit, ip_version).map_err(IntoErrno::into_errno)
     }
 
@@ -2172,77 +2069,44 @@ where
         let hop_limit =
             hop_limit.map(|u| NonZeroU8::new(u).ok_or(fposix::Errno::Einval)).transpose()?;
 
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::set_multicast_hop_limit(ctx, id, hop_limit, ip_version).map_err(IntoErrno::into_errno)
     }
 
     fn get_unicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_unicast_hop_limit(ctx, id, ip_version)
             .map(NonZeroU8::get)
             .map_err(IntoErrno::into_errno)
     }
 
     fn get_multicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_multicast_hop_limit(ctx, id, ip_version)
             .map(NonZeroU8::get)
             .map_err(IntoErrno::into_errno)
     }
 
     fn set_ip_transparent(self, value: bool) -> Result<(), T::SetIpTransparentError> {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::set_ip_transparent(ctx, id, value)
     }
 
     fn get_ip_transparent(self) -> bool {
-        let Self {
-            ctx,
-            data:
-                BindingData {
-                    peer_event: _,
-                    info: SocketControlInfo { _properties, id },
-                    version_specific_data: _,
-                    ip_receive_original_destination_address: _,
-                },
-        } = self;
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_ip_transparent(ctx, id)
+    }
+
+    fn get_timestamp_option(self) -> Result<fposix_socket::TimestampOption, fposix::Errno> {
+        Ok(self.data.timestamp_option)
+    }
+
+    fn set_timestamp_option(
+        self,
+        value: fposix_socket::TimestampOption,
+    ) -> Result<(), fposix::Errno> {
+        self.data.timestamp_option = value;
+        Ok(())
     }
 }
 

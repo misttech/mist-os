@@ -47,8 +47,9 @@
                 "AllInetTests/UdpSocketTest.RecvBufLimits/*",
                 "AllInetTests/UdpSocketTest.SoNoCheck/*",
                 "AllInetTests/UdpSocketTest.SoNoCheckOffByDefault/*",
+
+                // SO_TIMESTAMP is implemented, but the test depends on ioctl(SIOCGSTAMP).
                 "AllInetTests/UdpSocketTest.SoTimestamp/*",
-                "AllInetTests/UdpSocketTest.SoTimestampOffByDefault/*",
                 "AllInetTests/UdpSocketTest.TimestampIoctl/*",
                 "AllInetTests/UdpSocketTest.TimestampIoctlNothingRead/*",
                 "AllInetTests/UdpSocketTest.TimestampIoctlPersistence/*",
