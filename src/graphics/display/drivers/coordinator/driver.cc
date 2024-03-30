@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
@@ -58,10 +59,10 @@ zx_status_t Driver::Bind() {
   return ZX_OK;
 }
 
-void Driver::ReleaseImage(image_t* image) {
+void Driver::ReleaseImage(DriverImageId driver_image_id) {
   if (use_engine_) {
     fdf::WireUnownedResult result =
-        engine_.buffer(arena_)->ReleaseImage(ToFidlDriverImageId(DriverImageId(image->handle)));
+        engine_.buffer(arena_)->ReleaseImage(ToFidlDriverImageId(driver_image_id));
     if (!result.ok()) {
       zxlogf(ERROR, "ReleaseImage failed: %s", result.status_string());
     }
@@ -69,18 +70,20 @@ void Driver::ReleaseImage(image_t* image) {
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  dc_.ReleaseImage(image->handle);
+  dc_.ReleaseImage(ToBanjoDriverImageId(driver_image_id));
 }
 
-zx_status_t Driver::ReleaseCapture(DriverCaptureImageId driver_capture_image_id) {
+zx::result<> Driver::ReleaseCapture(DriverCaptureImageId driver_capture_image_id) {
   if (use_engine_) {
     fdf::WireUnownedResult result =
         engine_.buffer(arena_)->ReleaseCapture(ToFidlDriverCaptureImageId(driver_capture_image_id));
-    return result.status();
+    return zx::make_result(result.status());
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  return dc_.ReleaseCapture(ToBanjoDriverCaptureImageId(driver_capture_image_id));
+  zx_status_t banjo_status =
+      dc_.ReleaseCapture(ToBanjoDriverCaptureImageId(driver_capture_image_id));
+  return zx::make_result(banjo_status);
 }
 
 config_check_result_t Driver::CheckConfiguration(
@@ -107,13 +110,13 @@ void Driver::ApplyConfiguration(const display_config_t** display_config_list,
   dc_.ApplyConfiguration(display_config_list, display_config_count, config_stamp);
 }
 
-void Driver::SetEld(DisplayId display_id, const uint8_t* raw_eld_list, size_t raw_eld_count) {
+void Driver::SetEld(DisplayId display_id, cpp20::span<const uint8_t> raw_eld) {
   if (use_engine_) {
     return;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  dc_.SetEld(ToBanjoDisplayId(display_id), raw_eld_list, raw_eld_count);
+  dc_.SetEld(ToBanjoDisplayId(display_id), raw_eld.data(), raw_eld.size());
 }
 
 void Driver::SetDisplayControllerInterface(display_controller_interface_protocol_ops_t* ops) {
@@ -134,76 +137,84 @@ void Driver::ResetDisplayControllerInterface() {
   dc_.ResetDisplayControllerInterface();
 }
 
-zx_status_t Driver::ImportImage(image_t* image, DriverBufferCollectionId collection_id,
-                                uint32_t index) {
+zx::result<DriverImageId> Driver::ImportImage(const image_metadata_t& image_metadata,
+                                              DriverBufferCollectionId collection_id,
+                                              uint32_t index) {
   if (use_engine_) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  const image_metadata_t image_metadata = {
-      .width = image->width,
-      .height = image->height,
-      .tiling_type = image->tiling_type,
-  };
   uint64_t image_handle = 0;
-  zx_status_t status = dc_.ImportImage(
+  zx_status_t banjo_status = dc_.ImportImage(
       &image_metadata, ToBanjoDriverBufferCollectionId(collection_id), index, &image_handle);
-  image->handle = image_handle;
-  return status;
+  if (banjo_status != ZX_OK) {
+    return zx::error(banjo_status);
+  }
+  return zx::ok(DriverImageId(image_handle));
 }
 
-zx_status_t Driver::ImportImageForCapture(DriverBufferCollectionId collection_id, uint32_t index,
-                                          DriverCaptureImageId* capture_image_id) {
+zx::result<DriverCaptureImageId> Driver::ImportImageForCapture(
+    DriverBufferCollectionId collection_id, uint32_t index) {
   if (use_engine_) {
     fdf::WireUnownedResult result =
         engine_.buffer(arena_)->ImportImageForCapture(ToFidlDriverBufferId({
             .buffer_collection_id = collection_id,
             .buffer_index = index,
         }));
-    if (result.ok()) {
-      fuchsia_hardware_display_engine::wire::ImageId image_id = result->value()->capture_image_id;
-      *capture_image_id = ToDriverCaptureImageId(image_id.value);
+    if (!result.ok()) {
+      return zx::error(result.status());
     }
-    return result.status();
+    if (result->is_error()) {
+      return zx::error(result->error_value());
+    }
+    fuchsia_hardware_display_engine::wire::ImageId image_id = result->value()->capture_image_id;
+    return zx::ok(ToDriverCaptureImageId(image_id.value));
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  uint64_t banjo_capture_image_id = ToBanjoDriverCaptureImageId(*capture_image_id);
-  auto status = dc_.ImportImageForCapture(ToBanjoDriverBufferCollectionId(collection_id), index,
-                                          &banjo_capture_image_id);
-  *capture_image_id = ToDriverCaptureImageId(banjo_capture_image_id);
-  return status;
+  uint64_t banjo_capture_image_handle = 0;
+  zx_status_t banjo_status = dc_.ImportImageForCapture(
+      ToBanjoDriverBufferCollectionId(collection_id), index, &banjo_capture_image_handle);
+  if (banjo_status != ZX_OK) {
+    return zx::error(banjo_status);
+  }
+  return zx::ok(ToDriverCaptureImageId(banjo_capture_image_handle));
 }
 
-zx_status_t Driver::ImportBufferCollection(DriverBufferCollectionId collection_id,
-                                           zx::channel collection_token) {
+zx::result<> Driver::ImportBufferCollection(DriverBufferCollectionId collection_id,
+                                            zx::channel collection_token) {
   if (use_engine_) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  return dc_.ImportBufferCollection(ToBanjoDriverBufferCollectionId(collection_id),
-                                    std::move(collection_token));
+  zx_status_t banjo_status = dc_.ImportBufferCollection(
+      ToBanjoDriverBufferCollectionId(collection_id), std::move(collection_token));
+  return zx::make_result(banjo_status);
 }
 
-zx_status_t Driver::ReleaseBufferCollection(DriverBufferCollectionId collection_id) {
+zx::result<> Driver::ReleaseBufferCollection(DriverBufferCollectionId collection_id) {
   if (use_engine_) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  return dc_.ReleaseBufferCollection(ToBanjoDriverBufferCollectionId(collection_id));
+  zx_status_t banjo_status =
+      dc_.ReleaseBufferCollection(ToBanjoDriverBufferCollectionId(collection_id));
+  return zx::make_result(banjo_status);
 }
 
-zx_status_t Driver::SetBufferCollectionConstraints(const image_buffer_usage_t& usage,
-                                                   DriverBufferCollectionId collection_id) {
+zx::result<> Driver::SetBufferCollectionConstraints(const image_buffer_usage_t& usage,
+                                                    DriverBufferCollectionId collection_id) {
   if (use_engine_) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  return dc_.SetBufferCollectionConstraints(&usage, ToBanjoDriverBufferCollectionId(collection_id));
+  zx_status_t banjo_status =
+      dc_.SetBufferCollectionConstraints(&usage, ToBanjoDriverBufferCollectionId(collection_id));
+  return zx::make_result(banjo_status);
 }
 
 bool Driver::IsCaptureSupported() {
@@ -215,40 +226,44 @@ bool Driver::IsCaptureSupported() {
   return dc_.IsCaptureSupported();
 }
 
-zx_status_t Driver::StartCapture(DriverCaptureImageId driver_capture_image_id) {
+zx::result<> Driver::StartCapture(DriverCaptureImageId driver_capture_image_id) {
   if (use_engine_) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  return dc_.StartCapture(ToBanjoDriverCaptureImageId(driver_capture_image_id));
+  zx_status_t banjo_status = dc_.StartCapture(ToBanjoDriverCaptureImageId(driver_capture_image_id));
+  return zx::make_result(banjo_status);
 }
 
-zx_status_t Driver::SetDisplayPower(DisplayId display_id, bool power_on) {
+zx::result<> Driver::SetDisplayPower(DisplayId display_id, bool power_on) {
   if (use_engine_) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  return dc_.SetDisplayPower(ToBanjoDisplayId(display_id), power_on);
+  zx_status_t banjo_status = dc_.SetDisplayPower(ToBanjoDisplayId(display_id), power_on);
+  return zx::make_result(banjo_status);
 }
 
-zx_status_t Driver::SetMinimumRgb(uint8_t minimum_rgb) {
+zx::result<> Driver::SetMinimumRgb(uint8_t minimum_rgb) {
   if (use_engine_) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  return dc_.SetMinimumRgb(minimum_rgb);
+  zx_status_t banjo_status = dc_.SetMinimumRgb(minimum_rgb);
+  return zx::make_result(banjo_status);
 }
 
-zx_status_t Driver::GetSysmemConnection(zx::channel sysmem_handle) {
+zx::result<> Driver::GetSysmemConnection(zx::channel sysmem_handle) {
   if (use_engine_) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  return dc_.GetSysmemConnection(std::move(sysmem_handle));
+  zx_status_t banjo_status = dc_.GetSysmemConnection(std::move(sysmem_handle));
+  return zx::make_result(banjo_status);
 }
 
 }  // namespace display

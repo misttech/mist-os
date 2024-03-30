@@ -203,7 +203,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
     if (info->edid.has_value()) {
       fbl::Array<uint8_t> eld;
       ComputeEld(info->edid->base, eld);
-      driver_.SetEld(info->id, eld.get(), eld.size());
+      driver_.SetEld(info->id, eld);
     }
 
     if (displays_.insert_or_find(info)) {
@@ -607,7 +607,9 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
   driver_.ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
 }
 
-void Controller::ReleaseImage(image_t* image) { driver_.ReleaseImage(image); }
+void Controller::ReleaseImage(DriverImageId driver_image_id) {
+  driver_.ReleaseImage(driver_image_id);
+}
 
 void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id) {
   if (!supports_capture_) {
@@ -617,8 +619,8 @@ void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_i
     return;
   }
 
-  const zx_status_t release_status = driver_.ReleaseCapture(driver_capture_image_id);
-  if (release_status == ZX_ERR_SHOULD_WAIT) {
+  const zx::result<> result = driver_.ReleaseCapture(driver_capture_image_id);
+  if (result.is_error() && result.error_value() == ZX_ERR_SHOULD_WAIT) {
     ZX_DEBUG_ASSERT_MSG(pending_release_capture_image_id_ == kInvalidDriverCaptureImageId,
                         "multiple pending releases for capture images");
     // Delay the image release until the hardware is done.

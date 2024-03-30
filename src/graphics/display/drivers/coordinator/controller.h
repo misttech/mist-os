@@ -101,7 +101,7 @@ class Controller : public DeviceType,
   void ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStamp config_stamp,
                    uint32_t layer_stamp, ClientId client_id) __TA_EXCLUDES(mtx());
 
-  void ReleaseImage(image_t* image);
+  void ReleaseImage(DriverImageId driver_image_id);
   void ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id);
 
   // |mtx()| must be held for as long as |edid| and |params| are retained.

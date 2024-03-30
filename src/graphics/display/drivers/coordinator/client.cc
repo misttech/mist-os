@@ -53,10 +53,10 @@
 #include <fbl/string_printf.h>
 #include <fbl/vector.h>
 
-#include "fidl/fuchsia.hardware.display/cpp/wire_types.h"
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
+#include "src/graphics/display/drivers/coordinator/driver.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
@@ -163,19 +163,28 @@ zx_status_t Client::ImportImageForDisplay(
   }
   const Collections& collections = collection_map_it->second;
 
-  image_t dc_image = {};
-  dc_image.height = image_config.height;
-  dc_image.width = image_config.width;
-  dc_image.tiling_type = image_config.tiling_type;
+  const image_metadata_t image_metadata = {
+      .width = image_config.width,
+      .height = image_config.height,
+      .tiling_type = image_config.tiling_type,
+  };
 
-  zx_status_t status = controller_->driver()->ImportImage(
-      &dc_image, collections.driver_buffer_collection_id, buffer_id.buffer_index);
-  if (status != ZX_OK) {
-    return status;
+  zx::result<DriverImageId> result = controller_->driver()->ImportImage(
+      image_metadata, collections.driver_buffer_collection_id, buffer_id.buffer_index);
+  if (result.is_error()) {
+    return result.error_value();
   }
 
-  auto release_image = fit::defer([this, &dc_image]() { controller_->ReleaseImage(&dc_image); });
+  const DriverImageId driver_image_id = result.value();
+  auto release_image =
+      fit::defer([this, driver_image_id]() { controller_->ReleaseImage(driver_image_id); });
 
+  const image_t dc_image = {
+      .width = image_config.width,
+      .height = image_config.height,
+      .tiling_type = image_config.tiling_type,
+      .handle = driver_image_id.value(),
+  };
   fbl::AllocChecker alloc_checker;
   fbl::RefPtr<Image> image = fbl::AdoptRef(
       new (&alloc_checker) Image(controller_, dc_image, zx::vmo(), &proxy_->node(), id_));
@@ -247,11 +256,11 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
 
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       controller_->GetNextDriverBufferCollectionId();
-  zx_status_t import_status = controller_->driver()->ImportBufferCollection(
+  zx::result<> import_result = controller_->driver()->ImportBufferCollection(
       driver_buffer_collection_id, request->buffer_collection_token.TakeChannel());
-  if (import_status != ZX_OK) {
+  if (import_result.is_error()) {
     zxlogf(WARNING, "Cannot import BufferCollection to display driver: %s",
-           zx_status_get_string(import_status));
+           import_result.status_string());
     completer.ReplyError(ZX_ERR_INTERNAL);
     return;
   }
@@ -271,8 +280,11 @@ void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
     return;
   }
 
-  // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-  controller_->driver()->ReleaseBufferCollection(it->second.driver_buffer_collection_id);
+  [[maybe_unused]] zx::result<> result =
+      controller_->driver()->ReleaseBufferCollection(it->second.driver_buffer_collection_id);
+  if (result.is_error()) {
+    // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
+  }
 
   collection_map_.erase(it);
 }
@@ -289,17 +301,15 @@ void Client::SetBufferCollectionConstraints(
   }
   auto& collections = it->second;
 
-  zx_status_t status = ZX_ERR_INTERNAL;
-
   const image_buffer_usage_t image_buffer_usage = {
       .tiling_type = request->config.tiling_type,
   };
-  status = controller_->driver()->SetBufferCollectionConstraints(
+  zx::result<> result = controller_->driver()->SetBufferCollectionConstraints(
       image_buffer_usage, collections.driver_buffer_collection_id);
-  if (status != ZX_OK) {
+  if (result.is_error()) {
     zxlogf(WARNING,
            "Cannot set BufferCollection constraints using imported buffer collection (id=%lu) %s.",
-           buffer_collection_id.value(), zx_status_get_string(status));
+           buffer_collection_id.value(), result.status_string());
     completer.ReplyError(ZX_ERR_INTERNAL);
   }
   completer.ReplySuccess();
@@ -762,15 +772,17 @@ zx_status_t Client::ImportImageForCapture(
   if (it == collection_map_.end()) {
     return ZX_ERR_INVALID_ARGS;
   }
-  const auto& collections = it->second;
-  DriverCaptureImageId driver_capture_image_id = ToDriverCaptureImageId(INVALID_ID);
-  zx_status_t status = controller_->driver()->ImportImageForCapture(
-      collections.driver_buffer_collection_id, buffer_id.buffer_index, &driver_capture_image_id);
-  if (status != ZX_OK) {
-    return status;
+  const Client::Collections& collections = it->second;
+  zx::result<DriverCaptureImageId> import_result = controller_->driver()->ImportImageForCapture(
+      collections.driver_buffer_collection_id, buffer_id.buffer_index);
+  if (import_result.is_error()) {
+    return import_result.error_value();
   }
+  const DriverCaptureImageId driver_capture_image_id = import_result.value();
   auto release_image = fit::defer([this, driver_capture_image_id]() {
-    controller_->driver()->ReleaseCapture(driver_capture_image_id);
+    // TODO(https://fxbug.dev/42180237): Consider handling the error instead of ignoring it.
+    [[maybe_unused]] zx::result<> result =
+        controller_->driver()->ReleaseCapture(driver_capture_image_id);
   });
 
   fbl::AllocChecker alloc_checker;
@@ -817,14 +829,15 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   }
 
   capture_fence_id_ = ToEventId(request->signal_event_id);
-  auto status = controller_->driver()->StartCapture(image->driver_capture_image_id());
-  if (status == ZX_OK) {
-    fbl::AutoLock lock(controller_->mtx());
-    proxy_->EnableCapture(true);
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(status);
+  zx::result<> result = controller_->driver()->StartCapture(image->driver_capture_image_id());
+  if (result.is_error()) {
+    completer.ReplyError(result.error_value());
+    return;
   }
+
+  fbl::AutoLock lock(controller_->mtx());
+  proxy_->EnableCapture(true);
+  completer.ReplySuccess();
 
   // keep track of currently active capture image
   current_capture_image_id_ = capture_image_id;  // Is this right?
@@ -836,24 +849,24 @@ void Client::SetMinimumRgb(SetMinimumRgbRequestView request,
     completer.ReplyError(ZX_ERR_NOT_CONNECTED);
     return;
   }
-  auto status = controller_->driver()->SetMinimumRgb(request->minimum_rgb);
-  if (status == ZX_OK) {
-    client_minimum_rgb_ = request->minimum_rgb;
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(status);
+  zx::result<> result = controller_->driver()->SetMinimumRgb(request->minimum_rgb);
+  if (result.is_error()) {
+    completer.ReplyError(result.error_value());
+    return;
   }
+  client_minimum_rgb_ = request->minimum_rgb;
+  completer.ReplySuccess();
 }
 
 void Client::SetDisplayPower(SetDisplayPowerRequestView request,
                              SetDisplayPowerCompleter::Sync& completer) {
   const DisplayId display_id = ToDisplayId(request->display_id);
-  auto status = controller_->driver()->SetDisplayPower(display_id, request->power_on);
-  if (status == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(status);
+  zx::result<> result = controller_->driver()->SetDisplayPower(display_id, request->power_on);
+  if (result.is_error()) {
+    completer.ReplyError(result.error_value());
+    return;
   }
+  completer.ReplySuccess();
 }
 
 bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
@@ -1333,7 +1346,9 @@ void Client::TearDown() {
 
   // Release all imported buffer collections on display drivers.
   for (const auto& [k, v] : collection_map_) {
-    controller_->driver()->ReleaseBufferCollection(v.driver_buffer_collection_id);
+    // TODO(https://fxbug.dev/42180237): Consider handling the error instead of ignoring it.
+    [[maybe_unused]] zx::result<> result =
+        controller_->driver()->ReleaseBufferCollection(v.driver_buffer_collection_id);
   }
   collection_map_.clear();
 
@@ -1473,10 +1488,10 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
               return endpoints.error_value();
             }
             auto& [sysmem_allocator_client, sysmem_allocator_server] = endpoints.value();
-            if (zx_status_t status = controller_->driver()->GetSysmemConnection(
-                    sysmem_allocator_server.TakeChannel());
-                status != ZX_OK) {
-              return status;
+            zx::result<> result =
+                controller_->driver()->GetSysmemConnection(sysmem_allocator_server.TakeChannel());
+            if (result.is_error()) {
+              return result.error_value();
             }
             sysmem_allocator_ = fidl::WireSyncClient(std::move(sysmem_allocator_client));
 
@@ -1557,7 +1572,11 @@ void ClientProxy::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_i
 
 void ClientProxy::ReapplySpecialConfigs() {
   ZX_DEBUG_ASSERT(mtx_trylock(controller_->mtx()) == thrd_busy);
-  controller_->driver()->SetMinimumRgb(handler_.GetMinimumRgb());
+
+  zx::result<> result = controller_->driver()->SetMinimumRgb(handler_.GetMinimumRgb());
+  if (!result.is_ok()) {
+    zxlogf(ERROR, "Failed to reapply minimum RGB value: %s", result.status_string());
+  }
 }
 
 void ClientProxy::ReapplyConfig() {

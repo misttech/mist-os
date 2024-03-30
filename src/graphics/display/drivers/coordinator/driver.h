@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/zx/result.h>
 
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
@@ -15,6 +16,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 
 namespace display {
 
@@ -37,8 +39,8 @@ class Driver : public ddk::Device<Driver> {
   void DdkRelease();
   zx_status_t Bind(std::unique_ptr<Driver>* device_ptr);
 
-  void ReleaseImage(image_t* image);
-  zx_status_t ReleaseCapture(DriverCaptureImageId driver_capture_image_id);
+  void ReleaseImage(DriverImageId driver_image_id);
+  zx::result<> ReleaseCapture(DriverCaptureImageId driver_capture_image_id);
 
   config_check_result_t CheckConfiguration(
       const display_config_t** display_config_list, size_t display_config_count,
@@ -47,28 +49,29 @@ class Driver : public ddk::Device<Driver> {
   void ApplyConfiguration(const display_config_t** display_config_list, size_t display_config_count,
                           const config_stamp_t* config_stamp);
 
-  void SetEld(DisplayId display_id, const uint8_t* raw_eld_list, size_t raw_eld_count);
+  void SetEld(DisplayId display_id, cpp20::span<const uint8_t> raw_eld);
 
   // TODO(https://fxbug.dev/314126494): These methods are only used in the
   // banjo transport. Remove when all drivers are migrated to FIDL transport.
   void SetDisplayControllerInterface(display_controller_interface_protocol_ops_t* ops);
   void ResetDisplayControllerInterface();
 
-  zx_status_t ImportImage(image_t* image, DriverBufferCollectionId collection_id, uint32_t index);
-  zx_status_t ImportImageForCapture(DriverBufferCollectionId collection_id, uint32_t index,
-                                    DriverCaptureImageId* capture_image_id);
-  zx_status_t ImportBufferCollection(DriverBufferCollectionId collection_id,
-                                     zx::channel collection_token);
-  zx_status_t ReleaseBufferCollection(DriverBufferCollectionId collection_id);
-  zx_status_t SetBufferCollectionConstraints(const image_buffer_usage_t& usage,
-                                             DriverBufferCollectionId collection_id);
+  zx::result<DriverImageId> ImportImage(const image_metadata_t& image_metadata,
+                                        DriverBufferCollectionId collection_id, uint32_t index);
+  zx::result<DriverCaptureImageId> ImportImageForCapture(DriverBufferCollectionId collection_id,
+                                                         uint32_t index);
+  zx::result<> ImportBufferCollection(DriverBufferCollectionId collection_id,
+                                      zx::channel collection_token);
+  zx::result<> ReleaseBufferCollection(DriverBufferCollectionId collection_id);
+  zx::result<> SetBufferCollectionConstraints(const image_buffer_usage_t& usage,
+                                              DriverBufferCollectionId collection_id);
 
   bool IsCaptureSupported();
-  zx_status_t StartCapture(DriverCaptureImageId driver_capture_image_id);
-  zx_status_t SetDisplayPower(DisplayId display_id, bool power_on);
-  zx_status_t SetMinimumRgb(uint8_t minimum_rgb);
+  zx::result<> StartCapture(DriverCaptureImageId driver_capture_image_id);
+  zx::result<> SetDisplayPower(DisplayId display_id, bool power_on);
+  zx::result<> SetMinimumRgb(uint8_t minimum_rgb);
 
-  zx_status_t GetSysmemConnection(zx::channel sysmem_handle);
+  zx::result<> GetSysmemConnection(zx::channel sysmem_handle);
 
  private:
   // TODO(https://fxbug.dev/325474586): Revisit whether a single arena is the
