@@ -46,6 +46,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 .context("Adding power_manager's thermal config file")?;
         }
 
+        builder.platform_bundle("legacy_power_framework");
         if config.suspend_enabled {
             ensure!(
                 matches!(

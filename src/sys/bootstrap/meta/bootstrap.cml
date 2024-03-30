@@ -61,23 +61,6 @@
             url: "fuchsia-boot:///pkg-cache#meta/pkg-cache.cm",
             on_terminate: "reboot",
         },
-        {
-            name: "power_manager",
-            url: "fuchsia-boot:///power-manager#meta/power-manager.cm",
-        },
-        {
-            name: "power-broker",
-            url: "fuchsia-boot:///power-broker#meta/power-broker.cm",
-        },
-        {
-            name: "system-activity-governor",
-            url: "fuchsia-boot:///system-activity-governor#meta/system-activity-governor.cm",
-        },
-        {
-            name: "cpu_manager",
-            url: "fuchsia-boot:///cpu-manager#meta/cpu-manager.cm",
-            on_terminate: "reboot",
-        },
 
         // TODO(https://fxbug.dev/42180879): Remove need for separate full_resolver component here.
         // Full resolver clone to be used by the full-pkg-drivers collection
@@ -121,10 +104,8 @@
             from: "parent",
             to: [
                 "#archivist",
-                "#cpu_manager",
                 "#fshost",
                 "#pkg-cache",
-                "#power_manager",
             ],
             availability: "optional",
         },
@@ -152,27 +133,6 @@
             to: "#role_manager",
             rights: [ "r*" ],
             subdir: "config/profiles",
-        },
-        {
-            directory: "boot",
-            from: "parent",
-            as: "config",
-            to: [ "#power_manager" ],
-            rights: [ "r*" ],
-            subdir: "config/power_manager",
-        },
-        {
-            directory: "boot",
-            from: "parent",
-            as: "config",
-            to: [ "#cpu_manager" ],
-            rights: [ "r*" ],
-            subdir: "config/cpu_manager",
-        },
-        {
-            protocol: [ "fuchsia.thermal.ClientStateConnector" ],
-            from: "#power_manager",
-            to: "#cpu_manager",
         },
         {
             protocol: [
@@ -232,35 +192,7 @@
         {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
             from: "parent",
-            to: [
-                "#fshost",
-                "#power_manager",
-            ],
-        },
-        {
-            protocol: [
-                "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.kernel.CpuResource",
-            ],
-            from: "parent",
-            to: "#power_manager",
-        },
-        {
-            protocol: [ "fuchsia.component.Binder" ],
-            from: "#cpu_manager",
-            to: "#power_manager",
-
-            // cpu_manager uses fuchsia.thermal.ClientStateConnector from power_manage
-            // Weak to resolve dependency cycles
-            dependency: "weak",
-        },
-        {
-            protocol: [
-                "fuchsia.kernel.CpuResource",
-                "fuchsia.kernel.Stats",
-            ],
-            from: "parent",
-            to: [ "#cpu_manager" ],
+            to: "#fshost",
         },
         {
             protocol: [ "fuchsia.kernel.VmexResource" ],
@@ -294,27 +226,11 @@
             ],
         },
         {
-            directory: "dev-topological",
-            from: "#devfs-with-pkg",
-            to: [
-                "#cpu_manager",
-                "#power_manager",
-            ],
-            dependency: "weak",
-        },
-        {
             directory: "dev-class",
             from: "#devfs-with-pkg",
             as: "dev-class-network",
             to: "#device_name_provider",
             subdir: "network",
-        },
-        {
-            directory: "dev-class",
-            from: "#devfs",
-            as: "dev-class-suspend",
-            to: "#system-activity-governor",
-            subdir: "suspend",
         },
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
@@ -330,10 +246,7 @@
         {
             protocol: [ "fuchsia.sys2.SystemController" ],
             from: "parent",
-            to: [
-                "#power_manager",
-                "#shutdown_shim",
-            ],
+            to: "#shutdown_shim",
         },
         {
             protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
@@ -344,6 +257,7 @@
             protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
             from: "#power_manager",
             to: "#shutdown_shim",
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.device.manager.Administrator" ],
@@ -352,39 +266,20 @@
         },
         {
             protocol: [
-                "fuchsia.feedback.CrashReporter",
-                "fuchsia.kernel.Stats",
-                "fuchsia.ui.activity.Provider",
-            ],
-            from: "parent",
-            to: "#power_manager",
-        },
-        {
-            protocol: "fuchsia.settings.Input",
-            from: "parent",
-            to: "#power_manager",
-            availability: "optional",
-        },
-        {
-            protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
             to: [
-                "#cpu_manager",
                 "#device_name_provider",
                 "#fshost",
                 "#miscsvc",
-                "#power-broker",
-                "#power_manager",
                 "#ptysvc",
                 "#pwrbtn-monitor",
                 "#role_manager",
                 "#shutdown_shim",
                 "#svchost",
                 "#sysinfo",
-                "#system-activity-governor",
             ],
         },
         {
@@ -504,11 +399,6 @@
             from: "#archivist",
             to: "#full_resolver",
         },
-        {
-            protocol: [ "fuchsia.power.broker.Topology" ],
-            from: "#power-broker",
-            to: "#system-activity-governor",
-        },
 
         // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
         {
@@ -603,17 +493,6 @@
             from: "#sysinfo",
         },
         {
-            protocol: [
-                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-                "fuchsia.power.clientlevel.Connector",
-                "fuchsia.power.profile.Watcher",
-                "fuchsia.power.systemmode.ClientConfigurator",
-                "fuchsia.power.systemmode.Requester",
-                "fuchsia.thermal.ClientStateConnector",
-            ],
-            from: "#power_manager",
-        },
-        {
             protocol: "fuchsia.tpm.cr50.Cr50",
             from: "#cr50_agent",
             source_availability: "unknown",
@@ -656,17 +535,6 @@
                 "fuchsia.space.Manager",
             ],
             from: "#pkg-cache",
-        },
-        {
-            protocol: [ "fuchsia.power.broker.Topology" ],
-            from: "#power-broker",
-        },
-        {
-            protocol: [
-                "fuchsia.power.suspend.Stats",
-                "fuchsia.power.system.ActivityGovernor",
-            ],
-            from: "#system-activity-governor",
         },
     ],
     environments: [

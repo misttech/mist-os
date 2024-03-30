@@ -18,11 +18,14 @@ bootstrap_user_platform_aib_names = [
   # The bootstrap feature-set-level
   "bootstrap",
 
-  #Diagnostics
+  # Diagnostics
   "console",
 
   # Driver Framework
   "driver_framework",
+
+  # Power
+  "legacy_power_framework",
 
   # Graphics
   "virtcon",
@@ -315,6 +318,7 @@ required_user_aib_names = [
   "core_realm",
   "core_realm_user_and_userdebug",
   "driver_framework",
+  "legacy_power_framework",
   "zircon",
 ]
 

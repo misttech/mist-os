@@ -28,6 +28,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "kernel_anonymous_memory_compression_eager_lru",
     "kernel_contiguous_physical_pages",
     "kernel_args_user",
+    "legacy_power_framework",
     "live_usb",
     "resources",
     "virtcon",

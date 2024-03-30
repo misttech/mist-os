@@ -1,0 +1,164 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "power_manager",
+            url: "fuchsia-boot:///power-manager#meta/power-manager.cm",
+        },
+        {
+            name: "power-broker",
+            url: "fuchsia-boot:///power-broker#meta/power-broker.cm",
+        },
+        {
+            name: "system-activity-governor",
+            url: "fuchsia-boot:///system-activity-governor#meta/system-activity-governor.cm",
+        },
+        {
+            name: "cpu_manager",
+            url: "fuchsia-boot:///cpu-manager#meta/cpu-manager.cm",
+            on_terminate: "reboot",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: [
+                "#cpu_manager",
+                "#power_manager",
+            ],
+            availability: "optional",
+        },
+        {
+            directory: "boot",
+            from: "parent",
+            as: "config",
+            to: [ "#power_manager" ],
+            rights: [ "r*" ],
+            subdir: "config/power_manager",
+        },
+        {
+            directory: "boot",
+            from: "parent",
+            as: "config",
+            to: [ "#cpu_manager" ],
+            rights: [ "r*" ],
+            subdir: "config/cpu_manager",
+        },
+        {
+            protocol: [ "fuchsia.thermal.ClientStateConnector" ],
+            from: "#power_manager",
+            to: "#cpu_manager",
+        },
+        {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            from: "parent",
+            to: "#power_manager",
+        },
+        {
+            protocol: [
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.kernel.CpuResource",
+            ],
+            from: "parent",
+            to: "#power_manager",
+        },
+        {
+            protocol: [ "fuchsia.component.Binder" ],
+            from: "#cpu_manager",
+            to: "#power_manager",
+
+            // cpu_manager uses fuchsia.thermal.ClientStateConnector from power_manage
+            // Weak to resolve dependency cycles
+            dependency: "weak",
+        },
+        {
+            protocol: [
+                "fuchsia.kernel.CpuResource",
+                "fuchsia.kernel.Stats",
+            ],
+            from: "parent",
+            to: [ "#cpu_manager" ],
+        },
+        {
+            directory: "dev-topological",
+            from: "#devfs-with-pkg",
+            to: [
+                "#cpu_manager",
+                "#power_manager",
+            ],
+            dependency: "weak",
+        },
+        {
+            directory: "dev-class",
+            from: "#devfs",
+            as: "dev-class-suspend",
+            to: "#system-activity-governor",
+            subdir: "suspend",
+        },
+        {
+            protocol: [ "fuchsia.sys2.SystemController" ],
+            from: "parent",
+            to: "#power_manager",
+        },
+        {
+            protocol: [
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.kernel.Stats",
+                "fuchsia.ui.activity.Provider",
+            ],
+            from: "parent",
+            to: "#power_manager",
+        },
+        {
+            protocol: "fuchsia.settings.Input",
+            from: "parent",
+            to: "#power_manager",
+            availability: "optional",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: [
+                "#cpu_manager",
+                "#power-broker",
+                "#power_manager",
+                "#system-activity-governor",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+            to: "#system-activity-governor",
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
+                "fuchsia.power.clientlevel.Connector",
+                "fuchsia.power.profile.Watcher",
+                "fuchsia.power.systemmode.ClientConfigurator",
+                "fuchsia.power.systemmode.Requester",
+                "fuchsia.thermal.ClientStateConnector",
+            ],
+            from: "#power_manager",
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+        },
+        {
+            protocol: [
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "#system-activity-governor",
+        },
+    ],
+}
