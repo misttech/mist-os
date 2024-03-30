@@ -13,15 +13,11 @@
     },
     use: [
         {
-            protocol: "fuchsia.feedback.CrashReporter",
-            from: "parent",
-        },
-        {
-            protocol: "fuchsia.feedback.CrashReportingProductRegister",
-            from: "parent",
-        },
-        {
-            protocol: "fuchsia.diagnostics.FeedbackArchiveAccessor",
+            protocol: [
+                "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.feedback.CrashReportingProductRegister",
+            ],
             from: "parent",
         },
         {

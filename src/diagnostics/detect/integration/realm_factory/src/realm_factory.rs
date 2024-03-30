@@ -13,11 +13,10 @@ use {
     },
     fake_archive_accessor::FakeArchiveAccessor,
     fidl::endpoints::{create_endpoints, ClientEnd},
-    fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_diagnostics_test as ftest,
-    fidl_fuchsia_feedback as fcrash,
+    fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_feedback as fcrash,
     fidl_fuchsia_io::R_STAR_DIR,
     fidl_server::*,
-    fuchsia_async as fasync,
+    fidl_test_detect_factory as ftest, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
@@ -36,7 +35,7 @@ enum InternalError {
     ReadVmo(#[source] zx::Status),
 }
 
-const DETECT_URL: &str = "#meta/triage-detect.cm";
+const DETECT_URL: &str = "diagnostics_detect_integration_target#meta/target.cm";
 const ERR_EVENTS_UNAVAILABLE: &str = "you must create the realm before listening for events";
 
 pub(crate) struct RealmFactory {

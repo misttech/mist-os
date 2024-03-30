@@ -8,9 +8,9 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/detect_integration_test",
+        binary: "bin/diagnostics_detect_test_cases_bin",
     },
     use: [
-        { protocol: "fuchsia.diagnostics.test.RealmFactory" },
+        { protocol: "test.detect.factory.RealmFactory" },
     ],
 }

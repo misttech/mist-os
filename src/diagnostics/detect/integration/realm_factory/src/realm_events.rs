@@ -4,7 +4,7 @@
 
 use {
     fidl::endpoints::{RequestStream, ServerEnd},
-    fidl_fuchsia_diagnostics_test::{TriageDetectEventsControlHandle, TriageDetectEventsMarker},
+    fidl_test_detect_factory::{TriageDetectEventsControlHandle, TriageDetectEventsMarker},
     tracing::error,
 };
 

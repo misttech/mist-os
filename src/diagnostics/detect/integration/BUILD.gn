@@ -2,73 +2,26 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# This directory was based on fuchsia-mirror/src/sys/component_manager/tests/utc-time/
-
-import("//build/component/config.gni")
 import("//build/components.gni")
-import("//build/fidl/fidl.gni")
-import("//build/rust/rustc_binary.gni")
 
-group("integration") {
-  testonly = true
-  deps = [ ":tests" ]
-}
-
+# The canonical "all tests" target.
 group("tests") {
   testonly = true
-  deps = [ ":detect-integration-test" ]
+  deps = [ ":pkg" ]
 }
 
-rustc_test("integration_test_bin") {
-  edition = "2021"
-  source_root = "integration_test.rs"
-  name = "detect_integration_test"
-  deps = [
-    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
-    "//src/diagnostics/detect/testing/fidl/fuchsia.diagnostics.test:fuchsia.diagnostics.test_rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/testing/realm_proxy/client",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:test-case",
-    "//third_party/rust_crates:tracing",
-  ]
-
-  sources = [
-    "integration_test.rs",
-    "test_filing_enable.rs",
-    "test_snapshot_sanitizing.rs",
-    "test_snapshot_throttle.rs",
-    "test_trigger_truth.rs",
-  ]
-}
-
-fuchsia_component("test-suite-component") {
+fuchsia_component("root") {
   testonly = true
-  component_name = "test-suite"
-  manifest = "meta/integration-test.cml"
-  deps = [ ":integration_test_bin" ]
+  manifest = "meta/root.cml"
 }
 
-fuchsia_package("test-suite") {
-  testonly = true
-  deps = [ ":test-suite-component" ]
-}
-
-fuchsia_component("test-root") {
-  testonly = true
-  manifest = "meta/test-root.cml"
-  deps = [ ":integration_test_bin" ]
-}
-
-# Run with `fx test detect-integration-test`.
-fuchsia_test_package("detect-integration-test") {
-  test_components = [ ":test-root" ]
+# Run with `fx test detect_integration_test`.
+fuchsia_test_package("pkg") {
+  package_name = "detect_integration_test"
+  test_components = [ ":root" ]
+  deps = [ "//src/lib/fuchsia-component-test" ]
   subpackages = [
-    "//src/diagnostics/detect/testing/realm-factory:triage-detect-realm-factory",
-    ":test-suite",
+    "realm_factory:pkg",
+    "test_cases:pkg",
   ]
 }

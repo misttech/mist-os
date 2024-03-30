@@ -9,7 +9,7 @@ use crate::realm_factory::*;
 
 use {
     anyhow::{Error, Result},
-    fidl_fuchsia_diagnostics_test::*,
+    fidl_test_detect_factory::*,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     futures::{StreamExt, TryStreamExt},

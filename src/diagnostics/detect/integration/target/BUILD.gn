@@ -1,0 +1,38 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/config.gni")
+import("//build/rust/rustc_binary.gni")
+
+fuchsia_component_manifest("manifest") {
+  manifest = "//src/diagnostics/detect/meta/triage_detect.cml"
+  component_name = "target"
+}
+
+fuchsia_structured_config_values("configs") {
+  testonly = true
+  cm_label = ":manifest"
+  values_source = "configs/integration-test.json5"
+}
+
+fuchsia_structured_config_rust_lib("config-lib") {
+  testonly = true
+  cm_label = ":manifest"
+}
+
+fuchsia_component("component") {
+  testonly = true
+  cm_label = ":manifest"
+  deps = [ "//src/diagnostics/launcher:bin" ]
+}
+
+fuchsia_package("pkg") {
+  testonly = true
+  package_name = "diagnostics_detect_integration_target"
+  deps = [
+    ":component",
+    ":configs",
+  ]
+}

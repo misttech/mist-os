@@ -1,4 +1,4 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
@@ -8,30 +8,30 @@
     ],
     children: [
         {
-            name: "test_realm_factory",
-            url: "triage-detect-realm-factory#meta/realm-factory.cm",
+            name: "realm_factory",
+            url: "diagnostics_detect_realm_factory#meta/realm_factory.cm",
         },
         {
-            name: "test_suite",
-            url: "test-suite#meta/test-suite.cm",
+            name: "test_cases",
+            url: "diagnostics_detect_test_cases#meta/test_cases.cm",
         },
     ],
     offer: [
         {
-            protocol: "fuchsia.diagnostics.test.RealmFactory",
-            from: "#test_realm_factory",
-            to: "#test_suite",
+            protocol: "test.detect.factory.RealmFactory",
+            from: "#realm_factory",
+            to: "#test_cases",
         },
         {
             event_stream: [ "stopped" ],
             from: "parent",
-            to: [ "#test_realm_factory" ],
+            to: [ "#realm_factory" ],
         },
     ],
     expose: [
         {
             protocol: "fuchsia.test.Suite",
-            from: "#test_suite",
+            from: "#test_cases",
         },
     ],
 }

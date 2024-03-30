@@ -56,7 +56,7 @@ rustc_library("lib") {
 }
 
 fuchsia_component_manifest("triage-detect-manifest") {
-  manifest = "meta/triage-detect.cml"
+  manifest = "meta/triage_detect.cml"
   component_name = "triage-detect"
 }
 
@@ -65,23 +65,18 @@ fuchsia_structured_config_values("triage-detect-prod-config") {
   values_source = "configs/default.json5"
 }
 
-fuchsia_structured_config_values("triage-detect-test-config") {
-  cm_label = ":triage-detect-manifest"
-  values_source = "configs/integration-test.json5"
-}
-
 fuchsia_structured_config_rust_lib("triage-detect-config") {
   cm_label = ":triage-detect-manifest"
 }
 
-fuchsia_component("triage-detect-component") {
+fuchsia_component("component") {
   cm_label = ":triage-detect-manifest"
   deps = [ "//src/diagnostics/launcher:bin" ]
 }
 
 fuchsia_package("triage-detect") {
   deps = [
-    ":triage-detect-component",
+    ":component",
     ":triage-detect-prod-config",
   ]
 }
@@ -104,6 +99,6 @@ group("tests") {
   testonly = true
   deps = [
     ":triage-detect-tests",
-    "//src/diagnostics/detect/integration",
+    "//src/diagnostics/detect/integration:tests",
   ]
 }

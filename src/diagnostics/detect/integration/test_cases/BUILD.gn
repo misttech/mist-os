@@ -1,0 +1,56 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/component/config.gni")
+import("//build/components.gni")
+import("//build/fidl/fidl.gni")
+import("//build/rust/rustc_binary.gni")
+
+group("tests") {
+  testonly = true
+
+  # No unit tests here. Integration test enters at this file's package.
+  deps = [ ":pkg" ]
+}
+
+rustc_test("bin") {
+  testonly = true
+  edition = "2021"
+  source_root = "src/main.rs"
+  name = "diagnostics_detect_test_cases_bin"
+  deps = [
+    "../realm_factory/fidl/test.detect.factory:fidl_rust",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/testing/realm_proxy/client",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:test-case",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  sources = [
+    "src/main.rs",
+    "src/test_filing_enable.rs",
+    "src/test_snapshot_sanitizing.rs",
+    "src/test_snapshot_throttle.rs",
+    "src/test_trigger_truth.rs",
+  ]
+}
+
+fuchsia_component("component") {
+  testonly = true
+  component_name = "test_cases"
+  manifest = "meta/test_cases.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("pkg") {
+  testonly = true
+  package_name = "diagnostics_detect_test_cases"
+  deps = [ ":component" ]
+}

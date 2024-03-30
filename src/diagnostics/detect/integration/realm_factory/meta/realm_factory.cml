@@ -10,10 +10,10 @@
     ],
     program: {
         runner: "elf",
-        binary: "bin/triage_detect_realm_factory",
+        binary: "bin/diagnostics_detect_realm_factory_bin",
     },
     capabilities: [
-        { protocol: "fuchsia.diagnostics.test.RealmFactory" },
+        { protocol: "test.detect.factory.RealmFactory" },
     ],
     use: [
         {
@@ -23,7 +23,7 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.diagnostics.test.RealmFactory",
+            protocol: "test.detect.factory.RealmFactory",
             from: "self",
         },
     ],

@@ -7,7 +7,7 @@ import("//build/rust/rustc_binary.gni")
 rustc_binary("bin") {
   testonly = true
   edition = "2021"
-  name = "triage_detect_realm_factory"
+  name = "diagnostics_detect_realm_factory_bin"
   sources = [
     "src/main.rs",
     "src/realm_events.rs",
@@ -15,10 +15,10 @@ rustc_binary("bin") {
     "src/realm_options.rs",
   ]
   deps = [
+    "fidl/test.detect.factory:fidl_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/diagnostics/detect/testing/fidl/fuchsia.diagnostics.test:fuchsia.diagnostics.test_rust",
     "//src/lib/diagnostics/testing/fake-archive-accessor",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fidl_server",
@@ -37,18 +37,16 @@ rustc_binary("bin") {
   ]
 }
 
-fuchsia_component("realm-factory-component") {
+fuchsia_component("component") {
+  component_name = "realm_factory"
   testonly = true
-  component_name = "realm-factory"
-  manifest = "meta/realm-factory.cml"
+  manifest = "meta/realm_factory.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_package("triage-detect-realm-factory") {
+fuchsia_package("pkg") {
+  package_name = "diagnostics_detect_realm_factory"
   testonly = true
-  deps = [
-    ":realm-factory-component",
-    "//src/diagnostics/detect:triage-detect-component",
-    "//src/diagnostics/detect:triage-detect-test-config",
-  ]
+  deps = [ ":component" ]
+  subpackages = [ "../target:pkg" ]
 }

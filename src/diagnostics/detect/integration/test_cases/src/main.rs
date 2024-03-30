@@ -20,8 +20,8 @@
  *  not matter, but duplicates do matter.
  */
 use {
-    anyhow::Error, fidl::endpoints::create_endpoints, fidl_fuchsia_diagnostics_test as ftest,
-    fidl_fuchsia_testing_harness::RealmProxy_Marker,
+    anyhow::Error, fidl::endpoints::create_endpoints,
+    fidl_fuchsia_testing_harness::RealmProxy_Marker, fidl_test_detect_factory as ftest,
     fuchsia_component::client::connect_to_protocol, fuchsia_zircon as zx, futures::StreamExt,
     realm_proxy_client::Error::OperationError, std::cmp::Ordering, test_case::test_case,
     tracing::*,
