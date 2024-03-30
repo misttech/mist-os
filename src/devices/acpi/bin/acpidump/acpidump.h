@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_ACPIDUMP_ACPIDUMP_H_
-#define SRC_DEVICES_BIN_ACPIDUMP_ACPIDUMP_H_
+#ifndef SRC_DEVICES_ACPI_BIN_ACPIDUMP_ACPIDUMP_H_
+#define SRC_DEVICES_ACPI_BIN_ACPIDUMP_ACPIDUMP_H_
 
 #include <lib/stdcompat/span.h>
 
@@ -42,4 +42,4 @@ int Main(int argc, const char** argv);
 
 }  // namespace acpidump
 
-#endif  // SRC_DEVICES_BIN_ACPIDUMP_ACPIDUMP_H_
+#endif  // SRC_DEVICES_ACPI_BIN_ACPIDUMP_ACPIDUMP_H_

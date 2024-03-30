@@ -349,7 +349,7 @@ assembly_input_bundle("bootstrap_eng") {
   testonly = true
   bootfs_files_labels = [
     # tools
-    "//src/devices/bin/acpidump:bootfs",
+    "//src/devices/acpi/bin/acpidump:bootfs",
     "//src/devices/bin/driver_tools:bootfs",
     "//src/devices/bin/lsdev:bootfs",
     "//src/devices/block/bin/biotime:bootfs",
