@@ -7,6 +7,7 @@ use anyhow::{anyhow, Result};
 use argh::{ArgsInfo, FromArgs};
 use async_fs as afs;
 use async_trait::async_trait;
+use crossterm::tty::IsTty;
 use errors::ffx_bail;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::Proxy;
@@ -20,7 +21,7 @@ use futures::AsyncReadExt;
 use playground::interpreter::Interpreter;
 use playground::value::Value;
 use std::fs::File;
-use std::io::{self, BufRead as _, BufReader};
+use std::io::{self, stdin, BufRead as _, BufReader};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use vfs::directory::helper::DirectlyMutable;
@@ -67,6 +68,14 @@ pub async fn exec_playground(
     remote_proxy: rc::RemoteControlProxy,
     command: PlaygroundCommand,
 ) -> Result<()> {
+    if !stdin().is_tty() {
+        ffx_bail!("Playground must be used from a real TTY.\n\
+                   Playground is not stable enough for automation tasks, \
+                     and is not designed to be suitable for them.\n\
+                   If you'd like to do extensive scripting, consider Fuchsia Controller instead.\n\
+                   https://fuchsia.dev/fuchsia-src/development/tools/fuchsia-controller/getting-started-in-tree");
+    }
+
     let mut lib_namespace = lib::Namespace::new();
 
     let Ok(fuchsia_dir) = std::env::var("FUCHSIA_DIR") else {
