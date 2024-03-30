@@ -1,6 +1,8 @@
 # Copyright 2020 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
+import("//build/compiled_action.gni")
 import("//build/testing/test_spec.gni")
 import("fuchsia_package.gni")
 import("fuchsia_test_component.gni")
@@ -115,10 +117,15 @@ template("fuchsia_test_package") {
       _validate_structured_config = invoker.validate_structured_config
     }
 
-    host_executable = "$root_out_dir/host_test_component"
+    host_test_component_target =
+        "//tools/host_test_component:test_deps($host_toolchain)"
+    host_tool_dir = get_label_info(host_test_component_target, "root_out_dir")
+    host_executable = "$host_tool_dir/host_test_component"
     host_executable_rebased = rebase_path(host_executable, root_build_dir)
 
-    test_pilot_executable = "$root_out_dir/test_pilot"
+    test_pilot_target = "//tools/test_pilot:test_deps($host_toolchain)"
+    test_pilot_dir = get_label_info(test_pilot_target, "root_out_dir")
+    test_pilot_executable = "$test_pilot_dir/test_pilot"
     test_pilot_executable_rebased =
         rebase_path(test_pilot_executable, root_build_dir)
 
@@ -130,17 +137,16 @@ template("fuchsia_test_package") {
       manifest_name = get_target_outputs(test)
       manifest_name = get_path_info(manifest_name[0], "file")
 
-      action("${test_target}_script_gen") {
-        script = "//build/components/test_component_executable_generator.py"
-        inputs = [ "//build/components/test_component_executable_generator.py" ]
-
+      compiled_action("${test_target}_script_gen") {
+        testonly = true
+        tool = "//build/components:test_component_host_helper"
         outputs = [ "${root_out_dir}/${package_name}_${manifest_name}_test.sh" ]
         args = [
           "--bin_path",
           host_executable_rebased,
           "--test_pilot",
           test_pilot_executable_rebased,
-          "--output_filename",
+          "--script_output_filename",
           rebase_path(outputs[0], root_build_dir),
         ]
       }
@@ -152,8 +158,8 @@ template("fuchsia_test_package") {
         data_deps = [
           ":${test_target}_script_gen",
           "//src/developer/ffx:test_data($host_toolchain)",
-          "//tools/host_test_component:test_deps($host_toolchain)",
-          "//tools/test_pilot:test_deps($host_toolchain)",
+          host_test_component_target,
+          test_pilot_target,
         ]
         metadata = {
           test_runtime_deps = [ script_outputs[0] ]
