@@ -8,6 +8,9 @@
                 source_name: "fuchsia.boot.RootResource",
                 capability: "protocol",
                 target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console-launcher",
+
                     // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",

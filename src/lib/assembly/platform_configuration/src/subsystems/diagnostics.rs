@@ -34,9 +34,14 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         diagnostics_config: &DiagnosticsConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        // Unconditionally include console AIB for now. In the future, we may add an option to
-        // disable this.
-        builder.platform_bundle("console");
+        match context.build_type {
+            BuildType::Eng | BuildType::UserDebug => {
+                builder.platform_bundle("console_userdebug");
+            }
+            BuildType::User => {
+                builder.platform_bundle("console_user");
+            }
+        }
 
         let DiagnosticsConfig {
             archivist,

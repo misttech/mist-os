@@ -16,11 +16,7 @@
                 source: "component",
                 source_name: "fuchsia.boot.RootResource",
                 capability: "protocol",
-                target_monikers: [
-                    "/bootstrap",
-                    "/bootstrap/console-launcher",
-                    "/bootstrap/netsvc",
-                ],
+                target_monikers: [],
             },
             {
                 source_moniker: "<component_manager>",

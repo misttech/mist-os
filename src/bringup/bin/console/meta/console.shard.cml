@@ -38,7 +38,6 @@
                 "fuchsia.boot.FactoryItems",
                 "fuchsia.boot.Items",
                 "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.exception.Handler",
                 "fuchsia.kernel.RootJob",

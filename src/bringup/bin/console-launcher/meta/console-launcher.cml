@@ -73,7 +73,6 @@
                 "fuchsia.boot.FactoryItems",
                 "fuchsia.boot.Items",
                 "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.ArchiveAccessor",
@@ -153,6 +152,12 @@
 
             // The source of this protocol, virtual-console,
             // may not be available on all products.
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.boot.RootResource",
+
+            // This is not available on user builds.
             availability: "optional",
         },
     ],

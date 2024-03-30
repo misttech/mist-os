@@ -44,6 +44,8 @@
                 source_name: "fuchsia.boot.RootResource",
                 capability: "protocol",
                 target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console-launcher",
                     "/core/test_manager/system-tests:**",
                     "/core/testing/vfs-compliance-tests:**",
 

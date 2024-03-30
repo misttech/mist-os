@@ -19,7 +19,7 @@ bootstrap_user_platform_aib_names = [
   "bootstrap",
 
   # Diagnostics
-  "console",
+  "console_user",
 
   # Driver Framework
   "driver_framework",
@@ -67,6 +67,7 @@ bootstrap_userdebug_platform_aib_names = [
   "bootstrap_userdebug",
 
   "clock_development_tools",
+  "console_userdebug",
 
   # Kernel args
   "kernel_args_eng",
