@@ -179,12 +179,16 @@ class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory:
   // .dwo files are separate per-source symbols that are referenced by the main binary. Populated
   // by CreateIndex(). The dwo_skeleton_offset_to_index_ maps the SkeletonUnit's skeleton_die_offset
   // to the index of the DWO in the dwos_ array.
+  //
+  // DwoInfo pointers MAY BE NULL if the .dwo file could not be loaded.
   std::vector<std::unique_ptr<DwoInfo>> dwos_;
   std::unordered_map<uint64_t, size_t> dwo_skeleton_offset_to_index_;
 
   std::string build_dir_;
 
-  Index index_;
+  // Guaranteed non-null. This is a unique pointer to allow us to move it despite the Index object
+  // being non-moveable.
+  std::unique_ptr<Index> index_;
 
   // Maps the mangled symbol name to the elf symbol record. There can technically be more than
   // one entry for a name.

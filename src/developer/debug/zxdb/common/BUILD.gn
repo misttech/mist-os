@@ -26,6 +26,7 @@ static_library("common") {
     "string_util.h",
     "tagged_data.h",
     "tagged_data_builder.h",
+    "worker_pool.h",
   ]
 
   sources = [
@@ -43,6 +44,7 @@ static_library("common") {
     "string_util.cc",
     "tagged_data.cc",
     "tagged_data_builder.cc",
+    "worker_pool.cc",
   ]
 
   public_deps = [

@@ -33,6 +33,7 @@
 #include "src/developer/debug/zxdb/symbols/line_details.h"
 #include "src/developer/debug/zxdb/symbols/line_table_impl.h"
 #include "src/developer/debug/zxdb/symbols/location.h"
+#include "src/developer/debug/zxdb/symbols/module_indexer.h"
 #include "src/developer/debug/zxdb/symbols/resolve_options.h"
 #include "src/developer/debug/zxdb/symbols/symbol_context.h"
 #include "src/developer/debug/zxdb/symbols/symbol_data_provider.h"
@@ -153,6 +154,7 @@ ModuleSymbolsImpl::ModuleSymbolsImpl(std::unique_ptr<DwarfBinaryImpl> binary,
                                      const std::string& build_dir)
     : binary_(std::move(binary)),
       build_dir_(build_dir),
+      index_(std::make_unique<Index>()),  // Placeholder empty index so this is never null.
       weak_factory_(this),
       symbol_weak_factory_(this) {}
 
@@ -181,8 +183,8 @@ ModuleSymbolStatus ModuleSymbolsImpl::GetStatus() const {
   status.build_id = binary_->GetBuildID();
   status.base = 0;               // We don't know this, only ProcessSymbols does.
   status.symbols_loaded = true;  // Since this instance exists at all.
-  status.functions_indexed = index_.CountSymbolsIndexed();
-  status.files_indexed = index_.files_indexed();
+  status.functions_indexed = index_->CountSymbolsIndexed();
+  status.files_indexed = index_->files_indexed();
   status.symbol_file = binary_->GetName();
   return status;
 }
@@ -223,11 +225,15 @@ ModuleSymbols::FoundUnit ModuleSymbolsImpl::GetDwarfUnitForAddress(
 
   result.main_binary_unit =
       binary_->UnitForRelativeAddress(symbol_context.AbsoluteToRelative(absolute_address));
+
+  // Default to assuming the units are the same (simplifying the early returns later). This will be
+  // overwritten if a different details unit is found.
+  result.details_unit = result.main_binary_unit;
+
   // The dwos_.empty() check is an optimization to avoid checking the skeleton units when we know
   // there are none.
   if (!result.main_binary_unit || dwos_.empty()) {
     // The result should either be both null pointers, or both the valid non-DWO unit.
-    result.details_unit = result.main_binary_unit;
     return result;
   }
 
@@ -236,7 +242,6 @@ ModuleSymbols::FoundUnit ModuleSymbolsImpl::GetDwarfUnitForAddress(
   llvm::DWARFDie llvm_die = result.main_binary_unit->GetUnitDie();
   if (static_cast<int>(llvm_die.getTag()) != static_cast<int>(DwarfTag::kSkeletonUnit)) {
     // Not a skeleton unit.
-    result.details_unit = result.main_binary_unit;
     return result;
   }
 
@@ -245,11 +250,14 @@ ModuleSymbols::FoundUnit ModuleSymbolsImpl::GetDwarfUnitForAddress(
   auto found_skeleton_index = dwo_skeleton_offset_to_index_.find(skeleton_offset);
   if (found_skeleton_index == dwo_skeleton_offset_to_index_.end()) {
     // Some invalid DWO reference, give up and return the skeleton one.
-    result.details_unit = result.main_binary_unit;
     return result;
   }
 
   FX_CHECK(found_skeleton_index->second < dwos_.size());
+  if (!dwos_[found_skeleton_index->second]) {
+    // Invalid DWO reference.
+    return result;
+  }
   result.details_unit = dwos_[found_skeleton_index->second]->binary()->GetDwoUnit();
   return result;
 }
@@ -338,14 +346,14 @@ std::vector<std::string> ModuleSymbolsImpl::FindFileMatches(std::string_view nam
   // If both build_dir_ and name are absolute, convert it to a relative path against build_dir_
   // because the paths in the index are relative.
   if (!build_dir_.empty() && build_dir_[0] == '/' && name[0] == '/') {
-    return index_.FindFileMatches(PathRelativeTo(name, build_dir_).string());
+    return index_->FindFileMatches(PathRelativeTo(name, build_dir_).string());
   }
-  return index_.FindFileMatches(name);
+  return index_->FindFileMatches(name);
 }
 
 std::vector<fxl::RefPtr<Function>> ModuleSymbolsImpl::GetMainFunctions() const {
   std::vector<fxl::RefPtr<Function>> result;
-  for (const auto& ref : index_.main_functions()) {
+  for (const auto& ref : index_->main_functions()) {
     auto symbol_ref = IndexSymbolRefToSymbol(ref);
     const Function* func = symbol_ref.Get()->As<Function>();
     if (func)
@@ -354,7 +362,7 @@ std::vector<fxl::RefPtr<Function>> ModuleSymbolsImpl::GetMainFunctions() const {
   return result;
 }
 
-const Index& ModuleSymbolsImpl::GetIndex() const { return index_; }
+const Index& ModuleSymbolsImpl::GetIndex() const { return *index_; }
 
 LazySymbol ModuleSymbolsImpl::IndexSymbolRefToSymbol(const IndexNode::SymbolRef& ref) const {
   // TODO(bug 53091) in the future we may want to add ELF symbol support here.
@@ -369,6 +377,11 @@ LazySymbol ModuleSymbolsImpl::IndexSymbolRefToSymbol(const IndexNode::SymbolRef&
       } else {
         // The dwo_index is set: it is a reference into our dwos_ array.
         FX_CHECK(ref.dwo_index() >= 0 && ref.dwo_index() < static_cast<int32_t>(dwos_.size()));
+
+        // The pointers in the dwos_ array may be null. But if the .dwo file could not be loaded, we
+        // shouldn't have any index references into it. So all input .dwo indices should be valid
+        // pointers.
+        FX_CHECK(dwos_[ref.dwo_index()]);
         return dwos_[ref.dwo_index()]->symbol_factory()->MakeLazy(ref.offset());
       }
   }
@@ -463,7 +476,7 @@ std::vector<Location> ModuleSymbolsImpl::ResolveSymbolInputLocation(
   // TODO(bug 37654) it would be nice if this could be deleted and all code go through
   // expr/find_name.h to query the index. As-is this duplicates some of FindName's logic in a less
   // flexible way.
-  for (const auto& ref : index_.FindExact(symbol_to_find)) {
+  for (const auto& ref : index_->FindExact(symbol_to_find)) {
     LazySymbol lazy_symbol = IndexSymbolRefToSymbol(ref);
     const Symbol* symbol = lazy_symbol.Get();
 
@@ -747,7 +760,7 @@ void ModuleSymbolsImpl::ResolveLineInputLocationForFile(const SymbolContext& sym
                                                         int line_number,
                                                         const ResolveOptions& options,
                                                         std::vector<Location>* output) const {
-  const std::vector<UnitIndex>* units = index_.FindFileUnitIndices(canonical_file);
+  const std::vector<UnitIndex>* units = index_->FindFileUnitIndices(canonical_file);
   if (!units)
     return;
 
@@ -865,44 +878,16 @@ void ModuleSymbolsImpl::CreateIndex() {
   //
   // Although it will be slightly slower to create, the memory savings may make such a change
   // worth it for large programs.
-  index_.CreateIndex(*binary_, IndexNode::SymbolRef::kMainBinary);
-
-  // Index any referenced .dwo files.
-  dwos_.reserve(index_.dwo_refs().size());
-  for (const SkeletonUnit& skeleton : index_.dwo_refs()) {
-    // By default, the compiler will embed absolute paths to DWO files. Some builds like ours use
-    // relative ones so that symbol files are computer-independent.
-    std::filesystem::path dwo_path;
-    std::filesystem::path comp_dir = skeleton.comp_dir;
-    if (comp_dir.is_absolute()) {
-      dwo_path = comp_dir / skeleton.dwo_name;
-    } else {
-      // When the compilation directories are relative, use our notion of the build dir as the
-      // "current directory."
-      dwo_path = std::filesystem::path(build_dir_) / comp_dir / skeleton.dwo_name;
-    }
-
-    auto dwo_info = std::make_unique<DwoInfo>(skeleton, GetWeakPtr());
-    if (Err err = dwo_info->Load(dwo_path.string(), dwo_path.string()); err.has_error()) {
-      // TODO(brettw) have a better way to report this error/warning to the frontend.
-      fprintf(stderr, "Can't load DWO binary %s\n", dwo_path.c_str());
-      continue;
-    }
-
-    // TODO(brettw) this is great opportunity for parallelizing symbol loading. Creating the index
-    // for each .dwo file can be done in a thread pool since they're independent, and only the final
-    // merging needs to be done back on the main thread.
-    Index dwo_index;
-    dwo_index.CreateIndex(*dwo_info->binary(), static_cast<int32_t>(dwos_.size()));
-    index_.root().MergeFrom(dwo_index.root());
-
-    dwos_.push_back(std::move(dwo_info));
-  }
+  ModuleIndexerResult result = IndexModule(GetWeakPtr(), *binary_, build_dir_);
+  index_ = std::move(result.index);
+  dwos_ = std::move(result.dwo_info);
 
   // Index the DWOs array by skeleton die offset.
   dwo_skeleton_offset_to_index_.reserve(dwos_.size());
   for (size_t i = 0; i < dwos_.size(); i++) {
-    dwo_skeleton_offset_to_index_[dwos_[i]->skeleton().skeleton_die_offset] = i;
+    if (dwos_[i]) {
+      dwo_skeleton_offset_to_index_[dwos_[i]->skeleton().skeleton_die_offset] = i;
+    }
   }
 }
 

@@ -129,7 +129,9 @@ class Index {
   // attribute. Normally there will be 0 (not all compiler annotate this) or 1.
   std::vector<IndexNode::SymbolRef> main_functions_;
 
-  FXL_DISALLOW_COPY_AND_ASSIGN(Index);
+  // The file name index stores iterators into the files_ map which will be invalidated if this
+  // class is moved.
+  FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(Index);
 };
 
 }  // namespace zxdb

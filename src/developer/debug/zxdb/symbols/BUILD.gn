@@ -140,6 +140,8 @@ static_library("symbols") {
     "location.cc",
     "member_ptr.cc",
     "modified_type.cc",
+    "module_indexer.cc",
+    "module_indexer.h",
     "module_symbols.cc",
     "module_symbols_impl.cc",
     "module_symbols_impl.h",
