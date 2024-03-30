@@ -304,7 +304,7 @@ class Device : public std::enable_shared_from_this<Device> {
   FidlErrorHandler<fuchsia_hardware_audio::StreamConfig> stream_config_handler_;
 
   // Members related to driver RingBuffer.
-  fidl::Client<fuchsia_hardware_audio::RingBuffer> ring_buffer_client_;
+  std::optional<fidl::Client<fuchsia_hardware_audio::RingBuffer>> ring_buffer_client_;
   FidlErrorHandler<fuchsia_hardware_audio::RingBuffer> ring_buffer_handler_;
 
   fit::callback<void(RingBufferInfo)> create_ring_buffer_callback_;

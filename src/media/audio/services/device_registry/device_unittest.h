@@ -330,7 +330,7 @@ class StreamConfigTest : public DeviceTestBase {
         }},
     }}));
     RunLoopUntilIdle();
-    EXPECT_TRUE(device->ring_buffer_client_.is_valid());
+    EXPECT_TRUE(device->ring_buffer_client_.has_value() && device->ring_buffer_client_->is_valid());
   }
 
   void GetRingBufferProperties(std::shared_ptr<Device> device) {

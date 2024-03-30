@@ -342,6 +342,9 @@ bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
   for (auto weak_obs = observers_.begin(); weak_obs < observers_.end(); ++weak_obs) {
     if (auto observer = weak_obs->lock(); observer) {
       if (observer == observer_to_add) {
+        // Because observers are not explicitly dropped (they are weakly held and allowed to
+        // self-invalidate), this can occur if a Control is dropped then immediately readded.
+        // This is OK because the outcome is ultimately correct (it is still in the vector).
         FX_LOGS(WARNING) << "Device(" << this << ")::AddObserver: observer cannot be re-added";
         return false;
       }
@@ -390,25 +393,41 @@ void Device::DeviceDroppedRingBuffer() {
 void Device::DropRingBuffer() {
   ADR_LOG_METHOD(kLogDeviceState);
 
-  // If we've already cleaned out any state with the underlying driver RingBuffer, then we're done.
-  if (!ring_buffer_client_.is_valid()) {
-    return;
-  }
-
   if (state_ != State::Error) {
     SetState(State::DeviceInitialized);
   }
 
-  start_time_.reset();  // We are not started.
+  // If we've already cleaned out any state with the underlying driver RingBuffer, then we're done.
+  if (!ring_buffer_client_.has_value() || !ring_buffer_client_->is_valid()) {
+    return;
+  }
 
-  delay_info_.reset();  // We are not paused.
-  num_ring_buffer_frames_.reset();
-  ring_buffer_properties_.reset();
+  // Revert all configuration state related to the ring buffer.
+  //
+  start_time_.reset();  // Pause, if we are started.
 
-  driver_format_.reset();  // We are not configured.
+  requested_ring_buffer_bytes_.reset();  // User must call CreateRingBuffer again, leading to ...
+  create_ring_buffer_callback_ = nullptr;
+
+  driver_format_.reset();  // ... our re-calling ConnectToRingBufferFidl ...
+  vmo_format_ = {};
+  num_ring_buffer_frames_.reset();  // ... and GetVmo ...
+  ring_buffer_vmo_.reset();
+
+  ring_buffer_properties_.reset();  // ... and GetProperties ...
+
+  delay_info_.reset();   // ... and WatchDelayInfo ...
+  bytes_per_frame_ = 0;  // (.. which calls CalculateRequiredRingBufferSizes ...)
+  requested_ring_buffer_frames_ = 0u;
+  ring_buffer_producer_bytes_ = 0;
+  ring_buffer_consumer_bytes_ = 0;
+
+  active_channels_bitmask_ = 0;  // ... and SetActiveChannels.
+  active_channels_set_time_.reset();
 
   // Clear our FIDL connection to the driver RingBuffer.
-  (void)ring_buffer_client_.UnbindMaybeGetEndpoint();
+  (void)ring_buffer_client_->UnbindMaybeGetEndpoint();
+  ring_buffer_client_.reset();
 }
 
 void Device::SetError(zx_status_t error) {
@@ -1444,7 +1463,8 @@ bool Device::ConnectRingBufferFidl(fuchsia_hardware_audio::Format driver_format)
     return false;
   }
 
-  ring_buffer_client_.Bind(std::move(endpoints->client), dispatcher_, &ring_buffer_handler_);
+  ring_buffer_client_.emplace();
+  ring_buffer_client_->Bind(std::move(endpoints->client), dispatcher_, &ring_buffer_handler_);
 
   std::optional<fuchsia_audio::SampleType> sample_type;
   if (bytes_per_sample == 1 &&
@@ -1495,9 +1515,11 @@ bool Device::ConnectRingBufferFidl(fuchsia_hardware_audio::Format driver_format)
 
 void Device::RetrieveRingBufferProperties() {
   ADR_LOG_METHOD(kLogRingBufferMethods || kLogRingBufferFidlCalls);
+  FX_CHECK(ring_buffer_client_.has_value() && ring_buffer_client_->is_valid());
 
-  ring_buffer_client_->GetProperties().Then(
-      [this](fidl::Result<fuchsia_hardware_audio::RingBuffer::GetProperties>& result) {
+  (*ring_buffer_client_)
+      ->GetProperties()
+      .Then([this](fidl::Result<fuchsia_hardware_audio::RingBuffer::GetProperties>& result) {
         if (LogResultFrameworkError(result, "RingBuffer/GetProperties response")) {
           return;
         }
@@ -1517,10 +1539,11 @@ void Device::RetrieveRingBufferProperties() {
 
 void Device::RetrieveDelayInfo() {
   ADR_LOG_METHOD(kLogRingBufferMethods || kLogRingBufferFidlCalls);
-  FX_CHECK(ring_buffer_client_.is_valid());
+  FX_CHECK(ring_buffer_client_.has_value() && ring_buffer_client_->is_valid());
 
-  ring_buffer_client_->WatchDelayInfo().Then(
-      [this](fidl::Result<fuchsia_hardware_audio::RingBuffer::WatchDelayInfo>& result) {
+  (*ring_buffer_client_)
+      ->WatchDelayInfo()
+      .Then([this](fidl::Result<fuchsia_hardware_audio::RingBuffer::WatchDelayInfo>& result) {
         if (LogResultFrameworkError(result, "RingBuffer/WatchDelayInfo response")) {
           return;
         }
@@ -1561,10 +1584,10 @@ void Device::RetrieveDelayInfo() {
 
 void Device::GetVmo(uint32_t min_frames, uint32_t position_notifications_per_ring) {
   ADR_LOG_METHOD(kLogRingBufferMethods || kLogRingBufferFidlCalls);
-  FX_CHECK(ring_buffer_client_.is_valid());
+  FX_CHECK(ring_buffer_client_.has_value() && ring_buffer_client_->is_valid());
   FX_CHECK(driver_format_);
 
-  ring_buffer_client_
+  (*ring_buffer_client_)
       ->GetVmo({{.min_frames = min_frames,
                  .clock_recovery_notifications_per_ring = position_notifications_per_ring}})
       .Then([this](fidl::Result<fuchsia_hardware_audio::RingBuffer::GetVmo>& result) {
@@ -1638,13 +1661,14 @@ void Device::SetActiveChannels(
     uint64_t channel_bitmask,
     fit::callback<void(zx::result<zx::time>)> set_active_channels_callback) {
   ADR_LOG_METHOD(kLogRingBufferFidlCalls);
-  FX_CHECK(ring_buffer_client_.is_valid());
+  FX_CHECK(ring_buffer_client_.has_value() && ring_buffer_client_->is_valid());
 
   // If we already know this device doesn't support SetActiveChannels, do nothing.
   if (!supports_set_active_channels_.value_or(true)) {
     return;
   }
-  ring_buffer_client_->SetActiveChannels({{.active_channels_bitmask = channel_bitmask}})
+  (*ring_buffer_client_)
+      ->SetActiveChannels({{.active_channels_bitmask = channel_bitmask}})
       .Then(
           [this, channel_bitmask, callback = std::move(set_active_channels_callback)](
               fidl::Result<fuchsia_hardware_audio::RingBuffer::SetActiveChannels>& result) mutable {
@@ -1674,11 +1698,12 @@ void Device::SetActiveChannels(
 
 void Device::StartRingBuffer(fit::callback<void(zx::result<zx::time>)> start_callback) {
   ADR_LOG_METHOD(kLogRingBufferFidlCalls);
-  FX_CHECK(ring_buffer_client_.is_valid());
+  FX_CHECK(ring_buffer_client_.has_value() && ring_buffer_client_->is_valid());
 
-  ring_buffer_client_->Start().Then(
-      [this, callback = std::move(start_callback)](
-          fidl::Result<fuchsia_hardware_audio::RingBuffer::Start>& result) mutable {
+  (*ring_buffer_client_)
+      ->Start()
+      .Then([this, callback = std::move(start_callback)](
+                fidl::Result<fuchsia_hardware_audio::RingBuffer::Start>& result) mutable {
         if (LogResultFrameworkError(result, "RingBuffer/Start response")) {
           callback(zx::error(ZX_ERR_INTERNAL));
           return;
@@ -1693,11 +1718,12 @@ void Device::StartRingBuffer(fit::callback<void(zx::result<zx::time>)> start_cal
 
 void Device::StopRingBuffer(fit::callback<void(zx_status_t)> stop_callback) {
   ADR_LOG_METHOD(kLogRingBufferFidlCalls);
-  FX_CHECK(ring_buffer_client_.is_valid());
+  FX_CHECK(ring_buffer_client_.has_value() && ring_buffer_client_->is_valid());
 
-  ring_buffer_client_->Stop().Then(
-      [this, callback = std::move(stop_callback)](
-          fidl::Result<fuchsia_hardware_audio::RingBuffer::Stop>& result) mutable {
+  (*ring_buffer_client_)
+      ->Stop()
+      .Then([this, callback = std::move(stop_callback)](
+                fidl::Result<fuchsia_hardware_audio::RingBuffer::Stop>& result) mutable {
         if (LogResultFrameworkError(result, "RingBuffer/Stop response")) {
           callback(ZX_ERR_INTERNAL);
           return;

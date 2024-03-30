@@ -35,6 +35,7 @@ FakeStreamConfig::FakeStreamConfig(zx::channel server_end, zx::channel client_en
 
 FakeStreamConfig::~FakeStreamConfig() {
   ADR_LOG_METHOD(kLogFakeStreamConfig || kLogObjectLifetimes);
+  DropStreamConfig();
 }
 
 fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> FakeStreamConfig::Enable() {
@@ -43,15 +44,20 @@ fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> FakeStreamConfig::Enable()
   EXPECT_FALSE(stream_config_binding_);
   stream_config_binding_.emplace(this, std::move(stream_config_server_end_), dispatcher_);
   EXPECT_TRUE(stream_config_binding_->is_bound());
+  stream_config_binding_->set_error_handler([this](zx_status_t status) { DropStreamConfig(); });
 
   return fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(
       std::move(stream_config_client_end_));
 }
 
 void FakeStreamConfig::DropStreamConfig() {
-  ADR_LOG_METHOD(kLogFakeStreamConfig);
+  if (stream_config_binding_.has_value()) {
+    ADR_LOG_METHOD(kLogFakeStreamConfig);
 
-  stream_config_binding_->Close(ZX_ERR_PEER_CLOSED);
+    DropRingBuffer();
+    stream_config_binding_->Close(ZX_ERR_PEER_CLOSED);
+    stream_config_binding_.reset();
+  }
 }
 
 void FakeStreamConfig::InjectGainChange(fuchsia_hardware_audio::GainState gain_state) {
@@ -91,9 +97,16 @@ void FakeStreamConfig::InjectUnpluggedAt(zx::time plug_time) {
 }
 
 void FakeStreamConfig::DropRingBuffer() {
-  ADR_LOG_METHOD(kLogFakeStreamConfig);
   if (ring_buffer_binding_) {
+    ADR_LOG_METHOD(kLogFakeStreamConfig);
+
     ring_buffer_binding_->Close(ZX_ERR_PEER_CLOSED);
+    is_running_ = false;
+    mono_start_time_ = zx::time(0);
+
+    delay_has_changed_ = true;
+    pending_delay_callback_ = nullptr;
+    ring_buffer_binding_.reset();
   }
 }
 
@@ -302,6 +315,7 @@ void FakeStreamConfig::CreateRingBuffer(
   ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   ring_buffer_binding_.emplace(this, ring_buffer_request.TakeChannel(), dispatcher_);
+  ring_buffer_binding_->set_error_handler([this](zx_status_t status) { DropRingBuffer(); });
   selected_format_ = format.pcm_format();
 
   active_channels_bitmask_ = (1 << selected_format_->number_of_channels) - 1;

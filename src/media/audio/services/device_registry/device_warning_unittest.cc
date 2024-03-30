@@ -427,4 +427,51 @@ TEST_F(StreamConfigWarningTest, CodecDeviceCallsFail) {
 
 // TODO(https://fxbug.dev/42069012): GetVmo size too large; min_frames too large
 
+// Validate that Device can reopen the driver's RingBuffer FIDL channel after closing it.
+//
+// We perform this positive test here because a potential race can produce a WARNING.
+// Controls are also Observers, and this test drops and then immediately re-adds a Control.
+// Observers are not explicitly dropped; they are weakly held and allowed to self-invalidate,
+// which may not occur before it is re-added, causing a WARNING.
+TEST_F(StreamConfigWarningTest, CreateRingBufferTwice) {
+  auto fake_stream_config = MakeFakeStreamConfigInput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  ASSERT_TRUE(InInitializedState(device));
+  fake_stream_config->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device));
+  auto connected_to_ring_buffer_fidl =
+      device->CreateRingBuffer(kDefaultRingBufferFormat, 2000, [](Device::RingBufferInfo info) {
+        EXPECT_TRUE(info.ring_buffer.buffer());
+        EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
+
+        EXPECT_TRUE(info.ring_buffer.format());
+        EXPECT_TRUE(info.ring_buffer.producer_bytes());
+        EXPECT_TRUE(info.ring_buffer.consumer_bytes());
+        EXPECT_TRUE(info.ring_buffer.reference_clock());
+      });
+  ASSERT_TRUE(connected_to_ring_buffer_fidl);
+  ExpectRingBufferReady(device);
+  StartAndExpectValid(device);
+  StopAndExpectValid(device);
+
+  device->DropRingBuffer();
+  ASSERT_TRUE(device->DropControl());
+
+  ASSERT_TRUE(SetControl(device));
+  auto reconnected_to_ring_buffer_fidl =
+      device->CreateRingBuffer(kDefaultRingBufferFormat, 2000, [](Device::RingBufferInfo info) {
+        EXPECT_TRUE(info.ring_buffer.buffer());
+        EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
+
+        EXPECT_TRUE(info.ring_buffer.format());
+        EXPECT_TRUE(info.ring_buffer.producer_bytes());
+        EXPECT_TRUE(info.ring_buffer.consumer_bytes());
+        EXPECT_TRUE(info.ring_buffer.reference_clock());
+      });
+  EXPECT_TRUE(reconnected_to_ring_buffer_fidl);
+  ExpectRingBufferReady(device);
+  StartAndExpectValid(device);
+  StopAndExpectValid(device);
+}
+
 }  // namespace media_audio
