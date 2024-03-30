@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 
 #include <memory>
 #include <optional>
@@ -44,6 +43,12 @@ inline void LogFidlClientError(fidl::UnbindInfo error, std::string tag = "") {
 // This provides shared unittest functions for AudioDeviceRegistry and the six FIDL server classes.
 class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
  protected:
+  // Create a FakeCodec that can mock a real device that has been detected, using default settings.
+  // From here, the fake Codec can be customized before it is enabled.
+  std::unique_ptr<FakeCodec> CreateFakeCodecInput() { return CreateFakeCodec(true); }
+  std::unique_ptr<FakeCodec> CreateFakeCodecOutput() { return CreateFakeCodec(false); }
+  std::unique_ptr<FakeCodec> CreateFakeCodecNoDirection() { return CreateFakeCodec(std::nullopt); }
+
   // Create a FakeStreamConfig that can mock a real device that has been detected, using default
   // settings. From here, the fake StreamConfig can be customized before it is enabled.
   std::unique_ptr<FakeStreamConfig> CreateFakeStreamConfigInput() {
@@ -52,12 +57,6 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   std::unique_ptr<FakeStreamConfig> CreateFakeStreamConfigOutput() {
     return CreateFakeStreamConfig(false);
   }
-
-  // Create a FakeCodec that can mock a real device that has been detected, using default settings.
-  // From here, the fake Codec can be customized before it is enabled.
-  std::unique_ptr<FakeCodec> CreateFakeCodecInput() { return CreateFakeCodec(true); }
-  std::unique_ptr<FakeCodec> CreateFakeCodecOutput() { return CreateFakeCodec(false); }
-  std::unique_ptr<FakeCodec> CreateFakeCodecNoDirection() { return CreateFakeCodec(std::nullopt); }
 
   // Device
   // Create a Device object (backed by a fake driver); insert it to ADR as if it had been detected.

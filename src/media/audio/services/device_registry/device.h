@@ -5,19 +5,14 @@
 #ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_H_
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_H_
 
-#include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.audio/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/client.h>
-#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fit/function.h>
-#include <lib/fit/internal/result.h>
-#include <lib/fit/result.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
-#include <zircon/errors.h>
 
 #include <cstdint>
 #include <memory>
@@ -120,6 +115,14 @@ class Device : public std::enable_shared_from_this<Device> {
   }
   bool codec_is_started() const { return codec_start_state_.started; }
 
+  bool has_codec_properties() const { return codec_properties_.has_value(); }
+  bool has_stream_config_properties() const { return stream_config_properties_.has_value(); }
+  bool has_health_state() const { return health_state_.has_value(); }
+  bool dai_format_sets_retrieved() const { return dai_format_sets_retrieved_; }
+  bool ring_buffer_format_sets_retrieved() const { return ring_buffer_format_sets_retrieved_; }
+  bool has_plug_state() const { return plug_state_.has_value(); }
+  bool has_gain_state() const { return gain_state_.has_value(); }
+
   // Static object counts, for debugging purposes.
   static inline uint64_t count() { return count_; }
   static inline uint64_t initialized_count() { return initialized_count_; }
@@ -147,15 +150,15 @@ class Device : public std::enable_shared_from_this<Device> {
   // confusion with the methods on StreamConfig or RingBuffer, which are generally 'Get...'.
   //
   void RetrieveStreamProperties();
-  void RetrieveInitialRingBufferFormatSets();
-  void RetrieveGainState();
-  void RetrieveStreamPlugState();
   void RetrieveStreamHealthState();
+  void RetrieveStreamRingBufferFormatSets();
+  void RetrieveStreamPlugState();
+  void RetrieveGainState();
 
   void RetrieveCodecProperties();
-  void RetrieveInitialDaiFormats();
-  void RetrieveCodecPlugState();
   void RetrieveCodecHealthState();
+  void RetrieveCodecDaiFormatSets();
+  void RetrieveCodecPlugState();
 
   bool IsFullyInitialized();
   void OnInitializationResponse();
@@ -263,6 +266,9 @@ class Device : public std::enable_shared_from_this<Device> {
 
   std::optional<fuchsia_hardware_audio::CodecProperties> codec_properties_;
   std::optional<std::vector<fuchsia_hardware_audio::DaiSupportedFormats>> dai_format_sets_;
+
+  bool dai_format_sets_retrieved_ = false;
+  bool ring_buffer_format_sets_retrieved_ = false;
 
   struct CodecFormat {
     fuchsia_hardware_audio::DaiFormat dai_format;

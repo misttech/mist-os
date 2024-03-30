@@ -72,9 +72,7 @@ bool ClientIsValidForDeviceType(const fuchsia_audio_device::DeviceType& device_t
 
 // Translate from fuchsia_hardware_audio::SupportedFormats to fuchsia_audio_device::PcmFormatSet.
 std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
-    std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
-  ADR_LOG(kLogDeviceMethods);
-
+    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
   // translated_ring_buffer_format_sets is more complex to copy, since fuchsia_audio_device defines
   // its tables from scratch instead of reusing types from fuchsia_hardware_audio. We build from the
   // inside-out: populating attributes then channel_sets then translated_ring_buffer_format_sets.
@@ -139,17 +137,18 @@ std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
       continue;
     }
 
-    // Construct frame_rates on-the-fly.
-    std::sort(pcm_formats.frame_rates()->begin(), pcm_formats.frame_rates()->end());
     if (pcm_formats.frame_rates()->empty()) {
       FX_LOGS(WARNING) << "Could not translate a format set - frame_rates was empty";
       continue;
     }
+    // Make a copy of the frame_rates result, so we can sort it.
+    std::vector<uint32_t> frame_rates = *pcm_formats.frame_rates();
+    std::sort(frame_rates.begin(), frame_rates.end());
 
     fuchsia_audio_device::PcmFormatSet pcm_format_set = {{
         .channel_sets = channel_sets,
         .sample_types = sample_types,
-        .frame_rates = *pcm_formats.frame_rates(),
+        .frame_rates = frame_rates,
     }};
     translated_ring_buffer_format_sets.emplace_back(pcm_format_set);
   }
@@ -167,6 +166,13 @@ zx_status_t ValidateStreamProperties(
       !stream_props.gain_step_db() || !stream_props.plug_detect_capabilities() ||
       !stream_props.clock_domain()) {
     FX_LOGS(WARNING) << "Incomplete StreamConfig/GetProperties response";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if ((stream_props.manufacturer().has_value() && stream_props.manufacturer()->empty()) ||
+      (stream_props.product().has_value() && stream_props.product()->empty())) {
+    FX_LOGS(WARNING) << __func__
+                     << ": manufacturer and product, if present, must not be empty strings";
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -409,6 +415,13 @@ zx_status_t ValidateCodecProperties(
     std::optional<const fuchsia_hardware_audio::PlugState> plug_state) {
   ADR_LOG(kLogDeviceMethods);
   LogCodecProperties(codec_props);
+
+  if ((codec_props.manufacturer().has_value() && codec_props.manufacturer()->empty()) ||
+      (codec_props.product().has_value() && codec_props.product()->empty())) {
+    FX_LOGS(WARNING) << __func__
+                     << ": manufacturer and product, if present, must not be empty strings";
+    return ZX_ERR_INVALID_ARGS;
+  }
 
   if (!codec_props.plug_detect_capabilities()) {
     FX_LOGS(WARNING) << "Incomplete Codec/GetProperties response";
@@ -682,22 +695,22 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
   LogDeviceInfo(device_info);
 
   // Validate top-level required members.
-  if (!device_info.token_id() || !device_info.device_type() || !device_info.device_name() ||
-      device_info.device_name()->empty()) {
-    FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance (baseline props)";
+  if (!device_info.token_id().has_value() || !device_info.device_type().has_value() ||
+      !device_info.device_name().has_value() || device_info.device_name()->empty()) {
+    FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance";
     return false;
   }
   // These strings must not be empty, if present.
-  if ((device_info.manufacturer() && device_info.manufacturer()->empty()) ||
-      (device_info.product() && device_info.product()->empty())) {
+  if ((device_info.manufacturer().has_value() && device_info.manufacturer()->empty()) ||
+      (device_info.product().has_value() && device_info.product()->empty())) {
     FX_LOGS(WARNING) << __func__
                      << ": manufacturer and product, if present, must not be empty strings";
     return false;
   }
   // These vectors must not be empty, if present.
-  if ((device_info.signal_processing_elements() &&
+  if ((device_info.signal_processing_elements().has_value() &&
        device_info.signal_processing_elements()->empty()) ||
-      (device_info.signal_processing_topologies() &&
+      (device_info.signal_processing_topologies().has_value() &&
        device_info.signal_processing_topologies()->empty())) {
     FX_LOGS(WARNING)
         << __func__
@@ -705,24 +718,29 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
     return false;
   }
   switch (*device_info.device_type()) {
-    case fuchsia_audio_device::DeviceType::kInput:
-    case fuchsia_audio_device::DeviceType::kOutput:
-      if (!device_info.is_input().has_value() || !device_info.gain_caps() ||
-          !device_info.ring_buffer_format_sets() ||
-          device_info.ring_buffer_format_sets()->empty() || !device_info.plug_detect_caps() ||
-          !device_info.clock_domain()) {
-        FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance (StreamConfig)";
+    case fuchsia_audio_device::DeviceType::kCodec:
+      if (!device_info.dai_format_sets().has_value() || device_info.dai_format_sets()->empty() ||
+          !device_info.plug_detect_caps().has_value()) {
+        FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance";
+        return false;
+      }
+      if (device_info.ring_buffer_format_sets().has_value() ||
+          device_info.gain_caps().has_value() || device_info.clock_domain().has_value()) {
+        FX_LOGS(WARNING) << __func__ << ": invalid DeviceInfo fields are populated";
         return false;
       }
       break;
-    case fuchsia_audio_device::DeviceType::kCodec:
-      if (!device_info.plug_detect_caps()) {
-        FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance (Codec)";
+    case fuchsia_audio_device::DeviceType::kInput:
+    case fuchsia_audio_device::DeviceType::kOutput:
+      if (!device_info.is_input().has_value() || !device_info.gain_caps().has_value() ||
+          !device_info.ring_buffer_format_sets().has_value() ||
+          device_info.ring_buffer_format_sets()->empty() ||
+          !device_info.plug_detect_caps().has_value() || !device_info.clock_domain().has_value()) {
+        FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance";
         return false;
       }
-      if (device_info.ring_buffer_format_sets() || device_info.gain_caps() ||
-          device_info.clock_domain()) {
-        FX_LOGS(WARNING) << __func__ << ": invalid DeviceInfo fields are populated (Codec)";
+      if (device_info.dai_format_sets().has_value()) {
+        FX_LOGS(WARNING) << __func__ << ": invalid DeviceInfo fields are populated";
         return false;
       }
       break;

@@ -183,6 +183,7 @@ source_set("unittest_base") {
     "common_unittest.cc",
     "common_unittest.h",
     "device_unittest.h",
+    "validate_unittest.h",
   ]
 
   public_deps = [

@@ -25,7 +25,7 @@ bool ClientIsValidForDeviceType(const fuchsia_audio_device::DeviceType& device_t
                                 const fuchsia_audio_device::DriverClient& driver_client);
 
 std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
-    std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
+    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
 
 zx_status_t ValidateStreamProperties(
     const fuchsia_hardware_audio::StreamProperties& stream_props,

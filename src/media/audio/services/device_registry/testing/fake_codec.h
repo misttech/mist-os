@@ -230,7 +230,7 @@ class FakeCodec : public fidl::testing::TestBase<CodecConnector>,
 
   std::optional<std::string> manufacturer_ = kDefaultManufacturer;
   std::optional<std::string> product_ = kDefaultProduct;
-  std::optional<UniqueId> uid_;  //= kDefaultUniqueInstanceId;
+  std::optional<UniqueId> uid_ = kDefaultUniqueInstanceId;
   std::optional<bool> is_input_ = kDefaultIsInput;
   std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities_ =
       kDefaultDriverPlugCaps;

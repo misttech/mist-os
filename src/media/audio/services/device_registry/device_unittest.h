@@ -25,11 +25,9 @@
 #include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
-#include "src/media/audio/services/device_registry/observer_notify.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
-#include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
 
@@ -94,17 +92,15 @@ class DeviceTestBase : public gtest::TestLoopFixture {
         const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) final {
       dai_format_error_.reset();
 
-      if (!dai_format.has_value()) {
-        FX_LOGS(INFO) << "DaiFormat was cleared";
-        dai_format_.reset();
-        codec_format_info_.reset();
-      } else {
-        FX_LOGS(INFO) << __func__;
+      if (dai_format.has_value()) {
         LogDaiFormat(dai_format);
         LogCodecFormatInfo(codec_format_info);
         FX_DCHECK(codec_format_info.has_value());
         dai_format_ = *dai_format;
         codec_format_info_ = codec_format_info;
+      } else {
+        dai_format_.reset();
+        codec_format_info_.reset();
       }
     }
     void DaiFormatNotSet(const fuchsia_hardware_audio::DaiFormat& dai_format,

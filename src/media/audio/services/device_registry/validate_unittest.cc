@@ -16,24 +16,47 @@
 
 #include <gtest/gtest.h>
 
+#include "src/media/audio/services/device_registry/validate_unittest.h"
+
 // These cases unittest the Validate... functions with inputs that cause INFO logging (if any).
 
 namespace media_audio {
 
-const std::vector<uint8_t> kChannels = {1, 8, 255};
-const std::vector<std::pair<uint8_t, fuchsia_hardware_audio::SampleFormat>> kFormats = {
-    {1, fuchsia_hardware_audio::SampleFormat::kPcmUnsigned},
-    {2, fuchsia_hardware_audio::SampleFormat::kPcmSigned},
-    {4, fuchsia_hardware_audio::SampleFormat::kPcmSigned},
-    {4, fuchsia_hardware_audio::SampleFormat::kPcmFloat},
-    {8, fuchsia_hardware_audio::SampleFormat::kPcmFloat},
-};
-const std::vector<uint32_t> kFrameRates = {1000, 44100, 48000, 19200};
+// Unittest ValidateCodecProperties -- the missing, minimal and maximal possibilities
+TEST(ValidateTest, ValidateCodecProperties) {
+  EXPECT_EQ(
+      ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
+          // is_input missing
+          .manufacturer = " ",  // minimal value (empty is disallowed)
+          .product =            // maximal value
+          "Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name extends to 321X",
+          // unique_id missing
+          .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
+      }}),
+      ZX_OK);
+  EXPECT_EQ(
+      ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
+          .is_input = false,
+          .manufacturer =  // maximal value
+          "Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long, which extends to... 321X",
+          // product missing
+          .unique_id = {{}},  // minimal value
+          .plug_detect_capabilities =
+              fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
+      }}),
+      ZX_OK);
+  EXPECT_EQ(ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
+                .is_input = true,
+                // manufacturer missing
+                .product = " ",  // minimal value (empty is disallowed)
+                .unique_id = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  //
+                               0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}},
+                .plug_detect_capabilities =
+                    fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
+            }}),
+            ZX_OK);
+}
 
-// TODO(https://fxbug.dev/42069012): Unittest TranslateRingBufferFormatSets
-// TEST(ValidateTest, TranslateRingBufferFormatSets) {}
-
-// Unittest ValidateStreamProperties
 TEST(ValidateTest, ValidateStreamProperties) {
   fuchsia_hardware_audio::StreamProperties stream_properties{{
       .is_input = false,
@@ -72,6 +95,8 @@ TEST(ValidateTest, ValidateStreamProperties) {
   EXPECT_EQ(ValidateStreamProperties(stream_properties, gain_state, plug_state), ZX_OK);
 }
 
+// TODO(https://fxbug.dev/42069012): Unittest ValidateDeviceInfo, incl. manuf & prod 256 chars long
+
 fuchsia_hardware_audio::SupportedFormats CompliantFormatSet() {
   return fuchsia_hardware_audio::SupportedFormats{{
       .pcm_supported_formats = fuchsia_hardware_audio::PcmSupportedFormats{{
@@ -93,7 +118,144 @@ fuchsia_hardware_audio::SupportedFormats CompliantFormatSet() {
   }};
 }
 
-// Unittest ValidateRingBufferFormatSets
+TEST(ValidateTest, ValidateRingBufferProperties) {
+  EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
+                .needs_cache_flush_or_invalidate = false,
+                .turn_on_delay = 125,
+                .driver_transfer_bytes = 32,
+            }}),
+            ZX_OK);
+
+  // TODO(b/311694769): Resolve driver_transfer_bytes lower limit: specifically is 0 allowed?
+  EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
+                .needs_cache_flush_or_invalidate = true,
+                .turn_on_delay = 0,  // can be zero
+                .driver_transfer_bytes = 1,
+            }}),
+            ZX_OK);
+
+  // TODO(b/311694769): Resolve driver_transfer_bytes upper limit: no limit? Soft guideline?
+  EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
+                .needs_cache_flush_or_invalidate = true,
+                // turn_on_delay (optional) is missing
+                .driver_transfer_bytes = 128,
+            }}),
+            ZX_OK);
+}
+
+TEST(ValidateTest, ValidateGainState) {
+  EXPECT_EQ(ValidateGainState(fuchsia_hardware_audio::GainState{{
+                // muted (optional) is missing: NOT muted
+                // agc_enabled (optional) is missing: NOT enabled
+                .gain_db = -42.0f,
+            }}),
+            // If StreamProperties is not provided, assume the device cannot mute or agc
+            ZX_OK);
+  EXPECT_EQ(
+      ValidateGainState(
+          fuchsia_hardware_audio::GainState{{
+              .muted = false,
+              .agc_enabled = false,
+              .gain_db = 0,
+          }},
+          std::nullopt  // If StreamProperties is not provided, assume the device cannot mute or agc
+          ),
+      ZX_OK);
+  EXPECT_EQ(ValidateGainState(fuchsia_hardware_audio::GainState{{
+                                  .muted = false,
+                                  .agc_enabled = true,
+                                  .gain_db = -12.0f,
+                              }},
+                              fuchsia_hardware_audio::StreamProperties{{
+                                  .is_input = false,
+                                  // can_mute (optional) is missing: device cannot mute
+                                  .can_agc = true,
+                                  .min_gain_db = -12.0f,
+                                  .max_gain_db = 12.0f,
+                                  .gain_step_db = 0.5f,
+                                  .plug_detect_capabilities =
+                                      fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
+                                  .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
+                              }}),
+            ZX_OK);
+  EXPECT_EQ(ValidateGainState(fuchsia_hardware_audio::GainState{{
+                                  .muted = true,
+                                  .agc_enabled = false,
+                                  .gain_db = -12.0f,
+                              }},
+                              fuchsia_hardware_audio::StreamProperties{{
+                                  .is_input = false,
+                                  .can_mute = true,
+                                  // can_agc (optional) is missing: device cannot agc
+                                  .min_gain_db = -24.0f,
+                                  .max_gain_db = -12.0f,
+                                  .gain_step_db = 2.0f,
+                                  .plug_detect_capabilities =
+                                      fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
+                                  .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
+                              }}),
+            ZX_OK);
+  EXPECT_EQ(ValidateGainState(fuchsia_hardware_audio::GainState{{
+                                  // muted (optional) is missing: NOT muted
+                                  .agc_enabled = false,
+                                  .gain_db = -12.0f,
+                              }},
+                              fuchsia_hardware_audio::StreamProperties{{
+                                  .is_input = false,
+                                  .can_mute = false,
+                                  .can_agc = true,
+                                  .min_gain_db = -12.0f,
+                                  .max_gain_db = 12.0f,
+                                  .gain_step_db = 0.5f,
+                                  .plug_detect_capabilities =
+                                      fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
+                                  .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
+                              }}),
+            ZX_OK);
+  EXPECT_EQ(ValidateGainState(fuchsia_hardware_audio::GainState{{
+                                  .muted = false,
+                                  // agc_enabled (optional) is missing: NOT enabled
+                                  .gain_db = -12.0f,
+                              }},
+                              fuchsia_hardware_audio::StreamProperties{{
+                                  .is_input = false,
+                                  .can_mute = true,
+                                  .can_agc = false,
+                                  .min_gain_db = -24.0f,
+                                  .max_gain_db = -12.0f,
+                                  .gain_step_db = 2.0f,
+                                  .plug_detect_capabilities =
+                                      fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
+                                  .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
+                              }}),
+            ZX_OK);
+}
+
+TEST(ValidateTest, ValidatePlugState) {
+  EXPECT_EQ(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
+                .plugged = true,
+                .plug_state_time = 0,
+            }}),
+            ZX_OK);
+  EXPECT_EQ(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
+                .plugged = false,
+                .plug_state_time = zx::clock::get_monotonic().get(),
+            }}),
+            ZX_OK);
+  EXPECT_EQ(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
+                                  .plugged = true,
+                                  .plug_state_time = zx::clock::get_monotonic().get(),
+                              }},
+                              fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired),
+            ZX_OK);
+  EXPECT_EQ(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
+                                  .plugged = false,
+                                  .plug_state_time = zx::clock::get_monotonic().get(),
+                              }},
+                              fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify),
+            ZX_OK);
+}
+
 TEST(ValidateTest, ValidateRingBufferFormatSets) {
   EXPECT_EQ(ValidateRingBufferFormatSets({CompliantFormatSet()}), ZX_OK);
 
@@ -228,152 +390,8 @@ TEST(ValidateTest, ValidateRingBufferFormatSets) {
   EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_OK);
 }
 
-// Unittest ValidateGainState
-TEST(ValidateTest, ValidateGainState) {
-  EXPECT_EQ(ValidateGainState(fuchsia_hardware_audio::GainState{{
-                // muted (optional) is missing: NOT muted
-                // agc_enabled (optional) is missing: NOT enabled
-                .gain_db = -42.0f,
-            }}),
-            // If StreamProperties is not provided, assume the device cannot mute or agc
-            ZX_OK);
-  EXPECT_EQ(
-      ValidateGainState(
-          fuchsia_hardware_audio::GainState{{
-              .muted = false,
-              .agc_enabled = false,
-              .gain_db = 0,
-          }},
-          std::nullopt  // If StreamProperties is not provided, assume the device cannot mute or agc
-          ),
-      ZX_OK);
-  EXPECT_EQ(ValidateGainState(fuchsia_hardware_audio::GainState{{
-                                  .muted = false,
-                                  .agc_enabled = true,
-                                  .gain_db = -12.0f,
-                              }},
-                              fuchsia_hardware_audio::StreamProperties{{
-                                  .is_input = false,
-                                  // can_mute (optional) is missing: device cannot mute
-                                  .can_agc = true,
-                                  .min_gain_db = -12.0f,
-                                  .max_gain_db = 12.0f,
-                                  .gain_step_db = 0.5f,
-                                  .plug_detect_capabilities =
-                                      fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
-                                  .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
-                              }}),
-            ZX_OK);
-  EXPECT_EQ(ValidateGainState(fuchsia_hardware_audio::GainState{{
-                                  .muted = true,
-                                  .agc_enabled = false,
-                                  .gain_db = -12.0f,
-                              }},
-                              fuchsia_hardware_audio::StreamProperties{{
-                                  .is_input = false,
-                                  .can_mute = true,
-                                  // can_agc (optional) is missing: device cannot agc
-                                  .min_gain_db = -24.0f,
-                                  .max_gain_db = -12.0f,
-                                  .gain_step_db = 2.0f,
-                                  .plug_detect_capabilities =
-                                      fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
-                                  .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
-                              }}),
-            ZX_OK);
-  EXPECT_EQ(ValidateGainState(fuchsia_hardware_audio::GainState{{
-                                  // muted (optional) is missing: NOT muted
-                                  .agc_enabled = false,
-                                  .gain_db = -12.0f,
-                              }},
-                              fuchsia_hardware_audio::StreamProperties{{
-                                  .is_input = false,
-                                  .can_mute = false,
-                                  .can_agc = true,
-                                  .min_gain_db = -12.0f,
-                                  .max_gain_db = 12.0f,
-                                  .gain_step_db = 0.5f,
-                                  .plug_detect_capabilities =
-                                      fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
-                                  .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
-                              }}),
-            ZX_OK);
-  EXPECT_EQ(ValidateGainState(fuchsia_hardware_audio::GainState{{
-                                  .muted = false,
-                                  // agc_enabled (optional) is missing: NOT enabled
-                                  .gain_db = -12.0f,
-                              }},
-                              fuchsia_hardware_audio::StreamProperties{{
-                                  .is_input = false,
-                                  .can_mute = true,
-                                  .can_agc = false,
-                                  .min_gain_db = -24.0f,
-                                  .max_gain_db = -12.0f,
-                                  .gain_step_db = 2.0f,
-                                  .plug_detect_capabilities =
-                                      fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
-                                  .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
-                              }}),
-            ZX_OK);
-}
+// TODO(https://fxbug.dev/42069012): Unittest TranslateRingBufferFormatSets
 
-// Unittest ValidatePlugState
-TEST(ValidateTest, ValidatePlugState) {
-  EXPECT_EQ(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
-                .plugged = true,
-                .plug_state_time = 0,
-            }}),
-            ZX_OK);
-  EXPECT_EQ(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
-                .plugged = false,
-                .plug_state_time = zx::clock::get_monotonic().get(),
-            }}),
-            ZX_OK);
-  EXPECT_EQ(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
-                                  .plugged = true,
-                                  .plug_state_time = zx::clock::get_monotonic().get(),
-                              }},
-                              fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired),
-            ZX_OK);
-  EXPECT_EQ(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
-                                  .plugged = false,
-                                  .plug_state_time = zx::clock::get_monotonic().get(),
-                              }},
-                              fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify),
-            ZX_OK);
-}
-
-// TODO(https://fxbug.dev/42069012): Unittest ValidateDeviceInfo
-// TODO(https://fxbug.dev/42069012): manufacturer and product strings that are 256 chars long
-// TEST(ValidateTest, ValidateDeviceInfo) {}
-
-// Unittest ValidateRingBufferProperties
-TEST(ValidateTest, ValidateRingBufferProperties) {
-  EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
-                .needs_cache_flush_or_invalidate = false,
-                .turn_on_delay = 125,
-                .driver_transfer_bytes = 32,
-            }}),
-            ZX_OK);
-
-  // TODO(b/311694769): Resolve driver_transfer_bytes lower limit: specifically is 0 allowed?
-  EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
-                .needs_cache_flush_or_invalidate = true,
-                .turn_on_delay = 0,  // can be zero
-                .driver_transfer_bytes = 1,
-            }}),
-            ZX_OK);
-
-  // TODO(b/311694769): Resolve driver_transfer_bytes upper limit: no limit? Soft guideline?
-  EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
-                .needs_cache_flush_or_invalidate = true,
-                // turn_on_delay (optional) is missing
-                .driver_transfer_bytes = 128,
-            }}),
-            ZX_OK);
-}
-
-// Unittest ValidateRingBufferFormat
 TEST(ValidateTest, ValidateRingBufferFormat) {
   for (auto chans : kChannels) {
     for (auto [bytes, sample_format] : kFormats) {
@@ -413,14 +431,12 @@ TEST(ValidateTest, ValidateRingBufferFormat) {
   }
 }
 
-// Unittest ValidateSampleFormatCompatibility
 TEST(ValidateTest, ValidateSampleFormatCompatibility) {
   for (auto [bytes, sample_format] : kFormats) {
     EXPECT_EQ(ValidateSampleFormatCompatibility(bytes, sample_format), ZX_OK);
   }
 }
 
-// Unittest ValidateRingBufferVmo
 TEST(ValidateTest, ValidateRingBufferVmo) {
   constexpr uint64_t kVmoContentSize = 4096;
   zx::vmo vmo;
@@ -444,7 +460,6 @@ TEST(ValidateTest, ValidateRingBufferVmo) {
             ZX_OK);
 }
 
-// Unittest ValidateDelayInfo
 TEST(ValidateTest, ValidateDelayInfo) {
   EXPECT_EQ(ValidateDelayInfo(fuchsia_hardware_audio::DelayInfo{{
                 .internal_delay = 0,
@@ -462,42 +477,6 @@ TEST(ValidateTest, ValidateDelayInfo) {
             ZX_OK);
 }
 
-// Unittest ValidateCodecProperties -- the missing, minimal and maximal possibilities
-TEST(ValidateTest, ValidateCodecProperties) {
-  EXPECT_EQ(
-      ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
-          // is_input missing
-          .manufacturer = "",  // minimal value
-          .product =           // maximal value
-          "Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name extends to 321X",
-          // unique_id missing
-          .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
-      }}),
-      ZX_OK);
-  EXPECT_EQ(
-      ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
-          .is_input = false,
-          .manufacturer =  // maximal value
-          "Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long, which extends to... 321X",
-          // product missing
-          .unique_id = {{}},  // minimal value
-          .plug_detect_capabilities =
-              fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
-      }}),
-      ZX_OK);
-  EXPECT_EQ(ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
-                .is_input = true,
-                // manufacturer missing
-                .product = "",                                                  // minimal value
-                .unique_id = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  //
-                               0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}},
-                .plug_detect_capabilities =
-                    fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
-            }}),
-            ZX_OK);
-}
-
-// Unittest ValidateDaiFormatSets
 TEST(ValidateTest, ValidateDaiFormatSets) {
   EXPECT_EQ(
       ValidateDaiFormatSets({{
@@ -514,7 +493,6 @@ TEST(ValidateTest, ValidateDaiFormatSets) {
       ZX_OK);
 }
 
-// Unittest ValidateDaiFormat
 TEST(ValidateTest, ValidateDaiFormat) {
   // Normal values
   EXPECT_EQ(ValidateDaiFormat({{
@@ -574,7 +552,6 @@ TEST(ValidateTest, ValidateDaiFormat) {
             ZX_OK);
 }
 
-// Unittest ValidateCodecFormatInfo
 TEST(ValidateTest, ValidateCodecFormatInfo) {
   EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{}), ZX_OK);
   // For all three fields, test missing, minimal and maximal values.

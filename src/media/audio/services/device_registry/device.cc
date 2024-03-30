@@ -9,9 +9,7 @@
 #include <fidl/fuchsia.audio/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/client.h>
-#include <lib/fidl/cpp/clone.h>
-#include <lib/fidl/cpp/unified_messaging_declarations.h>
-#include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
@@ -205,14 +203,12 @@ void Device::OnError(zx_status_t error) {
 bool Device::IsFullyInitialized() {
   switch (device_type_) {
     case fuchsia_audio_device::DeviceType::kCodec:
-      return codec_properties_ && dai_format_sets_ && plug_state_ &&  // signalprocessing_ &&
-             health_state_;
-      break;
+      return has_codec_properties() && has_health_state() && dai_format_sets_retrieved() &&
+             has_plug_state();
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
-      return stream_config_properties_ && ring_buffer_format_sets_ && gain_state_ &&
-             plug_state_ &&  // signalprocessing_ &&
-             health_state_;
+      return has_stream_config_properties() && has_health_state() &&
+             ring_buffer_format_sets_retrieved() && has_gain_state() && has_plug_state();
     case fuchsia_audio_device::DeviceType::kComposite:
       ADR_WARN_METHOD() << "Don't yet support Composite";
       return false;
@@ -239,21 +235,21 @@ void Device::OnInitializationResponse() {
   switch (device_type_) {
     case fuchsia_audio_device::DeviceType::kCodec:
       ADR_LOG_METHOD(kLogDeviceInitializationProgress)
-          << " (RECEIVED|pending)"                                 //
-          << "    " << (codec_properties_ ? "PROPS" : "props")     //
-          << "    " << (dai_format_sets_ ? "FORMATS" : "formats")  //
-          << "    " << (plug_state_ ? "PLUG" : "plug")             //
-          << "    " << (health_state_ ? "HEALTH" : "health");
+          << " (RECEIVED|pending)"                                                 //
+          << "   " << (has_codec_properties() ? "PROPS" : "props")                 //
+          << "   " << (has_health_state() ? "HEALTH" : "health")                   //
+          << "   " << (dai_format_sets_retrieved() ? "DAIFORMATS" : "daiformats")  //
+          << "   " << (has_plug_state() ? "PLUG" : "plug");
       break;
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
       ADR_LOG_METHOD(kLogDeviceInitializationProgress)
-          << " (RECEIVED|pending)"                                         //
-          << "    " << (stream_config_properties_ ? "PROPS" : "props")     //
-          << "    " << (ring_buffer_format_sets_ ? "FORMATS" : "formats")  //
-          << "    " << (gain_state_ ? "GAIN" : "gain")                     //
-          << "    " << (plug_state_ ? "PLUG" : "plug")                     //
-          << "    " << (health_state_ ? "HEALTH" : "health");
+          << " (RECEIVED|pending)"                                                         //
+          << "   " << (has_stream_config_properties() ? "PROPS" : "props")                 //
+          << "   " << (has_health_state() ? "HEALTH" : "health")                           //
+          << "   " << (ring_buffer_format_sets_retrieved() ? "RB_FORMATS" : "rb_formats")  //
+          << "   " << (has_plug_state() ? "PLUG" : "plug")                                 //
+          << "   " << (has_gain_state() ? "GAIN" : "gain");
       break;
     case fuchsia_audio_device::DeviceType::kComposite:
     case fuchsia_audio_device::DeviceType::kDai:
@@ -296,14 +292,16 @@ bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
   control_notify_ = control_notify;
   AddObserver(std::move(control_notify));
 
-  if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
-    if (auto notify = GetControlNotify(); notify) {
+  // For this new control, "catch it up" on the current state.
+  if (auto notify = GetControlNotify(); notify) {
+    // DaiFormat(s)
+    if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
       if (codec_format_) {
         notify->DaiFormatChanged(codec_format_->dai_format, codec_format_->codec_format_info);
       } else {
         notify->DaiFormatChanged(std::nullopt, std::nullopt);
       }
-
+      // Codec start state
       codec_start_state_.started ? notify->CodecStarted(codec_start_state_.start_stop_time)
                                  : notify->CodecStopped(codec_start_state_.start_stop_time);
     }
@@ -352,7 +350,9 @@ bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
   }
   observers_.push_back(observer_to_add);
 
-  // Only do this if StreamConfig.
+  // For this new observer, "catch it up" on the current state.
+  //
+  // GainState -- if StreamConfig.
   if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
       device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
     observer_to_add->GainStateChanged({{
@@ -361,7 +361,8 @@ bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
         .agc_enabled = gain_state_->agc_enabled().value_or(false),
     }});
   }
-  // Only do this if Codec or StreamConfig.
+
+  // PlugState -- if Codec or StreamConfig.
   if (device_type_ == fuchsia_audio_device::DeviceType::kCodec ||
       device_type_ == fuchsia_audio_device::DeviceType::kInput ||
       device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
@@ -450,18 +451,16 @@ void Device::Initialize() {
 
   if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
     RetrieveCodecProperties();
-    RetrieveInitialDaiFormats();
-    RetrieveCodecPlugState();
     RetrieveCodecHealthState();
-    // ... and RetrieveSignalProcessingState() when this is added
+    RetrieveCodecDaiFormatSets();
+    RetrieveCodecPlugState();
   } else if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
              device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
     RetrieveStreamProperties();
-    RetrieveInitialRingBufferFormatSets();
-    RetrieveGainState();
-    RetrieveStreamPlugState();
     RetrieveStreamHealthState();
-    // ... and RetrieveSignalProcessingState() when this is added
+    RetrieveStreamRingBufferFormatSets();
+    RetrieveStreamPlugState();
+    RetrieveGainState();
   } else {
     FX_LOGS(WARNING) << "Different device type: " << device_type_;
   }
@@ -535,7 +534,7 @@ void Device::RetrieveStreamProperties() {
           return;
         }
 
-        FX_CHECK(!stream_config_properties_)
+        FX_CHECK(!has_stream_config_properties())
             << "StreamConfig/GetProperties response: stream_config_properties_ already set";
         stream_config_properties_ = result->properties();
         SanitizeStreamPropertiesStrings(stream_config_properties_);
@@ -588,8 +587,8 @@ void Device::RetrieveCodecProperties() {
           return;
         }
 
-        FX_CHECK(!codec_properties_)
-            << "Codec/GetProperties response: stream_config_properties_ already set";
+        FX_CHECK(!has_codec_properties())
+            << "Codec/GetProperties response: codec_properties_ already set";
         codec_properties_ = result->properties();
         SanitizeCodecPropertiesStrings(codec_properties_);
 
@@ -616,11 +615,11 @@ void Device::SanitizeCodecPropertiesStrings(
   }
 }
 
-void Device::RetrieveInitialRingBufferFormatSets() {
+void Device::RetrieveStreamRingBufferFormatSets() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   RetrieveRingBufferFormatSets(
-      [this](std::vector<fuchsia_hardware_audio::SupportedFormats> ring_buffer_format_sets) {
+      [this](const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
         if (state_ == State::Error) {
           ADR_WARN_OBJECT() << "device has an error while retrieving initial RingBuffer formats";
           return;
@@ -640,6 +639,7 @@ void Device::RetrieveInitialRingBufferFormatSets() {
           return;
         }
 
+        ring_buffer_format_sets_retrieved_ = true;
         OnInitializationResponse();
       });
 }
@@ -647,7 +647,7 @@ void Device::RetrieveInitialRingBufferFormatSets() {
 void Device::RetrieveRingBufferFormatSets(
     fit::callback<void(std::vector<fuchsia_hardware_audio::SupportedFormats>)>
         ring_buffer_format_sets_callback) {
-  ADR_LOG_METHOD(kLogRingBufferMethods);
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls || kLogRingBufferMethods);
 
   // TODO(https://fxbug.dev/42064765): handle command timeouts
 
@@ -672,7 +672,7 @@ void Device::RetrieveRingBufferFormatSets(
       });
 }
 
-void Device::RetrieveInitialDaiFormats() {
+void Device::RetrieveCodecDaiFormatSets() {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
   RetrieveDaiFormatSets(
       [this](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_format_sets) {
@@ -684,6 +684,7 @@ void Device::RetrieveInitialDaiFormats() {
         for (const auto& dai_format_set : dai_format_sets) {
           dai_format_sets_->emplace_back(dai_format_set);
         }
+        dai_format_sets_retrieved_ = true;
         OnInitializationResponse();
       });
 }
@@ -723,7 +724,7 @@ void Device::RetrieveGainState() {
   if (state_ == State::Error) {
     return;
   }
-  if (!gain_state_) {
+  if (!has_gain_state()) {
     // TODO(https://fxbug.dev/42064765): handle command timeout on initial (not subsequent) watches.
   }
 
@@ -770,7 +771,7 @@ void Device::RetrieveStreamPlugState() {
   if (state_ == State::Error) {
     return;
   }
-  if (!plug_state_) {
+  if (!has_plug_state()) {
     // TODO(https://fxbug.dev/42064765): handle command timeouts (but not on subsequent watches)
   }
 
@@ -783,7 +784,7 @@ void Device::RetrieveStreamPlugState() {
 
         ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState response";
         std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities;
-        if (stream_config_properties_) {
+        if (has_stream_config_properties()) {
           plug_detect_capabilities = stream_config_properties_->plug_detect_capabilities();
         }
         auto status = ValidatePlugState(result->plug_state(), plug_detect_capabilities);
@@ -818,7 +819,7 @@ void Device::RetrieveCodecPlugState() {
   if (state_ == State::Error) {
     return;
   }
-  if (!plug_state_) {
+  if (!has_plug_state()) {
     // TODO(https://fxbug.dev/113429): handle command timeouts (but not on subsequent watches)
   }
 
@@ -831,7 +832,7 @@ void Device::RetrieveCodecPlugState() {
 
         ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState response";
         std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities;
-        if (codec_properties_) {
+        if (has_codec_properties()) {
           plug_detect_capabilities = codec_properties_->plug_detect_capabilities();
         }
         auto status = ValidatePlugState(result->plug_state(), plug_detect_capabilities);
@@ -943,9 +944,6 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
       .token_id = token_id_,
       .device_type = device_type_,
       .device_name = name_,
-      // Required for Composite; optional for Codec, Dai and StreamConfig:
-      .signal_processing_elements = {},    // signalprocessing support
-      .signal_processing_topologies = {},  // remains to be completed
   }};
   if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
     // Optional for all device types.
@@ -1285,7 +1283,7 @@ bool Device::CodecReset() {
         }
         ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/Reset: success";
 
-        // Reset to Stopped (if Started), even if no ControlNotify is listening for notifications.
+        // Reset to Stopped (if Started), even if no ControlNotify listens for notifications.
         if (codec_start_state_.started) {
           codec_start_state_.started = false;
           codec_start_state_.start_stop_time = zx::clock::get_monotonic();
@@ -1294,7 +1292,7 @@ bool Device::CodecReset() {
           }
         }
 
-        // Reset our DaiFormat (if set), even if no ControlNotify is listening for notifications.
+        // Reset our DaiFormat (if set), even if no ControlNotify listens for notifications.
         if (codec_format_) {
           codec_format_.reset();
           if (auto notify = GetControlNotify(); notify) {

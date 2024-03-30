@@ -27,7 +27,7 @@ using ::testing::Optional;
 /////////////////////
 // Codec tests
 //
-// Validate that a fake codec with default values is initialized successfully.
+// Validate that a fake codec is initialized successfully.
 TEST_F(CodecTest, Initialization) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
@@ -41,14 +41,13 @@ TEST_F(CodecTest, Initialization) {
   EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
   EXPECT_EQ(device->device_type(), fuchsia_audio_device::DeviceType::kCodec);
-  EXPECT_TRUE(device->ring_buffer_format_sets().empty());
-  EXPECT_EQ(device->dai_format_sets(), FakeCodec::kDefaultDaiFormatSets);
 
-  ASSERT_TRUE(device->info().has_value());
-  EXPECT_TRUE(device->info()->is_input().has_value());
-  EXPECT_FALSE(*device->info()->is_input());
+  EXPECT_TRUE(device->has_codec_properties());
+  EXPECT_TRUE(device->has_health_state());
+  EXPECT_TRUE(device->dai_format_sets_retrieved());
+  EXPECT_TRUE(device->has_plug_state());
 
-  device_presence_watcher().reset();
+  EXPECT_TRUE(device->info().has_value());
 }
 
 TEST_F(CodecTest, InitializationNoDirection) {
@@ -65,12 +64,10 @@ TEST_F(CodecTest, InitializationNoDirection) {
 
   ASSERT_TRUE(device->info().has_value());
   EXPECT_FALSE(device->info()->is_input().has_value());
-
-  device_presence_watcher().reset();
 }
 
-// Validate that a fake codec with default values is initialized successfully.
-TEST_F(CodecTest, DeviceInfoValues) {
+// Validate that a fake codec is initialized to the expected default values.
+TEST_F(CodecTest, DeviceInfo) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
@@ -81,36 +78,46 @@ TEST_F(CodecTest, DeviceInfoValues) {
   ASSERT_TRUE(device->info().has_value());
   auto info = *device->info();
   EXPECT_TRUE(info.token_id().has_value());
-  EXPECT_TRUE(info.device_type().has_value());
-  EXPECT_TRUE(info.device_name().has_value());
-  EXPECT_TRUE(info.manufacturer().has_value());
-  EXPECT_TRUE(info.product().has_value());
-  EXPECT_TRUE(info.unique_instance_id().has_value());
-  EXPECT_TRUE(info.is_input().has_value());
-  EXPECT_FALSE(info.ring_buffer_format_sets().has_value());
-  EXPECT_TRUE(info.dai_format_sets().has_value());
-  EXPECT_FALSE(info.gain_caps().has_value());
-  EXPECT_TRUE(info.plug_detect_caps().has_value());
-  EXPECT_FALSE(info.clock_domain().has_value());
-  EXPECT_FALSE(info.signal_processing_elements().has_value());
-  EXPECT_FALSE(info.signal_processing_topologies().has_value());
 
+  ASSERT_TRUE(info.device_type().has_value());
   EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kCodec);
+
+  ASSERT_TRUE(info.device_name().has_value());
   EXPECT_TRUE(!info.device_name()->empty());
+
+  ASSERT_TRUE(info.manufacturer().has_value());
   EXPECT_EQ(*info.manufacturer(), FakeCodec::kDefaultManufacturer);
+
+  ASSERT_TRUE(info.product().has_value());
   EXPECT_EQ(*info.product(), FakeCodec::kDefaultProduct);
-  // EXPECT_EQ(*info.unique_instance_id(), FakeCodec::kDefaultUniqueInstanceId);
-  EXPECT_TRUE(!info.is_input().value());
+
+  ASSERT_TRUE(info.unique_instance_id().has_value());
+  EXPECT_EQ(*info.unique_instance_id(), FakeCodec::kDefaultUniqueInstanceId);
+
+  ASSERT_TRUE(info.is_input().has_value());
+  EXPECT_FALSE(info.is_input().value());
+
+  EXPECT_FALSE(info.ring_buffer_format_sets().has_value());
+
+  ASSERT_TRUE(info.dai_format_sets().has_value());
   EXPECT_EQ(*info.dai_format_sets(), FakeCodec::kDefaultDaiFormatSets);
+
+  EXPECT_FALSE(info.gain_caps().has_value());
+
+  ASSERT_TRUE(info.plug_detect_caps().has_value());
   EXPECT_EQ(*info.plug_detect_caps(), FakeCodec::kDefaultPlugCaps);
 
-  device_presence_watcher().reset();
+  EXPECT_FALSE(info.clock_domain().has_value());
+
+  EXPECT_FALSE(info.signal_processing_elements().has_value());
+
+  EXPECT_FALSE(info.signal_processing_topologies().has_value());
 }
 
 // Validate that a driver's dropping the Codec causes a DeviceIsRemoved notification.
 TEST_F(CodecTest, Disconnect) {
-  auto fake_codec = MakeFakeCodecNoDirection();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -119,7 +126,7 @@ TEST_F(CodecTest, Disconnect) {
   ASSERT_EQ(device_presence_watcher()->on_error_count(), 0u);
   ASSERT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
-  fake_codec->DropCodec();
+  fake_driver->DropCodec();
   RunLoopUntilIdle();
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
@@ -133,46 +140,26 @@ TEST_F(CodecTest, Disconnect) {
 
 // Validate that a GetHealthState response of an empty struct is considered "healthy".
 TEST_F(CodecTest, EmptyHealthResponse) {
-  auto fake_codec = MakeFakeCodecOutput();
-  fake_codec->set_health_state(std::nullopt);
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecOutput();
+  fake_driver->set_health_state(std::nullopt);
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   EXPECT_TRUE(InInitializedState(device));
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
-TEST_F(CodecTest, DeviceInfo) {
-  auto fake_codec = MakeFakeCodecInput();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
-  ASSERT_TRUE(InInitializedState(device));
-  auto info = GetDeviceInfo(device);
-
-  EXPECT_TRUE(info.token_id());
-  EXPECT_TRUE(info.device_type());
-  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kCodec);
-  EXPECT_TRUE(info.device_name());
-  // manufacturer is optional, but it can't be an empty string
-  EXPECT_TRUE(!info.manufacturer().has_value() || !info.manufacturer()->empty());
-  // product is optional, but it can't be an empty string
-  EXPECT_TRUE(!info.product().has_value() || !info.product()->empty());
-  // unique_instance_id is optional
-  EXPECT_FALSE(info.gain_caps());
-  EXPECT_TRUE(info.plug_detect_caps());
-  EXPECT_FALSE(info.clock_domain());
-}
-
 TEST_F(CodecTest, Observer) {
-  auto fake_codec = MakeFakeCodecNoDirection();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
 
   EXPECT_TRUE(AddObserver(device));
 }
 
 TEST_F(CodecTest, Control) {
-  auto fake_codec = MakeFakeCodecOutput();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
 
@@ -180,8 +167,8 @@ TEST_F(CodecTest, Control) {
 }
 
 TEST_F(CodecTest, GetDaiFormats) {
-  auto fake_codec = MakeFakeCodecInput();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecInput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_FALSE(IsControlled(device));
 
@@ -210,8 +197,8 @@ TEST_F(CodecTest, GetDaiFormats) {
 //
 // SetDaiFormat - use the first supported format
 TEST_F(CodecTest, SetDaiFormat) {
-  auto fake_codec = MakeFakeCodecNoDirection();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
 
   ASSERT_TRUE(SetControl(device));
@@ -230,7 +217,6 @@ TEST_F(CodecTest, SetDaiFormat) {
   RunLoopUntilIdle();
   ASSERT_TRUE(received_get_dai_formats_callback);
   ASSERT_FALSE(notify()->dai_format());
-
   ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
 
   // check that notify received dai_format and codec_format_info
@@ -243,8 +229,8 @@ TEST_F(CodecTest, SetDaiFormat) {
 
 // Start and Stop
 TEST_F(CodecTest, InitialStop) {
-  auto fake_codec = MakeFakeCodecOutput();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
 
   ASSERT_TRUE(SetControl(device));
@@ -279,13 +265,13 @@ TEST_F(CodecTest, InitialStop) {
 }
 
 TEST_F(CodecTest, Start) {
-  auto fake_codec = MakeFakeCodecInput();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecInput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         dai_formats.push_back(formats[0]);
       });
 
@@ -305,13 +291,13 @@ TEST_F(CodecTest, Start) {
 }
 
 TEST_F(CodecTest, SetDaiFormatChange) {
-  auto fake_codec = MakeFakeCodecNoDirection();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         dai_formats.push_back(formats[0]);
       });
 
@@ -340,13 +326,13 @@ TEST_F(CodecTest, SetDaiFormatChange) {
 }
 
 TEST_F(CodecTest, SetDaiFormatNoChange) {
-  auto fake_codec = MakeFakeCodecNoDirection();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         dai_formats.push_back(formats[0]);
       });
 
@@ -375,13 +361,13 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
 }
 
 TEST_F(CodecTest, StartStop) {
-  auto fake_codec = MakeFakeCodecNoDirection();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         dai_formats.push_back(formats[0]);
       });
 
@@ -405,13 +391,13 @@ TEST_F(CodecTest, StartStop) {
 
 // Start when already started: no notification; old start_time.
 TEST_F(CodecTest, StartStart) {
-  auto fake_codec = MakeFakeCodecOutput();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         dai_formats.push_back(formats[0]);
       });
 
@@ -436,13 +422,13 @@ TEST_F(CodecTest, StartStart) {
 
 // Stop when already stopped: no notification; old stop_time.
 TEST_F(CodecTest, StopStop) {
-  auto fake_codec = MakeFakeCodecInput();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecInput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         dai_formats.push_back(formats[0]);
       });
 
@@ -474,13 +460,13 @@ TEST_F(CodecTest, StopStop) {
 
 // Reset stops the Codec and resets DaiFormat, Elements and Topology
 TEST_F(CodecTest, Reset) {
-  auto fake_codec = MakeFakeCodecNoDirection();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         dai_formats.push_back(formats[0]);
       });
 
@@ -518,8 +504,8 @@ TEST_F(CodecTest, Reset) {
 
 // This tests the driver's ability to inform its ObserverNotify of initial plug state.
 TEST_F(CodecTest, InitialPlugState) {
-  auto fake_codec = MakeFakeCodecNoDirection();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(AddObserver(device));
 
@@ -533,8 +519,8 @@ TEST_F(CodecTest, InitialPlugState) {
 // This tests the driver's ability to originate plug changes, such as from jack detection. It also
 // validates that plug notifications are delivered through ControlNotify (not just ObserverNotify).
 TEST_F(CodecTest, DynamicPlugUpdate) {
-  auto fake_codec = MakeFakeCodecOutput();
-  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  auto fake_driver = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
 
@@ -546,7 +532,7 @@ TEST_F(CodecTest, DynamicPlugUpdate) {
   notify()->plug_state().reset();
 
   auto unplug_time = zx::clock::get_monotonic();
-  fake_codec->InjectUnpluggedAt(unplug_time);
+  fake_driver->InjectUnpluggedAt(unplug_time);
   RunLoopUntilIdle();
   EXPECT_FALSE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
@@ -554,6 +540,9 @@ TEST_F(CodecTest, DynamicPlugUpdate) {
   EXPECT_EQ(notify()->plug_state()->second.get(), unplug_time.get());
 }
 
+/////////////////////
+// StreamConfig tests
+//
 // Validate that a fake stream_config with default values is initialized successfully.
 TEST_F(StreamConfigTest, Initialization) {
   auto device = InitializeDeviceForFakeStreamConfig(MakeFakeStreamConfigOutput());
@@ -566,16 +555,21 @@ TEST_F(StreamConfigTest, Initialization) {
   EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
   EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
-  device_presence_watcher().reset();
+  EXPECT_EQ(device->device_type(), fuchsia_audio_device::DeviceType::kOutput);
+
+  EXPECT_TRUE(device->has_stream_config_properties());
+  EXPECT_TRUE(device->has_health_state());
+  EXPECT_TRUE(device->ring_buffer_format_sets_retrieved());
+  EXPECT_TRUE(device->has_plug_state());
+  EXPECT_TRUE(device->has_gain_state());
+
+  EXPECT_TRUE(device->info().has_value());
 }
 
-/////////////////////
-// StreamConfig tests
-//
 // Validate that a driver's dropping the StreamConfig causes a DeviceIsRemoved notification.
 TEST_F(StreamConfigTest, Disconnect) {
-  auto fake_stream_config = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -584,7 +578,7 @@ TEST_F(StreamConfigTest, Disconnect) {
   ASSERT_EQ(device_presence_watcher()->on_error_count(), 0u);
   ASSERT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
-  fake_stream_config->DropStreamConfig();
+  fake_driver->DropStreamConfig();
   RunLoopUntilIdle();
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
@@ -598,9 +592,9 @@ TEST_F(StreamConfigTest, Disconnect) {
 
 // Validate that a GetHealthState response of an empty struct is considered "healthy".
 TEST_F(StreamConfigTest, EmptyHealthResponse) {
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  fake_stream_config->set_health_state(std::nullopt);
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  fake_driver->set_health_state(std::nullopt);
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   EXPECT_TRUE(InInitializedState(device));
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
@@ -608,8 +602,8 @@ TEST_F(StreamConfigTest, EmptyHealthResponse) {
 }
 
 TEST_F(StreamConfigTest, DistinctTokenIds) {
-  auto fake_stream_config = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
 
   // Set up a second, entirely distinct fake device.
@@ -631,8 +625,8 @@ TEST_F(StreamConfigTest, DistinctTokenIds) {
 }
 
 TEST_F(StreamConfigTest, DefaultClock) {
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
 
   EXPECT_EQ(device_clock(device)->domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
@@ -645,9 +639,9 @@ TEST_F(StreamConfigTest, DefaultClock) {
 
 TEST_F(StreamConfigTest, ClockInOtherDomain) {
   const uint32_t kNonMonotonicClockDomain = fuchsia_hardware_audio::kClockDomainMonotonic + 1;
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  fake_stream_config->set_clock_domain(kNonMonotonicClockDomain);
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  fake_driver->set_clock_domain(kNonMonotonicClockDomain);
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
 
   EXPECT_EQ(device_clock(device)->domain(), kNonMonotonicClockDomain);
@@ -659,8 +653,8 @@ TEST_F(StreamConfigTest, ClockInOtherDomain) {
 }
 
 TEST_F(StreamConfigTest, DeviceInfo) {
-  auto fake_stream_config = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   auto info = GetDeviceInfo(device);
 
@@ -680,11 +674,11 @@ TEST_F(StreamConfigTest, DeviceInfo) {
 }
 
 TEST_F(StreamConfigTest, SupportedDriverFormatForClientFormat) {
-  auto fake_stream_config = MakeFakeStreamConfigOutput();
-  fake_stream_config->set_frame_rates(0, {48000, 48001});
-  fake_stream_config->set_valid_bits_per_sample(0, {12, 15, 20});
-  fake_stream_config->set_bytes_per_sample(0, {2, 4});
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  fake_driver->set_frame_rates(0, {48000, 48001});
+  fake_driver->set_valid_bits_per_sample(0, {12, 15, 20});
+  fake_driver->set_bytes_per_sample(0, {2, 4});
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
 
   auto valid_bits = ExpectFormatMatch(device, fuchsia_audio::SampleType::kInt16, 2, 48001);
@@ -695,16 +689,16 @@ TEST_F(StreamConfigTest, SupportedDriverFormatForClientFormat) {
 }
 
 TEST_F(StreamConfigTest, Observer) {
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
 
   EXPECT_TRUE(AddObserver(device));
 }
 
 TEST_F(StreamConfigTest, Control) {
-  auto fake_stream_config = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
 
@@ -713,8 +707,8 @@ TEST_F(StreamConfigTest, Control) {
 
 // This tests the driver's ability to inform its ObserverNotify of initial gain state.
 TEST_F(StreamConfigTest, InitialGainState) {
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(AddObserver(device));
 
@@ -733,8 +727,8 @@ TEST_F(StreamConfigTest, InitialGainState) {
 // This tests the driver's ability to originate gain changes, such as from hardware buttons. It also
 // validates that gain notifications are delivered through ControlNotify (not just ObserverNotify).
 TEST_F(StreamConfigTest, DynamicGainUpdate) {
-  auto fake_stream_config = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
 
@@ -749,7 +743,7 @@ TEST_F(StreamConfigTest, DynamicGainUpdate) {
   notify()->gain_state().reset();
 
   constexpr float kNewGainDb = -2.0f;
-  fake_stream_config->InjectGainChange({{
+  fake_driver->InjectGainChange({{
       .muted = true,
       .agc_enabled = true,
       .gain_db = kNewGainDb,
@@ -772,8 +766,8 @@ TEST_F(StreamConfigTest, DynamicGainUpdate) {
 
 // This tests the ability to set gain to the driver, such as from GUI volume controls.
 TEST_F(StreamConfigTest, SetGain) {
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
 
@@ -810,8 +804,8 @@ TEST_F(StreamConfigTest, SetGain) {
 
 // This tests the driver's ability to inform its ObserverNotify of initial plug state.
 TEST_F(StreamConfigTest, InitialPlugState) {
-  auto fake_stream_config = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(AddObserver(device));
 
@@ -823,8 +817,8 @@ TEST_F(StreamConfigTest, InitialPlugState) {
 }
 
 TEST_F(StreamConfigTest, DynamicPlugUpdate) {
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
 
@@ -836,7 +830,7 @@ TEST_F(StreamConfigTest, DynamicPlugUpdate) {
   notify()->plug_state().reset();
 
   auto unplug_time = zx::clock::get_monotonic();
-  fake_stream_config->InjectUnpluggedAt(unplug_time);
+  fake_driver->InjectUnpluggedAt(unplug_time);
   RunLoopUntilIdle();
   EXPECT_FALSE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
@@ -846,10 +840,10 @@ TEST_F(StreamConfigTest, DynamicPlugUpdate) {
 
 // Validate that Device can open the driver's RingBuffer FIDL channel.
 TEST_F(StreamConfigTest, CreateRingBuffer) {
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
-  fake_stream_config->AllocateRingBuffer(8192);
+  fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl =
@@ -866,10 +860,10 @@ TEST_F(StreamConfigTest, CreateRingBuffer) {
 }
 
 TEST_F(StreamConfigTest, RingBufferProperties) {
-  auto fake_stream_config = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
-  fake_stream_config->AllocateRingBuffer(8192);
+  fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
   ConnectToRingBufferAndExpectValidClient(device);
 
@@ -879,10 +873,10 @@ TEST_F(StreamConfigTest, RingBufferProperties) {
 // TODO(https://fxbug.dev/42069012): Unittest CalculateRequiredRingBufferSizes
 
 TEST_F(StreamConfigTest, RingBufferGetVmo) {
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
-  fake_stream_config->AllocateRingBuffer(8192);
+  fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
   ConnectToRingBufferAndExpectValidClient(device);
 
@@ -890,10 +884,10 @@ TEST_F(StreamConfigTest, RingBufferGetVmo) {
 }
 
 TEST_F(StreamConfigTest, BasicStartAndStop) {
-  auto fake_stream_config = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
-  fake_stream_config->AllocateRingBuffer(8192);
+  fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl =
@@ -915,9 +909,9 @@ TEST_F(StreamConfigTest, BasicStartAndStop) {
 }
 
 TEST_F(StreamConfigTest, InitialDelay) {
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
-  fake_stream_config->AllocateRingBuffer(8192);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
+  fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
 
   auto created_ring_buffer = false;
@@ -942,9 +936,9 @@ TEST_F(StreamConfigTest, InitialDelay) {
 }
 
 TEST_F(StreamConfigTest, DynamicDelay) {
-  auto fake_stream_config = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
-  fake_stream_config->AllocateRingBuffer(8192);
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
+  fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
 
   auto created_ring_buffer = false;
@@ -964,7 +958,7 @@ TEST_F(StreamConfigTest, DynamicDelay) {
   RunLoopUntilIdle();
   EXPECT_FALSE(notify()->delay_info());
 
-  fake_stream_config->InjectDelayUpdate(zx::nsec(123'456), zx::nsec(654'321));
+  fake_driver->InjectDelayUpdate(zx::nsec(123'456), zx::nsec(654'321));
   RunLoopUntilIdle();
   ASSERT_TRUE(DeviceDelayInfo(device));
   ASSERT_TRUE(DeviceDelayInfo(device)->internal_delay());
@@ -980,11 +974,11 @@ TEST_F(StreamConfigTest, DynamicDelay) {
 }
 
 TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
 
   ASSERT_TRUE(InInitializedState(device));
-  fake_stream_config->AllocateRingBuffer(8192);
+  fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl =
@@ -1004,11 +998,11 @@ TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
 }
 
 TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
-  auto fake_stream_config = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
-  fake_stream_config->set_active_channels_supported(false);
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
+  fake_driver->set_active_channels_supported(false);
   ASSERT_TRUE(InInitializedState(device));
-  fake_stream_config->AllocateRingBuffer(8192);
+  fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl =
@@ -1028,11 +1022,11 @@ TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
 }
 
 TEST_F(StreamConfigTest, SetActiveChannels) {
-  auto fake_stream_config = MakeFakeStreamConfigInput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+  auto fake_driver = MakeFakeStreamConfigInput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
-  fake_stream_config->AllocateRingBuffer(8192);
-  fake_stream_config->set_active_channels_supported(true);
+  fake_driver->AllocateRingBuffer(8192);
+  fake_driver->set_active_channels_supported(true);
   ASSERT_TRUE(SetControl(device));
   ConnectToRingBufferAndExpectValidClient(device);
 

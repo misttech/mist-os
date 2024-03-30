@@ -68,12 +68,11 @@ zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
   auto detector_result =
       media_audio::DeviceDetector::Create(device_detection_handler, thread_->dispatcher());
 
-  ADR_LOG_METHOD(kLogDeviceDetection) << "returning " << detector_result.status_value();
-
   if (detector_result.is_ok()) {
     device_detector_ = detector_result.value();
   }
 
+  ADR_LOG_METHOD(kLogDeviceDetection) << "returning " << detector_result.status_string();
   return detector_result.status_value();
 }
 
@@ -236,17 +235,10 @@ zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
 
   // Set up an outgoing directory with the startup handle (provided by the system to components so
   // they can serve out FIDL protocols etc).
-  return outgoing_.ServeFromStartupInfo().status_value();
-}
+  auto result = outgoing_.ServeFromStartupInfo();
 
-// This does nothing that couldn't be done by calling ProviderServer::Create directly, bit it
-// mirrors similar (upcoming) methods for other FIDL Server classes that WILL do more. If this turns
-// out to not be the case, we will remove this at that time.
-std::shared_ptr<ProviderServer> AudioDeviceRegistry::CreateProviderServer(
-    fidl::ServerEnd<fuchsia_audio_device::Provider> server_end) {
-  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogProviderServerMethods);
-
-  return ProviderServer::Create(thread_, std::move(server_end), shared_from_this());
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods) << "returning " << result.status_string();
+  return result.status_value();
 }
 
 std::shared_ptr<RegistryServer> AudioDeviceRegistry::CreateRegistryServer(
@@ -260,13 +252,6 @@ std::shared_ptr<RegistryServer> AudioDeviceRegistry::CreateRegistryServer(
     new_registry->DeviceWasAdded(device);
   }
   return new_registry;
-}
-
-std::shared_ptr<ControlCreatorServer> AudioDeviceRegistry::CreateControlCreatorServer(
-    fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end) {
-  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogControlCreatorServerMethods);
-
-  return ControlCreatorServer::Create(thread_, std::move(server_end), shared_from_this());
 }
 
 std::shared_ptr<ObserverServer> AudioDeviceRegistry::CreateObserverServer(
@@ -294,12 +279,25 @@ std::shared_ptr<ControlServer> AudioDeviceRegistry::CreateControlServer(
   return nullptr;
 }
 
+// These subsequent methods simply call [Provider|ControlCreator|RingBuffer]Server::Create directly,
+// but they mirror similar methods (above) for FIDL Server classes that do more.
+std::shared_ptr<ProviderServer> AudioDeviceRegistry::CreateProviderServer(
+    fidl::ServerEnd<fuchsia_audio_device::Provider> server_end) {
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogProviderServerMethods);
+  return ProviderServer::Create(thread_, std::move(server_end), shared_from_this());
+}
+
+std::shared_ptr<ControlCreatorServer> AudioDeviceRegistry::CreateControlCreatorServer(
+    fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end) {
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogControlCreatorServerMethods);
+  return ControlCreatorServer::Create(thread_, std::move(server_end), shared_from_this());
+}
+
 std::shared_ptr<RingBufferServer> AudioDeviceRegistry::CreateRingBufferServer(
     fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
     const std::shared_ptr<ControlServer>& parent,
     const std::shared_ptr<Device>& device_to_control) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogRingBufferServerMethods);
-
   return RingBufferServer::Create(thread_, std::move(server_end), parent, device_to_control);
 }
 
