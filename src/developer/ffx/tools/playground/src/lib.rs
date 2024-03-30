@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use analytics::add_custom_event;
 use anyhow::{anyhow, Result};
 use argh::{ArgsInfo, FromArgs};
 use async_fs as afs;
@@ -136,27 +137,31 @@ pub async fn exec_playground(
         })
         .await;
 
-    let mut line = String::new();
+    let mut text = String::new();
     if let Some(cmd) = command.command {
         if command.file.is_some() {
             Err(anyhow!("Cannot specify a command and a file at the same time"))
         } else {
-            display_result(
-                &mut AllowStdIo::new(&io::stdout()),
-                interpreter.run(cmd.as_str()).await,
-                &interpreter,
-            )
-            .await?;
+            let res = interpreter.run(cmd.as_str()).await;
+            let _ = add_custom_event(
+                Some("ffx_playground_inline_cmd"),
+                Some(cmd.as_str()),
+                None,
+                [("result", format!("{res:?}").into())].into_iter().collect(),
+            );
+            display_result(&mut AllowStdIo::new(&io::stdout()), res, &interpreter).await?;
             Ok(())
         }
     } else if let Some(file) = command.file {
-        afs::File::open(file).await?.read_to_string(&mut line).await?;
-        display_result(
-            &mut AllowStdIo::new(&io::stdout()),
-            interpreter.run(line.as_str()).await,
-            &interpreter,
-        )
-        .await?;
+        afs::File::open(&file).await?.read_to_string(&mut text).await?;
+        let res = interpreter.run(text.as_str()).await;
+        let _ = add_custom_event(
+            Some("ffx_playground_script"),
+            Some(&file),
+            None,
+            [("result", format!("{res:?}").into())].into_iter().collect(),
+        );
+        display_result(&mut AllowStdIo::new(&io::stdout()), res, &interpreter).await?;
         Ok(())
     } else {
         let node_name = remote_proxy
@@ -187,13 +192,16 @@ pub async fn exec_playground(
             let interpreter = Arc::clone(&interpreter);
             if let Some(line) = line? {
                 fasync::Task::local(async move {
-                    display_result(
-                        &mut repl::ReplWriter::new(&*repl),
-                        interpreter.run(line.as_str()).await,
-                        &interpreter,
-                    )
-                    .await
-                    .unwrap();
+                    let res = interpreter.run(line.as_str()).await;
+                    let _ = add_custom_event(
+                        Some("ffx_playground_cmd"),
+                        Some(line.as_str()),
+                        None,
+                        [("result", format!("{res:?}").into())].into_iter().collect(),
+                    );
+                    display_result(&mut repl::ReplWriter::new(&*repl), res, &interpreter)
+                        .await
+                        .unwrap();
                 })
                 .detach();
             } else {
