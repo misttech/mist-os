@@ -29,8 +29,9 @@ class Driver : public fdf::DriverBase {
   using Base = fdf::DriverBase;
 
  public:
-  Driver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher,
-         device_t device, const zx_protocol_device_t* ops, std::string_view driver_path);
+  Driver(fdf::DriverStartArgs start_args, zx::vmo config_vmo,
+         fdf::UnownedSynchronizedDispatcher driver_dispatcher, device_t device,
+         const zx_protocol_device_t* ops, std::string_view driver_path);
   ~Driver() override;
 
   void Start(fdf::StartCompleter completer) override;
@@ -58,6 +59,8 @@ class Driver : public fdf::DriverBase {
   zx_handle_t GetIrqResource();
 
   zx_handle_t GetSmcResource();
+
+  zx::vmo& GetConfigVmo();
 
   // # Threading notes
   //
@@ -151,6 +154,7 @@ class Driver : public fdf::DriverBase {
   zx::resource info_resource_;
   zx::resource iommu_resource_;
   zx::resource framebuffer_resource_;
+  zx::vmo config_vmo_;
 
   fidl::WireClient<fuchsia_driver_compat::Device> parent_client_;
   std::unordered_map<std::string, fidl::WireClient<fuchsia_driver_compat::Device>> parent_clients_;

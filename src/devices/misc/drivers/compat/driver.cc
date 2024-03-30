@@ -327,13 +327,14 @@ std::optional<size_t> GlobalLoggerList::loggers_count_for_testing(const std::str
   return std::nullopt;
 }
 
-Driver::Driver(fdf::DriverStartArgs start_args,
+Driver::Driver(fdf::DriverStartArgs start_args, zx::vmo config_vmo,
                fdf::UnownedSynchronizedDispatcher driver_dispatcher, device_t device,
                const zx_protocol_device_t* ops, std::string_view driver_path)
     : Base("compat", std::move(start_args), std::move(driver_dispatcher)),
       executor_(dispatcher()),
       driver_path_(driver_path),
-      device_(device, ops, this, std::nullopt, nullptr, dispatcher()) {
+      device_(device, ops, this, std::nullopt, nullptr, dispatcher()),
+      config_vmo_(std::move(config_vmo)) {
   // Give the parent device the correct node.
   device_.Bind({std::move(node()), dispatcher()});
   // Call this so the parent device is in the post-init state.
@@ -507,6 +508,8 @@ zx_handle_t Driver::GetSmcResource() {
   }
   return smc_resource_.get();
 }
+
+zx::vmo& Driver::GetConfigVmo() { return config_vmo_; }
 
 zx_handle_t Driver::GetInfoResource() {
   if (!info_resource_.is_valid()) {

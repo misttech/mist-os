@@ -291,6 +291,10 @@ typedef struct zx_protocol_device {
 // } protocol_xyz_t;
 zx_status_t device_get_protocol(const zx_device_t* dev, uint32_t proto_id, void* protocol);
 
+// Structured configuration VMO
+// Returns the configuration VMO. This call can only be made once per device.
+zx_status_t device_get_config_vmo(zx_device_t* device, zx_handle_t* config_vmo);
+
 // Direct Device Ops Functions
 
 // Opens a connection to the specified runtime service offered by |device|.

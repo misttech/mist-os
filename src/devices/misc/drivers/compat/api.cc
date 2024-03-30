@@ -47,6 +47,14 @@ __EXPORT zx_status_t device_get_protocol(const zx_device_t* dev, uint32_t proto_
   return dev->GetProtocol(proto_id, out);
 }
 
+__EXPORT zx_status_t device_get_config_vmo(zx_device_t* device, zx_handle_t* config_vmo) {
+  if (device == nullptr || config_vmo == nullptr) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  *config_vmo = device->driver()->GetConfigVmo().release();
+  return ZX_OK;
+}
+
 // LibDriver Misc Interfaces
 
 __EXPORT zx_handle_t get_mmio_resource(zx_device_t* device) {

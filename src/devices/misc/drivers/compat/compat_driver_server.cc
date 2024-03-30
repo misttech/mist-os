@@ -51,9 +51,10 @@ Driver* CompatDriverServer::CreateDriver(fuchsia_driver_framework::DriverStartAr
     start_completer(compat.take_error());
     return nullptr;
   }
-
-  auto driver = std::make_unique<Driver>(std::move(start_args), std::move(driver_dispatcher),
-                                         *compat_device, ops, "/pkg/" + *compat);
+  zx::vmo config_vmo = std::move(start_args.config()).value_or(zx::vmo());
+  auto driver = std::make_unique<Driver>(std::move(start_args), std::move(config_vmo),
+                                         std::move(driver_dispatcher), *compat_device, ops,
+                                         "/pkg/" + *compat);
   driver->Start(std::move(start_completer));
   return driver.release();
 }
