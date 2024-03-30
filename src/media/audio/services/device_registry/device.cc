@@ -408,7 +408,7 @@ void Device::DropRingBuffer() {
   driver_format_.reset();  // We are not configured.
 
   // Clear our FIDL connection to the driver RingBuffer.
-  ring_buffer_client_ = fidl::Client<fuchsia_hardware_audio::RingBuffer>();
+  (void)ring_buffer_client_.UnbindMaybeGetEndpoint();
 }
 
 void Device::SetError(zx_status_t error) {

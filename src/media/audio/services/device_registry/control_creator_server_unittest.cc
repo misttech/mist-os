@@ -8,7 +8,6 @@
 
 #include <gtest/gtest.h>
 
-#include "lib/fidl/cpp/wire/channel.h"
 #include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 
@@ -27,7 +26,7 @@ TEST_F(ControlCreatorServerTest, CleanClientDrop) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
 
-  control_creator->client() = fidl::Client<fuchsia_audio_device::ControlCreator>();
+  (void)control_creator->client().UnbindMaybeGetEndpoint();
 }
 
 // Validate that the ControlCreator server can shutdown cleanly without generating a WARNING.

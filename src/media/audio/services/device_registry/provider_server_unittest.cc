@@ -29,8 +29,7 @@ TEST_F(ProviderServerTest, CleanClientDrop) {
   auto provider = CreateTestProviderServer();
   ASSERT_EQ(ProviderServer::count(), 1u);
 
-  provider->client() = fidl::Client<Provider>();
-
+  (void)provider->client().UnbindMaybeGetEndpoint();
   // No WARNING logging should occur.
 }
 
@@ -40,7 +39,6 @@ TEST_F(ProviderServerTest, CleanServerShutdown) {
   ASSERT_EQ(ProviderServer::count(), 1u);
 
   provider->server().Shutdown(ZX_ERR_PEER_CLOSED);
-
   // No WARNING logging should occur.
 }
 
@@ -70,7 +68,7 @@ TEST_F(ProviderServerCodecTest, AddedDeviceThatOutlivesProvider) {
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
-  provider->client() = fidl::Client<Provider>();
+  (void)provider->client().UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
   EXPECT_TRUE(provider->server().WaitForShutdown(zx::sec(1)));
@@ -211,7 +209,7 @@ TEST_F(ProviderServerStreamConfigTest, AddedDeviceThatOutlivesProvider) {
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
-  provider->client() = fidl::Client<Provider>();
+  (void)provider->client().UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
   EXPECT_TRUE(provider->server().WaitForShutdown(zx::sec(1)));

@@ -33,7 +33,7 @@ TEST_F(RegistryServerTest, CleanClientDrop) {
   auto registry = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
 
-  registry->client() = fidl::Client<fuchsia_audio_device::Registry>();
+  (void)registry->client().UnbindMaybeGetEndpoint();
 }
 
 // Server can cleanly shutdown without hang, and without WARNING being logged.

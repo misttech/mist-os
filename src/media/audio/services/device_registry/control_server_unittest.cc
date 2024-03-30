@@ -104,8 +104,7 @@ TEST_F(ControlServerCodecTest, CleanClientDrop) {
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  control->client() = fidl::Client<fuchsia_audio_device::Control>();
-
+  (void)control->client().UnbindMaybeGetEndpoint();
   // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
 }
 
@@ -139,7 +138,7 @@ TEST_F(ControlServerCodecTest, BasicClose) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(control_client.is_valid());
-  control_client = fidl::Client<fuchsia_audio_device::Control>();
+  (void)control_client.UnbindMaybeGetEndpoint();
 }
 
 // A ControlCreator can be closed without affecting the Controls that it created.
@@ -161,7 +160,7 @@ TEST_F(ControlServerCodecTest, ControlCreatorServerShutdownDoesNotAffectControl)
 
   EXPECT_TRUE(control_client.is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
-  control_client = fidl::Client<fuchsia_audio_device::Control>();
+  (void)control_client.UnbindMaybeGetEndpoint();
 }
 
 // Validate that the ControlServer shuts down cleanly if the driver drops its Codec.
@@ -386,7 +385,7 @@ TEST_F(ControlServerStreamConfigTest, CleanClientDrop) {
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  control->client() = fidl::Client<fuchsia_audio_device::Control>();
+  (void)control->client().UnbindMaybeGetEndpoint();
 
   // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
 }
@@ -421,7 +420,7 @@ TEST_F(ControlServerStreamConfigTest, BasicClose) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(control_client.is_valid());
-  control_client = fidl::Client<fuchsia_audio_device::Control>();
+  (void)control_client.UnbindMaybeGetEndpoint();
 }
 
 // A ControlCreator can be closed without affecting the Controls that it created.
@@ -443,7 +442,7 @@ TEST_F(ControlServerStreamConfigTest, ControlCreatorServerShutdownDoesNotAffectC
 
   EXPECT_TRUE(control_client.is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
-  control_client = fidl::Client<fuchsia_audio_device::Control>();
+  (void)control_client.UnbindMaybeGetEndpoint();
 }
 
 // Validate that the ControlServer shuts down cleanly if the driver drops its Codec.
@@ -519,7 +518,7 @@ TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) 
     EXPECT_TRUE(received_callback);
 
     // Let our RingBuffer client connection drop.
-    ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>();
+    (void)ring_buffer_client.UnbindMaybeGetEndpoint();
   }
 
   // Wait for the RingBufferServer to destruct.

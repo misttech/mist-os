@@ -139,7 +139,7 @@ TEST_F(ObserverServerCodecTest, CleanClientDrop) {
   auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
-  observer->client() = fidl::Client<fuchsia_audio_device::Observer>();
+  (void)observer->client().UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
@@ -362,7 +362,7 @@ TEST_F(ObserverServerStreamConfigTest, CleanClientDrop) {
   auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
-  observer->client() = fidl::Client<fuchsia_audio_device::Observer>();
+  (void)observer->client().UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
@@ -695,10 +695,6 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfDriverRingBufferDrop
   EXPECT_EQ(ObserverServer::count(), 1u);
   EXPECT_TRUE(observer->client().is_valid());
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
-
-  //// Previously this may have been needed, to ensure we didn't get a WARNING as things unwound.
-  //// Keep it around for now, just in case flakes crop up in CQ.
-  // ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>();
 }
 
 // Validate that an Observer does not drop, if the observed device's RingBuffer client is dropped.
