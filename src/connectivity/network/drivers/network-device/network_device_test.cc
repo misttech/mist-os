@@ -94,11 +94,7 @@ class NetDeviceDriverTest : public ::testing::Test {
       return connect_result.take_error();
     }
     fidl::WireSyncClient<netdev::Device>& netdevice = connect_result.value();
-    zx::result endpoints = fidl::CreateEndpoints<netdev::PortWatcher>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    auto [client_end, server_end] = std::move(endpoints.value());
+    auto [client_end, server_end] = fidl::Endpoints<netdev::PortWatcher>::Create();
     if (zx_status_t status = netdevice->GetPortWatcher(std::move(server_end)).status();
         status != ZX_OK) {
       return zx::error(status);

@@ -137,9 +137,7 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
 
   void StartNetdeviceClient(fidl::InterfaceHandle<fuchsia::hardware::network::Port> port_handle,
                             ClientWithAttachedPort* out_client) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
-    ASSERT_OK(endpoints.status_value());
-    auto& [client_end, server_end] = endpoints.value();
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_network::Device>::Create();
 
     fuchsia::hardware::network::PortSyncPtr port = port_handle.BindSync();
     ASSERT_OK(port->GetDevice(

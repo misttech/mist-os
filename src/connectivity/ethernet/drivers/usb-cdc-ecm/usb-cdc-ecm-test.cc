@@ -94,9 +94,7 @@ class NetworkDeviceInterface {
         component::ConnectAt<fuchsia_hardware_network::DeviceInstance>(directory, path);
     ASSERT_OK(controller);
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
-    ASSERT_OK(endpoints.status_value());
-    auto& [client_end, server_end] = endpoints.value();
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_network::Device>::Create();
 
     fidl::Status device_status =
         fidl::WireCall(controller.value())->GetDevice(std::move(server_end));

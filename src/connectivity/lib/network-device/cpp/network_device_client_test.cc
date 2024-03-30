@@ -169,11 +169,7 @@ class NetDeviceTest : public gtest::RealLoopFixture {
 
   static zx::result<fuchsia_hardware_network::wire::PortId> GetPortId(
       fit::function<zx_status_t(fidl::ServerEnd<fuchsia_hardware_network::Port>)> get_port) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Port>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<fuchsia_hardware_network::Port>::Create();
     if (zx_status_t status = get_port(std::move(server)); status != ZX_OK) {
       return zx::error(status);
     }
@@ -947,9 +943,7 @@ TEST_P(GetPortsTest, GetPortsWithPortCount) {
     zx::result status = AddTunPort(tun_device, std::move(config));
     ASSERT_OK(status.status_value());
     fidl::ClientEnd port = std::move(status.value());
-    zx::result endpoints = fidl::CreateEndpoints<netdev::Port>();
-    ASSERT_OK(endpoints.status_value());
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<netdev::Port>::Create();
     ASSERT_OK(fidl::WireCall(port)->GetPort(std::move(server)).status());
     ports.push_back(std::move(port));
 

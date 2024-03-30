@@ -100,9 +100,8 @@ class UsbAx88179Test : public zxtest::Test, loop_fixture::RealLoop {
         caller.directory(), dev_path_);
     ASSERT_OK(instance);
 
-    zx::result device_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
-    ASSERT_OK(device_endpoints);
-    auto& [device_client, device_server] = device_endpoints.value();
+    auto [device_client, device_server] =
+        fidl::Endpoints<fuchsia_hardware_network::Device>::Create();
     ASSERT_OK(fidl::WireCall(instance.value())->GetDevice(std::move(device_server)));
 
     client_ = std::make_unique<network::client::NetworkDeviceClient>(std::move(device_client),

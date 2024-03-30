@@ -2983,9 +2983,7 @@ TEST_F(NetworkDeviceTest, CloneDevice) {
   impl_.info().min_rx_buffer_length = 1234;
   ASSERT_OK(CreateDevice());
   fidl::WireSyncClient connection1 = OpenConnection();
-  zx::result endpoints = fidl::CreateEndpoints<netdev::Device>();
-  ASSERT_OK(endpoints.status_value());
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] = fidl::Endpoints<netdev::Device>::Create();
   ASSERT_OK(connection1->Clone(std::move(server_end)).status());
   fidl::WireSyncClient connection2{std::move(client_end)};
   fidl::WireResult result = connection2->GetInfo();
@@ -3001,9 +2999,7 @@ TEST_F(NetworkDeviceTest, ClonePort) {
   zx::result port = OpenPort(kPort13);
   ASSERT_OK(port.status_value());
   fidl::WireSyncClient connection1 = std::move(port.value());
-  zx::result endpoints = fidl::CreateEndpoints<netdev::Port>();
-  ASSERT_OK(endpoints.status_value());
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] = fidl::Endpoints<netdev::Port>::Create();
   ASSERT_OK(connection1->Clone(std::move(server_end)).status());
   fidl::WireSyncClient connection2{std::move(client_end)};
 
@@ -3028,9 +3024,7 @@ TEST_F(NetworkDeviceTest, PortGetDevice) {
   zx::result port = OpenPort(kPort13);
   ASSERT_OK(port.status_value());
   fidl::WireSyncClient port_connection = std::move(port.value());
-  zx::result endpoints = fidl::CreateEndpoints<netdev::Device>();
-  ASSERT_OK(endpoints.status_value());
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] = fidl::Endpoints<netdev::Device>::Create();
   ASSERT_OK(port_connection->GetDevice(std::move(server_end)).status());
   fidl::WireSyncClient device_connection{std::move(client_end)};
   fidl::WireResult result = device_connection->GetInfo();
@@ -3234,9 +3228,7 @@ TEST_F(NetworkDeviceTest, LogDebugInfoToSyslog) {
   ASSERT_OK(port.status_value());
   fidl::WireSyncClient port_connection = std::move(port.value());
 
-  zx::result endpoints = fidl::CreateEndpoints<netdev::Diagnostics>();
-  ASSERT_OK(endpoints.status_value());
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] = fidl::Endpoints<netdev::Diagnostics>::Create();
   ASSERT_OK(port_connection->GetDiagnostics(std::move(server_end)).status());
 
   fidl::WireSyncClient diagnostics{std::move(client_end)};
