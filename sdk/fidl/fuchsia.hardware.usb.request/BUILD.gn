@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.usb.request") {
+  sdk_category = "internal"
   sources = [ "request.fidl" ]
   public_deps = [
     # TODO(https://fxbug.dev/42178882): migrate usb descriptor to FIDL

@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.powersource.test") {
+  sdk_category = "internal"
   sources = [ "simulator.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.hardware.powersource" ]
 }

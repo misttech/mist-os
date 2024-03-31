@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.sysmem") {
+  sdk_category = "internal"
   sources = [
     "driver_connector.fidl",
     "heap.fidl",

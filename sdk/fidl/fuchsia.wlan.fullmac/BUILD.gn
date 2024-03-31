@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.wlan.fullmac") {
+  sdk_category = "internal"
   sources = [ "fullmac.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.wlan.common",

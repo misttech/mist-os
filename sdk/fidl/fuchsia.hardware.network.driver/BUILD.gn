@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.network.driver") {
+  sdk_category = "internal"
   sources = [
     "network-device.fidl",
     "network-mac.fidl",

@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.usb.phy") {
+  sdk_category = "internal"
   sources = [ "usb-phy.fidl" ]
   contains_drivers = true
   public_deps = [ "//zircon/vdso/zx" ]

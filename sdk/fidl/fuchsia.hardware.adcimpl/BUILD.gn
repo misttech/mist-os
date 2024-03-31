@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.adcimpl") {
+  sdk_category = "internal"
   sources = [
     "adc-impl.fidl",
     "metadata.fidl",

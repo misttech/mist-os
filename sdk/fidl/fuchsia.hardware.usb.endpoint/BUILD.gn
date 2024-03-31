@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.usb.endpoint") {
+  sdk_category = "internal"
   sources = [ "endpoint.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.usb.request",

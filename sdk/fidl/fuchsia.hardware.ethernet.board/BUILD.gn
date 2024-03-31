@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.ethernet.board") {
+  sdk_category = "internal"
   sources = [ "ethernet-board.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
