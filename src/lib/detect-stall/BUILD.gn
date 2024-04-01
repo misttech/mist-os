@@ -35,6 +35,7 @@ rustc_library("detect-stall") {
     ":*",
     "//src/connectivity/policy/http-client:*",
     "//src/lib/fuchsia-component:*",
+    "//src/sys/component_manager/tests/*",
     "//src/sys/pkg/bin/system-update-committer:*",
   ]
 }

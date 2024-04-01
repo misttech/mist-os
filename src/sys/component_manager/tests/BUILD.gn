@@ -49,6 +49,7 @@ group("hermetic_tests") {
     "security_policy/next_vdso:security-policy-next-vdso-test",
     "services:tests",
     "shutdown:shutdown_integration_test",
+    "stop_with_escrow:tests",
     "storage:storage_integration_test",
     "structured_config/client_integration/cpp_driver:cpp_driver",
     "structured_config/client_integration/cpp_elf:cpp_elf",
