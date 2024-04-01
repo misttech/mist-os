@@ -23,7 +23,7 @@ var fidlTmpl = template.Must(template.New("fidlTmpl").Parse(
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// GENERATED FILE: Regen with "fx regen_fidl_benchmark_suite"
+// GENERATED FILE: Regen with "fx build host-tools/regen_fidl_benchmark_suite && fx regen_fidl_benchmark_suite && fx format-code"
 
 library test.benchmarkfidl;
 {{- if .ExtraDefinition }}
@@ -65,7 +65,7 @@ func genFidlFile(filepath string, fidl config.FidlFile) error {
 			body = attribute + body
 		}
 		definitions = append(definitions, fidlTmplDefinition{
-			Body:    formatObj(0, body),
+			Body:    strings.TrimSpace(body),
 			Comment: formatComment(definition.Comment),
 		})
 	}
@@ -77,7 +77,7 @@ func genFidlFile(filepath string, fidl config.FidlFile) error {
 	defer f.Close()
 	return fidlTmpl.Execute(f, fidlTmplInput{
 		Year:            time.Now().Year(),
-		ExtraDefinition: formatObj(0, fidl.ExtraDefinition),
+		ExtraDefinition: strings.TrimSpace(fidl.ExtraDefinition),
 		Definitions:     definitions,
 	})
 }

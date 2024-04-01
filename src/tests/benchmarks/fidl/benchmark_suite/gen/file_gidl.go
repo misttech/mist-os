@@ -24,7 +24,7 @@ var gidlTmpl = template.Must(template.New("gidlTmpl").Parse(
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// GENERATED FILE: Regen with "fx regen_fidl_benchmark_suite"
+// GENERATED FILE: Regen with "fx build host-tools/regen_fidl_benchmark_suite && fx regen_fidl_benchmark_suite && fx format-code"
 
 {{- range .Benchmarks }}
 
@@ -92,7 +92,7 @@ func genGidlFile(filepath string, gidl config.GidlFile) error {
 			Name:                     benchmark.Name,
 			Comment:                  formatComment(benchmark.Comment),
 			HandleDefs:               formatHandleDefList(benchmark.HandleDefs),
-			Value:                    formatObj(1, value),
+			Value:                    strings.TrimSpace(value),
 			Allowlist:                formatBindingList(benchmark.Allowlist),
 			Denylist:                 formatBindingList(benchmark.Denylist),
 			EnableSendEventBenchmark: benchmark.EnableSendEventBenchmark,
