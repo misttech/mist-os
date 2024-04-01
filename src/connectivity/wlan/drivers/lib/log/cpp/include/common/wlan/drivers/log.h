@@ -60,24 +60,20 @@
     }                                                       \
   } while (0)
 
-#define WLAN_TRACE_DURATION(...)                                          \
-  auto function_name = cpp20::source_location::current().function_name(); \
-  auto file_name = cpp20::source_location::current().file_name();         \
-  auto line = cpp20::source_location::current().line();                   \
-  WLAN_TRACE_DURATION_(function_name);
+#define WLAN_TRACE_DURATION(...) \
+  WLAN_TRACE_DURATION_(cpp20::source_location::current().function_name());
 
-#define WLAN_LAMBDA_TRACE_DURATION(name, ...)                     \
-  auto file_name = cpp20::source_location::current().file_name(); \
-  auto line = cpp20::source_location::current().line();           \
-  WLAN_TRACE_DURATION_(("λ " name));
+#define WLAN_LAMBDA_TRACE_DURATION(name, ...) WLAN_TRACE_DURATION_(("λ " name));
 
 // TODO(https://fxbug.dev/320494175): Record an instant event at the
 // beginning of this macro to guarantee an event will be logged even
 // in the case of a crash.
-#define WLAN_TRACE_DURATION_(name, ...)                                                   \
-  TRACE_INSTANT("wlan", name, TRACE_SCOPE_THREAD, "line", TA_UINT64(line), "filename",    \
-                TA_STRING(file_name), ##__VA_ARGS__);                                     \
-  TRACE_DURATION("wlan", name, "line", TA_UINT64(line), "filename", TA_STRING(file_name), \
+#define WLAN_TRACE_DURATION_(name, ...)                                                     \
+  TRACE_INSTANT("wlan", name, TRACE_SCOPE_THREAD, "line",                                   \
+                TA_UINT64(cpp20::source_location::current().line()), "filename",            \
+                TA_STRING(cpp20::source_location::current().file_name()), ##__VA_ARGS__);   \
+  TRACE_DURATION("wlan", name, "line", TA_UINT64(cpp20::source_location::current().line()), \
+                 "filename", TA_STRING(cpp20::source_location::current().file_name()),      \
                  ##__VA_ARGS__);
 
 // The name_literal used here should be the same as defined in
