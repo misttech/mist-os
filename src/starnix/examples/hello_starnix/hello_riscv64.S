@@ -13,7 +13,7 @@ msg:
 _start:
     addi a0, zero, 1 # write to stdout
     la a1, msg # pointer to msg
-    addi a2, zero, 13 # length of msg
+    addi a2, zero, 14 # length of msg
     addi a7, zero, 64 # linux write system call
     ecall
 

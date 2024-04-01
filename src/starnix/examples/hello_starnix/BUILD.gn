@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
 
 config("config") {
   asmflags = [ "-fPIC" ]
@@ -31,4 +32,47 @@ fuchsia_package_with_single_component("hello_starnix") {
   component_name = "hello_starnix"
   manifest = "meta/hello_starnix.cml"
   deps = [ ":bin" ]
+}
+
+rustc_binary("hello_starnix_integration_test_bin") {
+  testonly = true
+  edition = "2021"
+  source_root = "test.rs"
+  sources = [ source_root ]
+  deps = [
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component-test",
+    "//src/sys/lib/component-events",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+fuchsia_test_component("hello_starnix_integration") {
+  manifest = "meta/integration_test.cml"
+  deps = [ ":hello_starnix_integration_test_bin" ]
+
+  test_type = "starnix"
+
+  # TODO(https://fxbug.dev/296309679) remove once ScopedInstance can be used separately
+  check_includes = false
+}
+
+fuchsia_test_package("hello_starnix_integration_test") {
+  test_components = [ ":hello_starnix_integration" ]
+  subpackages = [
+    ":hello_starnix",
+    "//src/starnix/kernel:starnix_kernel_package",
+    "//src/starnix/containers/empty_container",
+  ]
+}
+
+group("tests") {
+  testonly = true
+
+  if (current_cpu != "riscv64") {
+    deps = [ ":hello_starnix_integration_test" ]
+  }
 }
