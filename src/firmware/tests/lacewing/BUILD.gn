@@ -8,6 +8,7 @@ import("//build/testing/environments.gni")
 assert(is_host, "Python E2E tests are host-only")
 
 python_mobly_test("lacewing") {
+  enable_mypy = true
   main_source = "fastboot.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",

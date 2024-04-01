@@ -44,7 +44,7 @@ _GETVAR_REGEX = re.compile(
 )
 
 
-def parse_getvar(line: str) -> Tuple[str, str, str]:
+def parse_getvar(line: str) -> Tuple[str, str, str]:  # type: ignore[return]
     """Parses a `getvar` or `getvar all` output line.
 
     Args:
@@ -58,18 +58,17 @@ def parse_getvar(line: str) -> Tuple[str, str, str]:
         Mobly assert if the line doesn't look like `getvar` output.
     """
     match = _GETVAR_REGEX.match(line)
-    asserts.assert_true(
-        match, "Failed to parse getvar output", extras={"line": line}
-    )
-    return (
-        match.group("name"),
-        match.group("arg") or "",
-        match.group("val"),
-    )
+    if match:
+        return (
+            match.group("name"),
+            match.group("arg") or "",
+            match.group("val") or "",
+        )
+    asserts.fail("Failed to parse getvar output", extras={"line": line})
 
 
 class FastbootTest(fuchsia_base_test.FuchsiaBaseTest):
-    def setup_class(self):
+    def setup_class(self) -> None:
         """Initializes all DUT(s)"""
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
@@ -81,18 +80,18 @@ class FastbootTest(fuchsia_base_test.FuchsiaBaseTest):
         # For the time being we'll group tests that would ideally be separate
         # into single methods to minimize the number of times we have to reboot.
 
-    def setup_test(self):
+    def setup_test(self) -> None:
         """Puts the device into fastboot mode before each test."""
         super().setup_test()
         self.device.fastboot.boot_to_fastboot_mode()
 
-    def teardown_test(self):
+    def teardown_test(self) -> None:
         """Puts the device back into Fuchsia mode after each test."""
         if self.device.fastboot.is_in_fastboot_mode():
             self.device.fastboot.boot_to_fuchsia_mode()
         super().teardown_test()
 
-    def test_getvar(self):
+    def test_getvar(self) -> None:
         """Tests fastboot variables."""
         # Make sure each variable can also be individually queried and that the
         # value is what we expect.
