@@ -137,10 +137,11 @@ size_checker_input = {
       pkgs = [
         "vulkan_loader",
         "libvulkan_intel_gen",
+        "libvulkan_gfxstream",
         "libvulkan_goldfish",
         "vulkan_loader",
       ]
-      limit = 4194304  # 4 MiB
+      limit = 4980736  # 4.75 MiB
       creep_limit = 49152  # 48.0 KiB
     },
     {
