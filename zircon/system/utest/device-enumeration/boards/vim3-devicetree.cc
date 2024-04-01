@@ -21,7 +21,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/clock-controller-ff63c000/clocks",
       "sys/platform/clock-controller-ff63c000/clocks/clock-init",
       "sys/platform/fuchsia-contiguous/sysmem",
-      "sys/platform/register-controller-1000/registers-device",
+      "sys/platform/register-controller-1000",
       "sys/platform/nna-ff100000/nna-ff100000_group/aml-nna",
       "sys/platform/canvas-ff638000/aml-canvas",
       "sys/platform/adc-9000",

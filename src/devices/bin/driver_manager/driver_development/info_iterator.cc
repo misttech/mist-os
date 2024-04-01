@@ -10,7 +10,7 @@ namespace driver_development {
 
 namespace {
 
-constexpr size_t kMaxEntries = 10;
+constexpr size_t kMaxEntries = 7;
 
 }  // namespace
 
