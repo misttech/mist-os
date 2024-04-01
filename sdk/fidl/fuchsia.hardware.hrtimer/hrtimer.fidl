@@ -93,8 +93,7 @@ open protocol Device {
     /// will restart the timer. Note that this may race with the expiration of the previous timer,
     /// for instance the notification process may be already started and a new `Start` call won't
     /// be able to stop a notification that is already in flight.
-    /// If the specified `id` is not within the `properties` returned by `GetProperties`,
-    /// i.e. if 'id' is not a valid identifier, this call will return `INVALID_ARGS`.
+    /// If the specified `id` is invalid, then this call will return `INVALID_ARGS`.
     /// If the specified `resolution` is not supported per the `resolutions` provided by
     /// `GetProperties`, then this call will return `INVALID_ARGS`.
     /// If the specified `ticks` is beyond the range supported for the timer as provided by
@@ -110,8 +109,7 @@ open protocol Device {
     ///
     /// Note that this may race with the expiration of the timer, for instance notification via
     /// an event set with `SetEvent` may be already in flight.
-    /// If the specified `id` is not within the `properties` returned by `GetProperties`,
-    /// i.e. if 'id' is not a valid identifier, this call will return `INVALID_ARGS`.
+    /// If the specified `id` is invalid, then this call will return `INVALID_ARGS`.
     /// If the driver encounters an internal error, then this call will return `INTERNAL_ERROR`.
     flexible Stop(struct {
         id uint64;
@@ -119,8 +117,7 @@ open protocol Device {
 
     /// Get the current time in ticks left in timer `id` until expiration.
     ///
-    /// If the specified `id` is not within the `properties` returned by `GetProperties`,
-    /// i.e. if 'id' is not a valid identifier, this call will return `INVALID_ARGS`.
+    /// If the specified `id` is invalid, then this call will return `INVALID_ARGS`.
     flexible GetTicksLeft(struct {
         id uint64;
     }) -> (struct {
@@ -136,10 +133,10 @@ open protocol Device {
     /// To guarantee that an event is delivered upon timer expiration, this method must be
     /// called before calling `Start`.
     ///
-    /// If the specified `id` is not within the `properties` returned by `GetProperties`,
-    /// i.e. if 'id' is not a valid identifier, this call will return `INVALID_ARGS`.
+    /// If the specified `id` is invalid, then this call will return `INVALID_ARGS`.
     /// If this method is not supported for the given `id`, then this call will return
     /// `NOT_SUPPORTED`.
+    /// If the driver encounters an internal error, then this call will return `INTERNAL_ERROR`.
     flexible SetEvent(resource struct {
         id uint64;
         event zx.Handle:EVENT;
@@ -148,22 +145,19 @@ open protocol Device {
     /// Start the timer `id` to expire after `ticks` and waits until the timer expires with
     /// support for preventing suspension via the Power Framework.
     ///
-    /// The driver will not respond (hang) until the timer has triggered.
+    /// The driver will not respond to this call (hang) until the timer has triggered.
     /// Calling `Stop` on the timer will abort this call and return `CANCELED`. Note that this
     /// may race with the expiration of the timer.
     ///
-    /// The `keep_alive` LeaseControl channel keeps a lease on a power element that keeps the
-    /// system from suspending. When `keep_alive` is closed, then the driver lease keeping the
+    /// A driver supporting this call must be able to get a lease on a power element that keeps
+    /// the system from suspending. This lease is returned to the client via the `keep_alive`
+    /// LeaseControl channel field. When `keep_alive` is closed, then the driver lease keeping the
     /// system from suspending will be dropped. Hence, to guarantee that the system is not
     /// suspended by the Power Framework a client must either keep this `keep_alive` channel for
     /// as long as the system needs to not suspend, or a client must get its own lease from the
     /// Power Framework to prevent suspension before it drops `keep_alive`.
-    /// Note that there is no need to keep both the `keep_alive` channel and a new lease from the
-    /// Power Framwork to prevent suspension, one lease is enough to keep the system from
-    /// suspending.
     ///
-    /// If the specified `id` is not within the `properties` returned by `GetProperties`,
-    /// i.e. if 'id' is not a valid identifier, this call will return `INVALID_ARGS`.
+    /// If the specified `id` is invalid, then this call will return `INVALID_ARGS`.
     /// If this method is not supported for the given `id`, then this call will return
     /// `NOT_SUPPORTED`.
     /// If the driver does not have a `keep_alive` channel to provide to the client, then this
