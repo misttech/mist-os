@@ -269,13 +269,12 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
   }
 
   void BindRpmbClient() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_rpmb::Rpmb>();
-    ASSERT_OK(endpoints.status_value());
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_rpmb::Rpmb>::Create();
 
-    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server),
+    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(server_end),
                                 block_device_->child_rpmb_device().get());
     ASSERT_OK(loop_.StartThread("rpmb-client-thread"));
-    rpmb_client_.Bind(std::move(endpoints->client), loop_.dispatcher());
+    rpmb_client_.Bind(std::move(client_end), loop_.dispatcher());
   }
 
   void MakeBlockOp(uint8_t opcode, uint32_t length, uint64_t offset,
@@ -1720,9 +1719,6 @@ TEST_P(SdmmcBlockDeviceTest, GetRpmbClient) {
 
   ASSERT_OK(StartDriverForMmc());
   BindRpmbClient();
-
-  zx::result rpmb_ends = fidl::CreateEndpoints<fuchsia_hardware_rpmb::Rpmb>();
-  ASSERT_OK(rpmb_ends.status_value());
 
   sync_completion_t completion;
   rpmb_client_->GetDeviceInfo().ThenExactlyOnce(

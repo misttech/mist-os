@@ -116,19 +116,18 @@ TEST_F(ZxcryptInspect, ExportsGuid) {
   zx::result channel =
       device_watcher::RecursiveWaitForFile(devfs_root_fd.get(), ramdisk_get_path(ramdisk));
   ASSERT_EQ(ZX_OK, channel.status_value());
-  fidl::ClientEnd<fuchsia_device::Controller> ramdisk_controller;
+  auto [controller_client_end, controller_server_end] =
+      fidl::Endpoints<fuchsia_device::Controller>::Create();
   {
     fidl::UnownedClientEnd<fuchsia_device::Controller> client(
         ramdisk_get_block_controller_interface(ramdisk));
-    zx::result controller_server = fidl::CreateEndpoints(&ramdisk_controller);
-    ASSERT_TRUE(controller_server.is_ok());
     ASSERT_EQ(
         ZX_OK,
-        fidl::WireCall(client)->ConnectToController(std::move(controller_server.value())).status());
+        fidl::WireCall(client)->ConnectToController(std::move(controller_server_end)).status());
   }
 
   // Create a new zxcrypt volume manager using the ramdisk.
-  zxcrypt::VolumeManager vol_mgr(std::move(ramdisk_controller), std::move(devfs_root_fd));
+  zxcrypt::VolumeManager vol_mgr(std::move(controller_client_end), std::move(devfs_root_fd));
   zx::channel zxc_client_chan;
   ASSERT_EQ(ZX_OK, vol_mgr.OpenClient(kTimeout, zxc_client_chan));
 

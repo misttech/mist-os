@@ -169,11 +169,7 @@ TEST(RamdiskTests, RamdiskTestSimple) {
 
 zx::result<std::unique_ptr<block_client::Client>> CreateSession(
     fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [session, server] = endpoints.value();
+  auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
 
   const fidl::Status result = fidl::WireCall(block)->OpenSession(std::move(server));
   if (!result.ok()) {
@@ -673,9 +669,7 @@ TEST(RamdiskTests, RamdiskTestFifoNoOp) {
   fidl::UnownedClientEnd block_interface = ramdisk->block_interface();
 
   auto open_and_close_fifo = [block_interface]() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-    ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-    auto& [session, server] = endpoints.value();
+    auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
 
     {
       const fidl::Status result = fidl::WireCall(block_interface)->OpenSession(std::move(server));
@@ -770,9 +764,7 @@ TEST(RamdiskTests, RamdiskTestFifoNoGroup) {
 
   fidl::UnownedClientEnd block_interface = ramdisk->block_interface();
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [session, server] = endpoints.value();
+  auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
 
   const fidl::Status result = fidl::WireCall(block_interface)->OpenSession(std::move(server));
   ASSERT_TRUE(result.ok()) << result.FormatDescription();
@@ -1052,9 +1044,7 @@ TEST(RamdiskTests, RamdiskTestFifoLargeOpsCountShutdown) {
   // Create a connection to the ramdisk
   fidl::UnownedClientEnd block_interface = ramdisk->block_interface();
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [session, server] = endpoints.value();
+  auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
 
   const fidl::Status result = fidl::WireCall(block_interface)->OpenSession(std::move(server));
   ASSERT_TRUE(result.ok()) << result.FormatDescription();

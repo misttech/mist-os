@@ -32,29 +32,19 @@ zx::result<> SdmmcRootDevice::Start() {
     sdmmc_metadata = *parsed_metadata;
   }
 
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (!controller_endpoints.is_ok()) {
-    FDF_LOGL(ERROR, logger(), "Failed to create controller endpoints: %s",
-             controller_endpoints.status_string());
-    return controller_endpoints.take_error();
-  }
+  auto [controller_client_end, controller_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+  auto [node_client_end, node_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::Node>::Create();
 
-  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  if (!node_endpoints.is_ok()) {
-    FDF_LOGL(ERROR, logger(), "Failed to create node endpoints: %s",
-             node_endpoints.status_string());
-    return node_endpoints.take_error();
-  }
-
-  controller_.Bind(std::move(controller_endpoints->client));
-  root_node_.Bind(std::move(node_endpoints->client));
+  controller_.Bind(std::move(controller_client_end));
+  root_node_.Bind(std::move(node_client_end));
 
   const auto args =
       fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, name()).Build();
 
-  auto result = parent_node_->AddChild(args, std::move(controller_endpoints->server),
-                                       std::move(node_endpoints->server));
+  auto result =
+      parent_node_->AddChild(args, std::move(controller_server_end), std::move(node_server_end));
   if (!result.ok()) {
     FDF_LOGL(ERROR, logger(), "Failed to add child: %s", result.status_string());
     return zx::error(result.status());

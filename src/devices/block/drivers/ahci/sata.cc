@@ -278,15 +278,10 @@ zx_status_t SataDevice::AddDevice() {
     return status;
   }
 
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (!controller_endpoints.is_ok()) {
-    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
-            controller_endpoints.status_string());
-    return controller_endpoints.status_value();
-  }
+  auto [controller_client_end, controller_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
-  node_controller_.Bind(std::move(controller_endpoints->client));
+  node_controller_.Bind(std::move(controller_client_end));
 
   fidl::Arena arena;
 
@@ -301,8 +296,7 @@ zx_status_t SataDevice::AddDevice() {
                         .properties(properties)
                         .Build();
 
-  auto result =
-      controller_->root_node()->AddChild(args, std::move(controller_endpoints->server), {});
+  auto result = controller_->root_node()->AddChild(args, std::move(controller_server_end), {});
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to add child SATA device: %s", result.status_string());
     return result.status();

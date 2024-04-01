@@ -261,18 +261,19 @@ class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
  public:
   void Lease(fuchsia_power_broker::LessorLeaseRequest& req,
              LeaseCompleter::Sync& completer) override {
-    auto lease_control = fidl::CreateEndpoints<fuchsia_power_broker::LeaseControl>();
+    auto [lease_control_client_end, lease_control_server_end] =
+        fidl::Endpoints<fuchsia_power_broker::LeaseControl>::Create();
 
     // Instantiate (fake) lease control implementation.
     auto lease_control_impl = std::make_unique<FakeLeaseControl>();
     lease_control_ = lease_control_impl.get();
     lease_control_binding_ = fidl::BindServer<fuchsia_power_broker::LeaseControl>(
-        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(lease_control->server),
+        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(lease_control_server_end),
         std::move(lease_control_impl),
         [](FakeLeaseControl* impl, fidl::UnbindInfo info,
            fidl::ServerEnd<fuchsia_power_broker::LeaseControl> server_end) mutable {});
 
-    completer.Reply(fit::success(std::move(lease_control->client)));
+    completer.Reply(fit::success(std::move(lease_control_client_end)));
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> md,
@@ -352,7 +353,8 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     fidl::ServerEnd<fuchsia_power_broker::Lessor>& lessor_server_end = req.lessor_channel().value();
 
     // Make channels to return to client
-    auto element_control = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
+    auto [element_control_client_end, element_control_server_end] =
+        fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
 
     // Instantiate (fake) lessor implementation.
     auto lessor_impl = std::make_unique<FakeLessor>();
@@ -408,11 +410,11 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
           });
     }
 
-    servers_.emplace_back(std::move(element_control->server), std::move(lessor_binding),
+    servers_.emplace_back(std::move(element_control_server_end), std::move(lessor_binding),
                           std::move(current_level_binding), std::move(required_level_binding));
 
     fuchsia_power_broker::TopologyAddElementResponse result{
-        {.element_control_channel = std::move(element_control->client)},
+        {.element_control_channel = std::move(element_control_client_end)},
     };
 
     completer.Reply(fit::success(std::move(result)));
@@ -570,14 +572,13 @@ class AmlSdmmcTest : public zxtest::Test {
 
     [&]() {
       // Open the svc directory in the driver's outgoing, and store a client to it.
-      auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-      ASSERT_EQ(ZX_OK, svc_endpoints.status_value());
+      auto [svc_client_end, svc_server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
       zx_status_t status = fdio_open_at(outgoing_directory_client_.handle()->get(), "/svc",
                                         static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                        svc_endpoints->server.TakeChannel().release());
+                                        svc_server_end.TakeChannel().release());
       ASSERT_EQ(ZX_OK, status);
-      client_end = std::move(svc_endpoints->client);
+      client_end = std::move(svc_client_end);
     }();
 
     return client_end;

@@ -159,10 +159,10 @@ class GptDeviceTest : public zxtest::Test {
     zx_status_t status = PartitionManager::Bind(nullptr, fake_parent_.get());
     if (status == ZX_OK) {
       loop_.StartThread();
-      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
-      EXPECT_OK(endpoints.status_value());
-      fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), GetPartitionManager());
-      volume_manager_fidl_.Bind(std::move(endpoints->client));
+      auto [client_end, server_end] =
+          fidl::Endpoints<fuchsia_hardware_block_volume::VolumeManager>::Create();
+      fidl::BindServer(loop_.dispatcher(), std::move(server_end), GetPartitionManager());
+      volume_manager_fidl_.Bind(std::move(client_end));
     }
     return status;
   }

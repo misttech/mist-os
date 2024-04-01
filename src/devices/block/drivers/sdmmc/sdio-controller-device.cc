@@ -229,31 +229,21 @@ zx_status_t SdioControllerDevice::AddDevice() {
   exposed_inspector_.emplace(inspect::ComponentInspector(
       dispatcher_, {.inspector = inspector_, .client_end = std::move(inspect_sink.value())}));
 
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (!controller_endpoints.is_ok()) {
-    FDF_LOGL(ERROR, logger(), "Failed to create controller endpoints: %s",
-             controller_endpoints.status_string());
-    return controller_endpoints.status_value();
-  }
+  auto [controller_client_end, controller_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+  auto [node_client_end, node_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::Node>::Create();
 
-  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  if (!node_endpoints.is_ok()) {
-    FDF_LOGL(ERROR, logger(), "Failed to create node endpoints: %s",
-             node_endpoints.status_string());
-    return node_endpoints.status_value();
-  }
-
-  controller_.Bind(std::move(controller_endpoints->client));
-  sdio_controller_node_.Bind(std::move(node_endpoints->client));
+  controller_.Bind(std::move(controller_client_end));
+  sdio_controller_node_.Bind(std::move(node_client_end));
 
   fidl::Arena arena;
 
   const auto args =
       fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, kDeviceName).Build();
 
-  auto result = parent_->root_node()->AddChild(args, std::move(controller_endpoints->server),
-                                               std::move(node_endpoints->server));
+  auto result = parent_->root_node()->AddChild(args, std::move(controller_server_end),
+                                               std::move(node_server_end));
   if (!result.ok()) {
     FDF_LOGL(ERROR, logger(), "Failed to add child sdio controller device: %s",
              result.status_string());

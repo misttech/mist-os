@@ -259,9 +259,7 @@ TEST(BlockTest, TestReadWriteSingle) {
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_end, server_end] = endpoints.value();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   fidl::BindServer(loop.dispatcher(), std::move(server_end), dut);
 
