@@ -210,7 +210,6 @@
                 "ptrace06",
                 "recvmsg01",
                 "rename14",
-                "select03",
 
                 // Causes an OOM when /dev/loop-control is available.
                 "fallocate05",
