@@ -481,7 +481,7 @@ class CxxRemoteAction(object):
             self.vmsg(
                 "Running the original compile command (with -Wdate-time) locally twice and comparing outputs."
             )
-            output_files = self._remote_output_files()
+            output_files = list(self._remote_output_files())
 
             max_attempts = self.determinism_attempts
             # For https://fxbug.dev/42080457, increase repetition count for

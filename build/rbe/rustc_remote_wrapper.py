@@ -1008,11 +1008,23 @@ class RustRemoteAction(object):
         )
         if self.check_determinism:
             self.vmsg("Comparing two local runs of the original command.")
+
+            output_files = list(self._remote_output_files())
+
+            max_attempts = self.determinism_attempts
+            # For b/328756843, increase repetition count for hard-to-reproduce cases.
+            override_attempts = fuchsia.determinism_repetitions(output_files)
+            if override_attempts is not None:
+                msg(
+                    f"Notice: Overriding number of determinism repetitions: {override_attempts}"
+                )
+                max_attempts = override_attempts
+
             command = fuchsia.check_determinism_command(
                 exec_root=self.exec_root_rel,
-                outputs=list(self._remote_output_files()),
+                outputs=output_files,
                 command=command,
-                max_attempts=self.determinism_attempts,
+                max_attempts=max_attempts,
                 miscomparison_export_dir=(
                     export_dir / self.build_subdir if export_dir else None
                 ),

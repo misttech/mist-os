@@ -186,6 +186,8 @@ def determinism_repetitions(paths: Iterable[Path]) -> Optional[int]:
     if any("libminfs.vnode.cc" in str(path) for path in paths):
         # Historically, this failed around 5% of the time in infra.
         return 100
+    if any("libstarnix_core.rlib" in path.name for path in paths):
+        return 10  # See b/328756843 for failures.
     return None
 
 
