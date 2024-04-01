@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
+#include <lib/fit/result.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/interrupt.h>
 
@@ -21,15 +22,20 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   AmlHrtimerServer(
       async_dispatcher_t* dispatcher, fdf::MmioBuffer mmio,
       std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control,
-      zx::interrupt irq_a, zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d,
-      zx::interrupt irq_f, zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i);
+      fidl::SyncClient<fuchsia_power_broker::Lessor> lease, zx::interrupt irq_a,
+      zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d, zx::interrupt irq_f,
+      zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i);
 
-  void ShutDown() {}
+  void ShutDown();
 
   // For unit testing.
   static size_t GetNumberOfTimers() { return kNumberOfTimers; }
   std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>>& element_control() {
     return element_control_;
+  }
+  bool HasWaitCompleter(size_t timer_index) {
+    ZX_ASSERT(timer_index < kNumberOfTimers);
+    return timers_[timer_index].wait_completer.has_value();
   }
 
  protected:
@@ -43,6 +49,10 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
+  enum class MaxTicks : uint8_t {
+    k16Bit,
+    k64Bit,
+  };
   struct Timer {
     Timer(AmlHrtimerServer& server) : parent(server) {}
 
@@ -53,48 +63,56 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
     std::optional<zx::event> event;
     zx::interrupt irq;
     async::IrqMethod<Timer, &Timer::HandleIrq> irq_handler{this};
+    std::optional<StartAndWaitCompleter::Async> wait_completer;
     uint64_t start_ticks_requested = 0;
   };
 
   struct TimersProperties {
     uint64_t id;
-    bool supports_event;
+    bool supports_notifications;
     bool supports_system_clock;
     bool supports_1usec;
     bool supports_10usecs;
     bool supports_100usecs;
     bool supports_1msec;
-    bool supports_64_bits_tick;  // as opposed to 16bits.
+    MaxTicks max_ticks_support;
     bool always_on_domain;
     bool watchdog;
   };
 
   static constexpr size_t kNumberOfTimers = 9;
+  static const fuchsia_power_broker::PowerLevel kWakeHandlingLeaseOn =
+      static_cast<fuchsia_power_broker::PowerLevel>(fuchsia_power_broker::BinaryPowerLevel::kOn);
 
   static size_t TimerIndexFromId(uint64_t id) { return id; }
 
+  fit::result<const fuchsia_hardware_hrtimer::DriverError> StartHardware(
+      size_t timer_index, fuchsia_hardware_hrtimer::Resolution resolution, uint64_t ticks);
+
   TimersProperties timers_properties_[kNumberOfTimers] = {
       // clang-format off
-      // id| event|system|   1us|  10us| 100us|   1ms| 64bit| AOdom|   WDT|
-      {   0,  true, false,  true,  true,  true,  true, false, false, false },  // A.
-      {   1,  true, false,  true,  true,  true,  true, false, false, false },  // B.
-      {   2,  true, false,  true,  true,  true,  true, false, false, false },  // C.
-      {   3,  true, false,  true,  true,  true,  true, false, false, false },  // D.
-      {   4, false,  true,  true,  true,  true, false, true,  false, false },  // E.
-      {   5,  true, false,  true,  true,  true,  true, false, false, false },  // F.
-      {   6,  true, false,  true,  true,  true,  true, false, false, false },  // G.
-      {   7,  true, false,  true,  true,  true,  true, false, false, false },  // H.
-      {   8,  true, false,  true,  true,  true,  true, false, false, false },  // I.
+      // id| notif|system|   1us|  10us| 100us|   1ms|        max ticks| AOdom|   WDT|
+      {   0,  true, false,  true,  true,  true,  true, MaxTicks::k16Bit, false, false },  // A.
+      {   1,  true, false,  true,  true,  true,  true, MaxTicks::k16Bit, false, false },  // B.
+      {   2,  true, false,  true,  true,  true,  true, MaxTicks::k16Bit, false, false },  // C.
+      {   3,  true, false,  true,  true,  true,  true, MaxTicks::k16Bit, false, false },  // D.
+      {   4, false,  true,  true,  true,  true, false, MaxTicks::k64Bit, false, false },  // E.
+      {   5,  true, false,  true,  true,  true,  true, MaxTicks::k16Bit, false, false },  // F.
+      {   6,  true, false,  true,  true,  true,  true, MaxTicks::k16Bit, false, false },  // G.
+      {   7,  true, false,  true,  true,  true,  true, MaxTicks::k16Bit, false, false },  // H.
+      {   8,  true, false,  true,  true,  true,  true, MaxTicks::k16Bit, false, false },  // I.
       // The timers below are available in the hardware but not supported by this driver.
-      // {   9,  true, false, false, false, false, false, false, false, true  },  // WDT 24MHz.
-      // {  10,  true, false,  true,  true,  true, false, false,  true, false },  // AO_A.
-      // {  11,  true, false,  true,  true,  true, false, false,  true, false },  // AO_B.
-      // {  12, false, false,  true,  true,  true, false, false,  true, false },  // AO_C.
+      // Timer id 9 is a WDT 24MHz.
+      // {   9,  true, false, false, false, false, false, MaxTicks::k16Bit,false, true  },
+      // {  10,  true, false,  true,  true,  true, false, MaxTicks::k16Bit, true, false },  // AO_A.
+      // {  11,  true, false,  true,  true,  true, false, MaxTicks::k16Bit, true, false },  // AO_B.
+      // {  12, false, false,  true,  true,  true, false, MaxTicks::k16Bit, true, false },  // AO_C.
       // // There is no AO_D.
-      // {  13, false,  true, false, false, false, false,  true,  true, false },  // AO_E.
-      // {  14, false,  true, false, false, false, false,  true,  true, false },  // AO_F.
-      // {  15, false,  true, false, false, false, false,  true,  true, false },  // AO_G.
-      // {  16, true,   true, false, false, false, false, false,  true, true  },  // AO_WDT.
+      // {  13, false,  true, false, false, false, false, MaxTicks::k64Bit, true, false },  // AO_E.
+      // {  14, false,  true, false, false, false, false, MaxTicks::k64Bit, true, false },  // AO_F.
+      // {  15, false,  true, false, false, false, false, MaxTicks::k64Bit, true, false },  // AO_G.
+      // Timer id 16 is a AO_WDT.
+      // {  16, true,   true, false, false, false, false, MaxTicks::k16Bit, true, true  },
       // clang-format on
   };
 
@@ -103,6 +121,8 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   std::optional<fdf::MmioBuffer> mmio_;
   zx::interrupt irq_;
   std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_;
+  fidl::SyncClient<fuchsia_power_broker::Lessor> wake_handling_lessor_;
+  async_dispatcher_t* dispatcher_;
 };
 }  // namespace hrtimer
 #endif  // SRC_DEVICES_HRTIMER_DRIVERS_AML_HRTIMER_AML_HRTIMER_SERVER_H_

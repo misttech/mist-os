@@ -17,6 +17,7 @@ static constexpr char kDeviceName[] = "aml-hrtimer";
 
 struct PowerConfiguration {
   fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_client;
+  fidl::ClientEnd<fuchsia_power_broker::Lessor> lessor_client;
 };
 
 class AmlHrtimer : public fdf::DriverBase {
@@ -33,6 +34,9 @@ class AmlHrtimer : public fdf::DriverBase {
   // For unit testing.
   std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>>& element_control() {
     return server_->element_control();
+  }
+  bool HasWaitCompleter(size_t timer_index) {
+    return server_ && server_->HasWaitCompleter(timer_index);
   }
 
  private:

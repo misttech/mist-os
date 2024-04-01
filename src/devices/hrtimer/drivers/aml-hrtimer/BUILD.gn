@@ -57,6 +57,7 @@ source_set("common") {
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/power/cpp",
+    "//sdk/lib/fit",
     "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
