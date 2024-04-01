@@ -296,6 +296,13 @@ impl Suite {
                         // return rest of event. Eventually an empty array and will close the
                         // connection after that.
                     }
+                    SuiteControllerRequest::WatchEvents { responder } => {
+                        warn!("Unimplemented WatchEvents suite controller request received: closing connection");
+                        // Dropping the remote handle for the suite execution task cancels it.
+                        drop(task.take());
+                        responder.control_handle().shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+                        break;
+                    }
                     SuiteControllerRequest::GetEvents { responder } => {
                         events_responder_sender.unbounded_send(responder).unwrap_or_else(|e| {
                             // If the handler is already done, drop responder without closing the
