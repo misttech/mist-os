@@ -200,14 +200,13 @@ impl SessionInner {
         self.multiplexer.parameters_negotiated()
     }
 
-    /// Establishes the SessionChannel for the provided `dlci`. Returns true if establishment
-    /// is successful.
-    /// `initiator` indicates if this session initiated the connection.
+    /// Establishes the SessionChannel for the provided `dlci`.
+    /// Returns true if establishment is successful.
     async fn establish_session_channel(&mut self, dlci: DLCI) -> bool {
+        let server_channel = dlci.try_into().unwrap();
         let user_data_sender = self.outgoing_frame_sender.clone();
         match self.multiplexer().establish_session_channel(dlci, user_data_sender) {
             Ok(channel) => {
-                let server_channel = dlci.try_into().unwrap();
                 let result = if dlci.initiator(self.role()).expect("should be valid") {
                     self.relay_outbound_channel_result_to_client(server_channel, Ok(channel))
                 } else {
@@ -219,11 +218,11 @@ impl SessionInner {
                     let _ = self.multiplexer().close_session_channel(&dlci);
                     return false;
                 }
-                trace!("Established RFCOMM Channel with DLCI: {dlci:?}");
+                trace!(%server_channel, %dlci, "Established RFCOMM channel");
                 true
             }
             Err(e) => {
-                warn!("Couldn't establish DLCI {dlci:?}: {e:?}");
+                warn!(%server_channel, "Couldn't establish DLCI {dlci:?}: {e:?}");
                 false
             }
         }
@@ -240,7 +239,7 @@ impl SessionInner {
 
         if let Some(channel_open_fn) = self.pending_channels.remove(&server_channel) {
             if let Err(e) = self.open_remote_channel(server_channel, channel_open_fn).await {
-                warn!("Error opening outbound remote channel {server_channel:?}: {e:?}");
+                warn!(%server_channel, "Error opening remote channel: {e:?}");
             }
         }
         Ok(())
@@ -255,9 +254,9 @@ impl SessionInner {
 
         let outstanding_channels = std::mem::take(&mut self.pending_channels);
         for (server_channel, channel_open_fn) in outstanding_channels {
-            trace!("Processing outstanding open channel request: {server_channel:?}");
+            trace!(%server_channel, "Processing RFCOMM open channel request.");
             if let Err(e) = self.open_remote_channel(server_channel, channel_open_fn).await {
-                warn!("Error opening remote channel {server_channel:?}: {e:?}");
+                warn!(%server_channel, "Error opening remote channel: {e:?}");
             }
         }
         Ok(())
@@ -335,7 +334,7 @@ impl SessionInner {
     /// Mux Control DLCI.
     async fn start_multiplexer(&mut self) -> Result<(), Error> {
         if self.multiplexer().started() || self.role() == Role::Negotiating {
-            warn!("StartMultiplexer request when multiplexer has role: {:?}", self.role());
+            warn!(role = ?self.role(), "Multiplexer already started");
             return Err(Error::MultiplexerAlreadyStarted);
         }
         self.multiplexer().set_role(Role::Negotiating);
@@ -349,7 +348,7 @@ impl SessionInner {
     /// for the given `dlci`.
     async fn start_parameter_negotiation(&mut self, dlci: DLCI) -> Result<(), Error> {
         if !self.multiplexer().started() {
-            warn!("ParameterNegotiation request before multiplexer startup");
+            warn!(role = ?self.role(), "ParameterNegotiation request before multiplexer startup");
             return Err(Error::MultiplexerNotStarted);
         }
 
@@ -475,7 +474,7 @@ impl SessionInner {
     /// 1) Mux Control DLCI - indicates request to start up the session multiplexer.
     /// 2) User DLCI - indicates request to establish up an RFCOMM channel over the provided `dlci`.
     async fn handle_sabm_command(&mut self, dlci: DLCI) {
-        trace!("Handling SABM with DLCI: {dlci:?}");
+        trace!(%dlci, "Handling SABM");
         if dlci.is_mux_control() {
             match &self.role() {
                 Role::Unassigned => {
@@ -606,7 +605,7 @@ impl SessionInner {
     /// Handles a Disconnect command over the provided `dlci`. Returns a flag indicating
     /// session termination.
     async fn handle_disconnect_command(&mut self, dlci: DLCI) -> bool {
-        trace!("Received Disconnect for DLCI {:?}", dlci);
+        trace!(%dlci, "Received Disconnect");
 
         let terminate_session = if dlci.is_user() {
             let pn_identifier =
@@ -621,7 +620,7 @@ impl SessionInner {
 
             // Otherwise, it's a request to close the DLC.
             if !self.multiplexer().close_session_channel(&dlci) {
-                warn!("Received Disc command for unopened DLCI: {:?}", dlci);
+                warn!(%dlci, "Received Disc command for unopened DLCI");
                 self.send_dm_response(dlci).await;
                 return false;
             }
@@ -661,9 +660,8 @@ impl SessionInner {
                 // If we are not negotiating anymore, mux startup was either canceled
                 // or completed. No need to do anything.
                 if self.role() != Role::Negotiating {
-                    trace!(
-                        "Received response when mux startup was either canceled or completed: {:?}",
-                        self.role()
+                    trace!(role = ?self.role(),
+                        "Received response when mux startup was either canceled or completed",
                     );
                     return false;
                 }
@@ -767,22 +765,20 @@ impl SessionInner {
         warn!("Error parsing frame: {e:?}");
         // Currently, the only frame parsing error that requires a response is the MuxCommand
         // parsing error.
-        match e {
-            FrameParseError::UnsupportedMuxCommandType(val) => {
-                let non_supported_response = Frame::make_mux_command(
-                    self.role(),
-                    MuxCommand {
-                        params: MuxCommandParams::NonSupported(NonSupportedCommandParams {
-                            cr_bit: true,
-                            non_supported_command: val,
-                        }),
-                        command_response: CommandResponse::Response,
-                    },
-                );
-                self.send_frame(non_supported_response).await;
-            }
-            _ => {}
-        }
+        let FrameParseError::UnsupportedMuxCommandType(val) = e else {
+            return;
+        };
+        let non_supported_response = Frame::make_mux_command(
+            self.role(),
+            MuxCommand {
+                params: MuxCommandParams::NonSupported(NonSupportedCommandParams {
+                    cr_bit: true,
+                    non_supported_command: val,
+                }),
+                command_response: CommandResponse::Response,
+            },
+        );
+        self.send_frame(non_supported_response).await;
     }
 
     /// Sends a RLS command for the provided `dlci`.
@@ -833,8 +829,7 @@ impl SessionInner {
             return;
         }
 
-        // Result of this send doesn't matter since failure indicates
-        // peer disconnection.
+        // Result of this send doesn't matter since failure indicates peer disconnection.
         let _ = self.outgoing_frame_sender.send(frame).await;
     }
 
@@ -934,7 +929,7 @@ impl Session {
     /// The lifetime of this task is tied to the provided `l2cap` channel. When the remote peer
     /// disconnects, the `l2cap` channel will close, and therefore the task will terminate.
     async fn session_task(
-        id: PeerId,
+        peer_id: PeerId,
         l2cap: Channel,
         session_inner: Arc<Mutex<SessionInner>>,
         frame_receiver: mpsc::Receiver<Frame>,
@@ -962,7 +957,7 @@ impl Session {
         let _ = futures::future::join(session_inner_task, peer_processing_task).await;
 
         // Session has finished; notify any subscribed clients.
-        info!(%id, "Session with peer ended");
+        info!(%peer_id, "Session with peer ended");
         let _ = termination_sender.send(());
     }
 
@@ -982,7 +977,7 @@ impl Session {
                         Some(Ok(bytes)) => {
                             trace!("Received packet from peer: {:?}", bytes);
                             if let Err(_) = data_sender.send(bytes).await {
-                                warn!("Couldn't send bytes to main run task");
+                                warn!("Couldn't send bytes to RFCOMM Session task");
                             }
                         },
                         Some(Err(e)) => {
@@ -995,24 +990,22 @@ impl Session {
                     }
                 }
                 frame_to_be_written = pending_writes.next() => {
-                    let frame = match frame_to_be_written {
-                        Some(frame) => frame,
-                        None => {
-                            // The SessionInner task finished and closed its end of the channel.
-                            // This means a Disconnect frame was received (in either direction), and
-                            // we can terminate.
-                            trace!("SessionInner task finished, closing peer_processing_task.");
-                            return;
-                        }
+                    let Some(frame) = frame_to_be_written else {
+                        // The SessionInner task finished and closed its end of the channel.
+                        // This means a Disconnect frame was received (in either direction), and
+                        // we can terminate.
+                        trace!("SessionInner task finished -- closing toplevel task.");
+                        return;
                     };
-                    trace!("Sending frame to remote: {:?}", frame);
+                    trace!("Sending frame to peer: {frame:?}");
                     let mut buf = vec![0; frame.encoded_len()];
                     if let Err(e) = frame.encode(&mut buf[..]) {
                         warn!("Couldn't encode frame: {e:?}");
                         continue;
                     }
-                    // The result of this send is irrelevant, as failure would
-                    // indicate peer disconnection.
+                    trace!("Sending packet to peer: {buf:?}");
+                    // The result of this send is irrelevant as failure would indicate that the peer
+                    // has disconnected.
                     let _ = l2cap_channel.as_ref().write(&buf);
                 }
                 complete => { return; }
@@ -1038,7 +1031,7 @@ impl Session {
     ) {
         let mut w_inner = self.inner.lock().await;
         if let Err(e) = w_inner.open_remote_channel(server_channel, channel_opened_cb).await {
-            warn!("Couldn't open RFCOMM channel: {e:?}");
+            warn!(%server_channel, "Couldn't open RFCOMM channel: {e:?}");
         }
     }
 

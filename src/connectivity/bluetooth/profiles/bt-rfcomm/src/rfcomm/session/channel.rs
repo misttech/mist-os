@@ -199,7 +199,7 @@ impl CreditFlowController {
         outgoing_sender: mpsc::Sender<Frame>,
         initial_credits: Credits,
     ) -> Self {
-        trace!("Creating credit flow controller with initial credits: {:?}", initial_credits);
+        trace!(?initial_credits, "Creating credit flow controller");
         Self {
             role,
             dlci,
@@ -216,6 +216,7 @@ impl CreditFlowController {
     async fn send_user_data(&mut self, user_data: UserData) {
         let data_size = user_data.information.len();
         if data_size != 0 && self.credits.local() == 0 {
+            trace!("No local credits available - staging user data");
             self.outgoing_data_pending_credits.push(user_data);
             return;
         }
@@ -383,8 +384,7 @@ impl SessionChannel {
         Ok(())
     }
 
-    /// A user data relay task that reads data from the `channel` and relays to the
-    /// `frame_sender`.
+    /// A user data relay task that reads data from the `channel` and relays to the `frame_sender`.
     /// The task also processes user data received from the peer in the `pending_writes` queue
     /// and sends it to the `channel`.
     /// The user data relay is flow controlled by the provided `flow_control` mode.
@@ -399,14 +399,10 @@ impl SessionChannel {
     ) {
         loop {
             select! {
-                // The fuse() is within the loop because `channel` is both borrowed in its stream
-                // form, and in the receive_data_from_peer() call. This fuse() is OK because when
-                // the stream terminates, `data_from_client` will be None, and we will break
-                // out of the loop - `channel.next()` will never be polled again.
                 data_from_client = channel.next() => {
                     match data_from_client {
                         Some(Ok(bytes)) => {
-                            trace!("Sending user-data packet for DLCI {:?}: {:?}", dlci, bytes);
+                            trace!(%dlci, "Sending user-data packet {:?}", bytes);
                             let user_data = UserData { information: bytes };
                             flow_controller.send_data_to_peer(user_data).await;
                         }
@@ -414,7 +410,7 @@ impl SessionChannel {
                             error!("Error receiving data from client {e:?}");
                         }
                         None => {
-                            trace!("RFCOMM channel closed by profile");
+                            trace!(%dlci, "RFCOMM channel closed by profile");
                             // The client has disconnected the RFCOMM channel. We should relay
                             // a Disconnect frame to the remote peer.
                             let disc = Frame::make_disc_command(role, dlci);
@@ -431,19 +427,21 @@ impl SessionChannel {
                 complete => break,
             }
         }
-        info!("Profile-client processing task for DLCI {dlci:?} finished");
+        info!(%dlci, "SessionChannel processing task finished");
         // Client closed the `channel` - notify listener of termination.
         let _ = termination_sender.send(());
     }
 
-    /// Starts the processing task over the provided `channel`. The processing task will:
-    /// 1) Read bytes received from the `channel` and relay user data to the `frame_sender`.
-    /// 2) Read packets from the `pending_writes` queue, and send the data to the client
-    ///    end of the `channel`.
+    /// Starts the processing task over the provided RFCOMM `channel`.
+    /// The processing task will:
+    /// 1) Read bytes received from the `channel` - this "user data" is received from the upper
+    ///    layer client (e.g. Bluetooth Profile) and will be relayed to the `frame_sender`.
+    /// 2) Read packets from the `pending_writes` queue, and send the data to the upper layer
+    ///    client.
     ///
     /// While unusual, it is OK to call establish() multiple times. The currently active
-    /// processing task will be dropped, and a new one will be spawned using the provided
-    /// new channel. If the flow control has not been negotiated, the channel will default
+    /// processing task will be terminated and a new task will be created with the provided
+    /// `channel`. If the flow control has not been negotiated, the channel will default
     /// to using credit-based flow control.
     pub fn establish(&mut self, channel: Channel, frame_sender: mpsc::Sender<Frame>) {
         let (user_data_queue, pending_writes) = mpsc::channel(HIGH_CREDIT_WATER_MARK);
@@ -479,7 +477,7 @@ impl SessionChannel {
         ));
         let terminated = receiver.map(|_| ()).boxed().shared();
         self.processing_task = Some(SessionChannelTask { _task, user_data_queue, terminated });
-        trace!("Established SessionChannel for DLCI {:?}", self.dlci);
+        trace!(dlci = %self.dlci, "Started SessionChannel processing task");
     }
 
     /// Receive a user data payload from the remote peer, which will be queued to be sent

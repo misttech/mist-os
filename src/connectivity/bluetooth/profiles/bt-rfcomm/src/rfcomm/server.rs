@@ -16,7 +16,7 @@ use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::{lock::Mutex, FutureExt};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tracing::{info, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 use crate::rfcomm::session::Session;
 use crate::rfcomm::types::{status_to_rls_error, SignaledTask};
@@ -81,7 +81,7 @@ impl Clients {
         let new_channel =
             ServerChannel::all().find(|sc| !inner.channel_receivers.contains_key(&sc));
         new_channel.map(|channel| {
-            trace!("Reserving RFCOMM channel: {:?}", channel);
+            trace!(server_channel = %channel, "Reserving RFCOMM channel");
             let tagged_client = RegisteredClient {
                 connection_receiver: proxy,
                 _channel_number: inner
@@ -101,12 +101,12 @@ impl Clients {
         server_channel: ServerChannel,
         channel: Channel,
     ) -> Result<(), Error> {
-        trace!(%peer_id, "Delivering RFCOMM channel (# = {:?}) to client", server_channel);
+        trace!(%peer_id, %server_channel, "Delivering RFCOMM channel to client");
         let inner = self.inner.lock().await;
         let client = inner
             .channel_receivers
             .get(&server_channel)
-            .ok_or(format_err!("ServerChannel {:?} not registered", server_channel))?;
+            .ok_or(format_err!("{server_channel:?} not registered"))?;
         // Build the RFCOMM protocol descriptor and relay the channel.
         let protocol: Vec<bredr::ProtocolDescriptor> =
             build_rfcomm_protocol(server_channel).iter().map(Into::into).collect();
@@ -190,17 +190,17 @@ impl RfcommServer {
     /// Returns an error if there is no session established with the peer.
     pub async fn open_rfcomm_channel(
         &mut self,
-        id: PeerId,
+        peer_id: PeerId,
         server_channel: ServerChannel,
         responder: bredr::ProfileConnectResponder,
     ) -> Result<(), Error> {
-        trace!(%id, "Received request to open RFCOMM channel ({server_channel:?})");
+        trace!(%peer_id, %server_channel, "Opening RFCOMM channel");
 
-        match self.sessions.get(&id).and_then(|s| s.upgrade()) {
+        match self.sessions.get(&peer_id).and_then(|s| s.upgrade()) {
             None => {
                 // Peer either disconnected or doesn't exist.
                 let _ = responder.send(Err(ErrorCode::Failed));
-                Err(format_err!("Invalid peer ID {id}"))
+                Err(format_err!("Invalid peer ID {peer_id}"))
             }
             Some(session) => {
                 let channel_opened_callback =
@@ -214,35 +214,34 @@ impl RfcommServer {
         }
     }
 
-    /// Handles an incoming L2CAP connection from the remote peer.
+    /// Handles the establishment of a new L2CAP connection.
     ///
-    /// If there is already an active session established with this peer, returns an Error
-    /// as there can only be one active session per peer.
-    /// Otherwise, creates and stores a new session over the provided `l2cap` channel.
-    pub fn new_l2cap_connection(&mut self, id: PeerId, l2cap: Channel) -> Result<(), Error> {
-        if self.is_active_session(&id) {
-            return Err(format_err!("RFCOMM Session already exists with peer {id}"));
+    /// Creates and stores a new RFCOMM Session for the provided `l2cap` channel.
+    /// Returns Error if an active session already exists for the peer `id`.
+    pub fn new_l2cap_connection(&mut self, peer_id: PeerId, l2cap: Channel) -> Result<(), Error> {
+        if self.is_active_session(&peer_id) {
+            return Err(format_err!("RFCOMM Session already exists with peer {peer_id}"));
         }
-        info!(%id, "Received new l2cap connection");
+        info!(%peer_id, "Handling new L2CAP connection for the RFCOMM PSM");
 
         // Create a new RFCOMM Session with the provided `channel_opened_callback` which will be
         // called anytime an RFCOMM channel is created. Opened RFCOMM channels will be delivered
         // to the `clients` of the `RfcommServer`.
         let clients = self.clients.clone();
         let channel_opened_callback = Box::new(move |server_channel, channel| {
-            let peer_id = id;
+            let peer_id = peer_id;
             let clients = clients.clone();
             async move { clients.deliver_channel(peer_id, server_channel, channel).await }.boxed()
         });
-        let mut session = Session::create(id, l2cap, channel_opened_callback);
+        let mut session = Session::create(peer_id, l2cap, channel_opened_callback);
         let _ = session.iattach(&self.inspect, inspect::unique_name("peer_"));
         let closed_fut = session.finished();
-        if self.sessions.insert(id, session).is_some() {
-            warn!(%id, "Overwriting existing RFCOMM session");
+        if self.sessions.insert(peer_id, session).is_some() {
+            debug!(%peer_id, "Overwriting existing RFCOMM session");
         }
 
         // Task eagerly removes the Session from the set of active sessions upon termination.
-        let detached_session = self.sessions.get(&id).expect("just inserted");
+        let detached_session = self.sessions.get(&peer_id).expect("just inserted");
         fasync::Task::spawn(async move {
             let _ = closed_fut.await;
             detached_session.detach();
@@ -252,7 +251,7 @@ impl RfcommServer {
         Ok(())
     }
 
-    /// Handles a RfcommTest FIDL request.
+    /// Handles a `RfcommTest` FIDL request.
     pub async fn handle_test_request(&mut self, request: RfcommTestRequest) {
         info!("Received RFCOMM Test request: {:?}", request);
         // Note: The test request is a no-op if there is no connected session with the peer.

@@ -154,7 +154,7 @@ impl ProfileRegistrar {
         channel: bredr::Channel,
         protocol: Vec<bredr::ProtocolDescriptor>,
     ) -> Result<(), Error> {
-        trace!(%peer_id, "Received incoming L2CAP connection request {protocol:?}");
+        trace!(%peer_id, ?protocol, "Incoming L2CAP connection request");
         let local = protocol.iter().map(|p| p.into()).collect();
         // TODO(b/327758656): The RFCOMM server cannot relay dynamic PSM connections to the correct
         // FIDL client.
@@ -198,7 +198,7 @@ impl ProfileRegistrar {
             .map_err(|_| ErrorCode::Failed)
     }
 
-    /// Processes an outgoing L2Cap connection initiated by a client of the ProfileRegistrar.
+    /// Handles an outgoing L2Cap connection request made by a client of the ProfileRegistrar.
     ///
     /// Returns an error if the connection request fails.
     async fn handle_outgoing_connection(
@@ -221,20 +221,18 @@ impl ProfileRegistrar {
                 let _ = responder.send(result);
             }
             bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters { channel, .. }) => {
-                let server_channel = match channel.map(ServerChannel::try_from) {
-                    Some(Ok(sc)) => sc,
-                    _ => {
-                        let _ = responder.send(Err(ErrorCode::InvalidArguments));
-                        return Ok(());
-                    }
+                let Some(Ok(server_channel)) = channel.map(ServerChannel::try_from) else {
+                    // Missing or invalid RFCOMM channel number.
+                    let _ = responder.send(Err(ErrorCode::InvalidArguments));
+                    return Ok(());
                 };
 
-                // Ensure there is an RFCOMM Session between us and the peer.
+                // Ensure there is an L2CAP connection for the RFCOMM PSM between us and the peer.
                 if let Err(e) = self.ensure_service_connection(peer_id).await {
                     let _ = responder.send(Err(e));
                     return Ok(());
                 }
-                // Open the RFCOMM channel.
+                // Open the specific RFCOMM channel.
                 self.rfcomm_server.open_rfcomm_channel(peer_id, server_channel, responder).await?;
             }
         }
@@ -410,7 +408,7 @@ impl ProfileRegistrar {
                     .map(ServiceDefinition::try_from)
                     .collect::<Result<Vec<_>, _>>()
                     .ok()?;
-                trace!("Received advertise request: {:?}", services_local);
+                trace!("Advertise request: {services_local:?}");
                 if service_definitions_request_rfcomm(&services_local) {
                     let receiver = receiver.into_proxy().ok()?;
                     let parameters = ChannelParameters::try_from(&parameters).ok()?;
@@ -429,16 +427,19 @@ impl ProfileRegistrar {
                 }
             }
             bredr::ProfileRequest::Connect { peer_id, connection, responder, .. } => {
-                let id = peer_id.into();
-                if let Err(e) = self.handle_outgoing_connection(id, connection, responder).await {
-                    warn!(%id, "Error establishing outgoing connection {e:?}");
+                let peer_id = peer_id.into();
+                if let Err(e) =
+                    self.handle_outgoing_connection(peer_id, connection, responder).await
+                {
+                    warn!(%peer_id, "Error making outgoing connection: {e:?}");
                 }
             }
             bredr::ProfileRequest::Search { service_uuid, attr_ids, results, .. } => {
-                // Simply forward over the search to the Profile server.
+                // Searches are handled directly by the upstream Profile Server.
                 let _ = self.profile_upstream.search(service_uuid, &attr_ids, results);
             }
             bredr::ProfileRequest::ConnectSco { peer_id, initiator, params, receiver, .. } => {
+                // Sco connections are handled directly by the upstream Profile Server.
                 let _ = self.profile_upstream.connect_sco(&peer_id, initiator, &params, receiver);
             }
             bredr::ProfileRequest::_UnknownMethod { .. } => {

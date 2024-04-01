@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
+use core::fmt::{self, Display};
 
 use crate::frame::FrameParseError;
 use crate::{RfcommError, Role};
 
 /// Identifier for a direct link connection (DLC) between devices.
 ///
-/// Use the provided `u8::try_from` implementation to construct a valid DLCI.
+/// Use the `TryFrom<u8>` implementation to construct a valid DLCI.
 ///
-/// The DLCI is 6 bits wide and is split into a direction bit and a
-/// 5-bit Server Channel number.
+/// The DLCI is 6 bits wide and consists of a direction bit and a 5-bit Server Channel number.
 /// DLCIs 1 and 62-63 are reserved and never used in RFCOMM.
 /// See RFCOMM 5.4.
 #[derive(Clone, Copy, Hash, Eq, Debug, PartialEq)]
@@ -114,6 +114,12 @@ impl TryFrom<DLCI> for ServerChannel {
     }
 }
 
+impl Display for DLCI {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.0)
+    }
+}
+
 /// The Server Channel number associated with an RFCOMM channel.
 ///
 /// Use the provided `u8::try_from` implementation to construct a valid ServerChannel.
@@ -163,6 +169,12 @@ impl TryFrom<u8> for ServerChannel {
 impl From<ServerChannel> for u8 {
     fn from(value: ServerChannel) -> u8 {
         value.0
+    }
+}
+
+impl Display for ServerChannel {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.0)
     }
 }
 

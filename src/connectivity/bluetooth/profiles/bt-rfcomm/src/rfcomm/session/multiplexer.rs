@@ -8,7 +8,7 @@ use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::Inspect;
 use futures::channel::mpsc;
 use std::collections::HashMap;
-use tracing::{trace, warn};
+use tracing::{info, trace, warn};
 
 use crate::rfcomm::inspect::SessionMultiplexerInspect;
 use crate::rfcomm::session::channel::{FlowControlMode, FlowControlledData, SessionChannel};
@@ -189,7 +189,7 @@ impl SessionMultiplexer {
         }
 
         self.set_role(role);
-        trace!("Session multiplexer started with role: {:?}", role);
+        info!(?role, "RFCOMM Session multiplexer started");
         Ok(())
     }
 
