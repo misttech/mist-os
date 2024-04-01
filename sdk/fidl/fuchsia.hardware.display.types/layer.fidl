@@ -70,7 +70,7 @@ type ClientCompositionOpcode = strict enum : uint8 {
 };
 
 type PrimaryLayer = struct {
-    image Image;
+    image_metadata ImageMetadata;
 
     /// If `alpha_mode` is `AlphaMode.DISABLE`, the layer is opaque and
     /// `alpha_layer_val` is ignored.

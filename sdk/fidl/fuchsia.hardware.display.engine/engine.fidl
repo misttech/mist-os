@@ -8,18 +8,6 @@ using fuchsia.hardware.i2cimpl;
 using fuchsia.images2;
 using zx;
 
-/// A structure containing information about an image.
-type Image = struct {
-    /// The width and height of the image in pixels.
-    width uint32;
-    height uint32;
-
-    /// The type conveys information about what is providing the pixel data. If this is not
-    /// IMAGE_TYPE_SIMPLE, it is up to the driver and buffer producer to agree on the meaning
-    /// of the value through some mechanism outside the scope of this API.
-    type uint32;
-};
-
 type ColorConversion = strict bits : uint32 {
     /// If set, use the 0 vector for the color conversion preoffset
     PREOFFSET = 0x1;
@@ -130,7 +118,10 @@ open protocol Engine {
     /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
     /// allocated.
     flexible ImportImage(struct {
-        image Image;
+        // TODO(https://fxbug.dev/329163718): Some of the information in
+        // `image_metadata` was negotiated by sysmem. The display coordinator or
+        // engine drivers should read that information directly from sysmem.
+        image_metadata fuchsia.hardware.display.types.ImageMetadata;
         buffer_id BufferId;
     }) -> (struct {
         image_id ImageId;
@@ -249,7 +240,7 @@ open protocol Engine {
     ///
     /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
     flexible SetBufferCollectionConstraints(struct {
-        config Image;
+        usage fuchsia.hardware.display.types.ImageBufferUsage;
         buffer_collection_id BufferCollectionId;
     }) -> () error zx.Status;
 
