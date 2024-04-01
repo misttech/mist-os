@@ -34,7 +34,7 @@ Then, login to luci by running:
 ```
 
 Now you should be able to run the tests against any device that is discoverable
-by `fx device-finder`.
+by `ffx target list`.
 
 ## Available Tests
 
@@ -55,8 +55,8 @@ You should be able to run the tests with:
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key ~/.ssh/fuchsia_ed25519 \
-  --downgrade-builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
-  --upgrade-fuchsia-build-dir $(fx get-build-dir)
+  --builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
+  --fuchsia-build-dir $(fx get-build-dir)
 ```
 
 This will run through the whole test paving the build to the latest version
@@ -69,8 +69,8 @@ determine the build ids from the downgrade and upgrade builds, then run:
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key ~/.ssh/fuchsia_ed25519 \
-  --downgrade-build-id 123456789... \
-  --upgrade-build-id 987654321...
+  --build-id 123456789... \
+  --build-id 987654321...
 ```
 
 Or you can combine these options:
@@ -78,8 +78,8 @@ Or you can combine these options:
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key ~/.ssh/fuchsia_ed25519 \
-  --downgrade-build-id 123456789... \
-  --upgrade-fuchsia-build-dir $(fx get-build-dir)
+  --build-id 123456789... \
+  --fuchsia-build-dir $(fx get-build-dir)
 ```
 
 There are more options to the test, to see them all run
@@ -116,8 +116,8 @@ for you. You can run it like this:
   -o ~/logs \
   --tty /dev/ttyUSB0 \
   $(fx get-build-dir)/host_x64/system_tests_upgrade \
-  --downgrade-builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
-  --upgrade-fuchsia-build-dir $(fx get-build-dir)
+  --builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
+  --fuchsia-build-dir $(fx get-build-dir)
 ```
 
 This will setup a `tmux` with 3 windows, one for the serial session on
@@ -155,8 +155,8 @@ Once the VM has finished paving, you can then use it with the upgrade tests:
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key ~/fuchsia/.ssh/pkey \
-  --downgrade-builder-name fuchsia/global.ci/workstation_eng.x64-release-e2e-isolated \
-  --upgrade-fuchsia-build-dir $(fx get-build-dir) \
+  --builder-name fuchsia/global.ci/workstation_eng.x64-release-e2e-isolated \
+  --fuchsia-build-dir $(fx get-build-dir) \
   --device fuchsia-5254-0063-5e7a
 ```
 
