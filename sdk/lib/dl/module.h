@@ -47,9 +47,13 @@ class Module : public fbl::DoublyLinkedListable<std::unique_ptr<Module>> {
   Module(const Module&) = delete;
   Module(Module&&) = default;
 
-  // TODO(https://fxbug.dev/324136435): This should also match against the
-  // SONAME, like ld::LoadModule does.
-  constexpr bool operator==(const Soname& other_name) const { return name() == other_name; }
+  // The name of the module handle is set to the filename passed to dlopen() to
+  // create the module handle. This is usually the same as the DT_SONAME of the
+  // AbiModule, but that is not guaranteed. When performing an equality check,
+  // match against both possible name values.
+  constexpr bool operator==(const Soname& name) const {
+    return name == name_ || name == abi_module_.soname;
+  }
 
   constexpr const Soname& name() const { return name_; }
 
