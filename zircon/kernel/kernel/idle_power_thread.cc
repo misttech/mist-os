@@ -176,10 +176,24 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_time_t resume_at) {
     return ZX_ERR_TIMED_OUT;
   }
 
-  // Set the global suspended flag so that other subsystems can act appropriately during suspend.
-  system_suspend_state_.store(SystemSuspendState::Suspended, ktl::memory_order_release);
-  auto restore_suspend_flag = fit::defer(
-      [] { system_suspend_state_.store(SystemSuspendState::Active, ktl::memory_order_release); });
+  // Conditionally set the global suspended flag so that other subsystems can act appropriately
+  // during suspend. If there are pending wake events, abort the suspend.
+  {
+    uint64_t expected = SystemSuspendStateActive;
+    if (!system_suspend_state_.compare_exchange_strong(expected, SystemSuspendStateSuspendedBit,
+                                                       ktl::memory_order_release,
+                                                       ktl::memory_order_relaxed)) {
+      DEBUG_ASSERT((expected & SystemSuspendStateSuspendedBit) != SystemSuspendStateSuspendedBit);
+      const uint64_t pending_wake_events = expected & SystemSuspendStateWakeEventPendingMask;
+      dprintf(INFO, "Aborting suspend due to %" PRIu64 " pending wake events\n",
+              pending_wake_events);
+      return ZX_ERR_BAD_STATE;
+    }
+  }
+
+  auto restore_suspend_flag = fit::defer([] {
+    system_suspend_state_.fetch_and(~SystemSuspendStateSuspendedBit, ktl::memory_order_release);
+  });
 
   // Move to the boot CPU which will be suspended last.
   auto restore_affinity = fit::defer(
@@ -232,7 +246,8 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_time_t resume_at) {
             // Verify this handler is running in the correct context.
             DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID);
 
-            const WakeResult wake_result = TriggerSystemWake();
+            WakeEvent wake_event;
+            const WakeResult wake_result = wake_event.Trigger();
             const char* message_prefix = wake_result == WakeResult::SuspendAborted
                                              ? "Wakeup before suspend completed. Aborting suspend"
                                              : "Resuming boot CPU";
@@ -354,19 +369,28 @@ IdlePowerThread::WakeResult IdlePowerThread::WakeBootCpu() {
   return WakeResult::Resumed;
 }
 
-IdlePowerThread::WakeResult IdlePowerThread::TriggerSystemWake() {
+IdlePowerThread::WakeResult IdlePowerThread::TriggerSystemWakeEvent() {
   DEBUG_ASSERT(arch_ints_disabled());
   DEBUG_ASSERT(Thread::Current::Get()->preemption_state().PreemptIsEnabled() == false);
 
-  SystemSuspendState expected = system_suspend_state_.load(ktl::memory_order_relaxed);
-  if (expected == SystemSuspendState::Suspended) {
-    if (system_suspend_state_.compare_exchange_strong(expected, SystemSuspendState::ResumePending,
-                                                      ktl::memory_order_acq_rel,
-                                                      ktl::memory_order_relaxed)) {
-      return WakeBootCpu();
-    }
+  const uint64_t previous = system_suspend_state_.fetch_add(1, ktl::memory_order_relaxed);
+  const uint64_t previous_pending_wake_events = previous & SystemSuspendStateWakeEventPendingMask;
+  const bool suspended = previous & SystemSuspendStateSuspendedBit;
+
+  DEBUG_ASSERT_MSG(previous_pending_wake_events != SystemSuspendStateWakeEventPendingMask,
+                   "Pending wake event count overflow!");
+
+  // Wake the boot CPU if the system is suspended and this is the first pending wake event.
+  if (suspended && previous_pending_wake_events == 0) {
+    return WakeBootCpu();
   }
-  return expected == SystemSuspendState::Active ? WakeResult::BadState : WakeResult::Resumed;
+  return suspended ? WakeResult::Resumed : WakeResult::Active;
+}
+
+void IdlePowerThread::AcknowledgeSystemWakeEvent() {
+  const uint64_t previous = system_suspend_state_.fetch_add(-1, ktl::memory_order_relaxed);
+  const uint64_t previous_pending_wake_events = previous & SystemSuspendStateWakeEventPendingMask;
+  DEBUG_ASSERT_MSG(previous_pending_wake_events != 0, "Pending wake event count underflow!");
 }
 
 #include <lib/console.h>

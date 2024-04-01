@@ -34,6 +34,9 @@ zx_status_t InterruptDispatcher::WaitForInterrupt(zx_time_t* out_timestamp) {
           timestamp_ = 0;
           return event_.Unsignal();
         case InterruptState::NEEDACK:
+          if ((flags_ & INTERRUPT_WAKE_VECTOR)) {
+            wake_event_.Acknowledge();
+          }
           if (flags_ & INTERRUPT_UNMASK_PREWAIT) {
             UnmaskInterrupt();
           } else if (flags_ & INTERRUPT_UNMASK_PREWAIT_UNLOCKED) {
@@ -136,8 +139,9 @@ void InterruptDispatcher::InterruptHandler() {
   }
   if ((flags_ & INTERRUPT_WAKE_VECTOR) &&
       (state_ == InterruptState::TRIGGERED || state_ == InterruptState::NEEDACK)) {
-    // Wake the system if it is in suspend. Ignored if the system is not in suspend.
-    IdlePowerThread::TriggerSystemWake();
+    // Trigger the wake event which will wake the system if suspended and prevent entering suspend
+    // until acknowledged.
+    wake_event_.Trigger();
   }
 }
 
@@ -234,13 +238,16 @@ zx_status_t InterruptDispatcher::Ack() {
   AutoPreemptDisabler preempt_disable;
   {
     Guard<SpinLock, IrqSave> guard{&spinlock_};
-    if (port_dispatcher_ == nullptr) {
+    if (port_dispatcher_ == nullptr && !(flags_ & INTERRUPT_ALLOW_ACK_WITHOUT_PORT_FOR_TEST)) {
       return ZX_ERR_BAD_STATE;
     }
     if (state_ == InterruptState::DESTROYED) {
       return ZX_ERR_CANCELED;
     }
     if (state_ == InterruptState::NEEDACK) {
+      if (flags_ & INTERRUPT_WAKE_VECTOR) {
+        wake_event_.Acknowledge();
+      }
       if (flags_ & INTERRUPT_UNMASK_PREWAIT) {
         UnmaskInterrupt();
       } else if (flags_ & INTERRUPT_UNMASK_PREWAIT_UNLOCKED) {

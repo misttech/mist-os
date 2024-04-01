@@ -21,8 +21,8 @@ KCOUNTER(dispatcher_interrupt_event_create_count, "dispatcher.interrupt_event.cr
 KCOUNTER(dispatcher_interrupt_event_destroy_count, "dispatcher.interrupt_event.destroy")
 
 zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* handle,
-                                             zx_rights_t* rights, uint32_t vector,
-                                             uint32_t options) {
+                                             zx_rights_t* rights, uint32_t vector, uint32_t options,
+                                             bool allow_ack_without_port_for_test) {
   if (options & ZX_INTERRUPT_VIRTUAL) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -91,6 +91,10 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
 
   if (options & ZX_INTERRUPT_WAKE_VECTOR) {
     interrupt_flags |= INTERRUPT_WAKE_VECTOR;
+  }
+
+  if (allow_ack_without_port_for_test) {
+    interrupt_flags |= INTERRUPT_ALLOW_ACK_WITHOUT_PORT_FOR_TEST;
   }
 
   if (!default_mode) {

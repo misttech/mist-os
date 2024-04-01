@@ -16,7 +16,8 @@
 class InterruptEventDispatcher final : public InterruptDispatcher {
  public:
   static zx_status_t Create(KernelHandle<InterruptDispatcher>* handle, zx_rights_t* rights,
-                            uint32_t vector, uint32_t options);
+                            uint32_t vector, uint32_t options,
+                            bool allow_ack_without_port_for_test = false);
 
   ~InterruptEventDispatcher() final;
 

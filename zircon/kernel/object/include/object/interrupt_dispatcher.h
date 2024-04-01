@@ -7,11 +7,13 @@
 #ifndef ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_INTERRUPT_DISPATCHER_H_
 #define ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_INTERRUPT_DISPATCHER_H_
 
+#include <lib/zircon-internal/thread_annotations.h>
 #include <sys/types.h>
 #include <zircon/rights.h>
 #include <zircon/types.h>
 
 #include <kernel/event.h>
+#include <kernel/idle_power_thread.h>
 #include <kernel/spinlock.h>
 #include <object/dispatcher.h>
 #include <object/port_dispatcher.h>
@@ -66,6 +68,8 @@ class InterruptDispatcher
   static constexpr uint32_t INTERRUPT_MASK_POSTWAIT = (1u << 4);
   // The interrupt may wake the system from suspend.
   static constexpr uint32_t INTERRUPT_WAKE_VECTOR = (1u << 5);
+  // Allow kernel tests to call Ack() without binding to a port.
+  static constexpr uint32_t INTERRUPT_ALLOW_ACK_WITHOUT_PORT_FOR_TEST = (1u << 6);
 
  private:
   AutounsignalEvent event_;
@@ -77,6 +81,7 @@ class InterruptDispatcher
   InterruptState state_ TA_GUARDED(spinlock_);
   PortInterruptPacket port_packet_ TA_GUARDED(spinlock_) = {};
   fbl::RefPtr<PortDispatcher> port_dispatcher_ TA_GUARDED(spinlock_);
+  IdlePowerThread::WakeEvent wake_event_ TA_GUARDED(spinlock_);
 
   // Controls the access to Interrupt properties
   DECLARE_SPINLOCK(InterruptDispatcher) spinlock_;
