@@ -101,6 +101,7 @@ pub fn do_mmap(
         return error!(EINVAL);
     }
 
+    let file = if flags & MAP_ANONYMOUS != 0 { None } else { Some(current_task.files.get(fd)?) };
     if flags & (MAP_PRIVATE | MAP_SHARED) == 0
         || flags & (MAP_PRIVATE | MAP_SHARED) == MAP_PRIVATE | MAP_SHARED
     {
@@ -151,7 +152,7 @@ pub fn do_mmap(
         trace_duration!(CATEGORY_STARNIX_MM, c"FileBackedMmap");
         profile_duration!("FileBackedMmap");
         // TODO(tbodt): maximize protection flags so that mprotect works
-        let file = current_task.files.get(fd)?;
+        let file = file.expect("file retrieved above for file-backed mapping");
         file.mmap(current_task, addr, vmo_offset, length, prot_flags, options, file.name.clone())
     }
 }

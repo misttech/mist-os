@@ -56,8 +56,6 @@
                 // Fails due to: "No supported filesystems"
                 "getxattr03",
                 "gettimeofday01",
-                "mmap08",
-                "readlinkat01",
 
                 // 23 requires F_SETLEASE
                 "fcntl23",
@@ -148,6 +146,7 @@
 
                 // Depends on IO stats in /proc/<pid>/io .
                 "readahead02",
+                "readlinkat01",
                 "remap_file_pages02",
                 "request_key01",
                 "request_key02",
