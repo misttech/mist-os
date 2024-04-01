@@ -1121,7 +1121,7 @@ func (t *FuchsiaSSHTester) runSSHCommand(ctx context.Context, command []string, 
 	select {
 	case <-t.client.DisconnectionListener():
 		if err := t.Reconnect(ctx); err != nil {
-			return err
+			return connectionError{err}
 		}
 	default:
 		// The client is still connected, so continue to run the command.
