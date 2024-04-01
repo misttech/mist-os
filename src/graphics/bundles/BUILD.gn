@@ -7,12 +7,8 @@ group("drivers") {
   testonly = true
   deps = [
     "//src/graphics/display:drivers",
-    "//src/graphics/display/drivers/simple:simple.amd-kaveri",
     "//src/graphics/display/drivers/simple:simple.bochs",
-    "//src/graphics/display/drivers/simple:simple.gga",
     "//src/graphics/display/drivers/simple:simple.intel",
-    "//src/graphics/display/drivers/simple:simple.nv",
-    "//src/graphics/display/drivers/simple:simple.vmware",
     "//src/graphics/display/drivers/virtio-guest:virtio_gpu",
     "//src/graphics/drivers/aml-gpu",
     "//src/graphics/drivers/misc/goldfish:goldfish_driver",

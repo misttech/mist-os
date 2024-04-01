@@ -119,27 +119,16 @@ template("simple_fuchsia_driver") {
   }
 }
 
-simple_fuchsia_driver("amd-kaveri") {
-}
 simple_fuchsia_driver("bochs") {
 }
-simple_fuchsia_driver("gga") {
-}
 simple_fuchsia_driver("intel") {
-}
-simple_fuchsia_driver("nv") {
-}
-simple_fuchsia_driver("vmware") {
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":simple-amd-kaveri-bind_test",
     ":simple-bochs-bind_test",
     ":simple-display-test",
-    ":simple-gga-bind_test",
     ":simple-intel-bind_test",
-    ":simple-vmware-bind_test",
   ]
 }

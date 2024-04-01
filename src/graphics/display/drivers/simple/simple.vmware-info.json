@@ -1,9 +1,0 @@
-{
-    "short_description": "Simple PCI Vmware display driver",
-    "manufacturer": "Vmware",
-    "families": [],
-    "models": [],
-    "areas": [
-        "Display"
-    ]
-}
