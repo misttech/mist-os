@@ -6,7 +6,7 @@
 import logging
 import re
 import time
-from typing import Any, List, Tuple
+from typing import Any
 
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
@@ -23,7 +23,7 @@ class MultiDeviceSampleTest(fuchsia_base_test.FuchsiaBaseTest):
 
     def pre_run(self) -> None:
         """Mobly method used to generate the test cases at run time."""
-        test_arg_tuple_list: List[Tuple[int]] = []
+        test_arg_tuple_list: list[tuple[int]] = []
 
         for iteration in range(1, int(self.user_params["num_iterations"]) + 1):
             test_arg_tuple_list.append((iteration,))
@@ -87,7 +87,7 @@ class MultiDeviceSampleTest(fuchsia_base_test.FuchsiaBaseTest):
 
         return super().teardown_class()
 
-    def _sl4f_bt_mac_address(self, mac_address: str) -> List:
+    def _sl4f_bt_mac_address(self, mac_address: str) -> list[int]:
         """Converts BT mac addresses to reversed BT byte lists.
         Args:
             mac_address: mac address of device
@@ -101,7 +101,7 @@ class MultiDeviceSampleTest(fuchsia_base_test.FuchsiaBaseTest):
             return self._convert_reverse_hex(mac_address.split(":"))
         return self._convert_reverse_hex(re.findall("..", mac_address))
 
-    def _convert_reverse_hex(self, address: List) -> List:
+    def _convert_reverse_hex(self, address: list[str]) -> list[int]:
         """Reverses ASCII mac address to 64-bit byte lists.
         Args:
             address: Mac address of device
@@ -117,7 +117,7 @@ class MultiDeviceSampleTest(fuchsia_base_test.FuchsiaBaseTest):
         return res
 
     def _verify_receiver_is_discovered(
-        self, data: dict[str, dict[str, Any]], reverse_hex_address: List
+        self, data: dict[str, dict[str, Any]], reverse_hex_address: list[int]
     ) -> bool:
         """Verify if we have seen the reciever via the Bluetooth data
         Args:

@@ -168,7 +168,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
     def _get_controller_configs(
         self, controller_type: str
-    ) -> list[dict[str, str]]:
+    ) -> list[dict[str, object]]:
         """Return testbed config associated with a specific Mobly Controller.
 
         Args:
@@ -215,7 +215,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
     def _get_device_config(
         self, controller_type: str, identifier_key: str, identifier_value: str
-    ) -> dict[str, str]:
+    ) -> dict[str, object]:
         """Return testbed config associated with a specific device of a
         particular mobly controller type.
 
@@ -344,13 +344,13 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         Returns:
             custom_types.TRANSPORT associated with the device
         """
-        device_config: dict[str, str] = self._get_device_config(
+        device_config: dict[str, object] = self._get_device_config(
             controller_type="FuchsiaDevice",
             identifier_key="name",
             identifier_value=fx_device.device_name,
         )
 
-        return custom_types.TRANSPORT(device_config["transport"])
+        return custom_types.TRANSPORT(str(device_config["transport"]))
 
     def _log_message_to_devices(
         self, message: str, level: custom_types.LEVEL

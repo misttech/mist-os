@@ -8,6 +8,7 @@ import("//build/testing/environments.gni")
 assert(is_host, "Python E2E tests are host-only")
 
 python_mobly_test("multi_device_test_sl4f") {
+  enable_mypy = true
   main_source = "test_multi_device.py"
 
   # The library below provides device interaction APIs.
