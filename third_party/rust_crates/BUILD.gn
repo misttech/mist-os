@@ -1597,7 +1597,7 @@ rust_proc_macro("argh_derive-v0_1_12") {
   deps += [ ":argh_shared-v0_1_12" ]
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v2_0_52" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
@@ -2023,7 +2023,7 @@ rust_proc_macro("async-stream-impl-v0_3_5") {
   deps = []
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v2_0_52" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
@@ -2088,7 +2088,7 @@ rust_proc_macro("async-trait-v0_1_71") {
   deps = []
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v2_0_52" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
@@ -10110,7 +10110,7 @@ rust_library("pest_generator-v2_7_8") {
   deps += [ ":pest_meta-v2_7_8" ]
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v2_0_52" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
@@ -14747,7 +14747,7 @@ rust_proc_macro("strum_macros-v0_25_3") {
   deps += [ ":heck-v0_4_1" ]
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v2_0_52" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
@@ -14878,18 +14878,18 @@ rust_library("syn-v1_0_98") {
   applicable_licenses = [ ":syn-v1_0_98.license" ]
 }
 
-license("syn-v2_0_52.license") {
+license("syn-v2_0_55.license") {
   public_package_name = "syn"
   license_files = [
-    "//third_party/rust_crates/vendor/syn-2.0.52/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/syn-2.0.52/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/syn-2.0.55/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/syn-2.0.55/LICENSE-MIT",
   ]
 }
 
-rust_library("syn-v2_0_52") {
+rust_library("syn-v2_0_55") {
   crate_name = "syn"
-  crate_root = "//third_party/rust_crates/vendor/syn-2.0.52/src/lib.rs"
-  output_name = "syn-cd5149292042d6d2"
+  crate_root = "//third_party/rust_crates/vendor/syn-2.0.55/src/lib.rs"
+  output_name = "syn-84094996fbbeddfc"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -14902,8 +14902,8 @@ rust_library("syn-v2_0_52") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=cd5149292042d6d2",
-    "-Cextra-filename=-cd5149292042d6d2",
+    "-Cmetadata=84094996fbbeddfc",
+    "-Cextra-filename=-84094996fbbeddfc",
     "--cfg=feature=\"clone-impls\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"derive\"",
@@ -14918,7 +14918,7 @@ rust_library("syn-v2_0_52") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":syn-v2_0_52.license" ]
+  applicable_licenses = [ ":syn-v2_0_55.license" ]
 }
 
 license("synstructure-v0_12_1.license") {
@@ -15333,7 +15333,7 @@ rust_library("test-case-core-v3_2_1") {
   deps += [ ":proc-macro-error-v1_0_4" ]
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v2_0_52" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
@@ -15366,7 +15366,7 @@ rust_proc_macro("test-case-macros-v3_2_1") {
   deps += [ ":proc-macro-error-v1_0_4" ]
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v2_0_52" ]
+  deps += [ ":syn-v2_0_55" ]
   deps += [ ":test-case-core-v3_2_1" ]
 
   rustenv = []
@@ -15460,7 +15460,7 @@ rust_proc_macro("thiserror-impl-v1_0_57") {
   deps = []
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v2_0_52" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
@@ -15913,7 +15913,7 @@ rust_proc_macro("tracing-attributes-v0_1_27") {
   deps = []
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v2_0_52" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
@@ -18050,7 +18050,7 @@ rust_proc_macro("zerocopy-derive-v0_7_15") {
   deps = []
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v2_0_52" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
@@ -18084,7 +18084,7 @@ rust_proc_macro("zerocopy-derive-v0_8_0-alpha_5") {
   deps = []
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v2_0_52" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
