@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.spi/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.spiimpl/cpp/driver/fidl.h>
-#include <fuchsia/hardware/spi/cpp/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include <ddktl/device.h>
@@ -21,9 +20,7 @@ using SpiChildType =
     ddk::Device<SpiChild, ddk::Messageable<fuchsia_hardware_spi::Controller>::Mixin,
                 ddk::Unbindable>;
 
-class SpiChild : public SpiChildType,
-                 public ddk::SpiProtocol<SpiChild, ddk::base_protocol>,
-                 public fidl::WireServer<fuchsia_hardware_spi::Device> {
+class SpiChild : public SpiChildType, public fidl::WireServer<fuchsia_hardware_spi::Device> {
  public:
   SpiChild(zx_device_t* parent, fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> spi,
            uint32_t chip_select, bool has_siblings, fdf::UnownedDispatcher fidl_dispatcher)
@@ -57,12 +54,6 @@ class SpiChild : public SpiChildType,
   void CanAssertCs(CanAssertCsCompleter::Sync& completer) override;
   void AssertCs(AssertCsCompleter::Sync& completer) override;
   void DeassertCs(DeassertCsCompleter::Sync& completer) override;
-
-  zx_status_t SpiTransmit(const uint8_t* txdata_list, size_t txdata_count);
-  zx_status_t SpiReceive(uint32_t size, uint8_t* out_rxdata_list, size_t rxdata_count,
-                         size_t* out_rxdata_actual);
-  zx_status_t SpiExchange(const uint8_t* txdata_list, size_t txdata_count, uint8_t* out_rxdata_list,
-                          size_t rxdata_count, size_t* out_rxdata_actual);
 
   void Bind(fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end);
 

@@ -26,7 +26,6 @@ group("tests") {
 group("common") {
   public_deps = [
     ":spi_bind",
-    "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
     "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
     "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_cpp",

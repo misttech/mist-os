@@ -205,69 +205,6 @@ void SpiChild::Exchange(ExchangeRequestView request, ExchangeCompleter::Sync& co
               }));
 }
 
-zx_status_t SpiChild::SpiTransmit(const uint8_t* txdata_list, size_t txdata_count) {
-  fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->TransmitVector(
-      cs_,
-      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(txdata_list), txdata_count));
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVector: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  return ZX_OK;
-}
-
-zx_status_t SpiChild::SpiReceive(uint32_t size, uint8_t* out_rxdata_list, size_t rxdata_count,
-                                 size_t* out_rxdata_actual) {
-  if (size > rxdata_count) {
-    return ZX_ERR_BUFFER_TOO_SMALL;
-  }
-
-  fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->ReceiveVector(cs_, size);
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVector: %s", zx_status_get_string(status));
-    return status;
-  }
-  if (result->value()->data.count() != size) {
-    zxlogf(ERROR, "Expected %u bytes != received %zu bytes", size, result->value()->data.count());
-    return ZX_ERR_INTERNAL;
-  }
-
-  *out_rxdata_actual = result->value()->data.count();
-  memcpy(out_rxdata_list, result->value()->data.data(), *out_rxdata_actual);
-
-  return ZX_OK;
-}
-
-zx_status_t SpiChild::SpiExchange(const uint8_t* txdata_list, size_t txdata_count,
-                                  uint8_t* out_rxdata_list, size_t rxdata_count,
-                                  size_t* out_rxdata_actual) {
-  if (txdata_count != rxdata_count) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->ExchangeVector(
-      cs_,
-      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(txdata_list), txdata_count));
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVector: %s", zx_status_get_string(status));
-    return status;
-  }
-  if (result.value()->rxdata.count() != rxdata_count) {
-    zxlogf(ERROR, "Expected %zu bytes != received %zu bytes", rxdata_count,
-           result->value()->rxdata.count());
-    return ZX_ERR_INTERNAL;
-  }
-
-  *out_rxdata_actual = result.value()->rxdata.count();
-  memcpy(out_rxdata_list, result.value()->rxdata.data(), *out_rxdata_actual);
-
-  return ZX_OK;
-}
-
 void SpiChild::CanAssertCs(CanAssertCsCompleter::Sync& completer) {
   completer.Reply(!has_siblings_);
 }
