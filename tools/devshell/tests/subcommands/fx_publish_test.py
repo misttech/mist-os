@@ -60,16 +60,18 @@ class FxPublishTest(unittest.TestCase):
         return ["true", subcommand, *args]
 
     def _test_publish_cache(self, test_dir: str) -> None:
-        with patch(
-            "sys.argv",
-            [
-                publish.__file__,
-                "cache",
-                "--quiet",
-            ],
-        ), patch(
-            "publish.fx_command", self.fake_fx_command
-        ), patch_cwd(test_dir):
+        with (
+            patch(
+                "sys.argv",
+                [
+                    publish.__file__,
+                    "cache",
+                    "--quiet",
+                ],
+            ),
+            patch("publish.fx_command", self.fake_fx_command),
+            patch_cwd(test_dir),
+        ):
             # Launches the real devshell publish tool under the fake build
             # directory.
             self.assertEqual(publish.main(), 0)
@@ -80,8 +82,8 @@ class FxPublishTest(unittest.TestCase):
                 [
                     set(
                         [
-                            "build/images/updates:prepare_publish",
-                            "assembly_cache_packages.list",
+                            "//build/images/updates:prepare_publish",
+                            "//build/images/updates:assembly_cache_packages.list",
                         ]
                     )
                 ],

@@ -129,11 +129,13 @@ def main() -> int:
     )
 
     # Collect ninja targets.
-    ninja_targets = ["build/images/updates:prepare_publish"]
+    ninja_targets = ["//build/images/updates:prepare_publish"]
     packages_to_publish = []
     for packages in set(args.packages):
         if packages == "cache":
-            ninja_targets.append("assembly_cache_packages.list")
+            ninja_targets.append(
+                "//build/images/updates:assembly_cache_packages.list"
+            )
             packages_to_publish.append(
                 build_dir / "assembly_cache_packages.list"
             )
