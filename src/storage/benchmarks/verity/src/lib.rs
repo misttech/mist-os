@@ -7,7 +7,7 @@ use linux_uapi::{fsverity_enable_arg, FS_IOC_ENABLE_VERITY, FS_VERITY_HASH_ALG_S
 use std::os::fd::AsRawFd;
 use std::time::Instant;
 
-pub const VERITY_FILE_SIZES: [u64; 5] = [4096, 24576, 262144, 2097152, 10485760];
+pub const VERITY_FILE_SIZES: [u64; 4] = [4096, 24576, 262144, 2097152];
 pub const SAMPLES: u64 = 5;
 pub const ENABLE_BENCHMARK_NAME: &str = "Enable";
 pub const READ_BENCHMARK_NAME: &str = "Read";

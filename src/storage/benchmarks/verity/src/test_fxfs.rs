@@ -21,7 +21,7 @@ enum IncomingRequest {
 #[fuchsia::main]
 async fn main() {
     let fvm_volume_factory = FvmVolumeFactory::new().await.unwrap();
-    let mut fs = Fxfs::new(100 * 1024 * 1024).start_filesystem(&fvm_volume_factory).await;
+    let mut fs = Fxfs::new(20 * 1024 * 1024).start_filesystem(&fvm_volume_factory).await;
     let mut svc = ServiceFs::new();
     let root_dir = open_in_namespace(
         &fs.benchmark_dir().to_string_lossy(),
