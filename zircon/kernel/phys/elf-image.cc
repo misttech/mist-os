@@ -97,12 +97,12 @@ fit::result<ElfImage::Error> ElfImage::Init(ElfImage::BootfsDir dir, ktl::string
   auto [ehdr, phdrs] = *headers;
 
   ktl::optional<elfldltl::Elf<>::Phdr> relro, dynamic, interp;
-  elfldltl::DecodePhdrs(
+  elfldltl::DecodePhdrs(  //
       diagnostics, phdrs, load_info_.GetPhdrObserver(ZX_PAGE_SIZE),
-      elfldltl::PhdrFileNoteObserver(elfldltl::Elf<>(), image_,
-                                     elfldltl::NoArrayFromFile<ktl::byte>(),
-                                     elfldltl::ObserveBuildIdNote(build_id_)),
-      elfldltl::PhdrSingletonObserver<elfldltl::Elf<>, elfldltl::ElfPhdrType::kRelro>(relro),
+      elfldltl::PhdrFileNoteObserver(  //
+          elfldltl::Elf<>(), image_, elfldltl::NoArrayFromFile<ktl::byte>(),
+          elfldltl::ObserveBuildIdNote(build_id_)),
+      elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro),
       elfldltl::PhdrDynamicObserver<elfldltl::Elf<>>(dynamic),
       elfldltl::PhdrInterpObserver<elfldltl::Elf<>>(interp));
 

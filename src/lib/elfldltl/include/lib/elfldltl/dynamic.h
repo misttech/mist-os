@@ -642,8 +642,8 @@ class DynamicNeededObserver
 // Deduction guides.
 
 template <class Elf, class AbiTraits, template <class, class> class SymbolInfo, class Callback>
-DynamicNeededObserver(const SymbolInfo<Elf, AbiTraits>& info, Callback)
-    -> DynamicNeededObserver<Elf, SymbolInfo<Elf, AbiTraits>, Callback>;
+DynamicNeededObserver(const SymbolInfo<Elf, AbiTraits>& info,
+                      Callback) -> DynamicNeededObserver<Elf, SymbolInfo<Elf, AbiTraits>, Callback>;
 
 // This provides a trivial observer that simply counts how many occurrences of
 // any of the given tags appear.

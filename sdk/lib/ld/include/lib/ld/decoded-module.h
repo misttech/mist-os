@@ -6,10 +6,12 @@
 #define LIB_LD_DECODED_MODULE_H_
 
 #include <lib/elfldltl/load.h>
+#include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/relocation.h>
 #include <lib/elfldltl/soname.h>
 
 #include "abi.h"
+#include "load.h"
 
 namespace ld {
 
@@ -49,6 +51,20 @@ enum class DecodedModuleRelocInfo : bool { kNo, kYes };
 // as a marker so they can be detected using std::is_base_of.
 struct DecodedModuleBase {};
 
+// These fixed limits on the number of PT_LOAD segments and the overall e_phnum
+// are what the startup dynamic linker uses, so it's not unreasonable for any
+// other implementation to impose the same limits since any ELF file that has
+// more segments/phdrs would be unusable as an initial exec module.
+
+// Usually there are fewer than five segments, so this seems like a reasonable
+// upper bound to support.
+inline constexpr size_t kMaxSegments = 8;
+
+// There can be quite a few metadata phdrs in addition to a PT_LOAD for each
+// segment, so allow a fair few more.
+inline constexpr size_t kMaxPhdrs = 32;
+static_assert(kMaxPhdrs > kMaxSegments);
+
 template <class ElfLayout, template <typename> class SegmentContainer, AbiModuleInline InlineModule,
           DecodedModuleRelocInfo WithRelocInfo = DecodedModuleRelocInfo::kYes,
           template <class SegmentType> class SegmentWrapper = elfldltl::NoSegmentWrapper>
@@ -63,6 +79,7 @@ class DecodedModule : public DecodedModuleBase {
       elfldltl::LoadInfo<Elf, SegmentContainer, elfldltl::PhdrLoadPolicy::kBasic, SegmentWrapper>;
   using RelocationInfo = elfldltl::RelocationInfo<Elf>;
   using Soname = elfldltl::Soname<Elf>;
+  using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
   using Sym = typename Elf::Sym;
 
@@ -131,6 +148,55 @@ class DecodedModule : public DecodedModuleBase {
   template <auto R = WithRelocInfo, typename = std::enable_if_t<R == DecodedModuleRelocInfo::kYes>>
   constexpr const RelocationInfo& reloc_info() const {
     return reloc_info_;
+  }
+
+  // This uses Loader API and File API objects to get the file's memory image
+  // set up, which populates load_info().  This must be called after
+  // HasModule() is true, so it can initialize the module() fields for phdrs
+  // and vaddr bounds.  It returns the elfldltl::LoadHeadersFromFile return
+  // value, so the ehdr and phdrs can be examined further.  (Note that
+  // module().phdrs might validly be empty, so the returned phdrs buffer should
+  // be used for further decoding.)  The File object should no longer be needed
+  // after this, so it can be passed as an rvalue and consumed if convenient.
+  // As long as the PhdrAllocator object does not own the allocations it
+  // returns, then it can be a consumed rvalue too.
+  template <class Diagnostics, class Loader, class File,
+            typename PhdrAllocator = elfldltl::FixedArrayFromFile<Phdr, kMaxPhdrs>>
+  constexpr auto LoadFromFile(Diagnostics& diag, Loader& loader, File&& file,
+                              PhdrAllocator&& phdr_allocator = PhdrAllocator{})
+      -> decltype(elfldltl::LoadHeadersFromFile<Elf>(  //
+          diag, file, std::forward<PhdrAllocator>(phdr_allocator))) {
+    assert(HasModule());
+
+    // Read the file header and program headers into stack buffers.
+    auto headers =
+        elfldltl::LoadHeadersFromFile<Elf>(diag, file, std::forward<PhdrAllocator>(phdr_allocator));
+    if (headers) [[likely]] {
+      auto& [ehdr_owner, phdrs_owner] = *headers;
+      const Ehdr& ehdr = ehdr_owner;
+      const cpp20::span<const Phdr> phdrs = phdrs_owner;
+
+      // Decode phdrs just to fill load_info_.  There will need to be another
+      // pass over the phdrs after the image is mapped in, because metadata
+      // segments like notes refer to data in memory and it's not there yet.
+      // So everything else can wait until then.  With that, load_info_ has
+      // enough information to actually load the file.  Once the segments are
+      // in all memory, then a metadata phdr can be decoded via its vaddr.
+      if (elfldltl::DecodePhdrs(diag, phdrs, load_info_.GetPhdrObserver(loader.page_size())) &&
+          loader.Load(diag, load_info_, file.borrow())) [[likely]] {
+        // Update the module to reflect the runtime vaddr bounds.
+        SetModuleVaddrBounds(module(), load_info_, loader.load_bias());
+
+        // Update the module to point to the phdrs in memory.  Note that the
+        // rest of the decoding still uses the original phdrs buffer in the
+        // return value just in case the phdrs aren't in the memory image.
+        SetModulePhdrs(module(), ehdr, load_info_, loader.memory());
+
+        return headers;
+      }
+    }
+
+    return std::nullopt;
   }
 
   // Set up the Abi<>::TlsModule in tls_module() based on the PT_TLS segment.

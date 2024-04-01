@@ -216,7 +216,7 @@ TYPED_TEST(ElfldltlNoteObserverTests, ObserveEmpty) {
   elfldltl::DirectMemory file;
   auto observer = TestFixture::Make(Elf{}, file, [](const elfldltl::ElfNote& note) {
     EXPECT_TRUE(false) << "callback shouldn't be called";
-    return false;
+    return fit::failed();
   });
 
   std::vector<std::string> errors;
@@ -235,7 +235,7 @@ TYPED_TEST(ElfldltlNoteObserverTests, ObserveBadFile) {
   elfldltl::DirectMemory file;
   auto observer = TestFixture::Make(Elf{}, file, [](const elfldltl::ElfNote& note) {
     EXPECT_TRUE(false) << "callback shouldn't be called";
-    return false;
+    return fit::failed();
   });
   std::vector<std::string> errors;
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
@@ -255,7 +255,7 @@ TYPED_TEST(ElfldltlNoteObserverTests, ObserveOneBuildID) {
 
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note)));
+    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note, false)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
@@ -281,7 +281,7 @@ TYPED_TEST(ElfldltlNoteObserverTests, ObserveBuildIDFirst) {
 
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note)));
+    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note, false)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data.build_id, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
@@ -307,7 +307,7 @@ TYPED_TEST(ElfldltlNoteObserverTests, ObserveBuildIDLast) {
 
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note)));
+    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note, false)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data.build_id, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
@@ -334,7 +334,7 @@ TYPED_TEST(ElfldltlNoteObserverTests, Observe2BuildIDs) {
   // These check that ObserveBuildIdNote will yield the first found and not later ones.
   {
     std::optional<elfldltl::ElfNote> note;
-    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note)));
+    EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note, false)));
     ASSERT_TRUE(note.has_value());
     EXPECT_EQ(note_data.build_id, *note);
     EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
@@ -370,8 +370,8 @@ TYPED_TEST(ElfldltlNoteObserverTests, ObserveMultipleObservers) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
   std::optional<elfldltl::ElfNote> note, note2;
-  EXPECT_TRUE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note, true),
-                                 ObserveBuildIdNote(note2, true)));
+  EXPECT_TRUE(
+      this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note), ObserveBuildIdNote(note2)));
   ASSERT_TRUE(note.has_value());
   EXPECT_EQ(note_data, *note);
   ASSERT_TRUE(note2.has_value());
@@ -386,7 +386,7 @@ TYPED_TEST(ElfldltlNoteObserverTests, ObserveMultipleStopsEarly) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
   std::optional<elfldltl::ElfNote> note, note2;
-  EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note),
+  EXPECT_FALSE(this->ObserveNotes(note_data, diag, ObserveBuildIdNote(note, false),
                                   ObserveBuildIdNote(note2, true)));
   ASSERT_TRUE(note.has_value());
   EXPECT_EQ(note_data, *note);

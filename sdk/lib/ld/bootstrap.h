@@ -146,9 +146,12 @@ inline BootstrapModule BootstrapSelfModule(Diagnostics&& diag, const abi::Abi<>:
 
   std::optional<elfldltl::ElfNote> build_id;
   std::optional<Phdr> dyn_phdr;
-  elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<elfldltl::Elf<>>(dyn_phdr),
-                        elfldltl::PhdrMemoryNoteObserver(elfldltl::Elf<>{}, memory,
-                                                         elfldltl::ObserveBuildIdNote(build_id)));
+  elfldltl::DecodePhdrs(
+      diag, phdrs, elfldltl::PhdrDynamicObserver<elfldltl::Elf<>>(dyn_phdr),
+      // Since this is the only phdr observer, tell it not to keep going after
+      // seeing a build ID note.
+      elfldltl::PhdrMemoryNoteObserver(elfldltl::Elf<>{}, memory,
+                                       elfldltl::ObserveBuildIdNote(build_id, false)));
 
   const uintptr_t bias = elfldltl::Self<>::LoadBias();
   const uintptr_t start = memory.base() + bias;

@@ -132,8 +132,10 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   std::optional<elfldltl::ElfNote> build_id;
   elfldltl::DecodePhdrs(
       diag, phdrs,
+      // Since this is the only phdr observer, tell it not to keep going after
+      // seeing a build ID note.
       elfldltl::PhdrMemoryNoteObserver(elfldltl::Elf<>{}, main_executable->memory(),
-                                       elfldltl::ObserveBuildIdNote(build_id)));
+                                       elfldltl::ObserveBuildIdNote(build_id, false)));
   if (build_id) {
     module.build_id = build_id->desc;
   }

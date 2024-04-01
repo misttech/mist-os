@@ -31,15 +31,6 @@
 
 namespace ld {
 
-// Usually there are fewer than five segments, so this seems like a reasonable
-// upper bound to support.
-inline constexpr size_t kMaxSegments = 8;
-
-// There can be quite a few metadata phdrs in addition to a PT_LOAD for each
-// segment, so allow a fair few more.
-inline constexpr size_t kMaxPhdrs = 32;
-static_assert(kMaxPhdrs > kMaxSegments);
-
 // The startup dynamic linker always uses the default ELF layout.
 using Elf = elfldltl::Elf<>;
 using size_type = Elf::size_type;
@@ -151,9 +142,21 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     // name, unless the name is empty as it is for the main executable.
     ScopedModuleDiagnostics module_diag(diag, this->name().str());
 
-    // Read the file header and program headers into stack buffers.
-    auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
-        diag, file, elfldltl::FixedArrayFromFile<Phdr, kMaxPhdrs>{});
+    // Allocate the Module object first.
+    fbl::AllocChecker ac;
+    this->NewModule(symbolizer_modid, allocator, ac);
+    CheckAlloc(diag, ac, "passive ABI module");
+
+    // All modules allocated by StartupModule are part of the initial exec set
+    // and their symbols are inherently visible.
+    decoded().module().symbols_visible = true;
+
+    // Read the file header and program headers into stack buffers and map in
+    // the image.  This fills in load_info() as well as the module vaddr bounds
+    // and phdrs fields.  Note that module().phdrs might remain empty if the
+    // phdrs aren't in the load image, so keep using the stack copy read from
+    // the file instead.
+    auto headers = decoded().LoadFromFile(diag, loader_, std::forward<File>(file));
     if (!headers) [[unlikely]] {
       return {};
     }
@@ -161,53 +164,30 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     const Ehdr& ehdr = ehdr_owner;
     const cpp20::span<const Phdr> phdrs = phdrs_owner;
 
-    // Decode phdrs to fill LoadInfo and other things.
+    // Now the module's image is in memory!  Decode phdrs for everything else
+    // but the PT_LOADs for load_info_, already filled by LoadFromFile.
+    std::optional<elfldltl::ElfNote> build_id;
     std::optional<Phdr> relro_phdr;
     auto result = DecodeModulePhdrs(
-        diag, phdrs, this->decoded().load_info().GetPhdrObserver(loader_.page_size()),
+        diag, phdrs,
+        elfldltl::PhdrMemoryNoteObserver(Elf{}, memory(), elfldltl::ObserveBuildIdNote(build_id)),
         elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr));
-    if (!result) {
+    if (!result) [[unlikely]] {
       return {};
     }
 
     auto [dyn_phdr, tls_phdr, stack_size] = *result;
     set_relro(relro_phdr);
 
-    // load_info() now has enough information to actually load the file.
-    if (!loader_.Load(diag, this->load_info(), file.borrow())) [[unlikely]] {
-      return {};
+    // Start filling in module() with pointers into the loaded image.
+
+    if (build_id) {
+      decoded().module().build_id = build_id->desc;
     }
-
-    // Now the module's image is in memory!  Allocate the Module object and
-    // start filling it in with pointers into the loaded image.
-
-    fbl::AllocChecker ac;
-    this->NewModule(symbolizer_modid, allocator, ac);
-    CheckAlloc(diag, ac, "passive ABI module");
-
-    // All modules allocated by StartupModule are part of the initial exec set
-    // and their symbols are inherently visible.
-    this->decoded().module().symbols_visible = true;
-
-    // This fills in the vaddr bounds and phdrs fields.  Note that module.phdrs
-    // might remain empty if the phdrs aren't in the load image, so keep using
-    // the stack copy read from the file instead.
-    SetModuleVaddrBounds(this->decoded().module(), this->load_info(), loader_.load_bias());
-    SetModulePhdrs(this->decoded().module(), ehdr, this->load_info(), memory());
 
     // If there was a PT_TLS, fill in tls_module() to be published later.
     if (tls_phdr) {
       decoded().SetTls(diag, memory(), *tls_phdr, ++max_tls_modid);
-    }
-
-    // A second phdr scan is needed to decode notes now that they can be
-    // accessed in memory.
-    std::optional<elfldltl::ElfNote> build_id;
-    elfldltl::DecodePhdrs(diag, phdrs,
-                          elfldltl::PhdrMemoryNoteObserver(elfldltl::Elf<>{}, memory(),
-                                                           elfldltl::ObserveBuildIdNote(build_id)));
-    if (build_id) {
-      this->decoded().module().build_id = build_id->desc;
     }
 
     // Now that there is a Memory object to use, decode the dynamic section.

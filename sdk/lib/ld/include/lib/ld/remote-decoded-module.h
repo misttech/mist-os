@@ -135,11 +135,11 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
     std::optional<Phdr> relro_phdr;
     std::optional<elfldltl::ElfNote> build_id;
     constexpr elfldltl::NoArrayFromFile<std::byte> kNoBuildIdAllocator;
-    auto result = DecodeModulePhdrs(
+    auto result = DecodeModulePhdrs(  //
         diag, phdrs, this->load_info().GetPhdrObserver(page_size),
         elfldltl::PhdrRelroObserver<Elf>(relro_phdr),
         elfldltl::PhdrFileNoteObserver(Elf{}, mapped_vmo_, kNoBuildIdAllocator,
-                                       elfldltl::ObserveBuildIdNote(build_id, true)));
+                                       elfldltl::ObserveBuildIdNote(build_id)));
     if (!result) [[unlikely]] {
       // DecodeModulePhdrs only fails if Diagnostics said to give up.
       return false;

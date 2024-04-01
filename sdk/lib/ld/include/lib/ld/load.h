@@ -85,7 +85,7 @@ constexpr std::optional<ModulePhdrInfo<Elf>> DecodeModulePhdrs(
   if (!elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(result.dyn_phdr),
                              elfldltl::PhdrTlsObserver<Elf>(result.tls_phdr),
                              elfldltl::PhdrStackObserver<Elf>(result.stack_size),
-                             std::forward<PhdrObservers>(phdr_observers)...)) {
+                             std::forward<PhdrObservers>(phdr_observers)...)) [[unlikely]] {
     return std::nullopt;
   }
   return result;
@@ -105,6 +105,12 @@ constexpr fit::result<bool, cpp20::span<const typename Elf::Dyn>> DecodeModuleDy
   }
 
   const size_t count = dyn_phdr->filesz / sizeof(Dyn);
+  if (count <= 1) [[unlikely]] {
+    return fit::error{diag.FormatError("PT_DYNAMIC p_filesz ", dyn_phdr->filesz(),
+                                       " too small for any ", sizeof(Dyn),
+                                       "-byte entries before DT_NULL entry")};
+  }
+
   auto read_dyn = memory.template ReadArray<Dyn>(dyn_phdr->vaddr, count);
   if (!read_dyn) [[unlikely]] {
     return fit::error{
@@ -134,7 +140,7 @@ constexpr fit::result<bool, cpp20::span<const typename Elf::Dyn>> DecodeModuleDy
 // via elfldltl::PhdrMemoryNoteObserver in a second elfldltl::DecodePhdrs scan
 // performed after the module has been loaded.
 template <class Elf = elfldltl::Elf<>>
-constexpr auto ObserveBuildIdNote(AbiModule<Elf>& module, bool keep_going = false) {
+constexpr auto ObserveBuildIdNote(AbiModule<Elf>& module, bool keep_going = true) {
   // Use the toolkit's generic observer to find the build ID note.
   using ObserverResult = std::optional<elfldltl::ElfNote>&;
   auto make_observer = [keep_going](ObserverResult& build_id) {
