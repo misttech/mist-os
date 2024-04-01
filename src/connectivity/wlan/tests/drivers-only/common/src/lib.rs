@@ -6,13 +6,13 @@ use {
     fidl::endpoints::{create_endpoints, create_proxy},
     fidl_test_wlan_realm as fidl_realm, fidl_test_wlan_testcontroller as fidl_testcontroller,
     fuchsia_component::client::connect_to_protocol,
-    realm_proxy_client::RealmProxyClient,
+    realm_proxy_client::{extend_namespace, InstalledNamespace},
     test_realm_helpers::constants::TESTCONTROLLER_DRIVER_TOPOLOGICAL_PATH,
 };
 
 pub struct DriversOnlyTestRealm {
     pub testcontroller_proxy: fidl_testcontroller::TestControllerProxy,
-    _realm_proxy: RealmProxyClient,
+    _test_ns: InstalledNamespace,
 }
 
 impl DriversOnlyTestRealm {
@@ -20,7 +20,7 @@ impl DriversOnlyTestRealm {
         let realm_factory = connect_to_protocol::<fidl_realm::RealmFactoryMarker>()
             .expect("Could not connect to realm factory protocol");
 
-        let (realm_client, realm_server) = create_endpoints();
+        let (dict_client, dict_server) = create_endpoints();
         let (dev_topological, dev_topological_server) =
             create_proxy().expect("Could not create proxy");
         let (_dev_class, dev_class_server) = create_proxy().expect("Could not create proxy");
@@ -51,7 +51,7 @@ impl DriversOnlyTestRealm {
         };
 
         realm_factory
-            .create_realm(options, realm_server)
+            .create_realm2(options, dict_server)
             .await
             .expect("FIDL error on create_realm")
             .expect("create_realm returned an error");
@@ -64,8 +64,9 @@ impl DriversOnlyTestRealm {
         .await
         .expect("Could not open testcontroller_proxy");
 
-        let realm_proxy = RealmProxyClient::from(realm_client);
+        let test_ns =
+            extend_namespace(realm_factory, dict_client).await.expect("Failed to extend ns");
 
-        Self { testcontroller_proxy, _realm_proxy: realm_proxy }
+        Self { testcontroller_proxy, _test_ns: test_ns }
     }
 }
