@@ -79,7 +79,7 @@ zx::result<std::unique_ptr<profiler::Component>> profiler::Component::Create(
   component->lifecycle_controller_client_ = fidl::SyncClient{std::move(*client_end)};
   zx::result split = SplitMoniker(moniker);
   if (split.is_error()) {
-    split.take_error();
+    return split.take_error();
   }
   component->parent_moniker_ = split->parent;
   component->collection_ = split->collection;
@@ -172,7 +172,6 @@ zx::result<> profiler::Component::Start(ComponentWatcher::ComponentEventHandler 
     FX_LOGS(ERROR) << "Failed to start component: " << start_res.error_value();
     return zx::error(ZX_ERR_UNAVAILABLE);
   }
-  destroyed_ = false;
   return zx::ok();
 }
 
@@ -192,9 +191,10 @@ zx::result<> profiler::Component::Destroy() {
           .child = {{.name = name_, .collection = collection_}},
       }});
       destroy_res.is_error()) {
+    FX_LOGS(ERROR) << "Failed to destroy " << name_ << ": " << destroy_res.error_value();
     return zx::error(ZX_ERR_BAD_STATE);
   }
-  destroyed_ = true;
+  needs_destruction_ = false;
   return zx::ok();
 }
 
@@ -228,7 +228,7 @@ profiler::Component::GetResolvedDeclaration(const std::string& moniker) {
 }
 
 profiler::Component::~Component() {
-  if (!destroyed_) {
+  if (needs_destruction_) {
     (void)Destroy();
   }
 }

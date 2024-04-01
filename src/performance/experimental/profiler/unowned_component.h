@@ -18,7 +18,9 @@ namespace profiler {
 // A component that is to be profiled, but who's lifecycle is not controlled by the profiler
 class UnownedComponent : public Component {
  public:
-  explicit UnownedComponent(async_dispatcher_t* dispatcher) : Component(dispatcher) {}
+  explicit UnownedComponent(async_dispatcher_t* dispatcher) : Component(dispatcher) {
+    needs_destruction_ = false;
+  }
   static zx::result<std::unique_ptr<Component>> Create(async_dispatcher_t* dispatcher,
                                                        const std::string& moniker);
   zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start = nullptr) override;

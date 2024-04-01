@@ -6,7 +6,10 @@ import("//build/components.gni")
 executable("profiler_integration_test_bin") {
   testonly = true
   output_name = "profiler_integration_test"
-  sources = [ "integration_test.cc" ]
+  sources = [
+    "component_controlling_test.cc",
+    "integration_test.cc",
+  ]
   deps = [
     "//sdk/fidl/fuchsia.cpu.profiler:fuchsia.cpu.profiler_cpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
@@ -43,6 +46,9 @@ fuchsia_test_package("profiler_integration_test") {
 
   test_specs = {
     parallel = 1
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 

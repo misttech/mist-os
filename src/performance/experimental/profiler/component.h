@@ -49,9 +49,9 @@ class Component {
   std::vector<Component> children_;
 
   ComponentWatcher component_watcher_;
+  bool needs_destruction_ = true;
 
  private:
-  bool destroyed_ = true;
   fidl::SyncClient<fuchsia_sys2::LifecycleController> lifecycle_controller_client_;
 };
 

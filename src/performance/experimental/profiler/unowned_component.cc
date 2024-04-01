@@ -37,6 +37,7 @@ zx::result<std::unique_ptr<profiler::Component>> profiler::UnownedComponent::Cre
   std::unique_ptr component = std::make_unique<UnownedComponent>(dispatcher);
   component->moniker_ = moniker;
   component->url_ = *result->instance().url();
+  component->needs_destruction_ = false;
   return zx::ok(std::move(component));
 }
 
