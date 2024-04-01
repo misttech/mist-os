@@ -177,6 +177,11 @@ else _RBE_cache_dir="/tmp/.cache/reproxy/deps"
 fi
 mkdir -p "$_RBE_cache_dir"
 
+[[ "${USER-NOT_SET}" != "NOT_SET" ]] || {
+  echo "Error: USER must be set to authenticate using RBE."
+  exit 1
+}
+
 # These environment variables take precedence over those found in --cfg.
 bootstrap_env=(
   env

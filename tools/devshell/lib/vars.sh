@@ -1019,6 +1019,10 @@ function fx-run-ninja {
   if fx-rbe-enabled
   then
     rbe_wrapper=("FUCHSIA_BUILD_DIR=${FUCHSIA_BUILD_DIR}" "${RBE_WRAPPER[@]}")
+    [[ "${USER-NOT_SET}" != "NOT_SET" ]] || {
+      echo "Error: USER is not set"
+      exit 1
+    }
     user_rbe_env=(
       # Automatic auth with gcert (from re-client bootstrap) needs $USER.
       "USER=${USER}"
