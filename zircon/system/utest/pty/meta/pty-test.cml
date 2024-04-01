@@ -4,14 +4,29 @@
 {
     include: [
         "//sdk/lib/sys/testing/elf_test_runner.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         binary: "test/pty-test",
     },
+    children: [
+        {
+            name: "ptysvc",
+            url: "ptysvc#meta/ptysvc.cm",
+        },
+    ],
     use: [
         {
             protocol: [ "fuchsia.hardware.pty.Device" ],
+            from: "#ptysvc",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.boot.WriteOnlyLog" ],
+            from: "parent",
+            to: "#ptysvc",
         },
     ],
 }
