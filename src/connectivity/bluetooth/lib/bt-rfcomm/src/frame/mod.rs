@@ -38,9 +38,9 @@ decodable_enum! {
 impl FrameTypeMarker {
     /// Returns true if the frame type is a valid multiplexer start-up frame.
     //
-    /// Valid multiplexer start-up frames are the only frames which are allowed to be
-    /// sent before the multiplexer starts, and must be sent over the Mux Control Channel.
-    fn is_mux_startup_frame(&self, dlci: &DLCI) -> bool {
+    /// These are the only frames which are allowed to be sent before the multiplexer starts, and
+    /// must be sent over the Mux Control Channel.
+    fn is_mux_startup(&self, dlci: &DLCI) -> bool {
         dlci.is_mux_control()
             && (*self == FrameTypeMarker::SetAsynchronousBalancedMode
                 || *self == FrameTypeMarker::UnnumberedAcknowledgement
@@ -226,6 +226,26 @@ fn is_two_octet_length(length: usize) -> bool {
     length > MAX_SINGLE_OCTET_LENGTH
 }
 
+/// Returns the C/R bit for a non-UIH frame.
+fn cr_bit_for_non_uih_frame(role: Role, command_response: CommandResponse) -> bool {
+    // Defined in GSM Section 5.2.1.2 Table 1.
+    match (role, command_response) {
+        (Role::Initiator, CommandResponse::Command)
+        | (Role::Responder, CommandResponse::Response) => true,
+        _ => false,
+    }
+}
+
+/// Returns the C/R bit for a UIH frame.
+/// This must only be used on frames sent after multiplexer startup.
+fn cr_bit_for_uih_frame(role: Role) -> bool {
+    // The C/R bit is based on subclause 5.4.3.1 and matches the role of the device.
+    match role {
+        Role::Initiator => true,
+        _ => false,
+    }
+}
+
 /// The highest-level unit of data that is passed around in RFCOMM.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Frame {
@@ -268,14 +288,13 @@ impl Frame {
 
         // If the Session multiplexer hasn't started, then the `frame_type` must be a
         // multiplexer startup frame.
-        if !role.is_multiplexer_started() && !frame_type.is_mux_startup_frame(&dlci) {
+        if !role.is_multiplexer_started() && !frame_type.is_mux_startup(&dlci) {
             return Err(FrameParseError::InvalidFrame);
         }
 
         // Classify the frame as either a Command or Response depending on the role, type of frame,
         // and the C/R bit of the Address Field.
-        let command_response = CommandResponse::classify(role, frame_type, cr_bit)
-            .or(Err(FrameParseError::InvalidFrame))?;
+        let command_response = CommandResponse::classify(role, frame_type, cr_bit)?;
 
         // Parse the Information field of the Frame. If the EA bit is 0, then we need to construct
         // the InformationLength using two bytes.
@@ -405,21 +424,27 @@ impl Encodable for Frame {
             return Err(FrameParseError::BufferTooSmall);
         }
 
-        // If the multiplexer has started, the C/R bit of the Address Field is set based on
-        // GSM 7.10 Section 5.2.1.2 Table 1.
-        // Otherwise, the frame must be a Mux Startup frame, in which case the C/R bit is always
-        // set - see GSM 7.10 Section 5.4.4.1 and 5.4.4.2.
-        let cr_bit = if self.role.is_multiplexer_started() {
-            match (&self.role, &self.command_response) {
-                (Role::Initiator, CommandResponse::Command)
-                | (Role::Responder, CommandResponse::Response) => true,
-                _ => false,
-            }
-        } else {
-            if !self.data.marker().is_mux_startup_frame(&self.dlci) {
+        let assumed_role = if !self.role.is_multiplexer_started() {
+            if !self.data.marker().is_mux_startup(&self.dlci) {
                 return Err(FrameParseError::InvalidFrame);
             }
-            true
+            // The role is only determined after the multiplexer starts. Per GSM 5.2.1.2, the
+            // initiating side always sends the first SABM.
+            if self.data.marker() == FrameTypeMarker::SetAsynchronousBalancedMode {
+                Role::Initiator
+            } else {
+                Role::Responder
+            }
+        } else {
+            self.role
+        };
+        // The C/R bit of the Address Field depends on the frame type:
+        //   - For UIH frames, the C/R bit is based on GSM Section 5.4.3.1.
+        //   - For other frames, the C/R bit is determined by Table 1 in GSM Section 5.2.1.2.
+        let cr_bit = if self.data.marker() == FrameTypeMarker::UnnumberedInfoHeaderCheck {
+            cr_bit_for_uih_frame(assumed_role)
+        } else {
+            cr_bit_for_non_uih_frame(assumed_role, self.command_response)
         };
 
         // Set the Address Field, E/A = 1 since there is only one octet.
@@ -472,6 +497,8 @@ impl Encodable for Frame {
 
 #[cfg(test)]
 mod tests {
+    use crate::frame::mux_commands::ModemStatusParams;
+
     use super::*;
 
     use assert_matches::assert_matches;
@@ -483,12 +510,20 @@ mod tests {
         let user_dlci = DLCI::try_from(5).unwrap();
 
         let frame_type = FrameTypeMarker::SetAsynchronousBalancedMode;
-        assert!(frame_type.is_mux_startup_frame(&control_dlci));
-        assert!(!frame_type.is_mux_startup_frame(&user_dlci));
+        assert!(frame_type.is_mux_startup(&control_dlci));
+        assert!(!frame_type.is_mux_startup(&user_dlci));
+
+        let frame_type = FrameTypeMarker::UnnumberedAcknowledgement;
+        assert!(frame_type.is_mux_startup(&control_dlci));
+        assert!(!frame_type.is_mux_startup(&user_dlci));
+
+        let frame_type = FrameTypeMarker::DisconnectedMode;
+        assert!(frame_type.is_mux_startup(&control_dlci));
+        assert!(!frame_type.is_mux_startup(&user_dlci));
 
         let frame_type = FrameTypeMarker::Disconnect;
-        assert!(!frame_type.is_mux_startup_frame(&control_dlci));
-        assert!(!frame_type.is_mux_startup_frame(&user_dlci));
+        assert!(!frame_type.is_mux_startup(&control_dlci));
+        assert!(!frame_type.is_mux_startup(&user_dlci));
     }
 
     #[test]
@@ -655,7 +690,7 @@ mod tests {
         let role = Role::Responder;
         let frame_type = FrameTypeMarker::UnnumberedInfoHeaderCheck;
         let mut buf = vec![
-            0b00001111, // Address Field - EA = 1, C/R = 1, User DLCI = 3.
+            0b00001101, // Address Field - EA = 1, C/R = 0, User DLCI = 3.
             0b11101111, // Control Field - UIH command with P/F = 0.
             0b00000101, // Length Field - Bit1 = 1 Indicates one octet length = 2.
             0b00000000, // Data octet #1,
@@ -691,7 +726,7 @@ mod tests {
 
         // Concatenate the header, `length_data` payload, and FCS.
         let buf = vec![
-            0b00001111, // Address Field - EA = 1, C/R = 1, User DLCI = 3.
+            0b00001101, // Address Field - EA = 1, C/R = 0, User DLCI = 3.
             0b11101111, // Control Field - UIH command with P/F = 0.
             0b00000010, // Length Field0 - E/A = 0. Length = 1.
             0b00000001, // Length Field1 - No E/A. Length = 128.
@@ -719,7 +754,7 @@ mod tests {
         let role = Role::Responder;
         let frame_type = FrameTypeMarker::UnnumberedInfoHeaderCheck;
         let mut buf = vec![
-            0b00000011, // Address Field - EA = 1, C/R = 1, Mux DLCI = 0.
+            0b00000001, // Address Field - EA = 1, C/R = 0, Mux DLCI = 0.
             0b11111111, // Control Field - UIH command with P/F = 1.
             0b00000111, // Length Field - Bit1 = 1 Indicates one octet length = 3.
             0b10010001, // Data octet #1 - RPN command.
@@ -751,7 +786,7 @@ mod tests {
 
     #[test]
     fn test_parse_uih_frame_with_credits() {
-        let role = Role::Responder;
+        let role = Role::Initiator;
         let frame_type = FrameTypeMarker::UnnumberedInfoHeaderCheck;
         let credit_based_flow = true;
         let mut buf = vec![
@@ -774,7 +809,7 @@ mod tests {
             dlci: DLCI::try_from(7).unwrap(),
             data: FrameData::UnnumberedInfoHeaderCheck(UIHData::User(expected_user_data)),
             poll_final: true,
-            command_response: CommandResponse::Response,
+            command_response: CommandResponse::Command,
             credits: Some(5),
         };
         assert_eq!(res, expected_frame);
@@ -810,7 +845,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_mux_startup_frame_succeeds() {
+    fn encode_mux_startup_command_succeeds() {
         let frame = Frame {
             role: Role::Unassigned,
             dlci: DLCI::try_from(0).unwrap(),
@@ -831,26 +866,38 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_user_data_frame_succeeds() {
-        let frame = Frame {
-            role: Role::Initiator,
-            dlci: DLCI::try_from(3).unwrap(),
-            data: FrameData::UnnumberedInfoHeaderCheck(UIHData::User(UserData {
+    fn encode_mux_startup_response_succeeds() {
+        let frame = Frame::make_ua_response(Role::Unassigned, DLCI::try_from(0).unwrap());
+        let mut buf = vec![0; frame.encoded_len()];
+        assert!(frame.encode(&mut buf[..]).is_ok());
+        let expected = vec![
+            0b00000011, // Address Field: DLCI = 0, C/R = 1, E/A = 1.
+            0b01110011, // Control Field: UA, P/F = 1.
+            0b00000001, // Length Field: Length = 0, E/A = 1.
+            0b11010111, // FCS - precomputed.
+        ];
+        assert_eq!(buf, expected);
+    }
+
+    #[test]
+    fn encode_user_data_as_initiator_succeeds() {
+        let frame = Frame::make_user_data_frame(
+            Role::Initiator,
+            DLCI::try_from(3).unwrap(),
+            UserData {
                 information: vec![
                     0b00000001, // Data octet #1.
                     0b00000010, // Data octet #2.
                 ],
-            })),
-            poll_final: true,
-            command_response: CommandResponse::Command,
-            credits: Some(8),
-        };
+            },
+            Some(8),
+        );
         let mut buf = vec![0; frame.encoded_len()];
         assert!(frame.encode(&mut buf[..]).is_ok());
         let expected = vec![
             0b00001111, // Address Field: DLCI = 3, C/R = 1, E/A = 1.
             0b11111111, // Control Field - UIH command with P/F = 1.
-            0b00000101, // Length Field - Bit1 = 1 Indicates one octet length = 2.
+            0b00000101, // Length Field - Bit1 = 1 Indicates one octet, length = 2.
             0b00001000, // Credit Field - Credits = 8.
             0b00000001, // Data octet #1.
             0b00000010, // Data octet #2.
@@ -860,7 +907,57 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_mux_command_frame_succeeds() {
+    fn test_encode_user_data_as_responder_succeeds() {
+        let frame = Frame::make_user_data_frame(
+            Role::Responder,
+            DLCI::try_from(9).unwrap(),
+            UserData {
+                information: vec![
+                    0b00000001, // Data octet #1.
+                ],
+            },
+            Some(10),
+        );
+        let mut buf = vec![0; frame.encoded_len()];
+        assert!(frame.encode(&mut buf[..]).is_ok());
+        let expected = vec![
+            0b00100101, // Address Field: DLCI = 3, C/R = 0, E/A = 1.
+            0b11111111, // Control Field - UIH command with P/F = 1.
+            0b00000011, // Length Field - Bit1 = 1 Indicates one octet, length = 1.
+            0b00001010, // Credit Field - Credits = 10.
+            0b00000001, // Data octet #1.
+            0b11101001, // FCS - precomputed.
+        ];
+        assert_eq!(buf, expected);
+    }
+
+    #[test]
+    fn encode_mux_command_as_initiator() {
+        let mux_command = MuxCommand {
+            params: MuxCommandParams::ModemStatus(ModemStatusParams::default(
+                DLCI::try_from(5).unwrap(),
+            )),
+            command_response: CommandResponse::Command,
+        };
+        let frame = Frame::make_mux_command(Role::Initiator, mux_command);
+
+        let mut buf = vec![0; frame.encoded_len()];
+        assert!(frame.encode(&mut buf[..]).is_ok());
+        let expected = vec![
+            0b00000011, // Address Field: DLCI = 0, C/R = 1, E/A = 1.
+            0b11101111, // Control Field - UIH command with P/F = 1.
+            0b00001001, // Length Field - Bit1 = 1 Indicates one octet, length = 4.
+            0b11100011, // Data octet #1 - MSC response, C/R = 1, E/A = 1.
+            0b00000101, // Data octet #2 - Length = 2, E/A = 1.
+            0b00010111, // Data octet #3 DLCI = 5, E/A = 1, Bit2 = 1 always.
+            0b10001101, // Data octet #4 Signals = default, E/A = 1.
+            0b01110000, // FCS - precomputed.
+        ];
+        assert_eq!(buf, expected);
+    }
+
+    #[test]
+    fn encode_mux_command_as_responder() {
         let mux_command = MuxCommand {
             params: MuxCommandParams::RemotePortNegotiation(RemotePortNegotiationParams {
                 dlci: DLCI::try_from(7).unwrap(),
@@ -868,23 +965,67 @@ mod tests {
             }),
             command_response: CommandResponse::Command,
         };
-        let frame = Frame {
-            role: Role::Responder,
-            dlci: DLCI::try_from(0).unwrap(),
-            data: FrameData::UnnumberedInfoHeaderCheck(UIHData::Mux(mux_command)),
-            poll_final: false,
-            command_response: CommandResponse::Command,
-            credits: None,
-        };
+        let frame = Frame::make_mux_command(Role::Responder, mux_command);
+
         let mut buf = vec![0; frame.encoded_len()];
         assert!(frame.encode(&mut buf[..]).is_ok());
         let expected = vec![
             0b00000001, // Address Field: DLCI = 0, C/R = 0, E/A = 1.
             0b11101111, // Control Field - UIH command with P/F = 1.
-            0b00000111, // Length Field - Bit1 = 1 Indicates one octet length = 3.
+            0b00000111, // Length Field - Bit1 = 1 Indicates one octet, length = 3.
             0b10010011, // Data octet #1 - RPN command, C/R = 1, E/A = 1.
             0b00000011, // Data octet #2 - RPN Command length = 1.
             0b00011111, // Data octet #3 - RPN Data, DLCI = 7.
+            0b10101010, // FCS - precomputed.
+        ];
+        assert_eq!(buf, expected);
+    }
+
+    #[test]
+    fn encode_mux_response_as_initiator() {
+        let mux_command = MuxCommand {
+            params: MuxCommandParams::RemotePortNegotiation(RemotePortNegotiationParams {
+                dlci: DLCI::try_from(13).unwrap(),
+                port_values: None,
+            }),
+            command_response: CommandResponse::Response,
+        };
+        let frame = Frame::make_mux_command(Role::Initiator, mux_command);
+
+        let mut buf = vec![0; frame.encoded_len()];
+        assert!(frame.encode(&mut buf[..]).is_ok());
+        let expected = vec![
+            0b00000011, // Address Field: DLCI = 0, C/R = 1, E/A = 1.
+            0b11101111, // Control Field - UIH command with P/F = 1.
+            0b00000111, // Length Field - Bit1 = 1 Indicates one octet, length = 3.
+            0b10010001, // Data octet #1 - RPN command, C/R = 0, E/A = 1.
+            0b00000011, // Data octet #2 - RPN Command length = 1.
+            0b00110111, // Data octet #3 - RPN Data, DLCI = 7.
+            0b01110000, // FCS - precomputed.
+        ];
+        assert_eq!(buf, expected);
+    }
+
+    #[test]
+    fn encode_mux_response_as_responder() {
+        let mux_command = MuxCommand {
+            params: MuxCommandParams::ModemStatus(ModemStatusParams::default(
+                DLCI::try_from(11).unwrap(),
+            )),
+            command_response: CommandResponse::Response,
+        };
+        let frame = Frame::make_mux_command(Role::Responder, mux_command);
+
+        let mut buf = vec![0; frame.encoded_len()];
+        assert!(frame.encode(&mut buf[..]).is_ok());
+        let expected = vec![
+            0b00000001, // Address Field: DLCI = 0, C/R = 0, E/A = 1.
+            0b11101111, // Control Field - UIH command with P/F = 1.
+            0b00001001, // Length Field - Bit1 = 1 Indicates one octet, length = 4.
+            0b11100001, // Data octet #1 - MSC response, C/R = 0, E/A = 1.
+            0b00000101, // Data octet #2 - Length = 2, E/A = 1.
+            0b00101111, // Data octet #3 DLCI = 11, E/A = 1, Bit2 = 1 always.
+            0b10001101, // Data octet #4 Signals = default, E/A = 1.
             0b10101010, // FCS - precomputed.
         ];
         assert_eq!(buf, expected);

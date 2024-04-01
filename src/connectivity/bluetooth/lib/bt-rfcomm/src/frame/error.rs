@@ -4,6 +4,9 @@
 
 use thiserror::Error;
 
+use crate::frame::FrameTypeMarker;
+use crate::Role;
+
 /// Errors associated with parsing an RFCOMM Frame.
 #[derive(Error, Debug)]
 pub enum FrameParseError {
@@ -13,10 +16,14 @@ pub enum FrameParseError {
     InvalidBufferLength(usize, usize),
     #[error("FCS check for the Frame failed")]
     FCSCheckFailed,
+    #[error("Invalid Role when parsing frame: {:?}", .0)]
+    InvalidRole(Role),
     #[error("DLCI ({:?}) is invalid", .0)]
     InvalidDLCI(u8),
     #[error("Frame is invalid")]
     InvalidFrame,
+    #[error("Frame type not supported before mux startup: {:?})", .0)]
+    InvalidFrameBeforeMuxStartup(FrameTypeMarker),
     #[error("Frame type is unsupported")]
     UnsupportedFrameType,
     #[error("Mux Command type {} is unsupported", .0)]

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::format_err;
-
 use crate::frame::{error::FrameParseError, FrameTypeMarker};
 use crate::Role;
 
@@ -16,46 +14,39 @@ pub enum CommandResponse {
 }
 
 impl CommandResponse {
-    /// Classifies a frame type as a Command or Response.
-    pub fn classify(
+    /// Classifies a frame type as a Command (C) or Response (R).
+    pub(crate) fn classify(
         role: Role,
         frame_type: FrameTypeMarker,
         cr_bit: bool,
     ) -> Result<Self, FrameParseError> {
-        // See Table 1 in GSM 5.2.1.2, which describes exactly how the C/R bit is
-        // interpreted if the multiplexer has started.
+        use FrameTypeMarker::*;
+        // If the multiplexer has started, then the classification is determined by the frame type.
         if role.is_multiplexer_started() {
-            let command_response = match (role, cr_bit) {
-                (Role::Initiator, true) | (Role::Responder, false) => CommandResponse::Command,
-                _ => CommandResponse::Response,
+            let res = match (frame_type, role, cr_bit) {
+                // For UIH frames, it is determined by the role.
+                // This is defined in GSM 5.4.3.1, which is a subclause of GSM 5.2.1.2.
+                (UnnumberedInfoHeaderCheck, Role::Initiator, _) => Ok(CommandResponse::Command),
+                (UnnumberedInfoHeaderCheck, Role::Responder, _) => Ok(CommandResponse::Response),
+                (UnnumberedInfoHeaderCheck, role, _) => Err(FrameParseError::InvalidRole(role)),
+                // For all other frames, the logic is determined by both the role and C/R bit.
+                // See GSM 5.2.1.2 Table 1 for the exact mapping.
+                (_, Role::Initiator, true) | (_, Role::Responder, false) => {
+                    Ok(CommandResponse::Command)
+                }
+                (_, _, _) => Ok(CommandResponse::Response),
             };
-            return Ok(command_response);
+            return res;
         }
 
-        // Otherwise, assume the frame has the role of the sender (assuming mux startup succeeds).
-        let command_response = match frame_type {
-            FrameTypeMarker::SetAsynchronousBalancedMode => {
-                if cr_bit {
-                    CommandResponse::Command
-                } else {
-                    CommandResponse::Response
-                }
-            }
-            FrameTypeMarker::DisconnectedMode | FrameTypeMarker::UnnumberedAcknowledgement => {
-                if cr_bit {
-                    CommandResponse::Response
-                } else {
-                    CommandResponse::Command
-                }
-            }
-            frame_type => {
-                return Err(FrameParseError::Other(format_err!(
-                    "Invalid frame before mux startup: {:?}",
-                    frame_type
-                )));
-            }
-        };
-        Ok(command_response)
+        // Otherwise, the classification depends `cr_bit` of the mux startup frame.
+        match (frame_type, cr_bit) {
+            (SetAsynchronousBalancedMode, true) => Ok(CommandResponse::Command),
+            (SetAsynchronousBalancedMode, false) => Ok(CommandResponse::Response),
+            (DisconnectedMode | UnnumberedAcknowledgement, true) => Ok(CommandResponse::Response),
+            (DisconnectedMode | UnnumberedAcknowledgement, false) => Ok(CommandResponse::Command),
+            (frame_type, _) => Err(FrameParseError::InvalidFrameBeforeMuxStartup(frame_type)),
+        }
     }
 }
 
@@ -66,37 +57,58 @@ mod tests {
     use assert_matches::assert_matches;
 
     #[test]
-    fn test_classify_command_response_multiplexer_started() {
+    fn classify_frame_after_mux_startup() {
         // Multiplexer started because a Role has been assigned.
         let role = Role::Initiator;
         let frame = FrameTypeMarker::SetAsynchronousBalancedMode;
-        let cr_bit = true;
         assert_matches!(
-            CommandResponse::classify(role, frame, cr_bit),
-            Ok(CommandResponse::Command)
-        );
-
-        let role = Role::Responder;
-        let frame = FrameTypeMarker::UnnumberedInfoHeaderCheck;
-        let cr_bit = false;
-        assert_matches!(
-            CommandResponse::classify(role, frame, cr_bit),
+            CommandResponse::classify(role, frame, /* cr_bit= */ true),
             Ok(CommandResponse::Command)
         );
 
         let role = Role::Initiator;
         let frame = FrameTypeMarker::SetAsynchronousBalancedMode;
-        let cr_bit = false;
         assert_matches!(
-            CommandResponse::classify(role, frame, cr_bit),
+            CommandResponse::classify(role, frame, /* cr_bit= */ false),
             Ok(CommandResponse::Response)
         );
 
         let role = Role::Responder;
-        let frame = FrameTypeMarker::SetAsynchronousBalancedMode;
-        let cr_bit = true;
+        let frame = FrameTypeMarker::Disconnect;
         assert_matches!(
-            CommandResponse::classify(role, frame, cr_bit),
+            CommandResponse::classify(role, frame, /* cr_bit= */ true),
+            Ok(CommandResponse::Response)
+        );
+
+        let role = Role::Responder;
+        let frame = FrameTypeMarker::DisconnectedMode;
+        assert_matches!(
+            CommandResponse::classify(role, frame, /* cr_bit= */ false),
+            Ok(CommandResponse::Command)
+        );
+    }
+
+    #[test]
+    fn classify_uih_frame_after_mux_startup() {
+        let frame = FrameTypeMarker::UnnumberedInfoHeaderCheck;
+
+        assert_matches!(
+            CommandResponse::classify(Role::Initiator, frame, /* cr_bit=*/ true),
+            Ok(CommandResponse::Command)
+        );
+
+        assert_matches!(
+            CommandResponse::classify(Role::Initiator, frame, /* cr_bit=*/ false),
+            Ok(CommandResponse::Command)
+        );
+
+        assert_matches!(
+            CommandResponse::classify(Role::Responder, frame, /* cr_bit=*/ true),
+            Ok(CommandResponse::Response)
+        );
+
+        assert_matches!(
+            CommandResponse::classify(Role::Responder, frame, /* cr_bit=*/ false),
             Ok(CommandResponse::Response)
         );
     }
@@ -104,7 +116,7 @@ mod tests {
     /// Tests classifying a SABM command when the multiplexer has not started. The classification
     /// should simply be based on the CR bit.
     #[test]
-    fn test_classify_command_response_multiplexer_not_started_sabm() {
+    fn classify_sabm_before_mux_startup() {
         // Mux not started.
         let role = Role::Unassigned;
         let frame = FrameTypeMarker::SetAsynchronousBalancedMode;
@@ -115,7 +127,7 @@ mod tests {
         );
 
         // Mux not started.
-        let role = Role::Unassigned;
+        let role = Role::Negotiating;
         let frame = FrameTypeMarker::SetAsynchronousBalancedMode;
         let cr_bit = false;
         assert_matches!(
@@ -124,40 +136,20 @@ mod tests {
         );
     }
 
-    /// Tests classifying a DM/UA command when the multiplexer has not started. The classification
-    /// should simply be the opposite of the CR bit.
+    /// Tests classifying a DM before multiplexer startup. Should be opposite of C/R bit.
     #[test]
-    fn test_classify_command_response_multiplexer_not_started() {
-        // Mux not started.
-        let role = Role::Unassigned;
+    fn classify_dm_before_mux_startup() {
         let frame = FrameTypeMarker::DisconnectedMode;
+
+        // Mux not started.
+        let role = Role::Negotiating;
         let cr_bit = true;
         assert_matches!(
             CommandResponse::classify(role, frame, cr_bit),
             Ok(CommandResponse::Response)
         );
 
-        // Mux not started.
         let role = Role::Unassigned;
-        let frame = FrameTypeMarker::DisconnectedMode;
-        let cr_bit = false;
-        assert_matches!(
-            CommandResponse::classify(role, frame, cr_bit),
-            Ok(CommandResponse::Command)
-        );
-
-        // Mux not started.
-        let role = Role::Unassigned;
-        let frame = FrameTypeMarker::UnnumberedAcknowledgement;
-        let cr_bit = true;
-        assert_matches!(
-            CommandResponse::classify(role, frame, cr_bit),
-            Ok(CommandResponse::Response)
-        );
-
-        // Mux not started.
-        let role = Role::Unassigned;
-        let frame = FrameTypeMarker::UnnumberedAcknowledgement;
         let cr_bit = false;
         assert_matches!(
             CommandResponse::classify(role, frame, cr_bit),
@@ -166,17 +158,42 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_command_response_invalid_frame_type() {
-        // Mux not started - Disconnect can't be sent before startup.
+    fn classify_ua_before_mux_startup() {
+        let frame = FrameTypeMarker::UnnumberedAcknowledgement;
+
+        let role = Role::Unassigned;
+        let cr_bit = true;
+        assert_matches!(
+            CommandResponse::classify(role, frame, cr_bit),
+            Ok(CommandResponse::Response)
+        );
+
+        let role = Role::Negotiating;
+        let cr_bit = false;
+        assert_matches!(
+            CommandResponse::classify(role, frame, cr_bit),
+            Ok(CommandResponse::Command)
+        );
+    }
+
+    #[test]
+    fn classify_invalid_frame_before_mux_startup_is_error() {
+        // Disconnect can't be sent before startup.
         let role = Role::Unassigned;
         let frame = FrameTypeMarker::Disconnect;
         let cr_bit = true;
-        assert_matches!(CommandResponse::classify(role, frame, cr_bit), Err(_));
+        assert_matches!(
+            CommandResponse::classify(role, frame, cr_bit),
+            Err(FrameParseError::InvalidFrameBeforeMuxStartup(_))
+        );
 
-        // Mux not started - UIH can't be sent before startup.
+        // UIH can't be sent before startup.
         let role = Role::Unassigned;
         let frame = FrameTypeMarker::UnnumberedInfoHeaderCheck;
         let cr_bit = true;
-        assert_matches!(CommandResponse::classify(role, frame, cr_bit), Err(_));
+        assert_matches!(
+            CommandResponse::classify(role, frame, cr_bit),
+            Err(FrameParseError::InvalidFrameBeforeMuxStartup(_))
+        );
     }
 }

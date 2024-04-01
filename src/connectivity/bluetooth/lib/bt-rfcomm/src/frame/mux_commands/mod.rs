@@ -78,7 +78,7 @@ impl TypeField {
     }
 
     fn command_response(&self) -> CommandResponse {
-        // See GSM 7.10 Section 5.4.6.2 on how the cr_bit translates to CommandResponse.
+        // C/R bit is always set for commands - see GSM 7.10 Section 5.4.6.2.
         if self.cr_bit() {
             CommandResponse::Command
         } else {
