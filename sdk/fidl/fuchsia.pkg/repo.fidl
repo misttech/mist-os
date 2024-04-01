@@ -89,8 +89,6 @@ type RepositoryConfig = table {
     /// The repository mirrors that serve the package contents. Required.
     3: mirrors vector<MirrorConfig>;
 
-    4: reserved; // Formerly update_package_url string;
-
     /// The initial trusted root metadata version. Optional, if absent presumed
     /// to be 1.
     ///
@@ -145,11 +143,6 @@ type MirrorConfig = table {
 
     /// Whether or not to automatically monitor the mirror for updates. Required.
     2: subscribe bool;
-
-    // TODO(https://fxbug.dev/42155620): Turn comment below into doc-comment.
-    //
-    // Removed. Previously used for `RepositoryBlobKey blob_key`.
-    3: reserved;
 
     /// The URL where blobs from this mirror should be fetched.  Optional.
     /// If absent presumed to be `mirror_url + "/blobs"`.

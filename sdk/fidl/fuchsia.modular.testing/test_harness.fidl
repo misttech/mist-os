@@ -97,7 +97,6 @@ closed protocol TestHarness {
 type ModularService = strict resource union {
     1: puppet_master server_end:fuchsia.modular.PuppetMaster;
     2: component_context server_end:fuchsia.modular.ComponentContext;
-    3: reserved;
     4: element_manager server_end:fuchsia.element.Manager;
 };
 
@@ -175,8 +174,6 @@ type TestHarnessSpec = resource table {
     /// DEPRECATED. Use `env_services.service_dir` to pass through services from
     /// parent environment.
     3: env_services_to_inherit vector<string>;
-
-    5: reserved;
 };
 
 /// Options for configuring the test harness environment with services.

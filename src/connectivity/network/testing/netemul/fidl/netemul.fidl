@@ -90,7 +90,6 @@ closed protocol Sandbox {
                             2: subdir string:fuchsia.component.MAX_PATH_LENGTH;
                         };
 
-                        2: reserved;
                         /// The network context offered by netemul, shared
                         /// between all the managed realms in a given sandbox.
                         3: netemul_network_context Empty;

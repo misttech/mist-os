@@ -51,12 +51,6 @@ type Config = table {
     /// If not present, interpreted as 1.
     7: num_threads uint32;
 
-    /// Used to be builtin_pkg_resolver.
-    8: reserved;
-
-    /// Used to be out_dir_contents.
-    9: reserved;
-
     /// URL of the root component to launch. This field is used if the no URL
     /// is passed to component manager. If value is passed in both places, then
     /// an error is raised.
@@ -75,9 +69,6 @@ type Config = table {
     /// Which builtin resolver to use for the fuchsia-boot scheme.
     /// If not present, interpreted as BuiltinBootResolver.NONE.
     14: builtin_boot_resolver BuiltinBootResolver;
-
-    /// Used to be reboot_on_terminate_enabled.
-    15: reserved;
 
     /// If and how the realm builder resolver and runner will be used. Typically
     /// these capabilities from realm builder are available to a nested
@@ -205,7 +196,6 @@ type JobPolicyAllowlists = table {
 /// Represents the class of capabilities supported to be allowlisted.
 type AllowlistedCapability = flexible union {
     1: directory AllowlistedDirectory;
-    2: reserved;
     3: protocol AllowlistedProtocol;
     4: service AllowlistedService;
     5: storage AllowlistedStorage;

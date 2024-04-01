@@ -459,10 +459,6 @@ type Empty = struct {};
 ///
 /// These match control messages with a `SOL_SOCKET` level.
 type SocketRecvControlData = table {
-    1: reserved;
-
-    2: reserved;
-
     /// Data about the time at which the packet was received.
     3: timestamp @generated_name("Timestamp") struct {
         /// Time in nanoseconds since epoch (January 1 1970 GMT).
@@ -562,10 +558,9 @@ type NetworkSocketSendControlData = table {
     ///
     /// These match POSIX `SOL_IP` control messages.
     2: ip @generated_name("IpSendControlData") table {
-        // Reserved for `SOL_IP` -> `IP_TOS` control message, to maintain
-        // a consistent order with the similar IpRecvControlData table.
-        // TODO(https://fxbug.dev/42178100): Replace with `IP_TOS` cmsg.
-        1: reserved;
+        // TODO(https://fxbug.dev/42178100): Use ordinal 1 for the `SOL_IP` ->
+        // `IP_TOS` control message, to maintain a consistent order with the
+        // similar IpRecvControlData table.
 
         /// The Time to Live value to set in the IPv4 header of an outgoing
         /// packet.
@@ -577,10 +572,9 @@ type NetworkSocketSendControlData = table {
     ///
     /// These match POSIX `SOL_IPV6` control messages.
     3: ipv6 @generated_name("Ipv6SendControlData") table {
-        // Reserved for `SOL_IPV6` -> `IPV6_TCLASS` control message, to maintain
-        // a consistent order with the similar IpSendControlData table.
-        // TODO(https://fxbug.dev/42178100): Replace with `IPV6_TCLASS` cmsg.
-        1: reserved;
+        // TODO(https://fxbug.dev/42178100): Use ordinal 1 for the `SOL_IPV6` ->
+        // `IPV6_TCLASS` control message, to maintain a consistent order with
+        // the similar IpSendControlData table.
 
         /// The Hop Limit value to set in the IPv6 header of an outgoing
         /// packet.
@@ -1022,60 +1016,60 @@ type TcpCongestionControlState = strict enum {
 type TcpInfo = table {
     1: state TcpState;
     2: ca_state TcpCongestionControlState;
-    3: reserved; // uint8_t tcpi_retransmits;
-    4: reserved; // uint8_t tcpi_probes;
-    5: reserved; // uint8_t tcpi_backoff;
-    6: reserved; // uint8_t tcpi_options;
-    7: reserved; // uint8_t tcpi_snd_wscale : 4, tcpi_rcv_wscale : 4;
-    8: reserved;
-    9: reserved; // uint8_t tcpi_delivery_rate_app_limited : 1, tcpi_fastopen_client_fail : 2;
-    10: reserved;
+    // 3: tcpi_retransmits uint8;
+    // 4: tcpi_probes uint8;
+    // 5: tcpi_backoff uint8;
+    // 6: tcpi_options uint8;
+    // 7: ... // tcpi_snd_wscale : 4,
+    // 8: ... // tcpi_rcv_wscale : 4;
+    // 9: ... // tcpi_delivery_rate_app_limited : 1,
+    // 10: ... // tcpi_fastopen_client_fail : 2;
     11: rto_usec uint32;
-    12: reserved; // uint32_t tcpi_ato;
-    13: reserved; // uint32_t tcpi_snd_mss;
-    14: reserved; // uint32_t tcpi_rcv_mss;
-    15: reserved; // uint32_t tcpi_unacked;
-    16: reserved; // uint32_t tcpi_sacked;
-    17: reserved; // uint32_t tcpi_lost;
-    18: reserved; // uint32_t tcpi_retrans;
-    19: reserved; // uint32_t tcpi_fackets;
-    20: reserved; // uint32_t tcpi_last_data_sent;
-    21: reserved; // uint32_t tcpi_last_ack_sent;
-    22: reserved; // uint32_t tcpi_last_data_recv;
-    23: reserved; // uint32_t tcpi_last_ack_recv;
-    24: reserved; // uint32_t tcpi_pmtu;
-    25: reserved; // uint32_t tcpi_rcv_ssthresh;
+    // 12: tcpi_ato uint32;
+    // 13: tcpi_snd_mss uint32;
+    // 14: tcpi_rcv_mss uint32;
+    // 15: tcpi_unacked uint32;
+    // 16: tcpi_sacked uint32;
+    // 17: tcpi_lost uint32;
+    // 18: tcpi_retrans uint32;
+    // 19: tcpi_fackets uint32;
+    // 20: tcpi_last_data_sent uint32;
+    // 21: tcpi_last_ack_sent uint32;
+    // 22: tcpi_last_data_recv uint32;
+    // 23: tcpi_last_ack_recv uint32;
+    // 24: tcpi_pmtu uint32;
+    // 25: tcpi_rcv_ssthresh uint32;
     26: rtt_usec uint32;
     27: rtt_var_usec uint32;
     28: snd_ssthresh uint32;
     29: snd_cwnd uint32;
-    30: reserved; // uint32_t tcpi_advmss;
-    31: reserved; // uint32_t tcpi_reordering;
-    32: reserved; // uint32_t tcpi_rcv_rtt;
-    33: reserved; // uint32_t tcpi_rcv_space;
-    34: reserved; // uint32_t tcpi_total_retrans;
-    35: reserved; // uint64_t tcpi_pacing_rate;
-    36: reserved; // uint64_t tcpi_max_pacing_rate;
-    37: reserved; // uint64_t tcpi_bytes_acked;
-    38: reserved; // uint64_t tcpi_bytes_received;
-    39: reserved; // uint32_t tcpi_segs_out;
-    40: reserved; // uint32_t tcpi_segs_in;
-    41: reserved; // uint32_t tcpi_notsent_bytes;
-    42: reserved; // uint32_t tcpi_min_rtt;
-    43: reserved; // uint32_t tcpi_data_segs_in;
-    44: reserved; // uint32_t tcpi_data_segs_out;
-    45: reserved; // uint64_t tcpi_delivery_rate;
-    46: reserved; // uint64_t tcpi_busy_time;
-    47: reserved; // uint64_t tcpi_rwnd_limited;
-    48: reserved; // uint64_t tcpi_sndbuf_limited;
-    49: reserved; // uint32_t tcpi_delivered;
-    50: reserved; // uint32_t tcpi_delivered_ce;
-    51: reserved; // uint64_t tcpi_bytes_sent;
-    52: reserved; // uint64_t tcpi_bytes_retrans;
-    53: reserved; // uint32_t tcpi_dsack_dups;
+    // 30: tcpi_advmss uint32;
+    // 31: tcpi_reordering uint32;
+    // 32: tcpi_rcv_rtt uint32;
+    // 33: tcpi_rcv_space uint32;
+    // 34: tcpi_total_retrans uint32;
+    // 35: tcpi_pacing_rate uint64;
+    // 36: tcpi_max_pacing_rate uint64;
+    // 37: tcpi_bytes_acked uint64;
+    // 38: tcpi_bytes_received uint64;
+    // 39: tcpi_segs_out uint32;
+    // 40: tcpi_segs_in uint32;
+    // 41: tcpi_notsent_bytes uint32;
+    // 42: tcpi_min_rtt uint32;
+    // 43: tcpi_data_segs_in uint32;
+    // 44: tcpi_data_segs_out uint32;
+    // 45: tcpi_delivery_rate uint64;
+    // 46: tcpi_busy_time uint64;
+    // 47: tcpi_rwnd_limited uint64;
+    // 48: tcpi_sndbuf_limited uint64;
+    // 49: tcpi_delivered uint32;
+    // 50: tcpi_delivered_ce uint32;
+    // 51: tcpi_bytes_sent uint64;
+    // 52: tcpi_bytes_retrans uint64;
+    // 53: tcpi_dsack_dups uint32;
     54: reorder_seen bool;
-    55: reserved; // uint32_t tcpi_rcv_ooopack;
-    56: reserved; // uint32_t tcpi_snd_wnd;
+    // 55: tcpi_rcv_ooopack uint32;
+    // 56: tcpi_snd_wnd uint32;
 };
 
 /// Holds information about an interface and its addresses.
@@ -1084,7 +1078,6 @@ type InterfaceAddresses = table {
     1: id uint64;
     /// Name of the interface.
     2: name fuchsia.net.interfaces.Name;
-    3: reserved;
     /// All addresses currently assigned to the interface.
     4: addresses vector<fuchsia.net.Subnet>:MAX;
     /// Contains the interface flags, as returned by the SIOCGIFFLAGS ioctl

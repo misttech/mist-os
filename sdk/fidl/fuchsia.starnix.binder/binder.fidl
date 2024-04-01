@@ -63,8 +63,7 @@ open protocol ProcessAccessor {
         /// the new minted file descriptors.
         3: add_requests vector<FileHandle>:MAX_REQUEST_COUNT;
     }) -> (@generated_name("FileResponse") resource table {
-        /// No response for the close operation.
-        1: reserved;
+        // (No ordinal 1 since there is no response for the close operation.)
         /// The list of open file retriever for the `get_requests`.
         2: get_responses vector<FileHandle>:MAX_REQUEST_COUNT;
         /// The list of file descriptors minted for the `add_requests`.

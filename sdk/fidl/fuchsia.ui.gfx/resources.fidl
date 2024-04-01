@@ -15,7 +15,6 @@ type ResourceArgs = strict resource union {
     // Memory resources.
     1: memory MemoryArgs;
     2: image ImageArgs;
-    3: reserved;
     4: buffer BufferArgs;
 
     // Views.
@@ -40,7 +39,6 @@ type ResourceArgs = strict resource union {
     // Layers.
     16: compositor CompositorArgs;
     17: display_compositor DisplayCompositorArgs;
-    18: reserved;
     19: layer_stack LayerStackArgs;
     20: layer LayerArgs;
 
@@ -60,8 +58,6 @@ type ResourceArgs = strict resource union {
     // TODO(https://fxbug.dev/42098623): Move these where they belong.  They're added to the end
     // of the struct temporarily until we transition to xunions.
     28: point_light PointLightArgs;
-    29: reserved;
-    30: reserved;
     31: view3 ViewArgs3;
     32: image_pipe2 ImagePipe2Args;
     33: image2 ImageArgs2;

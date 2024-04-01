@@ -107,8 +107,6 @@ type CrashReport = resource table {
 /// Add a new member when the server needs to special case how it handles certain annotations and
 /// attachments for a given type of crashes, e.g., a `RuntimeCrashReport` for Javascript.
 type SpecificCrashReport = flexible resource union {
-    1: reserved;
-
     /// Intended for a native exception.
     2: native NativeCrashReport;
 

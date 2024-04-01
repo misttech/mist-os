@@ -13,23 +13,17 @@ type BasemgrConfig = table {
     /// Default: true
     1: enable_cobalt bool;
 
-    2: reserved;
-
     /// Create story shells through StoryShellFactory exposed by the session
     /// shell instead of creating separate story shell components. When set,
     /// `story_shell_url` and any story shell args are ignored.
     /// Default: false
     3: use_session_shell_for_story_shell_factory bool;
 
-    4: reserved;
-
     /// A map of launch configurations specific to session shells.
     5: session_shell_map vector<SessionShellMapEntry>;
 
     /// Launch configurations specific to story shell.
     6: story_shell StoryShellConfig;
-
-    7: reserved;
 
     /// Launch configuration for a session launcher component.
     ///
@@ -56,12 +50,6 @@ type SessionShellMapEntry = table {
 type SessionShellConfig = table {
     /// Contains the fuchsia package url and arguments to pass to the shell.
     1: app_config AppConfig;
-
-    2: reserved;
-
-    3: reserved;
-
-    4: reserved;
 };
 
 type StoryShellConfig = table {
@@ -70,16 +58,12 @@ type StoryShellConfig = table {
 };
 
 type SessionmgrConfig = table {
-    1: reserved;
-
     /// When set to false, Cobalt statistics are disabled. This is used for
     /// testing.
     /// Default: true
     2: enable_cobalt bool;
 
     3: reserved bool;
-
-    4: reserved;
 
     /// A list of fuchsia package urls that specify which agents to launch at
     /// startup.
@@ -94,8 +78,6 @@ type SessionmgrConfig = table {
 
     /// A map of agents to the arguments they should be started with.
     8: component_args vector<AppConfig>;
-
-    9: reserved;
 
     /// A list of services mapped to the component URL that serves it.
     /// Valid components to specify here are agents or the session shell.

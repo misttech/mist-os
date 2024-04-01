@@ -12,23 +12,11 @@ library fuchsia.modular;
 ///       operations to watchers of a story (through SessionWatcher) as are used
 ///       to control a story.
 type StoryCommand = strict resource union {
-    // Deprecated operation: set_focus_state.
-    1: reserved;
-
     /// Adds a Mod.
     2: add_mod AddMod;
 
     /// Removes an existing Mod.
     3: remove_mod RemoveMod;
-
-    // Deprecated operation: set_link_value.
-    4: reserved;
-
-    // Deprecated operation: focus_mod.
-    5: reserved;
-
-    // Deprecated operation: set_kind_of_proto_story_option.
-    6: reserved;
 };
 
 /// Adds a mod described by `intent` to the story with name `mod_name`. If

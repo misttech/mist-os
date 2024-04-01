@@ -47,7 +47,7 @@ closed protocol AccountManager {
     strict GetAccount(resource table {
         1: id AccountId;
         2: interaction server_end:fuchsia.identity.authentication.Interaction;
-        3: reserved; // 3 is reserved for auto_lock in a near-future CL
+        // 3 is reserved for auto_lock in a near-future CL.
         4: account server_end:Account;
     }) -> () error Error;
 

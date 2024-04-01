@@ -36,7 +36,6 @@ type CompatibilityInfo = struct {
 };
 
 type IdentifyHostResponse = table {
-    1: reserved;
     2: nodename string:NODE_NAME_MAX;
     // UTC timestamp of the target's time of boot, in nanoseconds.
     3: boot_timestamp_nanos uint64;

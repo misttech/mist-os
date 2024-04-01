@@ -399,10 +399,6 @@ type EncryptionPattern = struct {
 /// other than the data stream. It is only necessary to update fields if they
 /// changed, but not an error if the same value is repeated.
 type EncryptedFormat = table {
-    1: reserved;
-    2: reserved;
-    7: reserved;
-
     /// `scheme` specifies which encryption scheme to use, such as
     /// `fuchsia.media.ENCRYPTION_SCHEME_CENC`.
     /// Usage:

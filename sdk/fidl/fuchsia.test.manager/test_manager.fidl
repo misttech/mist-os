@@ -423,8 +423,6 @@ type Artifact = flexible resource union {
 
 /// Delivery method for syslog.
 type Syslog = flexible resource union {
-    1: reserved;
-
     /// Client end of the iterator used by Fuchsia clients.
     2: batch client_end:fuchsia.diagnostics.BatchIterator;
 
@@ -509,8 +507,6 @@ type LaunchError = flexible enum {
 
 /// Holds the server end of an iterator over the isolated logs of a test.
 type LogsIterator = flexible resource union {
-    1: reserved;
-
     /// Server end of the iterator, when this protocol is used by Fuchsia clients.
     2: batch server_end:fuchsia.diagnostics.BatchIterator;
 

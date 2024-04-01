@@ -96,9 +96,6 @@ type BondingData = table {
     /// The name of the peer, if known.
     3: name bt.DeviceName;
 
-    4: reserved;
-    5: reserved;
-
     /// The identity address of the peer.
     6: address bt.Address;
 

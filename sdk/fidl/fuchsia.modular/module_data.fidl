@@ -15,8 +15,6 @@ type ModuleData = resource table {
     /// instance calling StartModule().
     2: module_path vector<string:MAX>:MAX;
 
-    3: reserved;
-
     /// The way in which this Module instance was first started in the story,
     /// either by request from another Module instance (INTERNAL) or by request
     /// from outside the story (i.e. by suggestion from an agent - EXTERNAL).

@@ -14,9 +14,6 @@ const KEYBOARD_MAX_PRESSED_KEYS uint32 = 256;
 /// Describes the format of the input report that will be sent from the keyboard
 /// to the device.
 type KeyboardInputDescriptor = table {
-    // Was used for input2 keys.
-    1: reserved;
-
     /// The list of keys that this keyboard contains.
     2: keys3 vector<fuchsia.input.Key>:KEYBOARD_MAX_NUM_KEYS;
 };
@@ -35,9 +32,6 @@ type KeyboardDescriptor = table {
 
 /// A single report created by a keyboard device.
 type KeyboardInputReport = table {
-    // Was used for input2 pressed_keys.
-    1: reserved;
-
     /// The list of keys that are currently pressed down.
     2: pressed_keys3 vector<fuchsia.input.Key>:KEYBOARD_MAX_PRESSED_KEYS;
 };

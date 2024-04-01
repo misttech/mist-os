@@ -14,8 +14,6 @@ alias InstanceId = string:64;
 
 /// Top-level type describing the component ID index.
 type ComponentIdIndex = table {
-    1: reserved;
-
     /// A list of component ID instance entries.
     ///
     /// Required, but may be empty.
@@ -26,8 +24,6 @@ type InstanceIdEntry = table {
     /// A 256-bit identifier encoded in base64 which is unique across all other
     /// instance IDs in the index.
     1: instance_id InstanceId;
-
-    2: reserved;
 
     /// The moniker identifying the component instance.
     3: moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
