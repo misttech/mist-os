@@ -243,15 +243,4 @@ void ::test_union::wire::EmptyFlexibleUnion::SizeAndOffsetAssertionHelper() {
   static_assert(offsetof(EmptyFlexibleUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
-auto ::test_union::wire::OnlyReservedFlexibleUnion::Which() const -> ::test_union::wire::OnlyReservedFlexibleUnion::Tag {
-  ZX_ASSERT(!has_invalid_tag());
-  return ::test_union::wire::OnlyReservedFlexibleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
-}
-
-void ::test_union::wire::OnlyReservedFlexibleUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(OnlyReservedFlexibleUnion) == sizeof(fidl_union_t));
-  static_assert(offsetof(OnlyReservedFlexibleUnion, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(OnlyReservedFlexibleUnion, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
 #pragma clang diagnostic pop

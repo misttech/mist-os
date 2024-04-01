@@ -29,16 +29,12 @@ type Struct = struct {
 type Table = table {
     @available(added=2, deprecated=3)
     1: x uint32;
-    @available(added=2, deprecated=3)
-    2: reserved;
 };
 
 @available(added=2, deprecated=3)
 type Union = union {
     @available(added=2, deprecated=3)
     1: x uint32;
-    @available(added=2, deprecated=3)
-    2: reserved;
 };
 
 closed protocol OtherProtocol {};

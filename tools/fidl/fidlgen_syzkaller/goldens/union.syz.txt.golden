@@ -205,14 +205,6 @@ test_union_OlderSimpleUnionOutOfLine [
 test_union_OlderSimpleUnionHandles [
     void void
 ][varlen]
-test_union_OnlyReservedFlexibleUnionInLine [
-]
-test_union_OnlyReservedFlexibleUnionOutOfLine [
-    void void
-][varlen]
-test_union_OnlyReservedFlexibleUnionHandles [
-    void void
-][varlen]
 test_union_PizzaOrPastaInLine [
     pizzaInLine fidl_union_member[1, test_union_PizzaInLine]
     pastaInLine fidl_union_member[2, test_union_PastaInLine]

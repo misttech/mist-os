@@ -52,8 +52,6 @@ type StructWithOptString = struct {
 type Table = resource table {
     6: primitive8 uint64;
     5: primitive4 uint32;
-    2: reserved;
-    1: reserved;
     3: string string;
     4: handle zx.Handle;
 };

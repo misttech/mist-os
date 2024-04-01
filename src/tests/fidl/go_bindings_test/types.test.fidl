@@ -34,9 +34,6 @@ type EmptyFlexibleEnum = flexible enum : uint32 {};
 
 type SimpleTable = table {
     1: x int64;
-    2: reserved;
-    3: reserved;
-    4: reserved;
     5: y int64;
 };
 
@@ -47,9 +44,6 @@ type ExampleStrictUnion = strict union {
 };
 
 type ExampleFlexibleUnion = flexible union {
-    1: reserved;
-    2: reserved;
-    3: reserved;
     4: foo string;
     5: bar int32;
     6: baz vector<uint8>;

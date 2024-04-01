@@ -380,14 +380,6 @@ std::ostream& fidl::ostream::Formatter<::test_union::EmptyFlexibleUnion>::Format
   }
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_union::OnlyReservedFlexibleUnion>::Format(std::ostream& os, const ::test_union::OnlyReservedFlexibleUnion& value) {
-  os << "test_union::OnlyReservedFlexibleUnion::";
-  switch (value.Which()) {
-    default:
-      os << "Unknown";
-  }
-  return os;
-}
 
 namespace test_union {
 
@@ -509,10 +501,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_union::UnionWithAttribut
 
 std::ostream& operator<<(std::ostream& os, const ::test_union::EmptyFlexibleUnion& value) {
   return fidl::ostream::Formatter<::test_union::EmptyFlexibleUnion>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_union::OnlyReservedFlexibleUnion& value) {
-  return fidl::ostream::Formatter<::test_union::OnlyReservedFlexibleUnion>::Format(os, value);
 }
 
 #pragma clang diagnostic pop

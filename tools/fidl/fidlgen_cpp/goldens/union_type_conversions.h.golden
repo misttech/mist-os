@@ -602,27 +602,6 @@ struct WireTypeForNaturalType<::test_union::EmptyFlexibleUnion> {
   using type = ::test_union::wire::EmptyFlexibleUnion;
 };
 
-template <>
-struct WireNaturalConversionTraits<::test_union::wire::OnlyReservedFlexibleUnion, ::test_union::OnlyReservedFlexibleUnion> {
-  static ::test_union::OnlyReservedFlexibleUnion ToNatural(::test_union::wire::OnlyReservedFlexibleUnion src);
-  static ::test_union::wire::OnlyReservedFlexibleUnion ToWire(fidl::AnyArena& arena, ::test_union::OnlyReservedFlexibleUnion src);
-};
-
-template <>
-struct WireNaturalConversionTraits<::fidl::WireOptional<::test_union::wire::OnlyReservedFlexibleUnion>, std::unique_ptr<::test_union::OnlyReservedFlexibleUnion>> {
-  static std::unique_ptr<::test_union::OnlyReservedFlexibleUnion> ToNatural(::fidl::WireOptional<::test_union::wire::OnlyReservedFlexibleUnion> src);
-  static ::fidl::WireOptional<::test_union::wire::OnlyReservedFlexibleUnion> ToWire(fidl::AnyArena& arena, std::unique_ptr<::test_union::OnlyReservedFlexibleUnion> src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_union::wire::OnlyReservedFlexibleUnion> {
-  using type = ::test_union::OnlyReservedFlexibleUnion;
-};
-template <>
-struct WireTypeForNaturalType<::test_union::OnlyReservedFlexibleUnion> {
-  using type = ::test_union::wire::OnlyReservedFlexibleUnion;
-};
-
 #ifdef __Fuchsia__
 
 template <>

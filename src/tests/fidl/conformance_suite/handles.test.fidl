@@ -93,12 +93,10 @@ type MultipleHandleSubtypes = resource struct {
     channel handle:CHANNEL;
 };
 
-type ReservedFieldTable = resource table {
-    1: reserved;
-};
+type EmptyResourceTable = resource table {};
 
-type ReservedFieldTableStruct = resource struct {
-    table ReservedFieldTable;
+type EmptyResourceTableStruct = resource struct {
+    table EmptyResourceTable;
 };
 
 type EventWithDefaultRights = resource struct {

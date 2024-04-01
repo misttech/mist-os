@@ -27,7 +27,6 @@ type MyStruct = struct {
 type MyXunion = flexible union {
     1: i int32;
     2: b bool;
-    3: reserved;
     4: my_uint8 uint8;
     5: my_int8 int8;
 };
@@ -35,14 +34,12 @@ type MyXunion = flexible union {
 type MyUnion = strict union {
     1: i int32;
     2: b bool;
-    3: reserved;
     4: my_uint8 uint8;
     5: my_int8 int8;
 };
 
 type SimpleTable = table {
     1: x bool;
-    2: reserved;
     3: y MyStruct;
     4: z int32;
     5: my_uint8 uint8;

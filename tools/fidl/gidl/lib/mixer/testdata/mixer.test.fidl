@@ -24,7 +24,6 @@ type ExampleStruct = struct {
 
 type ExampleTable = table {
     1: s string;
-    2: reserved;
 };
 
 type ExampleStrictUnion = strict union {

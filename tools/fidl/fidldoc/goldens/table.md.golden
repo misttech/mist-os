@@ -22,7 +22,7 @@
 ### ExtensionTable  {#ExtensionTable data-text="ExtensionTable"}
 
 
-*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=43)*
+*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=33)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -31,7 +31,7 @@
 ### NewerSimpleTable  {#NewerSimpleTable data-text="NewerSimpleTable"}
 
 
-*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=18)*
+*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=14)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -64,7 +64,7 @@
 ### OlderSimpleTable  {#OlderSimpleTable data-text="OlderSimpleTable"}
 
 
-*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=13)*
+*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=10)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -81,7 +81,7 @@
 ### ReverseOrdinalTable  {#ReverseOrdinalTable data-text="ReverseOrdinalTable"}
 
 
-*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=28)*
+*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=20)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -139,7 +139,7 @@
 ### SixtyFourOrdinalTable  {#SixtyFourOrdinalTable data-text="SixtyFourOrdinalTable"}
 
 
-*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=45)*
+*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=35)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -660,7 +660,7 @@
 ### TableWithAttributes  {#TableWithAttributes data-text="TableWithAttributes"}
 
 
-*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=35)*
+*Defined in [test.table/table.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/table.test.fidl;l=27)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>

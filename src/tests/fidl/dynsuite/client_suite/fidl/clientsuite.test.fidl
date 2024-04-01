@@ -51,8 +51,6 @@ type FidlErrorKind = strict enum {
 type EmptyResultClassification = union {
     // This variant will be set if the method succeeded.
     1: success Empty;
-    // This variant would be used for error syntax if error syntax were used.
-    2: reserved;
     // This variant will be set if there is any error resulting from FIDL during
     // the call.
     3: fidl_error FidlErrorKind;
@@ -80,9 +78,6 @@ type NonEmptyPayload = struct {
 type NonEmptyResultClassification = union {
     // This variant will be set if the method succeeded.
     1: success NonEmptyPayload;
-    // This variant would be used for error syntax if error syntax were
-    // used.
-    2: reserved;
     // This varrant will be set if there is any error resulting from FIDL
     // during the call.
     3: fidl_error FidlErrorKind;
@@ -110,9 +105,6 @@ type TablePayload = table {
 type TableResultClassification = union {
     // This variant will be set if the method succeeded.
     1: success TablePayload;
-    // This variant would be used for error syntax if error syntax were
-    // used.
-    2: reserved;
     // This variant will be set if there is any error resulting from FIDL
     // during the call.
     3: fidl_error FidlErrorKind;
@@ -127,9 +119,6 @@ type UnionPayload = flexible union {
 type UnionResultClassification = union {
     // This variant will be set if the method succeeded.
     1: success UnionPayload;
-    // This variant would be used for error syntax if error syntax were
-    // used.
-    2: reserved;
     // This variant will be set if there is any error resulting from FIDL
     // during the call.
     3: fidl_error FidlErrorKind;

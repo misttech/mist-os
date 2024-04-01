@@ -14,8 +14,6 @@ type PizzaOrPasta = strict union {
 };
 
 type ExplicitPizzaOrPasta = strict union {
-    3: reserved;
-    2: reserved;
     1: pizza Pizza;
     4: pasta Pasta;
 };
@@ -53,7 +51,6 @@ type FieldCollision = strict union {
 };
 
 type ExplicitUnion = strict union {
-    2: reserved;
     1: Primitive int32;
     3: StringNeedsConstructor string;
 };
@@ -80,11 +77,9 @@ type StrictFoo = strict union {
 type ExplicitFoo = flexible union {
     2: s string;
     1: i int32;
-    3: reserved;
 };
 
 type ExplicitStrictFoo = strict union {
-    1: reserved;
     3: s string;
     2: i int32;
 };
@@ -135,8 +130,6 @@ type StructWithNullableUnion = struct {
 };
 
 type ExplicitFlexibleUnion = flexible union {
-    3: reserved;
-    2: reserved;
     1: i int64;
     4: f float32;
 };
@@ -151,16 +144,8 @@ type UnionSandwich = struct {
 type UnionWithAttributes = flexible union {
     @bar
     1: x int64;
-    @baz
-    2: reserved;
 };
 
 // TODO(https://fxbug.dev/42070033): Support empty flexible unions in libfuzzer.
 @bindings_denylist("libfuzzer")
 type EmptyFlexibleUnion = flexible union {};
-
-// TODO(https://fxbug.dev/42070033): Support empty flexible unions in libfuzzer.
-@bindings_denylist("libfuzzer")
-type OnlyReservedFlexibleUnion = flexible union {
-    1: reserved;
-};

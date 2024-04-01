@@ -396,11 +396,4 @@ std::shared_ptr<::test_union::EmptyFlexibleUnion::Storage_> test_union::EmptyFle
   }
 }
 
-std::shared_ptr<::test_union::OnlyReservedFlexibleUnion::Storage_> test_union::OnlyReservedFlexibleUnion::CloneStorage_() const {
-  switch (storage_->index()) {
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
 #pragma clang diagnostic pop

@@ -191,16 +191,9 @@ type FidlvizStruct2 = struct {
 
 type FidlvizTable = table {
     1: f1 bool;
-    2: reserved;
     3: f3 bool;
 };
 
 type FidlvizUnion = strict union {
-    1: reserved;
-    2: reserved;
-    3: reserved;
-    4: reserved;
-    5: reserved;
-    6: reserved;
     7: f7 string;
 };

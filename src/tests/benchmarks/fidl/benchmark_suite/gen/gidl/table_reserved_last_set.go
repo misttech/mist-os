@@ -20,14 +20,14 @@ func init() {
 		Benchmarks: []config.Benchmark{
 			{
 				Name:    "Table/LastSetOthersReserved/16",
-				Comment: `Table with 15 reserved fields and one non-reserved set field`,
+				Comment: `Table with only the 16th field set`,
 				Config: config.Config{
 					"size": 16,
 				},
 			},
 			{
 				Name:    "Table/LastSetOthersReserved/63",
-				Comment: `Table with 62 reserved fields and one non-reserved set field`,
+				Comment: `Table with only the 63rd field set (63 not 64 because of https://fuchsia.dev/error/fi-0093)`,
 				Config: config.Config{
 					"size": 63,
 				},

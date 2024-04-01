@@ -608,19 +608,6 @@ namespace internal {
   }
 }
 
-::test_union::OnlyReservedFlexibleUnion WireNaturalConversionTraits<::test_union::wire::OnlyReservedFlexibleUnion, ::test_union::OnlyReservedFlexibleUnion>::ToNatural(::test_union::wire::OnlyReservedFlexibleUnion src) {
-  switch (src.Which()) {
-    default:
-      return ::test_union::OnlyReservedFlexibleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-  }
-}
-::test_union::wire::OnlyReservedFlexibleUnion WireNaturalConversionTraits<::test_union::wire::OnlyReservedFlexibleUnion, ::test_union::OnlyReservedFlexibleUnion>::ToWire(fidl::AnyArena& arena, ::test_union::OnlyReservedFlexibleUnion src) {
-  switch (src.Which()) {
-    default:
-      return ::test_union::wire::OnlyReservedFlexibleUnion();
-  }
-}
-
 #ifdef __Fuchsia__
 
 ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> WireNaturalConversionTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>>::ToNatural(::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> src) {

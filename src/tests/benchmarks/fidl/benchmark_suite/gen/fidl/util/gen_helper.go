@@ -36,15 +36,3 @@ func OrdinalFields(typ types.FidlType, namePrefix string, n int) string {
 	}
 	return builder.String()
 }
-
-// Define a range of reserved fields from [start, end].
-func ReservedFields(start, end int) string {
-	var builder strings.Builder
-	for i := start; i <= end; i++ {
-		if i > start {
-			builder.WriteRune(('\n'))
-		}
-		builder.WriteString(fmt.Sprintf("%d: reserved;", i))
-	}
-	return builder.String()
-}

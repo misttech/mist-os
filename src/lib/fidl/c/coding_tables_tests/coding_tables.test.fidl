@@ -58,7 +58,6 @@ type MyStrictXUnion = strict union {
 type MyTable = table {
     1: foo bool;
     2: bar int32;
-    3: reserved;
     4: baz array<uint64, 42>;
     5: qux vector<uint64>:42;
 };

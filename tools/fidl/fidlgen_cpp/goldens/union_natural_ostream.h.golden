@@ -132,10 +132,6 @@ template <>
 struct fidl::ostream::Formatter<::test_union::EmptyFlexibleUnion> {
   static std::ostream& Format(std::ostream& os, const ::test_union::EmptyFlexibleUnion& value);
 };
-template <>
-struct fidl::ostream::Formatter<::test_union::OnlyReservedFlexibleUnion> {
-  static std::ostream& Format(std::ostream& os, const ::test_union::OnlyReservedFlexibleUnion& value);
-};
 
 namespace test_union {
 
@@ -198,8 +194,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_union::UnionSandwich& va
 std::ostream& operator<<(std::ostream& os, const ::test_union::UnionWithAttributes& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_union::EmptyFlexibleUnion& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_union::OnlyReservedFlexibleUnion& value);
 
 }  // namespace test_union
 

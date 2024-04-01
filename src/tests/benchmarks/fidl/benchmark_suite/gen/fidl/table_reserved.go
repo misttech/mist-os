@@ -40,7 +40,6 @@ type TableReserved%[1]dStruct = struct{
 };
 
 type TableReserved%[1]d = table{
-	%[2]s
 	%[1]d: field%[1]d uint8;
-};`, size, util.ReservedFields(1, size-1)), nil
+};`, size), nil
 }

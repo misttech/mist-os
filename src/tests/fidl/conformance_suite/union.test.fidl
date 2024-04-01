@@ -31,7 +31,6 @@ type Uint8UnionStruct = struct {
 // Union tags follow the explicit ordinal order, not source order.
 type ReverseOrdinalUnion = strict union {
     4: x int64; // tag 2
-    3: reserved;
     2: y bool; // tag 1
     1: z uint32; // tag 0
 };

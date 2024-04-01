@@ -9,11 +9,11 @@
 ## **PROTOCOLS**
 
 ## OtherProtocol {#OtherProtocol}
-*Defined in [test.versions/versions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=44)*
+*Defined in [test.versions/versions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=40)*
 
 
 ## Protocol {#Protocol}
-*Defined in [test.versions/versions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=47)*
+*Defined in [test.versions/versions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=43)*
 <div class="fidl-version-div"><span class="fidl-attribute fidl-version">Deprecated: 3</span> <span class="fidl-attribute fidl-version">Added: 2</span></div>
 
 
@@ -93,7 +93,7 @@ Type: <code>uint32</code>
 ## **UNIONS**
 
 ### Union [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Union data-text="Union"}
-*Defined in [test.versions/versions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=37)*
+*Defined in [test.versions/versions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=35)*
 <div class="fidl-version-div"><span class="fidl-attribute fidl-version">Deprecated: 3</span> <span class="fidl-attribute fidl-version">Added: 2</span></div>
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
@@ -133,7 +133,7 @@ Type: <code>uint32</code>
 <table>
     <tr><th>Name</th><th>Value</th><th>Type</th><th>Description</th></tr>
         <tr id="ADDED_AT_HEAD">
-            <td><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=63">ADDED_AT_HEAD</a></td>
+            <td><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=59">ADDED_AT_HEAD</a></td>
                 <td>
                     <code>true</code>
                 </td>
@@ -169,11 +169,11 @@ Type: <code>uint32</code>
 
 ### Service {#Service data-text="Service"}
 
-*Defined in [test.versions/versions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=56)*
+*Defined in [test.versions/versions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=52)*
 <table>
     <tr><th>Name</th><th>Type</th><th>Transport</th></tr>
         <tr id="p">
-            <td><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=58">p</a></td>
+            <td><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=54">p</a></td>
             <td>
                 <code>test.versions/Protocol</code>
             </td>

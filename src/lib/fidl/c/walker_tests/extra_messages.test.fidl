@@ -14,33 +14,22 @@ type IntStruct = struct {
 
 type SimpleTable = table {
     1: x IntStruct;
-    2: reserved;
-    3: reserved;
-    4: reserved;
     5: y IntStruct;
 };
 
 type ResourceSimpleTable = resource table {
     1: x IntStruct;
-    2: reserved;
-    3: reserved;
-    4: reserved;
     5: y IntStruct;
 };
 
 type OlderSimpleTable = table {
     1: x IntStruct;
-    2: reserved;
 };
 
 type NewerSimpleTable = table {
     1: x IntStruct;
-    2: reserved;
-    3: reserved;
-    4: reserved;
     5: y IntStruct;
     6: z IntStruct;
-    7: reserved;
 };
 
 type SampleUnion = strict union {

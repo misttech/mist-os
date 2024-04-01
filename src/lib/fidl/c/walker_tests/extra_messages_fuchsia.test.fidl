@@ -34,6 +34,5 @@ type TableOfStructWithHandle = resource table {
 };
 
 type SmallerTableOfStructWithHandle = resource table {
-    1: reserved;
     2: b StructWithManyHandles;
 };

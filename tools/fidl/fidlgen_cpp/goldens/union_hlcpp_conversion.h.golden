@@ -367,16 +367,6 @@ struct HLCPPToNaturalTraits<::test::union_::EmptyFlexibleUnion> {
   using NaturalType = ::test_union::EmptyFlexibleUnion;
   static inline ::test_union::EmptyFlexibleUnion Convert(::test::union_::EmptyFlexibleUnion&&);
 };
-template <>
-struct NaturalToHLCPPTraits<::test_union::OnlyReservedFlexibleUnion> {
-  using HLCPPType = ::test::union_::OnlyReservedFlexibleUnion;
-  static inline ::test::union_::OnlyReservedFlexibleUnion Convert(::test_union::OnlyReservedFlexibleUnion&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::union_::OnlyReservedFlexibleUnion> {
-  using NaturalType = ::test_union::OnlyReservedFlexibleUnion;
-  static inline ::test_union::OnlyReservedFlexibleUnion Convert(::test::union_::OnlyReservedFlexibleUnion&&);
-};
 
 ::test::union_::Pizza NaturalToHLCPPTraits<::test_union::Pizza>::Convert(::test_union::Pizza&& value) {
   ::test::union_::Pizza hlcpp;
@@ -1076,22 +1066,6 @@ struct HLCPPToNaturalTraits<::test::union_::OnlyReservedFlexibleUnion> {
 
 ::test_union::EmptyFlexibleUnion HLCPPToNaturalTraits<::test::union_::EmptyFlexibleUnion>::Convert(::test::union_::EmptyFlexibleUnion&& value) {
   using _NaturalUnion = ::test_union::EmptyFlexibleUnion;
-  switch (value.Which()) {
-    default:
-      return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-  }
-}
-::test::union_::OnlyReservedFlexibleUnion NaturalToHLCPPTraits<::test_union::OnlyReservedFlexibleUnion>::Convert(::test_union::OnlyReservedFlexibleUnion&& value) {
-  ::test::union_::OnlyReservedFlexibleUnion hlcpp;
-  switch (value.Which()) {
-    default:
-      break;
-  }
-  return hlcpp;
-}
-
-::test_union::OnlyReservedFlexibleUnion HLCPPToNaturalTraits<::test::union_::OnlyReservedFlexibleUnion>::Convert(::test::union_::OnlyReservedFlexibleUnion&& value) {
-  using _NaturalUnion = ::test_union::OnlyReservedFlexibleUnion;
   switch (value.Which()) {
     default:
       return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});

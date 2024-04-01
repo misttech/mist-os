@@ -172,20 +172,9 @@ type StructTableNoFields = struct {
     t TableNoFields;
 };
 
-type TableTwoReservedFields = table {
-    1: reserved;
-    2: reserved;
-};
-
-type StructTableTwoReservedFields = struct {
-    t TableTwoReservedFields;
-};
-
 type TableStructWithReservedSandwich = table {
-    1: reserved;
     2: s1 StructSize3Align1;
     3: s2 StructSize3Align1;
-    4: reserved;
 };
 
 type TableStructWithReservedSandwichStruct = struct {
@@ -204,9 +193,7 @@ type TableStructWithUint32SandwichStruct = struct {
 };
 
 type TableUnionWithVectorReservedSandwich = resource table {
-    1: reserved;
     2: uv UnionWithVector;
-    3: reserved;
 };
 
 type TableUnionWithVectorReservedSandwichStruct = resource struct {
@@ -385,7 +372,6 @@ type XUnionOfUnion = flexible union {
 };
 
 type TableOfXUnionThenUnion = table {
-    1: reserved;
     2: member XUnionOfUnion;
 };
 
@@ -395,13 +381,10 @@ type XUnionOfTableThenXUnionThenUnion = flexible union {
 
 type UnionOfXUnionThenTableThenXUnionThenUnion = strict union {
     1: unused1 uint8; // avoid tag 0
-    2: reserved; // no tag correspondance
     3: variant XUnionOfTableThenXUnionThenUnion; // tag = 1
 };
 
 type TableOfUnionThenXUnionThenTableThenXUnionThenUnion = table {
-    1: reserved;
-    2: reserved;
     3: member UnionOfXUnionThenTableThenXUnionThenUnion;
 };
 
@@ -421,9 +404,7 @@ type Regression8VectorOfOptUnionSize12Align4 = struct {
 
 type TableWithUnionSize12Align4 = table {
     1: before uint8;
-    2: reserved;
     3: member UnionSize12Align4;
-    4: reserved;
     5: after uint8;
 };
 
@@ -474,21 +455,14 @@ type Regression10TableV1 = table {
 // Then, we add a second member in 5th position.
 type Regression10TableV2 = table {
     1: member1 uint64;
-    2: reserved;
-    3: reserved;
-    4: reserved;
     5: member2 uint64;
 };
 
-// Third, we add a third member in 6th position, and reserve the 7th.
+// Third, we add a third member in 6th position.
 type Regression10TableV3 = table {
     1: x int64;
-    2: reserved;
-    3: reserved;
-    4: reserved;
     5: y int64;
     6: z int64;
-    7: reserved;
 };
 
 type Regression10V1 = struct {
@@ -505,7 +479,6 @@ type Regression10V3 = struct {
 
 type UnionWithRegression10Table = strict union {
     1: unused uint8; // avoid tag 0
-    2: reserved;
     3: at_v2 Regression10TableV2; // but consider the evolution v1, v2, v3, ...
 };
 
@@ -621,7 +594,6 @@ type StructOfTableWithXUnion = struct {
 };
 
 type TableWithReservedFieldThenUnion = table {
-    1: reserved;
     2: uv UnionSize8Align4;
 };
 

@@ -188,7 +188,6 @@ type TestHandleTableNonInlinableField = resource table {
 
 type TableMaxOrdinal3WithReserved2 = table {
     1: field_1 uint8;
-    2: reserved;
     3: field_3 uint8;
 };
 

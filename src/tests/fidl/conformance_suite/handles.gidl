@@ -511,8 +511,8 @@ decode_success("ChannelMaxUnknownHandlesDropped") {
         #56 = event(), #57 = event(), #58 = event(), #59 = event(),
         #60 = event(), #61 = event(), #62 = event(), #63 = event(),
     },
-    value = ReservedFieldTableStruct{
-        table: ReservedFieldTable{},
+    value = EmptyResourceTableStruct{
+        table: EmptyResourceTable{},
     },
     bytes = {
         v2 = [
@@ -557,9 +557,9 @@ encode_success("ChannelMaxUnknownHandlesDropped") {
         #56 = event(), #57 = event(), #58 = event(), #59 = event(),
         #60 = event(), #61 = event(), #62 = event(), #63 = event(),
     },
-    value = ReservedFieldTableStruct{
+    value = EmptyResourceTableStruct{
         table: decode({
-            type = ReservedFieldTable,
+            type = EmptyResourceTable,
             bytes = {
                 v2 = [
                     num(1):8, repeat(0xff):8, // Table header
@@ -611,8 +611,8 @@ success("ChannelMaxUnknownHandlesStored") {
         #56 = event(), #57 = event(), #58 = event(), #59 = event(),
         #60 = event(), #61 = event(), #62 = event(), #63 = event(),
     },
-    value = ReservedFieldTableStruct{
-        table: ReservedFieldTable{
+    value = EmptyResourceTableStruct{
+        table: EmptyResourceTable{
             1: {
                 // 256 bytes for 64 handles' 4-byte presence markers.
                 bytes = [

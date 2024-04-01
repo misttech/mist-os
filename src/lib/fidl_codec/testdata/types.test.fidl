@@ -333,7 +333,6 @@ type U8U16Union = strict union {
 
 type U8U16UnionReserved = strict union {
     1: variant_u8 uint8;
-    2: reserved;
     3: variant_u16 uint16;
 };
 
@@ -427,7 +426,6 @@ type I64Bits = strict bits : uint64 {
 type ValueTable = table {
     1: first_int16 int16;
     2: second_struct TwoStringStruct;
-    3: reserved;
     4: third_union IntStructUnion;
 };
 

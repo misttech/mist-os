@@ -65,25 +65,22 @@ type EventStruct = resource struct {
 
 // [START unions]
 type JsonValue = strict union {
-    1: reserved;
-    2: int_value int32;
-    3: string_value string:MAX_STRING_LENGTH;
+    1: int_value int32;
+    2: string_value string:MAX_STRING_LENGTH;
 };
 // [END unions]
 
 // [START flexible_unions]
 type FlexibleJsonValue = flexible union {
-    1: reserved;
-    2: int_value int32;
-    3: string_value string:MAX_STRING_LENGTH;
+    1: int_value int32;
+    2: string_value string:MAX_STRING_LENGTH;
 };
 // [END flexible_unions]
 
 // [START tables]
 type User = table {
-    1: reserved;
-    2: age uint8;
-    3: name string:MAX_STRING_LENGTH;
+    1: age uint8;
+    2: name string:MAX_STRING_LENGTH;
 };
 // [END tables]
 

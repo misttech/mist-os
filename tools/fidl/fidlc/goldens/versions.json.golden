@@ -205,7 +205,7 @@
       "name": "test.versions/ADDED_AT_HEAD",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-        "line": 63,
+        "line": 59,
         "column": 7,
         "length": 13
       },
@@ -225,7 +225,7 @@
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 62,
+                "line": 58,
                 "column": 12,
                 "length": 10
               }
@@ -233,7 +233,7 @@
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-            "line": 62,
+            "line": 58,
             "column": 1,
             "length": 22
           }
@@ -502,7 +502,7 @@
       "name": "test.versions/OtherProtocol",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-        "line": 44,
+        "line": 40,
         "column": 17,
         "length": 13
       },
@@ -515,7 +515,7 @@
       "name": "test.versions/Protocol",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-        "line": 47,
+        "line": 43,
         "column": 17,
         "length": 8
       },
@@ -539,7 +539,7 @@
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 46,
+                "line": 42,
                 "column": 12,
                 "length": 7
               }
@@ -559,7 +559,7 @@
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 46,
+                "line": 42,
                 "column": 21,
                 "length": 12
               }
@@ -567,7 +567,7 @@
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-            "line": 46,
+            "line": 42,
             "column": 1,
             "length": 33
           }
@@ -596,7 +596,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 48,
+                    "line": 44,
                     "column": 16,
                     "length": 7
                   }
@@ -616,7 +616,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 48,
+                    "line": 44,
                     "column": 25,
                     "length": 12
                   }
@@ -624,7 +624,7 @@
               ],
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 48,
+                "line": 44,
                 "column": 5,
                 "length": 33
               }
@@ -632,7 +632,7 @@
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-            "line": 49,
+            "line": 45,
             "column": 13,
             "length": 13
           },
@@ -646,7 +646,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-            "line": 52,
+            "line": 48,
             "column": 12,
             "length": 3
           },
@@ -671,7 +671,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 51,
+                    "line": 47,
                     "column": 16,
                     "length": 7
                   }
@@ -691,7 +691,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 51,
+                    "line": 47,
                     "column": 25,
                     "length": 12
                   }
@@ -699,7 +699,7 @@
               ],
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 51,
+                "line": 47,
                 "column": 5,
                 "length": 33
               }
@@ -717,7 +717,7 @@
       "name": "test.versions/Service",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-        "line": 56,
+        "line": 52,
         "column": 9,
         "length": 7
       },
@@ -741,7 +741,7 @@
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 55,
+                "line": 51,
                 "column": 12,
                 "length": 7
               }
@@ -761,7 +761,7 @@
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 55,
+                "line": 51,
                 "column": 21,
                 "length": 12
               }
@@ -769,7 +769,7 @@
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-            "line": 55,
+            "line": 51,
             "column": 1,
             "length": 33
           }
@@ -795,7 +795,7 @@
           "name": "p",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-            "line": 58,
+            "line": 54,
             "column": 5,
             "length": 1
           },
@@ -819,7 +819,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 57,
+                    "line": 53,
                     "column": 16,
                     "length": 7
                   }
@@ -839,7 +839,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 57,
+                    "line": 53,
                     "column": 25,
                     "length": 12
                   }
@@ -847,7 +847,7 @@
               ],
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 57,
+                "line": 53,
                 "column": 5,
                 "length": 33
               }
@@ -1185,7 +1185,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-        "line": 37,
+        "line": 35,
         "column": 6,
         "length": 5
       },
@@ -1209,7 +1209,7 @@
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 36,
+                "line": 34,
                 "column": 12,
                 "length": 7
               }
@@ -1229,7 +1229,7 @@
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 36,
+                "line": 34,
                 "column": 21,
                 "length": 12
               }
@@ -1237,7 +1237,7 @@
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-            "line": 36,
+            "line": 34,
             "column": 1,
             "length": 33
           }
@@ -1262,7 +1262,7 @@
           },
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-            "line": 39,
+            "line": 37,
             "column": 8,
             "length": 1
           },
@@ -1286,7 +1286,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 38,
+                    "line": 36,
                     "column": 16,
                     "length": 7
                   }
@@ -1306,7 +1306,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                    "line": 38,
+                    "line": 36,
                     "column": 25,
                     "length": 12
                   }
@@ -1314,7 +1314,7 @@
               ],
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 38,
+                "line": 36,
                 "column": 5,
                 "length": 33
               }

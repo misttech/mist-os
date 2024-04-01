@@ -146,10 +146,6 @@ class EmptyFlexibleUnion;
 
 
 
-class OnlyReservedFlexibleUnion;
-
-
-
 
 
 
@@ -3609,87 +3605,6 @@ class EmptyFlexibleUnion {
 };
 
 
-  
-  
-  
-
-
-
-
-
-class OnlyReservedFlexibleUnion {
- private:
-  using Storage_ =
-    std::variant<
-      std::monostate>;
-
- public:
-  // TODO: share union tag types between wire & natural.
-  enum class Tag : fidl_xunion_tag_t {
-    _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
-  };
-
-  OnlyReservedFlexibleUnion(OnlyReservedFlexibleUnion&& other) noexcept
-      : OnlyReservedFlexibleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  OnlyReservedFlexibleUnion& operator=(OnlyReservedFlexibleUnion&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
-    OnlyReservedFlexibleUnion(const OnlyReservedFlexibleUnion& other) noexcept : OnlyReservedFlexibleUnion(other.CloneStorage_()){}
-    OnlyReservedFlexibleUnion& operator=(const OnlyReservedFlexibleUnion& other) noexcept {
-      if (this != &other) {
-        storage_ = other.CloneStorage_();
-      }
-      return *this;
-    }
-
-    bool operator==(const OnlyReservedFlexibleUnion& other) const noexcept {
-      return *storage_ == *other.storage_;
-    }
-    bool operator!=(const OnlyReservedFlexibleUnion& other) const noexcept {
-      return *storage_ != *other.storage_;
-    }
-  constexpr bool IsUnknown() const {
-    return Which() == ::test_union::OnlyReservedFlexibleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
-  }
-
-  constexpr ::test_union::OnlyReservedFlexibleUnion::Tag Which() const {
-    return OnlyReservedFlexibleUnion::IndexToTag(storage_->index()).value();
-  }
-
-  OnlyReservedFlexibleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
-
- private:
-  std::shared_ptr<Storage_> storage_;
-    std::shared_ptr<Storage_> CloneStorage_() const;
-  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_union::OnlyReservedFlexibleUnion>;
-  static constexpr auto kMembers = std::make_tuple(
-    ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>());
-
-  explicit OnlyReservedFlexibleUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
-
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_union::OnlyReservedFlexibleUnion::Tag tag) {
-    switch (tag) {
-      default: {
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<::test_union::OnlyReservedFlexibleUnion::Tag> IndexToTag(size_t index) {
-    switch (index) {
-        default: return ::test_union::OnlyReservedFlexibleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
-    }
-  }
-
-};
-
-
 
 
   
@@ -3952,8 +3867,6 @@ class OnlyReservedFlexibleUnion {
       return *this;
     }
 
-  
-  
   
   
   
@@ -4655,29 +4568,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_union::EmptyFlexibleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::EmptyFlexibleUnion> {};
-
-
-  
-
-  
-  template <>
-  struct IsFidlType<::test_union::OnlyReservedFlexibleUnion> : public std::true_type {};
-
-  template<>
-  struct TypeTraits<::test_union::OnlyReservedFlexibleUnion> {
-    static constexpr uint32_t kMaxNumHandles = 0;
-    static constexpr uint32_t kMaxDepth = 0;
-    static constexpr uint32_t kPrimarySize = 16;
-    static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasPointer = false;
-  };
-
-  template <>
-  struct IsUnion<::test_union::OnlyReservedFlexibleUnion> : public std::true_type {};
-
-  template <>
-  struct internal::NaturalCodingTraits<::test_union::OnlyReservedFlexibleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::OnlyReservedFlexibleUnion> {};
 
 
 

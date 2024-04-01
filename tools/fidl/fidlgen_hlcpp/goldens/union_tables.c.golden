@@ -473,25 +473,6 @@ const struct FidlCodedUnion test_union_OlderSimpleUnionNullableRefTable = {
     .field_count = 2,
 };
 
-const struct FidlCodedUnion test_union_OnlyReservedFlexibleUnionTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.union/OnlyReservedFlexibleUnion",
-    .strictness = kFidlStrictness_Flexible,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nonnullable,
-    .fields = NULL,
-    .field_count = 0,
-};
-const struct FidlCodedUnion test_union_OnlyReservedFlexibleUnionNullableRefTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.union/OnlyReservedFlexibleUnion",
-    .strictness = kFidlStrictness_Flexible,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nullable,
-    .fields = NULL,
-    .field_count = 0,
-};
-
 static const struct FidlUnionField Fields23test_union_PizzaOrPasta[] = {
     {.type = (const fidl_type_t*)&test_union_PizzaTable},
     {.type = (const fidl_type_t*)&test_union_PastaTable},

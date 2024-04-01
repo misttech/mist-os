@@ -11,9 +11,6 @@ type StructOfEmptyTable = struct {
 
 type SimpleTable = table {
     1: x int64;
-    2: reserved;
-    3: reserved;
-    4: reserved;
     5: y int64;
 };
 
@@ -23,9 +20,6 @@ type StructOfSimpleTable = struct {
 
 type SimpleResourceTable = resource table {
     1: x int64;
-    2: reserved;
-    3: reserved;
-    4: reserved;
     5: y int64;
 };
 
@@ -50,7 +44,6 @@ type StructOfTableWithStringAndVector = struct {
 
 type ReverseOrdinalTable = table {
     4: x int64;
-    3: reserved;
     2: y int64;
     1: z int64;
 };
@@ -60,9 +53,7 @@ type StructOfReverseOrdinalTable = struct {
 };
 
 type TableWithGaps = table {
-    1: reserved;
     2: second int32;
-    3: reserved;
     4: fourth int32;
 };
 

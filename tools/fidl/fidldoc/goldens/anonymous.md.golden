@@ -8,7 +8,7 @@
 ## **PROTOCOLS**
 
 ## SomeProtocol {#SomeProtocol}
-*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=25)*
+*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=24)*
 
 
 ### SomeMethod {#SomeProtocol.SomeMethod}
@@ -82,7 +82,7 @@
 </table>
 
 ### SomeProtocol_SomeMethod_Response  {#SomeProtocol_SomeMethod_Response data-text="SomeProtocol_SomeMethod_Response"}
-*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=37)*
+*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=34)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -97,7 +97,7 @@
 </table>
 
 ### TableData  {#TableData data-text="TableData"}
-*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=33)*
+*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=30)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -141,7 +141,7 @@ Type: <code>uint32</code>
 ### SomeProtocol_SomeMethod_Error [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#SomeProtocol_SomeMethod_Error data-text="SomeProtocol_SomeMethod_Error"}
 Type: <code>uint32</code>
 
-*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=42)*
+*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=39)*
 
 <table>
     <tr><th>Name</th><th>Value</th><th>Description</th></tr>
@@ -196,7 +196,7 @@ Type: <code>uint32</code>
 ### TableMember  {#TableMember data-text="TableMember"}
 
 
-*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=31)*
+*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=29)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -244,7 +244,7 @@ Type: <code>uint32</code>
 </table>
 
 ### SomeProtocol_SomeMethod_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#SomeProtocol_SomeMethod_Result data-text="SomeProtocol_SomeMethod_Result"}
-*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=37)*
+*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=34)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="SomeProtocol_SomeMethod_Result.response">
@@ -266,7 +266,7 @@ Type: <code>uint32</code>
 </table>
 
 ### UnionMember [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnionMember data-text="UnionMember"}
-*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=27)*
+*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=26)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnionMember.union_data">
@@ -285,7 +285,7 @@ Type: <code>uint32</code>
 ### BitsMember [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#BitsMember data-text="BitsMember"}
 Type: <code>uint32</code>
 
-*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=38)*
+*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=35)*
 
 <table>
     <tr><th>Name</th><th>Value</th><th>Description</th></tr>
@@ -304,7 +304,7 @@ Type: <code>uint32</code>
 ### Flags [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#Flags data-text="Flags"}
 Type: <code>uint16</code>
 
-*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=19)*
+*Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=18)*
 
 <table>
     <tr><th>Name</th><th>Value</th><th>Description</th></tr>

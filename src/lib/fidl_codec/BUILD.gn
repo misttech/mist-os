@@ -209,7 +209,6 @@ fidl("fidl") {
 
   sources = [
     "testdata/empty.test.fidl",
-    "testdata/reserved_member.test.fidl",
     "testdata/types.test.fidl",
     "testdata/xunionmigration.fidl",
   ]

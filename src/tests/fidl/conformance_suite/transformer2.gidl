@@ -16,20 +16,6 @@ success("TableNoFields") {
     },
 }
 
-success("TableTwoReservedFields") {
-    value = StructTableTwoReservedFields{
-        t: TableTwoReservedFields{},
-    },
-    bytes = {
-        v2 = [
-            0x00, 0x00, 0x00, 0x00, // Table_TwoReservedFields.vector<envelope>.size
-            0x00, 0x00, 0x00, 0x00, // [cont.]
-            0xFF, 0xFF, 0xFF, 0xFF, // Table_TwoReservedFields.vector<envelope>.presence
-            0xFF, 0xFF, 0xFF, 0xFF, // [cont.]
-        ],
-    },
-}
-
 success("TableStructWithReservedSandwich") {
     value = TableStructWithReservedSandwichStruct{
         table: TableStructWithReservedSandwich{
