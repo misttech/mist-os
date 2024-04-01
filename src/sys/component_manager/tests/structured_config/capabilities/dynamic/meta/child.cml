@@ -42,5 +42,6 @@
     ],
     config: {
         my_int: { type: "uint8" },
+        transitional: { type: "uint8" },
     },
 }

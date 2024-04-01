@@ -1514,7 +1514,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 if u.config == None {
                     return None;
                 }
-                if u.availability != Some(Availability::Optional) {
+                if u.availability == Some(Availability::Required) || u.availability == None {
                     return None;
                 }
                 let key = ConfigKey(u.key.clone().expect("key should be set").into());
@@ -1527,7 +1527,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         let Some(fields) = fields else {
             if !optional_use_keys.is_empty() {
                 return Err(Error::validate(
-                    "'config' section is empty but there are optional config uses",
+                    "Optionally using a config capability requires a matching 'config' section.",
                 ));
             }
             return Ok(());
@@ -7343,7 +7343,19 @@ mod tests {
             },
         ],}),
         Err(Error::Validate {err, ..})
-        if &err == "'config' section is empty but there are optional config uses"
+        if &err == "Optionally using a config capability requires a matching 'config' section."
+        ),
+        test_cml_transitional_use_no_config(
+        json!({"use": [
+            {
+                "config": "fuchsia.config.MyConfig",
+                "key": "my_config",
+                "type": "bool",
+                "availability": "transitional",
+            },
+        ],}),
+        Err(Error::Validate {err, ..})
+        if &err == "Optionally using a config capability requires a matching 'config' section."
         ),
         test_cml_optional_use_bad_type(
         json!({"use": [
