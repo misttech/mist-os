@@ -8818,7 +8818,7 @@ From //src/graphics/drivers/arm-mali/icd/prebuilt_arm_mali.gni:8
 
 ### anv_enable_external_sync_fd
 
-TODO(fxbug.dev/42146493) - remove once external sync FD extensions fully supported
+TODO(https://fxbug.dev/42146493) - remove once external sync FD extensions fully supported
 
 **Current value (from the default):** `false`
 
