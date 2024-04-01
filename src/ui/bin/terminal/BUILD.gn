@@ -150,6 +150,7 @@ fuchsia_test_component("terminal_tests_component") {
 
 fuchsia_test_package("terminal_tests") {
   test_components = [ ":terminal_tests_component" ]
+  subpackages = [ "//src/bringup/bin/ptysvc:package" ]
 }
 
 fuchsia_unittest_package("term_model_tests") {

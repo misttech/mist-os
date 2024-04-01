@@ -13,6 +13,12 @@
     program: {
         binary: "bin/terminal_lib_lib_test",
     },
+    children: [
+        {
+            name: "ptysvc",
+            url: "ptysvc#meta/ptysvc.cm",
+        },
+    ],
     use: [
         {
             directory: "boot",
@@ -21,13 +27,23 @@
             subdir: "bin",
         },
         {
+            protocol: [ "fuchsia.hardware.pty.Device" ],
+            from: "#ptysvc",
+        },
+        {
             protocol: [
-                "fuchsia.hardware.pty.Device",
                 "fuchsia.process.Launcher",
                 "fuchsia.ui.input.ImeService",
                 "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.scenic.Scenic",
             ],
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.boot.WriteOnlyLog" ],
+            from: "parent",
+            to: "#ptysvc",
         },
     ],
 }
