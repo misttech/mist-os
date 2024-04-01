@@ -9,7 +9,7 @@ use std::{borrow::Borrow, cmp::Ordering, collections::BTreeMap, ops::Range};
 /// This object holds a Range but implements the ordering traits according to
 /// the start of the range. Using this struct lets us store both ends of the
 /// range in the BTreeMap and recover ranges by querying for their start point.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct RangeStart<T> {
     range: Range<T>,
 }
@@ -70,6 +70,7 @@ impl<T: Ord> Ord for RangeStart<T> {
 ///
 /// Querying a point in the map returns not only the value stored at that point
 /// but also the range that value occupies in the map.
+#[derive(Debug)]
 pub struct RangeMap<K, V> {
     map: BTreeMap<RangeStart<K>, V>,
 }
