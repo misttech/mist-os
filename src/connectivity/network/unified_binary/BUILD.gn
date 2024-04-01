@@ -26,10 +26,7 @@ rustc_binary("network_unified_binary") {
   if (!is_debug) {
     # Allow cross-crate optimization since each binary that is unified here is a
     # different crate.
-    configs += [ "//build/config/rust:lto_thin" ]
-
-    # Dynamic linking libstd is incompatible with LTO.
-    configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+    configs += [ "//build/config/lto:thinlto" ]
   }
 
   # This is a known massive target.

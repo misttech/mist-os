@@ -70,6 +70,11 @@ template("network_unified_binary") {
     source_root = _source_root
     configs += _add_configs
     configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+    if (!is_debug) {
+      # The unified binary builds with LTO in release, so avoid unnecessary work
+      # when generating the library for it.
+      configs += [ "//build/config/rust:linker_plugin_lto" ]
+    }
   }
 
   gub_target_name = target_name + "_gub"

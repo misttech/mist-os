@@ -127,6 +127,22 @@ config("lto_disabled") {
   rustflags = [ "-Clto=off" ]
 }
 
+# Enables linker plugin LTO.
+#
+# If an rlib is only ever going to get used later with a -Clto compilation then
+# you can pass -Clinker-plugin-lto to speed up compilation and avoid generating
+# object files that aren't used.
+#
+# See
+# https://doc.rust-lang.org/rustc/codegen-options/index.html#linker-plugin-lto
+# for details.
+config("linker_plugin_lto") {
+  rustflags = [
+    "-Clinker-plugin-lto",
+    "-Zsplit-lto-unit",
+  ]
+}
+
 config("lto_thin") {
   # Enable "thin" lto across all crates being linked
   rustflags = [ "-Clto=thin" ]
