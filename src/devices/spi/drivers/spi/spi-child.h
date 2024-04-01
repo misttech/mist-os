@@ -59,6 +59,9 @@ class SpiChild : public SpiChildType, public fidl::WireServer<fuchsia_hardware_s
 
   zx_status_t ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 
+  // May be called by the root device on any thread.
+  void FidlClientTeardownHandler();
+
  private:
   fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> spi_;
   const uint32_t cs_;
@@ -66,15 +69,13 @@ class SpiChild : public SpiChildType, public fidl::WireServer<fuchsia_hardware_s
   const bool has_siblings_;
   const fdf::UnownedDispatcher fidl_dispatcher_;
 
-  using Binding = struct {
-    fidl::ServerBindingRef<fuchsia_hardware_spi::Device> binding;
-    std::optional<ddk::UnbindTxn> unbind_txn;
-  };
-
   // These objects can only be accessed on the FIDL dispatcher. Making them optional allows them to
   // be destroyed manually in our unbind hook.
-  std::optional<Binding> binding_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_spi::Device>> binding_;
   std::optional<component::OutgoingDirectory> outgoing_;
+
+  std::optional<ddk::UnbindTxn> unbind_txn_;
+  bool client_torn_down_ = false;
 };
 
 }  // namespace spi

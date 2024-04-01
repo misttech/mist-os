@@ -159,8 +159,10 @@ void SpiDevice::AddChildren(const fuchsia_hardware_spi_businfo::wire::SpiBusMeta
       return;
     }
 
-    // Owned by the framework now.
-    [[maybe_unused]] auto ptr = dev.release();
+    // Owned by the framework now, but keep a pointer so that we can let it know when the FIDL
+    // client has been torn down. Unbind/release block until the FIDL client is gone, so we know
+    // that children will remain alive until then.
+    children_.push_back(dev.release());
   }
 }
 
@@ -193,6 +195,12 @@ void SpiDevice::FidlClientTeardownHandler() {
     fidl_client_teardown_complete_ = true;
     if (unbind_txn_ && dispatcher_shutdown_complete_) {
       unbind_txn_->Reply();
+    }
+
+    // Notify children that the FIDL client has been torn down and that it is now safe to complete
+    // unbind/release.
+    for (auto& child : children_) {
+      child->FidlClientTeardownHandler();
     }
   });
 }

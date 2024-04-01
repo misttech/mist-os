@@ -256,24 +256,23 @@ void SpiChild::Bind(fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end) {
     server_end.Close(ZX_ERR_ALREADY_BOUND);
     return;
   }
-  binding_ = Binding{
-      .binding = fidl::BindServer(
-          fidl_dispatcher_->async_dispatcher(), std::move(server_end), this,
-          [](SpiChild* self, fidl::UnbindInfo, fidl::ServerEnd<fuchsia_hardware_spi::Device>) {
-            std::optional opt = std::exchange(self->binding_, {});
-            ZX_ASSERT(opt.has_value());
+  if (unbind_txn_.has_value()) {
+    server_end.Close(ZX_ERR_CANCELED);
+    return;
+  }
+  binding_.emplace(fidl_dispatcher_->async_dispatcher(), std::move(server_end), this,
+                   [](SpiChild* self, fidl::UnbindInfo) {
+                     self->binding_.reset();
 
-            fdf::Arena arena('SPI_');
-            (void)self->spi_.sync().buffer(arena)->ReleaseRegisteredVmos(self->cs_);
+                     fdf::Arena arena('SPI_');
+                     (void)self->spi_.sync().buffer(arena)->ReleaseRegisteredVmos(self->cs_);
 
-            // If the server is unbinding because DdkUnbind is being called, then reply to the
-            // unbind transaction so that it completes.
-            Binding& binding = opt.value();
-            if (binding.unbind_txn.has_value()) {
-              binding.unbind_txn.value().Reply();
-            }
-          }),
-  };
+                     // If the server is unbinding because DdkUnbind is being called, then reply to
+                     // the unbind transaction so that it completes.
+                     if (self->unbind_txn_.has_value() && self->client_torn_down_) {
+                       self->unbind_txn_->Reply();
+                     }
+                   });
 }
 
 void SpiChild::DdkUnbind(ddk::UnbindTxn txn) {
@@ -282,13 +281,18 @@ void SpiChild::DdkUnbind(ddk::UnbindTxn txn) {
     // that live on the FIDL dispatcher during unbind instead.
     outgoing_.reset();
 
+    ZX_ASSERT(!unbind_txn_.has_value());
+    unbind_txn_ = std::move(txn);
+
     if (binding_.has_value()) {
-      Binding& binding = binding_.value();
-      ZX_ASSERT(!binding.unbind_txn.has_value());
-      binding.unbind_txn.emplace(std::move(txn));
-      binding.binding.Unbind();
-    } else {
-      txn.Reply();
+      binding_->Close(ZX_ERR_CANCELED);
+    }
+    if (!client_torn_down_) {
+      spi_.AsyncTeardown();
+    }
+
+    if (!binding_.has_value() && client_torn_down_) {
+      unbind_txn_->Reply();
     }
   });
 }
@@ -308,6 +312,15 @@ zx_status_t SpiChild::ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directo
   }
 
   return outgoing_->Serve(std::move(server_end)).status_value();
+}
+
+void SpiChild::FidlClientTeardownHandler() {
+  async::PostTask(fidl_dispatcher_->async_dispatcher(), [this]() {
+    client_torn_down_ = true;
+    if (unbind_txn_.has_value() && !binding_.has_value()) {
+      unbind_txn_->Reply();
+    }
+  });
 }
 
 }  // namespace spi

@@ -11,10 +11,13 @@
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <optional>
+#include <vector>
 
 #include <ddktl/device.h>
 
 namespace spi {
+
+class SpiChild;
 
 class SpiDevice;
 using SpiDeviceType = ddk::Device<SpiDevice, ddk::Unbindable>;
@@ -55,6 +58,8 @@ class SpiDevice : public SpiDeviceType {
   std::optional<ddk::UnbindTxn> unbind_txn_;
   bool fidl_client_teardown_complete_ = false;
   bool dispatcher_shutdown_complete_ = false;
+
+  std::vector<SpiChild*> children_;
 };
 
 }  // namespace spi
