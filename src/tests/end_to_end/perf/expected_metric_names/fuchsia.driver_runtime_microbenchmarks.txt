@@ -67,6 +67,7 @@ fuchsia.driver_runtime: Dispatcher/Runtime/Task/Threads/10tasks
 fuchsia.driver_runtime: Dispatcher/Runtime/Task/Threads/1tasks
 fuchsia.driver_runtime: Dispatcher/Runtime/Wait/NoThreads
 fuchsia.driver_runtime: Dispatcher/Runtime/Wait/Threads
+fuchsia.driver_runtime: FidlInlineEmptyCall
 fuchsia.driver_runtime: HandleCreate_Channel.close
 fuchsia.driver_runtime: HandleCreate_Channel.create
 fuchsia.driver_runtime: HandleGetObject_Channel.get_object
