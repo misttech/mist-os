@@ -44,6 +44,9 @@ static void trace_provider_with_fdio_thread_entry() {
     // Continue running the loop to handle future trace start/stop messages.
     loop.Run();
   }
+
+  // If the initialization failed, unblock waiters regardless.
+  provider_initialized.count_down();
 }
 
 // Calling this function multiple times is idempotent, to ensure that resources

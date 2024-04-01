@@ -122,6 +122,7 @@ async fn main() -> Result<(), Error> {
     health.set_starting_up();
 
     fuchsia_trace_provider::trace_provider_create_with_fdio();
+    fuchsia_trace_provider::trace_provider_wait_for_init();
     trace_instant!(CATEGORY_STARNIX, NAME_START_KERNEL, fuchsia_trace::Scope::Thread);
 
     let container = async_lock::OnceCell::<Container>::new();
