@@ -6,6 +6,8 @@
 #define SRC_DEVICES_HRTIMER_DRIVERS_AML_HRTIMER_AML_HRTIMER_SERVER_H_
 
 #include <fidl/fuchsia.hardware.hrtimer/cpp/fidl.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/interrupt.h>
@@ -16,13 +18,19 @@ namespace hrtimer {
 
 class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
  public:
-  AmlHrtimerServer(async_dispatcher_t* dispatcher, fdf::MmioBuffer mmio, zx::interrupt irq_a,
-                   zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d,
-                   zx::interrupt irq_f, zx::interrupt irq_g, zx::interrupt irq_h,
-                   zx::interrupt irq_i);
+  AmlHrtimerServer(
+      async_dispatcher_t* dispatcher, fdf::MmioBuffer mmio,
+      std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control,
+      zx::interrupt irq_a, zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d,
+      zx::interrupt irq_f, zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i);
 
   void ShutDown() {}
-  static size_t GetNumberOfTimers() { return kNumberOfTimers; }  // For unit testing.
+
+  // For unit testing.
+  static size_t GetNumberOfTimers() { return kNumberOfTimers; }
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>>& element_control() {
+    return element_control_;
+  }
 
  protected:
   void Start(StartRequest& request, StartCompleter::Sync& completer) override;
@@ -94,6 +102,7 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
                                                 *this, *this, *this, *this};
   std::optional<fdf::MmioBuffer> mmio_;
   zx::interrupt irq_;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_;
 };
 }  // namespace hrtimer
 #endif  // SRC_DEVICES_HRTIMER_DRIVERS_AML_HRTIMER_AML_HRTIMER_SERVER_H_

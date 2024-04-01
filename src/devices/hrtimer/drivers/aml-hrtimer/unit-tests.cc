@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 #include <lib/fake-bti/bti.h>
@@ -12,7 +15,7 @@
 
 namespace hrtimer {
 
-class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_device::Device> {
+class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device::Device> {
  public:
   fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler() {
     return fuchsia_hardware_platform_device::Service::InstanceHandler({
@@ -44,88 +47,80 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
  private:
   static constexpr size_t kMmioSize = 0x10000;
 
-  void GetMmioById(fuchsia_hardware_platform_device::wire::DeviceGetMmioByIdRequest* request,
-                   GetMmioByIdCompleter::Sync& completer) override {
-    if (request->index != 0) {
-      return completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
+  void GetMmioById(GetMmioByIdRequest& request, GetMmioByIdCompleter::Sync& completer) override {
+    if (request.index() != 0) {
+      return completer.Reply(zx::error(ZX_ERR_OUT_OF_RANGE));
     }
 
     zx::vmo vmo;
     if (zx_status_t status = mmio_.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo); status != ZX_OK) {
-      return completer.ReplyError(status);
+      return completer.Reply(zx::error(status));
     }
 
-    fidl::Arena arena;
-    completer.ReplySuccess(fuchsia_hardware_platform_device::wire::Mmio::Builder(arena)
-                               .offset(0)
-                               .size(kMmioSize)
-                               .vmo(std::move(vmo))
-                               .Build());
+    completer.Reply(zx::ok(fuchsia_hardware_platform_device::Mmio{{
+        .offset = 0,
+        .size = kMmioSize,
+        .vmo = std::move(vmo),
+    }}));
   }
 
-  void GetMmioByName(fuchsia_hardware_platform_device::wire::DeviceGetMmioByNameRequest* request,
+  void GetMmioByName(GetMmioByNameRequest& request,
                      GetMmioByNameCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
-  void GetInterruptById(
-      fuchsia_hardware_platform_device::wire::DeviceGetInterruptByIdRequest* request,
-      GetInterruptByIdCompleter::Sync& completer) override {
-    if (request->index >= AmlHrtimer::GetNumberOfIrqs()) {
-      completer.ReplyError(ZX_ERR_INVALID_ARGS);
+  void GetInterruptById(GetInterruptByIdRequest& request,
+                        GetInterruptByIdCompleter::Sync& completer) override {
+    if (request.index() >= AmlHrtimer::GetNumberOfIrqs()) {
+      completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
       return;
     }
     zx::interrupt interrupt;
     ASSERT_EQ(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL,
-                                    &fake_interrupts_[request->index]),
+                                    &fake_interrupts_[request.index()]),
               ZX_OK);
     zx_status_t status =
-        fake_interrupts_[request->index].duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt);
+        fake_interrupts_[request.index()].duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt);
     if (status != ZX_OK) {
-      completer.ReplyError(status);
+      completer.Reply(zx::error(status));
       return;
     }
-    completer.ReplySuccess(std::move(interrupt));
+    completer.Reply(zx::ok(std::move(interrupt)));
   }
 
-  void GetInterruptByName(
-      fuchsia_hardware_platform_device::wire::DeviceGetInterruptByNameRequest* request,
-      GetInterruptByNameCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  void GetInterruptByName(GetInterruptByNameRequest& request,
+                          GetInterruptByNameCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
-  void GetBtiById(fuchsia_hardware_platform_device::wire::DeviceGetBtiByIdRequest* request,
-                  GetBtiByIdCompleter::Sync& completer) override {
+  void GetBtiById(GetBtiByIdRequest& request, GetBtiByIdCompleter::Sync& completer) override {
     zx::bti bti;
     if (zx_status_t status = bti_.duplicate(ZX_RIGHT_SAME_RIGHTS, &bti); status != ZX_OK) {
-      return completer.ReplyError(status);
+      return completer.Reply(zx::error(status));
     }
-    completer.ReplySuccess(std::move(bti));
+    completer.Reply(zx::ok((std::move(bti))));
   }
 
-  void GetBtiByName(fuchsia_hardware_platform_device::wire::DeviceGetBtiByNameRequest* request,
-                    GetBtiByNameCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  void GetBtiByName(GetBtiByNameRequest& request, GetBtiByNameCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
-  void GetSmcById(fuchsia_hardware_platform_device::wire::DeviceGetSmcByIdRequest* request,
-                  GetSmcByIdCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  void GetSmcById(GetSmcByIdRequest& request, GetSmcByIdCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
   void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override {
-    fidl::Arena arena;
-    auto info = fuchsia_hardware_platform_device::wire::NodeDeviceInfo::Builder(arena);
-    completer.ReplySuccess(info.vid(PDEV_VID_AMLOGIC).pid(PDEV_PID_AMLOGIC_A311D).Build());
+    fuchsia_hardware_platform_device::NodeDeviceInfo info;
+    info.vid(PDEV_VID_AMLOGIC).pid(PDEV_PID_AMLOGIC_A311D);
+    completer.Reply(zx::ok(std::move(info)));
   }
 
-  void GetSmcByName(fuchsia_hardware_platform_device::wire::DeviceGetSmcByNameRequest* request,
-                    GetSmcByNameCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  void GetSmcByName(GetSmcByNameRequest& request, GetSmcByNameCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
   void handle_unknown_method(
@@ -135,7 +130,32 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
   void MapMmio() { mapped_mmio_.Map(mmio_); }
 
   void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    // fuchsia_hardware_power uses FIDL uint8 for power levels matching fuchsia_power_broker's.
+    constexpr uint8_t kPowerLevelOff =
+        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOff);
+    constexpr uint8_t kPowerLevelOn =
+        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOn);
+    constexpr char kPowerElementName[] = "aml-hrtimer-wake";
+    fuchsia_hardware_power::LevelTuple wake_handling_on = {{
+        .child_level = kPowerLevelOn,
+        .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
+    }};
+    fuchsia_hardware_power::PowerDependency wake_handling = {{
+        .child = kPowerElementName,
+        .parent = fuchsia_hardware_power::ParentElement::WithSag(
+            fuchsia_hardware_power::SagElement::kWakeHandling),
+        .level_deps = {{std::move(wake_handling_on)}},
+        .strength = fuchsia_hardware_power::RequirementType::kActive,
+    }};
+    fuchsia_hardware_power::PowerLevel off = {{.level = kPowerLevelOff, .name = "off"}};
+    fuchsia_hardware_power::PowerLevel on = {{.level = kPowerLevelOn, .name = "on"}};
+    fuchsia_hardware_power::PowerElement element = {
+        {.name = kPowerElementName, .levels = {{std::move(off), std::move(on)}}}};
+    fuchsia_hardware_power::PowerElementConfiguration wake_config = {
+        {.element = std::move(element), .dependencies = {{std::move(wake_handling)}}}};
+
+    completer.Reply(zx::ok(
+        std::vector<fuchsia_hardware_power::PowerElementConfiguration>{{std::move(wake_config)}}));
   }
 
   zx::vmo mmio_;
@@ -146,6 +166,119 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
   fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> bindings_;
 };
 
+// Power Specific.
+class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
+ public:
+  FakeSystemActivityGovernor(zx::event wake_handling) : wake_handling_(std::move(wake_handling)) {}
+
+  fidl::ProtocolHandler<fuchsia_power_system::ActivityGovernor> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
+    fuchsia_power_system::PowerElements elements;
+    zx::event duplicate;
+    wake_handling_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
+
+    fuchsia_power_system::WakeHandling wake_handling = {
+        {.active_dependency_token = std::move(duplicate)}};
+
+    elements = {{.wake_handling = std::move(wake_handling)}};
+
+    completer.Reply({{std::move(elements)}});
+  }
+
+  void RegisterListener(RegisterListenerRequest& request,
+                        RegisterListenerCompleter::Sync& completer) override {}
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  zx::event wake_handling_;
+  fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
+};
+
+class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl> {
+ public:
+  void WatchStatus(fuchsia_power_broker::LeaseControlWatchStatusRequest& request,
+                   WatchStatusCompleter::Sync& completer) override {
+    completer.Reply(lease_status_);
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::LeaseControl> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  fuchsia_power_broker::LeaseStatus lease_status_ = fuchsia_power_broker::LeaseStatus::kSatisfied;
+};
+
+class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
+ public:
+  void Lease(fuchsia_power_broker::LessorLeaseRequest& request,
+             LeaseCompleter::Sync& completer) override {
+    auto lease_control = fidl::CreateEndpoints<fuchsia_power_broker::LeaseControl>();
+    auto lease_control_impl = std::make_unique<FakeLeaseControl>();
+    lease_control_ = lease_control_impl.get();
+    lease_control_binding_ = fidl::BindServer<fuchsia_power_broker::LeaseControl>(
+        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(lease_control->server),
+        std::move(lease_control_impl),
+        [](FakeLeaseControl* impl, fidl::UnbindInfo info,
+           fidl::ServerEnd<fuchsia_power_broker::LeaseControl> server_end) mutable {});
+
+    completer.Reply(fit::success(std::move(lease_control->client)));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  FakeLeaseControl* lease_control_;
+  std::optional<fidl::ServerBindingRef<fuchsia_power_broker::LeaseControl>> lease_control_binding_;
+};
+
+class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
+ public:
+  fidl::ProtocolHandler<fuchsia_power_broker::Topology> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  void AddElement(fuchsia_power_broker::ElementSchema& request,
+                  AddElementCompleter::Sync& completer) override {
+    auto element_control = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
+    element_control_server_ = std::move(element_control->server);
+    if (request.lessor_channel()) {
+      auto lessor_impl = std::make_unique<FakeLessor>();
+      wake_lessor_ = lessor_impl.get();
+      fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_binding =
+          fidl::BindServer<fuchsia_power_broker::Lessor>(
+              fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+              std::move(*request.lessor_channel()), std::move(lessor_impl),
+              [](FakeLessor* impl, fidl::UnbindInfo info,
+                 fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) mutable {});
+    }
+
+    fuchsia_power_broker::TopologyAddElementResponse result{
+        {.element_control_channel = std::move(element_control->client)},
+    };
+
+    completer.Reply(fit::success(std::move(result)));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl>& element_control_server() {
+    return element_control_server_;
+  }
+
+ private:
+  FakeLessor* wake_lessor_ = nullptr;
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server_;
+  fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
+};
+
 class TestEnvironment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
@@ -153,12 +286,30 @@ class TestEnvironment : public fdf_testing::Environment {
     auto result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
         platform_device_.GetInstanceHandler());
     EXPECT_EQ(ZX_OK, result.status_value());
+
+    // Power specific.
+    zx::event::create(0, &wake_handling_);
+    zx::event duplicate;
+    EXPECT_EQ(wake_handling_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate), ZX_OK);
+    system_activity_governor_.emplace(std::move(duplicate));
+    auto result_sag =
+        to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
+            system_activity_governor_->CreateHandler());
+    EXPECT_EQ(ZX_OK, result_sag.status_value());
+    auto result_broker =
+        to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
+            power_broker_.CreateHandler());
+    EXPECT_EQ(ZX_OK, result_broker.status_value());
     return zx::ok();
   }
   FakePlatformDevice& platform_device() { return platform_device_; }
+  FakePowerBroker& power_broker() { return power_broker_; }
 
  private:
   FakePlatformDevice platform_device_;
+  std::optional<FakeSystemActivityGovernor> system_activity_governor_;
+  FakePowerBroker power_broker_;
+  zx::event wake_handling_;
 };
 
 class FixtureConfig final {
@@ -395,6 +546,24 @@ TEST_F(DriverTest, EventTriggering) {
     zx_signals_t signals = {};
     ASSERT_EQ(events[i].wait_one(ZX_EVENT_SIGNALED, zx::time::infinite(), &signals), ZX_OK);
   }
+}
+
+TEST_F(DriverTest, PowerLeaseControl) {
+  // Element control server in the driver is the same as provided by the fake SAG.
+  zx_info_handle_basic_t broker_element_control, driver_element_control;
+  RunInDriverContext([&](AmlHrtimer& driver) {
+    zx_status_t status = driver.element_control()->channel().get_info(
+        ZX_INFO_HANDLE_BASIC, &driver_element_control, sizeof(zx_info_handle_basic_t), nullptr,
+        nullptr);
+    ASSERT_EQ(status, ZX_OK);
+  });
+  RunInEnvironmentTypeContext([&](TestEnvironment& env) {
+    zx_status_t status = env.power_broker().element_control_server().channel().get_info(
+        ZX_INFO_HANDLE_BASIC, &broker_element_control, sizeof(zx_info_handle_basic_t), nullptr,
+        nullptr);
+    ASSERT_EQ(status, ZX_OK);
+  });
+  ASSERT_EQ(broker_element_control.koid, driver_element_control.related_koid);
 }
 
 }  // namespace hrtimer

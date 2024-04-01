@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_HRTIMER_DRIVERS_AML_HRTIMER_AML_HRTIMER_H_
 #define SRC_DEVICES_HRTIMER_DRIVERS_AML_HRTIMER_AML_HRTIMER_H_
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
@@ -13,6 +14,10 @@
 namespace hrtimer {
 
 static constexpr char kDeviceName[] = "aml-hrtimer";
+
+struct PowerConfiguration {
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_client;
+};
 
 class AmlHrtimer : public fdf::DriverBase {
  public:
@@ -25,6 +30,11 @@ class AmlHrtimer : public fdf::DriverBase {
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
+  // For unit testing.
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>>& element_control() {
+    return server_->element_control();
+  }
+
  private:
   static constexpr size_t kNumberOfIrqs = 8;  // These are provided by the platform, 8 total.
 
@@ -33,6 +43,8 @@ class AmlHrtimer : public fdf::DriverBase {
     bindings_.AddBinding(dispatcher(), std::move(server), server_.get(),
                          fidl::kIgnoreBindingClosure);
   }
+  zx::result<PowerConfiguration> GetPowerConfiguration(
+      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev);
 
   std::unique_ptr<AmlHrtimerServer> server_;
   fidl::ServerBindingGroup<fuchsia_hardware_hrtimer::Device> bindings_;

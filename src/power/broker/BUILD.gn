@@ -22,6 +22,7 @@ fidl("fuchsia.power.broker") {
     "//sdk/lib/driver/power/cpp/*:*",
     "//src/devices/block/drivers/aml-sdmmc/*:*",
     "//src/devices/bus/drivers/platform/test/*:*",
+    "//src/devices/hrtimer/drivers/aml-hrtimer/*:*",
     "//src/power/broker/*:*",
     "//src/power/system-activity-governor/*:*",
     "//src/power/testing/fake-broker/*:*",

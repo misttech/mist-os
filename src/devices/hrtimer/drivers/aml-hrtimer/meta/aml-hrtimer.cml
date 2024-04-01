@@ -13,5 +13,9 @@
     },
     use: [
         { service: "fuchsia.hardware.platform.device.Service" },
+        { protocol: "fuchsia.power.broker.Topology" },
+
+        // Used by //sdk/lib/driver/power/cpp
+        { protocol: "fuchsia.power.system.ActivityGovernor" },
     ],
 }

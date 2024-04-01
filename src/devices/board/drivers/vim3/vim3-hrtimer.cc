@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -65,6 +66,32 @@ zx::result<> Vim3::HrTimerInit() {
   dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_HRTIMER;
   dev.mmio() = mmios;
   dev.irq() = irqs;
+
+  // Power configuration.
+  // fuchsia_hardware_power uses FIDL uint8 for power levels matching fuchsia_power_broker's.
+  constexpr uint8_t kPowerLevelOff =
+      static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOff);
+  constexpr uint8_t kPowerLevelOn =
+      static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOn);
+  constexpr char kPowerElementName[] = "aml-hrtimer-wake";
+  fuchsia_hardware_power::LevelTuple wake_handling_on = {{
+      .child_level = kPowerLevelOn,
+      .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
+  }};
+  fuchsia_hardware_power::PowerDependency wake_handling = {{
+      .child = kPowerElementName,
+      .parent = fuchsia_hardware_power::ParentElement::WithSag(
+          fuchsia_hardware_power::SagElement::kWakeHandling),
+      .level_deps = {{std::move(wake_handling_on)}},
+      .strength = fuchsia_hardware_power::RequirementType::kActive,
+  }};
+  fuchsia_hardware_power::PowerLevel off = {{.level = kPowerLevelOff, .name = "off"}};
+  fuchsia_hardware_power::PowerLevel on = {{.level = kPowerLevelOn, .name = "on"}};
+  fuchsia_hardware_power::PowerElement element = {
+      {.name = kPowerElementName, .levels = {{std::move(off), std::move(on)}}}};
+  fuchsia_hardware_power::PowerElementConfiguration config = {
+      {.element = std::move(element), .dependencies = {{std::move(wake_handling)}}}};
+  dev.power_config() = {std::move(config)};
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('HRTR');

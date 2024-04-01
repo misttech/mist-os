@@ -9,10 +9,12 @@
 
 namespace hrtimer {
 
-AmlHrtimerServer::AmlHrtimerServer(async_dispatcher_t* dispatcher, fdf::MmioBuffer mmio,
-                                   zx::interrupt irq_a, zx::interrupt irq_b, zx::interrupt irq_c,
-                                   zx::interrupt irq_d, zx::interrupt irq_f, zx::interrupt irq_g,
-                                   zx::interrupt irq_h, zx::interrupt irq_i) {
+AmlHrtimerServer::AmlHrtimerServer(
+    async_dispatcher_t* dispatcher, fdf::MmioBuffer mmio,
+    std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control,
+    zx::interrupt irq_a, zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d,
+    zx::interrupt irq_f, zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i)
+    : element_control_(std::move(element_control)) {
   mmio_.emplace(std::move(mmio));
 
   timers_[0].irq_handler.set_object(irq_a.get());
