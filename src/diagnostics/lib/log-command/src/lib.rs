@@ -254,7 +254,10 @@ pub struct LogCommand {
     #[argh(switch)]
     pub no_symbolize: bool,
 
-    /// configure symbolization options, defaults to pretty.
+    /// configure symbolization options. Valid options are:
+    /// - pretty (default): pretty concise symbolization
+    /// - off: disables all symbolization
+    /// - classic: traiditional, non-prettified symbolization
     #[cfg(not(target_os = "fuchsia"))]
     #[argh(option, default = "SymbolizeMode::Pretty")]
     pub symbolize: SymbolizeMode,
