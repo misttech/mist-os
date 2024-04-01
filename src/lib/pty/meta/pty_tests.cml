@@ -13,7 +13,7 @@
     children: [
         {
             name: "ptysvc",
-            url: "#meta/ptysvc.cm",
+            url: "ptysvc#meta/ptysvc.cm",
         },
     ],
     use: [

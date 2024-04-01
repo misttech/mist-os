@@ -43,7 +43,6 @@ fuchsia_test_component("pty_tests_component") {
   manifest = "meta/pty_tests.cml"
   deps = [
     ":pty_test",
-    "//src/bringup/bin/ptysvc:component",
     "//src/lib/zircon/rust:exit_with_code_util",
     "//zircon/third_party/uapp/dash",
   ]
@@ -51,4 +50,5 @@ fuchsia_test_component("pty_tests_component") {
 
 fuchsia_test_package("pty_tests") {
   test_components = [ ":pty_tests_component" ]
+  subpackages = [ "//src/bringup/bin/ptysvc:package" ]
 }
