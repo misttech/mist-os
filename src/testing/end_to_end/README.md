@@ -316,10 +316,11 @@ accessible devices, choose only the one to target in the host test.
 
 The `ssh_private_key: $PKEY` value should match the path of the SSH private key
 that can be used to connect to the DUT. This is the key that pairs with the
-`authorized_keys` used in paving workflows or exists in the emulator image. For
-most users, this is ` ~/.ssh/fuchsia_ed25519` as it's the key used by Fuchsia's
-`fx` workflows. If the DUT is provisioned by other means, you'd have to provide
-the path to the corresponding SSH private key.
+`authorized_keys` used in paving workflows or exists in the emulator image.
+The path to the private key is configurable, and can be retrieved with
+`ffx config get ssh.priv`. The authorized_keys path is `ffx config get ssh.pub`.
+In most cases, the ssh keys are generated and used when flashing, `ffx target flash`
+or starting an emulator `ffx emu start`.
 
 A quick way to confirm that Fuchsia's default SSH key works is the following:
 
@@ -332,6 +333,5 @@ If the above succeeds, then the following command returns the working SSH key
 path:
 
 ```sh
-$ head -1 $FUCHSIA_DIR/.fx-ssh-path
+$ ffx config get ssh.priv
 ```
-
