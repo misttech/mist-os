@@ -14,6 +14,23 @@
                 "tid": 7022
             },
             {
+                "name": "memory-pressure-loop",
+                "ph": "t",
+                "pid": 7009,
+                "tid": 1036
+            },
+            {
+                "name": "process-with-no-trace-events",
+                "ph": "p",
+                "pid": 7011
+            },
+            {
+                "name": "initial-thread",
+                "ph": "t",
+                "pid": 7011,
+                "tid": 5555
+            },
+            {
                 "ph": "w",
                 "ts": 697503138,
                 "cpu": 0,
@@ -81,6 +98,34 @@
                 "in": {
                     "tid": 1036,
                     "prio": -2147483648
+                }
+            },
+            {
+                "ph": "k",
+                "ts": 20,
+                "cpu": 0,
+                "out": {
+                    "tid": 1036,
+                    "state": 3,
+                    "prio": 3122
+                },
+                "in": {
+                    "tid": 1037,
+                    "prio": 3122
+                }
+            },
+            {
+                "ph": "k",
+                "ts": 30,
+                "cpu": 0,
+                "out": {
+                    "tid": 1037,
+                    "state": 3,
+                    "prio": 3122
+                },
+                "in": {
+                    "tid": 5555,
+                    "prio": 3122
                 }
             }
         ],

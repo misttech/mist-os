@@ -180,8 +180,14 @@ def get_test_model() -> trace_model.Model:
     read_event.child_flows = [flow_start]
     write_event.child_flows = [flow_step, flow_end]
 
+    # No trace events for the following two threads.
+    thread1036 = trace_model.Thread(tid=1036, name="memory-pressure-loop")
+    thread5555 = trace_model.Thread(tid=5555, name="initial-thread")
+
     thread7021 = trace_model.Thread(
-        tid=7021, events=[read_event, flow_start, instant_event]
+        tid=7021,
+        name="tid: 7021",
+        events=[read_event, flow_start, instant_event],
     )
     thread7022 = trace_model.Thread(
         tid=7022,
@@ -189,16 +195,21 @@ def get_test_model() -> trace_model.Model:
         events=[async_read_write_event, write_event, flow_step, flow_end],
     )
     thread7023 = trace_model.Thread(
-        tid=7023, events=[read_event2, counter_event]
+        tid=7023, name="tid: 7023", events=[read_event2, counter_event]
     )
 
     process7009 = trace_model.Process(
-        pid=7009, name="process_foo", threads=[thread7021, thread7022]
+        pid=7009,
+        name="process_foo",
+        threads=[thread1036, thread7021, thread7022],
     )
     process7010 = trace_model.Process(pid=7010, threads=[thread7023])
+    process7011 = trace_model.Process(
+        pid=7011, name="process-with-no-trace-events", threads=[thread5555]
+    )
 
     model = trace_model.Model()
-    model.processes = [process7009, process7010]
+    model.processes = [process7009, process7010, process7011]
     model.scheduling_records[0] = [
         trace_model.Waking(
             start=trace_time.TimePoint.from_epoch_delta(
@@ -226,6 +237,28 @@ def get_test_model() -> trace_model.Model:
             incoming_tid=1036,
             outgoing_tid=7022,
             incoming_prio=-2147483648,
+            outgoing_prio=3122,
+            outgoing_state=3,
+            args={},
+        ),
+        trace_model.ContextSwitch(
+            start=trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(20)
+            ),
+            incoming_tid=1037,
+            outgoing_tid=1036,
+            incoming_prio=3122,
+            outgoing_prio=3122,
+            outgoing_state=3,
+            args={},
+        ),
+        trace_model.ContextSwitch(
+            start=trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(30)
+            ),
+            incoming_tid=5555,
+            outgoing_tid=1037,
+            incoming_prio=3122,
             outgoing_prio=3122,
             outgoing_state=3,
             args={},
@@ -391,6 +424,7 @@ def assertSchedulingRecordEqual(
     if isinstance(a, trace_model.ContextSwitch) and isinstance(
         b, trace_model.ContextSwitch
     ):
+        test.assertEqual(a.tid, b.tid)
         test.assertEqual(a.outgoing_tid, b.outgoing_tid)
         test.assertEqual(a.outgoing_prio, b.outgoing_prio)
         test.assertEqual(a.outgoing_state, b.outgoing_state)

@@ -77,7 +77,7 @@ class TraceModelTest(unittest.TestCase):
                 trace_time.TimeDelta.from_microseconds(697503138.9531089)
             ),
         )
-        self.assertEqual(len(head_model.scheduling_records[0]), 2)
+        self.assertEqual(len(head_model.scheduling_records[0]), 4)
         self.assertEqual(len(head_model.scheduling_records[1]), 2)
 
     def test_slice_doesnt_reference_old_model(self) -> None:
