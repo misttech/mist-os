@@ -54,7 +54,7 @@ You should be able to run the tests with:
 
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
-  --ssh-private-key ~/.ssh/fuchsia_ed25519 \
+  --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
   --builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
   --fuchsia-build-dir $(fx get-build-dir)
 ```
@@ -68,7 +68,7 @@ determine the build ids from the downgrade and upgrade builds, then run:
 
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
-  --ssh-private-key ~/.ssh/fuchsia_ed25519 \
+  --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
   --build-id 123456789... \
   --build-id 987654321...
 ```
@@ -77,7 +77,7 @@ Or you can combine these options:
 
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
-  --ssh-private-key ~/.ssh/fuchsia_ed25519 \
+  --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
   --build-id 123456789... \
   --fuchsia-build-dir $(fx get-build-dir)
 ```
@@ -93,14 +93,14 @@ can be done by running:
 
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_reboot \
-  --ssh-private-key ~/.ssh/fuchsia_ed25519 \
+  --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
   --fuchsia-build-dir $(fx get-build-dir)
 ```
 
 Or if you want to test a build, you can use:
 
-* `--builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs`, to test the
-  latest build published by that builder.
+* `--builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs`, to test
+  the latest build published by that builder.
 * `--build-id 1234...` to test the specific build.
 
 ## Running the Tests
@@ -128,10 +128,10 @@ See the `run-test --help` for more options.
 
 ## Running the tests locally in the Fuchsia Emulator (experimental)
 
-At the moment, the build script `fx qemu` does not bring up a configuration that can be
-OTA-ed. Until this is implemented, the `bin/` directory contains some helper
-scripts that bring up an OTA-able Fuchsia emulator. Follow these instructions to
-it.
+At the moment, the build script `fx qemu` does not bring up a configuration that
+can be OTA-ed. Until this is implemented, the `bin/` directory contains some
+helper scripts that bring up an OTA-able Fuchsia emulator. Follow these
+instructions to it.
 
 The `create-emu` script will create a Fuchsia EFI image:
 
@@ -154,7 +154,7 @@ Once the VM has finished paving, you can then use it with the upgrade tests:
 
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
-  --ssh-private-key ~/fuchsia/.ssh/pkey \
+  --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
   --builder-name fuchsia/global.ci/workstation_eng.x64-release-e2e-isolated \
   --fuchsia-build-dir $(fx get-build-dir) \
   --device fuchsia-5254-0063-5e7a
