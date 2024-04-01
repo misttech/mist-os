@@ -590,3 +590,27 @@
   available_in_git: '3e513d4cbd1b97750d4b92012ae56078084be57e'
   areas: ['Board']
   path: '/src/devices/mcu/drivers/chromiumos-acpi'
+- short_description: 'simple-display driver for AMD Kaveri R7 GPU'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '1018433'
+  available_in_git: '380af2404204382e9f13d524b1c34894758b6715'
+  areas: ['Display']
+  path: '/src/graphics/display/drivers/simple'
+- short_description: 'simple-display driver for NVIDIA GPU'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '1018433'
+  available_in_git: '380af2404204382e9f13d524b1c34894758b6715'
+  areas: ['Display']
+  path: '/src/graphics/display/drivers/simple'
+- short_description: 'simple-display driver for Google Graphics Array (GGA)'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '1018433'
+  available_in_git: '380af2404204382e9f13d524b1c34894758b6715'
+  areas: ['Display']
+  path: '/src/graphics/display/drivers/simple'
+- short_description: 'simple-display driver for VMWare'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '1018433'
+  available_in_git: '380af2404204382e9f13d524b1c34894758b6715'
+  areas: ['Display']
+  path: '/src/graphics/display/drivers/simple'
