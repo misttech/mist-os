@@ -4,9 +4,7 @@
 
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
-use iquery::commands::{
-    ListAccessorsCommand, ListCommand, ListFilesCommand, SelectorsCommand, ShowCommand,
-};
+use iquery::commands::{ListAccessorsCommand, ListCommand, SelectorsCommand, ShowCommand};
 use std::path::PathBuf;
 
 #[ffx_command()]
@@ -34,7 +32,6 @@ pub enum InspectSubCommand {
     ApplySelectors(ApplySelectorsCommand),
     List(ListCommand),
     ListAccessors(ListAccessorsCommand),
-    ListFiles(ListFilesCommand),
     Selectors(SelectorsCommand),
     Show(ShowCommand),
 }

@@ -3,11 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::commands::{
-        list_files::{list_files, ListFilesResultItem},
-        types::DiagnosticsProvider,
-        utils::*,
-    },
+    crate::commands::{types::DiagnosticsProvider, utils::*},
     crate::types::Error,
     anyhow::anyhow,
     async_trait::async_trait,
@@ -59,15 +55,6 @@ impl DiagnosticsProvider for ArchiveAccessorProvider {
         let realm_query_proxy = connect_realm_query().await?;
         get_accessor_selectors(&realm_query_proxy).await
     }
-
-    async fn list_files(&self, monikers: &[String]) -> Result<Vec<ListFilesResultItem>, Error> {
-        list_files_auto_proxy(monikers).await
-    }
-}
-
-async fn list_files_auto_proxy(monikers: &[String]) -> Result<Vec<ListFilesResultItem>, Error> {
-    let realm_query_proxy = connect_realm_query().await?;
-    list_files(realm_query_proxy, monikers).await
 }
 
 /// Helper method to connect to both the `RealmQuery` and the `RealmExplorer`.

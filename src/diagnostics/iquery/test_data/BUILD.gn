@@ -7,8 +7,6 @@ import("//build/components.gni")
 test_names = [
   "list_accessors",
   "list_archive",
-  "list_files_basic",
-  "list_files_all",
   "list_filter_manifest",
   "list_no_dups",
   "list_test",
@@ -21,10 +19,6 @@ test_names = [
   "show_filter_test",
   "show_filter_test_serve_fs",
   "show_test",
-  "show_test_with_file",
-  "show_test_with_file_deprecated_inspect",
-  "show_test_with_file_root_inspect",
-  "show_test_with_file_glob",
 ]
 
 formats = [

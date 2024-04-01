@@ -20,7 +20,6 @@ ffx_plugin("ffx_inspect") {
     "src/lib.rs",
     "src/tests/list.rs",
     "src/tests/list_accessors.rs",
-    "src/tests/list_files.rs",
     "src/tests/mod.rs",
     "src/tests/mod.rs",
     "src/tests/selectors.rs",
@@ -58,7 +57,6 @@ ffx_plugin("ffx_inspect") {
     "//src/developer/ffx/lib/writer:lib",
     "//src/diagnostics/iquery/test_support:iquery_test_support",
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:tempfile",
   ]

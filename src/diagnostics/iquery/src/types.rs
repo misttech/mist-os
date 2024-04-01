@@ -23,23 +23,11 @@ pub enum Error {
     #[error("Failed formatting the command response: {0}")]
     InvalidCommandResponse(serde_json::Error),
 
-    #[error("Failed parsing glob {0}: {1}")]
-    ParsePath(String, anyhow::Error),
-
     #[error("Failed parsing selector {0}: {1}")]
     ParseSelector(String, anyhow::Error),
 
     #[error("Failed to list archive accessors on {0} {1}")]
     ListAccessors(String, anyhow::Error),
-
-    #[error("Failed to list locations on {0} {1}")]
-    ListLocations(String, anyhow::Error),
-
-    #[error("Failed to find inspect data in location {0}: {1}")]
-    ReadLocation(String, anyhow::Error),
-
-    #[error("Error while connecting to {0}: {1}")]
-    ConnectingTo(String, fidl::Error),
 
     #[error("Error while communicating with {0}: {1}")]
     CommunicatingWith(String, #[source] anyhow::Error),
@@ -47,26 +35,14 @@ pub enum Error {
     #[error("Failed to connect to archivst: {0}")]
     ConnectToArchivist(#[source] anyhow::Error),
 
-    #[error("Unknown archive path")]
-    UnknownArchivePath,
-
     #[error("IO error. Failed to {0}: {1}")]
     IOError(String, #[source] anyhow::Error),
 
     #[error("No running component was found whose URL contains the given string: {0}")]
     ManifestNotFound(String),
 
-    #[error("Invalid accessor: {0}")]
-    InvalidAccessor(String),
-
     #[error("Invalid selector: {0}")]
     InvalidSelector(String),
-
-    #[error("Invalid component: {0}")]
-    InvalidComponent(String),
-
-    #[error("Invalid file pattern: {0}")]
-    InvalidFilePattern(String),
 
     #[error(transparent)]
     GetManifestError(#[from] component_debug::realm::GetDeclarationError),
@@ -74,20 +50,24 @@ pub enum Error {
     #[error(transparent)]
     GetAllInstancesError(#[from] component_debug::realm::GetAllInstancesError),
 
-    #[error("Timeout")]
-    Timeout,
     #[error(transparent)]
     SocketConversionError(#[from] std::io::Error),
+
     #[error(transparent)]
     FidlError(#[from] fidl::Error),
+
     #[error("Not enough dots in selector")]
     NotEnoughDots,
+
     #[error("Must be an exact moniker. Wildcards are not supported.")]
     MustBeExactMoniker,
+
     #[error("Must use a property selector to specify the protocol.")]
     MustUsePropertySelector,
+
     #[error("Failed to connect to capability {0:?}")]
     FailedToConnectToCapability(ConnectCapabilityError),
+
     #[error("Must be exact protocol (protocol cannot contain wildcards)")]
     MustBeExactProtocol,
 }

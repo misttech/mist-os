@@ -9,9 +9,7 @@ use ffx_inspect_args::{InspectCommand, InspectSubCommand};
 use fho::{deferred, toolbox_or, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorProxy;
-use iquery::commands::{
-    Command, ListAccessorsResult, ListFilesResult, ListResult, SelectorsResult, ShowResult,
-};
+use iquery::commands::{Command, ListAccessorsResult, ListResult, SelectorsResult, ShowResult};
 use serde::Serialize;
 use std::{fmt, io::Write};
 
@@ -64,9 +62,6 @@ impl FfxMain for InspectTool {
                 run_command(rcs, archive_accessor, cmd, &mut writer).await?;
             }
             InspectSubCommand::ListAccessors(cmd) => {
-                run_command(rcs, archive_accessor, cmd, &mut writer).await?;
-            }
-            InspectSubCommand::ListFiles(cmd) => {
                 run_command(rcs, archive_accessor, cmd, &mut writer).await?;
             }
             InspectSubCommand::Selectors(cmd) => {
@@ -126,4 +121,4 @@ macro_rules! impl_inspect_output {
     };
 }
 
-impl_inspect_output!(ShowResult, ListFilesResult, ListAccessorsResult, ListResult, SelectorsResult);
+impl_inspect_output!(ShowResult, ListAccessorsResult, ListResult, SelectorsResult);

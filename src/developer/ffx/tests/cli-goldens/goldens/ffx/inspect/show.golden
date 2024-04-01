@@ -26,18 +26,6 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "file"
-        }
-      },
-      "optionality": "repeating",
-      "long": "--file",
-      "short": null,
-      "description": "the filenames we are interested in. If any are provided, the output will only contain data from components which expose Inspect under the given file under their out/diagnostics directory. Supports shell globs expansions.",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
           "arg_name": "accessor"
         }
       },

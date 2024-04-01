@@ -6,7 +6,6 @@ use crate::{
     commands::{types::DiagnosticsProvider, Command, ListCommand},
     types::Error,
 };
-use anyhow::anyhow;
 use cm_rust::SourceName;
 use component_debug::realm::*;
 use fidl_fuchsia_sys2 as fsys2;
@@ -83,15 +82,6 @@ pub fn expand_selectors(selectors: Vec<String>) -> Result<Vec<String>, Error> {
         }
     }
     Ok(result)
-}
-
-/// Helper method to get all `InstanceInfo` from the `RealmExplorer`.
-pub(crate) async fn get_instance_infos(
-    realm_query: &fsys2::RealmQueryProxy,
-) -> Result<Vec<Instance>, Error> {
-    component_debug::realm::get_all_instances(realm_query)
-        .await
-        .map_err(|e| Error::CommunicatingWith("RealmExplorer".to_owned(), anyhow!("{:?}", e)))
 }
 
 /// Helper method to normalize a moniker into its canonical string form. Returns

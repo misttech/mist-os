@@ -4,9 +4,5 @@
 #[cfg(target_os = "fuchsia")]
 pub mod command_line;
 pub mod commands;
-#[cfg(target_os = "fuchsia")]
-pub mod constants;
-#[cfg(target_os = "fuchsia")]
-pub mod location;
 pub mod text_formatter;
 pub mod types;

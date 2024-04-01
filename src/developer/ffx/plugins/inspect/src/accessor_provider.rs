@@ -15,7 +15,7 @@ use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_sys2 as fsys2;
 use futures::AsyncReadExt;
 use iquery::{
-    commands::{get_accessor_selectors, list_files, DiagnosticsProvider, ListFilesResultItem},
+    commands::{get_accessor_selectors, DiagnosticsProvider},
     types::Error,
 };
 use serde::Deserialize;
@@ -175,11 +175,6 @@ impl DiagnosticsProvider for HostArchiveReader {
     async fn get_accessor_paths(&self) -> Result<Vec<String>, Error> {
         let query_proxy = connect_realm_query(&self.rcs_proxy).await?;
         get_accessor_selectors(&query_proxy).await
-    }
-
-    async fn list_files(&self, monikers: &[String]) -> Result<Vec<ListFilesResultItem>, Error> {
-        let query_proxy = connect_realm_query(&self.rcs_proxy).await?;
-        list_files(query_proxy, monikers).await
     }
 }
 

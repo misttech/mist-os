@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    crate::commands::list_files::ListFilesResultItem,
     crate::types::Error,
     async_trait::async_trait,
     diagnostics_data::{Data, DiagnosticsData},
@@ -27,6 +26,4 @@ pub trait DiagnosticsProvider: Send + Sync {
 
     /// Lists all ArchiveAccessor selectors.
     async fn get_accessor_paths(&self) -> Result<Vec<String>, Error>;
-
-    async fn list_files(&self, monikers: &[String]) -> Result<Vec<ListFilesResultItem>, Error>;
 }

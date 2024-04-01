@@ -75,7 +75,6 @@ pub enum AssertionOption {
 pub enum IqueryCommand {
     List,
     ListAccessors,
-    ListFiles,
     Selectors,
     Show,
 }
@@ -85,7 +84,6 @@ impl fmt::Display for IqueryCommand {
         let s = match self {
             Self::List => "list",
             Self::ListAccessors => "list-accessors",
-            Self::ListFiles => "list-files",
             Self::Selectors => "selectors",
             Self::Show => "show",
         };
