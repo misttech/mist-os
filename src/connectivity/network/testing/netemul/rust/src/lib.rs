@@ -21,6 +21,7 @@ use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_neighbor as fnet_neighbor;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul as fnetemul;
@@ -1214,8 +1215,14 @@ impl<'a> TestInterface<'a> {
 
         let client = provider.new_client_ext(id, fnet_dhcp_ext::default_new_client_params());
         let control = control.clone();
-        let stack = self.connect_stack().expect("connect stack");
-        let task = fnet_dhcp_ext::testutil::DhcpClientTask::new(client, id, stack, control);
+        let route_set_provider = realm
+            .connect_to_protocol::<fnet_routes_admin::SetProviderV4Marker>()
+            .expect("get fuchsia.net.routes.SetProviderV4");
+        let (route_set, server_end) =
+            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
+                .expect("creating route set proxy should succeed");
+        route_set_provider.new_route_set(server_end).expect("calling new_route_set should succeed");
+        let task = fnet_dhcp_ext::testutil::DhcpClientTask::new(client, id, route_set, control);
         *dhcp_client_task = Some(task);
         Ok(())
     }

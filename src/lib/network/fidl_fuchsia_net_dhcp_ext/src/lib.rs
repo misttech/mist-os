@@ -5,7 +5,7 @@
 //! Extensions for types in the `fidl_fuchsia_net_dhcp` crate.
 #![deny(missing_docs)]
 
-use std::{collections::HashSet, fmt::Display, num::NonZeroU64};
+use std::{collections::HashSet, num::NonZeroU64};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -15,10 +15,15 @@ use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_ext::IntoExt as _;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_stack as fnet_stack;
+use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use futures::{pin_mut, Future, FutureExt, Stream, StreamExt as _, TryStreamExt as _};
-use net_declare::fidl_subnet;
-use net_types::{ip::Ipv4Addr, SpecifiedAddr, Witness as _};
+use net_declare::fidl_ip_v4_with_prefix;
+use net_types::{
+    ip::{Ipv4, Ipv4Addr},
+    SpecifiedAddr,
+};
 
 /// The default `fnet_dhcp::NewClientParams`.
 pub fn default_new_client_params() -> fnet_dhcp::NewClientParams {
@@ -44,25 +49,15 @@ pub struct Configuration {
     pub routers: Vec<SpecifiedAddr<Ipv4Addr>>,
 }
 
-/// Error while manipulating a forwarding entry.
-#[derive(Debug, thiserror::Error)]
-#[error("error {operation} route for DHCPv4-learned router {router} on interface {device_id}: {error:?}")]
-pub struct ForwardingEntryError {
-    operation: ForwardingEntryOperation,
-    device_id: NonZeroU64,
-    router: SpecifiedAddr<Ipv4Addr>,
-    error: fnet_stack::Error,
-}
-
 /// Domain errors for this crate.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// A FIDL domain object was invalid.
     #[error("invalid FIDL domain object: {0:?}")]
     ApiViolation(anyhow::Error),
-    /// Errors were encountered while manipulating forwarding entries.
-    #[error("errors while manipulating forwarding entries: {0:?}")]
-    ForwardingEntry(Vec<ForwardingEntryError>),
+    /// An error was encountered while manipulating a route set.
+    #[error("errors while manipulating route set: {0:?}")]
+    RouteSet(fnet_routes_admin::RouteSetError),
     /// A FIDL error was encountered.
     #[error("fidl error: {0:?}")]
     Fidl(fidl::Error),
@@ -79,22 +74,11 @@ pub enum Error {
 
 /// The default subnet used as the destination while populating a
 /// `fuchsia.net.stack.ForwardingEntry` while applying newly-discovered routers.
-pub const DEFAULT_SUBNET: fnet::Subnet = fidl_subnet!("0.0.0.0/0");
+const DEFAULT_SUBNET: net_types::ip::Subnet<Ipv4Addr> = net_declare::net_subnet_v4!("0.0.0.0/0");
 
-#[derive(Copy, Clone, Debug)]
-enum ForwardingEntryOperation {
-    Adding,
-    Deleting,
-}
-
-impl Display for ForwardingEntryOperation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ForwardingEntryOperation::Adding => f.write_str("adding"),
-            ForwardingEntryOperation::Deleting => f.write_str("deleting"),
-        }
-    }
-}
+/// The default subnet used as the destination while populating a
+/// `fuchsia.net.routes.RouteV4` while applying newly-discovered routers.
+pub const DEFAULT_ADDR_PREFIX: fnet::Ipv4AddressWithPrefix = fidl_ip_v4_with_prefix!("0.0.0.0/0");
 
 /// Applies a new set of routers to a given `fuchsia.net.stack.Stack` and
 /// set of configured routers by deleting forwarding entries for
@@ -102,47 +86,52 @@ impl Display for ForwardingEntryOperation {
 /// ones.
 pub async fn apply_new_routers(
     device_id: NonZeroU64,
-    stack: &fnet_stack::StackProxy,
+    route_set: &fnet_routes_admin::RouteSetV4Proxy,
     configured_routers: &mut HashSet<SpecifiedAddr<Ipv4Addr>>,
     new_routers: impl IntoIterator<Item = SpecifiedAddr<Ipv4Addr>>,
 ) -> Result<(), Error> {
-    let fwd_entry = |next_hop: &SpecifiedAddr<Ipv4Addr>| fnet_stack::ForwardingEntry {
-        subnet: DEFAULT_SUBNET,
-        device_id: device_id.get(),
-        next_hop: Some(Box::new(fnet::IpAddress::Ipv4(fnet::Ipv4Address {
-            addr: next_hop.get().ipv4_bytes(),
-        }))),
-        metric: fnet_stack::UNSPECIFIED_METRIC,
+    let route = |next_hop: &SpecifiedAddr<Ipv4Addr>| fnet_routes_ext::Route::<Ipv4> {
+        action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+            outbound_interface: device_id.get(),
+            next_hop: Some(*next_hop),
+        }),
+        destination: DEFAULT_SUBNET,
+        properties: fnet_routes_ext::RouteProperties {
+            specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
+            },
+        },
     };
 
-    let mut errors = Vec::new();
-
     let new_routers = new_routers.into_iter().collect::<HashSet<_>>();
-    for router in new_routers.difference(configured_routers) {
-        match stack.add_forwarding_entry(&fwd_entry(router)).await.map_err(Error::Fidl)? {
-            Ok(()) => (),
-            Err(e) => {
-                errors.push(ForwardingEntryError {
-                    operation: ForwardingEntryOperation::Adding,
-                    device_id,
-                    router: *router,
-                    error: e,
-                });
-            }
+
+    for router in configured_routers.difference(&new_routers) {
+        let removed: bool = route_set
+            .remove_route(
+                &route(router)
+                    .try_into()
+                    .map_err(|e| Error::ApiViolation(anyhow::Error::new(e)))?,
+            )
+            .await
+            .map_err(Error::Fidl)?
+            .map_err(Error::RouteSet)?;
+        if !removed {
+            tracing::warn!("attempt to remove {router} from RouteSet was no-op");
         }
     }
 
-    for router in configured_routers.difference(&new_routers) {
-        match stack.del_forwarding_entry(&fwd_entry(router)).await.map_err(Error::Fidl)? {
-            Ok(()) => (),
-            Err(e) => {
-                errors.push(ForwardingEntryError {
-                    operation: ForwardingEntryOperation::Deleting,
-                    device_id,
-                    router: *router,
-                    error: e,
-                });
-            }
+    for router in new_routers.difference(&configured_routers) {
+        let added: bool = route_set
+            .add_route(
+                &route(router)
+                    .try_into()
+                    .map_err(|e| Error::ApiViolation(anyhow::Error::new(e)))?,
+            )
+            .await
+            .map_err(Error::Fidl)?
+            .map_err(Error::RouteSet)?;
+        if !added {
+            tracing::warn!("attempt to add {router} to RouteSet was no-op");
         }
     }
 
@@ -406,7 +395,7 @@ pub fn merged_configuration_stream(
                     }
                     Err(err) => Some(Err(match err {
                         err @ (Error::ApiViolation(_)
-                        | Error::ForwardingEntry(_)
+                        | Error::RouteSet(_)
                         | Error::Fidl(_)
                         | Error::UnexpectedExit(_)) => err,
                         Error::WrongExitReason(reason) => {
@@ -459,12 +448,30 @@ pub mod testutil {
         pub fn new(
             client: fnet_dhcp::ClientProxy,
             id: NonZeroU64,
-            stack: fnet_stack::StackProxy,
+            route_set: fnet_routes_admin::RouteSetV4Proxy,
             control: fnet_interfaces_ext::admin::Control,
         ) -> DhcpClientTask {
             DhcpClientTask {
                 client: client.clone(),
                 task: fasync::Task::spawn(async move {
+                    let fnet_interfaces_admin::GrantForInterfaceAuthorization {
+                        interface_id,
+                        token,
+                    } = control
+                        .get_authorization_for_interface()
+                        .await
+                        .expect("get interface authorization");
+                    route_set
+                        .authenticate_for_interface(
+                            fnet_interfaces_admin::ProofOfInterfaceAuthorization {
+                                interface_id,
+                                token,
+                            },
+                        )
+                        .await
+                        .expect("authenticate should not have FIDL error")
+                        .expect("authenticate should succeed");
+
                     let mut final_routers =
                         configuration_stream(client)
                             .scan((), |(), item| {
@@ -479,7 +486,7 @@ pub mod testutil {
                                         }) => None,
                                         Error::Fidl(_)
                                         | Error::ApiViolation(_)
-                                        | Error::ForwardingEntry(_)
+                                        | Error::RouteSet(_)
                                         | Error::WrongExitReason(_)
                                         | Error::UnexpectedExit(_)
                                         | Error::MissingExitReason => Some(Err(e)),
@@ -496,7 +503,7 @@ pub mod testutil {
                                      routers: new_routers,
                                  }| {
                                     let control = &control;
-                                    let stack = &stack;
+                                    let route_set = &route_set;
                                     async move {
                                         if let Some(address) = address {
                                             address
@@ -504,9 +511,14 @@ pub mod testutil {
                                                 .expect("add address should succeed");
                                         }
 
-                                        apply_new_routers(id, stack, &mut routers, new_routers)
-                                            .await
-                                            .expect("applying new routers should succeed");
+                                        apply_new_routers(
+                                            id,
+                                            &route_set,
+                                            &mut routers,
+                                            new_routers,
+                                        )
+                                        .await
+                                        .expect("applying new routers should succeed");
                                         Ok(routers)
                                     }
                                 },
@@ -515,7 +527,7 @@ pub mod testutil {
                             .expect("watch_configuration should succeed");
 
                     // DHCP client is being shut down, so we should remove all the routers.
-                    apply_new_routers(id, &stack, &mut final_routers, Vec::new())
+                    apply_new_routers(id, &route_set, &mut final_routers, Vec::new())
                         .await
                         .expect("removing all routers should succeed");
                 }),
@@ -537,7 +549,7 @@ pub mod testutil {
 
 #[cfg(test)]
 mod test {
-    use crate::{ClientExt as _, Error};
+    use crate::{ClientExt as _, Error, DEFAULT_ADDR_PREFIX};
 
     use std::{collections::HashSet, num::NonZeroU64};
 
@@ -546,7 +558,8 @@ mod test {
     use fidl_fuchsia_net as fnet;
     use fidl_fuchsia_net_dhcp as fnet_dhcp;
     use fidl_fuchsia_net_ext::IntoExt as _;
-    use fidl_fuchsia_net_stack as fnet_stack;
+    use fidl_fuchsia_net_routes as fnet_routes;
+    use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
     use fuchsia_async as fasync;
     use futures::{channel::oneshot, join, pin_mut, FutureExt as _, StreamExt as _};
     use net_declare::net_ip_v4;
@@ -725,9 +738,9 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn apply_new_routers() {
-        let (stack_proxy, stack_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_stack::StackMarker>()
-                .expect("create stack proxy and stream");
+        let (route_set, route_set_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fnet_routes_admin::RouteSetV4Marker>()
+                .expect("create route set proxy and stream");
 
         const REMOVED_ROUTER: Ipv4Addr = net_ip_v4!("1.1.1.1");
         const KEPT_ROUTER: Ipv4Addr = net_ip_v4!("2.2.2.2");
@@ -742,7 +755,7 @@ mod test {
 
         let apply_fut = crate::apply_new_routers(
             device_id,
-            &stack_proxy,
+            &route_set,
             &mut configured_routers,
             vec![
                 SpecifiedAddr::new(KEPT_ROUTER).unwrap(),
@@ -751,50 +764,68 @@ mod test {
         )
         .fuse();
 
-        let stack_fut = async move {
-            pin_mut!(stack_stream);
-            let (forwarding_entry, responder) = stack_stream
+        let route_set_fut = async move {
+            pin_mut!(route_set_stream);
+            let (route, responder) = route_set_stream
                 .next()
                 .await
                 .expect("should not have ended")
                 .expect("should not have error")
-                .into_add_forwarding_entry()
-                .expect("should be add forwarding entry");
+                .into_remove_route()
+                .expect("should be remove route");
             assert_eq!(
-                forwarding_entry,
-                fnet_stack::ForwardingEntry {
-                    subnet: crate::DEFAULT_SUBNET,
-                    device_id: device_id.get(),
-                    next_hop: Some(Box::new(net_types::ip::IpAddr::from(ADDED_ROUTER).into_ext())),
-                    metric: fnet_stack::UNSPECIFIED_METRIC,
+                route,
+                fnet_routes::RouteV4 {
+                    destination: DEFAULT_ADDR_PREFIX,
+                    action: fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4 {
+                        outbound_interface: device_id.get(),
+                        next_hop: Some(Box::new(REMOVED_ROUTER.into_ext()))
+                    }),
+                    properties: fnet_routes::RoutePropertiesV4 {
+                        specified_properties: Some(fnet_routes::SpecifiedRouteProperties {
+                            metric: Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                                fnet_routes::Empty
+                            )),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }
                 }
             );
-            responder.send(Ok(())).expect("responder send");
+            responder.send(Ok(true)).expect("responder send");
 
-            let (forwarding_entry, responder) = stack_stream
+            let (route, responder) = route_set_stream
                 .next()
                 .await
                 .expect("should not have ended")
                 .expect("should not have error")
-                .into_del_forwarding_entry()
-                .expect("should be del forwarding entry");
+                .into_add_route()
+                .expect("should be add route");
             assert_eq!(
-                forwarding_entry,
-                fnet_stack::ForwardingEntry {
-                    subnet: crate::DEFAULT_SUBNET,
-                    device_id: device_id.get(),
-                    next_hop: Some(Box::new(fnet::IpAddress::Ipv4(fnet::Ipv4Address {
-                        addr: REMOVED_ROUTER.ipv4_bytes(),
-                    }))),
-                    metric: fnet_stack::UNSPECIFIED_METRIC,
+                route,
+                fnet_routes::RouteV4 {
+                    destination: DEFAULT_ADDR_PREFIX,
+                    action: fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4 {
+                        outbound_interface: device_id.get(),
+                        next_hop: Some(Box::new(ADDED_ROUTER.into_ext()))
+                    }),
+                    properties: fnet_routes::RoutePropertiesV4 {
+                        specified_properties: Some(fnet_routes::SpecifiedRouteProperties {
+                            metric: Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                                fnet_routes::Empty
+                            )),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }
                 }
             );
-            responder.send(Ok(())).expect("responder send");
+            responder.send(Ok(true)).expect("responder send");
         }
         .fuse();
 
-        pin_mut!(apply_fut, stack_fut);
-        let (apply_result, ()) = join!(apply_fut, stack_fut);
+        pin_mut!(apply_fut, route_set_fut);
+        let (apply_result, ()) = join!(apply_fut, route_set_fut);
         apply_result.expect("apply should succeed");
     }
 

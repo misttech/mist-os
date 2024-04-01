@@ -8,9 +8,10 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt as _};
 use fidl_fuchsia_net_ext::FromExt as _;
+use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_name as fnet_name;
-use fidl_fuchsia_net_stack as fnet_stack;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fuchsia_zircon as zx;
 
 use anyhow::Context as _;
@@ -20,12 +21,14 @@ use fuchsia_async::TimeoutExt as _;
 use futures::{channel::oneshot, stream::StreamExt as _, FutureExt};
 use net_types::{ip::Ipv4Addr, SpecifiedAddr};
 use tracing::{info, warn};
+use zx::HandleBased;
 
 use crate::{dns, errors};
 
 #[derive(Debug)]
 pub(super) struct ClientState {
     routers: HashSet<SpecifiedAddr<Ipv4Addr>>,
+    route_set: fnet_routes_admin::RouteSetV4Proxy,
     shutdown_sender: oneshot::Sender<()>,
 }
 
@@ -49,11 +52,10 @@ pub(super) async fn probe_for_presence(provider: &fnet_dhcp::ClientProviderProxy
 
 pub(super) async fn update_configuration(
     interface_id: NonZeroU64,
-    ClientState { shutdown_sender: _, routers: configured_routers }: &mut ClientState,
+    ClientState { shutdown_sender: _, routers: configured_routers, route_set }: &mut ClientState,
     configuration: fnet_dhcp_ext::Configuration,
     dns_servers: &mut DnsServers,
     control: &fnet_interfaces_ext::admin::Control,
-    stack: &fnet_stack::StackProxy,
     lookup_admin: &fnet_name::LookupAdminProxy,
 ) {
     let fnet_dhcp_ext::Configuration {
@@ -101,20 +103,49 @@ pub(super) async fn update_configuration(
     )
     .await;
 
-    fnet_dhcp_ext::apply_new_routers(interface_id, stack, configured_routers, new_routers)
+    fnet_dhcp_ext::apply_new_routers(interface_id, route_set, configured_routers, new_routers)
         .await
         .unwrap_or_else(|e| {
             warn!("error applying new DHCPv4-acquired router configuration: {:?}", e);
         })
 }
 
-pub(super) fn start_client(
+pub(super) async fn start_client(
     interface_id: NonZeroU64,
     interface_name: &str,
     client_provider: &fnet_dhcp::ClientProviderProxy,
+    route_set_provider: &fnet_routes_admin::SetProviderV4Proxy,
+    interface_admin_auth: &fnet_interfaces_admin::GrantForInterfaceAuthorization,
     configuration_streams: &mut ConfigurationStreamMap,
-) -> ClientState {
+) -> Result<ClientState, errors::Error> {
     info!("starting DHCPv4 client for {} (id={})", interface_name, interface_id);
+
+    let (route_set, server_end) =
+        fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
+            .expect("failed to create RouteSetV4 proxy");
+
+    route_set_provider.new_route_set(server_end).expect("create new route set");
+
+    let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id: id, token } =
+        interface_admin_auth;
+
+    route_set
+        .authenticate_for_interface(fnet_interfaces_admin::ProofOfInterfaceAuthorization {
+            interface_id: *id,
+            token: token
+                .duplicate_handle(zx::Rights::TRANSFER)
+                .expect("interface auth grant is guaranteed to have ZX_RIGHT_DUPLICATE"),
+        })
+        .await
+        .map_err(|err| {
+            errors::Error::NonFatal(anyhow::anyhow!(
+                "FIDL error while getting authorization: {}",
+                err
+            ))
+        })?
+        .map_err(|err| {
+            errors::Error::NonFatal(anyhow::anyhow!("error while getting authorization: {:?}", err))
+        })?;
 
     let client = client_provider.new_client_end_ext(interface_id, new_client_params());
     let (shutdown_sender, shutdown_receiver) = oneshot::channel();
@@ -135,7 +166,7 @@ pub(super) fn start_client(
         unreachable!("only one DHCPv4 client may exist on {} (id={})", interface_name, interface_id)
     }
 
-    ClientState { shutdown_sender, routers: Default::default() }
+    Ok(ClientState { shutdown_sender, route_set, routers: Default::default() })
 }
 
 #[derive(Debug)]
@@ -153,7 +184,6 @@ pub(super) async fn stop_client(
     configuration_streams: &mut ConfigurationStreamMap,
     dns_servers: &mut DnsServers,
     control: &fnet_interfaces_ext::admin::Control,
-    stack: &fnet_stack::StackProxy,
     lookup_admin: &fnet_name::LookupAdminProxy,
     already_observed_exit: AlreadyObservedClientExit,
 ) {
@@ -165,12 +195,11 @@ pub(super) async fn stop_client(
         fnet_dhcp_ext::Configuration::default(),
         dns_servers,
         control,
-        stack,
         lookup_admin,
     )
     .await;
 
-    let ClientState { shutdown_sender, routers: _ } = state;
+    let ClientState { shutdown_sender, route_set: _, routers: _ } = state;
 
     let stream: Pin<Box<InterfaceIdTaggedConfigurationStream>> =
         configuration_streams.remove(&interface_id).unwrap_or_else(|| {

@@ -415,6 +415,16 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                                         constants::netstack::COMPONENT_NAME,
                                     )),
                                     fnetemul::Capability::ChildDep(protocol_dep::<
+                                        fnet_routes_admin::SetProviderV4Marker,
+                                    >(
+                                        constants::netstack::COMPONENT_NAME,
+                                    )),
+                                    fnetemul::Capability::ChildDep(protocol_dep::<
+                                        fnet_routes_admin::SetProviderV6Marker,
+                                    >(
+                                        constants::netstack::COMPONENT_NAME,
+                                    )),
+                                    fnetemul::Capability::ChildDep(protocol_dep::<
                                         fnet_name::DnsServerWatcherMarker,
                                     >(
                                         constants::netstack::COMPONENT_NAME,

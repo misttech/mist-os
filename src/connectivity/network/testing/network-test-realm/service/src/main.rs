@@ -20,7 +20,7 @@ use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_stack as fnet_stack;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_test_realm as fntr;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
@@ -951,8 +951,14 @@ impl Controller {
         let client = provider.new_client_ext(id, fnet_dhcp_ext::default_new_client_params());
         let control =
             connect_to_interface_admin_control(id.into(), hermetic_network_connector).await?;
-        let stack = hermetic_network_connector.connect_to_protocol::<fnet_stack::StackMarker>()?;
-        let poll_task = fnet_dhcp_ext::testutil::DhcpClientTask::new(client, id, stack, control);
+        let route_set_provider = hermetic_network_connector
+            .connect_to_protocol::<fnet_routes_admin::SetProviderV4Marker>()?;
+        let (route_set, server_end) =
+            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
+                .expect("creating route set proxy should succeed");
+        route_set_provider.new_route_set(server_end).expect("calling new_route_set should succeed");
+        let poll_task =
+            fnet_dhcp_ext::testutil::DhcpClientTask::new(client, id, route_set, control);
         let _: &mut fnet_dhcp_ext::testutil::DhcpClientTask = vacant_entry.insert(poll_task);
         Ok(())
     }

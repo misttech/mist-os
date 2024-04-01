@@ -175,6 +175,7 @@ fn get_suitable_dhcpv6_prefix(
                 dhcpv4_client: _,
                 dhcpv6_client_state,
                 dhcpv6_pd_config: _,
+                interface_admin_auth: _,
             }) => {
                 let ClientState { prefixes, sockaddr: _ } =
                     dhcpv6_client_state.as_ref().unwrap_or_else(|| {
@@ -205,6 +206,7 @@ fn get_suitable_dhcpv6_prefix(
                     dhcpv4_client: _,
                     dhcpv6_client_state,
                     dhcpv6_pd_config: _,
+                    interface_admin_auth: _,
                 }) => {
                     if let Some(ClientState { prefixes, sockaddr: _ }) = dhcpv6_client_state {
                         prefixes
@@ -354,6 +356,7 @@ impl PrefixProviderHandler {
 
 #[cfg(test)]
 mod tests {
+    use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
     use fuchsia_zircon as zx;
 
     use const_unwrap::const_unwrap_option;
@@ -386,6 +389,7 @@ mod tests {
             dhcpv6_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
             dhcpv6_client_state: Option<ClientState>,
             provisioning: ProvisioningAction,
+            interface_admin_auth: fnet_interfaces_admin::GrantForInterfaceAuthorization,
         ) -> Self {
             Self {
                 interface_naming_id,
@@ -394,10 +398,18 @@ mod tests {
                     dhcpv4_client: crate::Dhcpv4ClientState::NotRunning,
                     dhcpv6_client_state,
                     dhcpv6_pd_config,
+                    interface_admin_auth,
                 }),
                 device_class,
                 provisioning,
             }
+        }
+    }
+
+    fn fake_interface_grant() -> fnet_interfaces_admin::GrantForInterfaceAuthorization {
+        fnet_interfaces_admin::GrantForInterfaceAuthorization {
+            interface_id: 0,
+            token: zx::Event::create(),
         }
     }
 
@@ -518,6 +530,7 @@ mod tests {
                         prefixes: prefixes,
                     }),
                     ProvisioningAction::Local,
+                    fake_interface_grant(),
                 )
             }))
             .collect();
