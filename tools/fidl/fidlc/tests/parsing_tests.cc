@@ -871,5 +871,19 @@ TEST(ParsingTests, BadMissingEqualsValueEnum) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
+TEST(ParsingTests, GoodReservedFieldAllowedWithoutExperimentalFlag) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0209.noformat.test.fidl");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ParsingTests, BadReservedFieldNotAllowedWithExperimentalFlag) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0209.noformat.test.fidl");
+  library.EnableFlag(ExperimentalFlag::kDisallowReserved);
+  library.ExpectFail(ErrReservedNotAllowed);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 }  // namespace
 }  // namespace fidlc

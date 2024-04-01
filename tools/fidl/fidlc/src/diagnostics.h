@@ -419,6 +419,8 @@ constexpr ErrorDef<207, uint32_t, char, uint32_t> ErrTypeShapeIntegerOverflow(
 constexpr ErrorDef<208, Platform> ErrReservedPlatform(
     "platform '{0}' is reserved; choose a different platform name using "
     "@available(platform=\"...\", added=...)");
+constexpr ErrorDef<209> ErrReservedNotAllowed(
+    "FIDL no longer supports reserved table or union fields; use @available instead");
 
 // To add a new error:
 //
@@ -640,6 +642,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0206 */ &ErrReplacedWithoutReplacement,
     /* fi-0207 */ &ErrTypeShapeIntegerOverflow,
     /* fi-0208 */ &ErrReservedPlatform,
+    /* fi-0209 */ &ErrReservedNotAllowed,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

@@ -1127,6 +1127,8 @@ std::unique_ptr<RawLayoutMember> Parser::ParseLayoutMember(RawLayoutMember::Kind
       return Fail();
 
     if (identifier_is_reserved && Peek().kind() == Token::Kind::kSemicolon) {
+      if (experimental_flags_.IsEnabled(ExperimentalFlag::kDisallowReserved))
+        return Fail(ErrReservedNotAllowed);
       return std::make_unique<RawOrdinaledLayoutMember>(scope.GetSourceElement(),
                                                         std::move(attributes), std::move(ordinal));
     }

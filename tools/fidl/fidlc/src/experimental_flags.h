@@ -29,6 +29,10 @@ enum class ExperimentalFlag : uint8_t {
   // Allow any types in error syntax, not just (u)int32 or enums thereof.
   // TODO(https://fxbug.dev/42052574): Currently for FDomain. Remove when allowed everywhere.
   kAllowArbitraryErrorTypes = 1 << 3,
+
+  // Fail when parsing a `reserved` table or union field.
+  // TODO(https://fxbug.dev/330609159): Finish removing reserved fields.
+  kDisallowReserved = 1 << 4,
 };
 
 // The mapping from names to experimental flags.

@@ -30,7 +30,10 @@ template("fidlc") {
          "json_representation is required")
   assert(defined(invoker.sources), "sources is required")
 
-  experimental_flags = []
+  experimental_flags = [
+    # TODO(https://fxbug.dev/330609159): Remove once the migration is done.
+    "disallow_reserved",
+  ]
 
   if (defined(invoker.experimental_flags)) {
     experimental_flags += invoker.experimental_flags
