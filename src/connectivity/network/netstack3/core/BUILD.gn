@@ -173,7 +173,7 @@ rustc_library_with_features("netstack3-core") {
       # TODO(https://fxbug.dev/42086491): Split up large tests.
       # Compiling the tests OOMs on RBE with these variants.
       if (is_coverage || is_asan || is_hwasan || is_fuzzer ||
-          target_cpu == "arm64") {
+          optimize == "sanitizer" || target_cpu == "arm64") {
         test_disable_rbe = true
 
         # This is known to take over 17GB memory locally for coverage.
