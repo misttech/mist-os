@@ -180,7 +180,7 @@ bool AudioDeviceRegistry::ClaimDeviceForControl(std::shared_ptr<Device> device,
 }
 
 // Notify registry clients of this device departure (whether from surprise-removal or error).
-void AudioDeviceRegistry::NotifyRegistriesOfDeviceRemoval(uint64_t removed_device_id) {
+void AudioDeviceRegistry::NotifyRegistriesOfDeviceRemoval(TokenId removed_device_id) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods);
 
   for (auto& weak_registry : registries_) {

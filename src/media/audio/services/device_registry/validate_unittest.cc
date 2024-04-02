@@ -4,6 +4,8 @@
 
 #include "src/media/audio/services/device_registry/validate.h"
 
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <lib/syslog/cpp/macros.h>
@@ -16,6 +18,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/media/audio/services/device_registry/signal_processing_utils.h"
 #include "src/media/audio/services/device_registry/validate_unittest.h"
 
 // These cases unittest the Validate... functions with inputs that cause INFO logging (if any).
@@ -570,6 +573,69 @@ TEST(ValidateTest, ValidateCodecFormatInfo) {
                 .turn_off_delay = 0,
             }}),
             ZX_OK);
+}
+
+// signalprocessing functions
+TEST(ValidateTest, ValidateElements) { EXPECT_EQ(ValidateElements(kElements), ZX_OK); }
+
+TEST(ValidateTest, ValidateElement) {
+  EXPECT_EQ(ValidateElement(kElement1), ZX_OK);
+  EXPECT_EQ(ValidateElement(kElement2), ZX_OK);
+  EXPECT_EQ(ValidateElement(kElement3), ZX_OK);
+  EXPECT_EQ(ValidateElement(kElement4), ZX_OK);
+}
+
+TEST(ValidateTest, MapElements) {
+  auto map = MapElements(kElements);
+  EXPECT_EQ(map.size(), kElements.size());
+
+  EXPECT_EQ(*map.at(*kElement1.id()).type(), *kElement1.type());
+  EXPECT_EQ(*map.at(*kElement1.id()).type_specific()->endpoint()->type(),
+            fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
+
+  EXPECT_EQ(*map.at(*kElement2.id()).type(), *kElement2.type());
+
+  EXPECT_EQ(*map.at(*kElement3.id()).type(), *kElement3.type());
+  EXPECT_TRUE(map.at(*kElement3.id()).can_disable().value_or(false));
+  EXPECT_EQ(map.at(*kElement3.id()).description()->at(255), 'X');
+
+  EXPECT_EQ(*map.at(*kElement4.id()).type(), *kElement4.type());
+  EXPECT_EQ(*map.at(*kElement4.id()).type_specific()->endpoint()->type(),
+            fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
+}
+
+TEST(ValidateTest, ValidateTopologies) {
+  EXPECT_EQ(ValidateTopologies(kTopologies, MapElements(kElements)), ZX_OK);
+}
+
+TEST(ValidateTest, ValidateTopology) {
+  EXPECT_EQ(ValidateTopology(kTopology1234, MapElements(kElements)), ZX_OK);
+  EXPECT_EQ(ValidateTopology(kTopology14, MapElements(kElements)), ZX_OK);
+  EXPECT_EQ(ValidateTopology(kTopology41, MapElements(kElements)), ZX_OK);
+}
+
+TEST(ValidateTest, MapTopologies) {
+  auto map = MapTopologies(kTopologies);
+  EXPECT_EQ(map.size(), 3u);
+
+  EXPECT_EQ(map.at(kTopologyId1234).size(), 3u);
+  EXPECT_EQ(map.at(kTopologyId1234).at(0).processing_element_id_from(), kElementId1);
+  EXPECT_EQ(map.at(kTopologyId1234).at(0).processing_element_id_to(), kElementId2);
+
+  EXPECT_EQ(map.at(kTopologyId14).size(), 1u);
+  EXPECT_EQ(map.at(kTopologyId14).front().processing_element_id_from(), kElementId1);
+  EXPECT_EQ(map.at(kTopologyId14).front().processing_element_id_to(), kElementId4);
+
+  EXPECT_EQ(map.at(kTopologyId41).size(), 1u);
+  EXPECT_EQ(map.at(kTopologyId41).front().processing_element_id_from(), kElementId4);
+  EXPECT_EQ(map.at(kTopologyId41).front().processing_element_id_to(), kElementId1);
+}
+
+// ValidateElementState
+TEST(ValidateTest, ValidateElementState) {
+  EXPECT_EQ(ValidateElementState(kElementState1, kElement1), ZX_OK);
+
+  // Add more cases here
 }
 
 }  // namespace media_audio

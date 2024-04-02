@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.audio/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fit/function.h>
@@ -18,6 +19,8 @@
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
+#include <utility>
 
 #include "src/media/audio/lib/clock/clock.h"
 #include "src/media/audio/services/common/vector_of_weak_ptr.h"
@@ -68,6 +71,8 @@ class Device : public std::enable_shared_from_this<Device> {
   bool CodecStart();
   bool CodecStop();
 
+  bool SetTopology(TopologyId topology_id);
+
   struct RingBufferInfo {
     fuchsia_audio::RingBuffer ring_buffer;
     fuchsia_audio_device::RingBufferProperties properties;
@@ -117,11 +122,15 @@ class Device : public std::enable_shared_from_this<Device> {
 
   bool has_codec_properties() const { return codec_properties_.has_value(); }
   bool has_stream_config_properties() const { return stream_config_properties_.has_value(); }
+  bool checked_for_signalprocessing() const { return supports_signalprocessing_.has_value(); }
+  bool supports_signalprocessing() const { return supports_signalprocessing_.value_or(false); }
   bool has_health_state() const { return health_state_.has_value(); }
   bool dai_format_sets_retrieved() const { return dai_format_sets_retrieved_; }
   bool ring_buffer_format_sets_retrieved() const { return ring_buffer_format_sets_retrieved_; }
   bool has_plug_state() const { return plug_state_.has_value(); }
   bool has_gain_state() const { return gain_state_.has_value(); }
+
+  void SetSignalProcessingSupported(bool is_supported);
 
   // Static object counts, for debugging purposes.
   static inline uint64_t count() { return count_; }
@@ -159,6 +168,12 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveCodecHealthState();
   void RetrieveCodecDaiFormatSets();
   void RetrieveCodecPlugState();
+
+  void RetrieveSignalProcessingState();
+  void RetrieveSignalProcessingTopologies();
+  void RetrieveSignalProcessingElements();
+  void RetrieveCurrentTopology();
+  void RetrieveCurrentElementStates();
 
   bool IsFullyInitialized();
   void OnInitializationResponse();
@@ -250,8 +265,28 @@ class Device : public std::enable_shared_from_this<Device> {
   const std::string name_;
   const fuchsia_audio_device::DeviceType device_type_;
   fuchsia_audio_device::DriverClient driver_client_;
+
+  template <typename ProtocolT>
+  class FidlErrorHandler : public fidl::AsyncEventHandler<ProtocolT> {
+   public:
+    FidlErrorHandler(Device* device, std::string name) : device_(device), name_(std::move(name)) {}
+    FidlErrorHandler() = default;
+    void on_fidl_error(fidl::UnbindInfo info) override;
+
+   private:
+    Device* device_;
+    std::string name_;
+  };
+
   std::optional<fidl::Client<fuchsia_hardware_audio::Codec>> codec_client_;
+  FidlErrorHandler<fuchsia_hardware_audio::Codec> codec_handler_;
+
   std::optional<fidl::Client<fuchsia_hardware_audio::StreamConfig>> stream_config_client_;
+  FidlErrorHandler<fuchsia_hardware_audio::StreamConfig> stream_config_handler_;
+
+  std::optional<fidl::Client<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
+      sig_proc_client_;
+  FidlErrorHandler<fuchsia_hardware_audio_signalprocessing::SignalProcessing> sig_proc_handler_;
 
   // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
   const TokenId token_id_;
@@ -266,6 +301,16 @@ class Device : public std::enable_shared_from_this<Device> {
 
   std::optional<fuchsia_hardware_audio::CodecProperties> codec_properties_;
   std::optional<std::vector<fuchsia_hardware_audio::DaiSupportedFormats>> dai_format_sets_;
+
+  std::optional<bool> supports_signalprocessing_;
+  std::vector<fuchsia_hardware_audio_signalprocessing::Element> sig_proc_elements_;
+  std::vector<fuchsia_hardware_audio_signalprocessing::Topology> sig_proc_topologies_;
+  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>
+      sig_proc_element_map_;
+
+  std::unordered_map<TopologyId, std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>
+      sig_proc_topology_map_;
+  std::optional<TopologyId> current_topology_id_;
 
   bool dai_format_sets_retrieved_ = false;
   bool ring_buffer_format_sets_retrieved_ = false;
@@ -293,21 +338,6 @@ class Device : public std::enable_shared_from_this<Device> {
 
   // Members related to being controlled.
   std::optional<std::weak_ptr<ControlNotify>> control_notify_;
-
-  template <typename ProtocolT>
-  class FidlErrorHandler : public fidl::AsyncEventHandler<ProtocolT> {
-   public:
-    FidlErrorHandler(Device* device, const std::string& name) : device_(device), name_(name) {}
-    FidlErrorHandler() = default;
-    void on_fidl_error(fidl::UnbindInfo info) override;
-
-   private:
-    Device* device_;
-    std::string_view name_;
-  };
-
-  FidlErrorHandler<fuchsia_hardware_audio::Codec> codec_handler_;
-  FidlErrorHandler<fuchsia_hardware_audio::StreamConfig> stream_config_handler_;
 
   // Members related to driver RingBuffer.
   std::optional<fidl::Client<fuchsia_hardware_audio::RingBuffer>> ring_buffer_client_;

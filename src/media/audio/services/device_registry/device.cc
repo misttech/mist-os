@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.audio/cpp/common_types.h>
 #include <fidl/fuchsia.audio/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/markers.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/wire/channel.h>
@@ -27,12 +28,13 @@
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
+#include "src/media/audio/services/device_registry/signal_processing_utils.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
 
-uint64_t NextTokenId() {
-  static uint64_t token_id = 0;
+TokenId NextTokenId() {
+  static TokenId token_id = 0;
   return token_id++;
 }
 
@@ -85,7 +87,6 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
       stream_config_handler_ = {this, "StreamConfig"};
       stream_config_client_ = {driver_client_.stream_config().take().value(), dispatcher,
                                &stream_config_handler_};
-      ring_buffer_handler_ = {this, "RingBuffer"};
       break;
     case fuchsia_audio_device::DeviceType::kComposite:
       ADR_WARN_METHOD() << "Composite device type is not yet implemented";
@@ -110,6 +111,7 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
 Device::~Device() {
   ADR_LOG_METHOD(kLogObjectLifetimes);
   --count_;
+
   LogObjectCounts();
 }
 
@@ -118,18 +120,58 @@ template <>
 void Device::FidlErrorHandler<fuchsia_hardware_audio::RingBuffer>::on_fidl_error(
     fidl::UnbindInfo info) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogDeviceState) << "(RingBuffer)";
-
   if (device_->state_ == State::Error) {
     ADR_WARN_METHOD() << "device already has an error; no device state to unwind";
-    return;
-  }
-
-  if (!info.is_peer_closed() && !info.is_user_initiated()) {
-    ADR_WARN_METHOD() << name_ << " disconnected: " << info;
-    device_->OnError(info.status());
-  } else {
+  } else if (info.is_peer_closed() || info.is_user_initiated()) {
     ADR_LOG_METHOD(kLogRingBufferFidlResponses) << name_ << " disconnected: " << info;
     device_->DeviceDroppedRingBuffer();
+  } else {
+    ADR_WARN_METHOD() << name_ << " disconnected: " << info;
+    device_->OnError(info.status());
+  }
+  device_->ring_buffer_client_.reset();
+}
+
+// Invoked when a SignalProcessing channel drops. This can occur during device initialization.
+template <>
+void Device::FidlErrorHandler<fuchsia_hardware_audio_signalprocessing::SignalProcessing>::
+    on_fidl_error(fidl::UnbindInfo info) {
+  ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogDeviceState) << "(SignalProcessing)";
+  // If a device already encountered some other error, disconnects like this are not unexpected.
+  if (device_->state_ == State::Error) {
+    ADR_WARN_METHOD() << "(signalprocessing) device already has error; no state to unwind";
+    return;
+  }
+  // Check whether this occurred as a normal part of checking for signalprocessing support.
+  if (info.is_peer_closed() && info.status() == ZX_ERR_NOT_SUPPORTED) {
+    ADR_LOG_METHOD(kLogSignalProcessingFidlResponses || kLogDeviceState)
+        << name_ << ": signalprocessing not supported: " << info;
+    device_->SetSignalProcessingSupported(false);
+    return;
+  }
+  // Otherwise, we might just be unwinding this device (device-removal, or service shut-down).
+  if (info.is_peer_closed() || info.is_user_initiated()) {
+    ADR_LOG_METHOD(kLogSignalProcessingFidlResponses || kLogDeviceState)
+        << name_ << "(signalprocessing) disconnected: " << info;
+    device_->SetSignalProcessingSupported(false);
+    return;
+  }
+  // If none of the above, this driver's FIDL connection is now in doubt. Mark it as in ERROR.
+  ADR_WARN_METHOD() << name_ << "(signalprocessing) disconnected: " << info;
+  device_->SetSignalProcessingSupported(false);
+  device_->OnError(info.status());
+
+  device_->sig_proc_client_.reset();
+}
+
+void Device::SetSignalProcessingSupported(bool is_supported) {
+  auto first_set_of_signalprocessing_support = !supports_signalprocessing_.has_value();
+
+  supports_signalprocessing_ = is_supported;
+
+  // Only poke the initialization state machine the FIRST time this is called.
+  if (first_set_of_signalprocessing_support) {
+    OnInitializationResponse();
   }
 }
 
@@ -158,6 +200,12 @@ void Device::OnRemoval() {
     DropControl();  // Probably unneeded (the Device is going away) but makes unwind "complete".
     ForEachObserver([](auto obs) { obs->DeviceIsRemoved(); });  // Our control is also an observer.
   }
+
+  ring_buffer_client_.reset();
+  sig_proc_client_.reset();
+  codec_client_.reset();
+  stream_config_client_.reset();
+
   LogObjectCounts();
 
   // Regardless of whether device was pending / operational / unhealthy, notify the state watcher.
@@ -199,16 +247,16 @@ void Device::OnError(zx_status_t error) {
     pw->DeviceHasError(shared_from_this());
   }
 }
-
 bool Device::IsFullyInitialized() {
   switch (device_type_) {
     case fuchsia_audio_device::DeviceType::kCodec:
-      return has_codec_properties() && has_health_state() && dai_format_sets_retrieved() &&
-             has_plug_state();
+      return has_codec_properties() && has_health_state() && checked_for_signalprocessing() &&
+             dai_format_sets_retrieved() && has_plug_state();
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
       return has_stream_config_properties() && has_health_state() &&
-             ring_buffer_format_sets_retrieved() && has_gain_state() && has_plug_state();
+             checked_for_signalprocessing() && ring_buffer_format_sets_retrieved() &&
+             has_gain_state() && has_plug_state();
     case fuchsia_audio_device::DeviceType::kComposite:
       ADR_WARN_METHOD() << "Don't yet support Composite";
       return false;
@@ -238,6 +286,7 @@ void Device::OnInitializationResponse() {
           << " (RECEIVED|pending)"                                                 //
           << "   " << (has_codec_properties() ? "PROPS" : "props")                 //
           << "   " << (has_health_state() ? "HEALTH" : "health")                   //
+          << "   " << (checked_for_signalprocessing() ? "SIGPROC" : "sigproc")     //
           << "   " << (dai_format_sets_retrieved() ? "DAIFORMATS" : "daiformats")  //
           << "   " << (has_plug_state() ? "PLUG" : "plug");
       break;
@@ -247,6 +296,7 @@ void Device::OnInitializationResponse() {
           << " (RECEIVED|pending)"                                                         //
           << "   " << (has_stream_config_properties() ? "PROPS" : "props")                 //
           << "   " << (has_health_state() ? "HEALTH" : "health")                           //
+          << "   " << (checked_for_signalprocessing() ? "SIGPROC" : "sigproc")             //
           << "   " << (ring_buffer_format_sets_retrieved() ? "RB_FORMATS" : "rb_formats")  //
           << "   " << (has_plug_state() ? "PLUG" : "plug")                                 //
           << "   " << (has_gain_state() ? "GAIN" : "gain");
@@ -334,7 +384,7 @@ bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
-    FX_LOGS(WARNING) << "Device(" << this << ")::" << __func__ << ": unhealthy, cannot be observed";
+    ADR_WARN_METHOD() << ": unhealthy, cannot be observed";
     return false;
   }
   for (auto weak_obs = observers_.begin(); weak_obs < observers_.end(); ++weak_obs) {
@@ -352,6 +402,10 @@ bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
 
   // For this new observer, "catch it up" on the current state.
   //
+  // Current signalprocessing topology.
+
+  // ElementState for each signalprocessing element.
+
   // GainState -- if StreamConfig.
   if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
       device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
@@ -452,12 +506,14 @@ void Device::Initialize() {
   if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
     RetrieveCodecProperties();
     RetrieveCodecHealthState();
+    RetrieveSignalProcessingState();
     RetrieveCodecDaiFormatSets();
     RetrieveCodecPlugState();
   } else if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
              device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
     RetrieveStreamProperties();
     RetrieveStreamHealthState();
+    RetrieveSignalProcessingState();
     RetrieveStreamRingBufferFormatSets();
     RetrieveStreamPlugState();
     RetrieveGainState();
@@ -496,7 +552,7 @@ bool Device::LogResultError(const ResultT& result, const char* debug_context) {
 template <typename ResultT>
 bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_context) {
   if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error; ignoring this";
+    ADR_WARN_METHOD() << debug_context << ": device already has an error";
     return true;
   }
   if (result.is_error()) {
@@ -516,6 +572,7 @@ void Device::RetrieveStreamProperties() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
     return;
   }
   // TODO(https://fxbug.dev/42064765): handle command timeouts
@@ -569,6 +626,7 @@ void Device::RetrieveCodecProperties() {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
 
   if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
     return;
   }
   // TODO(https://fxbug.dev/113429): handle command timeouts
@@ -649,6 +707,10 @@ void Device::RetrieveRingBufferFormatSets(
         ring_buffer_format_sets_callback) {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls || kLogRingBufferMethods);
 
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
   // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   (*stream_config_client_)
@@ -672,12 +734,234 @@ void Device::RetrieveRingBufferFormatSets(
       });
 }
 
+void Device::RetrieveSignalProcessingState() {
+  ADR_LOG_METHOD(kLogDeviceMethods);
+
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+
+  auto endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
+  if (!endpoints.is_ok()) {
+    ADR_WARN_METHOD() << "unable to create SignalProcessing endpoints: "
+                      << endpoints.status_string();
+    OnError(endpoints.status_value());
+    return;
+  }
+  auto [sig_proc_client_end, sig_proc_server_end] = std::move(endpoints.value());
+
+  // TODO(https://fxbug.dev/113429): handle command timeouts
+
+  if (device_type() == fuchsia_audio_device::DeviceType::kCodec) {
+    ADR_LOG_METHOD(kLogCodecFidlCalls) << "calling SignalProcessingConnect";
+    if (!codec_client_->is_valid()) {
+      return;
+    }
+    auto status = (*codec_client_)->SignalProcessingConnect(std::move(sig_proc_server_end));
+
+    if (status.is_error()) {
+      if (status.error_value().is_canceled()) {
+        // These indicate that we are already shutting down, so they aren't error conditions.
+        ADR_LOG_METHOD(kLogCodecFidlResponses)
+            << "SignalProcessingConnect response will take no action on error "
+            << status.error_value().FormatDescription();
+        return;
+      }
+
+      FX_PLOGS(ERROR, status.error_value().status()) << __func__ << " returned error:";
+      OnError(status.error_value().status());
+      return;
+    }
+  } else if (device_type() == fuchsia_audio_device::DeviceType::kInput ||
+             device_type() == fuchsia_audio_device::DeviceType::kOutput) {
+    ADR_LOG_METHOD(kLogStreamConfigFidlCalls) << "calling SignalProcessingConnect";
+    if (!stream_config_client_->is_valid()) {
+      return;
+    }
+
+    auto status = (*stream_config_client_)->SignalProcessingConnect(std::move(sig_proc_server_end));
+
+    if (status.is_error()) {
+      if (status.error_value().is_canceled()) {
+        // These indicate that we are already shutting down, so they aren't error conditions.
+        ADR_LOG_METHOD(kLogStreamConfigFidlResponses)
+            << "SignalProcessingConnect response will take no action on error "
+            << status.error_value().FormatDescription();
+        return;
+      }
+
+      FX_PLOGS(ERROR, status.error_value().status()) << __func__ << " returned error:";
+      OnError(status.error_value().status());
+      return;
+    }
+  }
+
+  sig_proc_client_.emplace();
+  sig_proc_handler_ = {this, "SignalProcessing"};
+  sig_proc_client_->Bind(std::move(sig_proc_client_end), dispatcher_, &sig_proc_handler_);
+
+  RetrieveSignalProcessingElements();
+}
+
+void Device::RetrieveSignalProcessingElements() {
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+
+  (*sig_proc_client_)
+      ->GetElements()
+      .Then(
+          [this](
+              fidl::Result<fuchsia_hardware_audio_signalprocessing::SignalProcessing::GetElements>&
+                  result) {
+            std::string context("signalprocessing::GetElements response");
+            if (result.is_error() && result.error_value().is_domain_error() &&
+                result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED) {
+              ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context << ": NOT_SUPPORTED";
+
+              SetSignalProcessingSupported(false);
+              return;
+            }
+            if (LogResultError(result, context.c_str())) {
+              return;
+            }
+
+            ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
+            auto status = ValidateElements(result->processing_elements());
+            if (status != ZX_OK) {
+              OnError(status);
+              return;
+            }
+
+            sig_proc_elements_ = result->processing_elements();
+            sig_proc_element_map_ = MapElements(sig_proc_elements_);
+            if (sig_proc_element_map_.empty()) {
+              OnError(ZX_ERR_INVALID_ARGS);
+              return;
+            }
+            RetrieveSignalProcessingTopologies();
+          });
+}
+
+void Device::RetrieveSignalProcessingTopologies() {
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+  if (state_ == State::Error || (checked_for_signalprocessing() && !supports_signalprocessing())) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  FX_DCHECK(sig_proc_client_->is_valid());
+
+  (*sig_proc_client_)
+      ->GetTopologies()
+      .Then([this](fidl::Result<
+                   fuchsia_hardware_audio_signalprocessing::SignalProcessing::GetTopologies>&
+                       result) {
+        std::string context("signalprocessing::GetTopologies response");
+        if (result.is_error() && result.error_value().is_domain_error() &&
+            result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED) {
+          SetSignalProcessingSupported(false);
+          return;
+        }
+        if (LogResultError(result, context.c_str())) {
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
+        auto status = ValidateTopologies(result->topologies(), sig_proc_element_map_);
+        if (status != ZX_OK) {
+          OnError(status);
+          return;
+        }
+
+        sig_proc_topologies_ = result->topologies();
+        sig_proc_topology_map_ = MapTopologies(sig_proc_topologies_);
+        if (sig_proc_topology_map_.empty()) {
+          OnError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+
+        SetSignalProcessingSupported(true);
+
+        // Now we know we support signalprocessing: query the current topology/element states.
+        RetrieveCurrentTopology();
+        RetrieveCurrentElementStates();
+      });
+}
+
+void Device::RetrieveCurrentTopology() {
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  FX_DCHECK(sig_proc_client_->is_valid());
+
+  (*sig_proc_client_)
+      ->WatchTopology()
+      .Then([this](fidl::Result<
+                   fuchsia_hardware_audio_signalprocessing::SignalProcessing::WatchTopology>&
+                       result) {
+        std::string context("signalprocessing::WatchTopology response");
+        if (LogResultFrameworkError(result, context.c_str())) {
+          return;
+        }
+
+        TopologyId topology_id = result->topology_id();
+        auto match = sig_proc_topology_map_.find(topology_id);
+        if (match == sig_proc_topology_map_.end()) {
+          ADR_WARN_OBJECT() << context << ": topology_id " << topology_id << " not found";
+          OnError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+
+        if (!current_topology_id_.has_value() || *current_topology_id_ != topology_id) {
+          current_topology_id_ = topology_id;
+        }
+      });
+}
+
+void Device::RetrieveCurrentElementStates() {
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  FX_DCHECK(sig_proc_client_->is_valid());
+
+  for (auto& element_pair : sig_proc_element_map_) {
+    const auto& element = element_pair.second;
+    (*sig_proc_client_)
+        ->WatchElementState({{.processing_element_id = element_pair.first}})
+        .Then([this, element](
+                  fidl::Result<
+                      fuchsia_hardware_audio_signalprocessing::SignalProcessing::WatchElementState>&
+                      result) {
+          std::string context("signalprocessing::WatchElementState response");
+          if (LogResultFrameworkError(result, context.c_str())) {
+            return;
+          }
+
+          auto element_state = result->state();
+          if (auto status = ValidateElementState(element_state, element); status != ZX_OK) {
+            OnError(status);
+            return;
+          }
+
+          // Save the initial element state, for Observers
+        });
+  }
+}
+
 void Device::RetrieveCodecDaiFormatSets() {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
   RetrieveDaiFormatSets(
       [this](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_format_sets) {
         if (state_ == State::Error) {
-          ADR_WARN_OBJECT() << "device has an error while retrieving initial DAI formats";
+          ADR_WARN_METHOD() << "device already has an error";
           return;
         }
         dai_format_sets_ = std::vector<fuchsia_hardware_audio::DaiSupportedFormats>();
@@ -695,9 +979,9 @@ void Device::RetrieveDaiFormatSets(
   ADR_LOG_METHOD(kLogCodecFidlCalls);
 
   if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-
   // TODO(https://fxbug.dev/113429): handle command timeouts
 
   (*codec_client_)
@@ -722,6 +1006,7 @@ void Device::RetrieveGainState() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
     return;
   }
   if (!has_gain_state()) {
@@ -769,6 +1054,7 @@ void Device::RetrieveStreamPlugState() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
     return;
   }
   if (!has_plug_state()) {
@@ -817,6 +1103,7 @@ void Device::RetrieveCodecPlugState() {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
 
   if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
     return;
   }
   if (!has_plug_state()) {
@@ -866,9 +1153,9 @@ void Device::RetrieveStreamHealthState() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-
   // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   (*stream_config_client_)
@@ -902,9 +1189,9 @@ void Device::RetrieveCodecHealthState() {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
 
   if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-
   // TODO(https://fxbug.dev/113429): handle command timeouts, because that's the most likely
   // indicator of an unhealthy driver/device.
 
@@ -945,6 +1232,11 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
       .device_type = device_type_,
       .device_name = name_,
   }};
+  // Required for Composite; optional for Codec, Dai and StreamConfig:
+  if (supports_signalprocessing()) {
+    info.signal_processing_elements(sig_proc_elements_);
+    info.signal_processing_topologies(sig_proc_topologies_);
+  }
   if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
     // Optional for all device types.
     info.manufacturer(codec_properties_->manufacturer())
@@ -1121,7 +1413,7 @@ bool Device::SetGain(fuchsia_hardware_audio::GainState& gain_state) {
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "Device has previous error; cannot set gain";
+    ADR_WARN_METHOD() << "device already has an error";
     return false;
   }
   if (!GetControlNotify()) {
@@ -1177,9 +1469,10 @@ bool Device::CodecSetDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_form
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "Codec has previous error; cannot SetDaiFormat";
+    ADR_WARN_METHOD() << "device already has an error";
     return false;
   }
+  // TODO(https://fxbug.dev/113429): handle command timeouts
   if (!GetControlNotify()) {
     ADR_WARN_METHOD() << "Codec must be controlled before SetDaiFormat can be called";
     return false;
@@ -1267,9 +1560,10 @@ bool Device::CodecReset() {
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "Codec has previous error; cannot Reset";
+    ADR_WARN_METHOD() << "device already has an error";
     return false;
   }
+  // TODO(https://fxbug.dev/113429): handle command timeouts
   if (!GetControlNotify()) {
     ADR_WARN_METHOD() << "Codec must be controlled before Reset can be called";
     return false;
@@ -1317,9 +1611,10 @@ bool Device::CodecStart() {
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "Codec has previous error; cannot Start";
+    ADR_WARN_METHOD() << "device already has an error";
     return false;
   }
+  // TODO(https://fxbug.dev/113429): handle command timeouts
   if (!GetControlNotify()) {
     ADR_WARN_METHOD() << "Codec must be controlled before Start can be called";
     return false;
@@ -1370,9 +1665,10 @@ bool Device::CodecStop() {
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "Codec has previous error; cannot Stop";
+    ADR_WARN_METHOD() << "device already has an error";
     return false;
   }
+  // TODO(https://fxbug.dev/113429): handle command timeouts
   if (!GetControlNotify()) {
     ADR_WARN_METHOD() << "Codec must be controlled before Stop can be called";
     return false;
@@ -1431,6 +1727,11 @@ bool Device::CreateRingBuffer(const fuchsia_hardware_audio::Format& format,
 bool Device::ConnectRingBufferFidl(fuchsia_hardware_audio::Format driver_format) {
   ADR_LOG_METHOD(kLogRingBufferMethods || kLogRingBufferFidlCalls);
 
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return false;
+  }
+
   auto status = ValidateRingBufferFormat(driver_format);
   if (status != ZX_OK) {
     OnError(status);
@@ -1462,6 +1763,7 @@ bool Device::ConnectRingBufferFidl(fuchsia_hardware_audio::Format driver_format)
   }
 
   ring_buffer_client_.emplace();
+  ring_buffer_handler_ = {this, "RingBuffer"};
   ring_buffer_client_->Bind(std::move(endpoints->client), dispatcher_, &ring_buffer_handler_);
 
   std::optional<fuchsia_audio::SampleType> sample_type;
@@ -1612,7 +1914,7 @@ void Device::GetVmo(uint32_t min_frames, uint32_t position_notifications_per_rin
 void Device::CheckForRingBufferReady() {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses);
   if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device has previous error; cannot CheckForRingBufferReady";
+    ADR_WARN_METHOD() << "device already has an error";
     return;
   }
 

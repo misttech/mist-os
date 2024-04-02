@@ -310,7 +310,7 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   received_callback = false;
-  std::optional<uint64_t> removed_device_id;
+  std::optional<TokenId> removed_device_id;
 
   registry->client()->WatchDeviceRemoved().Then(
       [&received_callback,
@@ -663,7 +663,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   received_callback = false;
-  std::optional<uint64_t> removed_device_id;
+  std::optional<TokenId> removed_device_id;
 
   registry->client()->WatchDeviceRemoved().Then(
       [&received_callback,

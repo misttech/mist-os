@@ -5,6 +5,7 @@
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 #include <fuchsia/hardware/audio/cpp/fidl.h>
+#include <fuchsia/hardware/audio/signalprocessing/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/unified_messaging_declarations.h>
 #include <lib/fidl/cpp/wire/channel.h>
@@ -51,10 +52,10 @@ fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> FakeStreamConfig::Enable()
 }
 
 void FakeStreamConfig::DropStreamConfig() {
-  if (stream_config_binding_.has_value()) {
-    ADR_LOG_METHOD(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
+  DropRingBuffer();
 
-    DropRingBuffer();
+  if (stream_config_binding_.has_value()) {
     stream_config_binding_->Close(ZX_ERR_PEER_CLOSED);
     stream_config_binding_.reset();
   }
@@ -326,6 +327,10 @@ void FakeStreamConfig::CreateRingBuffer(
 void FakeStreamConfig::SignalProcessingConnect(
     fidl::InterfaceRequest<fha::signalprocessing::SignalProcessing> signal_processing_request) {
   ADR_LOG_METHOD(kLogFakeStreamConfig);
+
+  signal_processing_binding_.emplace(this);
+  signal_processing_binding_->Bind(signal_processing_request.TakeChannel(), dispatcher_);
+  signal_processing_binding_->Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 // RingBuffer methods

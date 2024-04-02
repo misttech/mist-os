@@ -6,6 +6,7 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
@@ -37,7 +38,7 @@ namespace media_audio {
 inline constexpr bool kLogMain = true;
 
 inline constexpr bool kLogDeviceDetection = false;
-inline constexpr bool kLogDeviceInitializationProgress = false;
+inline constexpr bool kLogDeviceInitializationProgress = true;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
 inline constexpr bool kLogSummaryFinalDeviceInfo = true;
 inline constexpr bool kLogDetailedFinalDeviceInfo = false;
@@ -46,7 +47,7 @@ inline constexpr bool kLogDeviceMethods = false;
 
 inline constexpr bool kLogObjectLifetimes = false;
 inline constexpr bool kLogDeviceState = false;
-inline constexpr bool kLogObjectCounts = false;
+inline constexpr bool kLogObjectCounts = true;
 inline constexpr bool kLogNotifyMethods = false;
 
 // Driver FIDL methods
@@ -57,6 +58,10 @@ inline constexpr bool kLogStreamConfigFidlResponseValues = false;
 inline constexpr bool kLogCodecFidlCalls = false;
 inline constexpr bool kLogCodecFidlResponses = false;
 inline constexpr bool kLogCodecFidlResponseValues = false;
+
+inline constexpr bool kLogSignalProcessingFidlCalls = true;
+inline constexpr bool kLogSignalProcessingFidlResponses = true;
+inline constexpr bool kLogSignalProcessingFidlResponseValues = true;
 
 inline constexpr bool kLogRingBufferMethods = false;
 inline constexpr bool kLogRingBufferFidlCalls = false;
@@ -92,6 +97,13 @@ void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_pro
 void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> format_info);
 
 void LogDeviceInfo(const fuchsia_audio_device::Info& device_info);
+
+void LogElements(const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements);
+void LogTopologies(
+    const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies);
+void LogElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
+void LogTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology);
+void LogElementState(const fuchsia_hardware_audio_signalprocessing::ElementState& element_state);
 
 void LogRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
@@ -202,20 +214,66 @@ inline std::ostream& operator<<(std::ostream& out,
 
 inline std::ostream& operator<<(
     std::ostream& out,
-    const std::optional<fuchsia_hardware_audio_signalprocessing::Element>& sp_element) {
-  if (sp_element) {
-    return (out << "DISPLAY IS UNSUPPORTED (for now)");
+    const std::optional<fuchsia_hardware_audio_signalprocessing::ElementType>& element_type) {
+  if (element_type.has_value()) {
+    switch (*element_type) {
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kVendorSpecific:
+        return (out << "VENDOR_SPECIFIC");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kConnectionPoint:
+        return (out << "CONNECTION_POINT");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kGain:
+        return (out << "GAIN");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kAutomaticGainControl:
+        return (out << "AUTOMATIC_GAIN_CONTROL");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kAutomaticGainLimiter:
+        return (out << "AUTOMATIC_GAIN_LIMITER");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kDynamics:
+        return (out << "DYNAMICS");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kMute:
+        return (out << "MUTE");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kDelay:
+        return (out << "DELAY");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kEqualizer:
+        return (out << "EQUALIZER");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kSampleRateConversion:
+        return (out << "SAMPLE_RATE_CONVERSION");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint:
+        return (out << "ENDPOINT");
+      default:
+        return (out << "OTHER (unknown enum)");
+    }
   }
-  return (out << "NONE");
+  return (out << "<none> (non-compliant)");
 }
-
 inline std::ostream& operator<<(
     std::ostream& out,
-    const std::optional<fuchsia_hardware_audio_signalprocessing::Topology>& sp_topology) {
-  if (sp_topology) {
-    return (out << "DISPLAY IS UNSUPPORTED (for now)");
+    const std::optional<fuchsia_hardware_audio_signalprocessing::Endpoint>& endpoint) {
+  if (endpoint->type().has_value()) {
+    switch (*endpoint->type()) {
+      case fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect:
+        out << "DAI_INTERCONNECT ";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer:
+        out << "RING_BUFFER      ";
+        break;
+      default:
+        out << "OTHER (unknown)  ";
+        break;
+    }
+  } else {
+    out << "<none type>, ";
   }
-  return (out << "NONE");
+  if (endpoint->plug_detect_capabilities().has_value()) {
+    switch (*endpoint->plug_detect_capabilities()) {
+      case fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired:
+        return (out << "HARDWIRED");
+      case fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify:
+        return (out << "PLUGGABLE");
+      default:
+        return (out << "OTHER (unknown PlugDetectCapabilities enum)");
+    }
+  }
+  return (out << "<none plug_caps>");
 }
 
 inline std::ostream& operator<<(std::ostream& out, const fuchsia_audio::SampleType& sample_type) {
@@ -254,7 +312,7 @@ inline std::ostream& operator<<(
         return (out << "[UNKNOWN]");
     }
   }
-  return (out << "NONE (non-compliant)");
+  return (out << "<none> (non-compliant)");
 }
 inline std::ostream& operator<<(
     std::ostream& out,
@@ -269,7 +327,7 @@ inline std::ostream& operator<<(
         return (out << "OTHER (unknown enum)");
     }
   }
-  return (out << "NONE (non-compliant)");
+  return (out << "<none>");
 }
 inline std::ostream& operator<<(std::ostream& out,
                                 const fuchsia_audio_device::PlugState& plug_state) {

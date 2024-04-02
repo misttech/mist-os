@@ -96,7 +96,7 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
  private:
   static inline const std::string_view kClassName = "AudioDeviceRegistry";
 
-  void NotifyRegistriesOfDeviceRemoval(uint64_t removed_device_id);
+  void NotifyRegistriesOfDeviceRemoval(TokenId removed_device_id);
 
   std::shared_ptr<DeviceDetector> device_detector_;
 

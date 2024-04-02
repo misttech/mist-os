@@ -5,9 +5,8 @@
 #ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_STREAM_CONFIG_H_
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_STREAM_CONFIG_H_
 
-#include <fidl/fuchsia.hardware.audio/cpp/markers.h>
-#include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <fuchsia/hardware/audio/cpp/fidl.h>
+#include <fuchsia/hardware/audio/signalprocessing/cpp/fidl.h>
 #include <lib/async/cpp/time.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fidl/cpp/wire/channel.h>
@@ -29,6 +28,7 @@ namespace media_audio {
 
 // This driver implements the audio driver interface and is configurable to simulate audio hardware.
 class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
+                         public fuchsia::hardware::audio::signalprocessing::SignalProcessing,
                          public fuchsia::hardware::audio::RingBuffer {
   static inline constexpr bool kLogFakeStreamConfig = false;
 
@@ -187,6 +187,18 @@ class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
       fidl::InterfaceRequest<fuchsia::hardware::audio::signalprocessing::SignalProcessing>
           signal_processing_request) final;
 
+  // fuchsia hardware audio signalprocessing SignalProcessing Interface
+  // These won't be called until SignalProcessingConnect is implemented, but we'll be safe.
+  void GetElements(GetElementsCallback callback) override {}
+  void WatchElementState(ElementId processing_element_id,
+                         WatchElementStateCallback callback) override {}
+  void GetTopologies(GetTopologiesCallback callback) override {}
+  void WatchTopology(WatchTopologyCallback callback) override {}
+  void SetElementState(ElementId processing_element_id,
+                       fuchsia::hardware::audio::signalprocessing::ElementState state,
+                       SetElementStateCallback callback) override {}
+  void SetTopology(TopologyId topology_id, SetTopologyCallback callback) override {}
+
   // fuchsia hardware audio RingBuffer Interface
   void GetProperties(fuchsia::hardware::audio::RingBuffer::GetPropertiesCallback callback) final;
   void WatchClockRecoveryPositionInfo(
@@ -265,6 +277,8 @@ class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
   zx::channel stream_config_client_end_;
 
   std::optional<fidl::Binding<fuchsia::hardware::audio::RingBuffer>> ring_buffer_binding_;
+  std::optional<fidl::Binding<fuchsia::hardware::audio::signalprocessing::SignalProcessing>>
+      signal_processing_binding_;
 
   bool position_notification_values_are_set_ = false;
   zx::time position_notify_timestamp_mono_;

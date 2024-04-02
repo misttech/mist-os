@@ -5,6 +5,7 @@
 #include "src/media/audio/services/device_registry/logging.h"
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
@@ -12,6 +13,7 @@
 #include <iomanip>
 #include <string>
 
+#include "fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h"
 #include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/control_creator_server.h"
 #include "src/media/audio/services/device_registry/control_server.h"
@@ -350,6 +352,206 @@ void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> f
                                                   : "<none>");
 }
 
+void LogElementState(const fuchsia_hardware_audio_signalprocessing::ElementState& element_state) {
+  if constexpr (!kLogSignalProcessingFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/ElementState";
+
+  if (element_state.type_specific().has_value()) {
+    switch (element_state.type_specific()->Which()) {
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kVendorSpecific:
+        FX_LOGS(INFO) << "    type_specific         VendorSpecific";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kGain:
+        FX_LOGS(INFO) << "    type_specific         Gain";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEqualizer:
+        FX_LOGS(INFO) << "    type_specific         Equalizer";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kDynamics:
+        FX_LOGS(INFO) << "    type_specific         Dynamics";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint:
+        FX_LOGS(INFO) << "    type_specific         Endpoint";
+        break;
+      default:
+        FX_LOGS(INFO) << "    type_specific         <unknown union>  (non-compliant)";
+        break;
+    }
+  } else {
+    FX_LOGS(INFO) << "    type_specific         <none>";
+  }
+
+  FX_LOGS(INFO) << "    enabled               "
+                << (element_state.enabled().has_value()
+                        ? (*element_state.enabled() ? "TRUE" : "FALSE")
+                        : "<none>");
+
+  if (element_state.latency().has_value()) {
+    switch (element_state.latency()->Which()) {
+      case fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime:
+        FX_LOGS(INFO) << "    latency (time)";
+        if (element_state.latency()->latency_time().has_value()) {
+          FX_LOGS(INFO) << "                          "
+                        << element_state.latency()->latency_time().value() << " ns";
+        } else {
+          FX_LOGS(INFO) << "                          <none> ns (non-compliant)";
+        }
+        break;
+      case fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyFrames:
+        FX_LOGS(INFO) << "    latency (frames)";
+        if (element_state.latency()->latency_frames().has_value()) {
+          FX_LOGS(INFO) << "                          "
+                        << element_state.latency()->latency_frames().value() << " frames";
+        } else {
+          FX_LOGS(INFO) << "                          <none> frames (non-compliant)";
+        }
+        break;
+      default:
+        FX_LOGS(INFO) << "    latency <unknown union>  ( non-compliant)";
+        break;
+    }
+  } else {
+    FX_LOGS(INFO) << "    latency               <none>";
+  }
+
+  if (element_state.vendor_specific_data().has_value()) {
+    FX_LOGS(INFO) << "    vendor_specific_data  [" << element_state.vendor_specific_data()->size()
+                  << "]  (not shown here)"
+                  << (element_state.vendor_specific_data()->empty() ? " (non-compliant)" : "");
+  } else {
+    FX_LOGS(INFO) << "    vendor_specific_data  <none>";
+  }
+}
+
+void LogElementInternal(const fuchsia_hardware_audio_signalprocessing::Element& element,
+                        std::string indent, std::optional<size_t> index = std::nullopt,
+                        std::string_view addl_indent = "") {
+  std::string first_indent{indent};
+  if (index.has_value()) {
+    first_indent.append("[")
+        .append(std::to_string(*index))
+        .append("]")
+        .append(addl_indent.substr(3));
+  } else {
+    first_indent.append(addl_indent);
+  }
+  indent.append(addl_indent);
+
+  FX_LOGS(INFO) << first_indent << "id               "
+                << (element.id() ? std::to_string(*element.id()) : "<none> (non-compliant)");
+  FX_LOGS(INFO) << indent << "type             " << element.type();
+
+  std::ostringstream type_specific;
+  type_specific << "type_specific    ";
+  if (element.type_specific()) {
+    switch (element.type_specific()->Which()) {
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kVendorSpecific:
+        type_specific << "vendor_specific";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kGain:
+        type_specific << "gain";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kEqualizer:
+        type_specific << "equalizer";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kDynamics:
+        type_specific << "dynamics";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kEndpoint:
+        type_specific << element.type_specific()->endpoint().value();
+        break;
+      default:
+        type_specific << "OTHER (unknown enum)";
+        break;
+    }
+  } else {
+    type_specific << "<none>";
+  }
+  FX_LOGS(INFO) << indent << type_specific.str();
+
+  FX_LOGS(INFO) << indent << "can_disable      "
+                << (element.can_disable() ? (*element.can_disable() ? "TRUE" : "FALSE")
+                                          : "<none> (FALSE)");
+  FX_LOGS(INFO) << indent << "description      "
+                << (element.description() ? std::string("'") + *element.description() + "'"
+                                          : "<none>");
+}
+void LogElement(const fuchsia_hardware_audio_signalprocessing::Element& element) {
+  if constexpr (!kLogSignalProcessingFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/Element";
+  LogElementInternal(element, "    ");
+}
+void LogElements(const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements) {
+  if constexpr (!kLogSignalProcessingFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/Elements";
+  FX_LOGS(INFO) << "  elements [" << elements.size() << "]";
+
+  for (auto i = 0u; i < elements.size(); ++i) {
+    LogElementInternal(elements[i], "   ", i, "    ");
+  }
+}
+
+void LogTopologyInternal(const fuchsia_hardware_audio_signalprocessing::Topology& topology,
+                         std::string indent, std::optional<size_t> index = std::nullopt,
+                         std::string_view addl_indent = "") {
+  std::string first_indent{indent};
+  if (index.has_value()) {
+    first_indent.append("[")
+        .append(std::to_string(*index))
+        .append("]")
+        .append(addl_indent.substr(3));
+  } else {
+    first_indent.append(addl_indent);
+  }
+  indent.append(addl_indent);
+
+  FX_LOGS(INFO) << first_indent << "id               "
+                << (topology.id() ? std::to_string(*topology.id()) : "<none> (non-compliant)");
+  if (topology.processing_elements_edge_pairs()) {
+    FX_LOGS(INFO) << indent << "processing_elements_edge_pairs ["
+                  << topology.processing_elements_edge_pairs()->size() << "]";
+    for (auto idx = 0u; idx < topology.processing_elements_edge_pairs()->size(); ++idx) {
+      FX_LOGS(INFO)
+          << indent << " [" << idx << "]             "
+          << topology.processing_elements_edge_pairs()->at(idx).processing_element_id_from()
+          << " -> "
+          << topology.processing_elements_edge_pairs()->at(idx).processing_element_id_to();
+    }
+  } else {
+    FX_LOGS(INFO) << indent << "processing_elements_edge_pairs <none> (non-compliant)";
+  }
+}
+void LogTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology) {
+  if constexpr (!kLogSignalProcessingFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/Topology";
+  LogTopologyInternal(topology, "        ");
+}
+void LogTopologies(
+    const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies) {
+  if constexpr (!kLogSignalProcessingFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/Topologies";
+  FX_LOGS(INFO) << "  topologies [" << topologies.size() << "]";
+
+  for (auto idx = 0u; idx < topologies.size(); ++idx) {
+    LogTopologyInternal(topologies[idx], "   ", idx, "    ");
+  }
+}
+
 void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
   if constexpr (kLogSummaryFinalDeviceInfo) {
     FX_LOGS(INFO) << "Detected " << device_info.device_type() << " device "
@@ -564,8 +766,8 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                   << device_info.signal_processing_elements()->size() << "]"
                   << (device_info.signal_processing_elements()->empty() ? " (non-compliant)" : "");
     for (auto idx = 0u; idx < device_info.signal_processing_elements()->size(); ++idx) {
-      FX_LOGS(INFO) << "       [" << idx << "]  "
-                    << (*device_info.signal_processing_elements())[idx];
+      LogElementInternal(device_info.signal_processing_elements()->at(idx), "           ", idx,
+                         "    ");
     }
   } else {
     FX_LOGS(INFO) << "   signal_processing_elements   <none>";
@@ -577,8 +779,8 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                   << (device_info.signal_processing_topologies()->empty() ? " (non-compliant)"
                                                                           : "");
     for (auto idx = 0u; idx < device_info.signal_processing_topologies()->size(); ++idx) {
-      FX_LOGS(INFO) << "       [" << idx << "]  "
-                    << (*device_info.signal_processing_topologies())[idx];
+      LogTopologyInternal(device_info.signal_processing_topologies()->at(idx), "           ", idx,
+                          "    ");
     }
   } else {
     FX_LOGS(INFO) << "   signal_processing_topologies <none>";

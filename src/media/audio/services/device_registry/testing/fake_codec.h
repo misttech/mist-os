@@ -219,8 +219,9 @@ class FakeCodec : public fidl::testing::TestBase<CodecConnector>,
   async_dispatcher_t* dispatcher_;
   fidl::ServerEnd<fuchsia_hardware_audio::Codec> server_end_;
   fidl::ClientEnd<fuchsia_hardware_audio::Codec> client_end_;
-  std::optional<fidl::ServerBindingRef<CodecConnector>> connector_binding_;
   std::optional<fidl::ServerBindingRef<Codec>> binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
+      signal_processing_binding_;
 
   bool responsive_ = true;
   std::optional<bool> healthy_ = true;

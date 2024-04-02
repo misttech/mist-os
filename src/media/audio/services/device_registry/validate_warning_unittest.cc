@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <lib/zx/clock.h>
@@ -16,7 +17,9 @@
 
 #include <gtest/gtest.h>
 
+#include "src/media/audio/services/device_registry/signal_processing_utils.h"
 #include "src/media/audio/services/device_registry/validate.h"
+#include "src/media/audio/services/device_registry/validate_unittest.h"
 
 // These cases unittest the Validate... functions with inputs that cause WARNING log output.
 
@@ -1146,6 +1149,102 @@ TEST(ValidateWarningTest, BadCodecFormatInfo) {
                 .turn_off_delay = zx::time::infinite_past().get(),
             }}),
             ZX_ERR_INVALID_ARGS);
+}
+
+// signalprocessing functions
+//
+TEST(ValidateWarningTest, BadElement) {
+  // This element has no 'id'.
+  EXPECT_EQ(ValidateElement(kElementNoId), ZX_ERR_INVALID_ARGS);
+
+  // This element has no 'type'.
+  EXPECT_EQ(ValidateElement(kElementNoType), ZX_ERR_INVALID_ARGS);
+
+  // This element has no 'type_specific', but its 'type' requires one.
+  EXPECT_EQ(ValidateElement(kElementNoRequiredTypeSpecific), ZX_ERR_INVALID_ARGS);
+
+  // This element contains a 'type_specific' that does not match its 'type'.
+  EXPECT_EQ(ValidateElement(kElementWrongTypeSpecific), ZX_ERR_INVALID_ARGS);
+
+  // This element contains a 'description' that is an empty string.
+  EXPECT_EQ(ValidateElement(kElementEmptyDescription), ZX_ERR_INVALID_ARGS);
+
+  // Test inconsistencies in certain type_specifics
+  // TODO(https://fxbug.dev/42069012): Negative-test ValidateElement
+}
+
+TEST(ValidateWarningTest, BadElementList) {
+  EXPECT_EQ(ValidateElements(kEmptyElements), ZX_ERR_INVALID_ARGS);
+
+  // List contains two elements with the same id.
+  EXPECT_EQ(ValidateElements(kElementsDuplicateId), ZX_ERR_INVALID_ARGS);
+
+  // bad Elements: all the ValidateElement negative cases
+  EXPECT_EQ(ValidateElements(kElementsWithNoId), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateElements(kElementsWithNoType), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateElements(kElementsWithNoRequiredTypeSpecific), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateElements(kElementsWithWrongTypeSpecific), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateElements(kElementsWithEmptyDescription), ZX_ERR_INVALID_ARGS);
+}
+
+TEST(ValidateWarningTest, BadTopology) {
+  // This topology has no 'id'.
+  EXPECT_EQ(ValidateTopology(kTopologyMissingId, MapElements(kElements)), ZX_ERR_INVALID_ARGS);
+
+  // This topology has no 'processing_elements_edge_pairs'.
+  EXPECT_EQ(ValidateTopology(kTopologyMissingEdgePairs, MapElements(kElements)),
+            ZX_ERR_INVALID_ARGS);
+
+  // This topology has an 'processing_elements_edge_pairs' vector that is empty.
+  EXPECT_EQ(ValidateTopology(kTopologyEmptyEdgePairs, MapElements(kElements)), ZX_ERR_INVALID_ARGS);
+
+  // This topology references an element_id that is not included in the element_map.
+  EXPECT_EQ(ValidateTopology(kTopologyUnknownElementId, MapElements(kElements)),
+            ZX_ERR_INVALID_ARGS);
+
+  // This topology includes an edge that connects one element_id to itself.
+  EXPECT_EQ(ValidateTopology(kTopologyEdgePairLoop, MapElements(kElements)), ZX_ERR_INVALID_ARGS);
+
+  // This topology has a terminal (source or destination) element that is not an Endpoint.
+  EXPECT_EQ(ValidateTopology(kTopologyTerminalNotEndpoint, MapElements(kElements)),
+            ZX_ERR_INVALID_ARGS);
+
+  // empty element_map
+  EXPECT_EQ(ValidateTopology(kTopology14, kEmptyElementMap), ZX_ERR_INVALID_ARGS);
+}
+
+TEST(ValidateWarningTest, BadTopologyList) {
+  EXPECT_EQ(ValidateTopologies(kEmptyTopologies, MapElements(kElements)), ZX_ERR_INVALID_ARGS);
+
+  // List contains two topologies with the same id.
+  EXPECT_EQ(ValidateTopologies(kTopologiesWithDuplicateId, MapElements(kElements)),
+            ZX_ERR_INVALID_ARGS);
+
+  // There are elements that are not mentioned in at least one of the topologies.
+  EXPECT_EQ(ValidateTopologies(kTopologiesWithoutAllElements, MapElements(kElements)),
+            ZX_ERR_INVALID_ARGS);
+
+  // Topology list with a bad Topology: all the ValidateTopology negative cases
+  EXPECT_EQ(ValidateTopologies(kTopologiesWithMissingId, MapElements(kElements)),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateTopologies(kTopologiesWithMissingEdgePairs, MapElements(kElements)),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateTopologies(kTopologiesWithEmptyEdgePairs, MapElements(kElements)),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateTopologies(kTopologiesWithUnknownElementId, MapElements(kElements)),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateTopologies(kTopologiesWithLoop, MapElements(kElements)), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateTopologies(kTopologiesWithTerminalNotEndpoint, MapElements(kElements)),
+            ZX_ERR_INVALID_ARGS);
+
+  // empty element_map
+  EXPECT_EQ(ValidateTopologies(kTopologies, kEmptyElementMap), ZX_ERR_INVALID_ARGS);
+}
+
+TEST(ValidateWarningTest, BadElementState) {
+  EXPECT_EQ(ValidateElementState(kElementStateEmpty, kElement1), ZX_ERR_INVALID_ARGS);
+
+  // Add more negative-test cases here
 }
 
 }  // namespace media_audio

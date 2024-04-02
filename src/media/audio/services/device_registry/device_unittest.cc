@@ -43,10 +43,12 @@ TEST_F(CodecTest, Initialization) {
   EXPECT_EQ(device->device_type(), fuchsia_audio_device::DeviceType::kCodec);
 
   EXPECT_TRUE(device->has_codec_properties());
+  EXPECT_TRUE(device->checked_for_signalprocessing());
   EXPECT_TRUE(device->has_health_state());
   EXPECT_TRUE(device->dai_format_sets_retrieved());
   EXPECT_TRUE(device->has_plug_state());
 
+  EXPECT_FALSE(device->supports_signalprocessing());
   EXPECT_TRUE(device->info().has_value());
 }
 
@@ -558,11 +560,13 @@ TEST_F(StreamConfigTest, Initialization) {
   EXPECT_EQ(device->device_type(), fuchsia_audio_device::DeviceType::kOutput);
 
   EXPECT_TRUE(device->has_stream_config_properties());
+  EXPECT_TRUE(device->checked_for_signalprocessing());
   EXPECT_TRUE(device->has_health_state());
   EXPECT_TRUE(device->ring_buffer_format_sets_retrieved());
   EXPECT_TRUE(device->has_plug_state());
   EXPECT_TRUE(device->has_gain_state());
 
+  EXPECT_FALSE(device->supports_signalprocessing());
   EXPECT_TRUE(device->info().has_value());
 }
 

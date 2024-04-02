@@ -6,7 +6,13 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_VALIDATE_H_
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
+#include <zircon/types.h>
+
+#include <unordered_map>
+
+#include "src/media/audio/services/device_registry/basic_types.h"
 
 namespace media_audio {
 
@@ -44,6 +50,22 @@ zx_status_t ValidateCodecProperties(
 zx_status_t ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInfo& format_info);
 
 bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info);
+
+zx_status_t ValidateElements(
+    const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements);
+zx_status_t ValidateElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
+zx_status_t ValidateElementState(
+    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
+
+zx_status_t ValidateTopologies(
+    const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies,
+    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
+        element_map);
+zx_status_t ValidateTopology(
+    const fuchsia_hardware_audio_signalprocessing::Topology& topology,
+    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
+        element_map);
 
 zx_status_t ValidateRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);

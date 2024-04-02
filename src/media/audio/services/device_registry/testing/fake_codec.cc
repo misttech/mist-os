@@ -5,6 +5,7 @@
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/markers.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <lib/fit/result.h>
 #include <zircon/errors.h>
@@ -52,7 +53,11 @@ FakeCodec::FakeCodec(zx::channel server_end, zx::channel client_end, async_dispa
   SetDefaultFormatSets();
 }
 
-FakeCodec::~FakeCodec() { ADR_LOG_METHOD(kLogFakeCodec || kLogObjectLifetimes); }
+FakeCodec::~FakeCodec() {
+  ADR_LOG_METHOD(kLogFakeCodec || kLogObjectLifetimes);
+  signal_processing_binding_.reset();
+  binding_.reset();
+}
 
 void on_unbind(FakeCodec* fake_codec, fidl::UnbindInfo info,
                fidl::ServerEnd<fuchsia_hardware_audio::Codec> server_end) {
@@ -102,7 +107,12 @@ void FakeCodec::SignalProcessingConnect(SignalProcessingConnectRequest& request,
 
   // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
   // Not yet implemented.
-  request.protocol().Close(ZX_ERR_NOT_SUPPORTED);
+  signal_processing_binding_ =
+      fidl::BindServer(dispatcher_,
+                       fidl::ServerEnd<fuchsia_hardware_audio_signalprocessing::SignalProcessing>(
+                           request.protocol().TakeChannel()),
+                       this);
+  signal_processing_binding_->Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 void FakeCodec::GetProperties(GetPropertiesCompleter::Sync& completer) {

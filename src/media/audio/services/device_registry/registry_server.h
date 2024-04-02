@@ -40,7 +40,7 @@ class RegistryServer
                       CreateObserverCompleter::Sync& completer) final;
 
   void DeviceWasAdded(std::shared_ptr<const Device> new_device);
-  void DeviceWasRemoved(uint64_t removed_id);
+  void DeviceWasRemoved(TokenId removed_id);
 
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }
@@ -61,7 +61,7 @@ class RegistryServer
   std::vector<fuchsia_audio_device::Info> devices_added_since_notify_;
   std::optional<WatchDevicesAddedCompleter::Async> watch_devices_added_completer_;
 
-  std::queue<uint64_t> devices_removed_since_notify_;
+  std::queue<TokenId> devices_removed_since_notify_;
   std::optional<WatchDeviceRemovedCompleter::Async> watch_device_removed_completer_;
 };
 

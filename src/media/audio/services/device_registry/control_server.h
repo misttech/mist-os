@@ -6,7 +6,8 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_CONTROL_SERVER_H_
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 
 #include <cstdint>
@@ -76,12 +77,20 @@ class ControlServer
   //
   void GetTopologies(GetTopologiesCompleter::Sync& completer) final;
   void GetElements(GetElementsCompleter::Sync& completer) final;
-  void WatchTopology(WatchTopologyCompleter::Sync& completer) final;
+  void WatchTopology(WatchTopologyCompleter::Sync& completer) final {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
   void WatchElementState(WatchElementStateRequest& request,
-                         WatchElementStateCompleter::Sync& completer) final;
-  void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) final;
+                         WatchElementStateCompleter::Sync& completer) final {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) final {
+    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+  }
   void SetElementState(SetElementStateRequest& request,
-                       SetElementStateCompleter::Sync& completer) final;
+                       SetElementStateCompleter::Sync& completer) final {
+    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+  }
 
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }

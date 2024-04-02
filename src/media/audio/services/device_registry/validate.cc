@@ -5,6 +5,8 @@
 #include "src/media/audio/services/device_registry/validate.h"
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
@@ -15,6 +17,7 @@
 #include <string>
 
 #include "src/media/audio/services/device_registry/logging.h"
+#include "src/media/audio/services/device_registry/signal_processing_utils.h"
 
 namespace media_audio {
 
@@ -899,6 +902,282 @@ zx_status_t ValidateDelayInfo(const fuchsia_hardware_audio::DelayInfo& delay_inf
     FX_LOGS(WARNING) << "WatchDelayInfo: reported 'external_delay' ("
                      << *delay_info.external_delay() << " ns) cannot be negative";
     return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t ValidateElementState(
+    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element) {
+  LogElementState(element_state);
+
+  if (auto status = ValidateElement(element); status != ZX_OK) {
+    return status;
+  }
+
+  bool type_specific_matches_element_type;
+  switch (*element.type()) {
+    case fuchsia_hardware_audio_signalprocessing::ElementType::kVendorSpecific:
+      type_specific_matches_element_type = (element_state.type_specific().has_value() &&
+                                            element_state.type_specific()->Which() ==
+                                                fuchsia_hardware_audio_signalprocessing::
+                                                    TypeSpecificElementState::Tag::kVendorSpecific);
+
+      // Need additional vendor-specific checks?
+      // Is .vendor_specific_data required?
+      break;
+    case fuchsia_hardware_audio_signalprocessing::ElementType::kGain:
+      type_specific_matches_element_type =
+          (element_state.type_specific().has_value() &&
+           element_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kGain &&
+           element_state.type_specific()->gain().has_value() &&
+           element_state.type_specific()->gain()->gain().has_value() &&
+           *element_state.type_specific()->gain()->gain() >=
+               element.type_specific()->gain()->min_gain() &&
+           *element_state.type_specific()->gain()->gain() <=
+               element.type_specific()->gain()->max_gain());
+      break;
+    case fuchsia_hardware_audio_signalprocessing::ElementType::kEqualizer:
+      type_specific_matches_element_type =
+          (element_state.type_specific().has_value() &&
+           element_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEqualizer &&
+           element_state.type_specific()->equalizer().has_value() &&
+           element_state.type_specific()->equalizer()->bands_state().has_value() &&
+           !element_state.type_specific()->equalizer()->bands_state()->empty());
+
+      // Need additional EQ-specific checks on each EqualizerBandState.
+      break;
+    case fuchsia_hardware_audio_signalprocessing::ElementType::kDynamics:
+      type_specific_matches_element_type =
+          (element_state.type_specific().has_value() &&
+           element_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kDynamics &&
+           element_state.type_specific()->dynamics().has_value() &&
+           element_state.type_specific()->dynamics()->band_states().has_value() &&
+           !element_state.type_specific()->dynamics()->band_states()->empty());
+
+      // Need additional dynamics-specific checks on each DynamicsBandState.
+      break;
+    case fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint:
+      type_specific_matches_element_type =
+          (element_state.type_specific().has_value() &&
+           element_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint &&
+           element_state.type_specific()->endpoint().has_value() &&
+           element_state.type_specific()->endpoint()->plug_state().has_value() &&
+           element_state.type_specific()->endpoint()->plug_state()->plugged().has_value() &&
+           element_state.type_specific()->endpoint()->plug_state()->plug_state_time().has_value() &&
+           (element_state.type_specific()->endpoint()->plug_state()->plugged() ||
+            *element.type_specific()->endpoint()->plug_detect_capabilities() ==
+                fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify));
+      break;
+    default:
+      type_specific_matches_element_type = true;
+      break;
+  }
+
+  if (!type_specific_matches_element_type) {
+    FX_LOGS(WARNING)
+        << "WatchElementState: type_specific is missing or does not match element_type "
+        << element.type();
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (element_state.enabled().has_value()) {
+    if (!element.can_disable().value_or(false) && !element_state.enabled().value_or(true)) {
+      FX_LOGS(WARNING)
+          << "WatchElementState: element_state is disabled, but element.can_disable is false";
+      return ZX_ERR_INVALID_ARGS;
+    }
+  }
+  if (element_state.latency().has_value()) {
+    if (element_state.latency()->Which() ==
+            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime &&
+        element_state.latency()->latency_time().value() < 0) {
+      FX_LOGS(WARNING) << "WatchElementState: latency, if a duration, must not be negative";
+    }
+  }
+
+  if (element_state.vendor_specific_data().has_value()) {
+    if (element_state.vendor_specific_data()->empty()) {
+      FX_LOGS(WARNING) << "WatchElementState: vendor_specific_data, if present, must not be empty";
+      return ZX_ERR_INVALID_ARGS;
+    }
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t ValidateElement(const fuchsia_hardware_audio_signalprocessing::Element& element) {
+  LogElement(element);
+
+  if (!element.id().has_value()) {
+    FX_LOGS(WARNING) << "SignalProcessing.element.id is missing";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (!element.type().has_value()) {
+    FX_LOGS(WARNING) << "SignalProcessing.element.type is missing";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (*element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint &&
+      !element.type_specific().has_value()) {
+    FX_LOGS(WARNING) << "SignalProcessing.element.type is ENDPOINT but type_specific is missing";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  bool mismatch = false;
+  if (element.type_specific().has_value()) {
+    const auto type = *element.type();
+    switch (element.type_specific()->Which()) {
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kVendorSpecific:
+        mismatch = (type != fuchsia_hardware_audio_signalprocessing::ElementType::kVendorSpecific);
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kGain:
+        mismatch = (type != fuchsia_hardware_audio_signalprocessing::ElementType::kGain);
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kEqualizer:
+        mismatch = (type != fuchsia_hardware_audio_signalprocessing::ElementType::kEqualizer);
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kDynamics:
+        mismatch = (type != fuchsia_hardware_audio_signalprocessing::ElementType::kDynamics);
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kEndpoint:
+        mismatch = (type != fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
+        break;
+      default:
+        FX_LOGS(WARNING) << "Unknown element.type_specific union found";
+        return ZX_ERR_INVALID_ARGS;
+    }
+    if (mismatch) {
+      FX_LOGS(WARNING) << "element(" << *element.id() << "): type " << type
+                       << " does not match type_specific union";
+      return ZX_ERR_INVALID_ARGS;
+    }
+  }
+  if (element.description().has_value() && element.description()->empty()) {
+    FX_LOGS(WARNING) << "SignalProcessing.element.description cannot be empty, if present";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t ValidateElements(
+    const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements) {
+  LogElements(elements);
+
+  if (elements.empty()) {
+    FX_LOGS(WARNING) << "Reported SignalProcessing.elements[] is empty";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  return (MapElements(elements).empty() ? ZX_ERR_INVALID_ARGS : ZX_OK);
+}
+
+zx_status_t ValidateTopology(
+    const fuchsia_hardware_audio_signalprocessing::Topology& topology,
+    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
+        element_map) {
+  LogTopology(topology);
+  if (!topology.id().has_value()) {
+    FX_LOGS(WARNING) << "Reported SignalProcessing.topology.id is missing";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (!topology.processing_elements_edge_pairs().has_value()) {
+    FX_LOGS(WARNING)
+        << "Reported SignalProcessing.topology.processing_elements_edge_pairs is missing";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (topology.processing_elements_edge_pairs()->empty()) {
+    FX_LOGS(WARNING)
+        << "Reported SignalProcessing.topology.processing_elements_edge_pairs[] is empty";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  std::unordered_set<ElementId> source_elements, destination_elements;
+  for (const auto& edge_pair : *topology.processing_elements_edge_pairs()) {
+    // Check that all the mentioned element_ids are contained in the elements set.
+    if (element_map.find(edge_pair.processing_element_id_from()) == element_map.end()) {
+      FX_LOGS(WARNING) << "Element_id_from " << edge_pair.processing_element_id_from()
+                       << " not found in element list";
+      return ZX_ERR_INVALID_ARGS;
+    }
+    if (element_map.find(edge_pair.processing_element_id_to()) == element_map.end()) {
+      FX_LOGS(WARNING) << "Element_id_to " << edge_pair.processing_element_id_to()
+                       << " not found in element list";
+      return ZX_ERR_INVALID_ARGS;
+    }
+    // Check that no EdgePair is self-referential.
+    if (edge_pair.processing_element_id_from() == edge_pair.processing_element_id_to()) {
+      FX_LOGS(WARNING) << "Edge_pair connects element_id " << edge_pair.processing_element_id_to()
+                       << " to itself";
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    source_elements.insert(edge_pair.processing_element_id_from());
+    destination_elements.insert(edge_pair.processing_element_id_to());
+  }
+
+  // Check that only ENDPOINTs are terminal
+  for (auto& [id, element] : element_map) {
+    if (source_elements.find(id) != source_elements.end() &&
+        destination_elements.find(id) == destination_elements.end()) {
+      if (*element.type() != fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+        FX_LOGS(WARNING) << "Element " << id << " has no incoming edges but is not an Endpoint! Is "
+                         << *element.type();
+        return ZX_ERR_INVALID_ARGS;
+      }
+    }
+    if (source_elements.find(id) == source_elements.end() &&
+        destination_elements.find(id) != destination_elements.end()) {
+      if (*element.type() != fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+        FX_LOGS(WARNING) << "Element " << id << " has no outgoing edges but is not an Endpoint! Is "
+                         << *element.type();
+        return ZX_ERR_INVALID_ARGS;
+      }
+    }
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t ValidateTopologies(
+    const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies,
+    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
+        element_map) {
+  LogTopologies(topologies);
+
+  if (topologies.empty()) {
+    FX_LOGS(WARNING) << "Reported SignalProcessing.topologies[] is empty";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (element_map.empty()) {
+    FX_LOGS(WARNING) << "Reported SignalProcessing.elements[] is empty";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // Check each topology
+  if (MapTopologies(topologies).empty()) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>
+      elements_remaining = element_map;
+  for (auto& topology : topologies) {
+    if (const auto& status = ValidateTopology(topology, element_map); status != ZX_OK) {
+      return status;
+    }
+    for (const auto& edge_pair : *topology.processing_elements_edge_pairs()) {
+      elements_remaining.erase(edge_pair.processing_element_id_from());
+      elements_remaining.erase(edge_pair.processing_element_id_to());
+    }
+  }
+  if (!elements_remaining.empty()) {
+    FX_LOGS(WARNING) << "topologies did not cover all elements. Example: element_id "
+                     << elements_remaining.begin()->first;
+    return ZX_ERR_INVALID_ARGS;
   }
 
   return ZX_OK;

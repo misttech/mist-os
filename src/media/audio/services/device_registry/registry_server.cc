@@ -113,7 +113,7 @@ void RegistryServer::WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& compl
   ReplyWithNextRemovedDevice();
 }
 
-void RegistryServer::DeviceWasRemoved(uint64_t removed_id) {
+void RegistryServer::DeviceWasRemoved(TokenId removed_id) {
   ADR_LOG_METHOD(kLogRegistryServerMethods);
   auto already_in_queue = false;
   for (auto i = devices_removed_since_notify_.size(); i > 0; --i) {

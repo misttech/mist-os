@@ -580,33 +580,4 @@ void ControlServer::GetElements(GetElementsCompleter::Sync& completer) {
   completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
 }
 
-void ControlServer::WatchTopology(WatchTopologyCompleter::Sync& completer) {
-  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
-                    << ": signalprocessing not supported";
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
-void ControlServer::WatchElementState(WatchElementStateRequest& request,
-                                      WatchElementStateCompleter::Sync& completer) {
-  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
-                    << "(id: " << request.processing_element_id()
-                    << "): signalprocessing not supported";
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
-void ControlServer::SetTopology(SetTopologyRequest& request,
-                                SetTopologyCompleter::Sync& completer) {
-  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
-                    << "(id: " << request.topology_id() << "): signalprocessing not supported";
-  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
-}
-
-void ControlServer::SetElementState(SetElementStateRequest& request,
-                                    SetElementStateCompleter::Sync& completer) {
-  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
-                    << "(id: " << request.processing_element_id()
-                    << "): signalprocessing not supported";
-  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
-}
-
 }  // namespace media_audio
