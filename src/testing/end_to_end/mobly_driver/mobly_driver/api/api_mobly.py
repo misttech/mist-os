@@ -80,7 +80,7 @@ def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
 # instantiation error.
 def new_testbed_config(
     testbed_name: str,
-    log_path: str,
+    output_path: str,
     ffx_path: str,
     transport: str,
     mobly_controllers: list[dict[str, Any]],
@@ -139,7 +139,7 @@ def new_testbed_config(
 
     Args:
         testbed_name: Mobly testbed name to use.
-        log_path: absolute path to Mobly's top-level output directory.
+        output_path: absolute path to Mobly's top-level output directory.
         ffx_path: absolute path to the FFX binary.
         transport: host->device transport type to use.
         mobly_controllers: List of Mobly controller objects.
@@ -183,7 +183,7 @@ def new_testbed_config(
             },
         ],
         keys.Config.key_mobly_params.value: {
-            keys.Config.key_log_path.value: log_path
+            keys.Config.key_log_path.value: output_path
         },
     }
 

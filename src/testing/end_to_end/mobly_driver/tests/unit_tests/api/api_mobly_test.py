@@ -63,7 +63,7 @@ class ApiMoblyTest(unittest.TestCase):
                     "test_params_dict": {},
                 },
                 expected_config_obj={
-                    "MoblyParams": {"LogPath": "log_path"},
+                    "MoblyParams": {"LogPath": "output_path"},
                     "TestBeds": [
                         {"Controllers": {}, "Name": "tb_name", "TestParams": {}}
                     ],
@@ -78,7 +78,7 @@ class ApiMoblyTest(unittest.TestCase):
                     "test_params_dict": {"param": "value"},
                 },
                 expected_config_obj={
-                    "MoblyParams": {"LogPath": "log_path"},
+                    "MoblyParams": {"LogPath": "output_path"},
                     "TestBeds": [
                         {
                             "Controllers": {
@@ -105,7 +105,7 @@ class ApiMoblyTest(unittest.TestCase):
                     ]
                 },
                 expected_config_obj={
-                    "MoblyParams": {"LogPath": "log_path"},
+                    "MoblyParams": {"LogPath": "output_path"},
                     "TestBeds": [
                         {
                             "Controllers": {
@@ -137,7 +137,7 @@ class ApiMoblyTest(unittest.TestCase):
                     ],
                 },
                 expected_config_obj={
-                    "MoblyParams": {"LogPath": "log_path"},
+                    "MoblyParams": {"LogPath": "output_path"},
                     "TestBeds": [
                         {
                             "Controllers": {
@@ -172,7 +172,7 @@ class ApiMoblyTest(unittest.TestCase):
                     },
                 },
                 expected_config_obj={
-                    "MoblyParams": {"LogPath": "log_path"},
+                    "MoblyParams": {"LogPath": "output_path"},
                     "TestBeds": [
                         {
                             "Controllers": {
@@ -200,7 +200,7 @@ class ApiMoblyTest(unittest.TestCase):
                     "ffx_subtools_search_path": "some/subtools/search/path",
                 },
                 expected_config_obj={
-                    "MoblyParams": {"LogPath": "log_path"},
+                    "MoblyParams": {"LogPath": "output_path"},
                     "TestBeds": [
                         {
                             "Controllers": {
@@ -230,7 +230,7 @@ class ApiMoblyTest(unittest.TestCase):
         """Test case for new testbed config generation"""
         config_obj = api_mobly.new_testbed_config(
             testbed_name=override_args.get("testbed_name", "tb_name"),
-            log_path=override_args.get("log_path", "log_path"),
+            output_path=override_args.get("output_path", "output_path"),
             ffx_path=override_args.get("ffx_path", "ffx_path"),
             transport=override_args.get("transport", "transport"),
             mobly_controllers=override_args.get("mobly_controllers", []),

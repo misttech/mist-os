@@ -20,7 +20,7 @@ class BaseMoblyDriverTest(unittest.TestCase):
     @parameterized.expand(  # type: ignore[misc]
         [
             (
-                "log_path specified",
+                "output_path specified",
                 "/user/path",
                 {
                     base.TEST_OUTDIR_ENV: "/env/path",
@@ -28,7 +28,7 @@ class BaseMoblyDriverTest(unittest.TestCase):
                 "/user/path",
             ),
             (
-                "log_path not specified",
+                "output_path not specified",
                 None,
                 {
                     base.TEST_OUTDIR_ENV: "/env/path",
@@ -41,17 +41,19 @@ class BaseMoblyDriverTest(unittest.TestCase):
     def test_init_success(
         self,
         unused_name: str,
-        log_path: str,
+        output_path: str,
         test_env: dict[str, str],
-        expected_log_path: str,
+        expected_output_path: str,
         *unused_args: Any,
     ) -> None:
         """Test case for initialization success"""
         with patch.dict(os.environ, test_env, clear=True):
             d = base.BaseDriver(  # type: ignore[abstract]
-                ffx_path="ffx_path", transport="transport", log_path=log_path
+                ffx_path="ffx_path",
+                transport="transport",
+                output_path=output_path,
             )
-            self.assertEqual(d._log_path, expected_log_path)
+            self.assertEqual(d._output_path, expected_output_path)
 
     @patch.multiple(base.BaseDriver, __abstractmethods__=set())
     def test_init_invalid_environment_raises_exception(

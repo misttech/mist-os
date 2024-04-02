@@ -30,7 +30,7 @@ class LocalDriverTest(unittest.TestCase):
         driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
-            log_path="log/path",
+            output_path="output/path",
             config_path="config/path",
             params_path="params/path",
         )
@@ -51,7 +51,7 @@ class LocalDriverTest(unittest.TestCase):
         driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
-            log_path="log/path",
+            output_path="output/path",
             config_path="config/path",
         )
         ret = driver.generate_test_config()
@@ -72,7 +72,7 @@ class LocalDriverTest(unittest.TestCase):
         driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
-            log_path="log/path",
+            output_path="output/path",
             config_path="config/path",
         )
         with self.assertRaises(common.InvalidFormatException):
@@ -89,7 +89,7 @@ class LocalDriverTest(unittest.TestCase):
         driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
-            log_path="log/path",
+            output_path="output/path",
             config_path="/does/not/exist",
         )
         with self.assertRaises(common.DriverException):
@@ -121,7 +121,9 @@ class LocalDriverTest(unittest.TestCase):
     ) -> None:
         """Test case for successful env config generation"""
         driver = local.LocalDriver(
-            ffx_path="ffx/path", transport="transport", log_path="log/path"
+            ffx_path="ffx/path",
+            transport="transport",
+            output_path="output/path",
         )
         ret = driver.generate_test_config()
 
@@ -171,7 +173,7 @@ class LocalDriverTest(unittest.TestCase):
         driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
-            log_path="log/path",
+            output_path="output/path",
             multi_device=True,
         )
         ret = driver.generate_test_config()
@@ -219,7 +221,7 @@ class LocalDriverTest(unittest.TestCase):
         driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
-            log_path="log/path",
+            output_path="output/path",
             multi_device=False,
         )
         ret = driver.generate_test_config()
@@ -248,7 +250,7 @@ class LocalDriverTest(unittest.TestCase):
         driver = local.LocalDriver(
             ffx_path="ffx/path",
             transport="transport",
-            log_path="log/path",
+            output_path="output/path",
         )
         with self.assertRaises(common.DriverException):
             ret = driver.generate_test_config()
@@ -264,7 +266,9 @@ class LocalDriverTest(unittest.TestCase):
     ) -> None:
         """Test case for exception being raised from discovery failure"""
         driver = local.LocalDriver(
-            ffx_path="ffx/path", transport="transport", log_path="log/path"
+            ffx_path="ffx/path",
+            transport="transport",
+            output_path="output/path",
         )
         with self.assertRaises(common.DriverException):
             ret = driver.generate_test_config()
@@ -288,7 +292,9 @@ class LocalDriverTest(unittest.TestCase):
         """Test case for exception being raised from invalid discovery output"""
         mock_check_output.return_value = discovery_output
         driver = local.LocalDriver(
-            ffx_path="ffx/path", transport="transport", log_path="log/path"
+            ffx_path="ffx/path",
+            transport="transport",
+            output_path="output/path",
         )
         with self.assertRaises(common.DriverException):
             ret = driver.generate_test_config()

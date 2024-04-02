@@ -35,7 +35,7 @@ class InfraDriver(base.BaseDriver):
         tb_json_path: str,
         ffx_path: str,
         transport: str,
-        log_path: Optional[str] = None,
+        output_path: Optional[str] = None,
         params_path: Optional[str] = None,
         ffx_subtools_search_path: Optional[str] = None,
     ) -> None:
@@ -45,7 +45,7 @@ class InfraDriver(base.BaseDriver):
           tb_json_path: absolute path to the testbed definition JSON file.
           ffx_path: absolute path to the FFX binary.
           transport: host->target transport type to use.
-          log_path: absolute path to directory for storing Mobly test output.
+          output_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
           ffx_subtools_search_path: absolute path to where to search for FFX plugins.
 
@@ -55,7 +55,7 @@ class InfraDriver(base.BaseDriver):
         super().__init__(
             ffx_path=ffx_path,
             transport=transport,
-            log_path=log_path,
+            output_path=output_path,
             params_path=params_path,
             ffx_subtools_search_path=ffx_subtools_search_path,
         )
@@ -103,7 +103,7 @@ class InfraDriver(base.BaseDriver):
             }
             config = api_mobly.new_testbed_config(
                 testbed_name=self._TESTBED_NAME,
-                log_path=self._log_path,
+                output_path=self._output_path,
                 ffx_path=self._ffx_path,
                 transport=self._transport,
                 mobly_controllers=tb_config,
@@ -118,7 +118,7 @@ class InfraDriver(base.BaseDriver):
     def teardown(self, *args: Any) -> None:
         """Performs any required clean up upon Mobly test completion."""
         results_path = api_mobly.get_result_path(
-            self._log_path, self._TESTBED_NAME
+            self._output_path, self._TESTBED_NAME
         )
         try:
             with open(results_path, "r") as f:
@@ -136,7 +136,7 @@ class InfraDriver(base.BaseDriver):
         # bug which can be removed once the following pull request is fixed:
         # https://github.com/bazelbuild/remote-apis-sdks/pull/422
         symlink_path = api_mobly.get_latest_test_output_dir_symlink_path(
-            self._log_path, self._TESTBED_NAME
+            self._output_path, self._TESTBED_NAME
         )
         try:
             os.remove(symlink_path)

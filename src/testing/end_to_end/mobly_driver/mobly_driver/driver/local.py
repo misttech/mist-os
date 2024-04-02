@@ -26,7 +26,7 @@ class LocalDriver(base.BaseDriver):
         ffx_path: str,
         transport: str,
         multi_device: bool = False,
-        log_path: Optional[str] = None,
+        output_path: Optional[str] = None,
         config_path: Optional[str] = None,
         params_path: Optional[str] = None,
         ffx_subtools_search_path: Optional[str] = None,
@@ -37,7 +37,7 @@ class LocalDriver(base.BaseDriver):
           ffx_path: absolute path to the FFX binary.
           transport: host->target transport type to use.
           multi_device: whether the Mobly test requires 2+ devices to run.
-          log_path: absolute path to directory for storing Mobly test output.
+          output_path: absolute path to directory for storing Mobly test output.
           config_path: absolute path to the Mobly test config file.
           params_path: absolute path to the Mobly test params file.
           ffx_subtools_search_path: absolute path to where to search for FFX plugins.
@@ -47,7 +47,7 @@ class LocalDriver(base.BaseDriver):
         super().__init__(
             ffx_path=ffx_path,
             transport=transport,
-            log_path=log_path,
+            output_path=output_path,
             params_path=params_path,
             ffx_subtools_search_path=ffx_subtools_search_path,
         )
@@ -136,7 +136,7 @@ class LocalDriver(base.BaseDriver):
 
         config = api_mobly.new_testbed_config(
             testbed_name="GeneratedLocalTestbed",
-            log_path=self._log_path,
+            output_path=self._output_path,
             ffx_path=self._ffx_path,
             transport=self._transport,
             mobly_controllers=mobly_controllers,

@@ -25,7 +25,7 @@ class BaseDriver(ABC):
         self,
         ffx_path: str,
         transport: str,
-        log_path: Optional[str] = None,
+        output_path: Optional[str] = None,
         params_path: Optional[str] = None,
         ffx_subtools_search_path: Optional[str] = None,
     ) -> None:
@@ -34,7 +34,7 @@ class BaseDriver(ABC):
         Args:
           ffx_path: absolute path to the FFX binary.
           transport: host->target transport type to use.
-          log_path: absolute path to directory for storing Mobly test output.
+          output_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
           ffx_subtools_search_path: absolute path to where to search for FFX plugins.
         Raises:
@@ -43,8 +43,10 @@ class BaseDriver(ABC):
         self._ffx_path = ffx_path
         self._transport = transport
         self._params_path = params_path
-        self._log_path = (
-            log_path if log_path is not None else os.environ[TEST_OUTDIR_ENV]
+        self._output_path = (
+            output_path
+            if output_path is not None
+            else os.environ[TEST_OUTDIR_ENV]
         )
         self._ffx_subtools_search_path = ffx_subtools_search_path
 

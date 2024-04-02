@@ -31,7 +31,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
             ffx_path="ffx/path",
             transport="transport",
             params_path="params/path",
-            log_path="",
+            output_path="",
         )
         ret = driver.generate_test_config()
 
@@ -56,7 +56,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
             tb_json_path="tb/json/path",
             ffx_path="ffx/path",
             transport="transport",
-            log_path="",
+            output_path="",
         )
         ret = driver.generate_test_config()
 
@@ -77,7 +77,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
             tb_json_path="tb/json/path",
             ffx_path="ffx/path",
             transport="transport",
-            log_path="",
+            output_path="",
         )
         with self.assertRaises(common.InvalidFormatException):
             driver.generate_test_config()
@@ -96,7 +96,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
             ffx_path="ffx/path",
             transport="transport",
             params_path="params/path",
-            log_path="",
+            output_path="",
         )
         with self.assertRaises(common.InvalidFormatException):
             driver.generate_test_config()
@@ -112,7 +112,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
             tb_json_path="/does/not/exist",
             ffx_path="ffx/path",
             transport="transport",
-            log_path="",
+            output_path="",
         )
         with self.assertRaises(common.DriverException):
             driver.generate_test_config()
@@ -129,7 +129,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
             ffx_path="ffx/path",
             transport="transport",
             params_path="params/path",
-            log_path="",
+            output_path="",
         )
         with self.assertRaises(common.DriverException):
             driver.generate_test_config()
@@ -154,7 +154,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
             tb_json_path="",
             ffx_path="ffx/path",
             transport="transport",
-            log_path="",
+            output_path="",
         )
         driver.teardown()
 
@@ -180,7 +180,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
             tb_json_path="",
             ffx_path="ffx/path",
             transport="transport",
-            log_path="",
+            output_path="",
         )
         driver.teardown()
 
