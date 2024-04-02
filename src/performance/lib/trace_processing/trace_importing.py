@@ -840,37 +840,41 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
                 )
 
     # Construct the map of Processes, including ones without trace events.
+
+    # Maps from PIDs to Process objects.
     processes: Dict[int, trace_model.Process] = {}
+    # Maps from Process objects to dicts that map from TIDs to Thread objects.
+    process_threads_map: Dict[
+        trace_model.Process, Dict[int, trace_model.Thread]
+    ] = {}
+
+    def get_process(pid: int) -> trace_model.Process:
+        if pid in processes:
+            return processes[pid]
+        process = trace_model.Process(pid=pid)
+        processes[pid] = process
+        return process
+
+    def get_thread(
+        process: trace_model.Process, tid: int
+    ) -> trace_model.Thread:
+        threads_map = process_threads_map.setdefault(process, {})
+        if tid in threads_map:
+            return threads_map[tid]
+        thread = trace_model.Thread(
+            tid=tid, name=tid_to_name.get(tid, "tid: %d" % tid)
+        )
+        threads_map[tid] = thread
+        process.threads.append(thread)
+        return thread
+
     for event in result_events:
-        if event.pid not in processes:
-            processes[event.pid] = trace_model.Process(pid=event.pid)
-
-        process: trace_model.Process = processes[event.pid]
-        threads: List[trace_model.Thread] = [
-            thread for thread in process.threads if thread.tid == event.tid
-        ]
-
-        assert len(threads) <= 1
-        if len(threads) == 0:
-            thread: trace_model.Thread = trace_model.Thread(
-                tid=event.tid,
-                name=tid_to_name.get(event.tid, "tid: %d" % event.tid),
-            )
-            process.threads.append(thread)
-            threads.append(thread)
-        threads[0].events.append(event)
+        thread = get_thread(get_process(event.pid), event.tid)
+        thread.events.append(event)
 
     for tid, pid in tid_to_pid.items():
-        if pid not in processes:
-            processes[pid] = trace_model.Process(pid=pid)
-
-        process = processes[pid]
         # If we don't already have the thread from the result_events loop, add it now.
-        if tid not in [t.tid for t in process.threads]:
-            thread = trace_model.Thread(
-                tid=tid, name=tid_to_name.get(tid, "tid: %d" % tid)
-            )
-            process.threads.append(thread)
+        get_thread(get_process(pid), tid)
 
     # Construct the final Model.
     model = trace_model.Model()
