@@ -6,8 +6,6 @@
 
 #include <fuchsia/bluetooth/test/cpp/fidl.h>
 
-#include "src/connectivity/bluetooth/hci/virtual/log.h"
-
 namespace fbt = fuchsia::bluetooth;
 namespace ftest = fuchsia::bluetooth::test;
 
@@ -46,7 +44,7 @@ EmulatedPeer::Result EmulatedPeer::NewLowEnergy(
   ZX_DEBUG_ASSERT(fake_controller);
 
   if (!parameters.has_address()) {
-    logf(ERROR, "A fake peer address is mandatory!\n");
+    bt_log(ERROR, "virtual", "A fake peer address is mandatory!\n");
     return fpromise::error(ftest::EmulatorPeerError::PARAMETERS_INVALID);
   }
 
@@ -72,8 +70,8 @@ EmulatedPeer::Result EmulatedPeer::NewLowEnergy(
   }
 
   if (!fake_controller->AddPeer(std::move(peer))) {
-    logf(ERROR, "A fake LE peer with given address already exists: %s\n",
-         address.ToString().c_str());
+    bt_log(ERROR, "virtual", "A fake LE peer with given address already exists: %s\n",
+           address.ToString().c_str());
     return fpromise::error(ftest::EmulatorPeerError::ADDRESS_REPEATED);
   }
 
@@ -90,7 +88,7 @@ EmulatedPeer::Result EmulatedPeer::NewBredr(
   ZX_DEBUG_ASSERT(fake_controller);
 
   if (!parameters.has_address()) {
-    logf(ERROR, "A fake peer address is mandatory!\n");
+    bt_log(ERROR, "virtual", "A fake peer address is mandatory!\n");
     return fpromise::error(ftest::EmulatorPeerError::PARAMETERS_INVALID);
   }
 
@@ -118,8 +116,8 @@ EmulatedPeer::Result EmulatedPeer::NewBredr(
   }
 
   if (!fake_controller->AddPeer(std::move(peer))) {
-    logf(ERROR, "A fake BR/EDR peer with given address already exists: %s\n",
-         address.ToString().c_str());
+    bt_log(ERROR, "virtual", "A fake BR/EDR peer with given address already exists: %s\n",
+           address.ToString().c_str());
     return fpromise::error(ftest::EmulatorPeerError::ADDRESS_REPEATED);
   }
 
@@ -140,7 +138,7 @@ EmulatedPeer::~EmulatedPeer() { CleanUp(); }
 
 void EmulatedPeer::AssignConnectionStatus(ftest::HciError status,
                                           AssignConnectionStatusCallback callback) {
-  logf(TRACE, "EmulatedPeer.AssignConnectionStatus\n");
+  bt_log(TRACE, "virtual", "EmulatedPeer.AssignConnectionStatus\n");
 
   auto peer = fake_controller_->FindPeer(address_);
   if (peer) {
@@ -151,17 +149,17 @@ void EmulatedPeer::AssignConnectionStatus(ftest::HciError status,
 }
 
 void EmulatedPeer::EmulateLeConnectionComplete(fbt::ConnectionRole role) {
-  logf(TRACE, "EmulatedPeer.EmulateLeConnectionComplete\n");
+  bt_log(TRACE, "virtual", "EmulatedPeer.EmulateLeConnectionComplete\n");
   fake_controller_->ConnectLowEnergy(address_, ConnectionRoleFromFidl(role));
 }
 
 void EmulatedPeer::EmulateDisconnectionComplete() {
-  logf(TRACE, "EmulatedPeer.EmulateDisconnectionComplete\n");
+  bt_log(TRACE, "virtual", "EmulatedPeer.EmulateDisconnectionComplete\n");
   fake_controller_->Disconnect(address_);
 }
 
 void EmulatedPeer::WatchConnectionStates(WatchConnectionStatesCallback callback) {
-  logf(TRACE, "EmulatedPeer.WatchConnectionState\n");
+  bt_log(TRACE, "virtual", "EmulatedPeer.WatchConnectionState\n");
   connection_state_getter_.Watch(std::move(callback));
 }
 
@@ -171,7 +169,7 @@ void EmulatedPeer::UpdateConnectionState(bool connected) {
 }
 
 void EmulatedPeer::OnChannelClosed(zx_status_t status) {
-  logf(TRACE, "EmulatedPeer channel closed\n");
+  bt_log(TRACE, "virtual", "EmulatedPeer channel closed\n");
   NotifyChannelClosed();
 }
 

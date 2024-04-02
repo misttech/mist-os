@@ -12,7 +12,6 @@
 #include <fbl/string_buffer.h>
 
 #include "src/connectivity/bluetooth/hci/virtual/emulator.h"
-#include "src/connectivity/bluetooth/hci/virtual/log.h"
 #include "src/connectivity/bluetooth/hci/virtual/loopback.h"
 
 namespace bt_hci_virtual {
@@ -41,7 +40,7 @@ class VirtualController : public VirtualControllerDeviceType {
     auto dev = std::make_unique<bt_hci_virtual::EmulatorDevice>(zxdev());
     zx_status_t status = dev->Bind(std::string_view(name));
     if (status != ZX_OK) {
-      logf(ERROR, "failed to bind: %s\n", zx_status_get_string(status));
+      bt_log(ERROR, "virtual", "Failed to bind: %s\n", zx_status_get_string(status));
       completer.ReplyError(status);
     } else {
       // The driver runtime has taken ownership of |dev|.
@@ -59,7 +58,7 @@ class VirtualController : public VirtualControllerDeviceType {
     auto channel = request->channel.release();
     zx_status_t status = dev->Bind(channel, std::string_view(name));
     if (status != ZX_OK) {
-      logf(ERROR, "failed to bind: %s\n", zx_status_get_string(status));
+      bt_log(ERROR, "virtual", "Failed to bind: %s\n", zx_status_get_string(status));
     } else {
       // The driver runtime has taken ownership of |dev|.
       [[maybe_unused]] bt_hci_virtual::LoopbackDevice* unused = dev.release();

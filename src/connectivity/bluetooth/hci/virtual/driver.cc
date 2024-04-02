@@ -8,23 +8,19 @@
 #include <lib/ddk/driver.h>
 #include <zircon/status.h>
 
-#include <cstdio>
-#include <future>
 #include <memory>
-#include <thread>
 
 #include "src/connectivity/bluetooth/hci/virtual/controller.h"
-#include "src/connectivity/bluetooth/hci/virtual/log.h"
 
 namespace {
 
 zx_status_t DriverBind(void* ctx, zx_device_t* device) {
-  logf(TRACE, "DriverBind\n");
+  bt_log(TRACE, "virtual", "DriverBind\n");
 
   auto dev = std::make_unique<bt_hci_virtual::VirtualController>(device);
   zx_status_t status = dev->Bind();
   if (status != ZX_OK) {
-    logf(ERROR, "failed to bind: %s\n", zx_status_get_string(status));
+    bt_log(ERROR, "virtual", "failed to bind: %s\n", zx_status_get_string(status));
   } else {
     dev.release();
   }
