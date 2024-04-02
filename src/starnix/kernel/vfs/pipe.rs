@@ -16,7 +16,7 @@ use crate::{
         SpecialNode,
     },
 };
-use starnix_sync::{FileOpsCore, FileOpsIoctl, LockBefore, Locked, Mutex, MutexGuard, WriteOps};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, MutexGuard, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::CAP_SYS_RESOURCE,
@@ -515,7 +515,7 @@ impl FileOps for PipeFileObject {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

@@ -36,7 +36,7 @@ use starnix_logging::{
     log_error, log_trace, log_warn, trace_duration, track_stub, CATEGORY_STARNIX,
 };
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, FileOpsIoctl, InterruptibleEvent, Locked, Mutex, MutexGuard, RwLock,
+    DeviceOpen, FileOpsCore, InterruptibleEvent, Locked, Mutex, MutexGuard, RwLock, Unlocked,
     WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -242,7 +242,7 @@ impl FileOps for BinderConnection {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -4574,7 +4574,7 @@ pub mod tests {
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
     use memoffset::offset_of;
-    use starnix_sync::{LockBefore, Unlocked};
+    use starnix_sync::LockBefore;
     use starnix_uapi::{
         binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
         errors::{EBADF, EINVAL},

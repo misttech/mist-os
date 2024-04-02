@@ -20,7 +20,7 @@ use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
 };
 use starnix_logging::{log_info, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, Mutex, WriteOps};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
     open_flags::OpenFlags, user_address::UserAddress, vfs::FdEvents,
@@ -223,7 +223,7 @@ impl FileOps for DevRandom {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

@@ -148,7 +148,7 @@ use starnix_core::{
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name, track_stub};
-use starnix_sync::{FileOpsCore, FileOpsIoctl, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,
@@ -455,7 +455,7 @@ impl FileOps for MagmaFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _request: u32,

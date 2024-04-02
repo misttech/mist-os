@@ -6,7 +6,7 @@ use crate::task::TaskBuilder;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use selinux::security_server::SecurityServer;
-use starnix_sync::{FileOpsCore, FileOpsIoctl, Locked, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Unlocked, WriteOps};
 use std::{ffi::CString, mem::MaybeUninit, sync::Arc};
 use zerocopy::{AsBytes, NoCell};
 
@@ -336,7 +336,7 @@ impl FileOps for PanickingFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _request: u32,

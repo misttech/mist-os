@@ -10,7 +10,7 @@ use starnix_core::{
     vfs::{FileObject, FileOps, InputBuffer, OutputBuffer, SeekTarget},
 };
 use starnix_logging::{log_error, log_info, track_stub};
-use starnix_sync::{FileOpsCore, FileOpsIoctl, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     errno, error,
@@ -98,7 +98,7 @@ impl FileOps for GrallocFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

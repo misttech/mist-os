@@ -19,7 +19,7 @@ use crate::{
     },
 };
 use starnix_logging::{log_info, log_warn, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, WriteOps};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::{DeviceType, INPUT_MAJOR},
@@ -500,7 +500,7 @@ impl FileOps for Arc<InputFile> {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -919,7 +919,6 @@ mod test {
         EventPhase, TouchEvent, TouchPointerSample, TouchResponse, TouchSourceMarker,
         TouchSourceRequest,
     };
-    use starnix_sync::Unlocked;
     use starnix_uapi::errors::EAGAIN;
     use test_case::test_case;
     use test_util::assert_near;
@@ -1312,7 +1311,6 @@ mod test {
         );
 
         // Invoke ioctl() for axis details.
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         input_file
             .ioctl(&mut locked, &file_object, &current_task, ioctl_op, address.into())
             .expect("ioctl() failed");

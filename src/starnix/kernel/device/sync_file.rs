@@ -19,7 +19,7 @@ use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
 use starnix_lifecycle::AtomicUsizeCounter;
 use starnix_logging::{impossible_error, log_warn};
-use starnix_sync::{FileOpsCore, FileOpsIoctl, Locked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     c_char, error,
@@ -128,7 +128,7 @@ impl FileOps for SyncFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

@@ -20,7 +20,7 @@ use fidl_fuchsia_ui_test_input::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::log_warn;
-use starnix_sync::{DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, Mutex, WriteOps};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type, errno, error, errors::Errno, open_flags::OpenFlags, uapi, user_address::UserRef,
@@ -288,7 +288,7 @@ impl FileOps for Arc<UinputDevice> {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, FileOpsIoctl>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -430,7 +430,6 @@ mod test {
     use fidl_fuchsia_input_report as fir;
     use fuchsia_async as fasync;
     use futures::StreamExt;
-    use starnix_sync::Unlocked;
     use starnix_uapi::user_address::UserAddress;
     use std::thread;
     use test_case::test_case;
@@ -480,7 +479,6 @@ mod test {
     async fn ui_get_version() {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let version_address =
             map_memory(&current_task, UserAddress::default(), std::mem::size_of::<u32>() as u64);
         let r = dev.ioctl(
@@ -512,7 +510,6 @@ mod test {
     async fn ui_set_evbit(bit: u32, expected_evbits: Vec<usize>) -> Result<SyscallResult, Errno> {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let r = dev.ioctl(
             &mut locked,
             &file_object,
@@ -530,7 +527,6 @@ mod test {
     async fn ui_set_evbit_call_multi() {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let r = dev.ioctl(
             &mut locked,
             &file_object,
@@ -555,7 +551,6 @@ mod test {
     async fn ui_set_keybit() {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let r = dev.ioctl(
             &mut locked,
             &file_object,
@@ -580,7 +575,6 @@ mod test {
     async fn ui_set_absbit() {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let r = dev.ioctl(
             &mut locked,
             &file_object,
@@ -605,7 +599,6 @@ mod test {
     async fn ui_set_propbit() {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let r = dev.ioctl(
             &mut locked,
             &file_object,
@@ -630,7 +623,6 @@ mod test {
     async fn ui_set_phys() {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let phys_name = b"mouse0\0";
         let phys_name_address =
             map_memory(&current_task, UserAddress::default(), phys_name.len() as u64);
@@ -659,7 +651,6 @@ mod test {
     async fn ui_dev_setup() {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let address = map_memory(
             &current_task,
             UserAddress::default(),
@@ -709,7 +700,6 @@ mod test {
             UserAddress::default(),
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let _ = dev.ioctl(
             &mut locked,
             &file_object,
@@ -758,7 +748,6 @@ mod test {
             UserAddress::default(),
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let _ = dev.ioctl(
             &mut locked,
             &file_object,
@@ -779,26 +768,20 @@ mod test {
     async fn keyboard_write() {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked_ioctl = locked.cast_locked::<FileOpsIoctl>();
         let address = map_memory(
             &current_task,
             UserAddress::default(),
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
         let _ = dev.ioctl(
-            &mut locked_ioctl,
+            &mut locked,
             &file_object,
             &current_task,
             uapi::UI_SET_EVBIT,
             SyscallArg::from(uapi::EV_KEY as u64),
         );
-        let _ = dev.ioctl(
-            &mut locked_ioctl,
-            &file_object,
-            &current_task,
-            uapi::UI_DEV_SETUP,
-            address.into(),
-        );
+        let _ =
+            dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
 
         let (key_client, mut key_server) =
             fidl::endpoints::create_sync_proxy_and_stream::<futinput::KeyboardMarker>()
@@ -894,7 +877,6 @@ mod test {
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
         {
-            let mut locked = locked.cast_locked::<FileOpsIoctl>();
             let _ = dev.ioctl(
                 &mut locked,
                 &file_object,
@@ -952,7 +934,6 @@ mod test {
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
         {
-            let mut locked = locked.cast_locked::<FileOpsIoctl>();
             let _ = dev.ioctl(
                 &mut locked,
                 &file_object,
@@ -980,21 +961,20 @@ mod test {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
         {
-            let mut locked_ioctl = locked.cast_locked::<FileOpsIoctl>();
             let address = map_memory(
                 &current_task,
                 UserAddress::default(),
                 std::mem::size_of::<uapi::uinput_setup>() as u64,
             );
             let _ = dev.ioctl(
-                &mut locked_ioctl,
+                &mut locked,
                 &file_object,
                 &current_task,
                 uapi::UI_SET_EVBIT,
                 SyscallArg::from(uapi::EV_ABS as u64),
             );
             let _ = dev.ioctl(
-                &mut locked_ioctl,
+                &mut locked,
                 &file_object,
                 &current_task,
                 uapi::UI_DEV_SETUP,

@@ -16,9 +16,6 @@ lock_level!(MmDumpable);
 lock_level!(TaskRelease);
 lock_level!(ProcessGroupState);
 
-// FileOps lock levels. These are artificial lock levels used to call methods of FileOps traits.
-lock_level!(FileOpsIoctl);
-
 // These lock levels are use to denote operations on FileOps, SocketOps and FsNodeOps
 // TODO(https://fxbug.dev/324065824): FsNode.create_file_ops, FsNode.mknod, FsNode.unlink, FileOps.read,
 // SocketOps.read use the same level because of the circular dependencies between them.
@@ -39,9 +36,7 @@ impl_lock_after!(Unlocked => MmDumpable);
 
 impl_lock_after!(Unlocked => TaskRelease);
 impl_lock_after!(TaskRelease => DeviceOpen);
-impl_lock_after!(DeviceOpen => FileOpsIoctl);
-// FileOpsIoctl is before read/write because SocketFile.ioctl ends up indirectly calling FileOps.read and FileOps.write
-impl_lock_after!(FileOpsIoctl => FileOpsCore);
+impl_lock_after!(DeviceOpen => FileOpsCore);
 impl_lock_after!(FileOpsCore => WriteOps);
 impl_lock_after!(WriteOps =>  ProcessGroupState);
 impl_lock_after!(WriteOps => BpfHelperOps);

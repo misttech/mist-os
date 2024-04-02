@@ -23,9 +23,7 @@ use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, trace_duration, track_stub, CATEGORY_STARNIX_MM};
-use starnix_sync::{
-    FileOpsCore, FileOpsIoctl, LockEqualOrBefore, Locked, Mutex, Unlocked, WriteOps,
-};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -338,7 +336,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -750,7 +748,7 @@ impl FileOps for OPathOps {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _request: u32,
@@ -866,7 +864,7 @@ impl FileOps for ProxyFileOps {
     }
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, FileOpsIoctl>,
+        locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1320,18 +1318,14 @@ impl FileObject {
         Ok(())
     }
 
-    pub fn ioctl<L>(
+    pub fn ioctl(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
-    ) -> Result<SyscallResult, Errno>
-    where
-        L: LockEqualOrBefore<FileOpsIoctl>,
-    {
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
-        self.ops().ioctl(&mut locked, self, current_task, request, arg)
+    ) -> Result<SyscallResult, Errno> {
+        self.ops().ioctl(locked, self, current_task, request, arg)
     }
 
     pub fn fcntl(

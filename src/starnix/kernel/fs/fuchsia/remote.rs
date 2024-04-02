@@ -26,7 +26,7 @@ use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
 use starnix_sync::{
-    FileOpsCore, FileOpsIoctl, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, WriteOps,
+    FileOpsCore, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
@@ -1460,7 +1460,7 @@ impl FileOps for RemoteFileObject {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, FileOpsIoctl>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

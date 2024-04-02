@@ -21,8 +21,8 @@ use bstr::B;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, FileOpsIoctl, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard,
-    RwLockWriteGuard, WriteOps,
+    DeviceOpen, FileOpsCore, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
@@ -791,7 +791,7 @@ impl FileOps for FuseFileObject {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

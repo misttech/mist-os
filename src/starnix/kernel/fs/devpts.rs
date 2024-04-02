@@ -21,7 +21,7 @@ use crate::{
 };
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, ProcessGroupState, WriteOps,
+    DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -397,7 +397,7 @@ impl FileOps for DevPtmxFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, FileOpsIoctl>,
+        locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -495,7 +495,7 @@ impl FileOps for DevPtsFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, FileOpsIoctl>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -891,18 +891,14 @@ mod tests {
             MountInfo, NamespaceNode,
         },
     };
-    use starnix_sync::Unlocked;
     use starnix_uapi::{
         auth::Credentials,
         file_mode::FileMode,
         signals::{SIGCHLD, SIGTTOU},
     };
 
-    fn ioctl<
-        T: zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::NoCell + Copy,
-        L: LockBefore<FileOpsIoctl>,
-    >(
-        locked: &mut Locked<'_, L>,
+    fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::NoCell + Copy>(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         file: &FileHandle,
         command: u32,
@@ -916,8 +912,8 @@ mod tests {
         current_task.read_object(address_ref)
     }
 
-    fn set_controlling_terminal<L: LockBefore<FileOpsIoctl>>(
-        locked: &mut Locked<'_, L>,
+    fn set_controlling_terminal(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         file: &FileHandle,
         steal: bool,
@@ -963,20 +959,15 @@ mod tests {
         open_file_with_flags(locked, current_task, fs, name, OpenFlags::RDWR | OpenFlags::NOCTTY)
     }
 
-    fn open_ptmx_and_unlock<L>(
-        locked: &mut Locked<'_, L>,
+    fn open_ptmx_and_unlock(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<FileOpsIoctl>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileHandle, Errno> {
         let file = open_file_with_flags(locked, current_task, fs, "ptmx".into(), OpenFlags::RDWR)?;
 
         // Unlock terminal
-        ioctl::<i32, L>(locked, current_task, &file, TIOCSPTLCK, &0)?;
+        ioctl::<i32>(locked, current_task, &file, TIOCSPTLCK, &0)?;
 
         Ok(file)
     }
@@ -1063,19 +1054,19 @@ mod tests {
         // Check that tty is the main terminal by calling the ioctl TIOCGPTN and checking it is
         // has the same result as on ptmx.
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task, &tty, TIOCGPTN, &0),
-            ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCGPTN, &0)
+            ioctl::<i32>(&mut locked, &task, &tty, TIOCGPTN, &0),
+            ioctl::<i32>(&mut locked, &task, &ptmx, TIOCGPTN, &0)
         );
 
         // Detach the controlling terminal.
-        ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCNOTTY, &0).expect("detach terminal");
+        ioctl::<i32>(&mut locked, &task, &ptmx, TIOCNOTTY, &0).expect("detach terminal");
         let pts = open_file(&mut locked, &task, fs, "0".into()).expect("open file");
         set_controlling_terminal(&mut locked, &task, &pts, false)
             .expect("set_controlling_terminal");
         let tty = open_file_with_flags(&mut locked, &task, devfs, "tty".into(), OpenFlags::RDWR)
             .expect("tty");
         // TIOCGPTN is not implemented on replica terminals
-        assert!(ioctl::<i32, Unlocked>(&mut locked, &task, &tty, TIOCGPTN, &0).is_err());
+        assert!(ioctl::<i32>(&mut locked, &task, &tty, TIOCGPTN, &0).is_err());
     }
 
     #[::fuchsia::test]
@@ -1097,10 +1088,10 @@ mod tests {
         let ptmx0 = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         let ptmx1 = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
 
-        let pts0 = ioctl::<u32, Unlocked>(&mut locked, &task, &ptmx0, TIOCGPTN, &0).expect("ioctl");
+        let pts0 = ioctl::<u32>(&mut locked, &task, &ptmx0, TIOCGPTN, &0).expect("ioctl");
         assert_eq!(pts0, 0);
 
-        let pts1 = ioctl::<u32, Unlocked>(&mut locked, &task, &ptmx1, TIOCGPTN, &0).expect("ioctl");
+        let pts1 = ioctl::<u32>(&mut locked, &task, &ptmx1, TIOCGPTN, &0).expect("ioctl");
         assert_eq!(pts1, 1);
     }
 
@@ -1122,14 +1113,14 @@ mod tests {
         let pts = lookup_node(&task, fs, "0".into()).expect("component_lookup");
 
         // Check that the lock is not set.
-        assert_eq!(ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCGPTLCK, &0), Ok(0));
+        assert_eq!(ioctl::<i32>(&mut locked, &task, &ptmx, TIOCGPTLCK, &0), Ok(0));
         // /dev/pts/0 can be opened
         pts.open(&mut locked, &task, OpenFlags::RDONLY, true).expect("open");
 
         // Lock the terminal
-        ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCSPTLCK, &42).expect("ioctl");
+        ioctl::<i32>(&mut locked, &task, &ptmx, TIOCSPTLCK, &42).expect("ioctl");
         // Check that the lock is set.
-        assert_eq!(ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCGPTLCK, &0), Ok(1));
+        assert_eq!(ioctl::<i32>(&mut locked, &task, &ptmx, TIOCGPTLCK, &0), Ok(1));
         // /dev/pts/0 cannot be opened
         assert_eq!(pts.open(&mut locked, &task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
     }
@@ -1205,28 +1196,25 @@ mod tests {
         let opened_main = open_ptmx_and_unlock(&mut locked, &task1, fs).expect("ptmx");
         let opened_replica = open_file(&mut locked, &task2, fs, "0".into()).expect("open file");
 
+        assert_eq!(ioctl::<i32>(&mut locked, &task1, &opened_main, TIOCGPGRP, &0), error!(ENOTTY));
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_main, TIOCGPGRP, &0),
-            error!(ENOTTY)
-        );
-        assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCGPGRP, &0),
+            ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCGPGRP, &0),
             error!(ENOTTY)
         );
 
         set_controlling_terminal(&mut locked, &task1, &opened_main, false).unwrap();
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_main, TIOCGPGRP, &0),
+            ioctl::<i32>(&mut locked, &task1, &opened_main, TIOCGPGRP, &0),
             Ok(task1.thread_group.read().process_group.leader)
         );
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCGPGRP, &0),
+            ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCGPGRP, &0),
             error!(ENOTTY)
         );
 
         set_controlling_terminal(&mut locked, &task2, &opened_replica, false).unwrap();
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCGPGRP, &0),
+            ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCGPGRP, &0),
             Ok(task2.thread_group.read().process_group.leader)
         );
     }
@@ -1325,7 +1313,7 @@ mod tests {
         // Cannot change the foreground process group if the terminal is not the controlling
         // terminal
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &task2_pgid),
+            ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &task2_pgid),
             error!(ENOTTY)
         );
 
@@ -1333,39 +1321,38 @@ mod tests {
         set_controlling_terminal(&mut locked, &task1, &opened_replica, false).unwrap();
         // The foreground process group should be the one of task1
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_replica, TIOCGPGRP, &0),
+            ioctl::<i32>(&mut locked, &task1, &opened_replica, TIOCGPGRP, &0),
             Ok(task1.thread_group.read().process_group.leader)
         );
 
         // Cannot change the foreground process group to a negative pid.
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &-1),
+            ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &-1),
             error!(EINVAL)
         );
 
         // Cannot change the foreground process group to a invalid process group.
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &255),
+            ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &255),
             error!(ESRCH)
         );
 
         // Cannot change the foreground process group to a process group in another session.
         let init_pgid = init.thread_group.read().process_group.leader;
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &init_pgid),
+            ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &init_pgid),
             error!(EPERM)
         );
 
         // Changing the foreground process while being in background generates SIGTTOU and fails.
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &task2_pgid),
+            ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &task2_pgid),
             error!(EINTR)
         );
         assert!(task2.read().signals.has_queued(SIGTTOU));
 
         // Set the foregound process to task2 process group
-        ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_replica, TIOCSPGRP, &task2_pgid)
-            .unwrap();
+        ioctl::<i32>(&mut locked, &task1, &opened_replica, TIOCSPGRP, &task2_pgid).unwrap();
 
         // Check that the foreground process has been changed.
         let terminal = Arc::clone(
@@ -1403,7 +1390,7 @@ mod tests {
 
         // Cannot detach the controlling terminal when none is attached terminal
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_replica, TIOCNOTTY, &0),
+            ioctl::<i32>(&mut locked, &task1, &opened_replica, TIOCNOTTY, &0),
             error!(ENOTTY)
         );
 
@@ -1412,13 +1399,12 @@ mod tests {
 
         // Cannot detach the controlling terminal when not the session leader.
         assert_eq!(
-            ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_replica, TIOCNOTTY, &0),
+            ioctl::<i32>(&mut locked, &task1, &opened_replica, TIOCNOTTY, &0),
             error!(ENOTTY)
         );
 
         // Detach the terminal
-        ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCNOTTY, &0)
-            .expect("detach terminal");
+        ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCNOTTY, &0).expect("detach terminal");
         assert!(task2
             .thread_group
             .read()

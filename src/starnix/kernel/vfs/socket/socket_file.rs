@@ -16,7 +16,7 @@ use crate::{
         FileHandle, FileObject, FileOps,
     },
 };
-use starnix_sync::{FileOpsCore, FileOpsIoctl, LockEqualOrBefore, Locked, WriteOps};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags, vfs::FdEvents};
 
@@ -93,7 +93,7 @@ impl FileOps for SocketFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, FileOpsIoctl>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

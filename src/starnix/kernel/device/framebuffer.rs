@@ -21,7 +21,7 @@ use fidl_fuchsia_ui_views as fuiviews;
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, log_info, log_warn};
-use starnix_sync::{DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, RwLock};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, RwLock, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,
@@ -182,7 +182,7 @@ impl FileOps for Arc<Framebuffer> {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

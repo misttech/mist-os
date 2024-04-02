@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use starnix_logging::log_info;
-use starnix_sync::{FileOpsCore, FileOpsIoctl, Locked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
 
@@ -54,7 +54,7 @@ impl FileOps for SyslogFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
