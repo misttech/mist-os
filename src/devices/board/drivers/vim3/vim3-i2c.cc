@@ -54,9 +54,9 @@ constexpr i2c_channel_t i2c_ao_channels[]{
     // STM8s microcontroller
     {
         .address = 0x18,
-        .vid = PDEV_VID_KHADAS,
-        .pid = PDEV_PID_VIM3,
-        .did = PDEV_DID_VIM3_MCU,
+        .vid = 0,
+        .pid = 0,
+        .did = 0,
     },
     // USB PD
     {

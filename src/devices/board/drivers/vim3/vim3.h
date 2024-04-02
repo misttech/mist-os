@@ -105,6 +105,7 @@ class Vim3 : public Vim3Type {
   zx_status_t MaliInit();
   zx_status_t VideoInit();
   zx_status_t SuspendInit();
+  zx_status_t McuInit();
 
   int Thread();
 
@@ -136,6 +137,14 @@ class Vim3 : public Vim3Type {
   std::vector<fuchsia_hardware_gpioimpl::wire::InitStep> gpio_init_steps_;
   std::vector<fuchsia_hardware_clockimpl::wire::InitStep> clock_init_steps_;
   thrd_t thread_;
+};
+
+class Vim3Child;
+using Vim3ChildType = ddk::Device<Vim3Child>;
+class Vim3Child : public Vim3ChildType {
+ public:
+  explicit Vim3Child(zx_device_t* parent) : Vim3ChildType(parent) {}
+  void DdkRelease() {}
 };
 
 }  // namespace vim3

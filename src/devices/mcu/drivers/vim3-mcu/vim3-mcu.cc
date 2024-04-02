@@ -24,7 +24,7 @@
 
 namespace stm {
 zx_status_t StmMcu::Create(void* ctx, zx_device_t* parent) {
-  ddk::I2cChannel i2c(parent);
+  ddk::I2cChannel i2c(parent, "i2c");
   if (!i2c.is_valid()) {
     zxlogf(ERROR, "Failed to get ZX_PROTOCOL_I2C");
     return ZX_ERR_NO_RESOURCES;

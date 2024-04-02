@@ -50,7 +50,7 @@ zx_status_t Vim3::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  status = board->DdkAdd("vim3");
+  status = board->DdkAdd("vim3", DEVICE_ADD_NON_BINDABLE);
   if (status != ZX_OK) {
     return status;
   }
@@ -73,6 +73,11 @@ int Vim3::Thread() {
   }
   if ((status = I2cInit()) != ZX_OK) {
     zxlogf(ERROR, "I2cInit() failed: %d", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
+  if ((status = McuInit()) != ZX_OK) {
+    zxlogf(ERROR, "McuInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }

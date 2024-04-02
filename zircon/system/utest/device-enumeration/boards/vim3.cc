@@ -106,7 +106,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       // reset pin
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-106",
 
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-24/vim3-mcu",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-24/mcu-composite/vim3-mcu",
 
       // Suspend HAL
       "sys/platform/05:06:41/aml-suspend-device",

@@ -37,6 +37,7 @@ fuchsia_driver("vim3-driver") {
     "vim3-i2c.cc",
     "vim3-lcd.cc",
     "vim3-mali.cc",
+    "vim3-mcu.cc",
     "vim3-nna.cc",
     "vim3-power.cc",
     "vim3-pwm.cc",

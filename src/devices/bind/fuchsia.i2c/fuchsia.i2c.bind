@@ -21,7 +21,7 @@ extend uint fuchsia.BIND_I2C_BUS_ID {
 
 extend uint fuchsia.BIND_I2C_ADDRESS {
   BACKLIGHT = 0x2C,
-  ETH = 0x18,
+  MCU = 0x18,
   AMBIENTLIGHT = 0x39,
   AUDIO_CODEC = 0x48,
   SHERLOCK = 0x36,
