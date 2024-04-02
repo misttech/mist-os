@@ -74,7 +74,7 @@ def make_image_assembly_path(package_name):
 
 
 def make_package_path(package_name):
-    return "packages/base/" + package_name
+    return "packages/" + package_name
 
 
 TestSetupArgs = namedtuple(
@@ -234,15 +234,13 @@ class MakeLegacyConfig(unittest.TestCase):
                 aib.packages,
                 set(
                     [
-                        PackageDetails("packages/base/base_a", "base"),
-                        PackageDetails("packages/base/base_b", "base"),
-                        PackageDetails("packages/cache/cache_a", "cache"),
-                        PackageDetails("packages/cache/cache_b", "cache"),
-                        PackageDetails("packages/system/system_a", "system"),
-                        PackageDetails("packages/system/system_b", "system"),
-                        PackageDetails(
-                            "packages/bootfs_packages/bootfs", "bootfs"
-                        ),
+                        PackageDetails("packages/base_a", "base"),
+                        PackageDetails("packages/base_b", "base"),
+                        PackageDetails("packages/cache_a", "cache"),
+                        PackageDetails("packages/cache_b", "cache"),
+                        PackageDetails("packages/system_a", "system"),
+                        PackageDetails("packages/system_b", "system"),
+                        PackageDetails("packages/bootfs", "bootfs"),
                     ]
                 ),
             )
@@ -252,17 +250,13 @@ class MakeLegacyConfig(unittest.TestCase):
             self.assertEqual(aib.kernel.clock_backstop, 123456)
             self.assertEqual(
                 aib.bootfs_files_package,
-                "packages/bootfs_packages/bootfs_files_package",
+                "packages/bootfs_files_package",
             )
             self.assertEqual(aib.bootfs_files, set())
 
             self.assertEqual(
                 aib.base_drivers,
-                [
-                    DriverDetails(
-                        "packages/base_drivers/base_driver", ["meta/driver.cm"]
-                    )
-                ],
+                [DriverDetails("packages/base_driver", ["meta/driver.cm"])],
             )
             self.assertEqual(aib.shell_commands, shell_commands_file)
             self.assertEqual(
@@ -287,7 +281,7 @@ class MakeLegacyConfig(unittest.TestCase):
                 for suffix in ["a", "b"]:
                     package_name = f"{package_set}_{suffix}"
                     with open(
-                        f"outdir/packages/{package_set}/{package_name}"
+                        f"outdir/packages/{package_name}"
                     ) as manifest_file:
                         manifest = serialization.json_load(
                             PackageManifest, manifest_file
@@ -306,7 +300,7 @@ class MakeLegacyConfig(unittest.TestCase):
 
             # Spot-check one of the manifests, that it contains the correct
             # source paths to the blobs.
-            with open("outdir/packages/base/base_a") as manifest_file:
+            with open("outdir/packages/base_a") as manifest_file:
                 manifest = serialization.json_load(
                     PackageManifest, manifest_file
                 )
@@ -315,7 +309,7 @@ class MakeLegacyConfig(unittest.TestCase):
                 blobs = manifest.blobs_by_path()
                 self.assertEqual(
                     blobs["internal/path/file_a_1"].source_path,
-                    "../../blobs/efac096092f7cf879c72ac51d23d9f142e97405dec7dd9c69aeee81de083f794",
+                    "../blobs/efac096092f7cf879c72ac51d23d9f142e97405dec7dd9c69aeee81de083f794",
                 )
                 self.assertEqual(
                     blobs["internal/path/file_a_1"].merkle,
@@ -323,7 +317,7 @@ class MakeLegacyConfig(unittest.TestCase):
                 )
                 self.assertEqual(
                     blobs["internal/path/file_a_2"].source_path,
-                    "../../blobs/bf0c3ae1356b5863258f73a37d555cf878007b8bfe4fd780d74466ec62fe062d",
+                    "../blobs/bf0c3ae1356b5863258f73a37d555cf878007b8bfe4fd780d74466ec62fe062d",
                 )
                 self.assertEqual(
                     blobs["internal/path/file_a_2"].merkle,
@@ -331,7 +325,7 @@ class MakeLegacyConfig(unittest.TestCase):
                 )
                 self.assertEqual(
                     blobs["internal/path/file_a_3"].source_path,
-                    "../../blobs/a2e574ccd55c815f0a87c4f27e7a3115fe8e46d41a2e0caf2a91096a41421f78",
+                    "../blobs/a2e574ccd55c815f0a87c4f27e7a3115fe8e46d41a2e0caf2a91096a41421f78",
                 )
                 self.assertEqual(
                     blobs["internal/path/file_a_3"].merkle,
@@ -533,13 +527,13 @@ class MakeLegacyConfig(unittest.TestCase):
                     "compiled_packages/core/core/shard1.cml",
                     "compiled_packages/core/core/shard2.cml",
                     "kernel/kernel.bin",
-                    "packages/base/base_a",
-                    "packages/base/base_b",
-                    "packages/bootfs_packages/bootfs",
-                    "packages/cache/cache_a",
-                    "packages/cache/cache_b",
-                    "packages/system/system_a",
-                    "packages/system/system_b",
+                    "packages/base_a",
+                    "packages/base_b",
+                    "packages/bootfs",
+                    "packages/cache_a",
+                    "packages/cache_b",
+                    "packages/system_a",
+                    "packages/system_b",
                 ],
             )
 

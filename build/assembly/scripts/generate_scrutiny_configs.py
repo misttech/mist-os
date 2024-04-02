@@ -19,22 +19,22 @@ def collect_aib_artifacts(aib, aib_path):
     bootfs_packages = set()
     for pkg in aib.packages:
         if pkg.set == "base":
-            name = pkg.package.removeprefix("packages/base/")
+            name = pkg.package.removeprefix("packages/")
             static_packages.add(name)
         elif pkg.set == "cache":
-            name = pkg.package.removeprefix("packages/cache/")
+            name = pkg.package.removeprefix("packages/")
             static_packages.add(name)
         elif pkg.set == "flexible":
-            name = pkg.package.removeprefix("packages/flexible/")
+            name = pkg.package.removeprefix("packages/")
             static_packages.add(name)
         elif pkg.set == "bootfs":
-            name = pkg.package.removeprefix("packages/bootfs_packages/")
+            name = pkg.package.removeprefix("packages/")
             bootfs_packages.add(name)
     for base_driver in aib.base_drivers:
-        name = base_driver.package.removeprefix("packages/base_drivers/")
+        name = base_driver.package.removeprefix("packages/")
         static_packages.add(name)
     for boot_driver in aib.boot_drivers:
-        name = boot_driver.package.removeprefix("packages/boot_drivers/")
+        name = boot_driver.package.removeprefix("packages/")
         bootfs_packages.add(name)
 
     bootfs_files = set()

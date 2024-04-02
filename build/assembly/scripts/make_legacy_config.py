@@ -27,6 +27,7 @@ from assembly import (
 from assembly.assembly_input_bundle import (
     CompiledPackageAdditionalShards,
     DuplicatePackageException,
+    PackageDetails,
     PackageManifestParsingException,
 )
 from depfile import DepFile
@@ -72,10 +73,11 @@ def copy_to_assembly_input_bundle(
         copying operation (ie. depfile contents)
     """
     aib_creator = AIBCreator(outdir)
-    aib_creator.base.update(base)
-    aib_creator.cache.update(cache)
-    aib_creator.system.update(system)
-    aib_creator.bootfs_packages.update(bootfs_packages)
+
+    aib_creator.system.update([PackageDetails(m, "system") for m in system])
+    aib_creator.packages.update(
+        [PackageDetails(m, "bootfs") for m in bootfs_packages]
+    )
     aib_creator.kernel = kernel
     aib_creator.boot_args.update(boot_args)
 
@@ -84,11 +86,21 @@ def copy_to_assembly_input_bundle(
     if bootfs_files_package:
         aib_creator.bootfs_files_package = bootfs_files_package
 
-    # Strip any base_driver and base pkgs from the cache set
-    aib_creator.cache = aib_creator.cache.difference(
-        aib_creator.base
-    ).difference(aib_creator.base_drivers)
-    aib_creator.base = aib_creator.base.difference(aib_creator.base_drivers)
+    # Order is important here, because there can be the same package in multiple
+    # of base, base_drivers, cache, and cache_drivers, so we need to remove the
+    # duplicates.
+
+    # Remove base_drivers from base
+    base_drivers = set(base_driver_packages_list)
+    base = set(base).difference(base_drivers)
+
+    # Remove base_drivers and base from cache
+    cache = set(cache).difference(base).difference(base_drivers)
+
+    # Now we can update the aib_creator
+    aib_creator.base_drivers = base_drivers
+    aib_creator.packages.update([PackageDetails(m, "base") for m in base])
+    aib_creator.packages.update([PackageDetails(m, "cache") for m in cache])
 
     if len(aib_creator.base_drivers) != len(base_driver_packages_list):
         raise ValueError(

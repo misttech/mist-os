@@ -35,10 +35,11 @@ from .common import FileEntry, FilePath, fast_copy, fast_copy_makedirs
 from .package_manifest import BlobEntry, PackageManifest, SubpackageEntry
 
 __all__ = [
-    "AssemblyInputBundle",
     "AIBCreator",
+    "AssemblyInputBundle",
     "ConfigDataEntries",
     "DriverDetails",
+    "PackageDetails",
 ]
 
 PackageManifestList = List[FilePath]
@@ -101,6 +102,9 @@ class PackageDetails:
         return self.package < other.package
 
 
+PackageDetailsList = List[PackageDetails]
+
+
 @dataclass
 @serialize_json
 class CompiledPackageMainDefinition:
@@ -144,21 +148,8 @@ class AssemblyInputBundle:
         ./
         assembly_config.json
         packages/
-            base/
-                <package name>
-            base_drivers/
-                <package name>
-            boot_drivers/
-                <package name>
-            cache/
-                <package name>
-            flexible/
-                <package name>
-            system/
-                <package name>
-            bootfs_packages/
-                name_of_aib.bootfs_files_package
-                <package name>
+            name_of_aib.bootfs_files_package
+            <package name>
         blobs/
             <merkle>
         subpackages/
@@ -404,11 +395,13 @@ class AIBCreator:
         # the root of this dir.
         self.outdir = outdir
 
-        # The package sets (paths to package manifests)
-        self.base: Set[FilePath] = set()
-        self.cache: Set[FilePath] = set()
-        self.flexible: Set[FilePath] = set()
+        # The packages (paths to package manifests)
+        self.packages: Set[PackageDetails] = set()
+
+        # The "system packages"
         self.system: Set[FilePath] = set()
+
+        # The shell command configurations
         self.shell_commands: Dict[str, List[str]] = defaultdict(list)
 
         # The kernel info
@@ -493,25 +486,10 @@ class AIBCreator:
         if kernel_backstop:
             result.kernel.clock_backstop = kernel_backstop
 
-        # Copy the manifests for the base package set into the assembly bundle
-        (base_pkgs, base_blobs, base_deps) = self._copy_packages("base")
-        deps.update(base_deps)
-        result.add_packages([PackageDetails(m, "base") for m in base_pkgs])
-
-        # Copy the manifests for the cache package set into the assembly bundle
-        (cache_pkgs, cache_blobs, cache_deps) = self._copy_packages("cache")
-        deps.update(cache_deps)
-        result.add_packages([PackageDetails(m, "cache") for m in cache_pkgs])
-
-        (
-            flexible_pkgs,
-            flexible_blobs,
-            flexible_deps,
-        ) = self._copy_packages("flexible")
-        deps.update(flexible_deps)
-        result.packages.update(
-            [PackageDetails(m, "flexible") for m in flexible_pkgs]
-        )
+        # Copy the manifests for the packages into the assembly bundle
+        (pkgs, pkg_blobs, pkg_deps) = self._copy_packages()
+        deps.update(pkg_deps)
+        result.add_packages(pkgs)
 
         # Copy base driver packages into the base driver list of the assembly bundle
         for d in self.provided_base_driver_details:
@@ -526,7 +504,9 @@ class AIBCreator:
             base_driver_pkgs,
             base_driver_blobs,
             base_driver_deps,
-        ) = self._copy_packages("base_drivers")
+        ) = self._copy_packages(
+            [PackageDetails(m, "base_drivers") for m in self.base_drivers]
+        )
         deps.update(base_driver_deps)
 
         (base_driver_details, base_driver_deps) = self._get_driver_details(
@@ -550,7 +530,9 @@ class AIBCreator:
             boot_driver_pkgs,
             boot_driver_blobs,
             boot_driver_deps,
-        ) = self._copy_packages("boot_drivers")
+        ) = self._copy_packages(
+            [PackageDetails(m, "boot_drivers") for m in self.boot_drivers]
+        )
         deps.update(boot_driver_deps)
 
         (boot_driver_details, boot_driver_deps) = self._get_driver_details(
@@ -562,17 +544,13 @@ class AIBCreator:
         deps.update(boot_driver_deps)
 
         # Copy the manifests for the system package set into the assembly bundle
-        (system_pkgs, system_blobs, system_deps) = self._copy_packages("system")
-        deps.update(system_deps)
-        result.add_packages([PackageDetails(m, "system") for m in system_pkgs])
-
-        # Copy the manifests for the bootfs package set into the assembly bundle
-        (bootfs_pkgs, bootfs_pkg_blobs, bootfs_pkg_deps) = self._copy_packages(
-            "bootfs_packages"
+        (system_pkgs, system_blobs, system_deps) = self._copy_packages(
+            self.system
         )
-        deps.update(bootfs_pkg_deps)
-        result.add_packages([PackageDetails(m, "bootfs") for m in bootfs_pkgs])
+        deps.update(system_deps)
+        result.add_packages(system_pkgs)
 
+        bootfs_pkg_blobs = []
         if self.bootfs_files_package:
             (
                 bootfs_files_pkg,
@@ -593,9 +571,7 @@ class AIBCreator:
         # to make invalid merkles).
         all_blobs = {}
         for merkle, source in [
-            *base_blobs,
-            *cache_blobs,
-            *flexible_blobs,
+            *pkg_blobs,
             *base_driver_blobs,
             *boot_driver_blobs,
             *system_blobs,
@@ -741,7 +717,7 @@ class AIBCreator:
         self,
         driver_component_files: List[dict],
         provided_driver_details: List[dict],
-        driver_pkgs: Set[FilePath],
+        driver_pkgs: Set[PackageDetails],
     ) -> List[DriverDetails]:
         """Read the driver package manifests and produce DriverDetails for the AIB config"""
         driver_details_list: List[DriverDetails] = list()
@@ -788,21 +764,21 @@ class AIBCreator:
                     )
                 component_files[package_name] = driver_details.components
 
-        for package_manifest_path in sorted(driver_pkgs):
+        for package_detail in sorted(driver_pkgs):
             with open(
-                os.path.join(self.outdir, package_manifest_path), "r"
+                os.path.join(self.outdir, package_detail.package), "r"
             ) as file:
                 try:
                     manifest = json_load(PackageManifest, file)
                 except Exception as exc:
                     raise PackageManifestParsingException(
-                        f"loading PackageManifest from {package_manifest_path}"
+                        f"loading PackageManifest from {package_detail.package}"
                     ) from exc
 
                 package_name = manifest.package.name
                 driver_details_list.append(
                     DriverDetails(
-                        package_manifest_path,
+                        package_detail.package,
                         # Include the driver components specified for this package
                         component_files[package_name],
                     )
@@ -812,16 +788,17 @@ class AIBCreator:
 
     def _copy_packages(
         self,
-        set_name: str,
+        package_details_list: PackageDetailsList = None,
     ) -> Tuple[PackageManifestList, BlobList, DepSet]:
         """Copy package manifests to the assembly bundle outdir, returning the set of blobs
         that need to be copied as well (so that they blob copying can be done in a
         single, deduplicated step).
         """
-        package_manifests = getattr(self, set_name)
+        if package_details_list is None:
+            package_details_list = self.packages
 
         # Resultant paths to package manifests
-        packages = []
+        packages: PackageDetailsList = []
 
         # All of the blobs to copy, deduplicated by merkle, and validated for
         # conflicting sources.
@@ -831,18 +808,18 @@ class AIBCreator:
         deps: DepSet = set()
 
         # Bail early if empty
-        if len(package_manifests) == 0:
+        if len(package_details_list) == 0:
             return (packages, blobs, deps)
 
         # Open each manifest, record the blobs, and then copy it to its destination,
         # sorted by path to the package manifest.
-        for package_manifest_path in sorted(package_manifests):
+        for package_detail in sorted(package_details_list):
             (manifest, blob_list, dep_set) = self._copy_package_from_path(
-                package_manifest_path, set_name
+                package_detail.package, package_detail.set
             )
             if manifest:
                 # Track the package manifest in our set of packages
-                packages.append(manifest)
+                packages.append(PackageDetails(manifest, package_detail.set))
                 blobs.extend(blob_list)
                 deps.update(dep_set)
 
@@ -891,7 +868,7 @@ class AIBCreator:
             deps.add(package_manifest_path)
 
         # Create the directory for the packages, now that we know it will exist
-        packages_dir = os.path.join("packages", set_name)
+        packages_dir = "packages"
         os.makedirs(os.path.join(self.outdir, packages_dir), exist_ok=True)
 
         # Path to which we will write the new manifest within the input bundle.

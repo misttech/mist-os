@@ -482,6 +482,7 @@ template("legacy_assembly_input_bundle") {
 
     outputs = [ files.assembly_input_bundle_config ]
     depfile = files.assembly_input_bundle_depfile
+
     args = [
       "--base-packages-list",
       rebase_path(files.base_package_list, root_build_dir),

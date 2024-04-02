@@ -16,12 +16,13 @@ from assembly.assembly_input_bundle import (
 )
 from depfile import DepFile
 from assembly import (
-    AssemblyInputBundle,
     AIBCreator,
+    AssemblyInputBundle,
     DriverDetails,
-    FilePath,
-    PackageManifest,
     FileEntry,
+    FilePath,
+    PackageDetails,
+    PackageManifest,
 )
 from serialization.serialization import (
     instance_from_dict,
@@ -44,20 +45,26 @@ def create_bundle(args: argparse.Namespace) -> None:
 
     # Add the base and cache packages, if they exist.
     if args.base_pkg_list:
-        add_pkg_list_from_file(aib_creator, args.base_pkg_list, "base")
+        add_pkg_list_from_file(aib_creator.packages, args.base_pkg_list, "base")
 
     if args.cache_pkg_list:
-        add_pkg_list_from_file(aib_creator, args.cache_pkg_list, "cache")
+        add_pkg_list_from_file(
+            aib_creator.packages, args.cache_pkg_list, "cache"
+        )
 
     if args.flexible_pkg_list:
-        add_pkg_list_from_file(aib_creator, args.flexible_pkg_list, "flexible")
+        add_pkg_list_from_file(
+            aib_creator.packages, args.flexible_pkg_list, "flexible"
+        )
 
     if args.system_pkg_list:
-        add_pkg_list_from_file(aib_creator, args.system_pkg_list, "system")
+        add_pkg_list_from_file(
+            aib_creator.system, args.system_pkg_list, "system"
+        )
 
     if args.bootfs_pkg_list:
         add_pkg_list_from_file(
-            aib_creator, args.bootfs_pkg_list, "bootfs_packages"
+            aib_creator.packages, args.bootfs_pkg_list, "bootfs"
         )
 
     if args.shell_cmds_list:
@@ -118,16 +125,13 @@ def create_bundle(args: argparse.Namespace) -> None:
 
 
 def add_pkg_list_from_file(
-    aib_creator: AIBCreator, pkg_list_file, pkg_set_name: str
+    pkg_set: List[PackageDetails], pkg_list_file, pkg_set_name: str
 ):
-    pkg_set: Set = getattr(aib_creator, pkg_set_name)
     pkg_list = _read_json_file(pkg_list_file)
-    for pkg_manifest_path in pkg_list:
-        if pkg_manifest_path in pkg_set:
-            raise ValueError(
-                f"duplicate pkg manifest found: {pkg_manifest_path}"
-            )
-        pkg_set.add(pkg_manifest_path)
+    for package in [PackageDetails(m, pkg_set_name) for m in pkg_list]:
+        if package in pkg_set:
+            raise ValueError(f"duplicate pkg manifest found: {package.package}")
+        pkg_set.add(package)
 
 
 def add_kernel_cmdline_from_file(aib_creator: AIBCreator, kernel_cmdline_file):
@@ -143,17 +147,11 @@ def add_driver_list_from_file(
 ):
     # cross-check the base and bootfs_package sets for the driver before adding
     # it to the target driver_list.
-    base_pkg_set: Set = getattr(aib_creator, "base")
-    boot_pkg_set: Set = getattr(aib_creator, "bootfs_packages")
     driver_details_list = _read_json_file(driver_list_file)
     for driver_details in driver_details_list:
-        if driver_details["package_target"] in base_pkg_set:
+        if driver_details["package_target"] in aib_creator.packages:
             raise ValueError(
-                f"duplicate pkg manifest found in base pkg set: {driver_details['package_target']}"
-            )
-        if driver_details["package_target"] in boot_pkg_set:
-            raise ValueError(
-                f"duplicate pkg manifest found in boot pkg set: {driver_details['package_target']}"
+                f"duplicate pkg manifest found: {driver_details['package_target']}"
             )
         driver_list.append(
             DriverDetails(

@@ -437,9 +437,11 @@ class PackageManifestBuilder:
                 path if path else f"some/path/for/{self._make_blob_name()}",
                 merkle if merkle else self._make_merkle(),
                 size if size else 0,
-                source
-                if source
-                else f"source/path/for/{self._make_blob_name('input_')}",
+                (
+                    source
+                    if source
+                    else f"source/path/for/{self._make_blob_name('input_')}"
+                ),
             )
         )
         return self
@@ -574,14 +576,17 @@ class AIBCreatorTest(unittest.TestCase):
                 another_package_manifest_path,
             ]
             expected_package_manifests = [
-                PackageDetails("packages/base/some_package", "base"),
-                PackageDetails("packages/base/another_package", "base"),
+                PackageDetails("packages/some_package", "base"),
+                PackageDetails("packages/another_package", "base"),
             ]
 
             # Create the AIBCreator and perform the operation that's under test.
             aib_creator = AIBCreator(assembly_dir)
-            aib_creator.base.update(
-                [some_package_manifest_path, another_package_manifest_path]
+            aib_creator.packages.update(
+                [
+                    PackageDetails(some_package_manifest_path, "base"),
+                    PackageDetails(another_package_manifest_path, "base"),
+                ]
             )
             bundle, bundle_path, deps = aib_creator.build()
 
@@ -620,7 +625,7 @@ class AIBCreatorTest(unittest.TestCase):
                         blob.path,
                         blob.merkle,
                         blob.size,
-                        f"../../blobs/{blob.merkle}",
+                        f"../blobs/{blob.merkle}",
                     )
                     for blob in expected.blobs
                 ]
