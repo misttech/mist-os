@@ -147,6 +147,11 @@ impl PidTable {
     pub fn kill_process(&mut self, pid: pid_t, zombie: WeakRef<ZombieProcess>) {
         let entry = self.get_entry_mut(pid);
         assert!(matches!(entry.process, ProcessEntry::ThreadGroup(_)));
+
+        // All tasks from the process are expected to be cleared from the table before the process
+        // becomes a zombie. We can't verify this for all tasks here, check it just for the leader.
+        assert!(entry.task.is_none());
+
         entry.process = ProcessEntry::Zombie(zombie);
     }
 

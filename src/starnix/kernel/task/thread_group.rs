@@ -498,6 +498,7 @@ impl ThreadGroup {
         let mut pids = self.kernel.pids.write();
 
         task.set_ptrace_zombie(&pids);
+        pids.remove_task(task.id);
 
         let mut state = self.write();
 

@@ -1284,8 +1284,6 @@ impl Releasable for Task {
 
         self.ptrace_disconnect();
 
-        self.kernel().pids.write().remove_task(self.id);
-
         // Release the fd table.
         self.files.release(());
 
