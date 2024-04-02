@@ -272,9 +272,7 @@ PaverServiceTest::PaverServiceTest()
     : loop_(&kAsyncLoopConfigAttachToCurrentThread),
       loop2_(&kAsyncLoopConfigNoAttachToCurrentThread),
       fake_svc_(loop2_.dispatcher(), FakeBootArgs()) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::Paver>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_paver::Paver>::Create();
 
   client_ = fidl::WireSyncClient(std::move(client));
 
@@ -332,9 +330,7 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
   }
 
   void FindBootManager() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::BootManager>();
-    ASSERT_OK(endpoints.status_value());
-    auto& [local, remote] = endpoints.value();
+    auto [local, remote] = fidl::Endpoints<fuchsia_paver::BootManager>::Create();
 
     auto result = client_->FindBootManager(std::move(remote));
     ASSERT_OK(result.status());
@@ -342,9 +338,7 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
   }
 
   void FindDataSink() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::DataSink>();
-    ASSERT_OK(endpoints.status_value());
-    auto& [local, remote] = endpoints.value();
+    auto [local, remote] = fidl::Endpoints<fuchsia_paver::DataSink>::Create();
 
     auto result = client_->FindDataSink(std::move(remote));
     ASSERT_OK(result.status());
@@ -352,9 +346,7 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
   }
 
   void FindSysconfig() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::Sysconfig>();
-    ASSERT_OK(endpoints.status_value());
-    auto& [local, remote] = endpoints.value();
+    auto [local, remote] = fidl::Endpoints<fuchsia_paver::Sysconfig>::Create();
 
     auto result = client_->FindSysconfig(std::move(remote));
     ASSERT_OK(result.status());
@@ -1883,9 +1875,7 @@ class PaverServiceBlockTest : public PaverServiceTest {
   }
 
   void UseBlockDevice(DeviceAndController block_device) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::DynamicDataSink>();
-    ASSERT_OK(endpoints.status_value());
-    auto& [local, remote] = endpoints.value();
+    auto [local, remote] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
 
     auto result = client_->UseBlockDevice(
         fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(block_device.device)),
@@ -2075,9 +2065,7 @@ TEST_F(PaverServiceLuisTest, CreateAbr) {
 
 TEST_F(PaverServiceLuisTest, SysconfigNotSupportedAndFailWithPeerClosed) {
   ASSERT_NO_FATAL_FAILURE(InitializeLuisGPTPartitions());
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::Sysconfig>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [local, remote] = endpoints.value();
+  auto [local, remote] = fidl::Endpoints<fuchsia_paver::Sysconfig>::Create();
   auto result = client_->FindSysconfig(std::move(remote));
   ASSERT_OK(result.status());
 
@@ -2095,10 +2083,8 @@ TEST_F(PaverServiceLuisTest, FindGPTDevicesIgnoreFvmPartitions) {
                                       paver::BindOption::Reformat);
   ASSERT_OK(fvm);
 
-  zx::result volume_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
-  ASSERT_OK(volume_endpoints);
-  auto& [volume, volume_server] = volume_endpoints.value();
+  auto [volume, volume_server] =
+      fidl::Endpoints<fuchsia_hardware_block_volume::VolumeManager>::Create();
   ASSERT_OK(fidl::WireCall(fvm.value())->ConnectToDeviceFidl(volume_server.TakeChannel()).status());
   zx::result status = paver::AllocateEmptyPartitions(devmgr_.devfs_root(), volume);
   ASSERT_OK(status);
@@ -2114,9 +2100,7 @@ TEST_F(PaverServiceLuisTest, FindGPTDevicesIgnoreFvmPartitions) {
 TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {
   // TODO(b/217597389): Consdier also adding an e2e test for this interface.
   ASSERT_NO_FATAL_FAILURE(InitializeLuisGPTPartitions());
-  auto endpoints = fidl::CreateEndpoints<fuchsia_paver::DynamicDataSink>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [local, remote] = endpoints.value();
+  auto [local, remote] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
 
   {
     zx::result connections = GetNewConnections(gpt_dev_->block_controller_interface());
@@ -2306,9 +2290,7 @@ SparseImageResult CreateSparseImage() {
 
 TEST_F(PaverServiceLuisTest, WriteSparseVolume) {
   ASSERT_NO_FATAL_FAILURE(InitializeLuisGPTPartitions());
-  auto endpoints = fidl::CreateEndpoints<fuchsia_paver::DynamicDataSink>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [local, remote] = endpoints.value();
+  auto [local, remote] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
 
   {
     zx::result connections = GetNewConnections(gpt_dev_->block_controller_interface());
@@ -2361,9 +2343,7 @@ TEST_F(PaverServiceLuisTest, OneShotRecovery) {
   // cover this.
   ASSERT_NO_FATAL_FAILURE(InitializeLuisGPTPartitions());
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::BootManager>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [local, remote] = endpoints.value();
+  auto [local, remote] = fidl::Endpoints<fuchsia_paver::BootManager>::Create();
 
   // Required by FindBootManager().
   fake_svc_.fake_boot_args().SetArgResponse("_a");

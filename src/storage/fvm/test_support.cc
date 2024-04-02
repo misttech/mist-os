@@ -49,12 +49,7 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> GetController(DeviceRef*
 zx_status_t RebindBlockDevice(DeviceRef* device) {
   // We need to create a DirWatcher to wait for the block device's child to disappear.
   fdio_cpp::UnownedFdioCaller caller(device->devfs_root_fd());
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  EXPECT_OK(endpoints);
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
-  }
-  auto& [client_end, server_end] = endpoints.value();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   const fidl::OneWayStatus status =
       fidl::WireCall(caller.directory())
           ->Open(fuchsia_io::OpenFlags::kDirectory, {},

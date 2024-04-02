@@ -210,11 +210,7 @@ zx::result<std::unique_ptr<block_client::Client>> GetBlockClient(const char* pat
   if (!info.ok()) {
     return zx::error(info.status());
   }
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [session, server] = endpoints.value();
+  auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
   if (fidl::OneWayStatus result = fidl::WireCall(*client)->OpenSession(std::move(server));
       !result.ok()) {
     return zx::error(result.status());

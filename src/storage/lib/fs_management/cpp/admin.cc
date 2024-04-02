@@ -21,11 +21,7 @@ namespace fs_management {
 __EXPORT
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> FsRootHandle(
     fidl::UnownedClientEnd<fuchsia_io::Directory> export_root, fuchsia_io::wire::OpenFlags flags) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   const fidl::Status result =
       fidl::WireCall(export_root)

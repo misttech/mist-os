@@ -160,10 +160,8 @@ TEST_F(FvmTest, AllocateEmptyPartitions) {
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
   ASSERT_OK(fvm);
 
-  zx::result volume_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
-  ASSERT_OK(volume_endpoints);
-  auto& [volume, volume_server] = volume_endpoints.value();
+  auto [volume, volume_server] =
+      fidl::Endpoints<fuchsia_hardware_block_volume::VolumeManager>::Create();
   ASSERT_OK(fidl::WireCall(fvm.value())->ConnectToDeviceFidl(volume_server.TakeChannel()).status());
   ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), volume));
 
@@ -183,10 +181,8 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
   ASSERT_OK(fvm1);
 
-  zx::result volume_endpoints1 =
-      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
-  ASSERT_OK(volume_endpoints1);
-  auto& [volume1, volume_server1] = volume_endpoints1.value();
+  auto [volume1, volume_server1] =
+      fidl::Endpoints<fuchsia_hardware_block_volume::VolumeManager>::Create();
   ASSERT_OK(
       fidl::WireCall(fvm1.value())->ConnectToDeviceFidl(volume_server1.TakeChannel()).status());
   ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), volume1));
@@ -210,10 +206,8 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
   ASSERT_OK(fvm2);
 
-  zx::result volume_endpoints2 =
-      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
-  ASSERT_OK(volume_endpoints2);
-  auto& [volume2, volume_server2] = volume_endpoints2.value();
+  auto [volume2, volume_server2] =
+      fidl::Endpoints<fuchsia_hardware_block_volume::VolumeManager>::Create();
   ASSERT_OK(
       fidl::WireCall(fvm2.value())->ConnectToDeviceFidl(volume_server2.TakeChannel()).status());
   ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), volume2));
@@ -253,10 +247,8 @@ TEST_F(FvmTest, Unbind) {
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
   ASSERT_OK(fvm);
 
-  zx::result volume_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
-  ASSERT_OK(volume_endpoints);
-  auto& [volume, volume_server] = volume_endpoints.value();
+  auto [volume, volume_server] =
+      fidl::Endpoints<fuchsia_hardware_block_volume::VolumeManager>::Create();
   ASSERT_OK(fidl::WireCall(fvm.value())->ConnectToDeviceFidl(volume_server.TakeChannel()).status());
   ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), volume));
 
@@ -278,10 +270,8 @@ TEST_F(FvmTest, UnbindInvalidPath) {
       SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
   ASSERT_OK(fvm);
 
-  zx::result volume_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
-  ASSERT_OK(volume_endpoints);
-  auto& [volume, volume_server] = volume_endpoints.value();
+  auto [volume, volume_server] =
+      fidl::Endpoints<fuchsia_hardware_block_volume::VolumeManager>::Create();
   ASSERT_OK(fidl::WireCall(fvm.value())->ConnectToDeviceFidl(volume_server.TakeChannel()).status());
 
   ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), volume));

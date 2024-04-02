@@ -44,9 +44,7 @@ TEST_P(DeviceTest, TestWriteThenRead) {
   const std::string kFilename = GetPath("block_device");
   const off_t kFileSize = 10 * 1024 * 1024;  // 10 megabytes
   CreateFxFile(kFilename, kFileSize);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   // Re-open file as block device i.e. using OpenFlag.BLOCK_DEVICE.
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
@@ -110,9 +108,7 @@ TEST_P(DeviceTest, TestWriteThenRead) {
 TEST_P(DeviceTest, TestGroupWritesThenReads) {
   const std::string kFilename = GetPath("block_device");
   CreateFxFile(kFilename);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
   ASSERT_EQ(fidl::WireCall(caller.directory())
@@ -195,9 +191,7 @@ TEST_P(DeviceTest, TestGroupWritesThenReads) {
 TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
   const std::string kFilename = GetPath("block_device");
   CreateFxFile(kFilename);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
   ASSERT_EQ(fidl::WireCall(caller.directory())
@@ -256,9 +250,7 @@ TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
 TEST_P(DeviceTest, TestInvalidGroupRequests) {
   const std::string kFilename = GetPath("block_device");
   CreateFxFile(kFilename);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
   ASSERT_EQ(fidl::WireCall(caller.directory())

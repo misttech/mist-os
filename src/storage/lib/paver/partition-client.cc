@@ -89,11 +89,7 @@ zx::result<> BlockPartitionClient::RegisterFastBlockIo() {
   if (client_) {
     return zx::ok();
   }
-  zx::result endpoints = fidl::CreateEndpoints<block::Session>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<block::Session>::Create();
   if (fidl::Status result = partition_->OpenSession(std::move(server)); !result.ok()) {
     return zx::error(result.status());
   }

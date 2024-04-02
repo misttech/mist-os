@@ -159,11 +159,8 @@ zx::result<std::unique_ptr<DevicePartitioner>> DevicePartitionerFactory::Create(
   for (auto& factory : *registered_factory_list()) {
     fidl::ClientEnd<fuchsia_device::Controller> controller;
     if (block_device.controller) {
-      zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-      if (controller_endpoints.is_error()) {
-        return controller_endpoints.take_error();
-      }
-      auto& [controller_client, controller_server] = controller_endpoints.value();
+      auto [controller_client, controller_server] =
+          fidl::Endpoints<fuchsia_device::Controller>::Create();
       if (zx_status_t status = fidl::WireCall(block_device.controller)
                                    ->ConnectToController(std::move(controller_server))
                                    .status();

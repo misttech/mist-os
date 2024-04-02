@@ -308,11 +308,7 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmPartitionFormat(
       zx::result fvm = TryBindToFvmDriver(devfs_root, partition_controller, zx::sec(3));
       if (fvm.is_ok()) {
         LOG("Found already formatted FVM.\n");
-        zx::result volume_endpoints = fidl::CreateEndpoints<volume::VolumeManager>();
-        if (volume_endpoints.is_error()) {
-          return volume_endpoints.take_error();
-        }
-        auto& [volume, volume_server] = volume_endpoints.value();
+        auto [volume, volume_server] = fidl::Endpoints<volume::VolumeManager>::Create();
         if (fidl::OneWayError status =
                 fidl::WireCall(fvm.value())->ConnectToDeviceFidl(volume_server.TakeChannel());
             !status.ok()) {
@@ -694,11 +690,7 @@ zx_status_t WipeAllFvmPartitionsWithGuid(fidl::UnownedClientEnd<fuchsia_device::
     // We're paving a partition that already exists within the FVM: let's
     // destroy it before we pave anew.
 
-    zx::result volume_endpoints = fidl::CreateEndpoints<volume::Volume>();
-    if (volume_endpoints.is_error()) {
-      return volume_endpoints.error_value();
-    }
-    auto& [volume, volume_server] = volume_endpoints.value();
+    auto [volume, volume_server] = fidl::Endpoints<volume::Volume>::Create();
     if (fidl::OneWayError status =
             fidl::WireCall(*old_partition)->ConnectToDeviceFidl(volume_server.TakeChannel());
         !status.ok()) {
@@ -860,11 +852,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
     }
     const fuchsia_hardware_block::wire::BlockInfo& info = response.value()->info;
 
-    zx::result endpoints = fidl::CreateEndpoints<block::Session>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    auto& [session, server] = endpoints.value();
+    auto [session, server] = fidl::Endpoints<block::Session>::Create();
     if (fidl::Status result = fidl::WireCall(parts[p].partition)->OpenSession(std::move(server));
         !result.ok()) {
       return zx::error(result.status());

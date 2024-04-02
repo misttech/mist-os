@@ -15,11 +15,7 @@ zx::result<MountedMemfs> MountedMemfs::Create(async_dispatcher_t* dispatcher, co
   }
   auto& [memfs, root] = result.value();
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   if (zx_status_t status = memfs->ServeDirectory(std::move(root), std::move(server));
       status != ZX_OK) {

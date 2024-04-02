@@ -126,9 +126,7 @@ TEST(BlkdevTests, blkdev_test_fifo_no_op) {
   fidl::ClientEnd<fuchsia_hardware_block::Block> client;
   ASSERT_NO_FATAL_FAILURE(get_testdev(&blk_size, &blk_count, &client));
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-  ASSERT_OK(endpoints);
-  auto& [session, server] = endpoints.value();
+  auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
 
   const fidl::Status result = fidl::WireCall(client)->OpenSession(std::move(server));
   ASSERT_OK(result.status());
@@ -142,11 +140,7 @@ static void fill_random(uint8_t* buf, uint64_t size) {
 
 zx::result<std::pair<fidl::ClientEnd<fuchsia_hardware_block::Session>, zx::fifo>> CreateRawSession(
     fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [session, server] = endpoints.value();
+  auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
 
   const fidl::Status result = fidl::WireCall(block)->OpenSession(std::move(server));
   if (!result.ok()) {

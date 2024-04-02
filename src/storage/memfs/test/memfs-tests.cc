@@ -44,9 +44,7 @@ TEST(MemfsTests, TestMemfsBasic) {
     ASSERT_EQ(promise.get_future().get(), ZX_OK);
   });
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   ASSERT_EQ(memfs->ServeDirectory(std::move(root), std::move(server)), ZX_OK);
   ASSERT_EQ(loop.StartThread(), ZX_OK);
@@ -95,9 +93,7 @@ TEST(MemfsTests, TestMemfsAppend) {
     ASSERT_EQ(promise.get_future().get(), ZX_OK);
   });
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   ASSERT_EQ(memfs->ServeDirectory(std::move(root), std::move(server)), ZX_OK);
   ASSERT_EQ(loop.StartThread(), ZX_OK);
@@ -152,9 +148,7 @@ TEST(MemfsTests, TestMemfsCloseDuringAccess) {
       ASSERT_EQ(promise.get_future().get(), ZX_OK);
     });
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     ASSERT_EQ(memfs->ServeDirectory(std::move(root), std::move(server)), ZX_OK);
     ASSERT_EQ(loop.StartThread(), ZX_OK);
@@ -218,9 +212,7 @@ TEST(MemfsTests, TestMemfsOverflow) {
     ASSERT_EQ(promise.get_future().get(), ZX_OK);
   });
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   ASSERT_EQ(memfs->ServeDirectory(std::move(root), std::move(server)), ZX_OK);
   ASSERT_EQ(loop.StartThread(), ZX_OK);
@@ -260,9 +252,7 @@ TEST(MemfsTests, TestMemfsDetachLinkedFilesystem) {
     ASSERT_EQ(promise.get_future().get(), ZX_OK);
   });
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   ASSERT_EQ(memfs->ServeDirectory(std::move(root), std::move(server)), ZX_OK);
   ASSERT_EQ(loop.StartThread(), ZX_OK);

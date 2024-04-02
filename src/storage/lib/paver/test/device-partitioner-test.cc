@@ -174,11 +174,7 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> ControllerFromBlock(Bloc
   if (!gpt) {
     return zx::ok(fidl::ClientEnd<fuchsia_device::Controller>());
   }
-  zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-  if (controller_endpoints.is_error()) {
-    return controller_endpoints.take_error();
-  }
-  auto& [controller, controller_server] = controller_endpoints.value();
+  auto [controller, controller_server] = fidl::Endpoints<fuchsia_device::Controller>::Create();
   if (zx_status_t status = fidl::WireCall(gpt->block_controller_interface())
                                ->ConnectToController(std::move(controller_server))
                                .status();

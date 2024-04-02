@@ -415,9 +415,7 @@ VmoClient::VmoClient(fidl::UnownedClientEnd<fuchsia_hardware_block::Block> devic
     block_size_ = response.value()->info.block_size;
   }
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-  ASSERT_OK(endpoints);
-  auto& [session, server] = endpoints.value();
+  auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
 
   const fidl::Status result = fidl::WireCall(device)->OpenSession(std::move(server));
   ASSERT_OK(result.status());

@@ -8,11 +8,7 @@
 #include <lib/fdio/directory.h>
 
 zx::result<fidl::ClientEnd<fuchsia_io::File>> OpenFile(const char* path) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
   return zx::make_result(
       fdio_open(path,
                 static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable |

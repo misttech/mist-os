@@ -82,9 +82,7 @@ void SyncStart(AsyncTearDownSync& completions, async::Loop* loop,
   ASSERT_OK(loop->StartThread());
 
   auto vn = fbl::AdoptRef(new AsyncTearDownVnode(completions, status_for_sync));
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_end, server_end] = endpoints.value();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
   ASSERT_OK(vn->Open(nullptr));
   ASSERT_OK((*vfs)->Serve(vn, server_end.TakeChannel(), {}));
   vn = nullptr;

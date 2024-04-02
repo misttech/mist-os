@@ -162,9 +162,7 @@ class MockBlockDevice final
 
 // Tests that the RemoteBlockDevice can be created and immediately destroyed.
 TEST(RemoteBlockDeviceTest, Constructor) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   MockBlockDevice mock_device;
   mock_device.BindServer(std::move(server));
@@ -177,9 +175,7 @@ TEST(RemoteBlockDeviceTest, Constructor) {
 // Tests that a fifo is attached to the block device for the duration of the
 // RemoteBlockDevice lifetime.
 TEST(RemoteBlockDeviceTest, FifoClosedOnDestruction) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   MockBlockDevice mock_device;
   mock_device.BindServer(std::move(server));
@@ -197,9 +193,7 @@ TEST(RemoteBlockDeviceTest, FifoClosedOnDestruction) {
 // Tests that the RemoteBlockDevice is capable of transmitting and receiving
 // messages with the block device.
 TEST(RemoteBlockDeviceTest, WriteTransactionReadResponse) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   MockBlockDevice mock_device;
   mock_device.BindServer(std::move(server));
@@ -247,9 +241,7 @@ TEST(RemoteBlockDeviceTest, WriteTransactionReadResponse) {
 // Tests that the RemoteBlockDevice is capable of transmitting and receiving
 // messages with the block device.
 TEST(RemoteBlockDeviceTest, WriteReadBlock) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   MockBlockDevice mock_device;
   mock_device.BindServer(std::move(server));
@@ -287,9 +279,7 @@ TEST(RemoteBlockDeviceTest, WriteReadBlock) {
 }
 
 TEST(RemoteBlockDeviceTest, VolumeManagerOrdinals) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   MockBlockDevice mock_device;
   mock_device.BindServer(std::move(server));
@@ -311,9 +301,7 @@ TEST(RemoteBlockDeviceTest, VolumeManagerOrdinals) {
 }
 
 TEST(RemoteBlockDeviceTest, LargeThreadCountSuceeds) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   MockBlockDevice mock_device;
   mock_device.BindServer(std::move(server));
@@ -383,9 +371,7 @@ TEST(RemoteBlockDeviceTest, LargeThreadCountSuceeds) {
 }
 
 TEST(RemoteBlockDeviceTest, NoHangForErrorsWithMultipleThreads) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   std::unique_ptr<RemoteBlockDevice> device;
   constexpr int kThreadCount = 4 * MAX_TXN_GROUP_COUNT;

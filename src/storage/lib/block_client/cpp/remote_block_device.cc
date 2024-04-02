@@ -122,11 +122,7 @@ zx_status_t RemoteBlockDevice::VolumeShrink(uint64_t offset, uint64_t length) {
 zx::result<std::unique_ptr<RemoteBlockDevice>> RemoteBlockDevice::Create(
     fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device,
     fidl::ClientEnd<fuchsia_device::Controller> controller) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [session, server] = endpoints.value();
+  auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
   if (fidl::Status result = fidl::WireCall(device)->OpenSession(std::move(server)); !result.ok()) {
     return zx::error(result.status());
   }
