@@ -52,7 +52,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/adc-9000",
       "sys/platform/gpio-controller-ff634400",
       "sys/platform/gpu-ffe40000",
-      "sys/platform/arm-mali-ffe40000",
+      "sys/platform/arm-mali-0",
       "sys/platform/audio-controller-ff642000",
       "sys/platform/phy-ffe09000",
       "sys/platform/usb-ff500000",
