@@ -24,13 +24,9 @@ constexpr char kChildUrl[] = "#meta/config_example.cm";
 class IntegrationTest : public gtest::RealLoopFixture {
  protected:
   InspectData GetInspect(const std::string& name, const std::string& moniker) {
-    fuchsia::diagnostics::ArchiveAccessorPtr archive;
-    auto svc = sys::ServiceDirectory::CreateFromNamespace();
-    svc->Connect(archive.NewRequest());
-
     std::stringstream selector;
     selector << "*/" << name << ":root";
-    diagnostics::reader::ArchiveReader reader(std::move(archive), {selector.str()});
+    diagnostics::reader::ArchiveReader reader(dispatcher(), {selector.str()});
     fpromise::result<std::vector<InspectData>, std::string> result;
     async::Executor executor(dispatcher());
     executor.schedule_task(reader.SnapshotInspectUntilPresent({moniker}).then(
