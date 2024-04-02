@@ -94,8 +94,9 @@ style guide permits both forms):
 if (x == kFoo) return new Foo();
 
 // Correct.
-if (x == kFoo)
+if (x == kFoo) {
   return new Foo;
+}
 ```
 
 ### Namespace names
