@@ -108,6 +108,7 @@ void FakeAdapter::FakeLowEnergy::StartAdvertising(
     AdvertisingData data,
     AdvertisingData scan_rsp,
     AdvertisingInterval interval,
+    bool extended_pdu,
     bool anonymous,
     bool include_tx_power_level,
     std::optional<ConnectableAdvertisingParameters> connectable,
@@ -119,6 +120,7 @@ void FakeAdapter::FakeLowEnergy::StartAdvertising(
                               .scan_rsp = std::move(scan_rsp),
                               .connectable = std::move(connectable),
                               .interval = interval,
+                              .extended_pdu = extended_pdu,
                               .anonymous = anonymous,
                               .include_tx_power_level = include_tx_power_level};
   AdvertisementId adv_id = next_advertisement_id_;

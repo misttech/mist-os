@@ -25,7 +25,9 @@ LegacyLowEnergyAdvertiser::~LegacyLowEnergyAdvertiser() {
 }
 
 EmbossCommandPacket LegacyLowEnergyAdvertiser::BuildEnablePacket(
-    const DeviceAddress& address, pwemb::GenericEnableParam enable) {
+    const DeviceAddress& address,
+    pwemb::GenericEnableParam enable,
+    bool /*extended_pdu*/) {
   auto packet =
       hci::EmbossCommandPacket::New<pwemb::LESetAdvertisingEnableCommandWriter>(
           hci_spec::kLESetAdvertisingEnable);
@@ -35,7 +37,10 @@ EmbossCommandPacket LegacyLowEnergyAdvertiser::BuildEnablePacket(
 }
 
 EmbossCommandPacket LegacyLowEnergyAdvertiser::BuildSetAdvertisingData(
-    const DeviceAddress& address, const AdvertisingData& data, AdvFlags flags) {
+    const DeviceAddress& address,
+    const AdvertisingData& data,
+    AdvFlags flags,
+    bool /*extended_pdu*/) {
   auto packet =
       EmbossCommandPacket::New<pwemb::LESetAdvertisingDataCommandWriter>(
           hci_spec::kLESetAdvertisingData);
@@ -52,7 +57,9 @@ EmbossCommandPacket LegacyLowEnergyAdvertiser::BuildSetAdvertisingData(
 }
 
 EmbossCommandPacket LegacyLowEnergyAdvertiser::BuildSetScanResponse(
-    const DeviceAddress& address, const AdvertisingData& scan_rsp) {
+    const DeviceAddress& address,
+    const AdvertisingData& scan_rsp,
+    bool /*extended_pdu*/) {
   auto packet =
       EmbossCommandPacket::New<pwemb::LESetScanResponseDataCommandWriter>(
           hci_spec::kLESetScanResponseData);
@@ -73,7 +80,8 @@ LegacyLowEnergyAdvertiser::BuildSetAdvertisingParams(
     const DeviceAddress& address,
     pwemb::LEAdvertisingType type,
     pwemb::LEOwnAddressType own_address_type,
-    AdvertisingIntervalRange interval) {
+    AdvertisingIntervalRange interval,
+    bool /*extended_pdu*/) {
   auto packet =
       EmbossCommandPacket::New<pwemb::LESetAdvertisingParametersCommandWriter>(
           hci_spec::kLESetAdvertisingParameters);
@@ -95,13 +103,13 @@ LegacyLowEnergyAdvertiser::BuildSetAdvertisingParams(
 }
 
 EmbossCommandPacket LegacyLowEnergyAdvertiser::BuildUnsetAdvertisingData(
-    const DeviceAddress& address) {
+    const DeviceAddress& address, bool /*extended_pdu*/) {
   return EmbossCommandPacket::New<pwemb::LESetAdvertisingDataCommandWriter>(
       hci_spec::kLESetAdvertisingData);
 }
 
 EmbossCommandPacket LegacyLowEnergyAdvertiser::BuildUnsetScanResponse(
-    const DeviceAddress& address) {
+    const DeviceAddress& address, bool /*extended_pdu*/) {
   auto packet =
       EmbossCommandPacket::New<pwemb::LESetScanResponseDataCommandWriter>(
           hci_spec::kLESetScanResponseData);
@@ -109,7 +117,7 @@ EmbossCommandPacket LegacyLowEnergyAdvertiser::BuildUnsetScanResponse(
 }
 
 EmbossCommandPacket LegacyLowEnergyAdvertiser::BuildRemoveAdvertisingSet(
-    const DeviceAddress& address) {
+    const DeviceAddress& address, bool /*extended_pdu*/) {
   auto packet =
       hci::EmbossCommandPacket::New<pwemb::LESetAdvertisingEnableCommandWriter>(
           hci_spec::kLESetAdvertisingEnable);
@@ -138,10 +146,18 @@ void LegacyLowEnergyAdvertiser::StartAdvertising(
     return;
   }
 
-  if (IsAdvertising() && !IsAdvertising(address)) {
+  if (IsAdvertising() && !IsAdvertising(address, options.extended_pdu)) {
     bt_log(INFO,
            "hci-le",
            "already advertising (only one advertisement supported at a time)");
+    result_callback(ToResult(HostError::kNotSupported));
+    return;
+  }
+
+  if (options.extended_pdu) {
+    bt_log(INFO,
+           "hci-le",
+           "legacy advertising cannot use extended advertising PDUs");
     result_callback(ToResult(HostError::kNotSupported));
     return;
   }
@@ -269,12 +285,20 @@ void LegacyLowEnergyAdvertiser::StopAdvertising() {
   local_address_ = DeviceAddress();
 }
 
-void LegacyLowEnergyAdvertiser::StopAdvertising(const DeviceAddress& address) {
+void LegacyLowEnergyAdvertiser::StopAdvertising(const DeviceAddress& address,
+                                                bool extended_pdu) {
+  if (extended_pdu) {
+    bt_log(INFO,
+           "hci-le",
+           "legacy advertising cannot use extended advertising PDUs");
+    return;
+  }
+
   if (!hci_cmd_runner().IsReady()) {
     hci_cmd_runner().Cancel();
   }
 
-  LowEnergyAdvertiser::StopAdvertisingInternal(address);
+  LowEnergyAdvertiser::StopAdvertisingInternal(address, extended_pdu);
   starting_ = false;
   local_address_ = DeviceAddress();
 }
@@ -295,8 +319,12 @@ void LegacyLowEnergyAdvertiser::OnIncomingConnection(
     local_address = local_address_;
   }
 
-  CompleteIncomingConnection(
-      handle, role, local_address, peer_address, conn_params);
+  CompleteIncomingConnection(handle,
+                             role,
+                             local_address,
+                             peer_address,
+                             conn_params,
+                             /*extended_pdu=*/false);
 }
 
 }  // namespace bt::hci

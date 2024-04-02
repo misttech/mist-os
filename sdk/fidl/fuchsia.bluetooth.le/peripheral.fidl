@@ -46,6 +46,24 @@ type AdvertisingModeHint = strict enum : uint8 {
     SLOW = 3;
 };
 
+@available(added=HEAD)
+type AdvertisingProcedure = flexible union {
+    /// Advertise using legacy advertising packets. All devices should be able
+    /// to discover this type of packet.
+    1: legacy table {};
+
+    /// Advertise using extended advertising packets. Extended advertising
+    /// packets allow for a much larger amount of data to be advertised than
+    /// legacy advertising packets (31 bytes vs 251 bytes per PDU). Extended
+    /// advertising packets support up to 1,650 bytes in an advertisement chain,
+    /// but they are only discoverable by newer devices using Bluetooth 5.0+.
+    ///
+    /// Extended advertising packets are not supported by all
+    /// products. PeripheralError::NOT_SUPPORTED will be returned if requested
+    /// and not supported.
+    2: extended table {};
+};
+
 /// Represents the parameters for configuring advertisements.
 type AdvertisingParameters = table {
     /// The fields that will be encoded in the data section of advertising packets.
@@ -75,6 +93,14 @@ type AdvertisingParameters = table {
     /// of `ConnectionOptions` will configure any connections set up from
     /// advertising.
     5: connection_options ConnectionOptions;
+
+    /// Specifies the advertising type to use (e.g. legacy, extended, etc).
+    ///
+    /// If not present, we default to legacy advertising to maintain optimal compatibility with
+    /// pre-Bluetooth 5.0 devices. See field descriptions within AdvertisingProcedure for more
+    /// information.
+    @available(added=HEAD)
+    6: advertising_procedure AdvertisingProcedure;
 };
 
 /// Capability that is valid for the duration of advertising. The caller can close the handle to

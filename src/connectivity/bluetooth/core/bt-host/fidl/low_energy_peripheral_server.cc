@@ -453,8 +453,14 @@ void LowEnergyPeripheralServer::StartAdvertisingInternal(
                                             : BondableMode::NonBondable;
   }
 
+  bool extended_pdu = false;
+  if (parameters.has_advertising_procedure()) {
+    extended_pdu = parameters.advertising_procedure().is_extended();
+  }
+
   BT_ASSERT(adapter()->le());
   adapter()->le()->StartAdvertising(std::move(adv_data), std::move(scan_rsp), interval,
+                                    extended_pdu,
                                     /*anonymous=*/false, include_tx_power_level,
                                     std::move(connectable_params), std::move(status_cb));
 }

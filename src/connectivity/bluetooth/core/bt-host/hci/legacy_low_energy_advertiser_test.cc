@@ -148,6 +148,7 @@ TEST_F(LegacyLowEnergyAdvertiserTest, NoAdvertiseTwice) {
   AdvertisingData scan_data = GetExampleData();
   AdvertisingOptions options(kTestInterval,
                              kDefaultNoAdvFlags,
+                             /*extended_pdu=*/false,
                              /*anonymous=*/false,
                              /*include_tx_power_level=*/false);
 
@@ -198,6 +199,7 @@ TEST_F(LegacyLowEnergyAdvertiserTest, StartAndStopWithTxPower) {
   AdvertisingData scan_data = GetExampleData();
   AdvertisingOptions options(kTestInterval,
                              kDefaultNoAdvFlags,
+                             /*extended_pdu=*/false,
                              /*anonymous=*/false,
                              /*include_tx_power_level=*/true);
 
@@ -228,7 +230,7 @@ TEST_F(LegacyLowEnergyAdvertiserTest, StartAndStopWithTxPower) {
       ContainersEqual(test_device()->legacy_advertising_state().scan_rsp_view(),
                       expected_scan_rsp));
 
-  advertiser()->StopAdvertising(kRandomAddress);
+  advertiser()->StopAdvertising(kRandomAddress, /*extended_pdu=*/false);
   RunUntilIdle();
   EXPECT_FALSE(test_device()->legacy_advertising_state().enabled);
 }
@@ -243,12 +245,14 @@ TEST_F(LegacyLowEnergyAdvertiserTest, StartWhileStartingWithTxPower) {
   const AdvertisingIntervalRange old_interval = kTestInterval;
   AdvertisingOptions options(old_interval,
                              kDefaultNoAdvFlags,
+                             /*extended_pdu=*/false,
                              /*anonymous=*/false,
                              /*include_tx_power_level=*/true);
   const AdvertisingIntervalRange new_interval(kTestInterval.min() + 1,
                                               kTestInterval.max() - 1);
   AdvertisingOptions new_options(new_interval,
                                  kDefaultNoAdvFlags,
+                                 /*extended_pdu=*/false,
                                  /*anonymous=*/false,
                                  /*include_tx_power_level=*/true);
 
@@ -293,12 +297,14 @@ TEST_F(LegacyLowEnergyAdvertiserTest,
   const AdvertisingIntervalRange old_interval = kTestInterval;
   AdvertisingOptions options(old_interval,
                              kDefaultNoAdvFlags,
+                             /*extended_pdu=*/false,
                              /*anonymous=*/false,
                              /*include_tx_power_level=*/true);
   const AdvertisingIntervalRange new_interval(kTestInterval.min() + 1,
                                               kTestInterval.max() - 1);
   AdvertisingOptions new_options(new_interval,
                                  kDefaultNoAdvFlags,
+                                 /*extended_pdu=*/false,
                                  /*anonymous=*/false,
                                  /*include_tx_power_level=*/false);
 
@@ -336,12 +342,14 @@ TEST_F(LegacyLowEnergyAdvertiserTest,
   const AdvertisingIntervalRange old_interval = kTestInterval;
   AdvertisingOptions options(old_interval,
                              kDefaultNoAdvFlags,
+                             /*extended_pdu=*/false,
                              /*anonymous=*/false,
                              /*include_tx_power_level=*/false);
   const AdvertisingIntervalRange new_interval(kTestInterval.min() + 1,
                                               kTestInterval.max() - 1);
   AdvertisingOptions new_options(new_interval,
                                  kDefaultNoAdvFlags,
+                                 /*extended_pdu=*/false,
                                  /*anonymous=*/false,
                                  /*include_tx_power_level=*/true);
 
@@ -381,12 +389,14 @@ TEST_F(LegacyLowEnergyAdvertiserTest, StartWhileTxPowerReadSuccess) {
   const AdvertisingIntervalRange old_interval = kTestInterval;
   AdvertisingOptions options(old_interval,
                              kDefaultNoAdvFlags,
+                             /*extended_pdu=*/false,
                              /*anonymous=*/false,
                              /*include_tx_power_level=*/true);
   const AdvertisingIntervalRange new_interval(kTestInterval.min() + 1,
                                               kTestInterval.max() - 1);
   AdvertisingOptions new_options(new_interval,
                                  kDefaultNoAdvFlags,
+                                 /*extended_pdu=*/false,
                                  /*anonymous=*/false,
                                  /*include_tx_power_level=*/true);
 
@@ -422,6 +432,7 @@ TEST_F(LegacyLowEnergyAdvertiserTest, StartAdvertisingReadTxPowerFails) {
   AdvertisingData scan_data;
   AdvertisingOptions options(kTestInterval,
                              kDefaultNoAdvFlags,
+                             /*extended_pdu=*/false,
                              /*anonymous=*/false,
                              /*include_tx_power_level=*/true);
 
@@ -456,6 +467,7 @@ TEST_F(LegacyLowEnergyAdvertiserTest, AllowsRandomAddressChange) {
   AdvertisingData scan_rsp;
   AdvertisingOptions options(kTestInterval,
                              kDefaultNoAdvFlags,
+                             /*extended_pdu=*/false,
                              /*anonymous=*/false,
                              /*include_tx_power_level=*/false);
 
@@ -480,7 +492,7 @@ TEST_F(LegacyLowEnergyAdvertiserTest, AllowsRandomAddressChange) {
 
   // The advertiser allows changing the address while advertising is getting
   // stopped.
-  advertiser()->StopAdvertising(kRandomAddress);
+  advertiser()->StopAdvertising(kRandomAddress, /*extended_pdu=*/false);
   EXPECT_TRUE(test_device()->legacy_advertising_state().enabled);
   EXPECT_TRUE(advertiser()->AllowsRandomAddressChange());
 
@@ -494,6 +506,7 @@ TEST_F(LegacyLowEnergyAdvertiserTest, StopWhileStarting) {
   AdvertisingData scan_data = GetExampleData();
   AdvertisingOptions options(kTestInterval,
                              kDefaultNoAdvFlags,
+                             /*extended_pdu=*/false,
                              /*anonymous=*/false,
                              /*include_tx_power_level=*/false);
 
@@ -503,7 +516,7 @@ TEST_F(LegacyLowEnergyAdvertiserTest, StopWhileStarting) {
                                        options,
                                        nullptr,
                                        MakeExpectErrorCallback());
-  this->advertiser()->StopAdvertising(kPublicAddress);
+  this->advertiser()->StopAdvertising(kPublicAddress, /*extended_pdu=*/false);
 
   this->RunUntilIdle();
   EXPECT_TRUE(MoveLastStatus());
