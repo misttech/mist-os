@@ -10,7 +10,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <optional>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
 

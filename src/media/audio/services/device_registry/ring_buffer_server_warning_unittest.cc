@@ -29,14 +29,16 @@ class RingBufferServerWarningTest
     : public AudioDeviceRegistryServerTestBase,
       public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer> {
  protected:
-  const fuchsia_audio_device::RingBufferOptions kDefaultRingBufferOptions = {{
-      .format = fuchsia_audio::Format{{
-          .sample_type = fuchsia_audio::SampleType::kInt16,
-          .channel_count = 2,
-          .frames_per_second = 48000,
-      }},
-      .ring_buffer_min_bytes = 2000,
-  }};
+  static fuchsia_audio_device::RingBufferOptions DefaultRingBufferOptions() {
+    return {{
+        .format = fuchsia_audio::Format{{
+            .sample_type = fuchsia_audio::SampleType::kInt16,
+            .channel_count = 2,
+            .frames_per_second = 48000,
+        }},
+        .ring_buffer_min_bytes = 2000,
+    }};
+  }
 
   void EnableInputAndAddDevice(const std::unique_ptr<FakeStreamConfig>& fake_driver) {
     adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test input name",
@@ -91,7 +93,7 @@ TEST_F(RingBufferServerWarningTest, SetActiveChannelsMissingChannelBitmask) {
   bool received_callback = false;
   control->client()
       ->CreateRingBuffer({{
-          .options = kDefaultRingBufferOptions,
+          .options = DefaultRingBufferOptions(),
           .ring_buffer_server =
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
@@ -139,7 +141,7 @@ TEST_F(RingBufferServerWarningTest, SetActiveChannelsBadChannelBitmask) {
   bool received_callback = false;
   control->client()
       ->CreateRingBuffer({{
-          .options = kDefaultRingBufferOptions,
+          .options = DefaultRingBufferOptions(),
           .ring_buffer_server =
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
@@ -188,7 +190,7 @@ TEST_F(RingBufferServerWarningTest, SetActiveChannelsWhilePending) {
   bool received_callback = false;
   control->client()
       ->CreateRingBuffer({{
-          .options = kDefaultRingBufferOptions,
+          .options = DefaultRingBufferOptions(),
           .ring_buffer_server =
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
@@ -242,7 +244,7 @@ TEST_F(RingBufferServerWarningTest, StartWhilePending) {
   bool received_callback = false;
   control->client()
       ->CreateRingBuffer({{
-          .options = kDefaultRingBufferOptions,
+          .options = DefaultRingBufferOptions(),
           .ring_buffer_server =
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
@@ -298,7 +300,7 @@ TEST_F(RingBufferServerWarningTest, StartWhileStarted) {
   bool received_callback = false;
   control->client()
       ->CreateRingBuffer({{
-          .options = kDefaultRingBufferOptions,
+          .options = DefaultRingBufferOptions(),
           .ring_buffer_server =
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
@@ -357,7 +359,7 @@ TEST_F(RingBufferServerWarningTest, StopBeforeStarted) {
   bool received_callback = false;
   control->client()
       ->CreateRingBuffer({{
-          .options = kDefaultRingBufferOptions,
+          .options = DefaultRingBufferOptions(),
           .ring_buffer_server =
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
@@ -401,7 +403,7 @@ TEST_F(RingBufferServerWarningTest, StopWhilePending) {
   bool received_callback = false;
   control->client()
       ->CreateRingBuffer({{
-          .options = kDefaultRingBufferOptions,
+          .options = DefaultRingBufferOptions(),
           .ring_buffer_server =
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
@@ -464,7 +466,7 @@ TEST_F(RingBufferServerWarningTest, StopAfterStopped) {
   bool received_callback = false;
   control->client()
       ->CreateRingBuffer({{
-          .options = kDefaultRingBufferOptions,
+          .options = DefaultRingBufferOptions(),
           .ring_buffer_server =
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
@@ -530,7 +532,7 @@ TEST_F(RingBufferServerWarningTest, WatchDelayInfoWhilePending) {
   bool received_callback = false;
   control->client()
       ->CreateRingBuffer({{
-          .options = kDefaultRingBufferOptions,
+          .options = DefaultRingBufferOptions(),
           .ring_buffer_server =
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})

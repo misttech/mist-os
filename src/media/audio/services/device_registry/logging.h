@@ -105,9 +105,23 @@ void LogElement(const fuchsia_hardware_audio_signalprocessing::Element& element)
 void LogTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology);
 void LogElementState(const fuchsia_hardware_audio_signalprocessing::ElementState& element_state);
 
+void LogElementRingBufferFormatSets(
+    const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>&
+        element_ring_buffer_format_sets);
+void LogElementRingBufferFormatSet(
+    const fuchsia_audio_device::ElementRingBufferFormatSet& element_ring_buffer_format_set);
+void LogTranslatedRingBufferFormatSets(
+    const std::vector<fuchsia_audio_device::PcmFormatSet>& translated_ring_buffer_format_sets);
+void LogTranslatedRingBufferFormatSet(
+    const fuchsia_audio_device::PcmFormatSet& translated_ring_buffer_format_set);
 void LogRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
 void LogRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format);
+
+void LogElementDaiFormatSets(
+    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets);
+void LogElementDaiFormatSet(
+    const fuchsia_audio_device::ElementDaiFormatSet& element_dai_format_set);
 void LogDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets);
 void LogDaiFormat(std::optional<fuchsia_hardware_audio::DaiFormat> dai_format);

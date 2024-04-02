@@ -31,7 +31,7 @@
 #include <string>
 #include <utility>
 
-#include "src/lib/fxl/strings/string_printf.h"
+#include <src/lib/fxl/strings/string_printf.h>
 
 namespace examples {
 
@@ -155,6 +155,8 @@ void MediaApp::WaitForFirstAudioOutput() {
       return;
     }
 
+    // Now that we have been notified of a device, log its information and configure the first
+    // ring_buffer with the first supported ring_buffer_format.
     for (const auto& device : *result->devices()) {
       if (*device.device_type() == fuchsia_audio_device::DeviceType::kOutput) {
         device_token_id_ = *device.token_id();
@@ -183,43 +185,53 @@ void MediaApp::WaitForFirstAudioOutput() {
         }
         std::cout << "    unique_instance_id        " << uid_str << '\n';
 
+        // Log ring_buffer_format_sets details
         std::cout << "    ring_buffer_format_sets[" << device.ring_buffer_format_sets()->size()
                   << "]" << '\n';
         for (auto idx = 0u; idx < device.ring_buffer_format_sets()->size(); ++idx) {
-          auto format = (*device.ring_buffer_format_sets())[idx];
-          std::cout << "        [" << idx << "] channel_sets[" << format.channel_sets()->size()
-                    << "]" << '\n';
-          for (auto cs = 0u; cs < format.channel_sets()->size(); ++cs) {
-            auto channel_set = (*format.channel_sets())[cs];
-            std::cout << "                [" << cs << "]   attributes["
-                      << channel_set.attributes()->size() << "]" << '\n';
-            for (auto a = 0u; a < channel_set.attributes()->size(); ++a) {
-              auto attribs = (*channel_set.attributes())[a];
-              std::cout << "                        [" << a << "]   min_frequency  "
-                        << (attribs.min_frequency().has_value()
-                                ? std::to_string(*attribs.min_frequency())
-                                : "NONE")
-                        << '\n';
-              std::cout << "                              max_frequency  "
-                        << (attribs.max_frequency().has_value()
-                                ? std::to_string(*attribs.max_frequency())
-                                : "NONE")
-                        << '\n';
+          auto element_ring_buffer_format_set = device.ring_buffer_format_sets()->at(idx);
+          std::cout << "        [" << idx << "]   element_id  "
+                    << *element_ring_buffer_format_set.element_id() << '\n';
+          std::cout << "              format_set ["
+                    << element_ring_buffer_format_set.format_sets()->size() << "]" << '\n';
+          for (auto idx = 0u; idx < element_ring_buffer_format_set.format_sets()->size(); ++idx) {
+            auto ring_buffer_format_set = element_ring_buffer_format_set.format_sets()->at(idx);
+            std::cout << "                  [" << idx << "]  channel_sets ["
+                      << ring_buffer_format_set.channel_sets()->size() << "]" << '\n';
+            for (auto cs = 0u; cs < ring_buffer_format_set.channel_sets()->size(); ++cs) {
+              auto channel_set = (*ring_buffer_format_set.channel_sets())[cs];
+              std::cout << "                [" << cs << "]   attributes["
+                        << channel_set.attributes()->size() << "]" << '\n';
+              for (auto a = 0u; a < channel_set.attributes()->size(); ++a) {
+                auto attribs = (*channel_set.attributes())[a];
+                std::cout << "                        [" << a << "]   min_frequency  "
+                          << (attribs.min_frequency().has_value()
+                                  ? std::to_string(*attribs.min_frequency())
+                                  : "NONE")
+                          << '\n';
+                std::cout << "                              max_frequency  "
+                          << (attribs.max_frequency().has_value()
+                                  ? std::to_string(*attribs.max_frequency())
+                                  : "NONE")
+                          << '\n';
+              }
+            }
+            std::cout << "            sample_types["
+                      << ring_buffer_format_set.sample_types()->size() << "]" << '\n';
+            for (auto st = 0u; st < ring_buffer_format_set.sample_types()->size(); ++st) {
+              std::cout << "                [" << st << "]     "
+                        << (*ring_buffer_format_set.sample_types())[st] << '\n';
+            }
+            std::cout << "            frame_rates [" << ring_buffer_format_set.frame_rates()->size()
+                      << "]" << '\n';
+            for (auto fr = 0u; fr < ring_buffer_format_set.frame_rates()->size(); ++fr) {
+              std::cout << "                [" << fr << "]     "
+                        << (*ring_buffer_format_set.frame_rates())[fr] << '\n';
             }
           }
-          std::cout << "            sample_types[" << format.sample_types()->size() << "]" << '\n';
-          for (auto st = 0u; st < format.sample_types()->size(); ++st) {
-            std::cout << "                [" << st << "]     " << (*format.sample_types())[st]
-                      << '\n';
-          }
-          std::cout << "            frame_rates [" << format.frame_rates()->size() << "]" << '\n';
-          for (auto fr = 0u; fr < format.frame_rates()->size(); ++fr) {
-            std::cout << "                [" << fr << "]     " << (*format.frame_rates())[fr]
-                      << '\n';
-          }
         }
-        channels_per_frame_ =
-            device.ring_buffer_format_sets()->front().channel_sets()->front().attributes()->size();
+
+        // Include `dai_format_sets` here too.
 
         std::cout << "    is_input                  "
                   << (device.is_input() ? (*device.is_input() ? "true" : "false") : "UNSPECIFIED")
@@ -273,15 +285,46 @@ void MediaApp::WaitForFirstAudioOutput() {
 
         // Include `signal_processing_topologies` here too.
 
-        // Determine the format we will use, then connect to the device.
-        if (device.ring_buffer_format_sets()->empty()) {
-          std::cout << "ring_buffer_format_sets EMPTY";
+        // Now determine the format we will use, and connect more deeply to the device.
+        if (!device.ring_buffer_format_sets() || device.ring_buffer_format_sets()->empty() ||
+            !device.ring_buffer_format_sets()->front().format_sets() ||
+            device.ring_buffer_format_sets()->front().format_sets()->empty() ||
+            !device.ring_buffer_format_sets()->front().format_sets()->front().channel_sets() ||
+            device.ring_buffer_format_sets()
+                ->front()
+                .format_sets()
+                ->front()
+                .channel_sets()
+                ->empty() ||
+            !device.ring_buffer_format_sets()
+                 ->front()
+                 .format_sets()
+                 ->front()
+                 .channel_sets()
+                 ->front()
+                 .attributes() ||
+            device.ring_buffer_format_sets()
+                ->front()
+                .format_sets()
+                ->front()
+                .channel_sets()
+                ->front()
+                .attributes()
+                ->empty()) {
+          std::cout
+              << "Cannot determine a channel-count from ring_buffer_format_sets (missing/empty)";
           Shutdown();
           return;
         }
-        // For convenience, just use the first channel configuration that they listed.
-        channels_per_frame_ =
-            device.ring_buffer_format_sets()->front().channel_sets()->front().attributes()->size();
+        // For convenience, just use the first channel configuration that the device listed.
+        channels_per_frame_ = device.ring_buffer_format_sets()
+                                  ->front()
+                                  .format_sets()
+                                  ->front()
+                                  .channel_sets()
+                                  ->front()
+                                  .attributes()
+                                  ->size();
 
         // If we didn't get a valid overall format, then we shouldn't continue onward.
         if (!channels_per_frame_) {

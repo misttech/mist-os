@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.audio/cpp/natural_types.h>
 #include <fidl/fuchsia.audio/cpp/type_conversions.h>
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/compiler.h>
 
 #include "src/media/audio/audio_core/shared/select_best_format.h"
 
@@ -93,23 +94,30 @@ void DeviceWatcher::WatchDevicesRemoved() {
 void DeviceWatcher::AddDevice(fuchsia_audio_device::wire::Info info) {
   // Ignore invalid device infos.
   if (!info.has_token_id() || !info.has_device_type() || !info.has_device_name() ||
-      !info.has_ring_buffer_format_sets() || info.ring_buffer_format_sets().count() == 0 ||
+      !info.has_ring_buffer_format_sets() || info.ring_buffer_format_sets().empty() ||
       !info.has_gain_caps() || !info.has_plug_detect_caps() || !info.has_clock_domain()) {
     FX_LOGS(ERROR) << "fuchsia.audio.device.Info missing required field";
     return;
   }
 #if USE_AUDIO_DEVICE_REGISTRY_DEVICES
-  for (auto format : info.ring_buffer_format_sets()) {
-    if (!format.has_channel_sets() || format.channel_sets().count() == 0 ||
-        !format.has_sample_types() || format.sample_types().count() == 0 ||
-        !format.has_frame_rates() || format.frame_rates().count() == 0) {
-      FX_LOGS(ERROR) << "fuchsia.audio.device.PcmFormatSet missing required field";
+  for (const auto& format_sets_for_element : info.ring_buffer_format_sets()) {
+    if (!format_sets_for_element.has_element_id() || !format_sets_for_element.has_format_sets() ||
+        format_sets_for_element.format_sets().empty()) {
+      FX_LOGS(ERROR) << "fuchsia.audio.device.ElementRingBufferFormatSet missing required field";
       return;
     }
-    for (auto channel_set : format.channel_sets()) {
-      if (!channel_set.has_attributes() || channel_set.attributes().count() == 0) {
-        FX_LOGS(ERROR) << "fuchsia.audio.device.ChannelSet missing required field";
+    for (auto format : format_sets_for_element.format_sets()) {
+      if (!format.has_channel_sets() || format.channel_sets().empty() ||
+          !format.has_sample_types() || format.sample_types().empty() ||
+          !format.has_frame_rates() || format.frame_rates().empty()) {
+        FX_LOGS(ERROR) << "fuchsia.audio.device.PcmFormatSet missing required field";
         return;
+      }
+      for (auto channel_set : format.channel_sets()) {
+        if (!channel_set.has_attributes() || channel_set.attributes().empty()) {
+          FX_LOGS(ERROR) << "fuchsia.audio.device.ChannelSet missing required field";
+          return;
+        }
       }
     }
   }
@@ -123,6 +131,13 @@ void DeviceWatcher::AddDevice(fuchsia_audio_device::wire::Info info) {
   // Duplicates should not happen: this is a bug.
   if (devices_.count(info.token_id()) > 0) {
     FX_LOGS(ERROR) << "device with token_id '" << info.token_id() << "' already exists";
+    return;
+  }
+
+  if (info.device_type() != fuchsia_audio_device::DeviceType::kInput &&
+      info.device_type() != fuchsia_audio_device::DeviceType::kOutput) {
+    FX_LOGS(WARNING) << "ignoring device with unsupported device_type '"
+                     << fidl::ToUnderlying(info.device_type()) << "'";
     return;
   }
 
@@ -172,8 +187,7 @@ void DeviceWatcher::AddDevice(fuchsia_audio_device::wire::Info info) {
                       std::move(control_endpoints->client));
       break;
     default:
-      FX_LOGS(WARNING) << "ignoring device with unsupported device_type '"
-                       << fidl::ToUnderlying(info.device_type()) << "'";
+      __UNREACHABLE;
       break;
   }
 }
@@ -196,8 +210,11 @@ void DeviceWatcher::AddOutputDevice(fuchsia_audio_device::wire::Info info,
   });
 
   // Select the format to use for this device.
-  const auto format =
-      media::audio::SelectBestFormat(*fidl::ToNatural(info.ring_buffer_format_sets()), pref_format);
+  const auto format = media::audio::SelectBestFormat(
+      *fidl::ToNatural(info.ring_buffer_format_sets()
+                           .at(fuchsia_audio_device::kDefaultRingBufferElementId)
+                           .format_sets()),
+      pref_format);
   if (!format.is_ok()) {
     FX_LOGS(WARNING) << "output device with token_id '" << info.token_id()
                      << "' cannot select a format given the pipeline format '" << pref_format
@@ -269,8 +286,11 @@ void DeviceWatcher::AddInputDevice(fuchsia_audio_device::wire::Info info,
       .channels = 1,
       .frames_per_second = profile.rate(),
   });
-  const auto format =
-      media::audio::SelectBestFormat(*fidl::ToNatural(info.ring_buffer_format_sets()), pref_format);
+  const auto format = media::audio::SelectBestFormat(
+      *fidl::ToNatural(info.ring_buffer_format_sets()
+                           .at(fuchsia_audio_device::kDefaultRingBufferElementId)
+                           .format_sets()),
+      pref_format);
   if (!format.is_ok()) {
     FX_LOGS(WARNING) << "input device with token_id '" << info.token_id()
                      << "' cannot select a format given the pipeline format '" << pref_format

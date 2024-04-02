@@ -112,6 +112,105 @@ void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_
   FX_LOGS(INFO) << clock_domain_str;
 }
 
+void LogElementRingBufferFormatSets(
+    const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>&
+        element_ring_buffer_format_sets) {
+  if constexpr (!kLogStreamConfigFidlResponseValues) {
+    return;
+  }
+
+  for (const auto& element_ring_buffer_format_set : element_ring_buffer_format_sets) {
+    LogElementRingBufferFormatSet(element_ring_buffer_format_set);
+  }
+}
+
+void LogElementRingBufferFormatSet(
+    const fuchsia_audio_device::ElementRingBufferFormatSet& element_ring_buffer_format_set) {
+  if constexpr (!kLogStreamConfigFidlResponseValues) {
+    return;
+  }
+
+  if (element_ring_buffer_format_set.element_id()) {
+    FX_LOGS(INFO) << "   .element_id  " << *element_ring_buffer_format_set.element_id();
+  } else {
+    FX_LOGS(INFO) << "   .element_id  <none> (non-compliant)";
+  }
+  if (element_ring_buffer_format_set.format_sets()) {
+    FX_LOGS(INFO) << "   .format_set  [" << element_ring_buffer_format_set.format_sets()->size()
+                  << "]";
+    LogTranslatedRingBufferFormatSets(*element_ring_buffer_format_set.format_sets());
+  } else {
+    FX_LOGS(INFO) << "   .format_set  <none> (non-compliant)";
+  }
+}
+
+void LogTranslatedRingBufferFormatSets(
+    const std::vector<fuchsia_audio_device::PcmFormatSet>& translated_ring_buffer_format_sets) {
+  if constexpr (!kLogStreamConfigFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "fuchsia_audio_device::translated_ring_buffer_format_sets";
+  FX_LOGS(INFO) << "    PcmFormatSet[" << translated_ring_buffer_format_sets.size() << "]";
+  for (auto idx = 0u; idx < translated_ring_buffer_format_sets.size(); ++idx) {
+    FX_LOGS(INFO) << "      [" << idx << "]";
+    LogTranslatedRingBufferFormatSet(translated_ring_buffer_format_sets[idx]);
+  }
+}
+
+void LogTranslatedRingBufferFormatSet(
+    const fuchsia_audio_device::PcmFormatSet& translated_ring_buffer_format_set) {
+  if constexpr (!kLogStreamConfigFidlResponseValues) {
+    return;
+  }
+
+  if (translated_ring_buffer_format_set.channel_sets()) {
+    const auto& channel_sets = *translated_ring_buffer_format_set.channel_sets();
+    FX_LOGS(INFO) << "            channel_sets  [" << channel_sets.size() << "]";
+    for (auto idx = 0u; idx < channel_sets.size(); ++idx) {
+      if (!channel_sets[idx].attributes()) {
+        FX_LOGS(INFO) << "              [" << idx << "] <none> (non-compliant)";
+        continue;
+      }
+      const auto& attribs = *channel_sets[idx].attributes();
+      FX_LOGS(INFO) << "              [" << idx << "] attributes[" << attribs.size() << "]";
+      for (auto idx = 0u; idx < attribs.size(); ++idx) {
+        FX_LOGS(INFO) << "                  [" << idx << "]";
+        FX_LOGS(INFO) << "                     min_frequency   "
+                      << (attribs[idx].min_frequency()
+                              ? std::to_string(*attribs[idx].min_frequency())
+                              : "<none>");
+        FX_LOGS(INFO) << "                     max_frequency   "
+                      << (attribs[idx].max_frequency()
+                              ? std::to_string(*attribs[idx].max_frequency())
+                              : "<none>");
+      }
+    }
+  } else {
+    FX_LOGS(INFO) << "            channel_sets  <none> (non-compliant)";
+  }
+
+  if (translated_ring_buffer_format_set.sample_types()) {
+    const auto& sample_types = *translated_ring_buffer_format_set.sample_types();
+    FX_LOGS(INFO) << "            sample_types [" << sample_types.size() << "]";
+    for (auto idx = 0u; idx < sample_types.size(); ++idx) {
+      FX_LOGS(INFO) << "              [" << idx << "]    " << sample_types[idx];
+    }
+  } else {
+    FX_LOGS(INFO) << "            sample_types <none> (non-compliant)";
+  }
+
+  if (translated_ring_buffer_format_set.frame_rates()) {
+    const auto& frame_rates = *translated_ring_buffer_format_set.frame_rates();
+    FX_LOGS(INFO) << "            frame_rates  [" << frame_rates.size() << "]";
+    for (auto idx = 0u; idx < frame_rates.size(); ++idx) {
+      FX_LOGS(INFO) << "              [" << idx << "]    " << frame_rates[idx];
+    }
+  } else {
+    FX_LOGS(INFO) << "            frame_rates  <none> (non-compliant)";
+  }
+}
+
 void LogRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
   if constexpr (!kLogStreamConfigFidlResponseValues) {
@@ -255,6 +354,36 @@ void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_pro
     FX_LOGS(INFO) << "    plug_detect_caps  " << *codec_props.plug_detect_capabilities();
   } else {
     FX_LOGS(INFO) << "    plug_detect_caps  <none> (non-compliant)";
+  }
+}
+
+void LogElementDaiFormatSets(
+    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets) {
+  if constexpr (!kLogCodecFidlResponseValues) {
+    return;
+  }
+
+  for (const auto& element_dai_format_set : element_dai_format_sets) {
+    LogElementDaiFormatSet(element_dai_format_set);
+  }
+}
+
+void LogElementDaiFormatSet(
+    const fuchsia_audio_device::ElementDaiFormatSet& element_dai_format_set) {
+  if constexpr (!kLogCodecFidlResponseValues) {
+    return;
+  }
+
+  if (element_dai_format_set.element_id()) {
+    FX_LOGS(INFO) << "   .element_id  " << *element_dai_format_set.element_id();
+  } else {
+    FX_LOGS(INFO) << "   .element_id  <none> (non-compliant)";
+  }
+  if (element_dai_format_set.format_sets()) {
+    FX_LOGS(INFO) << "   .format_set  [" << element_dai_format_set.format_sets()->size() << "]";
+    LogDaiFormatSets(*element_dai_format_set.format_sets());
+  } else {
+    FX_LOGS(INFO) << "   .format_set  <none> (non-compliant)";
   }
 }
 
@@ -595,57 +724,72 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
   if (device_info.ring_buffer_format_sets()) {
     FX_LOGS(INFO) << "   ring_buffer_format_sets [" << device_info.ring_buffer_format_sets()->size()
                   << "]";
-    for (auto j = 0u; j < device_info.ring_buffer_format_sets()->size(); ++j) {
-      const auto& pcm_format_set = device_info.ring_buffer_format_sets()->at(j);
-      if (pcm_format_set.channel_sets()) {
-        FX_LOGS(INFO) << "         [" << j << "] channel_sets ["
-                      << pcm_format_set.channel_sets()->size() << "]";
-        for (auto k = 0u; k < pcm_format_set.channel_sets()->size(); ++k) {
-          const auto& channel_set = pcm_format_set.channel_sets()->at(k);
-          if (channel_set.attributes()) {
-            FX_LOGS(INFO) << "              [" << k << "] attributes ["
-                          << channel_set.attributes()->size() << "]";
-            for (auto idx = 0u; idx < channel_set.attributes()->size(); ++idx) {
-              const auto& attributes = channel_set.attributes()->at(idx);
-              if (attributes.min_frequency()) {
-                FX_LOGS(INFO) << "                   [" << idx << "] min_freq "
-                              << *attributes.min_frequency();
+    for (auto i = 0u; i < device_info.ring_buffer_format_sets()->size(); ++i) {
+      const auto& element_ring_buffer_format_set = device_info.ring_buffer_format_sets()->at(i);
+      FX_LOGS(INFO) << "    [" << i << "] element_id              "
+                    << (element_ring_buffer_format_set.element_id().has_value()
+                            ? std::to_string(*element_ring_buffer_format_set.element_id())
+                            : "<none> (non-compliant)");
+      if (element_ring_buffer_format_set.format_sets().has_value()) {
+        FX_LOGS(INFO) << "        format_set ["
+                      << element_ring_buffer_format_set.format_sets()->size() << "]";
+        for (auto j = 0u; j < element_ring_buffer_format_set.format_sets()->size(); ++j) {
+          const auto& pcm_format_set = element_ring_buffer_format_set.format_sets()->at(j);
+          if (pcm_format_set.channel_sets()) {
+            FX_LOGS(INFO) << "         [" << j << "] channel_sets ["
+                          << pcm_format_set.channel_sets()->size() << "]";
+            for (auto k = 0u; k < pcm_format_set.channel_sets()->size(); ++k) {
+              const auto& channel_set = pcm_format_set.channel_sets()->at(k);
+              if (channel_set.attributes()) {
+                FX_LOGS(INFO) << "              [" << k << "] attributes ["
+                              << channel_set.attributes()->size() << "]";
+                for (auto idx = 0u; idx < channel_set.attributes()->size(); ++idx) {
+                  const auto& attributes = channel_set.attributes()->at(idx);
+                  if (attributes.min_frequency()) {
+                    FX_LOGS(INFO) << "                   [" << idx << "] min_freq "
+                                  << *attributes.min_frequency();
+                  } else {
+                    FX_LOGS(INFO) << "                   [" << idx << "] min_freq <none>";
+                  }
+                  if (attributes.max_frequency()) {
+                    FX_LOGS(INFO) << "                       max_freq "
+                                  << *attributes.max_frequency();
+                  } else {
+                    FX_LOGS(INFO) << "                       max_freq <none>";
+                  }
+                }
               } else {
-                FX_LOGS(INFO) << "                   [" << idx << "] min_freq <none>";
-              }
-              if (attributes.max_frequency()) {
-                FX_LOGS(INFO) << "                       max_freq " << *attributes.max_frequency();
-              } else {
-                FX_LOGS(INFO) << "                       max_freq <none>";
+                FX_LOGS(INFO) << "               [" << k
+                              << "] attributes     <none>  (non-compliant)";
               }
             }
           } else {
-            FX_LOGS(INFO) << "               [" << k << "] attributes     <none>  (non-compliant)";
+            FX_LOGS(INFO) << "         [" << j << "] channel_sets       <none> (non-compliant)";
+          }
+
+          if (pcm_format_set.sample_types()) {
+            FX_LOGS(INFO) << "             sample_types [" << pcm_format_set.sample_types()->size()
+                          << "]";
+            for (auto idx = 0u; idx < pcm_format_set.sample_types()->size(); ++idx) {
+              FX_LOGS(INFO) << "              [" << idx << "]               "
+                            << pcm_format_set.sample_types()->at(idx);
+            }
+          } else {
+            FX_LOGS(INFO) << "             sample_types       <none> (non-compliant)";
+          }
+          if (pcm_format_set.frame_rates()) {
+            FX_LOGS(INFO) << "             frame_rates [" << pcm_format_set.frame_rates()->size()
+                          << "]";
+            for (auto idx = 0u; idx < pcm_format_set.frame_rates()->size(); ++idx) {
+              FX_LOGS(INFO) << "              [" << idx << "]               "
+                            << pcm_format_set.frame_rates()->at(idx);
+            }
+          } else {
+            FX_LOGS(INFO) << "             frame_rates        <none> (non-compliant)";
           }
         }
       } else {
-        FX_LOGS(INFO) << "         [" << j << "] channel_sets       <none> (non-compliant)";
-      }
-
-      if (pcm_format_set.sample_types()) {
-        FX_LOGS(INFO) << "             sample_types [" << pcm_format_set.sample_types()->size()
-                      << "]";
-        for (auto idx = 0u; idx < pcm_format_set.sample_types()->size(); ++idx) {
-          FX_LOGS(INFO) << "              [" << idx << "]               "
-                        << pcm_format_set.sample_types()->at(idx);
-        }
-      } else {
-        FX_LOGS(INFO) << "             sample_types       <none> (non-compliant)";
-      }
-      if (pcm_format_set.frame_rates()) {
-        FX_LOGS(INFO) << "             frame_rates [" << pcm_format_set.frame_rates()->size()
-                      << "]";
-        for (auto idx = 0u; idx < pcm_format_set.frame_rates()->size(); ++idx) {
-          FX_LOGS(INFO) << "              [" << idx << "]               "
-                        << pcm_format_set.frame_rates()->at(idx);
-        }
-      } else {
-        FX_LOGS(INFO) << "             frame_rates        <none> (non-compliant)";
+        FX_LOGS(INFO) << "        format_set              <none> (non-compliant)";
       }
     }
   } else {
@@ -659,45 +803,58 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
   // dai_format_sets
   if (device_info.dai_format_sets()) {
     FX_LOGS(INFO) << "   dai_format_sets [" << device_info.dai_format_sets()->size() << "]";
-    for (auto j = 0u; j < device_info.dai_format_sets()->size(); ++j) {
-      const auto& dai_format_set = device_info.dai_format_sets()->at(j);
-      const auto& channel_counts = dai_format_set.number_of_channels();
-      FX_LOGS(INFO) << "          [" << j << "] number_of_channels [" << channel_counts.size()
-                    << "]";
-      for (auto idx = 0u; idx < channel_counts.size(); ++idx) {
-        FX_LOGS(INFO) << "               [" << idx << "]              " << channel_counts[idx];
-      }
+    for (auto i = 0u; i < device_info.dai_format_sets()->size(); ++i) {
+      auto element_dai_format_set = device_info.dai_format_sets()->at(i);
+      FX_LOGS(INFO) << "    [" << i << "]  element_id             "
+                    << (element_dai_format_set.format_sets().has_value()
+                            ? std::to_string(*element_dai_format_set.element_id())
+                            : "<none> (non-compliant)");
+      if (element_dai_format_set.format_sets().has_value()) {
+        FX_LOGS(INFO) << "         format_set [" << element_dai_format_set.format_sets()->size()
+                      << "]";
+        for (auto j = 0u; j < element_dai_format_set.format_sets()->size(); ++j) {
+          const auto& dai_format_set = element_dai_format_set.format_sets()->at(j);
+          const auto& channel_counts = dai_format_set.number_of_channels();
+          FX_LOGS(INFO) << "          [" << j << "] number_of_channels [" << channel_counts.size()
+                        << "]";
+          for (auto idx = 0u; idx < channel_counts.size(); ++idx) {
+            FX_LOGS(INFO) << "               [" << idx << "]              " << channel_counts[idx];
+          }
 
-      const auto& sample_formats = dai_format_set.sample_formats();
-      FX_LOGS(INFO) << "              sample_formats [" << sample_formats.size() << "]";
-      for (auto idx = 0u; idx < sample_formats.size(); ++idx) {
-        FX_LOGS(INFO) << "               [" << idx << "]              " << sample_formats[idx];
-      }
+          const auto& sample_formats = dai_format_set.sample_formats();
+          FX_LOGS(INFO) << "              sample_formats [" << sample_formats.size() << "]";
+          for (auto idx = 0u; idx < sample_formats.size(); ++idx) {
+            FX_LOGS(INFO) << "               [" << idx << "]              " << sample_formats[idx];
+          }
 
-      const auto& frame_formats = dai_format_set.frame_formats();
-      FX_LOGS(INFO) << "              frame_formats [" << frame_formats.size() << "]";
-      for (auto idx = 0u; idx < frame_formats.size(); ++idx) {
-        FX_LOGS(INFO) << "               [" << idx << "]              " << frame_formats[idx];
-      }
+          const auto& frame_formats = dai_format_set.frame_formats();
+          FX_LOGS(INFO) << "              frame_formats [" << frame_formats.size() << "]";
+          for (auto idx = 0u; idx < frame_formats.size(); ++idx) {
+            FX_LOGS(INFO) << "               [" << idx << "]              " << frame_formats[idx];
+          }
 
-      const auto& frame_rates = dai_format_set.frame_rates();
-      FX_LOGS(INFO) << "              frame_rates [" << frame_rates.size() << "]";
-      for (auto idx = 0u; idx < frame_rates.size(); ++idx) {
-        FX_LOGS(INFO) << "               [" << idx << "]              " << frame_rates[idx];
-      }
+          const auto& frame_rates = dai_format_set.frame_rates();
+          FX_LOGS(INFO) << "              frame_rates [" << frame_rates.size() << "]";
+          for (auto idx = 0u; idx < frame_rates.size(); ++idx) {
+            FX_LOGS(INFO) << "               [" << idx << "]              " << frame_rates[idx];
+          }
 
-      const auto& bits_per_slot = dai_format_set.bits_per_slot();
-      FX_LOGS(INFO) << "              bits_per_slot [" << bits_per_slot.size() << "]";
-      for (auto idx = 0u; idx < bits_per_slot.size(); ++idx) {
-        FX_LOGS(INFO) << "               [" << idx << "]              "
-                      << static_cast<int16_t>(bits_per_slot[idx]);
-      }
+          const auto& bits_per_slot = dai_format_set.bits_per_slot();
+          FX_LOGS(INFO) << "              bits_per_slot [" << bits_per_slot.size() << "]";
+          for (auto idx = 0u; idx < bits_per_slot.size(); ++idx) {
+            FX_LOGS(INFO) << "               [" << idx << "]              "
+                          << static_cast<int16_t>(bits_per_slot[idx]);
+          }
 
-      const auto& bits_per_sample = dai_format_set.bits_per_sample();
-      FX_LOGS(INFO) << "              bits_per_sample [" << bits_per_sample.size() << "]";
-      for (auto idx = 0u; idx < bits_per_sample.size(); ++idx) {
-        FX_LOGS(INFO) << "               [" << idx << "]              "
-                      << static_cast<int16_t>(bits_per_sample[idx]);
+          const auto& bits_per_sample = dai_format_set.bits_per_sample();
+          FX_LOGS(INFO) << "              bits_per_sample [" << bits_per_sample.size() << "]";
+          for (auto idx = 0u; idx < bits_per_sample.size(); ++idx) {
+            FX_LOGS(INFO) << "               [" << idx << "]              "
+                          << static_cast<int16_t>(bits_per_sample[idx]);
+          }
+        }
+      } else {
+        FX_LOGS(INFO) << "         format_set <none> (non-compliant)";
       }
     }
   } else {
@@ -754,7 +911,8 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
     }
   } else {
     clock_domain_str += "<none>";
-    if (device_info.device_type() == fuchsia_audio_device::DeviceType::kInput ||
+    if (device_info.device_type() == fuchsia_audio_device::DeviceType::kComposite ||
+        device_info.device_type() == fuchsia_audio_device::DeviceType::kInput ||
         device_info.device_type() == fuchsia_audio_device::DeviceType::kOutput) {
       clock_domain_str += " (non-compliant)";
     }

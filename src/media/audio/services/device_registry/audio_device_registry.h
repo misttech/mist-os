@@ -11,7 +11,6 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 
-#include <cstdint>
 #include <memory>
 #include <unordered_set>
 
@@ -57,7 +56,8 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   enum class DevicePresence { Unknown, Active, Error };
   std::pair<DevicePresence, std::shared_ptr<Device>> FindDeviceByTokenId(TokenId token_id);
 
-  bool ClaimDeviceForControl(std::shared_ptr<Device> device, std::shared_ptr<ControlNotify> notify);
+  static bool ClaimDeviceForControl(const std::shared_ptr<Device>& device,
+                                    std::shared_ptr<ControlNotify> notify);
 
   // DevicePresenceWatcher interface -- called by Devices when they change state.
   // Add a successfully-initialized Device to our active list.
@@ -80,12 +80,12 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   // Observer support
   std::shared_ptr<ObserverServer> CreateObserverServer(
       fidl::ServerEnd<fuchsia_audio_device::Observer> server_end,
-      std::shared_ptr<Device> observed_device);
+      const std::shared_ptr<Device>& observed_device);
 
   // Control support
   std::shared_ptr<ControlServer> CreateControlServer(
       fidl::ServerEnd<fuchsia_audio_device::Control> server_end,
-      std::shared_ptr<Device> device_to_control);
+      const std::shared_ptr<Device>& device_to_control);
 
   // RingBuffer support
   std::shared_ptr<RingBufferServer> CreateRingBufferServer(

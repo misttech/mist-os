@@ -19,7 +19,6 @@
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
-#include "src/media/audio/services/device_registry/observer_server.h"
 
 namespace media_audio {
 
@@ -30,10 +29,11 @@ std::shared_ptr<RegistryServer> RegistryServer::Create(
     std::shared_ptr<AudioDeviceRegistry> parent) {
   ADR_LOG_STATIC(kLogRegistryServerMethods);
 
-  return BaseFidlServer::Create(std::move(thread), std::move(server_end), parent);
+  return BaseFidlServer::Create(std::move(thread), std::move(server_end), std::move(parent));
 }
 
-RegistryServer::RegistryServer(std::shared_ptr<AudioDeviceRegistry> parent) : parent_(parent) {
+RegistryServer::RegistryServer(std::shared_ptr<AudioDeviceRegistry> parent)
+    : parent_(std::move(parent)) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();
@@ -58,7 +58,7 @@ void RegistryServer::WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& complet
   ReplyWithAddedDevices();
 }
 
-void RegistryServer::DeviceWasAdded(std::shared_ptr<const Device> new_device) {
+void RegistryServer::DeviceWasAdded(const std::shared_ptr<const Device>& new_device) {
   ADR_LOG_METHOD(kLogRegistryServerMethods);
 
   auto id = *new_device->info()->token_id();

@@ -39,7 +39,7 @@ class RegistryServer
   void CreateObserver(CreateObserverRequest& request,
                       CreateObserverCompleter::Sync& completer) final;
 
-  void DeviceWasAdded(std::shared_ptr<const Device> new_device);
+  void DeviceWasAdded(const std::shared_ptr<const Device>& new_device);
   void DeviceWasRemoved(TokenId removed_id);
 
   // Static object count, for debugging purposes.

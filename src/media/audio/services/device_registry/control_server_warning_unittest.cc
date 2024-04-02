@@ -199,8 +199,8 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatWhenAlreadyPending) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
-  auto dai_format2 = SecondDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
+  auto dai_format2 = SecondDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
   auto received_callback = false;
   auto received_callback2 = false;
 
@@ -237,7 +237,7 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatInvalidFormat) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto invalid_dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto invalid_dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
   invalid_dai_format.bits_per_sample() = invalid_dai_format.bits_per_slot() + 1;
   auto received_callback = false;
 
@@ -268,7 +268,8 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatUnsupportedFormat) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto unsupported_dai_format = UnsupportedDaiFormatFromDaiFormatSets(device->dai_format_sets());
+  auto unsupported_dai_format =
+      UnsupportedDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
   auto received_callback = false;
 
   control->client()
@@ -298,7 +299,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenAlreadyPending) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
   auto received_callback = false;
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
@@ -371,7 +372,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenStarted) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
   auto received_callback = false;
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
@@ -419,7 +420,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenAlreadyPending) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
   auto received_callback = false;
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
@@ -501,7 +502,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenStopped) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
   auto received_callback = false;
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})

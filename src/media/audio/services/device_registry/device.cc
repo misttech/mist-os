@@ -25,6 +25,7 @@
 
 #include "src/media/audio/lib/clock/real_clock.h"
 #include "src/media/audio/lib/timeline/timeline_rate.h"
+#include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
@@ -378,7 +379,7 @@ bool Device::DropControl() {
   return true;
 }
 
-bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
+bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add) {
   ADR_LOG_METHOD(kLogDeviceMethods || kLogNotifyMethods) << " (" << observer_to_add << ")";
 
   FX_CHECK(state_ != State::DeviceInitializing);
@@ -677,34 +678,44 @@ void Device::RetrieveStreamRingBufferFormatSets() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   RetrieveRingBufferFormatSets(
-      [this](const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
+      [this](ElementId element_id,
+             const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
         if (state_ == State::Error) {
           ADR_WARN_OBJECT() << "device has an error while retrieving initial RingBuffer formats";
           return;
         }
 
-        ring_buffer_format_sets_ = std::vector<fuchsia_hardware_audio::SupportedFormats>();
-        for (const auto& rb_format_set : ring_buffer_format_sets) {
-          ring_buffer_format_sets_->emplace_back(rb_format_set);
-        }
-
         // Required for StreamConfig and Dai, absent for Codec and Composite.
-        translated_ring_buffer_format_sets_ =
-            TranslateRingBufferFormatSets(*ring_buffer_format_sets_);
-        if (translated_ring_buffer_format_sets_.empty()) {
+        auto translated_ring_buffer_format_sets =
+            TranslateRingBufferFormatSets(ring_buffer_format_sets);
+        if (translated_ring_buffer_format_sets.empty()) {
           ADR_WARN_OBJECT() << "RingBuffer format sets could not be translated";
           OnError(ZX_ERR_INVALID_ARGS);
           return;
-        }
+        };
 
+        element_driver_ring_buffer_format_sets_ = {{
+            {
+                element_id,
+                ring_buffer_format_sets,
+            },
+        }};
+        element_ring_buffer_format_sets_ = {{
+            fuchsia_audio_device::ElementRingBufferFormatSet{{
+                .element_id = element_id,
+                .format_sets = translated_ring_buffer_format_sets,
+            }},
+        }};
         ring_buffer_format_sets_retrieved_ = true;
         OnInitializationResponse();
-      });
+      },
+      fuchsia_audio_device::kDefaultRingBufferElementId);
 }
 
 void Device::RetrieveRingBufferFormatSets(
-    fit::callback<void(std::vector<fuchsia_hardware_audio::SupportedFormats>)>
-        ring_buffer_format_sets_callback) {
+    fit::callback<void(ElementId, const std::vector<fuchsia_hardware_audio::SupportedFormats>&)>
+        ring_buffer_format_sets_callback,
+    ElementId element_id) {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls || kLogRingBufferMethods);
 
   if (state_ == State::Error) {
@@ -713,9 +724,14 @@ void Device::RetrieveRingBufferFormatSets(
   }
   // TODO(https://fxbug.dev/42064765): handle command timeouts
 
+  if (element_id != fuchsia_audio_device::kDefaultRingBufferElementId) {
+    OnError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
   (*stream_config_client_)
       ->GetSupportedFormats()
-      .Then([this, rb_formats_callback = std::move(ring_buffer_format_sets_callback)](
+      .Then([this, element_id, rb_formats_callback = std::move(ring_buffer_format_sets_callback)](
                 fidl::Result<fuchsia_hardware_audio::StreamConfig::GetSupportedFormats>&
                     result) mutable {
         if (LogResultFrameworkError(result, "GetSupportedFormats response")) {
@@ -730,7 +746,7 @@ void Device::RetrieveRingBufferFormatSets(
           return;
         }
 
-        rb_formats_callback(result->supported_formats());
+        rb_formats_callback(element_id, result->supported_formats());
       });
 }
 
@@ -959,23 +975,29 @@ void Device::RetrieveCurrentElementStates() {
 void Device::RetrieveCodecDaiFormatSets() {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
   RetrieveDaiFormatSets(
-      [this](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_format_sets) {
+      [this](ElementId element_id,
+             const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
         if (state_ == State::Error) {
-          ADR_WARN_METHOD() << "device already has an error";
+          ADR_WARN_OBJECT() << "device already has an error";
           return;
         }
-        dai_format_sets_ = std::vector<fuchsia_hardware_audio::DaiSupportedFormats>();
-        for (const auto& dai_format_set : dai_format_sets) {
-          dai_format_sets_->emplace_back(dai_format_set);
-        }
+
+        element_dai_format_sets_ = {{
+            fuchsia_audio_device::ElementDaiFormatSet{{
+                .element_id = element_id,
+                .format_sets = dai_format_sets,
+            }},
+        }};
         dai_format_sets_retrieved_ = true;
         OnInitializationResponse();
-      });
+      },
+      fuchsia_audio_device::kDefaultDaiInterconnectElementId);
 }
 
 void Device::RetrieveDaiFormatSets(
-    fit::callback<void(std::vector<fuchsia_hardware_audio::DaiSupportedFormats>)>
-        dai_format_sets_callback) {
+    fit::callback<void(ElementId, const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>&)>
+        dai_format_sets_callback,
+    ElementId element_id) {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
 
   if (state_ == State::Error) {
@@ -984,22 +1006,29 @@ void Device::RetrieveDaiFormatSets(
   }
   // TODO(https://fxbug.dev/113429): handle command timeouts
 
-  (*codec_client_)
-      ->GetDaiFormats()
-      .Then([this, callback = std::move(dai_format_sets_callback)](
-                fidl::Result<fuchsia_hardware_audio::Codec::GetDaiFormats>& result) mutable {
-        if (LogResultError(result, "GetDaiFormats response")) {
-          return;
-        }
+  if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
+    if (element_id != fuchsia_audio_device::kDefaultDaiInterconnectElementId) {
+      OnError(ZX_ERR_INVALID_ARGS);
+      return;
+    }
 
-        ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/GetDaiFormats: success";
+    (*codec_client_)
+        ->GetDaiFormats()
+        .Then([this, element_id, callback = std::move(dai_format_sets_callback)](
+                  fidl::Result<fuchsia_hardware_audio::Codec::GetDaiFormats>& result) mutable {
+          if (LogResultError(result, "GetDaiFormats response")) {
+            return;
+          }
 
-        if (auto status = ValidateDaiFormatSets(result->formats()); status != ZX_OK) {
-          OnError(status);
-          return;
-        }
-        callback(result->formats());
-      });
+          ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/GetDaiFormats: success";
+
+          if (auto status = ValidateDaiFormatSets(result->formats()); status != ZX_OK) {
+            OnError(status);
+            return;
+          }
+          callback(element_id, result->formats());
+        });
+  }
 }
 
 void Device::RetrieveGainState() {
@@ -1243,7 +1272,7 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
         .product(codec_properties_->product())
         // Required for Dai and StreamConfig; optional for Codec:
         .is_input(codec_properties_->is_input())
-        // Required for Codec, Dai and Composite; absent for StreamConfig:
+        // Required for Codec and Dai; optional for Composite; absent for StreamConfig:
         .dai_format_sets(dai_format_sets())
         // Required for Codec and StreamConfig; absent for Composite and Dai:
         .plug_detect_caps(*codec_properties_->plug_detect_capabilities() ==
@@ -1266,8 +1295,8 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
         .unique_instance_id(stream_config_properties_->unique_id())
         // Required for Dai and StreamConfig; optional for Codec:
         .is_input(stream_config_properties_->is_input())
-        // Required for Dai and StreamConfig; absent for Codec and Composite:
-        .ring_buffer_format_sets(translated_ring_buffer_format_sets_)
+        // Required for Dai and StreamConfig; optional for Composite; absent for Codec:
+        .ring_buffer_format_sets(ring_buffer_format_sets())
         // Required for StreamConfig; absent for Codec, Composite and Dai:
         .gain_caps(fuchsia_audio_device::GainCapabilities{{
             .min_gain_db = stream_config_properties_->min_gain_db(),
@@ -1322,7 +1351,7 @@ zx::result<zx::clock> Device::GetReadOnlyClock() const {
 // This method expects that the required fields are present.
 std::optional<fuchsia_hardware_audio::Format> Device::SupportedDriverFormatForClientFormat(
     // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
-    const fuchsia_audio::Format& client_format) {
+    const fuchsia_audio::Format& client_format, ElementId element_id) {
   fuchsia_hardware_audio::SampleFormat driver_sample_format;
   uint8_t bytes_per_sample, max_valid_bits;
   auto client_sample_type = *client_format.sample_type();
@@ -1360,9 +1389,20 @@ std::optional<fuchsia_hardware_audio::Format> Device::SupportedDriverFormatForCl
                       << static_cast<uint32_t>(client_sample_type);
   }
 
+  std::vector<fuchsia_hardware_audio::SupportedFormats> driver_ring_buffer_format_sets;
+  for (const auto& element_entry : element_driver_ring_buffer_format_sets_) {
+    if (element_entry.first == element_id) {
+      driver_ring_buffer_format_sets = element_entry.second;
+    }
+  }
+  if (driver_ring_buffer_format_sets.empty()) {
+    FX_LOGS(WARNING) << __func__ << ": no driver ring_buffer_format_set found for element_id "
+                     << element_id;
+    return {};
+  }
   // If format/bytes/rate/channels all match, save the highest valid_bits within our limit.
   uint8_t best_valid_bits = 0;
-  for (const auto& ring_buffer_format_set : *ring_buffer_format_sets_) {
+  for (const auto& ring_buffer_format_set : driver_ring_buffer_format_sets) {
     const auto pcm_format_set = *ring_buffer_format_set.pcm_supported_formats();
     if (std::count_if(
             pcm_format_set.sample_formats()->begin(), pcm_format_set.sample_formats()->end(),

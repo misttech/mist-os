@@ -8,6 +8,8 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <gtest/gtest.h>
+
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
@@ -19,17 +21,52 @@ namespace media_audio {
 
 ////////////////////////
 // Codec-related methods
-fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromDaiSupportedFormats(
+fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromElementDaiFormatSets(
+    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets,
+    ElementId element_id) {
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_format_sets;
+  for (const auto& element_entry : element_dai_format_sets) {
+    if (element_entry.element_id() && *element_entry.element_id() == element_id) {
+      return SafeDaiFormatFromDaiFormatSets(*element_entry.format_sets());
+    }
+  }
+  ADD_FAILURE()
+      << "SafeDaiFormatFromDaiFormatSets: No element_dai_format_sets entry found with specified element_id "
+      << element_id;
+  return {{}};
+}
+
+fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromElementDaiFormatSets(
+    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets,
+    ElementId element_id) {
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_format_sets;
+  for (const auto& element_entry : element_dai_format_sets) {
+    if (element_entry.element_id() && *element_entry.element_id() == element_id) {
+      return SecondDaiFormatFromDaiFormatSets(*element_entry.format_sets());
+    }
+  }
+  ADD_FAILURE() << "Could not create a second valid DaiFormat for specified element_id "
+                << element_id;
+  return {{}};
+}
+
+fuchsia_hardware_audio::DaiFormat UnsupportedDaiFormatFromElementDaiFormatSets(
+    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets,
+    ElementId element_id) {
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_format_sets;
+  for (const auto& element_entry : element_dai_format_sets) {
+    if (element_entry.element_id() && *element_entry.element_id() == element_id) {
+      return UnsupportedDaiFormatFromDaiFormatSets(*element_entry.format_sets());
+    }
+  }
+  ADD_FAILURE()
+      << "UnsupportedDaiFormatFromDaiFormatSets could not find an invalid dai_format for element_id "
+      << element_id;
+  return {{}};
+}
+
+fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
-  FX_CHECK(!dai_format_sets.empty()) << "empty DaiSupportedFormats";
-
-  FX_CHECK(
-      !dai_format_sets[0].number_of_channels().empty() &&
-      !dai_format_sets[0].sample_formats().empty() && !dai_format_sets[0].frame_formats().empty() &&
-      !dai_format_sets[0].frame_rates().empty() && !dai_format_sets[0].bits_per_slot().empty() &&
-      !dai_format_sets[0].bits_per_sample().empty())
-      << "empty sub-vector in DaiSupportedFormats";
-
   fuchsia_hardware_audio::DaiFormat dai_format{{
       .number_of_channels = dai_format_sets[0].number_of_channels()[0],
       .channels_to_use_bitmask = (dai_format_sets[0].number_of_channels()[0] < 64
@@ -41,15 +78,16 @@ fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromDaiSupportedFormats(
       .bits_per_slot = dai_format_sets[0].bits_per_slot()[0],
       .bits_per_sample = dai_format_sets[0].bits_per_sample()[0],
   }};
-  FX_CHECK(ValidateDaiFormat(dai_format) == ZX_OK)
-      << "first entries did not create a valid DaiFormat";
+  if (ValidateDaiFormat(dai_format) != ZX_OK) {
+    ADD_FAILURE() << "first entries did not create a valid DaiFormat";
+  }
 
   return dai_format;
 }
 
-fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromDaiSupportedFormats(
+fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
-  auto safe_format_2 = SafeDaiFormatFromDaiSupportedFormats(dai_format_sets);
+  auto safe_format_2 = SafeDaiFormatFromDaiFormatSets(dai_format_sets);
 
   if (safe_format_2.channels_to_use_bitmask() > 1) {
     safe_format_2.channels_to_use_bitmask() -= 1;
@@ -80,51 +118,46 @@ fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromDaiSupportedFormats(
     }};
 
   } else {
-    FX_CHECK(false) << "Dai format set has only one possible valid format";
+    ADD_FAILURE() << "Dai format set has only one possible valid format";
+    return {{}};
+  }
+  if (ValidateDaiFormat(safe_format_2) != ZX_OK) {
+    ADD_FAILURE() << "Could not create a second valid DaiFormat";
   }
   return safe_format_2;
 }
 
 fuchsia_hardware_audio::DaiFormat UnsupportedDaiFormatFromDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
-  FX_CHECK(!dai_format_sets.empty()) << "empty DaiSupportedFormats";
-
-  std::optional<fuchsia_hardware_audio::DaiFormat> dai_format;
-  for (const auto& format_set : dai_format_sets) {
-    FX_CHECK(!format_set.number_of_channels().empty() && !format_set.sample_formats().empty() &&
-             !format_set.frame_formats().empty() && !format_set.frame_rates().empty() &&
-             !format_set.bits_per_slot().empty() && !format_set.bits_per_sample().empty())
-        << "empty sub-vector in DaiSupportedFormats";
-    dai_format = SafeDaiFormatFromDaiSupportedFormats({{format_set}});
-    if (dai_format->number_of_channels() > 1) {
-      dai_format->number_of_channels() -= 1;
-      dai_format->channels_to_use_bitmask() = (1ull << dai_format->number_of_channels()) - 1ull;
-      FX_LOGS(INFO) << "Returning this invalid format: ";
-      LogDaiFormat(dai_format);
-      return *dai_format;
-    }
-    if (dai_format->frame_rate() > kMinSupportedDaiFrameRate) {
-      dai_format->frame_rate() -= 1;
-      FX_LOGS(INFO) << "Returning this invalid format: ";
-      LogDaiFormat(dai_format);
-      return *dai_format;
-    }
-    if (dai_format->bits_per_slot() > 1) {
-      dai_format->bits_per_slot() -= 1;
-      FX_LOGS(INFO) << "Returning this invalid format: ";
-      LogDaiFormat(dai_format);
-      return *dai_format;
-    }
-    if (dai_format->bits_per_sample() > 1) {
-      dai_format->bits_per_sample() -= 1;
-      FX_LOGS(INFO) << "Returning this invalid format: ";
-      LogDaiFormat(dai_format);
-      return *dai_format;
-    }
+  auto dai_format = SafeDaiFormatFromDaiFormatSets(dai_format_sets);
+  if (dai_format.number_of_channels() > 1) {
+    dai_format.number_of_channels() -= 1;
+    dai_format.channels_to_use_bitmask() = (1ull << dai_format.number_of_channels()) - 1ull;
+    FX_LOGS(INFO) << "Returning this invalid format: ";
+    LogDaiFormat(dai_format);
+    return dai_format;
+  }
+  if (dai_format.frame_rate() > kMinSupportedDaiFrameRate) {
+    dai_format.frame_rate() -= 1;
+    FX_LOGS(INFO) << "Returning this invalid format: ";
+    LogDaiFormat(dai_format);
+    return dai_format;
+  }
+  if (dai_format.bits_per_slot() > 1) {
+    dai_format.bits_per_slot() -= 1;
+    FX_LOGS(INFO) << "Returning this invalid format: ";
+    LogDaiFormat(dai_format);
+    return dai_format;
+  }
+  if (dai_format.bits_per_sample() > 1) {
+    dai_format.bits_per_sample() -= 1;
+    FX_LOGS(INFO) << "Returning this invalid format: ";
+    LogDaiFormat(dai_format);
+    return dai_format;
   }
 
-  FX_CHECK(false) << "No invalid DaiFormat found for these format_sets";
-  __UNREACHABLE;
+  ADD_FAILURE() << "No invalid DaiFormat found for these format_sets";
+  return {{}};
 }
 
 }  // namespace media_audio

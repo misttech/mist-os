@@ -20,6 +20,7 @@
 #include <optional>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 #include "src/media/audio/lib/clock/clock.h"
@@ -40,7 +41,7 @@ class Device : public std::enable_shared_from_this<Device> {
                                         fuchsia_audio_device::DriverClient driver_client);
   ~Device();
 
-  bool AddObserver(std::shared_ptr<ObserverNotify> observer_to_add);
+  bool AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add);
 
   void Initialize();
 
@@ -56,15 +57,19 @@ class Device : public std::enable_shared_from_this<Device> {
   // cannot satisfy the requested format, `.pcm_format` will be missing in the returned table.
   std::optional<fuchsia_hardware_audio::Format> SupportedDriverFormatForClientFormat(
       // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
-      const fuchsia_audio::Format& client_format);
+      const fuchsia_audio::Format& client_format,
+      ElementId element_id = fuchsia_audio_device::kDefaultRingBufferElementId);
   bool SetGain(fuchsia_hardware_audio::GainState& gain_state);
 
   void RetrieveRingBufferFormatSets(
-      fit::callback<void(std::vector<fuchsia_hardware_audio::SupportedFormats>)>
-          ring_buffer_format_sets_callback);
+      fit::callback<void(ElementId, const std::vector<fuchsia_hardware_audio::SupportedFormats>&)>
+          ring_buffer_format_sets_callback,
+      ElementId element_id = fuchsia_audio_device::kDefaultRingBufferElementId);
   void RetrieveDaiFormatSets(
-      fit::callback<void(std::vector<fuchsia_hardware_audio::DaiSupportedFormats>)>
-          dai_format_sets_callback);
+      fit::callback<void(ElementId,
+                         const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>&)>
+          dai_format_sets_callback,
+      ElementId element_id = fuchsia_audio_device::kDefaultDaiInterconnectElementId);
 
   bool CodecSetDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format);
   bool CodecReset();
@@ -98,9 +103,15 @@ class Device : public std::enable_shared_from_this<Device> {
   // `info` is only populated once the device is initialized.
   const std::optional<fuchsia_audio_device::Info>& info() const { return device_info_; }
   zx::result<zx::clock> GetReadOnlyClock() const;
-  const std::vector<fuchsia_audio_device::PcmFormatSet>& ring_buffer_format_sets() const {
-    return translated_ring_buffer_format_sets_;
+
+  const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& dai_format_sets() const {
+    return element_dai_format_sets_;
   }
+  const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>& ring_buffer_format_sets()
+      const {
+    return element_ring_buffer_format_sets_;
+  }
+
   // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
   const fuchsia_audio::Format& ring_buffer_format() { return vmo_format_; }
   std::optional<int16_t> valid_bits_per_sample() const {
@@ -111,9 +122,6 @@ class Device : public std::enable_shared_from_this<Device> {
   }
   std::optional<bool> supports_set_active_channels() const { return supports_set_active_channels_; }
 
-  const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets() const {
-    return *dai_format_sets_;
-  }
   bool dai_format_is_set() const { return codec_format_.has_value(); }
   const fuchsia_hardware_audio::CodecFormatInfo& codec_format_info() const {
     return codec_format_->codec_format_info;
@@ -122,14 +130,13 @@ class Device : public std::enable_shared_from_this<Device> {
 
   bool has_codec_properties() const { return codec_properties_.has_value(); }
   bool has_stream_config_properties() const { return stream_config_properties_.has_value(); }
-  bool checked_for_signalprocessing() const { return supports_signalprocessing_.has_value(); }
-  bool supports_signalprocessing() const { return supports_signalprocessing_.value_or(false); }
   bool has_health_state() const { return health_state_.has_value(); }
   bool dai_format_sets_retrieved() const { return dai_format_sets_retrieved_; }
   bool ring_buffer_format_sets_retrieved() const { return ring_buffer_format_sets_retrieved_; }
   bool has_plug_state() const { return plug_state_.has_value(); }
   bool has_gain_state() const { return gain_state_.has_value(); }
-
+  bool checked_for_signalprocessing() const { return supports_signalprocessing_.has_value(); }
+  bool supports_signalprocessing() const { return supports_signalprocessing_.value_or(false); }
   void SetSignalProcessingSupported(bool is_supported);
 
   // Static object counts, for debugging purposes.
@@ -294,13 +301,11 @@ class Device : public std::enable_shared_from_this<Device> {
   // Initialization is complete when these 5 optionals are populated.
   std::optional<fuchsia_hardware_audio::StreamProperties> stream_config_properties_;
   std::optional<std::vector<fuchsia_hardware_audio::SupportedFormats>> ring_buffer_format_sets_;
-  std::vector<fuchsia_audio_device::PcmFormatSet> translated_ring_buffer_format_sets_;
   std::optional<fuchsia_hardware_audio::GainState> gain_state_;
   std::optional<fuchsia_hardware_audio::PlugState> plug_state_;
   std::optional<bool> health_state_;
 
   std::optional<fuchsia_hardware_audio::CodecProperties> codec_properties_;
-  std::optional<std::vector<fuchsia_hardware_audio::DaiSupportedFormats>> dai_format_sets_;
 
   std::optional<bool> supports_signalprocessing_;
   std::vector<fuchsia_hardware_audio_signalprocessing::Element> sig_proc_elements_;
@@ -308,12 +313,21 @@ class Device : public std::enable_shared_from_this<Device> {
   std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>
       sig_proc_element_map_;
 
+  std::unordered_set<ElementId> dai_endpoint_ids_;
+  std::unordered_set<ElementId> temp_dai_endpoint_ids_;
+  std::unordered_set<ElementId> ring_buffer_endpoint_ids_;
   std::unordered_map<TopologyId, std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>
       sig_proc_topology_map_;
   std::optional<TopologyId> current_topology_id_;
 
   bool dai_format_sets_retrieved_ = false;
+  std::vector<fuchsia_audio_device::ElementDaiFormatSet> element_dai_format_sets_;
+  std::unordered_map<ElementId, fuchsia_hardware_audio::DaiFormat> composite_dai_formats_;
+
   bool ring_buffer_format_sets_retrieved_ = false;
+  std::vector<fuchsia_audio_device::ElementRingBufferFormatSet> element_ring_buffer_format_sets_;
+  std::vector<std::pair<ElementId, std::vector<fuchsia_hardware_audio::SupportedFormats>>>
+      element_driver_ring_buffer_format_sets_;
 
   struct CodecFormat {
     fuchsia_hardware_audio::DaiFormat dai_format;

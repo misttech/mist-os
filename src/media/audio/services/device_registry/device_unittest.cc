@@ -102,7 +102,9 @@ TEST_F(CodecTest, DeviceInfo) {
   EXPECT_FALSE(info.ring_buffer_format_sets().has_value());
 
   ASSERT_TRUE(info.dai_format_sets().has_value());
-  EXPECT_EQ(*info.dai_format_sets(), FakeCodec::kDefaultDaiFormatSets);
+  ASSERT_FALSE(info.dai_format_sets()->empty());
+  ASSERT_TRUE(info.dai_format_sets()->at(0).format_sets().has_value());
+  EXPECT_EQ(*info.dai_format_sets()->at(0).format_sets(), FakeCodec::kDefaultDaiFormatSets);
 
   EXPECT_FALSE(info.gain_caps().has_value());
 
@@ -179,8 +181,10 @@ TEST_F(CodecTest, GetDaiFormats) {
   bool received_get_dai_formats_callback = false;
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&received_get_dai_formats_callback,
-       &dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&received_get_dai_formats_callback, &dai_formats](
+          uint64_t element_id,
+          const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
           dai_formats.push_back(dai_format_set);
@@ -209,8 +213,10 @@ TEST_F(CodecTest, SetDaiFormat) {
   bool received_get_dai_formats_callback = false;
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&received_get_dai_formats_callback,
-       &dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&received_get_dai_formats_callback, &dai_formats](
+          uint64_t element_id,
+          const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
           dai_formats.push_back(dai_format_set);
@@ -219,7 +225,7 @@ TEST_F(CodecTest, SetDaiFormat) {
   RunLoopUntilIdle();
   ASSERT_TRUE(received_get_dai_formats_callback);
   ASSERT_FALSE(notify()->dai_format());
-  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiFormatSets(dai_formats)));
 
   // check that notify received dai_format and codec_format_info
   RunLoopUntilIdle();
@@ -241,8 +247,10 @@ TEST_F(CodecTest, InitialStop) {
   bool received_get_dai_formats_callback = false;
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&received_get_dai_formats_callback,
-       &dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&received_get_dai_formats_callback, &dai_formats](
+          uint64_t element_id,
+          const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
           dai_formats.push_back(dai_format_set);
@@ -251,7 +259,7 @@ TEST_F(CodecTest, InitialStop) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_get_dai_formats_callback);
-  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiFormatSets(dai_formats)));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -273,12 +281,14 @@ TEST_F(CodecTest, Start) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](uint64_t element_id,
+                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiFormatSets(dai_formats)));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -299,12 +309,14 @@ TEST_F(CodecTest, SetDaiFormatChange) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](uint64_t element_id,
+                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiFormatSets(dai_formats)));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -312,7 +324,7 @@ TEST_F(CodecTest, SetDaiFormatChange) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->codec_is_started());
-  auto dai_format2 = SecondDaiFormatFromDaiSupportedFormats(dai_formats);
+  auto dai_format2 = SecondDaiFormatFromDaiFormatSets(dai_formats);
   auto time_before_format_change = zx::clock::get_monotonic();
 
   // Change the DaiFormat
@@ -334,12 +346,14 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](uint64_t element_id,
+                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  auto safe_format = SafeDaiFormatFromDaiSupportedFormats(dai_formats);
+  auto safe_format = SafeDaiFormatFromDaiFormatSets(dai_formats);
   ASSERT_TRUE(device->CodecSetDaiFormat(safe_format));
 
   RunLoopUntilIdle();
@@ -369,12 +383,14 @@ TEST_F(CodecTest, StartStop) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](uint64_t element_id,
+                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiFormatSets(dai_formats)));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -399,12 +415,14 @@ TEST_F(CodecTest, StartStart) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](uint64_t element_id,
+                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiFormatSets(dai_formats)));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -430,12 +448,14 @@ TEST_F(CodecTest, StopStop) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](uint64_t element_id,
+                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiFormatSets(dai_formats)));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -468,12 +488,14 @@ TEST_F(CodecTest, Reset) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](uint64_t element_id,
+                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiFormatSets(dai_formats)));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());

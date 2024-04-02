@@ -392,7 +392,7 @@ void FakeStreamConfig::PositionNotification() {
         .position = position_notify_position_bytes_,
     };
 
-    callback(std::move(info));
+    callback(info);
   }
 }
 

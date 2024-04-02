@@ -241,7 +241,7 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
       [this](Device::RingBufferInfo info) {
         // If we have no async completer, maybe we're shutting down. Just exit.
         if (!create_ring_buffer_completer_.has_value()) {
-          ADR_WARN_METHOD()
+          ADR_WARN_OBJECT()
               << "create_ring_buffer_completer_ gone by the time the CreateRingBuffer callback ran";
           if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {
             ring_buffer_server_.reset();

@@ -4,12 +4,15 @@
 library fuchsia.audio.device;
 
 using fuchsia.hardware.audio;
+using fuchsia.hardware.audio.signalprocessing;
 using fuchsia.audio;
 
 /// Common aliases, consts and types used by more than one of the fuchsia.audio.device protocols.
 ///
 alias ClockDomain = fuchsia.hardware.audio.ClockDomain;
 alias TokenId = uint64;
+alias ElementId = fuchsia.hardware.audio.signalprocessing.ElementId;
+alias TopologyId = fuchsia.hardware.audio.signalprocessing.TopologyId;
 
 /// Maximum number of audio devices in the system at any time.
 const MAX_COUNT_DEVICES uint32 = 256;
@@ -32,6 +35,20 @@ const MAX_COUNT_CHANNELS uint32 = fuchsia.hardware.audio.MAX_COUNT_CHANNELS_IN_R
 
 /// Maximum length of the strings for device, manufacturer and product names.
 const MAX_STRING_SIZE uint32 = fuchsia.hardware.audio.MAX_UI_STRING_SIZE;
+
+/// Maximum number of processing elements supported by a single device.
+const MAX_COUNT_PROCESSING_ELEMENTS uint32
+        = fuchsia.hardware.audio.signalprocessing.MAX_COUNT_PROCESSING_ELEMENTS;
+
+/// For devices with Dai or StreamConfig drivers, there is only one RING_BUFFER entity. When a
+/// method requires us to address the RingBuffer by ID, we use element_id 0. Dai and StreamConfig
+/// drivers that implement signalprocessing should not assign this ID to other elements.
+const DEFAULT_RING_BUFFER_ELEMENT_ID ElementId = 0;
+
+/// For devices with Codec or Dai drivers, there is only one DAI_INTERCONNECT entity. When a method
+/// requires us to address the interconnect by ID, we use element_id 1. Codec and Dai drivers that
+/// implement signalprocessing should not assign this ID to other elements.
+const DEFAULT_DAI_INTERCONNECT_ELEMENT_ID ElementId = 1;
 
 /// The protocol channel used to configure and observe a device.
 type DriverClient = flexible resource union {
@@ -93,6 +110,38 @@ type PcmFormatSet = table {
     ///
     /// Required.
     3: frame_rates vector<uint32>:MAX_COUNT_RATES;
+};
+
+/// This table represents the possible RingBuffer formats that this endpoint can support.
+type ElementRingBufferFormatSet = table {
+    /// The ID of the element being described. This must match an ENDPOINT (RING_BUFFER) entry
+    /// in the list of elements contained in the device's `Info` table. If describing the
+    /// supported RingBuffer formats for a Dai or StreamConfig device, this value should be
+    /// `DEFAULT_RING_BUFFER_ELEMENT_ID` (0).
+    ///
+    /// Required.
+    1: element_id ElementId;
+
+    /// The ring_buffer_format_set entries that this element supports.
+    ///
+    /// Required. Must contain at least one entry.
+    2: format_sets vector<PcmFormatSet>:MAX_COUNT_FORMATS;
+};
+
+/// This table represents the possible Dai formats that this endpoint can support.
+type ElementDaiFormatSet = table {
+    /// The ID of the element being described. This must match an ENDPOINT (DAI_INTERCONNECT)
+    /// entry in the list of elements contained in the device's `Info` table. If describing the
+    /// supported DAI formats for a Codec or Dai device, this value should be
+    /// `DEFAULT_DAI_INTERCONNECT_ELEMENT_ID` (1).
+    ///
+    /// Required.
+    1: element_id ElementId;
+
+    /// The dai_format_set entries that this element supports.
+    ///
+    /// Required. Must contain at least one entry.
+    2: format_sets vector<fuchsia.hardware.audio.DaiSupportedFormats>:MAX_COUNT_DAI_FORMATS;
 };
 
 /// One possible channel configuration for the device.

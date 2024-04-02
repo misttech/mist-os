@@ -251,7 +251,7 @@ class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10},
   };
 
-  fuchsia::hardware::audio::PcmSupportedFormats format_set_ = {};
+  fuchsia::hardware::audio::PcmSupportedFormats format_set_;
   size_t ring_buffer_size_;
   zx::vmo ring_buffer_;
 

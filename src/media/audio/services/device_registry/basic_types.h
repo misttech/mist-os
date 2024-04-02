@@ -12,10 +12,10 @@
 namespace media_audio {
 
 // FIDL IDs.
-using TokenId = uint64_t;
-using ElementId = uint64_t;
-using TopologyId = uint64_t;
-using ClockDomain = uint32_t;
+using TokenId = fuchsia_audio_device::TokenId;
+using ElementId = fuchsia_audio_device::ElementId;
+using TopologyId = fuchsia_audio_device::TopologyId;
+using ClockDomain = fuchsia_audio_device::ClockDomain;
 using UniqueId = std::array<uint8_t, fuchsia_audio_device::kUniqueInstanceIdSize>;
 
 }  // namespace media_audio

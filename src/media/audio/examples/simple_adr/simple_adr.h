@@ -79,7 +79,7 @@ class MediaApp : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
   fidl::Client<fuchsia_audio_device::Control> control_client_;
   fidl::Client<fuchsia_audio_device::RingBuffer> ring_buffer_client_;
 
-  uint64_t device_token_id_;
+  fuchsia_audio_device::TokenId device_token_id_;
   fuchsia_audio::RingBuffer ring_buffer_;
   uint64_t ring_buffer_size_;  // From fuchsia.mem.Buffer/size and kBytesPerFrame
   fzl::VmoMapper ring_buffer_mapper_;

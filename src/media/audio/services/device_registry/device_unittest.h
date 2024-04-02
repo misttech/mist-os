@@ -41,17 +41,17 @@ class DeviceTestBase : public gtest::TestLoopFixture {
   void TearDown() override { fake_device_presence_watcher_.reset(); }
 
  protected:
-  static fuchsia_audio_device::Info GetDeviceInfo(std::shared_ptr<Device> device) {
+  static fuchsia_audio_device::Info GetDeviceInfo(const std::shared_ptr<Device>& device) {
     return *device->info();
   }
 
-  static bool HasError(std::shared_ptr<Device> device) {
+  static bool HasError(const std::shared_ptr<Device>& device) {
     return device->state_ == Device::State::Error;
   }
-  static bool InInitializedState(std::shared_ptr<Device> device) {
+  static bool InInitializedState(const std::shared_ptr<Device>& device) {
     return device->state_ == Device::State::DeviceInitialized;
   }
-  static bool IsControlled(std::shared_ptr<Device> device) {
+  static bool IsControlled(const std::shared_ptr<Device>& device) {
     return (device->GetControlNotify() != nullptr);
   }
 
@@ -60,13 +60,13 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     explicit NotifyStub(DeviceTestBase& parent) : parent_(parent) {}
     virtual ~NotifyStub() = default;
 
-    bool AddObserver(std::shared_ptr<Device> device) {
+    bool AddObserver(const std::shared_ptr<Device>& device) {
       return device->AddObserver(shared_from_this());
     }
-    bool SetControl(std::shared_ptr<Device> device) {
+    bool SetControl(const std::shared_ptr<Device>& device) {
       return device->SetControl(shared_from_this());
     }
-    bool DropControl(std::shared_ptr<Device> device) { return device->DropControl(); }
+    static bool DropControl(const std::shared_ptr<Device>& device) { return device->DropControl(); }
 
     // ObserverNotify
     //
@@ -186,7 +186,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     bool codec_stop_failed_ = false;
   };
 
-  static uint8_t ExpectFormatMatch(std::shared_ptr<Device> device,
+  static uint8_t ExpectFormatMatch(const std::shared_ptr<Device>& device,
                                    fuchsia_audio::SampleType sample_type, uint32_t channel_count,
                                    uint32_t rate) {
     std::stringstream stream;
@@ -202,7 +202,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     return match->pcm_format()->valid_bits_per_sample();
   }
 
-  static void ExpectNoFormatMatch(std::shared_ptr<Device> device,
+  static void ExpectNoFormatMatch(const std::shared_ptr<Device>& device,
                                   fuchsia_audio::SampleType sample_type, uint32_t channel_count,
                                   uint32_t rate) {
     std::stringstream stream;
@@ -223,11 +223,11 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     return fake_device_presence_watcher_;
   }
 
-  bool AddObserver(std::shared_ptr<Device> device) { return notify()->AddObserver(device); }
-  bool SetControl(std::shared_ptr<Device> device) { return notify()->SetControl(device); }
-  bool DropControl(std::shared_ptr<Device> device) { return notify()->DropControl(device); }
+  bool AddObserver(const std::shared_ptr<Device>& device) { return notify()->AddObserver(device); }
+  bool SetControl(const std::shared_ptr<Device>& device) { return notify()->SetControl(device); }
+  bool DropControl(const std::shared_ptr<Device>& device) { return notify()->DropControl(device); }
 
-  static bool device_plugged_state(std::shared_ptr<Device> device) {
+  static bool device_plugged_state(const std::shared_ptr<Device>& device) {
     return *device->plug_state_->plugged();
   }
 
@@ -306,16 +306,17 @@ class StreamConfigTest : public DeviceTestBase {
     return device;
   }
 
-  static fuchsia_hardware_audio::GainState device_gain_state(std::shared_ptr<Device> device) {
+  static fuchsia_hardware_audio::GainState device_gain_state(
+      const std::shared_ptr<Device>& device) {
     return *device->gain_state_;
   }
 
-  static bool SetDeviceGain(std::shared_ptr<Device> device,
+  static bool SetDeviceGain(const std::shared_ptr<Device>& device,
                             fuchsia_hardware_audio::GainState new_state) {
     return device->SetGain(new_state);
   }
 
-  void ConnectToRingBufferAndExpectValidClient(std::shared_ptr<Device> device) {
+  void ConnectToRingBufferAndExpectValidClient(const std::shared_ptr<Device>& device) {
     EXPECT_TRUE(device->ConnectRingBufferFidl({{
         fuchsia_hardware_audio::PcmFormat{{
             .number_of_channels = 2,
@@ -329,7 +330,7 @@ class StreamConfigTest : public DeviceTestBase {
     EXPECT_TRUE(device->ring_buffer_client_.has_value() && device->ring_buffer_client_->is_valid());
   }
 
-  void GetRingBufferProperties(std::shared_ptr<Device> device) {
+  void GetRingBufferProperties(const std::shared_ptr<Device>& device) {
     ASSERT_TRUE(device->state_ == Device::State::CreatingRingBuffer ||
                 device->state_ == Device::State::RingBufferStopped ||
                 device->state_ == Device::State::RingBufferStarted);
@@ -339,7 +340,7 @@ class StreamConfigTest : public DeviceTestBase {
     ASSERT_TRUE(device->ring_buffer_properties_);
   }
 
-  void RetrieveDelayInfoAndExpect(std::shared_ptr<Device> device,
+  void RetrieveDelayInfoAndExpect(const std::shared_ptr<Device>& device,
                                   std::optional<int64_t> internal_delay,
                                   std::optional<int64_t> external_delay) {
     ASSERT_TRUE(device->state_ == Device::State::CreatingRingBuffer ||
@@ -359,7 +360,7 @@ class StreamConfigTest : public DeviceTestBase {
     return device->delay_info_;
   }
 
-  void GetDriverVmoAndExpectValid(std::shared_ptr<Device> device) {
+  void GetDriverVmoAndExpectValid(const std::shared_ptr<Device>& device) {
     ASSERT_TRUE(device->state_ == Device::State::CreatingRingBuffer ||
                 device->state_ == Device::State::RingBufferStopped ||
                 device->state_ == Device::State::RingBufferStarted);
@@ -371,7 +372,8 @@ class StreamConfigTest : public DeviceTestBase {
                 device->state_ == Device::State::RingBufferStopped);
   }
 
-  void SetActiveChannelsAndExpect(std::shared_ptr<Device> device, uint64_t expected_bitmask) {
+  void SetActiveChannelsAndExpect(const std::shared_ptr<Device>& device,
+                                  uint64_t expected_bitmask) {
     ASSERT_TRUE(device->state_ == Device::State::CreatingRingBuffer ||
                 device->state_ == Device::State::RingBufferStopped ||
                 device->state_ == Device::State::RingBufferStarted);
@@ -389,16 +391,17 @@ class StreamConfigTest : public DeviceTestBase {
     ExpectActiveChannels(device, expected_bitmask);
   }
 
-  static void ExpectActiveChannels(std::shared_ptr<Device> device, uint64_t expected_bitmask) {
+  static void ExpectActiveChannels(const std::shared_ptr<Device>& device,
+                                   uint64_t expected_bitmask) {
     EXPECT_EQ(device->active_channels_bitmask_, expected_bitmask);
   }
 
-  void ExpectRingBufferReady(std::shared_ptr<Device> device) {
+  void ExpectRingBufferReady(const std::shared_ptr<Device>& device) {
     RunLoopUntilIdle();
     EXPECT_TRUE(device->state_ == Device::State::RingBufferStopped);
   }
 
-  void StartAndExpectValid(std::shared_ptr<Device> device) {
+  void StartAndExpectValid(const std::shared_ptr<Device>& device) {
     ASSERT_TRUE(device->state_ == Device::State::RingBufferStopped);
 
     const auto now = zx::clock::get_monotonic().get();
@@ -413,7 +416,7 @@ class StreamConfigTest : public DeviceTestBase {
     EXPECT_TRUE(device->state_ == Device::State::RingBufferStarted);
   }
 
-  void StopAndExpectValid(std::shared_ptr<Device> device) {
+  void StopAndExpectValid(const std::shared_ptr<Device>& device) {
     ASSERT_TRUE(device->state_ == Device::State::RingBufferStarted);
 
     device->StopRingBuffer([](zx_status_t result) { EXPECT_EQ(result, ZX_OK); });
@@ -422,7 +425,7 @@ class StreamConfigTest : public DeviceTestBase {
     EXPECT_TRUE(device->state_ == Device::State::RingBufferStopped);
   }
 
-  static std::shared_ptr<Clock> device_clock(std::shared_ptr<Device> device) {
+  static std::shared_ptr<Clock> device_clock(const std::shared_ptr<Device>& device) {
     return device->device_clock_;
   }
 

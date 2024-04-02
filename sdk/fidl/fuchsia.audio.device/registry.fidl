@@ -57,17 +57,25 @@ type Info = table {
     /// Required for StreamConfig; optional for Codec.
     7: is_input bool;
 
-    /// The union of all formats the device can support, across all combinations
-    /// of device configuration settings. Must contain at least one entry.
+    /// The union of all formats the device can support, across all combinations of device
+    /// configuration settings.
+    /// If the device exposes one or more RingBuffer ENDPOINT elements, this field must be present
+    /// and its vector must contain exactly one entry for each relevant ENDPOINT element.
+    /// If the device exposes NO RingBuffer ENDPOINT elements, this field must be omitted (entirely
+    /// absent, rather than populated with an empty vector).
     ///
     /// Required for StreamConfig; absent for Codec.
-    8: ring_buffer_format_sets vector<PcmFormatSet>:MAX_COUNT_FORMATS;
+    8: ring_buffer_format_sets vector<ElementRingBufferFormatSet>:MAX_COUNT_PROCESSING_ELEMENTS;
 
     /// The union of all DAI formats the device can support, across all combinations
-    /// of device configuration settings. Must contain at least one entry.
+    /// of device configuration settings.
+    /// If the device exposes one or more Dai ENDPOINT elements, this field must be present and its
+    /// vector must contain exactly one entry for each relevant ENDPOINT element.
+    /// If the device exposes NO Dai ENDPOINT elements, this field must be omitted (entirely absent,
+    /// rather than populated with an empty vector).
     ///
     /// Required for Codec; absent for StreamConfig.
-    9: dai_format_sets vector<fuchsia.hardware.audio.DaiSupportedFormats>:MAX_COUNT_DAI_FORMATS;
+    9: dai_format_sets vector<ElementDaiFormatSet>:MAX_COUNT_PROCESSING_ELEMENTS;
 
     /// The device's gain/mute capabilities.
     ///

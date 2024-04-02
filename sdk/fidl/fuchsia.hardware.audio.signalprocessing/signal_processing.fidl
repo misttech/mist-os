@@ -7,6 +7,9 @@ using zx;
 
 // TODO(https://fxbug.dev/42143529): Complete parameters and types for processing elements.
 
+alias ElementId = uint64;
+alias TopologyId = uint64;
+
 const MAX_COUNT_PROCESSING_ELEMENTS uint32 = 64;
 const MAX_COUNT_TOPOLOGIES uint32 = 64;
 const MAX_COUNT_PROCESSING_ELEMENTS_EDGE_PAIRS uint32 = 64;
@@ -89,7 +92,7 @@ type Element = table {
     /// protocol lifespan, i.e. until the channel associated with the protocol is closed.
     ///
     /// Required.
-    1: id uint64;
+    1: id ElementId;
 
     /// Processing element type.
     ///
@@ -174,8 +177,8 @@ type ElementState = table {
 /// Edge pairs between processing elements used to define ordering in processing elements
 /// arrangements.
 type EdgePair = struct {
-    processing_element_id_from uint64;
-    processing_element_id_to uint64;
+    processing_element_id_from ElementId;
+    processing_element_id_to ElementId;
 };
 
 /// A `Topology` specifies one way processing elements are arranged within the hardware.
@@ -184,7 +187,7 @@ type Topology = table {
     /// protocol lifespan, i.e. until the channel associated with the protocol is closed.
     ///
     /// Required.
-    1: id uint64;
+    1: id TopologyId;
 
     /// Vector of processing elements edge pairs in this order.
     /// The ordering of processing elements with edge pairs form pipelines.
@@ -227,7 +230,7 @@ closed protocol SignalProcessing {
     /// The client then must make the `SetElementState` call that returned
     /// `ZX_ERR_BAD_STATE` before any non-`SignalProcessing` protocol calls.
     strict SetElementState(struct {
-        processing_element_id uint64;
+        processing_element_id ElementId;
         state ElementState;
     }) -> () error zx.Status;
 
@@ -243,7 +246,7 @@ closed protocol SignalProcessing {
     /// `ZX_ERR_BAD_STATE` to indicate that the operation can not proceed without renegotiation of
     /// the driver state. See `SetElementState` for further discussion.
     strict SetTopology(struct {
-        topology_id uint64;
+        topology_id TopologyId;
     }) -> () error zx.Status;
 };
 
@@ -265,7 +268,7 @@ closed protocol Reader {
     /// method is called again while there is already a pending `WatchElementState` for this client
     /// and processing_element_id.
     strict WatchElementState(struct {
-        processing_element_id uint64;
+        processing_element_id ElementId;
     }) -> (struct {
         state ElementState;
     });
@@ -290,6 +293,6 @@ closed protocol Reader {
     /// method is called again while there is already a pending `WatchTopology` for this client.
     @available(added=HEAD)
     strict WatchTopology() -> (struct {
-        topology_id uint64;
+        topology_id TopologyId;
     });
 };

@@ -174,7 +174,7 @@ AudioDeviceRegistry::FindDeviceByTokenId(TokenId token_id) {
   return std::make_pair(DevicePresence::Unknown, nullptr);
 }
 
-bool AudioDeviceRegistry::ClaimDeviceForControl(std::shared_ptr<Device> device,
+bool AudioDeviceRegistry::ClaimDeviceForControl(const std::shared_ptr<Device>& device,
                                                 std::shared_ptr<ControlNotify> notify) {
   return device->SetControl(std::move(notify));
 }
@@ -256,7 +256,7 @@ std::shared_ptr<RegistryServer> AudioDeviceRegistry::CreateRegistryServer(
 
 std::shared_ptr<ObserverServer> AudioDeviceRegistry::CreateObserverServer(
     fidl::ServerEnd<fuchsia_audio_device::Observer> server_end,
-    std::shared_ptr<Device> observed_device) {
+    const std::shared_ptr<Device>& observed_device) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogObserverServerMethods);
 
   auto observer = ObserverServer::Create(thread_, std::move(server_end), observed_device);
@@ -266,7 +266,7 @@ std::shared_ptr<ObserverServer> AudioDeviceRegistry::CreateObserverServer(
 
 std::shared_ptr<ControlServer> AudioDeviceRegistry::CreateControlServer(
     fidl::ServerEnd<fuchsia_audio_device::Control> server_end,
-    std::shared_ptr<Device> device_to_control) {
+    const std::shared_ptr<Device>& device_to_control) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogControlServerMethods);
 
   auto control =
