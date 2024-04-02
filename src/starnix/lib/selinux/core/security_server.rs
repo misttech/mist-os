@@ -114,6 +114,7 @@ struct SecurityServerState {
 }
 
 impl SecurityServerState {
+    /// Looks up `security_context`, adding it if not found, and returns the SID.
     fn security_context_to_sid(&mut self, security_context: SecurityContext) -> SecurityId {
         match self.sids.iter().find(|(_, sc)| **sc == security_context) {
             Some((sid, _)) => *sid,
@@ -129,9 +130,27 @@ impl SecurityServerState {
             }
         }
     }
-    fn sid_to_security_context(&self, sid: SecurityId) -> Option<&SecurityContext> {
+
+    /// Returns the `SecurityContext` associated with `sid`.
+    /// If `sid` was invalidated by a policy reload then the "unlabeled" context is returned instead.
+    ///
+    /// # Panics
+    ///
+    /// This API panics if called before a policy has been loaded.
+    fn sid_to_security_context(&self, sid: SecurityId) -> &SecurityContext {
+        self.sids.get(&sid).unwrap_or_else(|| {
+            self.sids
+                .get(&SecurityId::initial(InitialSid::Unlabeled))
+                .expect("requires policy to be loaded")
+        })
+    }
+
+    /// Returns the `SecurityContext` associated with `sid`, unless `sid` was invalidated by a
+    /// policy reload. Query implementations should use `sid_to_security_context()`.
+    fn try_sid_to_security_context(&self, sid: SecurityId) -> Option<&SecurityContext> {
         self.sids.get(&sid)
     }
+
     fn deny_unknown(&self) -> bool {
         self.policy.as_ref().map_or(true, |p| *p.parsed.handle_unknown() != HandleUnknown::Allow)
     }
@@ -203,10 +222,7 @@ impl SecurityServer {
     /// is the case for e.g. the `/proc/*/attr/` filesystem.
     pub fn sid_to_security_context(&self, sid: SecurityId) -> Option<Vec<u8>> {
         let state = self.state.lock();
-        if state.policy.is_none() {
-            return None;
-        }
-        let context = state.sid_to_security_context(sid)?;
+        let context = state.try_sid_to_security_context(sid)?;
         Some(state.policy.as_ref()?.parsed.serialize_security_context(context))
     }
 
@@ -343,27 +359,29 @@ impl SecurityServer {
             None => return AccessVector::ALL,
         };
 
-        if let (Some(source_security_context), Some(target_security_context)) =
-            (state.sid_to_security_context(source_sid), state.sid_to_security_context(target_sid))
-        {
-            let source_type = source_security_context.type_();
-            let target_type = target_security_context.type_();
+        // Policy is loaded, so `sid_to_security_context()` will not panic.
+        let source_context = state.sid_to_security_context(source_sid);
+        let target_context = state.sid_to_security_context(target_sid);
 
-            match target_class {
-                AbstractObjectClass::System(target_class) => policy
-                    .parsed
-                    .compute_explicitly_allowed(&source_type, &target_type, target_class)
-                    .unwrap_or(AccessVector::NONE),
-                AbstractObjectClass::Custom(target_class) => policy
-                    .parsed
-                    .compute_explicitly_allowed_custom(&source_type, &target_type, &target_class)
-                    .unwrap_or(AccessVector::NONE),
-                // No meaningful policy can be determined without target class.
-                _ => AccessVector::NONE,
-            }
-        } else {
-            // No meaningful policy can be determined without source and target types.
-            AccessVector::NONE
+        match target_class {
+            AbstractObjectClass::System(target_class) => policy
+                .parsed
+                .compute_explicitly_allowed(
+                    source_context.type_(),
+                    target_context.type_(),
+                    target_class,
+                )
+                .unwrap_or(AccessVector::NONE),
+            AbstractObjectClass::Custom(target_class) => policy
+                .parsed
+                .compute_explicitly_allowed_custom(
+                    source_context.type_(),
+                    target_context.type_(),
+                    &target_class,
+                )
+                .unwrap_or(AccessVector::NONE),
+            // No meaningful policy can be determined without target class.
+            _ => AccessVector::NONE,
         }
     }
 
@@ -384,26 +402,16 @@ impl SecurityServer {
             }
         };
 
-        if let (Some(source_security_context), Some(target_security_context)) =
-            (state.sid_to_security_context(source_sid), state.sid_to_security_context(target_sid))
-        {
-            policy
-                .parsed
-                .new_file_security_context(
-                    &source_security_context,
-                    &target_security_context,
-                    &file_class,
-                )
-                .map(|sc| state.security_context_to_sid(sc))
-                .map_err(anyhow::Error::from)
-                .context("computing new file security context from policy")
-        } else {
-            anyhow::bail!(
-                "at least one security id, {:?} and/or {:?}, not recognized by security server",
-                source_sid,
-                target_sid
-            )
-        }
+        // Policy is loaded, so `sid_to_security_context()` will not panic.
+        let source_context = state.sid_to_security_context(source_sid);
+        let target_context = state.sid_to_security_context(target_sid);
+
+        policy
+            .parsed
+            .new_file_security_context(source_context, target_context, &file_class)
+            .map(|sc| state.security_context_to_sid(sc))
+            .map_err(anyhow::Error::from)
+            .context("computing new file security context from policy")
     }
 
     /// Returns a read-only VMO containing the SELinux "status" structure.
@@ -788,12 +796,13 @@ mod tests {
         let source_sid = SecurityId(NonZeroU32::new(FIRST_UNUSED_SID + 1).unwrap());
         let target_sid = SecurityId(NonZeroU32::new(FIRST_UNUSED_SID + 2).unwrap());
 
-        let error = security_server
+        // Both source and target will fall-back to the "unlabeled" Context,
+        // so that the new file Context will be identical to "unlabeled", and the
+        // same SID will be returned.
+        let sid = security_server
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
-            .expect_err("expected error");
-        let error_string = format!("{:?}", error);
-        assert!(error_string.contains("security id"));
-        assert!(error_string.contains("not recognized"));
+            .expect("new sid computed");
+        assert_eq!(sid, SecurityId::initial(InitialSid::Unlabeled));
     }
 
     #[fuchsia::test]

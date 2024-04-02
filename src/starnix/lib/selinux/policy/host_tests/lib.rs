@@ -106,8 +106,8 @@ fn policy_lookup() {
 
     policy
         .is_explicitly_allowed(
-            &unconfined_t,
-            &unconfined_t,
+            unconfined_t,
+            unconfined_t,
             Permission::Process(ProcessPermission::Fork),
         )
         .expect("check for `allow unconfined_t unconfined_t:process fork;` in policy");
@@ -146,7 +146,7 @@ fn explicit_allow_type_type() {
     let b_t = parsed_policy.type_id_by_name("b_t");
 
     assert!(parsed_policy
-        .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
+        .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
         .expect("query well-formed"));
 }
 
@@ -166,7 +166,7 @@ fn no_explicit_allow_type_type() {
     let b_t = parsed_policy.type_id_by_name("b_t");
 
     assert!(!parsed_policy
-        .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
+        .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
         .expect("query well-formed"));
 }
 
@@ -186,7 +186,7 @@ fn explicit_allow_type_attr() {
     let b_t = parsed_policy.type_id_by_name("b_t");
 
     assert!(parsed_policy
-        .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
+        .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
         .expect("query well-formed"));
 }
 
@@ -206,7 +206,7 @@ fn no_explicit_allow_type_attr() {
     let b_t = parsed_policy.type_id_by_name("b_t");
 
     assert!(!parsed_policy
-        .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
+        .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
         .expect("query well-formed"));
 }
 
@@ -226,7 +226,7 @@ fn explicit_allow_attr_attr() {
     let b_t = parsed_policy.type_id_by_name("b_t");
 
     assert!(parsed_policy
-        .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
+        .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
         .expect("query well-formed"));
 }
 
@@ -246,7 +246,7 @@ fn no_explicit_allow_attr_attr() {
     let b_t = parsed_policy.type_id_by_name("b_t");
 
     assert!(!parsed_policy
-        .is_explicitly_allowed_custom(&a_t, &b_t, "class0", "perm0")
+        .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
         .expect("query well-formed"));
 }
 
@@ -265,7 +265,7 @@ fn compute_explicitly_allowed_multiple_attributes() {
     let a_t = parsed_policy.type_id_by_name("a_t");
 
     let raw_access_vector = parsed_policy
-        .compute_explicitly_allowed_custom(&a_t, &a_t, "class0")
+        .compute_explicitly_allowed_custom(a_t, a_t, "class0")
         .expect("well-formed query")
         .into_raw();
 

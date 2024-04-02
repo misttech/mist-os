@@ -100,8 +100,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// associated with a [`selinux_common::AbstractPermission::Custom::permission`] value.
     pub fn is_explicitly_allowed_custom(
         &self,
-        source_type: &TypeId,
-        target_type: &TypeId,
+        source_type: TypeId,
+        target_type: TypeId,
         target_class_name: &str,
         permission_name: &str,
     ) -> Result<bool, QueryError> {
@@ -126,8 +126,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// statement, or an error if lookups for input values fail.
     pub(crate) fn class_permission_is_explicitly_allowed(
         &self,
-        source_type: &TypeId,
-        target_type: &TypeId,
+        source_type: TypeId,
+        target_type: TypeId,
         target_class: &Class<PS>,
         permission: &Permission<PS>,
     ) -> Result<bool, QueryError> {
@@ -197,8 +197,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// value.
     pub fn compute_explicitly_allowed_custom(
         &self,
-        source_type_name: &TypeId,
-        target_type_name: &TypeId,
+        source_type_name: TypeId,
+        target_type_name: TypeId,
         target_class_name: &str,
     ) -> Result<AccessVector, QueryError> {
         let target_class = find_class_by_name(self.classes(), target_class_name)
@@ -211,8 +211,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// if no such statement exists.
     pub(crate) fn compute_explicitly_allowed(
         &self,
-        source_type: &TypeId,
-        target_type: &TypeId,
+        source_type: TypeId,
+        target_type: TypeId,
         target_class: &Class<PS>,
     ) -> Result<AccessVector, QueryError> {
         let target_class_id = target_class.id();

@@ -226,8 +226,8 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// ensures that all such Ids have corresponding definitions.
     pub fn is_explicitly_allowed(
         &self,
-        source_type: &TypeId,
-        target_type: &TypeId,
+        source_type: TypeId,
+        target_type: TypeId,
         permission: sc::Permission,
     ) -> Result<bool, QueryError> {
         let object_class = permission.class();
@@ -251,8 +251,8 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// ensures that all such Ids have corresponding definitions.
     pub fn is_explicitly_allowed_custom(
         &self,
-        source_type: &TypeId,
-        target_type: &TypeId,
+        source_type: TypeId,
+        target_type: TypeId,
         target_class_name: &str,
         permission_name: &str,
     ) -> Result<bool, QueryError> {
@@ -269,8 +269,8 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// if no such statement exists.
     pub fn compute_explicitly_allowed(
         &self,
-        source_type: &TypeId,
-        target_type: &TypeId,
+        source_type: TypeId,
+        target_type: TypeId,
         object_class: sc::ObjectClass,
     ) -> Result<AccessVector, QueryError> {
         let target_class = self.0.class(&object_class);
@@ -284,13 +284,13 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// value.
     pub fn compute_explicitly_allowed_custom(
         &self,
-        source_type_name: &TypeId,
-        target_type_name: &TypeId,
+        source_type: TypeId,
+        target_type: TypeId,
         target_class_name: &str,
     ) -> Result<AccessVector, QueryError> {
         self.0.parsed_policy().compute_explicitly_allowed_custom(
-            source_type_name,
-            target_type_name,
+            source_type,
+            target_type,
             target_class_name,
         )
     }
