@@ -290,8 +290,8 @@ void Allocator::V1::ConnectToSysmem2Allocator(ConnectToSysmem2AllocatorRequest& 
   auto v2_allocator = Allocator::CreateChannelOwnedV2(request.allocator_request().TakeChannel(),
                                                       allocator_->parent_device_);
   if (allocator_->client_debug_info_.has_value()) {
-    v2_allocator.client_debug_info_->name = allocator_->client_debug_info_->name;
-    v2_allocator.client_debug_info_->id = allocator_->client_debug_info_->id;
+    // intentional clone / copy
+    v2_allocator.client_debug_info_ = *allocator_->client_debug_info_;
   }
 }
 

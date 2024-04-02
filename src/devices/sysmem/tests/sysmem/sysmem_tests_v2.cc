@@ -7280,26 +7280,40 @@ TEST(Sysmem, AllocateB8G8R8X8) {
 }
 
 TEST(Sysmem, V1ConnectToV2Allocator) {
-  auto v1_allocator_result = component::Connect<fuchsia_sysmem::Allocator>();
-  ASSERT_TRUE(v1_allocator_result.is_ok());
-  auto v1_allocator = fidl::SyncClient(std::move(v1_allocator_result.value()));
-  auto v2_allocator_endpoints_result = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
-  ASSERT_TRUE(v2_allocator_endpoints_result.is_ok());
-  auto v2_allocator_endpoints = std::move(v2_allocator_endpoints_result.value());
-  auto v2_allocator = fidl::SyncClient(std::move(v2_allocator_endpoints.client));
-  auto connect_result =
-      v1_allocator->ConnectToSysmem2Allocator(std::move(v2_allocator_endpoints.server));
-  ASSERT_TRUE(connect_result.is_ok());
-  auto allocator = fidl::SyncClient(std::move(v2_allocator));
+  for (uint32_t has_debug_info = 0; has_debug_info < 2; ++has_debug_info) {
+    auto v1_allocator_result = component::Connect<fuchsia_sysmem::Allocator>();
+    ASSERT_TRUE(v1_allocator_result.is_ok());
+    auto v1_allocator = fidl::SyncClient(std::move(v1_allocator_result.value()));
 
-  auto token = create_initial_token_v2();
+    if (has_debug_info) {
+      // Set debug info on the v1 allocator to cover the code that copies the debug info from v1
+      // allocator to v2 allocator.
+      fuchsia_sysmem::AllocatorSetDebugClientInfoRequest set_debug_info_request;
+      set_debug_info_request.name() = "V1ConnectToV2Allocator set this name";
+      set_debug_info_request.id() = 12;
+      auto v1_set_debug_info_result =
+          v1_allocator->SetDebugClientInfo(std::move(set_debug_info_request));
+      ASSERT_TRUE(v1_set_debug_info_result.is_ok());
+    }
 
-  fuchsia_sysmem2::AllocatorValidateBufferCollectionTokenRequest validate_request;
-  validate_request.token_server_koid() = get_related_koid(token.client_end().channel().get());
-  auto validate_result = allocator->ValidateBufferCollectionToken(std::move(validate_request));
-  ASSERT_TRUE(validate_result.is_ok());
-  ASSERT_TRUE(validate_result->is_known().has_value());
-  ASSERT_TRUE(validate_result->is_known().value());
+    auto v2_allocator_endpoints_result = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
+    ASSERT_TRUE(v2_allocator_endpoints_result.is_ok());
+    auto v2_allocator_endpoints = std::move(v2_allocator_endpoints_result.value());
+    auto v2_allocator = fidl::SyncClient(std::move(v2_allocator_endpoints.client));
+    auto connect_result =
+        v1_allocator->ConnectToSysmem2Allocator(std::move(v2_allocator_endpoints.server));
+    ASSERT_TRUE(connect_result.is_ok());
+    auto allocator = fidl::SyncClient(std::move(v2_allocator));
+
+    auto token = create_initial_token_v2();
+
+    fuchsia_sysmem2::AllocatorValidateBufferCollectionTokenRequest validate_request;
+    validate_request.token_server_koid() = get_related_koid(token.client_end().channel().get());
+    auto validate_result = allocator->ValidateBufferCollectionToken(std::move(validate_request));
+    ASSERT_TRUE(validate_result.is_ok());
+    ASSERT_TRUE(validate_result->is_known().has_value());
+    ASSERT_TRUE(validate_result->is_known().value());
+  }
 }
 
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable
