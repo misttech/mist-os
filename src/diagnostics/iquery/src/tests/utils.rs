@@ -19,8 +19,6 @@ pub const BASIC_COMPONENT_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm";
 pub const TEST_COMPONENT_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/iquery-tests#meta/test_component.cm";
-pub const INSPECT_SINK_COMPONENT_URL: &'static str =
-    "fuchsia-pkg://fuchsia.com/iquery-tests#meta/inspect_sink_component.cm";
 
 pub struct TestBuilder {
     builder: RealmBuilder,
@@ -38,11 +36,6 @@ impl TestBuilder {
 
     pub async fn add_test_component(mut self, name: &str) -> Self {
         self.add_child(name, TEST_COMPONENT_URL).await;
-        self
-    }
-
-    pub async fn add_inspect_sink_component(mut self, name: &str) -> Self {
-        self.add_child(name, INSPECT_SINK_COMPONENT_URL).await;
         self
     }
 

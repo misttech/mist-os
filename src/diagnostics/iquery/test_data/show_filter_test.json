@@ -2,10 +2,10 @@
     {
         "data_source": "Inspect",
         "metadata": {
-            "component_url": "fuchsia-pkg://fuchsia.com/iquery-tests#meta/inspect_sink_component.cm",
+            "component_url": "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm",
             "timestamp": "TIMESTAMP"
         },
-        "moniker": "realm_builder:CHILD_NAME/inspect-sink",
+        "moniker": "realm_builder:CHILD_NAME/basic",
         "payload": {
             "root": {
                 "fuchsia.inspect.Health": {

@@ -8,10 +8,6 @@
         "moniker": "realm_builder:CHILD_NAME/basic"
     },
     {
-        "component_url": "fuchsia-pkg://fuchsia.com/iquery-tests#meta/inspect_sink_component.cm",
-        "moniker": "realm_builder:CHILD_NAME/inspect-sink"
-    },
-    {
         "component_url": "fuchsia-pkg://fuchsia.com/iquery-tests#meta/test_component.cm",
         "moniker": "realm_builder:CHILD_NAME/test"
     }

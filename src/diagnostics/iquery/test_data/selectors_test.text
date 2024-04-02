@@ -3,9 +3,6 @@ realm_builder\:CHILD_NAME/basic-1:root/fuchsia.inspect.Health:status
 realm_builder\:CHILD_NAME/basic-2:root/fuchsia.inspect.Health:start_timestamp_nanos
 realm_builder\:CHILD_NAME/basic-2:root/fuchsia.inspect.Health:status
 realm_builder\:CHILD_NAME/basic-2:root:iquery
-realm_builder\:CHILD_NAME/inspect-sink:root/fuchsia.inspect.Health:start_timestamp_nanos
-realm_builder\:CHILD_NAME/inspect-sink:root/fuchsia.inspect.Health:status
-realm_builder\:CHILD_NAME/inspect-sink:root:iquery
 realm_builder\:CHILD_NAME/test:root/lazy-node:uint
 realm_builder\:CHILD_NAME/test:root/table\:0x0/row\:0x1/cell\:0x2:double_value
 realm_builder\:CHILD_NAME/test:root/table\:0x0/row\:0x1/cell\:0x2:name

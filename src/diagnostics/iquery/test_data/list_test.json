@@ -1,6 +1,5 @@
 [
     "archivist",
     "realm_builder:CHILD_NAME/basic-1",
-    "realm_builder:CHILD_NAME/basic-2",
-    "realm_builder:CHILD_NAME/basic-inspect-sink"
+    "realm_builder:CHILD_NAME/basic-2"
 ]

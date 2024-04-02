@@ -1,10 +1,10 @@
-realm_builder:CHILD_NAME/inspect-sink:
+realm_builder:CHILD_NAME/basic:
   metadata:
-    component_url = fuchsia-pkg://fuchsia.com/iquery-tests#meta/inspect_sink_component.cm
+    component_url = fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm
     timestamp = TIMESTAMP
   payload:
     root:
-      iquery = rules
+      iquery = rocks
       fuchsia.inspect.Health:
         start_timestamp_nanos = TIMESTAMP
         status = OK

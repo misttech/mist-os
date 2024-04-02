@@ -175,7 +175,6 @@ fuchsia_test_package("iquery-tests") {
   test_components = [ ":iquery-test" ]
   deps = [
     "test/basic_component",
-    "test/inspect_sink_component",
     "test/test_component",
     "test_data:goldens",
     "//src/diagnostics/archivist:archivist-for-embedding-bundle",

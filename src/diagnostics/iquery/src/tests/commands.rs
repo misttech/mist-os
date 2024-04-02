@@ -18,8 +18,6 @@ async fn test_list() {
         .await
         .add_basic_component("basic-2")
         .await
-        .add_inspect_sink_component("basic-inspect-sink")
-        .await
         .start()
         .await;
 
@@ -52,8 +50,6 @@ async fn test_list_filter_manifest() {
         .await
         .add_test_component("test")
         .await
-        .add_inspect_sink_component("inspect-sink")
-        .await
         .start()
         .await;
     test.assert(AssertionParameters {
@@ -61,7 +57,7 @@ async fn test_list_filter_manifest() {
         golden_basename: "list_filter_manifest",
         iquery_args: vec![
             "--manifest",
-            "inspect_sink_component.cm",
+            "test_component.cm",
             "--accessor",
             "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
         ],
@@ -77,8 +73,6 @@ async fn test_list_with_urls() {
         .add_basic_component("basic")
         .await
         .add_test_component("test")
-        .await
-        .add_inspect_sink_component("inspect-sink")
         .await
         .start()
         .await;
@@ -125,8 +119,6 @@ async fn test_selectors() {
         .await
         .add_test_component("test")
         .await
-        .add_inspect_sink_component("inspect-sink")
-        .await
         .start()
         .await;
     let prefix = format!("realm_builder\\:{}", test.instance_child_name());
@@ -139,7 +131,6 @@ async fn test_selectors() {
             &format!("{}/basic-1:root/fuchsia.inspect.Health", prefix),
             &format!("{}/basic-2:root", prefix),
             &format!("{}/test", prefix),
-            &format!("{}/inspect-sink:root", prefix),
         ],
         opts: vec![AssertionOption::Retry],
     })
@@ -153,8 +144,6 @@ async fn test_selectors_filter_serve_fs() {
         .add_basic_component("basic")
         .await
         .add_test_component("test")
-        .await
-        .add_inspect_sink_component("inspect-sink")
         .await
         .start()
         .await;
@@ -181,8 +170,6 @@ async fn test_selectors_filter() {
         .await
         .add_test_component("test")
         .await
-        .add_inspect_sink_component("inspect-sink")
-        .await
         .start()
         .await;
     test.assert(AssertionParameters {
@@ -192,7 +179,7 @@ async fn test_selectors_filter() {
             "--accessor",
             "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
             "--manifest",
-            "inspect_sink_component.cm",
+            "basic_component.cm",
             "root/fuchsia.inspect.Health",
         ],
         opts: vec![AssertionOption::Retry],
@@ -212,8 +199,6 @@ async fn show_test() {
         .await
         .add_basic_component("basic-3")
         .await
-        .add_inspect_sink_component("inspect-sink")
-        .await
         .start()
         .await;
     let prefix = format!("realm_builder\\:{}", test.instance_child_name());
@@ -226,7 +211,6 @@ async fn show_test() {
             &format!("{}/basic-1:root/fuchsia.inspect.Health", prefix),
             &format!("{}/basic-2:root:iquery", prefix),
             &format!("{}/basic-3", prefix),
-            &format!("{}/inspect-sink:root:iquery", prefix),
         ],
         opts: vec![AssertionOption::Retry],
     })
@@ -262,8 +246,6 @@ async fn show_filter_manifest_serve_fs() {
         .await
         .add_test_component("test")
         .await
-        .add_inspect_sink_component("inspect-sink")
-        .await
         .start()
         .await;
     test.assert(AssertionParameters {
@@ -289,8 +271,6 @@ async fn show_filter_manifest() {
         .await
         .add_test_component("test")
         .await
-        .add_inspect_sink_component("inspect-sink")
-        .await
         .start()
         .await;
     test.assert(AssertionParameters {
@@ -300,7 +280,7 @@ async fn show_filter_manifest() {
             "--accessor",
             "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
             "--manifest",
-            "inspect_sink_component.cm",
+            "basic_component.cm",
             "root/fuchsia.inspect.Health",
         ],
         opts: vec![AssertionOption::Retry],
@@ -315,8 +295,6 @@ async fn show_filter_manifest_no_selectors_serve_fs() {
         .add_basic_component("basic")
         .await
         .add_test_component("test")
-        .await
-        .add_inspect_sink_component("inspect-sink")
         .await
         .start()
         .await;
@@ -342,8 +320,6 @@ async fn show_filter_manifest_no_selectors() {
         .await
         .add_test_component("test")
         .await
-        .add_inspect_sink_component("inspect-sink")
-        .await
         .start()
         .await;
     test.assert(AssertionParameters {
@@ -353,7 +329,7 @@ async fn show_filter_manifest_no_selectors() {
             "--accessor",
             "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
             "--manifest",
-            "inspect_sink_component.cm",
+            "basic_component.cm",
         ],
         opts: vec![AssertionOption::Retry],
     })

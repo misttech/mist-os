@@ -2,7 +2,5 @@ archivist:
   #meta/archivist-for-embedding.cm
 realm_builder\:CHILD_NAME/basic:
   fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm
-realm_builder\:CHILD_NAME/inspect-sink:
-  fuchsia-pkg://fuchsia.com/iquery-tests#meta/inspect_sink_component.cm
 realm_builder\:CHILD_NAME/test:
   fuchsia-pkg://fuchsia.com/iquery-tests#meta/test_component.cm
