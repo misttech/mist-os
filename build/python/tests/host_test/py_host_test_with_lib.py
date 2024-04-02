@@ -9,10 +9,10 @@ import unittest
 
 
 class PyHostTestWithLibTests(unittest.TestCase):
-    def test_truthy(self):
+    def test_truthy(self) -> None:
         self.assertEqual(lib.truthy(), True)
 
-    def test_falsy(self):
+    def test_falsy(self) -> None:
         self.assertEqual(lib.falsy(), False)
 
 
