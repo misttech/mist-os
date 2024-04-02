@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/fuchsia/rust_target_api_level.gni")
 import("//build/testing/host_test_data.gni")
 import("config.gni")
 
@@ -113,6 +114,22 @@ if (current_toolchain != default_toolchain) {
       rebase_path("//", root_build_dir),
     ]
     deps = [ gn_desc_label ]
+  }
+}
+
+# Generated file containing flags to pass to each invocation of `rustc` (or
+# similar tools). Pass it to rustc by specifying `@rust_api_level_cfg_flags.txt`
+# in the command line.
+generated_file("api_level_cfg_flags") {
+  outputs = [ "$root_build_dir/rust_api_level_cfg_flags.txt" ]
+  output_conversion = "list lines"
+  contents = []
+
+  foreach(level, rust_lesser_or_equal_fuchsia_api_levels) {
+    contents += [ "--cfg=fuchsia_api_level_at_least=\"${level}\"" ]
+  }
+  foreach(level, rust_greater_fuchsia_api_levels) {
+    contents += [ "--cfg=fuchsia_api_level_less_than=\"${level}\"" ]
   }
 }
 

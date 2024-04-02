@@ -132,6 +132,10 @@ template("rustc_artifact") {
       rebase_path(target_out_dir, root_build_dir) + " " + target_name
   _rustflags = [ "-Cmetadata=${_codegen_metadata}" ]
 
+  _flag_deps = [ "//build/rust:api_level_cfg_flags" ]
+  _flag_inputs = [ "$root_build_dir/rust_api_level_cfg_flags.txt" ]
+  _rustflags += [ "@rust_api_level_cfg_flags.txt" ]
+
   if (defined(invoker.features)) {
     foreach(i, invoker.features) {
       _rustflags += [ "--cfg=feature=\"${i}\"" ]
@@ -173,7 +177,7 @@ template("rustc_artifact") {
       clippy_crate_type = invoker.clippy_crate_type
       configs = _configs
       crate_root = _crate_root
-      deps = invoker.deps
+      deps = invoker.deps + _flag_deps
       rustflags = _rustflags
       sources = invoker.sources
       quiet = _quiet_clippy
@@ -274,7 +278,8 @@ template("rustc_artifact") {
                              "deps",
                              "public_deps",
                            ])
-    inputs = _local_inputs
+    inputs = _local_inputs + _flag_inputs
+    deps += _flag_deps
 
     if (!defined(invoker.enforce_source_listing) ||
         invoker.enforce_source_listing) {

@@ -1,0 +1,28 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/config/fuchsia/platform_version.gni")
+import("//build/config/fuchsia/target_api_level.gni")
+
+if (override_target_api_level == -1) {
+  # All API levels are less than or equal to "HEAD" (ignoring the HEAD/LEGACY
+  # ambguity problem).
+  #
+  # TODO(https://fxbug.dev/325448727): Account for "LEGACY" here.
+  rust_lesser_or_equal_fuchsia_api_levels =
+      platform_version.all_numbered_api_levels + [ "HEAD" ]
+
+  # No API levels are greater than "HEAD".
+  rust_greater_fuchsia_api_levels = []
+} else {
+  rust_lesser_or_equal_fuchsia_api_levels = []
+  rust_greater_fuchsia_api_levels = [ "HEAD" ]
+  foreach(level, platform_version.all_numbered_api_levels) {
+    if (level <= override_target_api_level) {
+      rust_lesser_or_equal_fuchsia_api_levels += [ level ]
+    } else {
+      rust_greater_fuchsia_api_levels += [ level ]
+    }
+  }
+}

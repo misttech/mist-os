@@ -46,6 +46,8 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
 
     api_levels = data["data"]["api_levels"]
 
+    all_numbered_api_levels = [int(level) for level in api_levels]
+
     supported_api_levels: list[int] = [
         int(level)
         for level in api_levels
@@ -73,6 +75,7 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         in_development_api_level = in_development_api_levels[0]
 
     return {
+        "all_numbered_api_levels": all_numbered_api_levels,
         # TODO: https://fxbug.dev/305961460 - Remove this.
         "in_development_api_level": in_development_api_level,
         # API levels that the IDK supports targeting.
