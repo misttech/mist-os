@@ -3649,7 +3649,7 @@ impl BinderDriver {
         // Find the process and thread that initiated the transaction. This reply is for them.
         let (target_proc, target_thread, policy) =
             binder_thread.lock().pop_transaction_caller(current_task)?;
-        release_after!(policy, current_task, {
+        if let Err(e) = release_after!(policy, current_task, || -> Result<(), TransactionError> {
             let weak_task = current_task.get_task(target_proc.pid);
             let target_task = weak_task.upgrade().ok_or_else(|| TransactionError::Dead)?;
 
@@ -3692,7 +3692,12 @@ impl BinderDriver {
             binder_thread.lock().enqueue_command(Command::TransactionComplete);
 
             Ok(())
-        })
+        }) {
+            // Sending to the target process failed, notify of the transaction failure.
+            let _ = e.dispatch(&target_thread);
+            return Err(e);
+        }
+        Ok(())
     }
 
     /// Select which command queue to read from, preferring the thread-local one.
@@ -4439,7 +4444,7 @@ enum TransactionError {
 impl TransactionError {
     /// Dispatches the error, by potentially queueing a command to `binder_thread` and/or returning
     /// an error.
-    fn dispatch(self, binder_thread: &BinderThread) -> Result<(), Errno> {
+    fn dispatch(&self, binder_thread: &BinderThread) -> Result<(), Errno> {
         log_trace!("Dispatching transaction error {:?} for thread {}", self, binder_thread.tid);
         binder_thread.lock().enqueue_command(match self {
             TransactionError::Malformed(err) => {
@@ -7861,6 +7866,91 @@ pub mod tests {
             Some(Command::DeadReply { pop_transaction: true })
         );
         assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender(..)));
+    }
+
+    #[fuchsia::test]
+    async fn failed_reply_when_transaction_reply_is_too_big() {
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
+
+        // Insert a binder object for the receiver, and grab a handle to it in the sender.
+        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let handle = sender
+            .proc
+            .lock()
+            .handles
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+
+        // Construct a synchronous transaction to send from the sender to the receiver.
+        const FIRST_TRANSACTION_CODE: u32 = 42;
+        let transaction = binder_transaction_data_sg {
+            transaction_data: binder_transaction_data {
+                code: FIRST_TRANSACTION_CODE,
+                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                ..binder_transaction_data::default()
+            },
+            buffers_size: 0,
+        };
+
+        // Make the receiver thread look eligible for transactions.
+        // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
+        let fake_waiter = Waiter::new();
+        {
+            let mut thread_state = receiver.thread.lock();
+            thread_state.registration = RegistrationState::Main;
+            thread_state.command_queue.waiters.wait_async(&fake_waiter);
+        }
+
+        // Submit the transaction.
+        test.device
+            .handle_transaction(&sender.task, &sender.proc, &sender.thread, transaction)
+            .expect("failed to handle the transaction");
+
+        // Check that there are no commands waiting for the sending thread.
+        assert!(sender.thread.lock().command_queue.is_empty());
+
+        // Check that the receiving process has a transaction scheduled.
+        assert_matches!(
+            receiver.proc.command_queue.lock().commands.front(),
+            Some(Command::Transaction { .. })
+        );
+
+        // Have the thread dequeue the command.
+        let read_buffer_addr = map_memory(&receiver.task, UserAddress::default(), *PAGE_SIZE);
+        test.device
+            .handle_thread_read(
+                &receiver.task,
+                &receiver.proc,
+                &receiver.thread,
+                &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
+            )
+            .expect("read command");
+
+        // The thread should now have an empty command list and an ongoing transaction.
+        assert!(receiver.thread.lock().command_queue.is_empty());
+        assert!(!receiver.thread.lock().transactions.is_empty());
+
+        // Respond to the transaction with too much data.
+        let reply = binder_transaction_data_sg {
+            transaction_data: binder_transaction_data {
+                code: FIRST_TRANSACTION_CODE,
+                ..binder_transaction_data::default()
+            },
+            buffers_size: (u64::MAX / 2) & !7,
+        };
+
+        // Submit the reply.
+        assert_eq!(
+            test.device
+                .handle_reply(&receiver.task, &receiver.proc, &receiver.thread, reply)
+                .expect_err("transaction should have failed"),
+            TransactionError::Failure
+        );
+
+        assert!(receiver.thread.lock().transactions.is_empty());
+        assert_matches!(sender.thread.lock().command_queue.pop_front(), Some(Command::FailedReply));
     }
 
     #[fuchsia::test]
