@@ -67,6 +67,11 @@ def create_bundle(args: argparse.Namespace) -> None:
             aib_creator.packages, args.bootfs_pkg_list, "bootfs"
         )
 
+    if args.on_demand_pkg_list:
+        add_pkg_list_from_file(
+            aib_creator.packages, args.on_demand_pkg_list, "on_demand"
+        )
+
     if args.shell_cmds_list:
         add_shell_commands_from_file(aib_creator, args.shell_cmds_list)
 
@@ -485,6 +490,11 @@ def main():
         "--bootfs-pkg-list",
         type=argparse.FileType("r"),
         help="Path to a json list of package manifests for the 'bootfs' package set",
+    )
+    bundle_creation_parser.add_argument(
+        "--on-demand-pkg-list",
+        type=argparse.FileType("r"),
+        help="Path to a json list of package manifests for the 'on-demand' package set",
     )
     bundle_creation_parser.add_argument(
         "--boot-drivers-pkg-list",

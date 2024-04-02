@@ -399,13 +399,30 @@ impl ImageAssemblyConfigBuilder {
         for entry in packages {
             let manifest_path: Utf8PathBuf =
                 entry.package.clone().resolve_from_dir(&bundle_path)?.into();
-            let set = match (&entry.set, &self.build_type) {
-                (&PackageSet::Flexible, BuildType::Eng) => PackageSet::Cache,
-                (&PackageSet::Flexible, _) => PackageSet::Base,
-                (&PackageSet::Base, _) => PackageSet::Base,
-                (&PackageSet::Cache, _) => PackageSet::Cache,
-                (&PackageSet::System, _) => PackageSet::System,
-                (&PackageSet::Bootfs, _) => PackageSet::Bootfs,
+            let set = match (&entry.set, &self.build_type, &self.developer_only_options) {
+                // BootFS packages are always in BootFS.
+                (&PackageSet::Bootfs, _, _) => PackageSet::Bootfs,
+                // System packages are always system packages
+                (&PackageSet::System, _, _) => PackageSet::System,
+
+                // When the all_packages_in_base developer override option is
+                // enabled, that takes precedence over all the rest on eng and userdebug
+                // build-types.
+                (_, BuildType::Eng, Some(DeveloperOnlyOptions { all_packages_in_base: true }))
+                | (
+                    _,
+                    BuildType::UserDebug,
+                    Some(DeveloperOnlyOptions { all_packages_in_base: true }),
+                ) => PackageSet::Base,
+
+                // The Flexible package set is in Cache for eng builds, and base
+                // for user/userdebug.
+                (&PackageSet::Flexible, BuildType::Eng, _) => PackageSet::Cache,
+                (&PackageSet::Flexible, _, _) => PackageSet::Base,
+
+                // In all other cases, packages are just in their original
+                // package set.
+                (ps, _, _) => ps.clone(),
             };
             self.add_package_from_path(manifest_path, PackageOrigin::AIB, &set)?;
         }
@@ -928,13 +945,15 @@ impl PackageEntry {
         }
 
         let destination = match &package_set {
-            PackageSet::Base | PackageSet::Cache | PackageSet::System | PackageSet::Flexible => {
-                PackageSetDestination::Blob(match &origin {
-                    PackageOrigin::AIB => PackageDestination::FromAIB(name),
-                    PackageOrigin::Board => PackageDestination::FromBoard(name),
-                    PackageOrigin::Product => PackageDestination::FromProduct(name),
-                })
-            }
+            PackageSet::Base
+            | PackageSet::Cache
+            | PackageSet::System
+            | PackageSet::Flexible
+            | PackageSet::OnDemand => PackageSetDestination::Blob(match &origin {
+                PackageOrigin::AIB => PackageDestination::FromAIB(name),
+                PackageOrigin::Board => PackageDestination::FromBoard(name),
+                PackageOrigin::Product => PackageDestination::FromProduct(name),
+            }),
             PackageSet::Bootfs => PackageSetDestination::Boot(match &origin {
                 PackageOrigin::AIB => BootfsPackageDestination::FromAIB(name),
                 PackageOrigin::Board => BootfsPackageDestination::FromBoard(name),

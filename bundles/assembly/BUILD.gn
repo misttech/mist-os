@@ -1128,7 +1128,13 @@ assembly_input_bundle("core_realm_eng") {
       components = [ "ssh" ]
     },
   ]
+
+  # Document the sbase shell commands in the on-demand package set (these are
+  # not added to the product image).
+  on_demand = []
   foreach(bin, sbase_binaries) {
+    # To be enabled soon, but will cause errors in assembly.
+    # on_demand += [ "//third_party/sbase:${bin}_pkg" ]
     shell_commands += [
       {
         package = bin

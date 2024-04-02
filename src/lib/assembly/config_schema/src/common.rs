@@ -44,6 +44,17 @@ pub enum PackageSet {
     ///
     /// They cannot be updated without performing an OTA of the system.
     Bootfs,
+
+    /// The on-demand packages are packages that are known to assembly, but are
+    /// not part of the assembled image itself.  These will not be included in
+    /// the product images unless developer overrides push them into the base
+    /// package set.
+    ///
+    /// Note: This was previously the "universe" package set, and RFC-0212
+    /// refined this as the "on-demand;[anchored|updateable]" package set. No
+    /// anchoring (merkle-pinning) is done at this time.
+    /// see: https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0212_package_sets?hl=en#change-7
+    OnDemand,
 }
 
 impl std::fmt::Display for PackageSet {
@@ -54,6 +65,7 @@ impl std::fmt::Display for PackageSet {
             PackageSet::Flexible => "flexible",
             PackageSet::System => "system",
             PackageSet::Bootfs => "bootfs",
+            PackageSet::OnDemand => "on_demand",
         })
     }
 }

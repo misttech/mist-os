@@ -453,6 +453,16 @@ template("assembly_input_bundle") {
         ]
       }
     }
+    on_demand = []
+    if (defined(invoker.on_demand)) {
+      foreach(_target, invoker.on_demand) {
+        on_demand += [
+          {
+            package_target = _target
+          },
+        ]
+      }
+    }
 
     base_drivers = []
     if (defined(invoker.base_driver_packages)) {
@@ -475,6 +485,7 @@ template("assembly_input_bundle") {
             "base-drivers",
             "bootfs",
             "boot-drivers",
+            "on-demand",
           ]) {
     _package_target_details = []
     _package_target_details = package_sets[string_replace(set_name, "-", "_")]

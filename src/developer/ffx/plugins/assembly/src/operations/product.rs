@@ -113,6 +113,13 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     // and start doing the work of creating the image assembly config.
     let mut builder = ImageAssemblyConfigBuilder::new(config.platform.build_type.clone());
 
+    // Set the developer overrides, if any.
+    if let Some(developer_overrides) = developer_overrides {
+        builder
+            .add_developer_overrides(developer_overrides)
+            .context("Setting developer overrides")?;
+    }
+
     // Add the special platform AIB for the zircon kernel, or if provided, an
     // AIB that contains a custom kernel to use instead.
     let kernel_aib_path = match custom_kernel_aib {
@@ -202,13 +209,6 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         let additional_packages =
             read_config(package_config_path).context("Reading additional package config")?;
         builder.add_product_packages(additional_packages).context("Adding additional packages")?;
-    }
-
-    // Finally, set the developer overrides
-    if let Some(developer_overrides) = developer_overrides {
-        builder
-            .add_developer_overrides(developer_overrides)
-            .context("Setting developer overrides")?;
     }
 
     // Get the tool set.
