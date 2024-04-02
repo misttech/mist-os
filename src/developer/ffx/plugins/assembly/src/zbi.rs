@@ -4,15 +4,16 @@
 
 use crate::base_package::BasePackage;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_images_config::{Zbi, ZbiCompression};
 use assembly_manifest::{AssemblyManifest, Image};
 use assembly_package_list::{PackageList, WritablePackageList};
-use assembly_package_set::{PackageEntry, PackageSet};
 use assembly_tool::Tool;
-use assembly_util::{BootfsDestination, BootfsPackageDestination, PackageSetDestination};
+use assembly_util::{BootfsDestination, InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
+use fuchsia_pkg::PackageManifest;
+use std::collections::BTreeMap;
 use utf8_path::path_relative_from_current_dir;
 use zbi::ZbiBuilder;
 
@@ -67,24 +68,22 @@ pub fn construct_zbi(
     // meta.far.
     let mut bootfs_package_list = PackageList::default();
 
-    // Add the packages to a set first, to ensure uniqueness, and ensure a deterministic order.
-    let mut bootfs_package_set = PackageSet::new("bootfs packages");
-    for bootfs_package in &product.bootfs_packages {
-        // While these are not technically _all_ from AIBs, at this point, we do not care.
-        // Product Assembly has already succeeded, which is the piece that cares that all the
-        // destinations are provided and correct.
-        let entry = PackageEntry::parse_from(bootfs_package)?;
-        let d = PackageSetDestination::Boot(BootfsPackageDestination::FromAIB(
-            entry.name().to_string(),
-        ));
-        bootfs_package_set.add_package(d, entry)?;
+    // Add the packages to a map first, to ensure uniqueness, and ensure a deterministic order.
+    let mut bootfs_packages: BTreeMap<String, PackageManifest> = BTreeMap::new();
+    for manifest_path in &product.bootfs_packages {
+        let manifest = PackageManifest::try_load_from(manifest_path)
+            .with_context(|| format!("parsing {manifest_path} as a package manifest"))?;
+
+        bootfs_packages
+            .try_insert_unique(MapEntry(manifest.name().to_string(), manifest))
+            .map_err(|e| anyhow!("Duplicate bootfs package found: {}", e.existing_entry.key()))?;
     }
 
-    for entry in bootfs_package_set.into_values() {
-        for blob_info in entry.manifest.blobs() {
+    for (_, manifest) in bootfs_packages {
+        for blob_info in manifest.blobs() {
             zbi_builder.add_bootfs_blob(&blob_info.source_path, blob_info.merkle);
         }
-        bootfs_package_list.add_package(entry.manifest)?;
+        bootfs_package_list.add_package(manifest)?;
     }
 
     // Write the bootfs package index to the gendir, unconditionally, to satisfy

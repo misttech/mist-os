@@ -8,8 +8,8 @@ standardized_test_groups("tests") {
   host = [
     "//src/lib/assembly/assembly_manifest:assembly_manifest_test",
     "//src/lib/assembly/base_package:base_package_test",
-    "//src/lib/assembly/blobfs:blobfs_test",
     "//src/lib/assembly/blob_size:blob_size_test",
+    "//src/lib/assembly/blobfs:blobfs_test",
     "//src/lib/assembly/component_id_index:component_id_index_test",
     "//src/lib/assembly/component_manager_config:component_manager_config_test",
     "//src/lib/assembly/components:components_test",
@@ -30,6 +30,8 @@ standardized_test_groups("tests") {
     "//src/lib/assembly/partitions_config:partitions_config_test",
     "//src/lib/assembly/platform_configuration:platform_configuration_test",
     "//src/lib/assembly/shell_commands:shell_commands_test",
+    "//src/lib/assembly/structured_config/tests/malformed_fail",
+    "//src/lib/assembly/structured_config/tests/repackaging_pass",
     "//src/lib/assembly/subpackage_blobs_package:subpackage_blobs_package_test",
     "//src/lib/assembly/test_util:test_util_test",
     "//src/lib/assembly/tool:tool_test",
@@ -41,7 +43,5 @@ standardized_test_groups("tests") {
     "//src/lib/assembly/vbmeta:integration_test",
     "//src/lib/assembly/vbmeta:vbmeta_test",
     "//src/lib/assembly/zbi:zbi_test",
-    "//src/lib/assembly/structured_config/tests/malformed_fail",
-    "//src/lib/assembly/structured_config/tests/repackaging_pass",
   ]
 }

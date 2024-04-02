@@ -80,7 +80,6 @@ ffx_plugin("ffx_assembly") {
     "//src/lib/assembly/named_file_map",
     "//src/lib/assembly/package_copy",
     "//src/lib/assembly/package_list",
-    "//src/lib/assembly/package_set",
     "//src/lib/assembly/package_utils",
     "//src/lib/assembly/partitions_config",
     "//src/lib/assembly/platform_configuration",

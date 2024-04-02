@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::compiled_package::CompiledPackageBuilder;
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_data::ConfigDataBuilder;
 use assembly_config_schema::{
     assembly_config::{AssemblyInputBundle, CompiledPackageDefinition, ShellCommands},
@@ -18,8 +18,7 @@ use assembly_config_schema::{
 use assembly_domain_config::DomainConfigPackage;
 use assembly_driver_manifest::{DriverManifestBuilder, DriverPackageType};
 use assembly_named_file_map::NamedFileMap;
-use assembly_package_set::PackageEntry;
-use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
+use assembly_package_utils::PackageInternalPathBuf;
 use assembly_platform_configuration::{
     BootfsComponentConfigs, DomainConfig, DomainConfigs, PackageConfigs, PackageConfiguration,
 };
@@ -33,33 +32,24 @@ use assembly_util::{
 };
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
-use fuchsia_url::UnpinnedAbsolutePackageUrl;
 use itertools::Itertools;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
+use util::MapEntry;
 
 #[derive(Debug, Serialize)]
 pub struct ImageAssemblyConfigBuilder {
     /// The RFC-0115 Build Type of the assembled product + platform.
     build_type: BuildType,
 
-    /// The base packages from the AssemblyInputBundles
-    base: assembly_package_set::PackageSet,
-
-    /// The cache packages from the AssemblyInputBundles
-    cache: assembly_package_set::PackageSet,
+    /// All of the packages, in all package sets.
+    packages: Packages,
 
     /// The base driver packages from the AssemblyInputBundles
     base_drivers: NamedMap<String, DriverDetails>,
 
     /// The boot driver packages from the AssemblyInputBundles
     boot_drivers: NamedMap<String, DriverDetails>,
-
-    /// The system packages from the AssemblyInputBundles
-    system: assembly_package_set::PackageSet,
-
-    /// The bootfs packages from the AssemblyInputBundles
-    bootfs_packages: assembly_package_set::PackageSet,
 
     /// The boot_args from the AssemblyInputBundles
     boot_args: BTreeSet<String>,
@@ -83,9 +73,6 @@ pub struct ImageAssemblyConfigBuilder {
     qemu_kernel: Option<Utf8PathBuf>,
     shell_commands: ShellCommands,
 
-    /// A set of all unique packageUrls across all AIBs passed to the builder
-    package_urls: BTreeSet<UnpinnedAbsolutePackageUrl>,
-
     /// The packages for assembly to create specified by AIBs
     packages_to_compile: BTreeMap<String, CompiledPackageBuilder>,
 
@@ -106,12 +93,9 @@ impl ImageAssemblyConfigBuilder {
     pub fn new(build_type: BuildType) -> Self {
         Self {
             build_type,
-            base: assembly_package_set::PackageSet::new("base packages"),
-            cache: assembly_package_set::PackageSet::new("cache packages"),
+            packages: Packages::default(),
             base_drivers: NamedMap::new("base_drivers"),
             boot_drivers: NamedMap::new("boot_drivers"),
-            system: assembly_package_set::PackageSet::new("system packages"),
-            bootfs_packages: assembly_package_set::PackageSet::new("bootfs packages"),
             boot_args: BTreeSet::default(),
             shell_commands: ShellCommands::default(),
             bootfs_files: NamedFileMap::new("bootfs files"),
@@ -122,7 +106,6 @@ impl ImageAssemblyConfigBuilder {
             kernel_args: BTreeSet::default(),
             kernel_clock_backstop: None,
             qemu_kernel: None,
-            package_urls: BTreeSet::default(),
             packages_to_compile: BTreeMap::default(),
             board_driver_arguments: None,
             configuration_capabilities: None,
@@ -200,7 +183,7 @@ impl ImageAssemblyConfigBuilder {
         // Base drivers are added to the base packages
         for driver_details in base_drivers {
             let driver_package_path = &bundle_path.join(&driver_details.package);
-            self.add_aib_package_from_path(driver_package_path, &PackageSet::Base)?;
+            self.add_package_from_path(driver_package_path, PackageOrigin::AIB, &PackageSet::Base)?;
 
             let package_url = DriverManifestBuilder::get_package_url(
                 DriverPackageType::Base,
@@ -212,7 +195,11 @@ impl ImageAssemblyConfigBuilder {
         // Boot drivers are added to the bootfs package set
         for driver_details in boot_drivers {
             let driver_package_path = &bundle_path.join(&driver_details.package);
-            self.add_aib_package_from_path(driver_package_path, &PackageSet::Bootfs)?;
+            self.add_package_from_path(
+                driver_package_path,
+                PackageOrigin::AIB,
+                &PackageSet::Bootfs,
+            )?;
 
             let package_url = DriverManifestBuilder::get_package_url(
                 DriverPackageType::Boot,
@@ -290,7 +277,7 @@ impl ImageAssemblyConfigBuilder {
             // Always add the drivers if bootfs, and only add non-bootfs drivers
             // if this is not a bootstrap_only build.
             if set == PackageSet::Bootfs || !bootstrap_only {
-                self.add_product_package_from_path(&package, &set)?;
+                self.add_package_from_path(&package, PackageOrigin::Board, &set)?;
 
                 let package_url =
                     DriverManifestBuilder::get_package_url(driver_package_type, &package)?;
@@ -311,7 +298,7 @@ impl ImageAssemblyConfigBuilder {
             // Always add the package if bootfs, and only add non-bootfs packages
             // if this is not a bootstrap_only build.
             if set == PackageSet::Bootfs || !bootstrap_only {
-                self.add_product_package_from_path(package, &set)?;
+                self.add_package_from_path(package, PackageOrigin::Board, &set)?;
             }
         }
 
@@ -385,65 +372,19 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
-    fn add_aib_package_from_path(
+    fn add_package_from_path(
         &mut self,
         path: impl AsRef<Utf8Path>,
+        origin: PackageOrigin,
         to_package_set: &PackageSet,
     ) -> Result<()> {
         // Create PackageEntry
-        let package_entry = PackageEntry::parse_from(path.as_ref().to_owned())?;
-        let d = match to_package_set.to_owned() {
-            PackageSet::Base | PackageSet::Cache | PackageSet::System | PackageSet::Flexible => {
-                PackageSetDestination::Blob(PackageDestination::FromAIB(
-                    package_entry.name().to_string(),
-                ))
-            }
-            PackageSet::Bootfs => PackageSetDestination::Boot(BootfsPackageDestination::FromAIB(
-                package_entry.name().to_string(),
-            )),
-        };
-        self.add_unique_package_entry(d, package_entry, to_package_set)
-    }
+        let (d, package_entry) = PackageEntry::parse_from(origin, to_package_set.clone(), path)?;
 
-    fn add_product_package_from_path(
-        &mut self,
-        path: impl AsRef<Utf8Path>,
-        to_package_set: &PackageSet,
-    ) -> Result<()> {
-        // Create PackageEntry
-        let package_entry = PackageEntry::parse_from(path.as_ref().to_owned())?;
-        let d = PackageSetDestination::Blob(PackageDestination::FromProduct(
-            package_entry.name().to_string(),
-        ));
-        self.add_unique_package_entry(d, package_entry, to_package_set)
-    }
-
-    /// Adds a package via PackageEntry to the package set, only if it is unique across all other
-    /// packages in the builder
-    fn add_unique_package_entry(
-        &mut self,
-        d: PackageSetDestination,
-        package_entry: PackageEntry,
-        to_package_set: &PackageSet,
-    ) -> Result<()> {
-        let package_set = match to_package_set.to_owned() {
-            PackageSet::Base => &mut self.base,
-            PackageSet::Cache => &mut self.cache,
-            PackageSet::System => &mut self.system,
-            PackageSet::Bootfs => &mut self.bootfs_packages,
-            _ => bail!("Unsupported package set type {:?}", &to_package_set),
-        };
-
-        let package_url = package_entry.manifest.package_url()?.ok_or_else(|| {
-            anyhow::anyhow!(
-                "Failed to retrieve package_url for package {}",
-                package_entry.manifest.name()
-            )
-        })?;
-        self.package_urls.try_insert_unique(package_url).map_err(|e| {
-            anyhow::anyhow!("duplicate package {} found in {}", e, package_set.name)
-        })?;
-        package_set.add_package(d, package_entry)?;
+        // Now store the package and it's destination.
+        self.packages
+            .try_insert_unique(d, package_entry)
+            .with_context(|| format!("Adding packages to {to_package_set}"))?;
 
         Ok(())
     }
@@ -466,7 +407,7 @@ impl ImageAssemblyConfigBuilder {
                 (&PackageSet::System, _) => PackageSet::System,
                 (&PackageSet::Bootfs, _) => PackageSet::Bootfs,
             };
-            self.add_aib_package_from_path(manifest_path, &set)?;
+            self.add_package_from_path(manifest_path, PackageOrigin::AIB, &set)?;
         }
 
         Ok(())
@@ -504,19 +445,24 @@ impl ImageAssemblyConfigBuilder {
         to_package_set: PackageSet,
     ) -> Result<()> {
         for entry in entries {
-            // Parse the package_manifest.json into a PackageManifest, returning
-            // both along with any config_data entries defined for the package.
-            let (manifest_path, pkg_manifest, config_data) =
-                Self::parse_product_package_entry(entry)?;
-            let package_manifest_name = pkg_manifest.name().to_string();
-            let package_entry = PackageEntry { path: manifest_path.into(), manifest: pkg_manifest };
-            let d = PackageSetDestination::Blob(PackageDestination::FromProduct(
-                package_entry.name().to_string(),
-            ));
-            self.add_unique_package_entry(d, package_entry, &to_package_set)?;
+            // Load the PackageManifest from the given path, in order to get the
+            // package name.
+            let manifest = PackageManifest::try_load_from(&entry.manifest)
+                .with_context(|| format!("parsing {} as a package manifest", &entry.manifest))?;
+
+            // Add the package to the set of packages in the assembly.
+            self.add_package_from_path(entry.manifest, PackageOrigin::Product, &to_package_set)?;
+
             // Add the config data entries to the map
-            for config in config_data {
-                self.add_config_data_entry(&package_manifest_name, config)?;
+            for ProductConfigData { source, destination } in entry.config_data {
+                // If there are config_data entries, convert the TypedPathBuf pairs into
+                // FileEntry objects.  From this point on, they are handled as FileEntry
+                // TODO(tbd): Switch FileEntry to use TypedPathBuf instead of String and
+                // PathBuf.
+                self.add_config_data_entry(
+                    &manifest.name().to_string(),
+                    FileEntry { source: source.into(), destination: destination.to_string() },
+                )?;
             }
         }
         Ok(())
@@ -532,50 +478,21 @@ impl ImageAssemblyConfigBuilder {
         // Base drivers are added to the base packages
         // Config data is not supported for driver packages since it is deprecated.
         for driver_details in drivers {
-            let manifest =
-                PackageManifest::try_load_from(&driver_details.package).with_context(|| {
-                    format!("parsing {} as a package manifest", driver_details.package)
-                })?;
-            let entry = PackageEntry { path: driver_details.package.clone(), manifest };
-            let d = PackageSetDestination::Blob(PackageDestination::FromProduct(
-                entry.name().to_string(),
-            ));
-            self.base
-                .add_package(d, entry)
-                .context(format!("Adding driver {}", &driver_details.package))?;
+            self.add_package_from_path(
+                &driver_details.package,
+                PackageOrigin::Product,
+                &PackageSet::Base,
+            )
+            .context("Adding base drivers")?;
+
             let package_url = DriverManifestBuilder::get_package_url(
                 DriverPackageType::Base,
                 &driver_details.package,
             )?;
+
             self.base_drivers.try_insert_unique(package_url, driver_details)?;
         }
         Ok(())
-    }
-
-    /// Given the parsed json of the product package set entry, parse out the
-    /// package manifest, and any configuration associated with the package.
-    fn parse_product_package_entry(
-        entry: ProductPackageDetails,
-    ) -> Result<(PackageManifestPathBuf, PackageManifest, Vec<FileEntry<String>>)> {
-        // Load the PackageManifest from the given path
-        let manifest = PackageManifest::try_load_from(&entry.manifest)
-            .with_context(|| format!("parsing {} as a package manifest", &entry.manifest))?;
-
-        // If there are config_data entries, convert the TypedPathBuf pairs into
-        // FileEntry objects.  From this point on, they are handled as FileEntry
-        // TODO(tbd): Switch FileEntry to use TypedPathBuf instead of String and
-        // PathBuf.
-        let config_data_entries = entry
-            .config_data
-            .into_iter()
-            // Explicitly call out the path types to make sure that they
-            // are ordered as expected in the tuple.
-            .map(|ProductConfigData { destination, source }| FileEntry {
-                destination: destination.to_string(),
-                source: source.into(),
-            })
-            .collect();
-        Ok((entry.manifest, manifest, config_data_entries))
     }
 
     /// Add an entry to `config_data` for the given package.  If the entry
@@ -705,21 +622,17 @@ impl ImageAssemblyConfigBuilder {
             build_type: _,
             package_configs,
             domain_configs,
-            mut base,
-            mut cache,
+            mut packages,
             base_drivers,
             boot_drivers,
-            mut system,
             boot_args,
             mut bootfs_files,
-            mut bootfs_packages,
             bootfs_structured_config,
             kernel_path,
             kernel_args,
             kernel_clock_backstop,
             qemu_kernel,
             shell_commands,
-            package_urls: _,
             packages_to_compile,
             board_driver_arguments,
             configuration_capabilities,
@@ -741,8 +654,11 @@ impl ImageAssemblyConfigBuilder {
                 let d = PackageSetDestination::Blob(PackageDestination::FromProduct(
                     package_name.clone(),
                 ));
-                base.add_package_from_path(d, p)
-                    .with_context(|| format!("adding compiled package {}", &package_name))?;
+                let (_d, package_entry) =
+                    PackageEntry::parse_from(PackageOrigin::AIB, PackageSet::Base, p)?;
+                packages
+                    .try_insert_unique(d, package_entry)
+                    .with_context(|| format!("Adding compiled package {package_name}"))?;
             };
         }
 
@@ -758,35 +674,23 @@ impl ImageAssemblyConfigBuilder {
             }
         }
 
-        // Generate the boot driver manifest and add to bootfs files.
-        let boot_driver_config = {
-            let mut driver_manifest_builder = DriverManifestBuilder::default();
-            for (package_url, driver_details) in boot_drivers.entries {
-                driver_manifest_builder
-                    .add_driver(driver_details, &package_url)
-                    .with_context(|| format!("adding driver {}", &package_url))?;
-            }
-            driver_manifest_builder.create_config()
-        };
-
         // Repackage any matching packages
         for (package, config) in &package_configs {
             // Only process configs that have component entries for structured config.
             if !config.components.is_empty() {
-                // Get the manifest for this package name, returning the set from which it was removed
-                if let Some((manifest, source_package_set, destination)) = remove_package_from_sets(
-                    package.to_string(),
-                    [
-                        (&mut base, PackageSet::Base),
-                        (&mut cache, PackageSet::Cache),
-                        (&mut system, PackageSet::System),
-                        (&mut bootfs_packages, PackageSet::Bootfs),
-                    ],
-                )
-                .with_context(|| format!("removing {package} for repackaging"))?
+                // Get the manifest for this package name, removing it from the set.  There are two
+                // different potential destinations for this, so try each in order, removing the
+                // first entry that's found, so that we can replace it with the
+                if let Some((destination, entry)) = vec![
+                    PackageSetDestination::Blob(PackageDestination::FromAIB(package.clone())),
+                    PackageSetDestination::Boot(BootfsPackageDestination::FromAIB(package.clone())),
+                ]
+                .into_iter()
+                .find_map(|d| packages.remove(&d).map(|entry| (d, entry)))
                 {
-                    let outdir = outdir.join("repackaged").join(package);
-                    let mut repackager = Repackager::new(manifest, outdir)
+                    // Create the new package
+                    let outdir = outdir.join("repackaged").join(&package);
+                    let mut repackager = Repackager::new(entry.manifest, outdir)
                         .with_context(|| format!("reading existing manifest for {package}"))?;
 
                     // Iterate over the components to get their structured config values
@@ -798,9 +702,16 @@ impl ImageAssemblyConfigBuilder {
                     let new_path = repackager
                         .build()
                         .with_context(|| format!("building repackaged {package}"))?;
-                    let new_entry = PackageEntry::parse_from(new_path)
-                        .with_context(|| format!("parsing repackaged {package}"))?;
-                    source_package_set.insert(destination, new_entry);
+                    let (_, new_entry) =
+                        PackageEntry::parse_from(PackageOrigin::AIB, entry.package_set, new_path)
+                            .with_context(|| {
+                            "Parsing new package manifest for repackaged package: {package}"
+                        })?;
+
+                    // Re-add the package now that it's been repackaged.
+                    packages.try_insert_unique(destination, new_entry).with_context(|| {
+                        format!("Re-adding package after repackaging with new config: {package}")
+                    })?;
                 } else {
                     // TODO(https://fxbug.dev/42052394) return an error here
                 }
@@ -808,52 +719,53 @@ impl ImageAssemblyConfigBuilder {
         }
 
         // Construct the domain config packages
-        for (package_name, config) in domain_configs {
-            let outdir = outdir.join(package_name.to_string());
+        for (destination, config) in domain_configs {
+            let outdir = outdir.join(destination.to_string());
             std::fs::create_dir_all(&outdir)
                 .with_context(|| format!("creating directory {outdir}"))?;
             let package = DomainConfigPackage::new(config);
             let (path, manifest) = package
                 .build(outdir)
-                .with_context(|| format!("building domain config package {package_name}"))?;
-            match &package_name {
-                d @ PackageSetDestination::Blob(_) => {
-                    base.add_package(d.clone(), PackageEntry { path, manifest }).with_context(
-                        || format!("Adding domain config package: {}", package_name),
-                    )?;
-                }
-                d @ PackageSetDestination::Boot(_) => {
-                    bootfs_packages
-                        .add_package(d.clone(), PackageEntry { path, manifest })
-                        .with_context(|| {
-                            format!("Adding domain config package: {}", package_name)
-                        })?;
-                }
-            }
+                .with_context(|| format!("building domain config package {destination}"))?;
+
+            let package_set = match &destination {
+                PackageSetDestination::Blob(_) => PackageSet::Base,
+                PackageSetDestination::Boot(_) => PackageSet::Bootfs,
+            };
+            packages
+                .try_insert_unique(destination, PackageEntry { path, manifest, package_set })
+                .context("Adding domain config package")?;
         }
 
-        let base_driver_config = {
-            // TODO(https://fxbug.dev/42180403) Make the presence of the base package an explicit parameter
+        // Generate the driver manifests and add to the configuration capability package
+        let mut configuration_capabilities =
+            configuration_capabilities.unwrap_or_else(|| NamedMap::new("config capabilities"));
+        {
+            let mut driver_manifest_builder = DriverManifestBuilder::default();
+            for (package_url, driver_details) in boot_drivers.entries {
+                driver_manifest_builder
+                    .add_driver(driver_details, &package_url)
+                    .with_context(|| format!("adding driver {}", &package_url))?;
+            }
+
+            configuration_capabilities.try_insert_unique(
+                "fuchsia.driver.BootDrivers".to_string(),
+                driver_manifest_builder.create_config(),
+            )?;
+        }
+        {
             let mut driver_manifest_builder = DriverManifestBuilder::default();
             for (package_url, driver_details) in base_drivers.entries {
                 driver_manifest_builder
                     .add_driver(driver_details, &package_url)
                     .with_context(|| format!("adding driver {}", &package_url))?;
             }
-            driver_manifest_builder.create_config()
-        };
 
-        // Concatenate configuration capabilities together.
-        let configuration_capabilities = {
-            let mut config = configuration_capabilities.unwrap_or_else(|| {
-                assembly_config_capabilities::CapabilityNamedMap::new("config capabilities")
-            });
-            config
-                .try_insert_unique("fuchsia.driver.BootDrivers".to_string(), boot_driver_config)?;
-            config
-                .try_insert_unique("fuchsia.driver.BaseDrivers".to_string(), base_driver_config)?;
-            config
-        };
+            configuration_capabilities.try_insert_unique(
+                "fuchsia.driver.BaseDrivers".to_string(),
+                driver_manifest_builder.create_config(),
+            )?;
+        }
 
         // Construct the config capability package.
         {
@@ -867,16 +779,16 @@ impl ImageAssemblyConfigBuilder {
                 &outdir,
             )
             .with_context(|| format!("building config capabilties package {package_name}"))?;
-            bootfs_packages
-                .add_package(
+            packages
+                .try_insert_unique(
                     PackageSetDestination::Boot(BootfsPackageDestination::Config),
-                    PackageEntry { path, manifest },
+                    PackageEntry { path, manifest, package_set: PackageSet::Bootfs },
                 )
-                .with_context(|| format!("Adding config capabilities package: {}", package_name))?;
+                .context("Adding config capabilities package")?;
         }
 
-        // Build the config_data package if we have any packages.
-        if !base.is_empty() || !cache.is_empty() || !system.is_empty() {
+        // Build the config_data package if we have any blobfs packages.
+        if packages.has_blobs() {
             let mut config_data_builder = ConfigDataBuilder::default();
             for (package_name, config) in &package_configs {
                 for (destination, source_merkle_pair) in config.config_data.iter() {
@@ -890,23 +802,29 @@ impl ImageAssemblyConfigBuilder {
             let manifest_path = config_data_builder
                 .build(outdir)
                 .context("writing the 'config_data' package metafar.")?;
-            base.add_package_from_path(
-                PackageSetDestination::Blob(PackageDestination::ConfigData),
-                manifest_path,
-            )
-            .context("adding generated config-data package")?;
+            let (_, entry) =
+                PackageEntry::parse_from(PackageOrigin::AIB, PackageSet::Base, manifest_path)?;
+            packages
+                .try_insert_unique(
+                    PackageSetDestination::Blob(PackageDestination::ConfigData),
+                    entry,
+                )
+                .context("Adding generated config-data package")?;
         }
 
         if !shell_commands.is_empty() {
             let mut shell_commands_builder = ShellCommandsBuilder::new();
             shell_commands_builder.add_shell_commands(shell_commands, "fuchsia.com".to_string());
-            let manifest =
+            let manifest_path =
                 shell_commands_builder.build(outdir).context("building shell commands package")?;
-            base.add_package_from_path(
-                PackageSetDestination::Blob(PackageDestination::ShellCommands),
-                manifest,
-            )
-            .context("adding shell commands package to base")?;
+            let (_, entry) =
+                PackageEntry::parse_from(PackageOrigin::AIB, PackageSet::Base, manifest_path)?;
+            packages
+                .try_insert_unique(
+                    PackageSetDestination::Blob(PackageDestination::ShellCommands),
+                    entry,
+                )
+                .context("Adding shell commands package to base")?;
         }
 
         let bootfs_files = bootfs_files
@@ -919,9 +837,10 @@ impl ImageAssemblyConfigBuilder {
         // then pass this to the ImageAssemblyConfig::try_from_partials() to get the
         // final validation that it's complete.
         let image_assembly_config = assembly_config_schema::ImageAssemblyConfig {
-            system: system.into_paths().sorted().collect(),
-            base: base.into_paths().sorted().collect(),
-            cache: cache.into_paths().sorted().collect(),
+            base: packages.package_manifest_paths(PackageSet::Base),
+            cache: packages.package_manifest_paths(PackageSet::Cache),
+            system: packages.package_manifest_paths(PackageSet::System),
+            bootfs_packages: packages.package_manifest_paths(PackageSet::Bootfs),
             kernel: KernelConfig {
                 path: kernel_path.context("A kernel path must be specified")?,
                 args: kernel_args.into_iter().collect(),
@@ -931,7 +850,6 @@ impl ImageAssemblyConfigBuilder {
             qemu_kernel: qemu_kernel.context("A qemu kernel configuration must be specified")?,
             boot_args: boot_args.into_iter().collect(),
             bootfs_files,
-            bootfs_packages: bootfs_packages.into_paths().sorted().collect(),
             images_config: Default::default(),
             board_driver_arguments,
             devicetree,
@@ -940,37 +858,116 @@ impl ImageAssemblyConfigBuilder {
     }
 }
 
-/// Remove a package with a matching name from the provided package sets, returning its parsed
-/// manifest and a mutable reference to the set from which it was removed.
-fn remove_package_from_sets<'a, 'b: 'a, const N: usize>(
-    package_name: String,
-    package_sets: [(&'a mut assembly_package_set::PackageSet, assembly_config_schema::PackageSet);
-        N],
-) -> anyhow::Result<
-    Option<(PackageManifest, &'a mut assembly_package_set::PackageSet, PackageSetDestination)>,
-> {
-    let mut matches_name = None;
+/// A wrapper around all the packages
+#[derive(Debug, Default, Serialize)]
+struct Packages {
+    inner: BTreeMap<PackageSetDestination, PackageEntry>,
+}
 
-    for (package_set, package_set_type) in package_sets {
-        // All repackaged packages come from AIBs.
-        let destination = match package_set_type {
-            PackageSet::Base | PackageSet::Cache | PackageSet::System | PackageSet::Flexible => {
-                PackageSetDestination::Blob(PackageDestination::FromAIB(package_name.clone()))
-            }
-            PackageSet::Bootfs => {
-                PackageSetDestination::Boot(BootfsPackageDestination::FromAIB(package_name.clone()))
-            }
-        };
-        if let Some(entry) = package_set.remove(&destination) {
-            ensure!(
-                matches_name.is_none(),
-                "only one package with a given name is allowed per product"
-            );
-            matches_name = Some((entry.manifest, package_set, destination));
-        }
+impl Packages {
+    /// Insert a package entry by it's destination.  This enforces that there
+    /// no duplicate destinations.
+    fn try_insert_unique(
+        &mut self,
+        destination: PackageSetDestination,
+        entry: PackageEntry,
+    ) -> Result<()> {
+        self.inner
+            .try_insert_unique(MapEntry(destination, entry))
+            .map_err(|e| anyhow!("Duplicate package found {}", e.existing_entry.key()))
     }
 
-    Ok(matches_name)
+    /// Remove a package entry by its destination.
+    fn remove(&mut self, destination: &PackageSetDestination) -> Option<PackageEntry> {
+        self.inner.remove(destination)
+    }
+
+    /// Returns true if there are any packages destined for BlobFS.
+    fn has_blobs(&self) -> bool {
+        self.inner.iter().any(|(d, _)| matches!(d, PackageSetDestination::Blob(_)))
+    }
+
+    /// Returns a sorted list of the package manifests for a given package set.
+    fn package_manifest_paths(&self, package_set: PackageSet) -> Vec<Utf8PathBuf> {
+        self.inner
+            .values()
+            .filter_map(|e| if e.package_set == package_set { Some(e.path.clone()) } else { None })
+            .sorted()
+            .collect()
+    }
+}
+
+/// Information about a single package in the set.
+#[derive(Debug, Serialize)]
+struct PackageEntry {
+    /// Path to the package manifest.
+    path: Utf8PathBuf,
+
+    /// Parsed package manifest.
+    manifest: PackageManifest,
+
+    /// Which package set that the package belongs to.
+    package_set: PackageSet,
+}
+
+impl PackageEntry {
+    /// Construct a PackageEntry from a path to a package manifest, and a given
+    /// destination package set.
+    pub fn parse_from(
+        origin: PackageOrigin,
+        package_set: PackageSet,
+        path: impl AsRef<Utf8Path>,
+    ) -> Result<(PackageSetDestination, Self)> {
+        let path = path.as_ref();
+        let manifest = PackageManifest::try_load_from(path)
+            .with_context(|| format!("parsing {path} as a package manifest"))?;
+
+        let name = manifest.name().to_string();
+        if name == "" {
+            bail!("Package with no name {path}");
+        }
+
+        let destination = match &package_set {
+            PackageSet::Base | PackageSet::Cache | PackageSet::System | PackageSet::Flexible => {
+                PackageSetDestination::Blob(match &origin {
+                    PackageOrigin::AIB => PackageDestination::FromAIB(name),
+                    PackageOrigin::Board => PackageDestination::FromBoard(name),
+                    PackageOrigin::Product => PackageDestination::FromProduct(name),
+                })
+            }
+            PackageSet::Bootfs => PackageSetDestination::Boot(match &origin {
+                PackageOrigin::AIB => BootfsPackageDestination::FromAIB(name),
+                PackageOrigin::Board => BootfsPackageDestination::FromBoard(name),
+                PackageOrigin::Product => bail!("Products cannot add packages to bootfs  ({path})"),
+            }),
+        };
+
+        Ok((destination, Self { path: path.to_path_buf(), manifest, package_set }))
+    }
+}
+
+/// The origin of a package.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum PackageOrigin {
+    /// The package is from a platform AIB
+    AIB,
+
+    /// The package is from the board
+    Board,
+
+    /// The package is from the product
+    Product,
+}
+
+impl std::fmt::Display for PackageOrigin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            PackageOrigin::AIB => "platform",
+            PackageOrigin::Board => "board",
+            PackageOrigin::Product => "product",
+        })
+    }
 }
 
 #[cfg(test)]
@@ -982,6 +979,7 @@ mod tests {
     use assembly_config_schema::image_assembly_config::PartialKernelConfig;
     use assembly_file_relative_path::FileRelativePathBuf;
     use assembly_named_file_map::SourceMerklePair;
+    use assembly_package_utils::PackageManifestPathBuf;
     use assembly_platform_configuration::ComponentConfigs;
     use assembly_test_util::generate_test_manifest;
     use assembly_tool::testing::FakeToolProvider;
@@ -1877,39 +1875,6 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
         builder.add_parsed_bundle(outdir, aib).ok();
         assert!(builder.add_parsed_bundle(outdir, aib2).is_err());
-    }
-
-    #[test]
-    fn test_builder_allows_dupes_assuming_different_package_url() {
-        let tmp = TempDir::new().unwrap();
-        let outdir = Utf8Path::from_path(tmp.path()).unwrap();
-        let tmp_path1 = TempDir::new_in(outdir).unwrap();
-        let dir_path1 = Utf8Path::from_path(tmp_path1.path()).unwrap();
-        let tmp_path2 = TempDir::new_in(outdir).unwrap();
-        let dir_path2 = Utf8Path::from_path(tmp_path2.path()).unwrap();
-        let aib = AssemblyInputBundle {
-            packages: vec![PackageDetails {
-                package: FileRelativePathBuf::FileRelative(
-                    write_empty_pkg(dir_path1, "foo", Some("fuchsia.com")).into(),
-                ),
-                set: PackageSet::Base,
-            }],
-            ..Default::default()
-        };
-
-        let aib2 = AssemblyInputBundle {
-            packages: vec![PackageDetails {
-                package: FileRelativePathBuf::FileRelative(
-                    write_empty_pkg(dir_path2, "foo", Some("google.com")).into(),
-                ),
-                set: PackageSet::Cache,
-            }],
-            ..Default::default()
-        };
-
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
-        builder.add_parsed_bundle(outdir, aib).ok();
-        builder.add_parsed_bundle(outdir, aib2).unwrap();
     }
 
     #[test]

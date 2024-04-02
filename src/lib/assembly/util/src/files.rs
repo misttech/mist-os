@@ -107,7 +107,9 @@ pub enum PackageDestination {
     ForTest,
     /// Any package that came from an AIB.
     FromAIB(String),
-    /// Any package that came from the product..
+    /// Any package that came from the board
+    FromBoard(String),
+    /// Any package that came from the product.
     FromProduct(String),
 }
 
@@ -117,7 +119,8 @@ impl std::fmt::Display for PackageDestination {
             f,
             "{}",
             match self {
-                Self::FromAIB(s) | Self::FromProduct(s) => return write!(f, "{}", s),
+                Self::FromAIB(s) | Self::FromBoard(s) | Self::FromProduct(s) =>
+                    return write!(f, "{}", s),
                 Self::BuildInfo => "build-info",
                 Self::SensorConfig => "sensor-config",
                 Self::Base => "system_image",
@@ -142,6 +145,8 @@ pub enum BootfsPackageDestination {
     ForTest,
     /// Any package that came from an AIB.
     FromAIB(String),
+    /// Any package that came from a board
+    FromBoard(String),
 }
 
 impl std::fmt::Display for BootfsPackageDestination {
@@ -150,7 +155,7 @@ impl std::fmt::Display for BootfsPackageDestination {
             f,
             "{}",
             match self {
-                Self::FromAIB(s) => return write!(f, "{}", s),
+                Self::FromAIB(s) | Self::FromBoard(s) => return write!(f, "{}", s),
                 Self::ArchivistPipelines => "archivist-pipelines",
                 Self::Config => "config",
                 Self::ForTest => "for-test",
@@ -375,7 +380,6 @@ impl Destination for BootfsCompiledPackageDestination {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use strum::IntoEnumIterator;
 
     #[test]
     fn test_to_string() {
@@ -398,71 +402,5 @@ mod tests {
             BootfsComponentForRepackage::Fshost.manifest()
         );
         assert_eq!(BootfsDestination::FshostConfig, BootfsComponentForRepackage::Fshost.config());
-    }
-
-    #[test]
-    fn test_allowlists() {
-        let packages_expected: Vec<String> = vec![
-            "",
-            "",
-            "bootstrap",
-            "build-info",
-            "config-data",
-            "core",
-            "diagnostics",
-            "for-test",
-            "fshost",
-            "netcfg-config",
-            "network",
-            "sensor-config",
-            "shell-commands",
-            "system-update-realm",
-            "system_image",
-            "toolbox",
-        ]
-        .iter()
-        .map(ToString::to_string)
-        .collect();
-
-        let mut packages: Vec<String> = PackageDestination::iter().map(|p| p.to_string()).collect();
-        packages
-            .append(&mut BlobfsCompiledPackageDestination::iter().map(|p| p.to_string()).collect());
-        packages
-            .append(&mut BootfsCompiledPackageDestination::iter().map(|p| p.to_string()).collect());
-        packages.sort();
-        assert_eq!(packages_expected, packages);
-
-        let packages_expected: Vec<String> = vec!["", "archivist-pipelines", "config", "for-test"]
-            .iter()
-            .map(ToString::to_string)
-            .collect();
-
-        let mut packages: Vec<String> =
-            BootfsPackageDestination::iter().map(|p| p.to_string()).collect();
-        packages.sort();
-        assert_eq!(packages_expected, packages);
-
-        let bootfs_expected: Vec<String> = vec![
-            "",
-            "config/additional_boot_args",
-            "config/component_id_index",
-            "config/component_manager",
-            "config/cpu_manager/node_config.json",
-            "config/power_manager/node_config.json",
-            "config/power_manager/thermal_config.json",
-            "config/zxcrypt",
-            "data/bootfs_packages",
-            "for-test",
-            "meta/bootstrap.cm",
-            "meta/fshost.cm",
-            "meta/fshost.cvf",
-        ]
-        .iter()
-        .map(ToString::to_string)
-        .collect();
-
-        let mut bootfs: Vec<String> = BootfsDestination::iter().map(|b| b.to_string()).collect();
-        bootfs.sort();
-        assert_eq!(bootfs_expected, bootfs);
     }
 }

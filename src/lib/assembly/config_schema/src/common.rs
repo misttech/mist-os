@@ -46,6 +46,18 @@ pub enum PackageSet {
     Bootfs,
 }
 
+impl std::fmt::Display for PackageSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            PackageSet::Base => "base",
+            PackageSet::Cache => "cache",
+            PackageSet::Flexible => "flexible",
+            PackageSet::System => "system",
+            PackageSet::Bootfs => "bootfs",
+        })
+    }
+}
+
 /// Details about a package that contains drivers.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
