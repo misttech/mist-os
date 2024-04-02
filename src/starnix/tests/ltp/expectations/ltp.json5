@@ -114,7 +114,6 @@
                 "mlockall03",
                 "mmap12",
                 "mmap14",
-                "mmap20",
                 "mmapstress07",
                 "mount02",
                 "mount04",

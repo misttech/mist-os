@@ -32,7 +32,8 @@ use starnix_uapi::{
     FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_LOCK_PI,
     FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_UNLOCK_PI, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE,
     FUTEX_WAKE_BITSET, MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN,
-    MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_STACK, PROT_EXEC,
+    MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_SHARED_VALIDATE, MAP_STACK,
+    PROT_EXEC,
 };
 use std::ops::Deref as _;
 
@@ -88,6 +89,7 @@ pub fn do_mmap(
     let valid_flags: u32 = get_valid_platform_mmap_flags()
         | MAP_PRIVATE
         | MAP_SHARED
+        | MAP_SHARED_VALIDATE
         | MAP_ANONYMOUS
         | MAP_FIXED
         | MAP_FIXED_NOREPLACE
@@ -97,6 +99,9 @@ pub fn do_mmap(
         | MAP_DENYWRITE
         | MAP_GROWSDOWN;
     if flags & !valid_flags != 0 {
+        if flags & MAP_SHARED_VALIDATE != 0 {
+            return error!(EOPNOTSUPP);
+        }
         track_stub!(TODO("https://fxbug.dev/322873638"), "mmap check flags", flags);
         return error!(EINVAL);
     }
