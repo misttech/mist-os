@@ -1333,6 +1333,7 @@ void Dwc2::Endpoint::CancelAll() {
     queue = std::move(queued_reqs);
     if (current_req) {
       queue.push(std::move(current_req.value()));
+      current_req.reset();
     }
   }
 

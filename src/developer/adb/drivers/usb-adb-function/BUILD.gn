@@ -31,6 +31,7 @@ source_set("usb-adb-common") {
     "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_cpp",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:peripheral",
     "//src/devices/usb/lib/usb-endpoint:usb-endpoint-client",

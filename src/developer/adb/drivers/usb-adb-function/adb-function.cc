@@ -41,12 +41,12 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
       zxlogf(ERROR, "Device is already bound");
       ret_status = ZX_ERR_ALREADY_BOUND;
     } else {
-      adb_binding_ = fidl::BindServer<fuchsia_hardware_adb::UsbAdbImpl>(
-          dispatcher_, std::move(request->interface), this,
-          [this](auto* server, fidl::UnbindInfo info, auto server_end) {
-            zxlogf(INFO, "Device closed with reason '%s'", info.FormatDescription().c_str());
-            Stop();
-          });
+      adb_binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                           std::move(request->interface), this, [this](fidl::UnbindInfo info) {
+                             zxlogf(INFO, "Device closed with reason '%s'",
+                                    info.FormatDescription().c_str());
+                             Stop();
+                           });
       enable_ep = Online();
       fbl::AutoLock _(&lock_);
       auto result = fidl::WireSendEvent(adb_binding_.value())->OnStatusChanged(status_);
@@ -68,12 +68,36 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
 }
 
 void UsbAdbDevice::Stop() {
+  // Disable endpoints to prevent new requests present in our pipeline from getting queued.
+  ConfigureEndpoints(false);
+
+  // Cancel all requests in the pipeline -- the completion handler will free these requests as they
+  // come in.
+  //
+  // Do not hold locks when calling this method. It might result in deadlock as completion callbacks
+  // could be invoked during this call.
+  bulk_out_ep_->CancelAll().Then([](fidl::Result<fendpoint::Endpoint::CancelAll>& result) {
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to cancel all for bulk out endpoint %s",
+             result.error_value().FormatDescription().c_str());
+    }
+  });
+  bulk_in_ep_->CancelAll().Then([](fidl::Result<fendpoint::Endpoint::CancelAll>& result) {
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to cancel all for bulk in endpoint %s",
+             result.error_value().FormatDescription().c_str());
+    }
+  });
+
   {
     fbl::AutoLock _(&adb_mutex_);
     adb_binding_.reset();
+    while (!rx_requests_.empty()) {
+      rx_requests_.front().Reply(fit::error(ZX_ERR_BAD_STATE));
+      rx_requests_.pop();
+    }
   }
-  // Disable endpoints.
-  ConfigureEndpoints(false);
+
   test_stop_sync_.Signal();
 }
 
@@ -199,14 +223,14 @@ zx_status_t UsbAdbDevice::InsertUsbRequest(fuchsia_hardware_usb_request::Request
   fbl::AutoLock _(&lock_);
   // Return without adding the request to the pool during shutdown.
   ShutdownComplete();
-  return shutting_down_ ? ZX_ERR_CANCELED : ZX_OK;
+  return shutdown_callback_ ? ZX_ERR_CANCELED : ZX_OK;
 }
 
-void UsbAdbDevice::RxComplete(fuchsia_hardware_usb_endpoint::Completion completion) {
+void UsbAdbDevice::RxComplete(fendpoint::Completion completion) {
   // Return early during shutdown.
   {
     fbl::AutoLock _(&lock_);
-    if (shutting_down_) {
+    if (shutdown_callback_) {
       bulk_out_ep_.PutRequest(usb::FidlRequest(std::move(completion.request().value())));
       ShutdownComplete();
       return;
@@ -279,7 +303,7 @@ void UsbAdbDevice::RxComplete(fuchsia_hardware_usb_endpoint::Completion completi
   }
 }
 
-void UsbAdbDevice::TxComplete(fuchsia_hardware_usb_endpoint::Completion completion) {
+void UsbAdbDevice::TxComplete(fendpoint::Completion completion) {
   fbl::AutoLock _(&bulk_in_ep_.mutex_);
   if (InsertUsbRequest(std::move(completion.request().value()), bulk_in_ep_) != ZX_OK) {
     return;
@@ -371,15 +395,15 @@ zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetConfigured(bool configured, usb
   bool adb_configured = false;
   {
     fbl::AutoLock _(&lock_);
-    status_ = fuchsia_hardware_adb::StatusFlags(configured);
+    status_ = fadb::StatusFlags(configured);
     speed_ = speed;
   }
 
   {
     fbl::AutoLock _(&adb_mutex_);
     if (adb_binding_.has_value()) {
-      auto result = fidl::WireSendEvent(adb_binding_.value())
-                        ->OnStatusChanged(fuchsia_hardware_adb::StatusFlags(configured));
+      auto result =
+          fidl::WireSendEvent(adb_binding_.value())->OnStatusChanged(fadb::StatusFlags(configured));
       if (!result.ok()) {
         zxlogf(ERROR, "Could not call AdbInterface Status - %d.", result.status());
         return ZX_ERR_IO;
@@ -412,9 +436,9 @@ zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetInterface(uint8_t interface, ui
     }
   }
 
-  auto online = fuchsia_hardware_adb::StatusFlags(0);
+  auto online = fadb::StatusFlags(0);
   if (alt_setting && status == ZX_OK) {
-    online = fuchsia_hardware_adb::StatusFlags::kOnline;
+    online = fadb::StatusFlags::kOnline;
 
     // queue our IN reqs
     std::vector<fuchsia_hardware_usb_request::Request> requests;
@@ -460,48 +484,7 @@ void UsbAdbDevice::ShutdownComplete() {
 }
 
 void UsbAdbDevice::Shutdown() {
-  // Start the shutdown process by setting the shutdown bool to true.
-  // When the pipeline tries to submit requests, they will be immediately
-  // free'd.
-  {
-    fbl::AutoLock _(&lock_);
-    shutting_down_ = true;
-  }
-
-  // Disable endpoints to prevent new requests present in our
-  // pipeline from getting queued.
-  ConfigureEndpoints(false);
-
-  // Cancel all requests in the pipeline -- the completion handler
-  // will free these requests as they come in.
-  // Do not hold locks when calling this method. It might result in deadlock as completion callbacks
-  // could be invoked during this call.
-  bulk_out_ep_->CancelAll().Then(
-      [](fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::CancelAll>& result) {
-        if (result.is_error()) {
-          zxlogf(ERROR, "Failed to cancel all for bulk out endpoint %s",
-                 result.error_value().FormatDescription().c_str());
-        }
-      });
-  bulk_in_ep_->CancelAll().Then(
-      [](fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::CancelAll>& result) {
-        if (result.is_error()) {
-          zxlogf(ERROR, "Failed to cancel all for bulk in endpoint %s",
-                 result.error_value().FormatDescription().c_str());
-        }
-      });
-
-  {
-    fbl::AutoLock _(&adb_mutex_);
-    if (adb_binding_.has_value()) {
-      adb_binding_->Unbind();
-    }
-    adb_binding_.reset();
-    while (!rx_requests_.empty()) {
-      rx_requests_.front().Reply(fit::error(ZX_ERR_BAD_STATE));
-      rx_requests_.pop();
-    }
-  }
+  Stop();
 
   // Free all request pools.
   std::queue<txn_req_t> queue;

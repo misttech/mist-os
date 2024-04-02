@@ -118,13 +118,13 @@ class UsbAdbTest : public zxtest::Test {
   static constexpr uint32_t kVmoDataSize = 10;
 
   std::unique_ptr<FakeAdbDaemon> CreateFakeAdbDaemon() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_adb::UsbAdbImpl>();
+    auto endpoints = fidl::CreateEndpoints<fadb::UsbAdbImpl>();
     EXPECT_TRUE(endpoints.is_ok());
 
     {
-      auto adb_endpoints = fidl::CreateEndpoints<fuchsia_hardware_adb::Device>();
+      auto adb_endpoints = fidl::CreateEndpoints<fadb::Device>();
       EXPECT_TRUE(endpoints.is_ok());
-      std::optional<fidl::ServerBinding<fuchsia_hardware_adb::Device>> binding;
+      std::optional<fidl::ServerBinding<fadb::Device>> binding;
       EXPECT_OK(fdf::RunOnDispatcherSync(
           adb_dispatcher_->async_dispatcher(), [&adb_endpoints, &binding, this]() {
             binding.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
@@ -232,32 +232,31 @@ class UsbAdbTest : public zxtest::Test {
 // Fake Adb protocol service.
 class UsbAdbTest::FakeAdbDaemon {
  private:
-  class EventHandler : public fidl::WireAsyncEventHandler<fuchsia_hardware_adb::UsbAdbImpl> {
+  class EventHandler : public fidl::WireAsyncEventHandler<fadb::UsbAdbImpl> {
    public:
     explicit EventHandler(FakeAdbDaemon* dev) : dev_(dev) {}
 
    private:
-    void OnStatusChanged(
-        fidl::WireEvent<fuchsia_hardware_adb::UsbAdbImpl::OnStatusChanged>* event) override {
+    void OnStatusChanged(fidl::WireEvent<fadb::UsbAdbImpl::OnStatusChanged>* event) override {
       dev_->status_ = event->status;
     }
 
     FakeAdbDaemon* dev_;
   };
   EventHandler event_handler_{this};
-  fuchsia_hardware_adb::StatusFlags status_;
+  fadb::StatusFlags status_;
 
  public:
-  explicit FakeAdbDaemon(fidl::ClientEnd<fuchsia_hardware_adb::UsbAdbImpl> client)
+  explicit FakeAdbDaemon(fidl::ClientEnd<fadb::UsbAdbImpl> client)
       : client_(std::move(client), loop_.dispatcher(), &event_handler_) {}
 
-  void CheckStatus(fuchsia_hardware_adb::StatusFlags expected_status) {
+  void CheckStatus(fadb::StatusFlags expected_status) {
     loop_.RunUntilIdle();
     EXPECT_EQ(status_, expected_status);
   }
 
   async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  fidl::WireClient<fuchsia_hardware_adb::UsbAdbImpl> client_;
+  fidl::WireClient<fadb::UsbAdbImpl> client_;
 };
 
 void UsbAdbTest::SendTestData(std::unique_ptr<FakeAdbDaemon>& fake_adb, size_t size) {
@@ -301,10 +300,10 @@ TEST_F(UsbAdbTest, SendAdbMessage) {
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkOutEp);
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
   auto fake_adb = CreateFakeAdbDaemon();
-  fake_adb->CheckStatus(fuchsia_hardware_adb::StatusFlags(0));
+  fake_adb->CheckStatus(fadb::StatusFlags(0));
 
   Configure();
-  fake_adb->CheckStatus(fuchsia_hardware_adb::StatusFlags::kOnline);
+  fake_adb->CheckStatus(fadb::StatusFlags::kOnline);
 
   // Sending data that fits within a single VMO request
   SendTestData(fake_adb, kVmoDataSize - 2);
@@ -333,15 +332,14 @@ TEST_F(UsbAdbTest, RecvAdbMessage) {
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
   Configure();
   auto fake_adb = CreateFakeAdbDaemon();
-  fake_adb->CheckStatus(fuchsia_hardware_adb::StatusFlags::kOnline);
+  fake_adb->CheckStatus(fadb::StatusFlags::kOnline);
 
   // Queue a receive request before the data is available. The request will not get an immediate
   // reply. Data fits within a single VMO request.
   constexpr uint32_t kReceiveSize = kVmoDataSize - 2;
   libsync::Completion wait;
   fake_adb->client_->Receive().ThenExactlyOnce(
-      [&wait, &kReceiveSize](
-          fidl::WireUnownedResult<::fuchsia_hardware_adb::UsbAdbImpl::Receive>& response) -> void {
+      [&wait, &kReceiveSize](fidl::WireUnownedResult<fadb::UsbAdbImpl::Receive>& response) -> void {
         ASSERT_OK(response.status());
         ASSERT_FALSE(response.value().is_error());
         ASSERT_EQ(response.value().value()->data.count(), kReceiveSize);
