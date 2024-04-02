@@ -67,7 +67,8 @@ zx_vaddr_t load(const zx::debuglog& log, std::string_view what, const zx::vmar& 
   const uintptr_t entry = ehdr.entry + loader.load_bias();
   const uintptr_t base = load_info.vaddr_start() + loader.load_bias();
 
-  zx::vmar loaded_vmar = std::move(loader).Commit();
+  using RelroRegion = decltype(load_info)::Region;
+  zx::vmar loaded_vmar = std::move(loader).Commit(RelroRegion{}).TakeVmar();
   if (segments_vmar) {
     *segments_vmar = std::move(loaded_vmar);
   }

@@ -159,6 +159,8 @@ class LoadTests : public ::testing::Test {
     std::optional<typename Elf::size_type> stack_size;
   };
 
+  static constexpr typename LoadInfo::Region kNoRelro{};
+
   template <typename... LoaderArgs>
   void Load(const TestLib& test_lib, std::optional<LoadResult>& result,
             LoaderArgs&&... loader_args) {

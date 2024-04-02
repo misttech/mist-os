@@ -34,6 +34,10 @@ template <class Traits>
 class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
  public:
   using Base = elfldltl::testing::LoadTests<Traits>;
+  using typename Base::Loader;
+  using typename Base::LoadInfo;
+  using Relro = typename Loader::Relro;
+  using Region = typename LoadInfo::Region;
 
   void TearDown() override {
     // We use the Posix APIs for genericism of the test.
@@ -101,14 +105,18 @@ class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
 
     entry_ = mem.GetPointer<std::remove_pointer_t<decltype(entry_)>>(result->entry);
     if (options.commit) {
-      mem_.set_image(mem.image());
-      mem_.set_base(mem.base());
-      std::move(result->loader).Commit();
+      mem_ = mem;
+
+      Region relro_bounds{};
+      relro_phdr_ = relro_phdr;
+      if (relro_phdr_) {
+        relro_bounds = LoadInfo::RelroBounds(*relro_phdr_, result->loader.page_size());
+      }
+      relro_ = std::move(result->loader).Commit(relro_bounds);
     }
 
     if (options.persist_state) {
       loader_opt_ = std::move(result->loader);
-      relro_phdr_ = relro_phdr;
     }
 
     EXPECT_EQ(mem_.image().empty(), !options.commit);
@@ -126,8 +134,7 @@ class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
     ASSERT_TRUE(relro_phdr_);
     auto diag = elfldltl::testing::ExpectOkDiagnostics();
 
-    ASSERT_TRUE(loader_opt_->ProtectRelro(
-        diag, ElfLoadInfo::RelroBounds(*relro_phdr_, loader_opt_->page_size())));
+    ASSERT_TRUE(std::move(relro_).Commit(diag));
   }
 
   template <typename T>
@@ -137,7 +144,6 @@ class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
 
  private:
   using Elf = elfldltl::Elf<>;
-  using ElfLoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container>;
   using Phdr = Elf::Phdr;
   using Dyn = Elf::Dyn;
   using Sym = Elf::Sym;
@@ -167,6 +173,7 @@ class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
 
   void (*entry_)() = nullptr;
   elfldltl::DirectMemory mem_;
+  Relro relro_;
   elfldltl::SymbolInfo<Elf> sym_info_;
 
   std::optional<typename Traits::Loader> loader_opt_;
@@ -242,7 +249,7 @@ TYPED_TEST(ElfldltlLoaderTests, LargeBssSegment) {
 }
 
 TYPED_TEST(ElfldltlLoaderTests, ProtectRelroTest) {
-  ASSERT_NO_FATAL_FAILURE(this->Load(kRelro, {.commit = false, .persist_state = true}));
+  ASSERT_NO_FATAL_FAILURE(this->Load(kRelro, {.persist_state = true}));
 
   RelroData* data = this->template entry<RelroData>();
   ASSERT_NE(data, nullptr);

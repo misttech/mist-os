@@ -114,12 +114,10 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   // to find the load bias.
   if (!phdr_phdr) [[unlikely]] {
     no_phdrs();
-  } else {
-    module.link_map.addr = phdr - phdr_phdr->vaddr;
+    __builtin_unreachable();
   }
 
-  module.vaddr_start = main_executable->load_info().vaddr_start() + module.link_map.addr;
-  module.vaddr_end = module.vaddr_start + main_executable->load_info().vaddr_size();
+  SetModuleVaddrBounds(module, main_executable->load_info(), phdr - phdr_phdr->vaddr);
 
   // The module now has enough information to use ModuleMemory.  The common
   // code expects StartupModule::loader() to have the image and load bias,

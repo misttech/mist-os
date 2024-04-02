@@ -32,6 +32,56 @@ namespace elfldltl {
 /// destroyed without calling other methods.
 class VmarLoader {
  public:
+  // This is returned by Commit(), which completes the use of an VmarLoader.
+  // It represents the capability to apply RELRO protections to a loaded image.
+  // Unlike the VmarLoader object itself, its lifetime is not tied to the image
+  // mappings.  After Commit(), the image mapping won't be destroyed by the
+  // VmarLoader's destructor.
+  class Relro {
+   public:
+    Relro() = default;
+
+    // Movable, not copyable: the object represents capability ownership.
+    Relro(const Relro&) = delete;
+    Relro(Relro&&) = default;
+
+    Relro& operator=(const Relro&) = delete;
+    Relro& operator=(Relro&&) = default;
+
+    // This is the only method that can be called, and it must be last.
+    // It makes the RELRO region passed to MmapLoader::Commit read-only.
+    template <class Diagnostics>
+    [[nodiscard]] bool Commit(Diagnostics& diag) && {
+      zx::vmar vmar = std::exchange(vmar_, {});
+      if (size_ > 0) {
+        zx_status_t status = vmar.protect(ZX_VM_PERM_READ, addr_, size_);
+        if (status != ZX_OK) {
+          return diag.SystemError("cannot protect PT_GNU_RELRO region: ", ZirconError{status});
+        }
+      }
+      return true;
+    }
+
+    // Alternatively, the VMAR handle can be extracted without doing
+    // protections.
+    [[nodiscard]] zx::vmar TakeVmar() && { return std::move(vmar_); }
+
+   private:
+    friend VmarLoader;
+
+    template <class Region>
+    Relro(zx::vmar vmar, const Region& region, uintptr_t load_bias) : vmar_{std::move(vmar)} {
+      if (!region.empty()) {
+        addr_ = region.start + load_bias;
+        size_ = region.size();
+      }
+    }
+
+    zx_vaddr_t addr_ = 0;
+    size_t size_ = 0;
+    zx::vmar vmar_;
+  };
+
   // This can be specialized by the user for particular LoadInfo types passed
   // to Load().  It's constructed by Load() for each segment using the specific
   // LoadInfo::*Segment type, not the LoadInfo::Segment std::variant type, so
@@ -133,26 +183,16 @@ class VmarLoader {
   zx_vaddr_t load_bias() const { return load_bias_; }
 
   /// Commit is used to keep the mapping created by Load around even after the
-  /// VmarLoader object is destroyed. This method must be the last thing called
-  /// on the object if it is used, hence it can only be called with
-  /// `std::move(loader).Commit();`. If Commit() is not called, then loading is
-  /// aborted by destroying the VMAR when the VmarLoader object is destroyed.
-  /// Commit() returns the handle for the VMAR containing the load image. This
-  /// handle can usually be discarded, but saving makes it possible to modify
-  /// page protections after loading.
-  zx::vmar Commit() && { return std::exchange(load_image_vmar_, {}); }
-
-  /// Given a region returned by LoadInfo::RelroBounds, make that region read-only.
-  template <class Diagnostics, class Region>
-  [[nodiscard]] bool ProtectRelro(Diagnostics& diag, Region region) {
-    if (!region.empty()) {
-      zx_status_t status =
-          load_image_vmar_.protect(ZX_VM_PERM_READ, region.start + load_bias_, region.size());
-      if (status != ZX_OK) {
-        return diag.SystemError("cannot protect PT_GNU_RELRO region: ", ZirconError{status});
-      }
-    }
-    return true;
+  /// VmarLoader object is destroyed.  This method must be the last thing
+  /// called on the object if it is used, hence it can only be called with
+  /// `auto relro = std::move(loader).Commit(relro_bounds);`.  If Commit() is
+  /// not called, then loading is aborted by destroying the VMAR when the
+  /// VmarLoader object is destroyed.  Commit() returns the Relro object (see
+  /// above) that holds the VMAR handle allowing it to change page protections
+  /// of the load image.
+  template <class Region>
+  [[nodiscard]] Relro Commit(const Region& relro_bounds) && {
+    return {std::exchange(load_image_vmar_, {}), relro_bounds, load_bias()};
   }
 
  protected:

@@ -208,13 +208,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     }
   }
 
-  void ProtectRelro(Diagnostics& diag) {
-    ScopedModuleDiagnostics module_diag{diag, this->name().str()};
-    std::ignore = loader_.ProtectRelro(diag, relro_);
-  }
-
   void Relocate(Diagnostics& diag, const List& modules) {
-    ScopedModuleDiagnostics module_diag{diag, this->name().str()};
     elfldltl::RelocateRelative(diag, memory(), reloc_info(), load_bias());
     auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, kTlsDescResolver);
     elfldltl::RelocateSymbolic(memory(), diag, reloc_info(), symbol_info(), load_bias(), resolver);
@@ -231,8 +225,14 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     return count;
   }
 
-  // This must be the last method called before the StartupLoadModule is destroyed.
-  void Commit() && { std::move(loader_).Commit(); }
+  // Since later failures will be fatal anyway, we can go ahead and commit the
+  // mappings so the Loader destructor won't unmap the module.  Transferring
+  // ownership of the mappings and ending the lifetime of the Loader object is
+  // part of preparing to apply RELRO protections.  But we have no need to hold
+  // onto the Loader::Relro capability any longer.
+  void CommitAndProtectRelro(Diagnostics& diag) {
+    std::ignore = std::move(loader_).Commit(relro_).Commit(diag);
+  }
 
   List MakeList() {
     List list;
@@ -240,9 +240,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     return list;
   }
 
-  Loader& loader() { return loader_; }
-
-  decltype(auto) memory() { return loader_.memory(); }
+  // This is only valid until CommitAndProtectRelro() is called.
+  auto& memory() { return loader_.memory(); }
 
   template <typename ScratchAllocator, typename InitialExecAllocator, typename GetDepFile,
             typename... LoaderArgs>
@@ -390,8 +389,9 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
   static void RelocateModules(Diagnostics& diag, List& modules) {
     for (auto& module : modules) {
+      ScopedModuleDiagnostics module_diag{diag, module.name().str()};
       module.Relocate(diag, modules);
-      module.ProtectRelro(diag);
+      module.CommitAndProtectRelro(diag);
     }
   }
 
@@ -399,7 +399,6 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     while (!modules.is_empty()) {
       auto* module = modules.pop_front();
       diag.report().ReportModuleLoaded(*module);
-      std::move(*module).Commit();
       // The `operator delete` this calls does nothing since the scratch
       // allocator doesn't support deallocation per se since the scratch
       // memory will be deallocated en masse, but this calls destructors.

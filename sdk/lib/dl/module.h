@@ -95,7 +95,7 @@ class LoadModule {
  public:
   using Loader = typename OSImpl::Loader;
   using File = typename OSImpl::File;
-  using RelroCapability = typename OSImpl::RelroCapability;
+  using Relro = typename Loader::Relro;
   using Elf = elfldltl::Elf<>;
   using Phdr = Elf::Phdr;
   using Ehdr = Elf::Ehdr;
@@ -154,9 +154,9 @@ class LoadModule {
     // up unmap on dl::Module destruction, so for now the mapping is thrown
     // away.
     // To finalize the loaded module's mapping, OSImpl::Commit(...) will commit
-    // the loader and return the RelroCapability that is used to apply relro
+    // the loader and return the Relro object that is used to apply relro
     // protections later.
-    // relro_capability_ = OSImpl::Commit(std::move(loader));
+    // loader_relro_ = std::move(loader).Commit(relro_bounds);
 
     return true;
   }
@@ -210,7 +210,7 @@ class LoadModule {
 
   std::unique_ptr<Module> module_;
   LoadInfo load_info_;
-  RelroCapability relro_capability_;
+  Relro loader_relro_;
 };
 
 }  // namespace dl

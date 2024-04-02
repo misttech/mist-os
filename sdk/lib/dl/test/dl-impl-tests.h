@@ -26,9 +26,6 @@ class TestFuchsia {
  public:
   using File = elfldltl::VmoFile<Diagnostics>;
   using Loader = elfldltl::LocalVmarLoader;
-  using RelroCapability = zx::vmar;
-
-  static RelroCapability Commit(Loader loader) { return std::move(loader).Commit(); }
 
   static std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
 };
@@ -38,16 +35,6 @@ class TestPosix {
  public:
   using File = elfldltl::UniqueFdFile<Diagnostics>;
   using Loader = elfldltl::MmapLoader;
-  // The MmapLoader does not return anything after successfully committing to
-  // memory, and `mprotect` does not need any information from the Loader to
-  // apply relro protections. Hence the RelroCapability is an empty struct that
-  // will become a no-op to the function that performs relro protections.
-  struct RelroCapability {};
-
-  static RelroCapability Commit(Loader loader) {
-    std::move(loader).Commit();
-    return {};
-  }
 
   static std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
 };

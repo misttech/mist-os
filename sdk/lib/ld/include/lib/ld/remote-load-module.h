@@ -202,7 +202,10 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   // preserve the load image before it is garbage collected.
   void Commit() {
     assert(this->HasModule());
-    std::move(loader_).Commit();
+
+    // This returns the Loader::Relro object that holds the VMAR handle.  But
+    // we don't need it because the RELRO segment was mapped read-only anyway.
+    std::ignore = std::move(loader_).Commit(typename LoadInfo::Region{});
   }
 
   static void CommitModules(List& modules) {

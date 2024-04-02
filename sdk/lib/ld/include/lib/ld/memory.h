@@ -22,6 +22,8 @@ class ModuleMemory : public elfldltl::DirectMemory {
   explicit ModuleMemory(const Module& module)
       : elfldltl::DirectMemory{Image(module), module.vaddr_start - module.link_map.addr} {}
 
+  ModuleMemory& operator=(const ModuleMemory&) = default;
+
  private:
   template <class Module>
   static cpp20::span<std::byte> Image(const Module& module) {

@@ -72,7 +72,7 @@ void LdStartupInProcessTests::Load(std::string_view executable_name) {
   // where it loaded the test image.  This VMAR handle doesn't need to be
   // saved here, since it's a sub-VMAR of the test_vmar_ that will be
   // destroyed when this InProcessTestLaunch object dies.
-  zx::vmar load_image_vmar = std::move(result->loader).Commit();
+  zx::vmar load_image_vmar = std::move(result->loader).Commit(kNoRelro).TakeVmar();
 
   // Pass along that handle in the bootstrap message.
   ASSERT_NO_FATAL_FAILURE(procargs_.AddSelfVmar(std::move(load_image_vmar)));

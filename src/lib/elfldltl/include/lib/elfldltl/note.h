@@ -417,9 +417,9 @@ class PhdrMemoryNoteObserver
 };
 
 // Deduction guide, as for PhdrFileNoteObserver but with no allocator argument.
-template <class Elf, class File, typename... Callback>
-PhdrMemoryNoteObserver(Elf&&, File&, Callback&&...)
-    -> PhdrMemoryNoteObserver<std::decay_t<Elf>::kData, File, std::decay_t<Callback>...>;
+template <class Elf, class Memory, typename... Callback>
+PhdrMemoryNoteObserver(Elf&&, Memory&, Callback&&...)
+    -> PhdrMemoryNoteObserver<std::decay_t<Elf>::kData, Memory, std::decay_t<Callback>...>;
 
 // This returns a bool(ElfNote) callback object that can be passed to
 // elfldltl::PhdrFileNoteObserver or elfldltl::PhdrMemoryNoteObserver.  That

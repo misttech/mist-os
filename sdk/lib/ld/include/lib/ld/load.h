@@ -114,7 +114,7 @@ constexpr fit::result<bool, cpp20::span<const typename Elf::Dyn>> DecodeModuleDy
   auto read_dyn = memory.template ReadArray<Dyn>(dyn_phdr->vaddr, count);
   if (!read_dyn) [[unlikely]] {
     return fit::error{
-        diag.FormatError("cannot read", count, "entries from PT_DYNAMIC",
+        diag.FormatError("cannot read", count, " entries from PT_DYNAMIC",
                          elfldltl::FileAddress{dyn_phdr->vaddr}),
     };
   }

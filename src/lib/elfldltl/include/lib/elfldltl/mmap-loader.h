@@ -22,6 +22,50 @@ namespace elfldltl {
 
 class MmapLoader {
  public:
+  // This is returned by Commit(), which completes the use of an MmapLoader.
+  // It represents the capability to apply RELRO protections to a loaded image.
+  // Unlike the MmapLoader object itself, its lifetime is not tied to the image
+  // mappings.  After Commit(), the image mapping won't be destroyed by the
+  // MmapLoader's destructor.
+  class Relro {
+   public:
+    Relro() = default;
+
+    // Movable, not copyable: the object represents capability ownership.
+    Relro(const Relro&) = delete;
+    Relro(Relro&&) = default;
+
+    Relro& operator=(const Relro&) = delete;
+    Relro& operator=(Relro&&) = default;
+
+    // This is the only method that can be called, and it must be last.
+    // It makes the RELRO region passed to MmapLoader::Commit read-only.
+    template <class Diagnostics>
+    [[nodiscard]] bool Commit(Diagnostics& diag) && {
+      if (start_) {
+        if (mprotect(start_, size_, PROT_READ) != 0) [[unlikely]] {
+          diag.SystemError("cannot protect PT_GNU_RELRO region: ", PosixError{errno});
+          return false;
+        }
+      }
+      return true;
+    }
+
+   private:
+    friend MmapLoader;
+
+    template <class Region>
+    Relro(const Region& region, uintptr_t load_bias) {
+      if (!region.empty()) {
+        start_ = reinterpret_cast<void*>(region.start + load_bias);
+        size_ = region.size();
+      }
+    }
+
+    void* start_ = nullptr;
+    size_t size_ = 0;
+  };
+
   MmapLoader() = default;
 
   explicit MmapLoader(size_t page_size) : page_size_(page_size) {}
@@ -137,19 +181,6 @@ class MmapLoader {
     return load_info.VisitSegments(mapper);
   }
 
-  /// Given a region returned by LoadInfo::RelroBounds, make that region read-only.
-  template <class Diagnostics, class Region>
-  [[nodiscard]] bool ProtectRelro(Diagnostics& diag, Region region) {
-    if (!region.empty()) {
-      auto ptr = reinterpret_cast<void*>(region.start + load_bias());
-      if (mprotect(ptr, region.size(), PROT_READ) != 0) [[unlikely]] {
-        diag.SystemError("cannot protect PT_GNU_RELRO region: ", PosixError{errno});
-        return false;
-      }
-    }
-    return true;
-  }
-
   // After Load(), this is the bias added to the given LoadInfo::vaddr_start()
   // to find the runtime load address.
   uintptr_t load_bias() const {
@@ -162,10 +193,19 @@ class MmapLoader {
   // image() before Commit().
   DirectMemory& memory() { return memory_; }
 
-  // Commit is used to keep the mapping created by Load around even after the MmapLoader object is
-  // destroyed. This method is inherently the last thing called on the object if it is used.
-  // Use like `std::move(loader).Commit();`
-  void Commit() && { memory_.set_image({}); }
+  // Commit is used to keep the mapping created by Load around even after the
+  // MmapLoader object is destroyed.  It takes a RELRO region as returned by
+  // LoadInfo::RelroBounds, and yields a Relro object (see above).  This method
+  // is inherently the last thing called on the object if it is used.  Use like
+  // `auto relro = std::move(loader).Commit(relro_bounds);`.  After any
+  // relocation modifications to mapped segment memory, call
+  // `std::move(relro).Commit();`.
+  template <class Region>
+  [[nodiscard]] Relro Commit(const Region& relro_bounds) && {
+    Relro relro{relro_bounds, load_bias()};
+    memory_.set_image({});
+    return relro;
+  }
 
  private:
   cpp20::span<std::byte> image() const { return memory_.image(); }

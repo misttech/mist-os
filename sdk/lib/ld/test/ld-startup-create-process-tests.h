@@ -74,14 +74,14 @@ class LdStartupCreateProcessTests
     set_stack_size(result->stack_size);
 
     // The bootstrap message gets the VMAR where the dynamic linker resides.
-    zx::vmar self_vmar = std::move(result->loader).Commit();
+    zx::vmar self_vmar = std::move(result->loader).Commit(kNoRelro).TakeVmar();
     ASSERT_NO_FATAL_FAILURE(bootstrap().AddSelfVmar(std::move(self_vmar)));
 
     // Load the vDSO and record its base address.
     // No handles to the VMAR where it was loaded survive.
     ASSERT_NO_FATAL_FAILURE(this->Load(*GetVdsoVmo(), result, root_vmar()));
     set_vdso_base(result->info.vaddr_start() + result->loader.load_bias());
-    std::move(result->loader).Commit();
+    std::ignore = std::move(result->loader).Commit(kNoRelro);
 
     ASSERT_NO_FATAL_FAILURE(FinishLoad(executable_name));
   }
@@ -93,6 +93,7 @@ class LdStartupCreateProcessTests
 
  private:
   using Base = elfldltl::testing::LoadTests<elfldltl::testing::RemoteVmarLoaderTraits, Elf>;
+  using Base::kNoRelro;
   using Base::Load;
   using typename Base::LoadResult;
 };

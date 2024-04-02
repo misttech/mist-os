@@ -43,6 +43,9 @@ class ScratchPad {
   uintptr_t vdso_total_size() const { return vdso_code_offset_ + vdso_code_size_; }
 
   zx_status_t load_vdso(zx::vmar* segments_vmar = nullptr, bool really_load = true) {
+    using LoadInfo =
+        elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StdContainer<std::vector>::Container>;
+
     zx_status_t status = ZX_OK;
     auto report = [&status](auto&&... args) -> bool {
       auto check = [&status](auto arg) {
@@ -55,7 +58,7 @@ class ScratchPad {
     };
     auto diag = elfldltl::Diagnostics(report, elfldltl::DiagnosticsPanicFlags());
     elfldltl::UnownedVmoFile file(vdso_vmo.borrow(), diag);
-    elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StdContainer<std::vector>::Container> load_info;
+    LoadInfo load_info;
     elfldltl::RemoteVmarLoader loader{root_vmar()};
     auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
         diag, file, elfldltl::NewArrayFromFile<elfldltl::Elf<>::Phdr>());
@@ -75,7 +78,7 @@ class ScratchPad {
       if (loader.Load(diag, load_info, vdso_vmo.borrow())) {
         ZX_ASSERT(status == ZX_OK);
         vdso_base_ = load_info.vaddr_start() + loader.load_bias();
-        zx::vmar vmar = std::move(loader).Commit();
+        zx::vmar vmar = std::move(loader).Commit(LoadInfo::Region{}).TakeVmar();
         if (segments_vmar) {
           *segments_vmar = std::move(vmar);
         }

@@ -156,7 +156,7 @@ zx_status_t mini_process_load_vdso(zx_handle_t process, zx_handle_t vmar, uintpt
       if (entry) {
         *entry = ehdr.entry + loader.load_bias();
       }
-      std::move(loader).Commit();
+      std::ignore = std::move(loader).Commit(decltype(load_info)::Region{});
       return ZX_OK;
     }
   }
