@@ -6,7 +6,6 @@
 #define SRC_DEVICES_I2C_BIN_I2CUTIL2_H_
 
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 
 #include <vector>
 
@@ -14,14 +13,7 @@
 
 namespace i2cutil {
 
-// TODO(https://fxbug.dev/42055179): Currently there's a mismatch between the maximum
-//                         number of transactions the i2c.fidl and i2c-impl.fidl
-//                         permit.
-//                         This implementation just picks the smaller (safer) of
-//                         the two options. When the two are coalesced with one
-//                         another this can be removed.
-constexpr size_t kMaxTransactionCount =
-    std::min(fuchsia_hardware_i2c::wire::kMaxCountTransactions, I2C_IMPL_MAX_RW_OPS);
+constexpr size_t kMaxTransactionCount = fuchsia_hardware_i2c::wire::kMaxCountTransactions;
 
 zx_status_t execute(fidl::ClientEnd<fuchsia_hardware_i2c::Device> client,
                     std::vector<i2cutil::TransactionData>& transactions);
