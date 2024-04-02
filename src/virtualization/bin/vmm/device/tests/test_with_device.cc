@@ -76,11 +76,8 @@ zx_status_t TestWithDevice::MakeStartInfo(
 }
 
 diagnostics::reader::InspectData TestWithDevice::GetInspect(const std::string& selector,
-                                                         const std::string& moniker) {
-  fuchsia::diagnostics::ArchiveAccessorPtr accessor;
-  auto svc = sys::ServiceDirectory::CreateFromNamespace();
-  svc->Connect(accessor.NewRequest());
-  diagnostics::reader::ArchiveReader reader(std::move(accessor), {selector});
+                                                            const std::string& moniker) {
+  diagnostics::reader::ArchiveReader reader(dispatcher(), {selector});
   fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string> result;
   async::Executor executor(dispatcher());
   executor.schedule_task(reader.SnapshotInspectUntilPresent({moniker}).then(
