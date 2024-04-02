@@ -893,7 +893,7 @@ sdk_collection("firmware_collection") {
 
 # Tools Fuchsia driver developers used on the host platform; where host is often
 # Linux or Mac OS.
-# WARNING (https://fxbug.dev/42067830): the driver SDK will soon be removed.
+# WARNING (https://fxbug.dev/287395493): the driver SDK will soon be removed.
 # DO NOT ADD anything here!
 sdk_molecule("driver_host_tools") {
   _driver_host_tools = [
@@ -921,7 +921,7 @@ sdk_molecule("driver_host_tools") {
   }
 }
 
-# WARNING (https://fxbug.dev/42067830): the driver SDK will soon be removed.
+# WARNING (https://fxbug.dev/287395493): the driver SDK will soon be removed.
 # DO NOT ADD anything here!
 sdk_molecule("bind") {
   deps = [
@@ -936,7 +936,7 @@ pool("subbuild_pool") {
   depth = sdk_max_simultaneous_sub_builds
 }
 
-# WARNING (https://fxbug.dev/42067830): the driver SDK will soon be removed.
+# WARNING (https://fxbug.dev/287395493): the driver SDK will soon be removed.
 # DO NOT ADD anything here!
 sdk_molecule("driver_fidl") {
   deps = [

@@ -781,7 +781,7 @@ build_api_module("sdk_archives") {
   testonly = true
   data_keys = [ "sdk_archives" ]
   deps = [
-           # WARNING (https://fxbug.dev/42067830): the driver SDK will soon be removed.
+           # WARNING (https://fxbug.dev/287395493): the driver SDK will soon be removed.
            "//sdk:driver_archive",
            "//sdk:final_fuchsia_idk",
          ] + sdk_archive_labels
