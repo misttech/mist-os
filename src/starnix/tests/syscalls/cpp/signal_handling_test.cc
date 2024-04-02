@@ -661,4 +661,38 @@ TEST(SignalHandling, Sigsuspend) {
   ASSERT_EQ(0, sigprocmask(SIG_SETMASK, &old_sigset, NULL));
 }
 
+TEST(SignalHandling, RealTimeSignals) {
+  auto sig1 = SIGRTMIN;
+  auto sig2 = SIGRTMIN + 1;
+
+  sigset_t mask = {};
+  sigaddset(&mask, sig1);
+  sigaddset(&mask, sig2);
+
+  sigset_t old_mask = {};
+  sigprocmask(SIG_BLOCK, &mask, &old_mask);
+
+  auto pid = getpid();
+
+  EXPECT_EQ(sigqueue(pid, sig2, sigval{.sival_int = 1}), 0);
+  EXPECT_EQ(sigqueue(pid, sig1, sigval{.sival_int = 2}), 0);
+  EXPECT_EQ(sigqueue(pid, sig2, sigval{.sival_int = 3}), 0);
+  EXPECT_EQ(sigqueue(pid, sig1, sigval{.sival_int = 4}), 0);
+
+  // Dequeue the signals and verify that are dequeued in the right order. RT signals are expected
+  // to be ordered by signal number. Signals with the same number are handled in the order they
+  // were generated.
+  siginfo_t siginfo;
+  EXPECT_EQ(sigtimedwait(&mask, &siginfo, nullptr), sig1);
+  EXPECT_EQ(siginfo._sifields._rt.si_sigval.sival_int, 2);
+  EXPECT_EQ(sigtimedwait(&mask, &siginfo, nullptr), sig1);
+  EXPECT_EQ(siginfo._sifields._rt.si_sigval.sival_int, 4);
+  EXPECT_EQ(sigtimedwait(&mask, &siginfo, nullptr), sig2);
+  EXPECT_EQ(siginfo._sifields._rt.si_sigval.sival_int, 1);
+  EXPECT_EQ(sigtimedwait(&mask, &siginfo, nullptr), sig2);
+  EXPECT_EQ(siginfo._sifields._rt.si_sigval.sival_int, 3);
+
+  sigprocmask(SIG_SETMASK, &old_mask, nullptr);
+}
+
 }  // namespace

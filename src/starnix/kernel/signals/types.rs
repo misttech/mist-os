@@ -17,7 +17,7 @@ use starnix_uapi::{
     SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL,
     SI_MAX_SIZE,
 };
-use std::{collections::VecDeque, sync::Arc};
+use std::{cmp::Ordering, collections::VecDeque, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// `SignalActions` contains a `sigaction` for each valid signal.
@@ -143,11 +143,15 @@ pub struct SignalState {
     /// is dequeued `mask` can be reset to `saved_mask`.
     saved_mask: Option<SigSet>,
 
-    /// The queue of signals for a given task.
-    ///
-    /// There may be more than one instance of a real-time signal in the queue, but for standard
-    /// signals there is only ever one instance of any given signal.
+    /// The queue of standard signals for the task.
     queue: VecDeque<SignalInfo>,
+
+    /// Real-time signals queued for the task. Unlike standard signals there may be more than one
+    /// instance of the same real-time signal in the queue. POSIX requires real-time signals
+    /// with lower values to be delivered first. `enqueue()` ensures proper ordering when adding
+    /// new elements. There are no ordering requirements for standard signals. We always dequeue
+    /// standard signals first. This matches Linux behavior.
+    rt_queue: VecDeque<SignalInfo>,
 }
 
 impl SignalState {
@@ -190,10 +194,32 @@ impl SignalState {
     }
 
     pub fn enqueue(&mut self, siginfo: SignalInfo) {
-        if siginfo.signal.is_real_time() || !self.has_queued(siginfo.signal) {
+        if siginfo.signal.is_real_time() {
+            // Real-time signals are stored in `rt_queue` in the order they will be delivered,
+            // i.e. they sorted by the signal number. Signals with the same number must be
+            // delivered in the order they were queued. Use binary search to find the right
+            // position to insert the signal. Note that the comparator return `Less` when the
+            // signal is the same.
+            let pos = self
+                .rt_queue
+                .binary_search_by(|v| {
+                    if v.signal.number() <= siginfo.signal.number() {
+                        Ordering::Less
+                    } else {
+                        Ordering::Greater
+                    }
+                })
+                .expect_err("Invalid result from binary_search_by()");
+            self.rt_queue.insert(pos, siginfo);
+        } else {
+            // Don't queue duplicate standard signals.
+            if self.queue.iter().any(move |info| info.signal == siginfo.signal) {
+                return;
+            }
             self.queue.push_back(siginfo);
-            self.signal_wait.notify_all();
-        }
+        };
+
+        self.signal_wait.notify_all();
     }
 
     /// Used by ptrace to provide a replacement for the signal that might have been
@@ -204,7 +230,7 @@ impl SignalState {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.queue.is_empty()
+        self.queue.is_empty() && self.rt_queue.is_empty()
     }
 
     /// Finds the next queued signal where the given function returns true, removes it from the
@@ -213,9 +239,14 @@ impl SignalState {
     where
         F: Fn(&SignalInfo) -> bool,
     {
-        // Find the first non-blocked signal
-        let index = self.queue.iter().position(predicate)?;
-        self.queue.remove(index)
+        // Find the first non-blocked signal.
+        if let Some(index) = self.queue.iter().position(&predicate) {
+            return self.queue.remove(index);
+        }
+        if let Some(index) = self.rt_queue.iter().position(predicate) {
+            return self.rt_queue.remove(index);
+        }
+        None
     }
 
     /// Returns whether any signals are pending (queued and not blocked).
@@ -226,15 +257,27 @@ impl SignalState {
     /// Returns whether any signals are queued and not blocked by the given mask.
     pub fn is_any_allowed_by_mask(&self, mask: SigSet) -> bool {
         self.queue.iter().any(|sig| !mask.has_signal(sig.signal))
+            || self.rt_queue.iter().any(|sig| !mask.has_signal(sig.signal))
     }
 
     /// Iterates over queued signals with the given number.
     fn iter_queued_by_number(&self, signal: Signal) -> impl Iterator<Item = &SignalInfo> {
-        self.queue.iter().filter(move |info| info.signal == signal)
+        [&self.queue, &self.rt_queue]
+            .into_iter()
+            .flatten()
+            .filter(move |info| info.signal == signal)
+            .into_iter()
     }
 
     pub fn pending(&self) -> SigSet {
-        self.queue.iter().fold(SigSet::default(), |set, signal| set | signal.signal.into())
+        let mut pending = SigSet::default();
+        for signal in &self.queue {
+            pending = pending | signal.signal.into();
+        }
+        for signal in &self.rt_queue {
+            pending = pending | signal.signal.into();
+        }
+        pending
     }
 
     /// Tests whether a signal with the given number is in the queue.
@@ -243,7 +286,7 @@ impl SignalState {
     }
 
     pub fn num_queued(&self) -> usize {
-        self.queue.len()
+        self.queue.len() + self.rt_queue.len()
     }
 
     #[cfg(test)]
