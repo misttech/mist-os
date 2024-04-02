@@ -269,6 +269,11 @@ impl SecurityServer {
         self.state.lock().policy.as_ref().map_or(Vec::new(), |p| p.binary.clone())
     }
 
+    /// Returns true if a policy has been loaded.
+    pub fn has_policy(&self) -> bool {
+        self.state.lock().policy.is_some()
+    }
+
     /// Set to enforcing mode if `enforce` is true, permissive mode otherwise.
     pub fn set_enforcing(&self, enforcing: bool) {
         self.with_state_and_update_status(|state| state.enforcing = enforcing);
