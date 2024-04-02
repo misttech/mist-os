@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use alloc::sync::Arc;
+
 use packet_formats::ip::IpExt;
 
 use crate::{packets::TransportPacket, IpPacket, MaybeTransportPacket};
@@ -50,6 +52,133 @@ impl<I: IpExt> Tuple<I> {
             dst_port_or_id: self.src_port_or_id,
         }
     }
+}
+
+/// The direction of a packet when compared to the given connection.
+#[derive(Debug)]
+pub(crate) enum ConnectionDirection {
+    /// The packet is traveling in the same direction as the first packet seen
+    /// for the [`Connection`].
+    Original,
+
+    /// The packet is traveling in the opposite direction from the first packet
+    /// seen for the [`Connection`].
+    Reply,
+}
+
+/// A `Connection` contains all of the information about a single connection
+/// tracked by conntrack.
+#[derive(Debug)]
+#[allow(dead_code)]
+pub enum Connection<I: IpExt, E> {
+    /// A connection that is directly owned by the packet that originated the
+    /// connection and no others. All fields are modifiable.
+    Exclusive(ConnectionExclusive<I, E>),
+
+    /// This is an existing connection, and there are possibly many other
+    /// packets that are concurrently modifying it.
+    Shared(Arc<ConnectionShared<I, E>>),
+}
+
+#[allow(dead_code)]
+impl<I: IpExt, E> Connection<I, E> {
+    /// Returns the tuple of the original direction of this connection
+    pub(crate) fn original_tuple(&self) -> &Tuple<I> {
+        match self {
+            Connection::Exclusive(c) => &c.inner.original_tuple,
+            Connection::Shared(c) => &c.inner.original_tuple,
+        }
+    }
+
+    /// Returns the tuple of the reply direction of this connection.
+    pub(crate) fn reply_tuple(&self) -> &Tuple<I> {
+        match self {
+            Connection::Exclusive(c) => &c.inner.reply_tuple,
+            Connection::Shared(c) => &c.inner.reply_tuple,
+        }
+    }
+
+    /// Returns a reference to the [`Connection::external_data`] field.
+    pub(crate) fn external_data(&self) -> &E {
+        match self {
+            Connection::Exclusive(c) => &c.inner.external_data,
+            Connection::Shared(c) => &c.inner.external_data,
+        }
+    }
+
+    /// Returns the direction the tuple represents with respect to the
+    /// connection.
+    pub(crate) fn direction(&self, tuple: &Tuple<I>) -> Option<ConnectionDirection> {
+        let (original, reply) = match self {
+            Connection::Exclusive(c) => (&c.inner.original_tuple, &c.inner.reply_tuple),
+            Connection::Shared(c) => (&c.inner.original_tuple, &c.inner.reply_tuple),
+        };
+
+        if tuple == original {
+            Some(ConnectionDirection::Original)
+        } else if tuple == reply {
+            Some(ConnectionDirection::Reply)
+        } else {
+            None
+        }
+    }
+}
+
+/// Fields common to both [`ConnectionExclusive`] and [`ConnectionShared`].
+#[derive(Debug)]
+pub(crate) struct ConnectionCommon<I: IpExt, E> {
+    /// The 5-tuple for the connection in the original direction. This is
+    /// arbitrary, and is just the direction where a packet was first seen.
+    pub(crate) original_tuple: Tuple<I>,
+
+    /// The 5-tuple for the connection in the reply direction. This is what's
+    /// used for packet rewriting for NAT.
+    pub(crate) reply_tuple: Tuple<I>,
+
+    /// Extra information that is not needed by the conntrack module itself. In
+    /// the case of NAT, we expect this to contain things such as the kind of
+    /// rewriting that will occur (e.g. SNAT vs DNAT).
+    pub(crate) external_data: E,
+}
+
+/// A conntrack connection with single ownership.
+///
+/// Because of this, many fields may be updated without synchronization. There
+/// is no chance of messing with other packets for this connection or ending up
+/// out-of-sync with the table (e.g. by changing the tuples once the connection
+/// has been inserted).
+#[derive(Debug)]
+pub(crate) struct ConnectionExclusive<I: IpExt, E> {
+    pub(crate) inner: ConnectionCommon<I, E>,
+}
+
+#[allow(dead_code)]
+impl<I: IpExt, E> ConnectionExclusive<I, E> {
+    /// Turn this exclusive connection into a shared one. This is required in
+    /// order to insert into the [`Table`] table.
+    fn make_shared(self) -> Arc<ConnectionShared<I, E>> {
+        Arc::new(ConnectionShared { inner: self.inner })
+    }
+}
+
+impl<I: IpExt, E: Default> From<Tuple<I>> for ConnectionExclusive<I, E> {
+    fn from(original_tuple: Tuple<I>) -> Self {
+        let reply_tuple = original_tuple.clone().invert();
+
+        Self {
+            inner: ConnectionCommon { original_tuple, reply_tuple, external_data: E::default() },
+        }
+    }
+}
+
+/// A conntrack connection with shared ownership.
+///
+/// All fields are private, because other packets, and the conntrack table
+/// itself, will be depending on them not to change. Fields must be accessed
+/// through the associated methods.
+#[derive(Debug)]
+pub(crate) struct ConnectionShared<I: IpExt, E> {
+    inner: ConnectionCommon<I, E>,
 }
 
 #[cfg(test)]
@@ -154,5 +283,102 @@ mod tests {
 
         let tuple = Tuple::from_packet(&packet);
         assert_matches!(tuple, None);
+    }
+
+    #[ip_test]
+    #[test_case(IpProto::Udp)]
+    #[test_case(IpProto::Tcp)]
+    fn connection_from_tuple<I: Ip + IpExt + TestIpExt>(protocol: IpProto) {
+        let original_tuple = Tuple::<I> {
+            protocol: protocol.into(),
+            src_addr: I::SRC_ADDR,
+            dst_addr: I::DST_ADDR,
+            src_port_or_id: I::SRC_PORT,
+            dst_port_or_id: I::DST_PORT,
+        };
+        let reply_tuple = original_tuple.clone().invert();
+
+        let connection: ConnectionExclusive<I, ()> = original_tuple.clone().into();
+
+        assert_eq!(&connection.inner.original_tuple, &original_tuple);
+        assert_eq!(&connection.inner.reply_tuple, &reply_tuple);
+    }
+
+    #[ip_test]
+    fn connection_make_shared_has_same_underlying_info<I: Ip + IpExt + TestIpExt>() {
+        let original_tuple = Tuple::<I> {
+            protocol: I::Proto::from(IpProto::Tcp),
+            src_addr: I::SRC_ADDR,
+            dst_addr: I::DST_ADDR,
+            src_port_or_id: I::SRC_PORT,
+            dst_port_or_id: I::DST_PORT,
+        };
+        let reply_tuple = original_tuple.clone().invert();
+
+        let mut connection: ConnectionExclusive<I, u32> = original_tuple.clone().into();
+        connection.inner.external_data = 1234;
+        let shared = connection.make_shared();
+
+        assert_eq!(shared.inner.original_tuple, original_tuple);
+        assert_eq!(shared.inner.reply_tuple, reply_tuple);
+        assert_eq!(shared.inner.external_data, 1234);
+    }
+
+    enum ConnectionKind {
+        Exclusive,
+        Shared,
+    }
+
+    #[ip_test]
+    #[test_case(ConnectionKind::Exclusive)]
+    #[test_case(ConnectionKind::Shared)]
+    fn connection_getters<I: Ip + IpExt + TestIpExt>(connection_kind: ConnectionKind) {
+        let original_tuple = Tuple::<I> {
+            protocol: I::Proto::from(IpProto::Tcp),
+            src_addr: I::SRC_ADDR,
+            dst_addr: I::DST_ADDR,
+            src_port_or_id: I::SRC_PORT,
+            dst_port_or_id: I::DST_PORT,
+        };
+        let reply_tuple = original_tuple.clone().invert();
+
+        let mut connection: ConnectionExclusive<I, u32> = original_tuple.clone().into();
+        connection.inner.external_data = 1234;
+
+        let connection = match connection_kind {
+            ConnectionKind::Exclusive => Connection::Exclusive(connection),
+            ConnectionKind::Shared => Connection::Shared(connection.make_shared()),
+        };
+
+        assert_eq!(connection.original_tuple(), &original_tuple);
+        assert_eq!(connection.reply_tuple(), &reply_tuple);
+        assert_eq!(connection.external_data(), &1234);
+    }
+
+    #[ip_test]
+    #[test_case(ConnectionKind::Exclusive)]
+    #[test_case(ConnectionKind::Shared)]
+    fn connection_direction<I: Ip + IpExt + TestIpExt>(connection_kind: ConnectionKind) {
+        let original_tuple = Tuple::<I> {
+            protocol: I::Proto::from(IpProto::Tcp),
+            src_addr: I::SRC_ADDR,
+            dst_addr: I::DST_ADDR,
+            src_port_or_id: I::SRC_PORT,
+            dst_port_or_id: I::DST_PORT,
+        };
+        let reply_tuple = original_tuple.clone().invert();
+
+        let mut other_tuple = original_tuple.clone();
+        other_tuple.src_port_or_id += 1;
+
+        let connection: ConnectionExclusive<I, ()> = original_tuple.clone().into();
+        let connection = match connection_kind {
+            ConnectionKind::Exclusive => Connection::Exclusive(connection),
+            ConnectionKind::Shared => Connection::Shared(connection.make_shared()),
+        };
+
+        assert_matches!(connection.direction(&original_tuple), Some(ConnectionDirection::Original));
+        assert_matches!(connection.direction(&reply_tuple), Some(ConnectionDirection::Reply));
+        assert_matches!(connection.direction(&other_tuple), None);
     }
 }
