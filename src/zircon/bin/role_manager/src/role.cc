@@ -2,57 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.kernel/cpp/wire.h>
+#include "role.h"
+
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/component/incoming/cpp/protocol.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/syscalls/profile.h>
 
-#include "zircon/syscalls/profile.h"
+#include "resource.h"
 #include "zircon/system/ulib/profile/config.h"
 
-namespace {
-
-constexpr char kConfigPath[] = "/config/profiles";
-
-using zircon_profile::ConfiguredProfiles;
 using zircon_profile::Role;
 
-zx::result<zx::resource> GetSystemProfileResource() {
-  zx::result client = component::Connect<fuchsia_kernel::ProfileResource>();
-  if (client.is_error()) {
-    return client.take_error();
-  }
-  fidl::WireResult result = fidl::WireCall(*client)->Get();
-  if (result.status() != ZX_OK) {
-    return zx::error(result.status());
-  }
-  return zx::ok(std::move(result.value().resource));
-}
-
-class RoleManager : public fidl::WireServer<fuchsia_scheduler::RoleManager> {
- public:
-  static zx::result<std::unique_ptr<RoleManager>> Create();
-  void SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_scheduler::RoleManager> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override;
-
- private:
-  // Makes a best effort attempt to log the request to the syslog if a sufficient log level has
-  // been specified.
-  void LogRequest(SetRoleRequestView request);
-
-  RoleManager(zx::resource profile_resource, ConfiguredProfiles profiles)
-      : profile_resource_(std::move(profile_resource)), profiles_(std::move(profiles)) {}
-  zx::resource profile_resource_;
-  ConfiguredProfiles profiles_;
-};
+constexpr char kConfigPath[] = "/config/profiles";
 
 zx::result<std::unique_ptr<RoleManager>> RoleManager::Create() {
   auto profile_resource_result = GetSystemProfileResource();
@@ -200,38 +166,4 @@ void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& co
   FX_SLOG(DEBUG, "Requested role not found", FX_KV("role", role->name()),
           FX_KV("tag", "RoleManager"));
   completer.ReplyError(ZX_ERR_NOT_FOUND);
-}
-
-}  // namespace
-
-int main(int argc, const char** argv) {
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  async_dispatcher_t* dispatcher = loop.dispatcher();
-
-  zx::result create_result = RoleManager::Create();
-  if (create_result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to create role manager service: " << create_result.status_string();
-    return -1;
-  }
-  std::unique_ptr<RoleManager> role_manager_service = std::move(create_result.value());
-
-  component::OutgoingDirectory outgoing = component::OutgoingDirectory(dispatcher);
-  zx::result result =
-      outgoing.AddProtocol<fuchsia_scheduler::RoleManager>(std::move(role_manager_service));
-  if (result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to add RoleManager protocol: " << result.status_string();
-    return -1;
-  }
-
-  result = outgoing.ServeFromStartupInfo();
-  if (result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << result.status_string();
-    return -1;
-  }
-  FX_LOGS(INFO) << "Starting role manager\n";
-  zx_status_t status = loop.Run();
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to run async loop: " << zx_status_get_string(status);
-  }
-  return 0;
 }

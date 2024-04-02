@@ -6,7 +6,13 @@ import("//build/components.gni")
 
 executable("bin") {
   output_name = "role_manager"
-  sources = [ "src/role.cc" ]
+  sources = [
+    "src/main.cc",
+    "src/resource.cc",
+    "src/resource.h",
+    "src/role.cc",
+    "src/role.h",
+  ]
   deps = [
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
