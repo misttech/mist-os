@@ -67,6 +67,11 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
   CompleteTxn(completer, ret_status);
 }
 
+void UsbAdbDevice::Stop(StopCompleter::Sync& completer) {
+  Stop();
+  completer.Reply(fit::ok());
+}
+
 void UsbAdbDevice::Stop() {
   // Disable endpoints to prevent new requests present in our pipeline from getting queued.
   ConfigureEndpoints(false);

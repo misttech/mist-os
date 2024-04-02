@@ -54,6 +54,9 @@ closed protocol Device {
     strict Start(resource struct {
         interface server_end:UsbAdbImpl;
     }) -> () error zx.Status;
+
+    /// Stops USB ADB protocol.
+    strict Stop() -> () error zx.Status;
 };
 
 /// A Provider is a provider for one service which interacts with the adb component to implement

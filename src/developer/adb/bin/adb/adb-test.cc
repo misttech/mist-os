@@ -197,6 +197,8 @@ class FakeAdbDriver {
       completer.Reply(fit::success());
     }
 
+    void Stop(StopCompleter::Sync& completer) override { completer.Reply(fit::success()); }
+
    private:
     friend class FakeAdbDriver;
     UsbAdbImplServer* impl_;

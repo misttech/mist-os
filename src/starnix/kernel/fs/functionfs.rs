@@ -121,12 +121,15 @@ struct FunctionFsState {
     // FIDL bindings to the Adb driver, for reading and writing to a device.
     adb_proxy: Option<AdbHandle>,
 
+    // FIDL binding to the adb driver, for start and stop calls.
+    device_proxy: Option<fadb::DeviceSynchronousProxy>,
+
     // FunctionFs events that indicate the connection state, to be read through
     // the control endpoint.
     event_queue: VecDeque<usb_functionfs_event>,
 }
 
-fn connect_to_device() -> Result<AdbHandle, Errno> {
+fn connect_to_device() -> Result<(fadb::DeviceSynchronousProxy, AdbHandle), Errno> {
     let mut dir = std::fs::read_dir(ADB_DIRECTORY).map_err(|_| errno!(EINVAL))?;
 
     if let Some(Ok(entry)) = dir.next() {
@@ -143,7 +146,7 @@ fn connect_to_device() -> Result<AdbHandle, Errno> {
             .map_err(|_| errno!(EINVAL))?
             .map_err(|_| errno!(EINVAL))?;
 
-        return Ok(Arc::new(adb_proxy));
+        return Ok((device_proxy, Arc::new(adb_proxy)));
     }
     error!(EBUSY)
 }
@@ -162,7 +165,9 @@ impl FunctionFsRootDir {
         if state.has_input_output_endpoints {
             return Ok(());
         }
-        state.adb_proxy = Some(connect_to_device()?);
+        let result = connect_to_device()?;
+        state.device_proxy = Some(result.0);
+        state.adb_proxy = Some(result.1);
         state.has_input_output_endpoints = true;
 
         // Currently FunctionFS assumes the device is always online.
@@ -192,6 +197,13 @@ impl FunctionFsRootDir {
             state.has_input_output_endpoints = false;
             state.adb_proxy = None;
             state.event_queue.clear();
+
+            let _ = state
+                .device_proxy
+                .as_ref()
+                .expect("Device Proxy is required")
+                .stop(zx::Time::INFINITE)
+                .map_err(|_| errno!(EINVAL));
         }
     }
 

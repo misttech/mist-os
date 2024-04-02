@@ -75,6 +75,7 @@ class UsbAdbDevice : public UsbAdb,
 
   // fadb::Device methods.
   void Start(StartRequestView request, StartCompleter::Sync& completer) override;
+  void Stop(StopCompleter::Sync& completer) override;
 
   // Helper method called when fadb::Device closes.
   void Stop();
