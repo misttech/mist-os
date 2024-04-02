@@ -143,34 +143,23 @@ async fn read_components_single_selector() -> Result<(), Error> {
 #[fuchsia::test]
 async fn unified_reader() -> Result<(), Error> {
     let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
-        puppets: Some(vec![
-            test_topology::PuppetDeclBuilder::new("puppet_inspect_sink").into(),
-            test_topology::PuppetDeclBuilder::new("puppet_diagnostics_dir_methods")
-                .publish_inspect_with_deprecated_apis(true)
-                .into(),
-        ]),
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new("puppet").into()]),
         ..Default::default()
     })
     .await
     .expect("create realm");
 
-    let puppet1 =
-        test_topology::connect_to_puppet(&realm_proxy, "puppet_inspect_sink").await.unwrap();
-    let puppet2 = test_topology::connect_to_puppet(&realm_proxy, "puppet_diagnostics_dir_methods")
-        .await
-        .unwrap();
+    let puppet = test_topology::connect_to_puppet(&realm_proxy, "puppet").await.unwrap();
 
-    puppet1.emit_example_inspect_data().unwrap();
-    puppet2.emit_example_inspect_data().unwrap();
+    puppet.emit_example_inspect_data().unwrap();
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
     // The following hierarchies are expected:
-    //  - puppet_inspect_sink: 1 hierarchy published with InspectSink
-    //  - puppet_diagnostics_dir_methods: 1 VMO, 1 Tree, 1 deprecated Inspect hierarchies
+    //  - puppet1: 1 hierarchy published with InspectSink
     //  - archivist: archivist own hierarchy
-    const ALL_INSPECT_ENTRIES: usize = 5;
+    const ALL_INSPECT_ENTRIES: usize = 2;
     retrieve_and_validate_results(accessor, Vec::new(), &UNIFIED_ALL_GOLDEN, ALL_INSPECT_ENTRIES)
         .await;
 
@@ -231,7 +220,7 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
     let accessor = connect_to_feedback_accessor(&instance);
-    retrieve_and_validate_results(accessor, Vec::new(), &PIPELINE_ALL_GOLDEN, 3).await;
+    retrieve_and_validate_results(accessor, Vec::new(), &PIPELINE_ALL_GOLDEN, 1).await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
     let accessor = connect_to_feedback_accessor(&instance);
@@ -239,13 +228,13 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
         accessor,
         vec!["test_component:*:lazy-*"],
         &PIPELINE_SINGLE_VALUE_GOLDEN,
-        3,
+        1,
     )
     .await;
 
     // Then verify that subtree selection retrieves all trees under and including root.
     let accessor = connect_to_feedback_accessor(&instance);
-    retrieve_and_validate_results(accessor, vec!["test_component:root"], &PIPELINE_ALL_GOLDEN, 3)
+    retrieve_and_validate_results(accessor, vec!["test_component:root"], &PIPELINE_ALL_GOLDEN, 1)
         .await;
 
     // Then verify that client selectors dont override the static selectors provided
@@ -255,11 +244,11 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
         accessor,
         vec![r"test_component:root:array\:0x15"],
         &PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
-        3,
+        1,
     )
     .await;
 
-    assert!(pipeline_is_filtered(instance, 3, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(pipeline_is_filtered(instance, 1, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }
@@ -282,7 +271,7 @@ async fn feedback_disabled_pipeline() -> Result<(), Error> {
         .expect("add child a");
 
     let instance = builder.build().await.expect("create instance");
-    assert!(!pipeline_is_filtered(instance, 3, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(!pipeline_is_filtered(instance, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }
@@ -298,7 +287,7 @@ async fn feedback_pipeline_missing_selectors() -> Result<(), Error> {
 
     let instance = builder.build().await.expect("create instance");
 
-    assert!(!pipeline_is_filtered(instance, 3, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(!pipeline_is_filtered(instance, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }
@@ -323,7 +312,7 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
     let accessor = connect_to_lowpan_accessor(&instance);
-    retrieve_and_validate_results(accessor, Vec::new(), &PIPELINE_ALL_GOLDEN, 3).await;
+    retrieve_and_validate_results(accessor, Vec::new(), &PIPELINE_ALL_GOLDEN, 1).await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
     let accessor = connect_to_lowpan_accessor(&instance);
@@ -331,13 +320,13 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
         accessor,
         vec!["test_component:*:lazy-*"],
         &PIPELINE_SINGLE_VALUE_GOLDEN,
-        3,
+        1,
     )
     .await;
 
     // Then verify that subtree selection retrieves all trees under and including root.
     let accessor = connect_to_lowpan_accessor(&instance);
-    retrieve_and_validate_results(accessor, vec!["test_component:root"], &PIPELINE_ALL_GOLDEN, 3)
+    retrieve_and_validate_results(accessor, vec!["test_component:root"], &PIPELINE_ALL_GOLDEN, 1)
         .await;
 
     // Then verify that client selectors dont override the static selectors provided
@@ -347,11 +336,11 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
         accessor,
         vec![r"test_component:root:array\:0x15"],
         &PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
-        3,
+        1,
     )
     .await;
 
-    assert!(pipeline_is_filtered(instance, 3, constants::LOWPAN_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(pipeline_is_filtered(instance, 1, constants::LOWPAN_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }

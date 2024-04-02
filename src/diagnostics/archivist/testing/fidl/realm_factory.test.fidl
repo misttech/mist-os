@@ -23,11 +23,6 @@ type ArchivistConfig = table {
 type PuppetDecl = table {
     /// The child name this puppet should have in the test realm.
     1: name fuchsia.component.child_name;
-
-    // Whether the puppet serves inspect data using fuchsia.inspect.deprecated.inspect.Inspect.
-    //
-    // Defaults to false.
-    2: publish_inspect_with_deprecated_apis bool;
 };
 
 /// RealmOptions tells the RealmFactory protocol how to create the test realm.

@@ -19,14 +19,8 @@ pub enum EventError {
     #[error("received an invalid event type {0:?}")]
     InvalidEventType(fcomponent::EventType),
 
-    #[error("missing diagnostics directory in DirectoryReady payload")]
-    MissingDiagnosticsDir,
-
     #[error("missing `{0}`")]
     MissingField(&'static str),
-
-    #[error("Error converting node to directory: {0:?}")]
-    NodeToDirectory(#[source] anyhow::Error),
 
     #[error("received an unknown event result {0:?}")]
     UnknownResult(fcomponent::EventPayload),
