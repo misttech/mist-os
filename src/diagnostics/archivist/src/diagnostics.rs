@@ -45,9 +45,7 @@ lazy_static! {
 
 pub struct AccessorStats {
     /// Inspect node for tracking usage/health metrics of diagnostics platform.
-    // TODO(https://fxbug.dev/332406747): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub node: Node,
+    _node: Node,
 
     /// Metrics aggregated across all client connections.
     pub global_stats: Arc<GlobalAccessorStats>,
@@ -82,7 +80,7 @@ impl AccessorStats {
         let logs_stats = Arc::new(GlobalConnectionStats::new(node.create_child("logs")));
 
         AccessorStats {
-            node,
+            _node: node,
             global_stats: Arc::new(GlobalAccessorStats {
                 connections_opened,
                 connections_closed,
