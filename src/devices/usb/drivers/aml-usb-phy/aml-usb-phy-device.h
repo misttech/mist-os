@@ -51,9 +51,10 @@ class AmlUsbPhyDevice : public fdf::DriverBase {
   ChildNode xhci_{this, "xhci", PDEV_DID_USB_XHCI_COMPOSITE};
   ChildNode dwc2_{this, "dwc2", PDEV_DID_USB_DWC2};
 
- private:
-  friend class AmlUsbPhyTest;
+  // For testing.
+  std::unique_ptr<AmlUsbPhy>& device() { return device_; }
 
+ private:
   zx::result<> CreateNode();
 
   // Virtual for testing.

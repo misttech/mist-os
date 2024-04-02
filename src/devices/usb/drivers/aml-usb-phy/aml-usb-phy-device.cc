@@ -304,19 +304,6 @@ zx::result<> AmlUsbPhyDevice::Start() {
                                         parsed_metadata.pll_settings, std::move(*usbctrl_mmio),
                                         std::move(irq), std::move(usbphy2), std::move(usbphy3));
 
-  // Serve fuchsia_hardware_usb_phy.
-  {
-    auto result = outgoing()->AddService<fuchsia_hardware_usb_phy::Service>(
-        fuchsia_hardware_usb_phy::Service::InstanceHandler({
-            .device = bindings_.CreateHandler(device_.get(), fdf::Dispatcher::GetCurrent()->get(),
-                                              fidl::kIgnoreBindingClosure),
-        }));
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to add Device service %s", result.status_string());
-      return zx::error(result.status_value());
-    }
-  }
-
   {
     auto result = CreateNode();
     if (result.is_error()) {
@@ -369,6 +356,18 @@ AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator++() {
   count_++;
   if (count_ != 1) {
     return *this;
+  }
+
+  // Serve fuchsia_hardware_usb_phy.
+  {
+    auto result = parent_->outgoing()->AddService<fuchsia_hardware_usb_phy::Service>(
+        fuchsia_hardware_usb_phy::Service::InstanceHandler({
+            .device = parent_->bindings_.CreateHandler(parent_->device_.get(),
+                                                       fdf::Dispatcher::GetCurrent()->get(),
+                                                       fidl::kIgnoreBindingClosure),
+        }),
+        name_);
+    ZX_ASSERT_MSG(result.is_ok(), "Failed to add Device service %s", result.status_string());
   }
 
   {
@@ -431,6 +430,12 @@ AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator--() {
     controller_.TakeClientEnd().reset();
   }
   compat_server_.reset();
+  {
+    auto result = parent_->outgoing()->RemoveService<fuchsia_hardware_usb_phy::Service>(name_);
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to remove Device service %s", result.status_string());
+    }
+  }
   return *this;
 }
 

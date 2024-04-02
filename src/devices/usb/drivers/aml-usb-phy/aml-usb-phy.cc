@@ -257,8 +257,10 @@ zx_status_t AmlUsbPhy::Init() {
 // PHY tuning based on connection state
 void AmlUsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
                                      ConnectStatusChangedCompleter::Sync& completer) {
-  if (dwc2_connected_ == request.connected())
+  if (dwc2_connected_ == request.connected()) {
+    completer.Reply(fit::ok());
     return;
+  }
 
   for (auto& phy : usbphy2_) {
     if (phy.phy_mode() != UsbMode::PERIPHERAL) {
@@ -275,6 +277,7 @@ void AmlUsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
   }
 
   dwc2_connected_ = request.connected();
+  completer.Reply(fit::ok());
 }
 
 }  // namespace aml_usb_phy

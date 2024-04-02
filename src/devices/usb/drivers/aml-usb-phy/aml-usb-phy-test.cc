@@ -38,9 +38,10 @@ class FakeMmio {
 
   fdf::MmioBuffer mmio() { return region_.GetMmioBuffer(); }
 
+  uint64_t reg_values_[kRegisterCount] = {0};
+
  private:
   ddk_fake::FakeMmioRegRegion region_;
-  uint64_t reg_values_[kRegisterCount] = {0};
 };
 
 class FakePDev : public fidl::testing::WireTestBase<fuchsia_hardware_platform_device::Device> {
@@ -93,6 +94,9 @@ class TestAmlUsbPhyDevice : public AmlUsbPhyDevice {
         fdf_internal::DriverServer<TestAmlUsbPhyDevice>::destroy);
   }
 
+  bool dwc2_connected() { return device()->dwc2_connected(); }
+  FakeMmio& usbctrl_mmio() { return mmio_[0]; }
+
  private:
   zx::result<fdf::MmioBuffer> MapMmio(
       const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev,
@@ -128,12 +132,11 @@ class AmlUsbPhyTest : public zxtest::Test {
     };
 
     fuchsia_driver_framework::DriverStartArgs start_args;
-    fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
     incoming_.SyncCall([&](IncomingNamespace* incoming) {
       auto start_args_result = incoming->node_.CreateStartArgsAndServe();
       ASSERT_TRUE(start_args_result.is_ok());
       start_args = std::move(start_args_result->start_args);
-      outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
+      outgoing_ = std::move(start_args_result->outgoing_directory_client);
 
       auto init_result =
           incoming->env_.Initialize(std::move(start_args_result->incoming_directory_server));
@@ -199,10 +202,7 @@ class AmlUsbPhyTest : public zxtest::Test {
   // This method fires the irq and then waits for the side effects of SetMode to have taken place.
   void TriggerInterruptAndCheckMode(UsbMode mode) {
     // Switch to appropriate mode. This will be read by the irq thread.
-    USB_R5_V2::Get()
-        .FromValue(0)
-        .set_iddig_curr(mode == UsbMode::PERIPHERAL)
-        .WriteTo(&dut_->device_->usbctrl_mmio_);
+    dut_->usbctrl_mmio().reg_values_[USB_R5_OFFSET >> 2] = (mode == UsbMode::PERIPHERAL) << 6;
     // Wake up the irq thread.
     incoming_.SyncCall([](IncomingNamespace* incoming) {
       incoming->pdev_server.irq().trigger(0, zx::clock::get_monotonic());
@@ -210,10 +210,10 @@ class AmlUsbPhyTest : public zxtest::Test {
     runtime_.RunUntilIdle();
 
     // Check that mode is as expected.
-    auto& phy = dut_->device_;
-    EXPECT_EQ(phy->usbphy2_[0].phy_mode(), UsbMode::HOST);
-    EXPECT_EQ(phy->usbphy2_[1].phy_mode(), mode);
-    EXPECT_EQ(phy->usbphy3_[0].phy_mode(), UsbMode::HOST);
+    auto& phy = dut_->device();
+    EXPECT_EQ(phy->usbphy(UsbProtocol::Usb2_0, 0)->phy_mode(), UsbMode::HOST);
+    EXPECT_EQ(phy->usbphy(UsbProtocol::Usb2_0, 1)->phy_mode(), mode);
+    EXPECT_EQ(phy->usbphy(UsbProtocol::Usb3_0, 0)->phy_mode(), UsbMode::HOST);
   }
 
   void CheckDevices(fdf_testing::TestNode* test_node, std::vector<std::string> devices) {
@@ -238,8 +238,7 @@ class AmlUsbPhyTest : public zxtest::Test {
   fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{
       env_dispatcher_->async_dispatcher(), std::in_place};
-
- private:
+  fidl::ClientEnd<fuchsia_io::Directory> outgoing_;
   fdf_testing::DriverUnderTest<TestAmlUsbPhyDevice> dut_{
       TestAmlUsbPhyDevice::GetDriverRegistration()};
 };
@@ -273,6 +272,44 @@ TEST_F(AmlUsbPhyTest, SetMode) {
   TriggerInterruptAndCheckMode(UsbMode::HOST);
   // The dwc2 device should be removed.
   CheckDevices(phy, {"xhci"});
+}
+
+TEST_F(AmlUsbPhyTest, ConnectStatusChanged) {
+  fdf_testing::TestNode* phy;
+  runtime_.RunUntil(
+      [this]() {
+        return incoming_.SyncCall(
+            [&](IncomingNamespace* incoming) { return incoming->node_.children().size() == 1; });
+      },
+      zx::usec(1000));
+  incoming_.SyncCall([&](IncomingNamespace* incoming) {
+    // The aml_usb_phy device should be added.
+    ASSERT_EQ(incoming->node_.children().size(), 1);
+    ASSERT_NE(incoming->node_.children().find("aml_usb_phy"), incoming->node_.children().end());
+    phy = &incoming->node_.children().at("aml_usb_phy");
+  });
+  CheckDevices(phy, {"xhci"});
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(endpoints);
+  auto status = fdio_open_at(outgoing_.handle()->get(), "/svc",
+                             static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                             endpoints->server.TakeChannel().release());
+  ASSERT_OK(status);
+
+  auto result = fdf::internal::DriverTransportConnect<fuchsia_hardware_usb_phy::Service::Device>(
+      endpoints->client, "xhci");
+  ASSERT_OK(result);
+
+  runtime_.PerformBlockingWork([&result]() {
+    fdf::Arena arena('TEST');
+    fdf::WireUnownedResult wire_result =
+        fdf::WireCall(*result).buffer(arena)->ConnectStatusChanged(true);
+    ASSERT_OK(wire_result.status());
+    ASSERT_TRUE(wire_result.value().is_ok());
+  });
+
+  EXPECT_TRUE(dut_->dwc2_connected());
 }
 
 }  // namespace aml_usb_phy

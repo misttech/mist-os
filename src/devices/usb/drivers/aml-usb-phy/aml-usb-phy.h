@@ -45,9 +45,15 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
     FDF_LOG(ERROR, "Unknown method %lu", metadata.method_ordinal);
   }
 
+  // For testing.
+  bool dwc2_connected() const { return dwc2_connected_; }
+  UsbPhyBase* usbphy(UsbProtocol proto, uint32_t idx) {
+    return proto == UsbProtocol::Usb2_0 ? static_cast<UsbPhyBase*>(&usbphy2_.at(idx))
+                                        : static_cast<UsbPhyBase*>(&usbphy3_.at(idx));
+  }
+
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(AmlUsbPhy);
-  friend class AmlUsbPhyTest;
 
   zx_status_t InitPhy2();
   zx_status_t InitPhy3();
