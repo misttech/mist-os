@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_fuchsia_test_package.gni")
 import("//src/connectivity/bluetooth/core/bt-host/build/bt_gtest_package.gni")
 
 source_set("socket") {
@@ -37,10 +38,10 @@ source_set("tests") {
     "//src/connectivity/bluetooth/core/bt-host/l2cap:channel_manager_mock_controller_test_fixture",
     "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
     "//src/connectivity/bluetooth/core/bt-host/testing",
+    "//src/connectivity/bluetooth/core/bt-host/testing:loop_fixture",
     "//src/connectivity/bluetooth/core/bt-host/transport:testing",
-    "//src/lib/testing/loop_fixture",
-    "//third_party/googletest:gtest",
     "//third_party/pigweed/backends/pw_async_fuchsia:dispatcher",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 
   # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
@@ -49,4 +50,9 @@ source_set("tests") {
 
 bt_gtest_package("bt-host-socket-tests") {
   deps = [ ":tests" ]
+}
+
+bazel_fuchsia_test_package("test_pkg") {
+  test_package_name = "socket_tests"
+  test_component_names = [ "socket_test_autogen_cml" ]
 }

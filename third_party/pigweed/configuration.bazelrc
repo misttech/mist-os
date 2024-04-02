@@ -7,3 +7,5 @@ build --@pigweed//pw_function:config_override=//third_party/pigweed/backends/pw_
 build --@pigweed//pw_assert:backend=//third_party/pigweed/backends/pw_assert
 build --@pigweed//pw_log:backend=//third_party/pigweed/backends/pw_log
 build --@pigweed//pw_unit_test:backend=@pigweed//pw_unit_test:googletest
+build --@pigweed//pw_async:task_backend=//third_party/pigweed/backends/pw_async_fuchsia:task
+build --@pigweed//pw_async:fake_dispatcher_backend=//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher

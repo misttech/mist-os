@@ -326,6 +326,7 @@ group("bazel_tests") {
     "sco:test_pkg",
     "sdp:test_pkg",
     "sm:test_pkg",
+    "socket:test_pkg",
     "testing:test_pkg",
     "transport:test_pkg",
   ]

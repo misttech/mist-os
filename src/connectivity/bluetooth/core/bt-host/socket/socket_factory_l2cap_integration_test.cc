@@ -11,8 +11,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel_manager_mock_controller_test_fixture.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/test_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/loop_fixture.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/mock_controller.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace bt::socket {
 namespace {
@@ -21,8 +21,8 @@ using namespace bt::testing;
 
 using TestingBase = l2cap::ChannelManagerMockControllerTest;
 
-// This test harness provides test cases for interations between SocketFactory and the L2cap layer.
-class SocketFactoryL2capIntegrationTest : public ::gtest::TestLoopFixture, public TestingBase {
+// This test harness provides test cases for interactions between SocketFactory and the L2cap layer.
+class SocketFactoryL2capIntegrationTest : public TestLoopFixture, public TestingBase {
  public:
   SocketFactoryL2capIntegrationTest() : TestingBase(dispatcher_), dispatcher_(dispatcher()) {}
   ~SocketFactoryL2capIntegrationTest() override = default;

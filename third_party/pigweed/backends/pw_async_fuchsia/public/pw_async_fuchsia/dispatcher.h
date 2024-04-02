@@ -5,6 +5,7 @@
 #ifndef THIRD_PARTY_PIGWEED_BACKENDS_PW_ASYNC_FUCHSIA_PUBLIC_PW_ASYNC_FUCHSIA_DISPATCHER_H_
 #define THIRD_PARTY_PIGWEED_BACKENDS_PW_ASYNC_FUCHSIA_PUBLIC_PW_ASYNC_FUCHSIA_DISPATCHER_H_
 
+#include <lib/async/dispatcher.h>
 #include <zircon/assert.h>
 
 #include "pw_async/dispatcher.h"

@@ -164,6 +164,8 @@ group("non_hermetic_deps") {
     "//src/connectivity/bluetooth/core/bt-host/sdp:test_pkg.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host/sm:test_pkg",
     "//src/connectivity/bluetooth/core/bt-host/sm:test_pkg.bazel_build",
+    "//src/connectivity/bluetooth/core/bt-host/socket:test_pkg",
+    "//src/connectivity/bluetooth/core/bt-host/socket:test_pkg.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host/testing:test_pkg",
     "//src/connectivity/bluetooth/core/bt-host/testing:test_pkg.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host/transport:test_pkg",

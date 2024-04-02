@@ -112,6 +112,17 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "loop_fixture",
+    testonly = True,
+    # header is in bt-host:public
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "@com_google_googletest//:gtest",
+        "@fuchsia_sdk//pkg/async-testing",
+    ],
+)
+
 fuchsia_cc_test(
     name = "testing_test",
     testonly = True,

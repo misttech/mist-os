@@ -15,6 +15,11 @@ cc_library(
         "@pigweed//pw_async:task_facade",
         "@fuchsia_sdk//pkg/zx",
         "@fuchsia_sdk//pkg/async-loop-default",
+        ":util"
+    ],
+    hdrs = [
+        "public/pw_async_fuchsia/task.h",
+        "public_overrides/pw_async_backend/task.h",
     ],
     srcs = [
         "task.cc",
@@ -28,6 +33,10 @@ cc_library(
         "public",
         "public_overrides",
     ],
+    hdrs = [
+      "public/pw_async_fuchsia/fake_dispatcher.h",
+      "public_overrides/pw_async_backend/fake_dispatcher.h",
+    ],
     srcs = [
         "fake_dispatcher.cc",
     ],
@@ -36,3 +45,34 @@ cc_library(
         "@pigweed//pw_async:fake_dispatcher_facade",
     ],
 )
+
+cc_library(
+name = "dispatcher",
+    includes = [
+        "public",
+        "public_overrides",
+    ],
+    hdrs = [
+        "public/pw_async_fuchsia/dispatcher.h"
+    ],
+    srcs = [
+        "dispatcher.cc",
+    ],
+    deps = [
+        ":task",
+        "@pigweed//pw_async:dispatcher",
+        "@fuchsia_sdk//pkg/async-cpp",
+    ],
+)
+
+cc_library(
+    name = "util",
+    includes = [
+        "public",
+        "public_overrides",
+    ],
+    hdrs = [
+        "public/pw_async_fuchsia/util.h",
+    ],
+)
+

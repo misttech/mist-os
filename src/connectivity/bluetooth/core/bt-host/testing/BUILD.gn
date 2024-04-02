@@ -186,6 +186,16 @@ source_set("fuzztest_driver") {
   ]
 }
 
+# TODO(https://fxbug.dev/324105856): Delete after socket and fidl libraries are migrated to Bazel.
+source_set("loop_fixture") {
+  testonly = true
+  public = [ "$dir_public_testing/loop_fixture.h" ]
+  public_deps = [
+    "$dir_pw_unit_test",
+    "//zircon/system/ulib/async-testing",
+  ]
+}
+
 bazel_fuchsia_test_package("test_pkg") {
   test_package_name = "testing_tests"
   test_component_names = [ "testing_test_autogen_cml" ]

@@ -1,0 +1,61 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_test",
+    "fuchsia_unittest_package",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "socket",
+    hdrs = [
+        "socket_channel_relay.h",
+        "socket_factory.h",
+    ],
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "@fuchsia_sdk//pkg/async-default",
+        "@fuchsia_sdk//pkg/fit",
+        "@fuchsia_sdk//pkg/trace",
+        "@fuchsia_sdk//pkg/zx",
+    ],
+)
+
+fuchsia_cc_test(
+    name = "socket_test",
+    testonly = True,
+    srcs = [
+        "socket_channel_relay_test.cc",
+        "socket_factory_l2cap_integration_test.cc",
+        "socket_factory_test.cc",
+    ],
+    death_unittest = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":socket",
+        "//src/connectivity/bluetooth/core/bt-host/gap",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap:channel_manager_mock_controller_test_fixture",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
+        "//src/connectivity/bluetooth/core/bt-host/testing:loop_fixture",
+        "//src/connectivity/bluetooth/core/bt-host/transport:testing",
+        "//third_party/pigweed/backends/pw_async_fuchsia:dispatcher",
+        "@fuchsia_sdk//pkg/async-loop-cpp",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "test_pkg",
+    package_name = "socket_tests",
+    testonly = True,
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        ":socket_test",
+    ],
+    visibility = ["//visibility:public"],
+)

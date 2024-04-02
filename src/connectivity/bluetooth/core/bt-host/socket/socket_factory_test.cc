@@ -4,17 +4,14 @@
 
 #include "socket_factory.h"
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-
 #include <memory>
-#include <type_traits>
 
 #include <gtest/gtest.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_channel.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/loop_fixture.h"
 
 namespace bt::socket {
 namespace {
@@ -27,10 +24,9 @@ constexpr l2cap::ChannelId kRemoteChannelId = 0x0050;
 constexpr hci_spec::ConnectionHandle kDefaultConnectionHandle = 0x0001;
 constexpr hci_spec::ConnectionHandle kAnotherConnectionHandle = 0x0002;
 
-class SocketFactoryTest : public ::testing::Test {
+class SocketFactoryTest : public testing::TestLoopFixture {
  public:
-  SocketFactoryTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {
-    EXPECT_EQ(ASYNC_LOOP_RUNNABLE, loop_.GetState());
+  SocketFactoryTest() {
     channel_ = std::make_unique<l2cap::testing::FakeChannel>(
         kDynamicChannelIdMin, kRemoteChannelId, kDefaultConnectionHandle, bt::LinkType::kACL);
   }
@@ -43,11 +39,8 @@ class SocketFactoryTest : public ::testing::Test {
  protected:
   l2cap::Channel::WeakPtr channel() { return channel_->GetWeakPtr(); }
   l2cap::testing::FakeChannel::WeakPtr fake_channel() { return channel_->AsWeakPtr(); }
-  async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
-  void RunLoopUntilIdle() { loop_.RunUntilIdle(); }
 
  private:
-  async::Loop loop_;
   std::unique_ptr<l2cap::testing::FakeChannel> channel_;
 };
 
