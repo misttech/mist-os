@@ -16,6 +16,8 @@ use diagnostics_log::{OnInterestChanged, Publisher, PublisherOptions};
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_archivist_test as fpuppet;
 use fidl_fuchsia_diagnostics::Severity;
+use fidl_fuchsia_inspect::TreeRequestStream;
+use fidl_fuchsia_inspect_deprecated::InspectRequestStream;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_async::{Task, TaskGroup, Timer};
 use fuchsia_component::server::ServiceFs;
@@ -27,11 +29,15 @@ use futures::{
     FutureExt, StreamExt, TryStreamExt,
 };
 use inspect_testing::ExampleInspectData;
+use inspect_testing::{serve_deprecated_inspect, serve_inspect_tree};
+use puppet_config::Config;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 enum IncomingServices {
     Puppet(fpuppet::PuppetRequestStream),
+    DeprecatedInspect(InspectRequestStream),
+    InspectTree(TreeRequestStream),
 }
 
 // `logging = false` allows us to set the global default trace dispatcher
@@ -43,17 +49,36 @@ async fn main() -> Result<(), Error> {
     subscribe_to_log_interest_changes(InterestChangedNotifier(interest_send))?;
 
     let puppet_server = Arc::new(PuppetServer::new(interest_recv));
+    let inspector = component::inspector();
 
     let mut fs = ServiceFs::new();
+    let config = Config::take_from_startup_handle();
     let _inspect_publish_task: Option<Task<()>>;
 
-    let publish_options = inspect_runtime::PublishOptions::default();
-    _inspect_publish_task = inspect_runtime::publish(component::inspector(), publish_options);
+    if config.publish_inspect_with_deprecated_apis {
+        let vmo = inspector.duplicate_vmo().expect("failed to duplicate VMO");
+        fs.dir("diagnostics").add_vmo_file_at("root.inspect", vmo);
+        fs.dir("diagnostics").add_fidl_service(IncomingServices::DeprecatedInspect);
+        fs.dir("diagnostics").add_fidl_service(IncomingServices::InspectTree);
+    } else {
+        let publish_options = inspect_runtime::PublishOptions::default();
+        _inspect_publish_task = inspect_runtime::publish(component::inspector(), publish_options);
+    }
 
     fs.dir("svc").add_fidl_service(IncomingServices::Puppet);
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(0, |service| async {
         match service {
+            IncomingServices::DeprecatedInspect(s) => {
+                let inspect_data = puppet_server.inspect_data.lock().await;
+                if inspect_data.has_node_object() {
+                    let node_object = inspect_data.get_node_object();
+                    serve_deprecated_inspect(s, node_object).await;
+                }
+            }
+            IncomingServices::InspectTree(s) => {
+                serve_inspect_tree(s, component::inspector()).await;
+            }
             IncomingServices::Puppet(s) => {
                 serve_puppet(puppet_server.clone(), s).await;
             }

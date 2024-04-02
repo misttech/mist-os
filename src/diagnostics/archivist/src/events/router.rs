@@ -14,7 +14,10 @@ use pin_project::pin_project;
 use std::{
     collections::{BTreeMap, BTreeSet},
     pin::Pin,
-    sync::{Arc, Weak},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Weak,
+    },
 };
 use thiserror::Error;
 use tracing::{debug, error};
@@ -282,6 +285,7 @@ impl Dispatcher {
 
 struct EventStreamLogger {
     counters: BTreeMap<EventType, inspect::UintProperty>,
+    diagnostics_ready_seen_node: inspect::Node,
     component_log_node: BoundedListNode,
     counters_node: inspect::Node,
     _node: inspect::Node,
@@ -292,16 +296,19 @@ impl EventStreamLogger {
     pub fn new(node: inspect::Node) -> Self {
         let counters_node = node.create_child("event_counts");
         let recent_events_node = node.create_child("recent_events");
+        let diagnostics_ready_seen_node = node.create_child("diagnostics_ready_seen");
         Self {
             _node: node,
             counters: BTreeMap::new(),
             counters_node,
             component_log_node: BoundedListNode::new(recent_events_node, RECENT_EVENT_LIMIT),
+            diagnostics_ready_seen_node,
         }
     }
 
     /// Log a new component event to inspect.
     pub fn log(&mut self, event: &Event) {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let ty = event.ty();
         if self.counters.contains_key(&ty) {
             self.counters.get_mut(&ty).unwrap().add(1);
@@ -311,6 +318,12 @@ impl EventStreamLogger {
         }
         // TODO(https://fxbug.dev/42174041): leverage string references for the payload.
         match &event.payload {
+            EventPayload::DiagnosticsReady(DiagnosticsReadyPayload { component, .. }) => {
+                let index = COUNTER.fetch_add(1, Ordering::Relaxed);
+                self.diagnostics_ready_seen_node
+                    .record_string(format!("{index}"), component.moniker.to_string());
+                self.log_inspect(ty.as_ref(), component);
+            }
             EventPayload::LogSinkRequested(LogSinkRequestedPayload { component, .. })
             | EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                 component, ..
@@ -378,6 +391,7 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_inspect::InspectSinkMarker;
+    use fidl_fuchsia_io as fio;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fuchsia_async as fasync;
     use fuchsia_sync::Mutex;
@@ -404,6 +418,17 @@ mod tests {
     impl TestEventProducer {
         fn emit(&mut self, event_type: EventType, identity: Arc<ComponentIdentity>) {
             let event = match event_type {
+                EventType::DiagnosticsReady => {
+                    let (directory, _) =
+                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+                    Event {
+                        timestamp: zx::Time::from_nanos(FAKE_TIMESTAMP),
+                        payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                            component: identity,
+                            directory,
+                        }),
+                    }
+                }
                 EventType::LogSinkRequested => {
                     let (_, request_stream) =
                         fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
@@ -461,11 +486,11 @@ mod tests {
         let mut router = EventRouter::new(inspect::Node::default());
         router.add_producer(ProducerConfig {
             producer: &mut producer,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
         router.add_consumer(ConsumerConfig {
             consumer: &consumer,
-            events: vec![EventType::InspectSinkRequested, EventType::LogSinkRequested],
+            events: vec![EventType::DiagnosticsReady, EventType::LogSinkRequested],
         });
 
         // An explicit match is needed here since unwrap_err requires Debug implemented for both T
@@ -483,7 +508,7 @@ mod tests {
         let mut router = EventRouter::new(inspect::Node::default());
         router.add_producer(ProducerConfig {
             producer: &mut producer,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
         router.add_consumer(ConsumerConfig {
             consumer: &consumer,
@@ -494,7 +519,7 @@ mod tests {
             Err(err) => {
                 assert_matches!(
                     err,
-                    RouterError::MissingConsumer(EventType::InspectSinkRequested)
+                    RouterError::MissingConsumer(EventType::DiagnosticsReady)
                         | RouterError::MissingProducer(EventType::LogSinkRequested)
                 );
             }
@@ -566,19 +591,19 @@ mod tests {
         let mut router = EventRouter::new(inspect::Node::default());
         router.add_producer(ProducerConfig {
             producer: &mut producer,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
         router.add_consumer(ConsumerConfig {
             consumer: &first_consumer,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
         router.add_consumer(ConsumerConfig {
             consumer: &second_consumer,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
         router.add_consumer(ConsumerConfig {
             consumer: &third_consumer,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
 
         drop(first_consumer);
@@ -588,40 +613,38 @@ mod tests {
         let _router_task = fasync::Task::spawn(fut);
 
         // Emit an event
-        let (_, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+        let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         producer
             .dispatcher
             .emit(Event {
                 timestamp: zx::Time::get_monotonic(),
-                payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+                payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: IDENTITY.clone(),
-                    request_stream,
+                    directory,
                 }),
             })
             .unwrap();
 
         // We see the event only in the receiver which consumer wasn't dropped.
         let event = second_receiver.next().await.unwrap();
-        assert_matches!(event.payload, EventPayload::InspectSinkRequested(_));
+        assert_matches!(event.payload, EventPayload::DiagnosticsReady(_));
         assert!(first_receiver.next().now_or_never().unwrap().is_none());
         assert!(third_receiver.next().now_or_never().unwrap().is_none());
 
         // We see additional events in the second receiver which remains alive.
-        let (_, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+        let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         producer
             .dispatcher
             .emit(Event {
                 timestamp: zx::Time::get_monotonic(),
-                payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+                payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: IDENTITY.clone(),
-                    request_stream,
+                    directory,
                 }),
             })
             .unwrap();
         let event = second_receiver.next().await.unwrap();
-        assert_matches!(event.payload, EventPayload::InspectSinkRequested(_));
+        assert_matches!(event.payload, EventPayload::DiagnosticsReady(_));
         assert!(first_receiver.next().now_or_never().unwrap().is_none());
         assert!(third_receiver.next().now_or_never().unwrap().is_none());
     }
@@ -632,22 +655,32 @@ mod tests {
         let mut router = EventRouter::new(inspector.root().create_child("events"));
         let mut producer1 = TestEventProducer::default();
         let mut producer2 = TestEventProducer::default();
+        let mut producer3 = TestEventProducer::default();
         let (receiver, consumer) = TestEventConsumer::new();
         router.add_consumer(ConsumerConfig {
             consumer: &consumer,
-            events: vec![EventType::InspectSinkRequested, EventType::LogSinkRequested],
+            events: vec![
+                EventType::InspectSinkRequested,
+                EventType::LogSinkRequested,
+                EventType::DiagnosticsReady,
+            ],
         });
         router.add_producer(ProducerConfig {
             producer: &mut producer1,
-            events: vec![EventType::LogSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
         router.add_producer(ProducerConfig {
             producer: &mut producer2,
+            events: vec![EventType::LogSinkRequested],
+        });
+        router.add_producer(ProducerConfig {
+            producer: &mut producer3,
             events: vec![EventType::InspectSinkRequested],
         });
 
-        producer1.emit(EventType::LogSinkRequested, IDENTITY.clone());
-        producer2.emit(EventType::InspectSinkRequested, IDENTITY.clone());
+        producer1.emit(EventType::DiagnosticsReady, IDENTITY.clone());
+        producer2.emit(EventType::LogSinkRequested, IDENTITY.clone());
+        producer3.emit(EventType::InspectSinkRequested, IDENTITY.clone());
 
         // Consume the events.
         let (_terminate_handle, fut) = router.start().unwrap();
@@ -657,16 +690,25 @@ mod tests {
         assert_data_tree!(inspector, root: {
             events: {
                 event_counts: {
+                    diagnostics_ready: 1u64,
                     log_sink_requested: 1u64,
                     inspect_sink_requested: 1u64,
+                },
+                diagnostics_ready_seen: {
+                    "0": "a/b"
                 },
                 recent_events: {
                     "0": {
                         "@time": AnyProperty,
-                        event: "log_sink_requested",
+                        event: "diagnostics_ready",
                         moniker: "a/b"
                     },
                     "1": {
+                        "@time": AnyProperty,
+                        event: "log_sink_requested",
+                        moniker: "a/b"
+                    },
+                    "2": {
                         "@time": AnyProperty,
                         event: "inspect_sink_requested",
                         moniker: "a/b"
@@ -685,25 +727,25 @@ mod tests {
         let (receiver, consumer) = TestEventConsumer::new();
         router.add_consumer(ConsumerConfig {
             consumer: &consumer,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
         router.add_producer(ProducerConfig {
             producer: &mut producer1,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
         router.add_producer(ProducerConfig {
             producer: &mut producer2,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
 
         let identity = |moniker| {
             Arc::new(ComponentIdentity::new(ExtendedMoniker::parse_str(moniker).unwrap(), TEST_URL))
         };
 
-        producer1.emit(EventType::InspectSinkRequested, identity("./a"));
-        producer2.emit(EventType::InspectSinkRequested, identity("./b"));
-        producer1.emit(EventType::InspectSinkRequested, identity("./c"));
-        producer2.emit(EventType::InspectSinkRequested, identity("./d"));
+        producer1.emit(EventType::DiagnosticsReady, identity("./a"));
+        producer2.emit(EventType::DiagnosticsReady, identity("./b"));
+        producer1.emit(EventType::DiagnosticsReady, identity("./c"));
+        producer2.emit(EventType::DiagnosticsReady, identity("./d"));
 
         // We should see the events in order of emission.
         let (_terminate_handle, fut) = router.start().unwrap();
@@ -711,10 +753,10 @@ mod tests {
         let events = receiver.take(4).collect::<Vec<_>>().await;
 
         let expected_events = vec![
-            inspect_sink_requested(identity("./a")),
-            inspect_sink_requested(identity("./b")),
-            inspect_sink_requested(identity("./c")),
-            inspect_sink_requested(identity("./d")),
+            diagnostics_ready(identity("./a")),
+            diagnostics_ready(identity("./b")),
+            diagnostics_ready(identity("./c")),
+            diagnostics_ready(identity("./d")),
         ];
         assert_eq!(events.len(), expected_events.len());
         for (event, expected_event) in std::iter::zip(events, expected_events) {
@@ -730,31 +772,31 @@ mod tests {
         let (mut receiver, consumer) = TestEventConsumer::new();
         router.add_consumer(ConsumerConfig {
             consumer: &consumer,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
         router.add_producer(ProducerConfig {
             producer: &mut producer,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
         router.add_producer(ProducerConfig {
             producer: &mut producer,
-            events: vec![EventType::InspectSinkRequested],
+            events: vec![EventType::DiagnosticsReady],
         });
 
-        producer.emit(EventType::InspectSinkRequested, IDENTITY.clone());
+        producer.emit(EventType::DiagnosticsReady, IDENTITY.clone());
 
         let (terminate_handle, fut) = router.start().unwrap();
         let _router_task = fasync::Task::spawn(fut);
         let on_drained = terminate_handle.terminate();
         let drain_finished = fasync::Task::spawn(on_drained);
 
-        assert_event(receiver.next().await.unwrap(), inspect_sink_requested(IDENTITY.clone()));
+        assert_event(receiver.next().await.unwrap(), diagnostics_ready(IDENTITY.clone()));
 
         // This future must be complete now.
         drain_finished.await;
 
         // We must never see any new event emitted by the producer.
-        producer.emit(EventType::InspectSinkRequested, IDENTITY.clone());
+        producer.emit(EventType::DiagnosticsReady, IDENTITY.clone());
         assert!(receiver.next().now_or_never().is_none());
     }
 
@@ -762,11 +804,11 @@ mod tests {
         assert_eq!(event.timestamp, other.timestamp);
         match (event.payload, other.payload) {
             (
-                EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+                EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: this_identity,
                     ..
                 }),
-                EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+                EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: other_identity,
                     ..
                 }),
@@ -777,14 +819,13 @@ mod tests {
         }
     }
 
-    fn inspect_sink_requested(identity: Arc<ComponentIdentity>) -> Event {
-        let (_proxy, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+    fn diagnostics_ready(identity: Arc<ComponentIdentity>) -> Event {
+        let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         Event {
             timestamp: zx::Time::from_nanos(FAKE_TIMESTAMP),
-            payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+            payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                 component: identity,
-                request_stream,
+                directory,
             }),
         }
     }

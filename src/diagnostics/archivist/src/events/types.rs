@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{events::error::EventError, identity::ComponentIdentity};
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::prelude::*;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_inspect as finspect;
+use fidl_fuchsia_io as fio;
 use fidl_fuchsia_logger as flogger;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_zircon as zx;
@@ -17,6 +18,7 @@ use std::sync::Arc;
 /// won't be cloned.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum EventType {
+    DiagnosticsReady,
     LogSinkRequested,
     InspectSinkRequested,
 }
@@ -24,6 +26,7 @@ pub enum EventType {
 impl AsRef<str> for EventType {
     fn as_ref(&self) -> &str {
         match &self {
+            Self::DiagnosticsReady => "diagnostics_ready",
             Self::LogSinkRequested => "log_sink_requested",
             Self::InspectSinkRequested => "inspect_sink_requested",
         }
@@ -41,6 +44,7 @@ pub struct Event {
 impl Event {
     pub fn ty(&self) -> EventType {
         match &self.payload {
+            EventPayload::DiagnosticsReady(_) => EventType::DiagnosticsReady,
             EventPayload::LogSinkRequested(_) => EventType::LogSinkRequested,
             EventPayload::InspectSinkRequested(_) => EventType::InspectSinkRequested,
         }
@@ -50,6 +54,7 @@ impl Event {
 /// The contents of the event depending on the type of event.
 #[derive(Debug)]
 pub enum EventPayload {
+    DiagnosticsReady(DiagnosticsReadyPayload),
     LogSinkRequested(LogSinkRequestedPayload),
     InspectSinkRequested(InspectSinkRequestedPayload),
 }
@@ -65,6 +70,15 @@ impl std::fmt::Debug for InspectSinkRequestedPayload {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InspectSinkRequestedPayload").field("component", &self.component).finish()
     }
+}
+
+/// Payload for a CapabilityReady(diagnostics) event.
+#[derive(Debug)]
+pub struct DiagnosticsReadyPayload {
+    /// The component which diagnostics directory is available.
+    pub component: Arc<ComponentIdentity>,
+    /// The `out/diagnostics` directory of the component.
+    pub directory: fio::DirectoryProxy,
 }
 
 /// Payload for a connection to the `LogSink` protocol.
@@ -110,6 +124,36 @@ impl TryFrom<fcomponent::Event> for Event {
             );
 
             match event.header.event_type {
+                fcomponent::EventType::DirectoryReady => {
+                    let directory = match event.payload {
+                        fcomponent::EventPayload::DirectoryReady(directory_ready) => {
+                            let name =
+                                directory_ready.name.ok_or(EventError::MissingField("name"))?;
+                            if name != "diagnostics" {
+                                return Err(EventError::IncorrectName {
+                                    received: name,
+                                    expected: "diagnostics",
+                                });
+                            }
+                            match directory_ready.node {
+                                Some(node) => {
+                                    let directory =
+                                        ClientEnd::<fio::DirectoryMarker>::new(node.into_channel());
+                                    directory.into_proxy()?
+                                }
+                                None => return Err(EventError::MissingDiagnosticsDir),
+                            }
+                        }
+                        _ => return Err(EventError::UnknownResult(event.payload)),
+                    };
+                    Ok(Event {
+                        timestamp: zx::Time::from_nanos(event.header.timestamp),
+                        payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                            component: Arc::new(identity),
+                            directory,
+                        }),
+                    })
+                }
                 fcomponent::EventType::CapabilityRequested => match event.payload {
                     fcomponent::EventPayload::CapabilityRequested(capability_requested) => {
                         let name =
@@ -169,6 +213,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl_fuchsia_component as fcomponent;
     use fidl_fuchsia_inspect as finspect;
+    use fidl_fuchsia_io as fio;
     use fidl_fuchsia_logger::LogSinkMarker;
     use fuchsia_zircon as zx;
 
@@ -189,6 +234,30 @@ mod tests {
                 fcomponent::CapabilityRequestedPayload {
                     name: Some(finspect::InspectSinkMarker::PROTOCOL_NAME.into()),
                     capability: Some(capability),
+                    ..Default::default()
+                },
+            )),
+            ..Default::default()
+        }
+    }
+
+    fn create_diagnostics_ready_event(
+        target_moniker: String,
+        target_url: String,
+        directory: ClientEnd<fio::NodeMarker>,
+    ) -> fcomponent::Event {
+        fcomponent::Event {
+            header: Some(fcomponent::EventHeader {
+                event_type: Some(fcomponent::EventType::DirectoryReady),
+                moniker: Some(target_moniker),
+                component_url: Some(target_url),
+                timestamp: Some(zx::Time::get_monotonic().into_nanos()),
+                ..Default::default()
+            }),
+            payload: Some(fcomponent::EventPayload::DirectoryReady(
+                fcomponent::DirectoryReadyPayload {
+                    name: Some("diagnostics".into()),
+                    node: Some(directory),
                     ..Default::default()
                 },
             )),
@@ -232,6 +301,23 @@ mod tests {
         assert_matches!(actual, Event { payload, .. } => {
             assert_matches!(payload,
                 EventPayload::LogSinkRequested(LogSinkRequestedPayload {
+                    component, ..
+                }) => {
+                    assert_eq!(component, ComponentIdentity::from(vec!["a", "b"]).into());
+                })
+        });
+    }
+
+    #[fuchsia::test]
+    fn diagnostics_ready() {
+        let _exec = fuchsia_async::LocalExecutor::new();
+        let (directory, _) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
+        let event = create_diagnostics_ready_event("a/b".into(), "".into(), directory);
+        let actual = event.try_into().unwrap();
+
+        assert_matches!(actual, Event { payload, .. } => {
+            assert_matches!(payload,
+                EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component, ..
                 }) => {
                     assert_eq!(component, ComponentIdentity::from(vec!["a", "b"]).into());

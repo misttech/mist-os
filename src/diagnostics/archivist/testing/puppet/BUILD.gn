@@ -4,6 +4,8 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import(
+    "//src/diagnostics/archivist/testing/realm-factory/fuchsia_configured_component.gni")
 
 rustc_binary("bin") {
   testonly = true
@@ -12,7 +14,10 @@ rustc_binary("bin") {
   source_root = "src/main.rs"
   sources = [ "src/main.rs" ]
   deps = [
+    ":puppet_config",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
+    "//sdk/fidl/fuchsia.inspect.deprecated:fuchsia.inspect.deprecated_rust",
     "//src/diagnostics/archivist/testing/fidl:fuchsia.archivist.test_rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
@@ -32,11 +37,22 @@ rustc_binary("bin") {
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
-fuchsia_component("puppet-component") {
+fuchsia_configured_component("puppet-component") {
   testonly = true
   component_name = "puppet"
   manifest = "meta/puppet.cml"
+
+  # Default config values.
+  # These can be overridden by the test at runtime.
+  config_values = {
+    publish_inspect_with_deprecated_apis = false
+  }
   deps = [ ":bin" ]
+}
+
+fuchsia_structured_config_rust_lib("puppet_config") {
+  testonly = true
+  cm_label = ":puppet-component_manifest"
 }
 
 fuchsia_package("puppet") {
