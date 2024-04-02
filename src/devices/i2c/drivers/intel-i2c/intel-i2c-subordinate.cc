@@ -57,11 +57,11 @@ std::unique_ptr<IntelI2cSubordinate> IntelI2cSubordinate::Create(IntelI2cControl
 }
 
 zx_status_t IntelI2cSubordinate::Transfer(const IntelI2cSubordinateSegment* segments,
-                                          int segment_count) {
+                                          size_t segment_count) {
   zx_status_t status = ZX_OK;
   int last_type = IntelI2cSubordinateSegment::kEnd;
 
-  for (int i = 0; i < segment_count; i++) {
+  for (size_t i = 0; i < segment_count; i++) {
     if (segments[i].type != IntelI2cSubordinateSegment::kRead &&
         segments[i].type != IntelI2cSubordinateSegment::kWrite) {
       status = ZX_ERR_INVALID_ARGS;
@@ -88,8 +88,8 @@ zx_status_t IntelI2cSubordinate::Transfer(const IntelI2cSubordinateSegment* segm
     last_type = segments->type;
 
   while (segment_count--) {
-    int len = segments->len;
-    uint8_t* buf = segments->buf;
+    auto len = static_cast<ssize_t>(segments->buf.count());
+    uint8_t* buf = segments->buf.data();
 
     // If this segment is in the same direction as the last, inject a
     // restart at its start.

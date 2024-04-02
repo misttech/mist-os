@@ -13,8 +13,17 @@
         compat: "driver/intel-i2c.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
+    capabilities: [
+        { service: "fuchsia.hardware.i2cimpl.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.acpi.Service" },
         { service: "fuchsia.hardware.pci.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.i2cimpl.Service",
+            from: "self",
+        },
     ],
 }

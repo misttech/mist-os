@@ -6,7 +6,7 @@
 #define SRC_DEVICES_I2C_DRIVERS_INTEL_I2C_INTEL_I2C_CONTROLLER_H_
 
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/mmio/mmio.h>
@@ -24,6 +24,7 @@
 #include <ddktl/device.h>
 
 #include "intel-i2c-subordinate.h"
+#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
 
 namespace intel_i2c {
 struct __attribute__((packed)) I2cRegs {
@@ -132,10 +133,12 @@ class IntelI2cController;
 using IntelI2cControllerType = ddk::Device<IntelI2cController, ddk::Initializable, ddk::Unbindable>;
 
 class IntelI2cController : public IntelI2cControllerType,
-                           public ddk::I2cImplProtocol<IntelI2cController, ddk::base_protocol> {
+                           public fdf::WireServer<fuchsia_hardware_i2cimpl::Device> {
  public:
   explicit IntelI2cController(zx_device_t* parent)
-      : IntelI2cControllerType(parent), pci_(parent, "pci") {}
+      : IntelI2cControllerType(parent),
+        pci_(parent, "pci"),
+        outgoing_(fdf::Dispatcher::GetCurrent()->get()) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -166,9 +169,13 @@ class IntelI2cController : public IntelI2cControllerType,
   void SetAddressingMode(const uint32_t addr_mode_bit);
   void SetTargetAddress(const uint32_t addr_mode_bit, const uint32_t address);
 
-  zx_status_t I2cImplGetMaxTransferSize(size_t* out_size);
-  zx_status_t I2cImplSetBitrate(uint32_t bitrate);
-  zx_status_t I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count);
+  void GetMaxTransferSize(fdf::Arena& arena, GetMaxTransferSizeCompleter::Sync& completer) override;
+  void SetBitrate(SetBitrateRequestView request, fdf::Arena& arena,
+                  SetBitrateCompleter::Sync& completer) override;
+  void Transact(TransactRequestView request, fdf::Arena& arena,
+                TransactCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_i2cimpl::Device> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
@@ -239,6 +246,9 @@ class IntelI2cController : public IntelI2cControllerType,
   std::map<uint16_t, std::unique_ptr<IntelI2cSubordinate>> subordinates_ TA_GUARDED(mutex_);
 
   mtx_t irq_mask_mutex_;
+
+  fdf::ServerBindingGroup<fuchsia_hardware_i2cimpl::Device> bindings_;
+  fdf::OutgoingDirectory outgoing_;
 };
 
 }  // namespace intel_i2c

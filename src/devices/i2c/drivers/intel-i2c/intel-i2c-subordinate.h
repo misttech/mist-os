@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_I2C_DRIVERS_INTEL_I2C_INTEL_I2C_SUBORDINATE_H_
 #define SRC_DEVICES_I2C_DRIVERS_INTEL_I2C_INTEL_I2C_SUBORDINATE_H_
 
+#include <lib/fidl/cpp/wire/vector_view.h>
 #include <stdint.h>
 #include <zircon/types.h>
 
@@ -23,8 +24,7 @@ struct IntelI2cSubordinateSegment {
     kRead = 2,
     kWrite = 3,
   } type;
-  int len;
-  uint8_t* buf;
+  fidl::VectorView<uint8_t> buf;
 };
 
 class IntelI2cSubordinate {
@@ -33,7 +33,7 @@ class IntelI2cSubordinate {
                                                      uint8_t chip_address_width,
                                                      uint16_t chip_address);
 
-  zx_status_t Transfer(const IntelI2cSubordinateSegment* segments, int segment_count);
+  zx_status_t Transfer(const IntelI2cSubordinateSegment* segments, size_t segment_count);
   uint8_t GetChipAddressWidth() const { return chip_address_width_; }
   uint16_t GetChipAddress() const { return chip_address_; }
 

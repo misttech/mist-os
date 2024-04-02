@@ -10,7 +10,6 @@
 #include <fidl/fuchsia.hardware.acpi/cpp/wire_types.h>
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pci/cpp/wire_types.h>
-#include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -28,6 +27,7 @@
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -61,6 +61,7 @@ constexpr uint32_t kErrorDetectedSignal = ZX_USER_SIGNAL_3;
 
 // More than enough
 constexpr size_t MAX_TRANSFER_SIZE = (UINT16_MAX - 1);
+constexpr size_t MAX_RW_OPS = 8;
 
 constexpr uint32_t kIntelDesignwareCompType = 0x44570140;
 
@@ -166,6 +167,28 @@ zx_status_t IntelI2cController::Init() {
     return status;
   }
 
+  {
+    fuchsia_hardware_i2cimpl::Service::InstanceHandler handler({
+        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
+                                          fidl::kIgnoreBindingClosure),
+    });
+    auto result = outgoing_.AddService<fuchsia_hardware_i2cimpl::Service>(std::move(handler));
+    if (result.is_error()) {
+      zxlogf(ERROR, "AddService failed: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
+  auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+  {
+    auto result = outgoing_.Serve(std::move(directory_server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to serve the outgoing directory: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
   // We add one device. This device holds DEVICE_METADATA_I2C_CHANNELS
   // which contains info for each child device.
   // TODO: This should be a composite device that also holds interrupt information.
@@ -173,8 +196,11 @@ zx_status_t IntelI2cController::Init() {
   char name[ZX_DEVICE_NAME_MAX];
   snprintf(name, sizeof(name), "i2c-bus-%04x", device_id);
 
-  status =
-      DdkAdd(ddk::DeviceAddArgs(name).forward_metadata(parent(), DEVICE_METADATA_I2C_CHANNELS));
+  std::array<const char*, 1> fidl_service_offers{fuchsia_hardware_i2cimpl::Service::Name};
+  status = DdkAdd(ddk::DeviceAddArgs(name)
+                      .set_outgoing_dir(directory_client.TakeChannel())
+                      .set_runtime_service_offers(fidl_service_offers)
+                      .forward_metadata(parent(), DEVICE_METADATA_I2C_CHANNELS));
   if (status < 0) {
     zxlogf(ERROR, "device add failed: %s", zx_status_get_string(status));
     return status;
@@ -239,56 +265,72 @@ void IntelI2cController::DdkInit(ddk::InitTxn txn) {
   txn.Reply(ZX_OK);
 }
 
-zx_status_t IntelI2cController::I2cImplTransact(const i2c_impl_op_t* op_list,
-                                                const size_t op_count) {
-  if (op_count == 0) {
-    return ZX_OK;
+void IntelI2cController::Transact(TransactRequestView request, fdf::Arena& arena,
+                                  TransactCompleter::Sync& completer) {
+  if (request->op.count() == 0) {
+    return completer.buffer(arena).ReplySuccess({});
   }
 
   fbl::AutoLock lock(&mutex_);
 
   // Every op has the same address/subordinate.
-  auto it = subordinates_.find(op_list->address);
+  auto it = subordinates_.find(request->op[0].address);
 
   if (it == subordinates_.end()) {
-    return ZX_ERR_NOT_FOUND;
+    return completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
   }
 
   auto& subordinate = it->second;
 
-  IntelI2cSubordinateSegment segs[I2C_IMPL_MAX_RW_OPS];
+  IntelI2cSubordinateSegment segs[MAX_RW_OPS];
+  fuchsia_hardware_i2cimpl::wire::ReadData read_buffers[MAX_RW_OPS];
 
-  if (op_count > I2C_IMPL_MAX_RW_OPS) {
-    return ZX_ERR_NOT_SUPPORTED;
+  if (request->op.count() > std::size(segs)) {
+    zxlogf(ERROR, "Too many ops in request; only %zu are supported", std::size(segs));
+    return completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  for (size_t i = 0; i < op_count; ++i) {
-    segs[i].buf = reinterpret_cast<uint8_t*>(op_list[i].data_buffer);
-    segs[i].len = static_cast<int>(op_list[i].data_size);
-    if (op_list[i].is_read) {
+  size_t read_count = 0;
+  for (size_t i = 0; i < request->op.count(); ++i) {
+    if (request->op[i].type.is_read_size()) {
       segs[i].type = IntelI2cSubordinateSegment::kRead;
-    } else {
+      segs[i].buf = fidl::VectorView<uint8_t>(arena, request->op[i].type.read_size());
+      read_buffers[read_count++].data = segs[i].buf;
+    } else if (request->op[i].type.is_write_data()) {
       segs[i].type = IntelI2cSubordinateSegment::kWrite;
+      segs[i].buf = request->op[i].type.write_data();
+    } else {
+      ZX_ASSERT_MSG(false, "Unknown i2cimpl transfer type");
     }
   }
 
-  zx_status_t status = subordinate->Transfer(segs, static_cast<int>(op_count));
+  zx_status_t status = subordinate->Transfer(segs, request->op.count());
   if (status != ZX_OK) {
     zxlogf(ERROR, "intel-i2c-controller: subordinate transfer failed with: %d\n", status);
     Reset();
+    return completer.buffer(arena).ReplyError(status);
   }
 
-  return status;
+  completer.buffer(arena).ReplySuccess(
+      fidl::VectorView<fuchsia_hardware_i2cimpl::wire::ReadData>::FromExternal(read_buffers,
+                                                                               read_count));
 }
 
-zx_status_t IntelI2cController::I2cImplGetMaxTransferSize(size_t* out_size) {
-  *out_size = MAX_TRANSFER_SIZE;
-  return ZX_OK;
+void IntelI2cController::GetMaxTransferSize(fdf::Arena& arena,
+                                            GetMaxTransferSizeCompleter::Sync& completer) {
+  completer.buffer(arena).ReplySuccess(MAX_TRANSFER_SIZE);
 }
 
-zx_status_t IntelI2cController::I2cImplSetBitrate(const uint32_t bitrate) {
+void IntelI2cController::SetBitrate(SetBitrateRequestView request, fdf::Arena& arena,
+                                    SetBitrateCompleter::Sync& completer) {
   // TODO: implement
-  return ZX_ERR_NOT_SUPPORTED;
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void IntelI2cController::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_i2cimpl::Device> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "Unknown method %lu", metadata.method_ordinal);
 }
 
 uint8_t IntelI2cController::ExtractTxFifoDepthFromParam(const uint32_t param) {
