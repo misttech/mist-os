@@ -141,10 +141,7 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
   void Connect(fuchsia::bluetooth::PeerId peer_id,
                fuchsia::bluetooth::bredr::ConnectParameters connection,
                ConnectCallback callback) override;
-  void ConnectSco(
-      fuchsia::bluetooth::PeerId fidl_peer_id, bool initiator,
-      std::vector<fuchsia::bluetooth::bredr::ScoConnectionParameters> fidl_params,
-      fidl::InterfaceHandle<fuchsia::bluetooth::bredr::ScoConnectionReceiver> receiver) override;
+  void ConnectSco(::fuchsia::bluetooth::bredr::ProfileConnectScoRequest request) override;
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
   // Callback when clients close their connection targets

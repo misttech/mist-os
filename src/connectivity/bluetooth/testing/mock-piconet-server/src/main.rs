@@ -150,8 +150,12 @@ impl MockPiconetServer {
                 let proxy = results.into_proxy().expect("couldn't get connection receiver");
                 self.new_search(id, service_uuid, attr_ids, proxy);
             }
-            bredr::ProfileRequest::ConnectSco { receiver, .. } => {
-                let proxy = receiver.into_proxy().expect("couldn't get sco connection receiver");
+            bredr::ProfileRequest::ConnectSco { payload, .. } => {
+                let proxy = payload
+                    .receiver
+                    .unwrap()
+                    .into_proxy()
+                    .expect("couldn't get sco connection receiver");
                 let _ = proxy.error(bredr::ScoErrorCode::Failure);
                 error!("ConnectSco not implemented");
             }

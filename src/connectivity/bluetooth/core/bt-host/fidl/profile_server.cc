@@ -639,26 +639,28 @@ void ProfileServer::Connect(fuchsia::bluetooth::PeerId peer_id,
       FidlToChannelParameters(parameters), std::move(connected_cb));
 }
 
-void ProfileServer::ConnectSco(fuchsia::bluetooth::PeerId fidl_peer_id, bool initiator,
-                               std::vector<fidlbredr::ScoConnectionParameters> fidl_params,
-                               fidl::InterfaceHandle<fidlbredr::ScoConnectionReceiver> receiver) {
-  bt::PeerId peer_id(fidl_peer_id.value);
-  auto client = receiver.Bind();
+void ProfileServer::ConnectSco(::fuchsia::bluetooth::bredr::ProfileConnectScoRequest request) {
+  if (!request.has_receiver()) {
+    bt_log(WARN, "fidl", "%s missing receiver", __FUNCTION__);
+    return;
+  }
+  auto client = request.mutable_receiver()->Bind();
 
-  if (fidl_params.empty()) {
-    bt_log(WARN, "fidl", "%s: empty parameters (peer: %s)", __FUNCTION__, bt_str(peer_id));
+  if (!request.has_peer_id() || !request.has_initiator() || !request.has_params() ||
+      request.params().empty()) {
     client->Error(fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
     return;
   }
+  bt::PeerId peer_id(request.peer_id().value);
 
-  if (initiator && fidl_params.size() != 1u) {
+  if (request.initiator() && request.params().size() != 1u) {
     bt_log(WARN, "fidl", "%s: too many parameters in initiator request (peer: %s)", __FUNCTION__,
            bt_str(peer_id));
     client->Error(fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
     return;
   }
 
-  auto params_result = fidl_helpers::FidlToScoParametersVector(fidl_params);
+  auto params_result = fidl_helpers::FidlToScoParametersVector(request.params());
   if (params_result.is_error()) {
     bt_log(WARN, "fidl", "%s: invalid parameters (peer: %s)", __FUNCTION__, bt_str(peer_id));
     client->Error(fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
@@ -666,14 +668,15 @@ void ProfileServer::ConnectSco(fuchsia::bluetooth::PeerId fidl_peer_id, bool ini
   }
   auto params = params_result.value();
 
-  auto request = fbl::MakeRefCounted<ScoRequest>();
-  client.set_error_handler([request](zx_status_t status) { request->request_handle.reset(); });
-  request->receiver = std::move(client);
-  request->parameters = std::move(fidl_params);
+  auto sco_request = fbl::MakeRefCounted<ScoRequest>();
+  client.set_error_handler(
+      [sco_request](zx_status_t status) { sco_request->request_handle.reset(); });
+  sco_request->receiver = std::move(client);
+  sco_request->parameters = std::move(*request.mutable_params());
 
-  if (initiator) {
-    auto callback = [self = weak_self_.GetWeakPtr(),
-                     request](bt::sco::ScoConnectionManager::OpenConnectionResult result) mutable {
+  if (request.initiator()) {
+    auto callback = [self = weak_self_.GetWeakPtr(), sco_request](
+                        bt::sco::ScoConnectionManager::OpenConnectionResult result) mutable {
       // The connection may complete after this server is destroyed.
       if (!self.is_alive()) {
         // Prevent leaking connections.
@@ -685,20 +688,20 @@ void ProfileServer::ConnectSco(fuchsia::bluetooth::PeerId fidl_peer_id, bool ini
 
       // Convert result type.
       if (result.is_error()) {
-        self->OnScoConnectionResult(std::move(request), result.take_error());
+        self->OnScoConnectionResult(std::move(sco_request), result.take_error());
         return;
       }
       self->OnScoConnectionResult(
-          std::move(request),
+          std::move(sco_request),
           fit::ok(std::make_pair(std::move(result.value()), /*parameter index=*/0u)));
     };
 
-    request->request_handle =
+    sco_request->request_handle =
         adapter()->bredr()->OpenScoConnection(peer_id, params.front(), std::move(callback));
     return;
   }
-  auto callback = [self = weak_self_.GetWeakPtr(),
-                   request](bt::sco::ScoConnectionManager::AcceptConnectionResult result) mutable {
+  auto callback = [self = weak_self_.GetWeakPtr(), sco_request](
+                      bt::sco::ScoConnectionManager::AcceptConnectionResult result) mutable {
     // The connection may complete after this server is destroyed.
     if (!self.is_alive()) {
       // Prevent leaking connections.
@@ -708,9 +711,9 @@ void ProfileServer::ConnectSco(fuchsia::bluetooth::PeerId fidl_peer_id, bool ini
       return;
     }
 
-    self->OnScoConnectionResult(std::move(request), std::move(result));
+    self->OnScoConnectionResult(std::move(sco_request), std::move(result));
   };
-  request->request_handle =
+  sco_request->request_handle =
       adapter()->bredr()->AcceptScoConnection(peer_id, params, std::move(callback));
 }
 

@@ -497,9 +497,12 @@ class ProfileServerTestScoConnected : public ProfileServerTestConnectedPeer {
 
     fidlbredr::ScoConnectionReceiverHandle receiver_handle;
     FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
-    client()->ConnectSco(fuchsia::bluetooth::PeerId{peer()->identifier().value()},
-                         /*initiator=*/false, std::move(sco_params_list),
-                         std::move(receiver_handle));
+    fidlbredr::ProfileConnectScoRequest request;
+    request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
+    request.set_initiator(false);
+    request.set_params(std::move(sco_params_list));
+    request.set_receiver(std::move(receiver_handle));
+    client()->ConnectSco(std::move(request));
     RunLoopUntilIdle();
     test_device()->SendConnectionRequest(peer()->address(), pw::bluetooth::emboss::LinkType::SCO);
     RunLoopUntilIdle();
@@ -953,22 +956,63 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectionReceiverReturnsValidSocket) {
 
 TEST_F(ProfileServerTest, ConnectScoWithInvalidParameters) {
   std::vector<fidlbredr::ScoConnectionParameters> bad_sco_params;
-  bad_sco_params.emplace_back(fidlbredr::ScoConnectionParameters());
+  bad_sco_params.emplace_back();
   fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
-  client()->ConnectSco(fuchsia::bluetooth::PeerId{1}, /*initiator=*/true, std::move(bad_sco_params),
-                       std::move(receiver_handle));
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{1});
+  request.set_initiator(true);
+  request.set_params(std::move(bad_sco_params));
+  request.set_receiver(std::move(receiver_handle));
+  client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
   ASSERT_TRUE(receiver.error().has_value());
   EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
   EXPECT_FALSE(receiver.connection().is_bound());
 }
 
+TEST_F(ProfileServerTest, ConnectScoWithMissingPeerId) {
+  fidlbredr::ScoConnectionParameters sco_params = CreateScoConnectionParameters();
+  EXPECT_TRUE(fidl_helpers::FidlToScoParameters(sco_params).is_ok());
+  std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
+  sco_params_list.emplace_back(std::move(sco_params));
+  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
+  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_initiator(true);
+  request.set_params(std::move(sco_params_list));
+  request.set_receiver(std::move(receiver_handle));
+  client()->ConnectSco(std::move(request));
+  RunLoopUntilIdle();
+  ASSERT_TRUE(receiver.error().has_value());
+  EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
+  EXPECT_FALSE(receiver.connection().is_bound());
+}
+
+TEST_F(ProfileServerTest, ConnectScoWithMissingReceiverDoesNotCrash) {
+  fidlbredr::ScoConnectionParameters sco_params = CreateScoConnectionParameters();
+  EXPECT_TRUE(fidl_helpers::FidlToScoParameters(sco_params).is_ok());
+  std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
+  sco_params_list.emplace_back(std::move(sco_params));
+  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
+  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{1});
+  request.set_initiator(true);
+  request.set_params(std::move(sco_params_list));
+  client()->ConnectSco(std::move(request));
+  RunLoopUntilIdle();
+}
+
 TEST_F(ProfileServerTest, ConnectScoWithEmptyParameters) {
   fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
-  client()->ConnectSco(fuchsia::bluetooth::PeerId{1}, /*initiator=*/true, /*params=*/{},
-                       std::move(receiver_handle));
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{1});
+  request.set_initiator(true);
+  request.set_params({});
+  request.set_receiver(std::move(receiver_handle));
+  client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
   ASSERT_TRUE(receiver.error().has_value());
   EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
@@ -982,8 +1026,12 @@ TEST_F(ProfileServerTest, ConnectScoInitiatorWithTooManyParameters) {
 
   fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
-  client()->ConnectSco(fuchsia::bluetooth::PeerId{1}, /*initiator=*/true,
-                       /*params=*/std::move(sco_params_list), std::move(receiver_handle));
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{1});
+  request.set_initiator(true);
+  request.set_params(std::move(sco_params_list));
+  request.set_receiver(std::move(receiver_handle));
+  client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
   ASSERT_TRUE(receiver.error().has_value());
   EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
@@ -998,8 +1046,12 @@ TEST_F(ProfileServerTest, ConnectScoWithUnconnectedPeerReturnsError) {
 
   fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
-  client()->ConnectSco(fuchsia::bluetooth::PeerId{1}, /*initiator=*/true,
-                       std::move(sco_params_list), std::move(receiver_handle));
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{1});
+  request.set_initiator(true);
+  request.set_params(std::move(sco_params_list));
+  request.set_receiver(std::move(receiver_handle));
+  client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
   ASSERT_TRUE(receiver.error().has_value());
   EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::FAILURE);
@@ -1015,8 +1067,12 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoInitiatorSuccess) {
 
   fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
-  client()->ConnectSco(fuchsia::bluetooth::PeerId{peer()->identifier().value()}, /*initiator=*/true,
-                       std::move(sco_params_list), std::move(receiver_handle));
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
+  request.set_initiator(true);
+  request.set_params(std::move(sco_params_list));
+  request.set_receiver(std::move(receiver_handle));
+  client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
   EXPECT_FALSE(receiver.error().has_value());
   ASSERT_TRUE(receiver.connection().is_bound());
@@ -1037,8 +1093,12 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoResponderSuccess) {
 
   fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
-  client()->ConnectSco(fuchsia::bluetooth::PeerId{peer()->identifier().value()},
-                       /*initiator=*/false, std::move(sco_params_list), std::move(receiver_handle));
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
+  request.set_initiator(false);
+  request.set_params(std::move(sco_params_list));
+  request.set_receiver(std::move(receiver_handle));
+  client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
   // Receive a SCO connection request. The D0 parameters will be used to accept the request.
   test_device()->SendConnectionRequest(peer()->address(), pw::bluetooth::emboss::LinkType::SCO);
@@ -1056,8 +1116,13 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoResponderUnconnectedPeerReturns
 
   fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
-  client()->ConnectSco(fuchsia::bluetooth::PeerId{1}, /*initiator=*/false,
-                       std::move(sco_params_list), std::move(receiver_handle));
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{1});
+  request.set_initiator(false);
+  request.set_params(std::move(sco_params_list));
+  request.set_receiver(std::move(receiver_handle));
+  client()->ConnectSco(std::move(request));
+
   RunLoopUntilIdle();
   ASSERT_TRUE(receiver.error().has_value());
   EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::FAILURE);
@@ -1072,8 +1137,13 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoInitiatorAndCloseReceiver) {
 
   fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
-  client()->ConnectSco(fuchsia::bluetooth::PeerId{peer()->identifier().value()}, /*initiator=*/true,
-                       std::move(sco_params_list), std::move(receiver_handle));
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
+  request.set_initiator(true);
+  request.set_params(std::move(sco_params_list));
+  request.set_receiver(std::move(receiver_handle));
+  client()->ConnectSco(std::move(request));
+
   receiver.Close();
   RunLoopUntilIdle();
   EXPECT_FALSE(receiver.error().has_value());
@@ -1093,8 +1163,13 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoInitiatorAndCloseReceiverBefore
 
   test_device()->SetDefaultCommandStatus(bt::hci_spec::kEnhancedSetupSynchronousConnection,
                                          pw::bluetooth::emboss::StatusCode::SUCCESS);
-  client()->ConnectSco(fuchsia::bluetooth::PeerId{peer()->identifier().value()}, /*initiator=*/true,
-                       std::move(sco_params_list), std::move(receiver_handle));
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
+  request.set_initiator(true);
+  request.set_params(std::move(sco_params_list));
+  request.set_receiver(std::move(receiver_handle));
+  client()->ConnectSco(std::move(request));
+
   receiver.Close();
   RunLoopUntilIdle();
   EXPECT_FALSE(receiver.error().has_value());

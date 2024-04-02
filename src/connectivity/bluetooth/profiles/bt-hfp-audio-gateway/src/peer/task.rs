@@ -1841,7 +1841,16 @@ mod tests {
         loop {
             tracing::info!("Waiting for a SCO connection");
             let (proxy, params) = match profile_requests.next().await.expect("request").unwrap() {
-                bredr::ProfileRequest::ConnectSco { receiver, params, initiator, .. } => {
+                bredr::ProfileRequest::ConnectSco { payload, .. } => {
+                    let bredr::ProfileConnectScoRequest {
+                        initiator: Some(initiator),
+                        params: Some(params),
+                        receiver: Some(receiver),
+                        ..
+                    } = payload
+                    else {
+                        panic!("ConnectSco missing required fields");
+                    };
                     if initiator != expected_initiator {
                         tracing::warn!("Skipping because we expect {initiator} to match expected {expected_initiator}");
                         continue;

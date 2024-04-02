@@ -451,9 +451,8 @@ impl ProfileRegistrar {
                 // Searches are handled directly by the upstream Profile Server.
                 let _ = self.profile_upstream.search(service_uuid, &attr_ids, results);
             }
-            bredr::ProfileRequest::ConnectSco { peer_id, initiator, params, receiver, .. } => {
-                // Sco connections are handled directly by the upstream Profile Server.
-                let _ = self.profile_upstream.connect_sco(&peer_id, initiator, &params, receiver);
+            bredr::ProfileRequest::ConnectSco { payload, .. } => {
+                let _ = self.profile_upstream.connect_sco(payload);
             }
             bredr::ProfileRequest::_UnknownMethod { .. } => {
                 warn!("ProfileRequest: received unknown method");
@@ -612,12 +611,13 @@ mod tests {
             create_request_stream::<bredr::ScoConnectionReceiverMarker>().unwrap();
 
         assert!(profile_proxy
-            .connect_sco(
-                &PeerId(1).into(),
-                /*initiator=*/ true,
-                &[bredr::ScoConnectionParameters::default()],
-                receiver_client
-            )
+            .connect_sco(bredr::ProfileConnectScoRequest {
+                peer_id: Some(PeerId(1).into()),
+                initiator: Some(true),
+                params: Some(vec![bredr::ScoConnectionParameters::default()]),
+                receiver: Some(receiver_client),
+                ..Default::default()
+            })
             .is_ok());
 
         match exec.run_until_stalled(&mut profile_request_stream.next()) {

@@ -161,12 +161,14 @@ impl ScoConnector {
     ) -> Result<ScoConnection, ScoConnectError> {
         let (client, mut requests) =
             fidl::endpoints::create_request_stream::<bredr::ScoConnectionReceiverMarker>()?;
-        proxy.connect_sco(
-            &peer_id.into(),
-            /* initiate = */ role == ScoInitiatorRole::Initiate,
-            &params,
-            client,
-        )?;
+        proxy.connect_sco(bredr::ProfileConnectScoRequest {
+            peer_id: Some(peer_id.into()),
+            initiator: Some(role == ScoInitiatorRole::Initiate),
+            params: Some(params),
+            receiver: Some(client),
+            ..Default::default()
+        })?;
+
         match requests.next().await {
             Some(Ok(bredr::ScoConnectionReceiverRequest::Connected {
                 connection,

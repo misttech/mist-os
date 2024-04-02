@@ -323,10 +323,14 @@ open protocol Profile {
     /// The result of the connection attempt and the parameters used for the
     /// connection will be returned with `receiver`.  Dropping `receiver` will
     /// cancel the request.
-    flexible ConnectSco(resource struct {
-        peer_id fuchsia.bluetooth.PeerId;
-        initiator bool;
-        params vector<ScoConnectionParameters>:MAX;
-        receiver client_end:ScoConnectionReceiver;
+    flexible ConnectSco(resource table {
+        /// Required.
+        1: peer_id fuchsia.bluetooth.PeerId;
+        /// Required.
+        2: initiator bool;
+        /// Required.
+        3: params vector<ScoConnectionParameters>:MAX;
+        /// Required.
+        4: receiver client_end:ScoConnectionReceiver;
     });
 };
