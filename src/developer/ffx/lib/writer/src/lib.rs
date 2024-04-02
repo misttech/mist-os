@@ -27,8 +27,8 @@ pub enum Error {
     Utf8(#[from] std::string::FromUtf8Error),
     #[error("`{0}` is not a valid machine format")]
     InvalidFormat(String),
-    #[error("Schema validation failed")]
-    SchemaFailure,
+    #[error("Schema validation failed: {0}")]
+    SchemaFailure(String),
 }
 
 type Result<O, E = Error> = std::result::Result<O, E>;
@@ -57,7 +57,7 @@ impl From<Error> for ffx_command_error::Error {
         use ffx_command_error::Error::*;
         use Error::*;
         match error {
-            error @ (Io(_) | Json(_) | Utf8(_) | SchemaFailure) => Unexpected(error.into()),
+            error @ (Io(_) | Json(_) | Utf8(_) | SchemaFailure(_)) => Unexpected(error.into()),
             error @ InvalidFormat(_) => User(error.into()),
         }
     }

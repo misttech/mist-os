@@ -29,7 +29,7 @@ pub trait ToolIO: Write + Sized {
     }
 
     fn try_print_schema(&mut self) -> Result<()> {
-        Err(Error::SchemaFailure)
+        Err(Error::SchemaFailure("No schema defined".into()))
     }
 
     /// Returns true if the receiver was configured to output for machines.

@@ -1,8 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{Format, MachineWriter, Result, TestBuffers, ToolIO};
+use crate::{format_output, Format, MachineWriter, Result, TestBuffers, ToolIO};
 use serde::Serialize;
+use serde_json::Value;
 use std::{fmt::Display, io::Write};
 
 /// Structured output writer with schema.
@@ -67,6 +68,26 @@ where
     {
         self.machine_writer.machine_or_else(value, f)
     }
+
+    /// Validates the passed in data object against the schema
+    /// for the writer type.
+    pub fn verify_schema(&self, data: &Value) -> Result<()> {
+        let s = schemars::schema_for!(T);
+        let mut schema: Vec<u8> = vec![];
+        format_output(Format::JsonPretty, &mut schema, &s)?;
+        let schema_val = serde_json::from_slice(&schema)?;
+
+        let mut scope = valico::json_schema::Scope::new();
+        let schema = scope
+            .compile_and_return(serde_json::to_value(&schema_val)?, false)
+            .map_err(|e| crate::Error::SchemaFailure(format!("Error compiling schema: {e:?}")))?;
+        let state = schema.validate(data);
+
+        if !state.is_valid() {
+            return Err(crate::Error::SchemaFailure(format!("{:?}", state.errors)));
+        }
+        Ok(())
+    }
 }
 
 impl<T> ToolIO for VerifiedMachineWriter<T>
@@ -120,7 +141,6 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::format_output;
     use schemars::JsonSchema;
 
     #[test]
