@@ -18,13 +18,30 @@
         "target_type"
       ],
       "properties": {
-        "nodename": true,
-        "rcs_state": true,
-        "serial": true,
-        "target_type": true,
-        "target_state": true,
-        "addresses": true,
-        "is_default": true
+        "nodename": {
+          "type": "string"
+        },
+        "rcs_state": {
+          "type": "string"
+        },
+        "serial": {
+          "type": "string"
+        },
+        "target_type": {
+          "type": "string"
+        },
+        "target_state": {
+          "type": "string"
+        },
+        "addresses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "is_default": {
+          "type": "boolean"
+        }
       }
     }
   }

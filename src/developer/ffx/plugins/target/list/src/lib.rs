@@ -41,13 +41,13 @@ fho::embedded_plugin!(ListTool);
 #[async_trait(?Send)]
 impl FfxMain for ListTool {
     type Writer = VerifiedMachineWriter<Vec<JsonTarget>>;
-    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let infos = if ffx_target::is_discovery_enabled(&self.context).await {
             list_targets(self.tc_proxy.await?, &self.cmd).await?
         } else {
             local_list_targets(&self.context, &self.cmd).await?
         };
-        show_targets(self.cmd, infos, writer, &self.context).await?;
+        show_targets(self.cmd, infos, &mut writer, &self.context).await?;
         Ok(())
     }
 }
@@ -55,7 +55,7 @@ impl FfxMain for ListTool {
 async fn show_targets(
     cmd: ListCommand,
     infos: Vec<ffx::TargetInfo>,
-    mut writer: VerifiedMachineWriter<Vec<JsonTarget>>,
+    writer: &mut VerifiedMachineWriter<Vec<JsonTarget>>,
     context: &EnvironmentContext,
 ) -> Result<()> {
     match infos.len() {
@@ -228,9 +228,9 @@ mod test {
     ) -> Result<String> {
         let proxy = setup_fake_target_collection_server(num_tests);
         let test_buffers = TestBuffers::default();
-        let writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
         let infos = list_targets(proxy, &cmd).await?;
-        show_targets(cmd, infos, writer, context).await?;
+        show_targets(cmd, infos, &mut writer, context).await?;
         Ok(test_buffers.into_stdout_str())
     }
 
@@ -240,6 +240,26 @@ mod test {
         context: &EnvironmentContext,
     ) -> String {
         try_run_list_test(num_tests, cmd, context).await.unwrap()
+    }
+
+    #[fuchsia::test]
+    async fn test_machine_schema() {
+        let env = ffx_config::test_init().await.unwrap();
+        let proxy = setup_fake_target_collection_server(3);
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(Some(fho::Format::Json), &test_buffers);
+        let cmd = ListCommand { format: Format::Tabular, ..Default::default() };
+        let infos = list_targets(proxy, &cmd).await.expect("list targets");
+        show_targets(cmd, infos, &mut writer, &env.context).await.expect("show_targets");
+        let data_str = test_buffers.into_stdout_str();
+        let data = serde_json::from_str(&data_str).expect("json value");
+        match writer.verify_schema(&data) {
+            Ok(_) => (),
+            Err(e) => {
+                println!("Error verifying schema: {e}");
+                println!("{data:?}");
+            }
+        };
     }
 
     #[fuchsia::test]

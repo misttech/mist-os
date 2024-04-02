@@ -10,7 +10,6 @@ use fidl_fuchsia_net::IpAddress;
 use netext::IsLocalAddr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::{
     cmp::max,
     fmt::{self, Display, Write},
@@ -364,14 +363,6 @@ macro_rules! make_structs_and_support_functions {
             }
         }
 
-        #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
-        pub struct JsonTarget {
-            $(
-                $field: serde_json::Value,
-            )*
-            is_default: serde_json::Value,
-        }
-
         make_structs_and_support_functions!(@print_func $($field,)*);
     };
 
@@ -399,6 +390,16 @@ macro_rules! make_structs_and_support_functions {
     };
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
+pub struct JsonTarget {
+    nodename: String,
+    rcs_state: String,
+    serial: String,
+    target_type: String,
+    target_state: String,
+    addresses: Vec<String>,
+    is_default: bool,
+}
 // Second field is printed last in this implementation, everything else is printed in order.
 make_structs_and_support_functions!(
     nodename,
@@ -502,24 +503,24 @@ impl TryFrom<(Option<usize>, ffx::TargetInfo)> for JsonTarget {
 
     fn try_from((index, target): (Option<usize>, ffx::TargetInfo)) -> Result<Self, Self::Error> {
         Ok(Self {
-            nodename: json!(nodename_to_string(index, target.nodename)),
-            serial: json!(target.serial_number.unwrap_or(UNKNOWN.to_string())),
-            addresses: json!(target
+            nodename: nodename_to_string(index, target.nodename),
+            serial: target.serial_number.unwrap_or(UNKNOWN.to_string()),
+            addresses: target
                 .addresses
                 .unwrap_or(vec![])
                 .drain(..)
                 .map(StringifiedTarget::from_target_addr_info)
-                .collect::<Vec<_>>()),
-            rcs_state: json!(StringifiedTarget::from_rcs_state(
+                .collect::<Vec<_>>(),
+            rcs_state: StringifiedTarget::from_rcs_state(
                 target.rcs_state.ok_or(StringifyError::MissingRcsState)?,
-            )),
-            target_type: json!(StringifiedTarget::from_target_type(
+            ),
+            target_type: StringifiedTarget::from_target_type(
                 target.board_config.as_deref(),
                 target.product_config.as_deref(),
-            )),
-            target_state: json!(StringifiedTarget::from_target_state(
+            ),
+            target_state: StringifiedTarget::from_target_state(
                 target.target_state.ok_or(StringifyError::MissingTargetState)?,
-            )),
+            ),
             is_default: false.into(),
         })
     }
