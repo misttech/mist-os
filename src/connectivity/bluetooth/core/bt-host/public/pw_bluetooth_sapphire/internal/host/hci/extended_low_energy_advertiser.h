@@ -94,7 +94,7 @@ class ExtendedLowEnergyAdvertiser final : public LowEnergyAdvertiser {
       const DeviceAddress& address,
       pw::bluetooth::emboss::LEAdvertisingType type,
       pw::bluetooth::emboss::LEOwnAddressType own_address_type,
-      AdvertisingIntervalRange interval,
+      const AdvertisingIntervalRange& interval,
       bool extended_pdu) override;
 
   EmbossCommandPacket BuildSetAdvertisingData(const DeviceAddress& address,
