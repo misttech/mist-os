@@ -625,7 +625,11 @@ pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
 
     /// Call `f` with each socket's state.
     fn for_each_socket<
-        F: FnMut(&mut Self::SocketsStateCtx<'_>, &SocketState<I, Self::WeakDeviceId, S>),
+        F: FnMut(
+            &mut Self::SocketsStateCtx<'_>,
+            &S::SocketId<I, Self::WeakDeviceId>,
+            &SocketState<I, Self::WeakDeviceId, S>,
+        ),
     >(
         &mut self,
         cb: F,
@@ -5294,6 +5298,7 @@ mod test {
         fn for_each_socket<
             F: FnMut(
                 &mut Self::SocketsStateCtx<'_>,
+                &Id<I, Self::WeakDeviceId>,
                 &SocketState<I, Self::WeakDeviceId, FakeStateSpec>,
             ),
         >(
@@ -5302,7 +5307,7 @@ mod test {
         ) {
             self.outer.keys().for_each(|id| {
                 let id = Id::from(id.clone());
-                cb(&mut self.inner, &id.get());
+                cb(&mut self.inner, &id, &id.get());
             })
         }
     }

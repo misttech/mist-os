@@ -1327,7 +1327,11 @@ pub trait StateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
 
     /// Call `f` with each socket's state.
     fn for_each_socket<
-        F: FnMut(&mut Self::SocketStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId, BC>),
+        F: FnMut(
+            &mut Self::SocketStateCtx<'_>,
+            &UdpSocketId<I, Self::WeakDeviceId, BC>,
+            &UdpSocketState<I, Self::WeakDeviceId, BC>,
+        ),
     >(
         &mut self,
         cb: F,
@@ -2335,8 +2339,8 @@ where
         N: Inspector
             + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
     {
-        DatagramStateContext::for_each_socket(self.core_ctx(), |_ctx, socket_state| {
-            inspector.record_unnamed_child(|node| {
+        DatagramStateContext::for_each_socket(self.core_ctx(), |_ctx, socket_id, socket_state| {
+            inspector.record_debug_child(socket_id, |node| {
                 socket_state.record_common_info(node);
 
                 let socket_info = socket_state.to_socket_info().into();
@@ -2443,7 +2447,11 @@ impl<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>, CC: StateContext<I, BC
     }
 
     fn for_each_socket<
-        F: FnMut(&mut Self::SocketsStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId, BC>),
+        F: FnMut(
+            &mut Self::SocketsStateCtx<'_>,
+            &UdpSocketId<I, Self::WeakDeviceId, BC>,
+            &UdpSocketState<I, Self::WeakDeviceId, BC>,
+        ),
     >(
         &mut self,
         cb: F,
@@ -2941,6 +2949,7 @@ mod tests {
         fn for_each_socket<
             F: FnMut(
                 &mut Self::SocketStateCtx<'_>,
+                &UdpSocketId<I, Self::WeakDeviceId, FakeUdpBindingsCtx<D>>,
                 &UdpSocketState<I, Self::WeakDeviceId, FakeUdpBindingsCtx<D>>,
             ),
         >(
@@ -2949,7 +2958,7 @@ mod tests {
         ) {
             self.outer.borrow().keys().for_each(|id| {
                 let id = UdpSocketId::from(id.clone());
-                cb(&mut self.inner, &id.get());
+                cb(&mut self.inner, &id, &id.get());
             })
         }
     }

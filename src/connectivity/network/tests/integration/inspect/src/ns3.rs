@@ -12,7 +12,7 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 
 use net_declare::{fidl_mac, fidl_subnet, std_ip_v4};
 use net_types::{
-    ip::{IpAddress, Ipv4, Ipv6},
+    ip::{IpAddress, IpVersion, Ipv4, Ipv6},
     AddrAndPortFormatter, Witness as _,
 };
 use netstack_testing_common::{constants, get_inspect_data, realms::TestSandboxExt as _};
@@ -21,7 +21,7 @@ use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
 use test_case::test_case;
 
 #[netstack_test]
-async fn inspect_sockets(name: &str) {
+async fn inspect_sockets<I: net_types::ip::Ip>(name: &str) {
     type N = netstack_testing_common::realms::Netstack3;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
@@ -35,25 +35,29 @@ async fn inspect_sockets(name: &str) {
         netstack_testing_common::interfaces::wait_for_v6_ll(&interfaces_state, dev.id())
             .await
             .expect("wait for v6 link local");
+    let scope = dev.id().try_into().unwrap();
 
     // Ensure ns3 has started and that there is a Socket to collect inspect data about.
-    let tcp_socket = realm
-        .stream_socket(fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp)
-        .await
-        .expect("create TCP socket");
     const PORT: u16 = 8080;
-    tcp_socket
-        .bind(&std::net::SocketAddr::from((std_ip_v4!("0.0.0.0"), PORT)).into())
-        .expect("bind to 0.0.0.0");
-
+    let (domain, addr) = match I::VERSION {
+        IpVersion::V4 => {
+            (fposix_socket::Domain::Ipv4, std::net::SocketAddr::from((std_ip_v4!("0.0.0.0"), PORT)))
+        }
+        IpVersion::V6 => (
+            fposix_socket::Domain::Ipv6,
+            std::net::SocketAddr::from(std::net::SocketAddrV6::new(
+                link_local.into(),
+                PORT,
+                0,
+                scope,
+            )),
+        ),
+    };
     let tcp_socket = realm
-        .stream_socket(fposix_socket::Domain::Ipv6, fposix_socket::StreamSocketProtocol::Tcp)
+        .stream_socket(domain, fposix_socket::StreamSocketProtocol::Tcp)
         .await
         .expect("create TCP socket");
-
-    let scope = dev.id().try_into().unwrap();
-    let sockaddr = std::net::SocketAddrV6::new(link_local.into(), PORT, 0, scope);
-    tcp_socket.bind(&sockaddr.into()).expect("bind socket");
+    tcp_socket.bind(&addr.into()).expect("bind");
 
     let data =
         get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
@@ -62,22 +66,38 @@ async fn inspect_sockets(name: &str) {
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
-    diagnostics_assertions::assert_data_tree!(data, "root": contains {
-        "Sockets": {
-            "0": {
-                LocalAddress: format!("0.0.0.0:{PORT}"),
-                RemoteAddress: "[NOT CONNECTED]",
-                TransportProtocol: "TCP",
-                NetworkProtocol: "IPv4"
-            },
-            "1": {
-                LocalAddress: format!("[{link_local}%{scope}]:{PORT}"),
-                RemoteAddress: "[NOT CONNECTED]",
-                TransportProtocol: "TCP",
-                NetworkProtocol: "IPv6"
-            }
+
+    // NB: The sockets are keyed by an opaque debug identifier; get that here.
+    let sockets = data.get_child("Sockets").unwrap();
+    assert_eq!(sockets.children.len(), 1);
+    let sock_name = sockets.children[0].name.clone();
+
+    match I::VERSION {
+        IpVersion::V4 => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                    "Sockets": {
+                        sock_name => {
+                            LocalAddress: format!("0.0.0.0:{PORT}"),
+                            RemoteAddress: "[NOT CONNECTED]",
+                            TransportProtocol: "TCP",
+                            NetworkProtocol: "IPv4",
+                        },
+                    }
+            })
         }
-    })
+        IpVersion::V6 => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                "Sockets": {
+                    sock_name => {
+                        LocalAddress: format!("[{link_local}%{scope}]:{PORT}"),
+                        RemoteAddress: "[NOT CONNECTED]",
+                        TransportProtocol: "TCP",
+                        NetworkProtocol: "IPv6",
+                    }
+                }
+            })
+        }
+    }
 }
 
 enum SocketState {
@@ -165,9 +185,13 @@ async fn inspect_datagram_sockets<I: net_types::ip::Ip + TestIpExt>(
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
+    // NB: The sockets are keyed by an opaque debug identifier.
+    let sockets = data.get_child("Sockets").unwrap();
+    assert_eq!(sockets.children.len(), 1);
+    let sock_name = sockets.children[0].name.clone();
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         Sockets: {
-            "0": {
+            sock_name => {
                 LocalAddress: want_local,
                 RemoteAddress: want_remote,
                 TransportProtocol: want_proto,

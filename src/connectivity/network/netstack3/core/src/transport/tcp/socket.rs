@@ -593,7 +593,12 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     fn socket_destruction_deferred(&mut self, socket: WeakTcpSocketId<I, Self::WeakDeviceId, BC>);
 
     /// Calls the callback once for each currently installed socket.
-    fn for_each_socket<F: FnMut(&TcpSocketState<I, Self::WeakDeviceId, BC>)>(&mut self, cb: F);
+    fn for_each_socket<
+        F: FnMut(&TcpSocketId<I, Self::WeakDeviceId, BC>, &TcpSocketState<I, Self::WeakDeviceId, BC>),
+    >(
+        &mut self,
+        cb: F,
+    );
 
     /// Calls the function with access to the socket state, ISN generator, and
     /// Transport + Demux context.
@@ -4053,7 +4058,7 @@ where
         N: Inspector
             + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
     {
-        self.core_ctx().for_each_socket(|socket_state| {
+        self.core_ctx().for_each_socket(|socket_id, socket_state| {
             let TcpSocketState { socket_state, ip_options: _ } = socket_state;
             let (local, remote) = match socket_state {
                 TcpSocketStateInner::Unbound(_) => (None, None),
@@ -4084,7 +4089,7 @@ where
                     (Some((ip.into(), port)), Some(remote_addr))
                 }
             };
-            inspector.record_unnamed_child(|node| {
+            inspector.record_debug_child(socket_id, |node| {
                 node.record_str("TransportProtocol", "TCP");
                 node.record_str(
                     "NetworkProtocol",
@@ -5469,7 +5474,12 @@ mod tests {
             );
         }
 
-        fn for_each_socket<F: FnMut(&TcpSocketState<Ipv6, Self::WeakDeviceId, BC>)>(
+        fn for_each_socket<
+            F: FnMut(
+                &TcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
+                &TcpSocketState<Ipv6, Self::WeakDeviceId, BC>,
+            ),
+        >(
             &mut self,
             _cb: F,
         ) {
@@ -5544,7 +5554,12 @@ mod tests {
             );
         }
 
-        fn for_each_socket<F: FnMut(&TcpSocketState<Ipv4, Self::WeakDeviceId, BC>)>(
+        fn for_each_socket<
+            F: FnMut(
+                &TcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
+                &TcpSocketState<Ipv4, Self::WeakDeviceId, BC>,
+            ),
+        >(
             &mut self,
             _cb: F,
         ) {

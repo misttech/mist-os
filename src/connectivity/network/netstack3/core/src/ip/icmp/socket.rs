@@ -319,7 +319,11 @@ pub trait StateContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self::De
 
     /// Call `f` with each socket's state.
     fn for_each_socket<
-        F: FnMut(&mut Self::SocketStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId, BC>),
+        F: FnMut(
+            &mut Self::SocketStateCtx<'_>,
+            &IcmpSocketId<I, Self::WeakDeviceId, BC>,
+            &IcmpSocketState<I, Self::WeakDeviceId, BC>,
+        ),
     >(
         &mut self,
         cb: F,
@@ -589,7 +593,11 @@ where
     }
 
     fn for_each_socket<
-        F: FnMut(&mut Self::SocketsStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId, BC>),
+        F: FnMut(
+            &mut Self::SocketsStateCtx<'_>,
+            &IcmpSocketId<I, Self::WeakDeviceId, BC>,
+            &IcmpSocketState<I, Self::WeakDeviceId, BC>,
+        ),
     >(
         &mut self,
         cb: F,
@@ -954,8 +962,8 @@ where
         N: Inspector
             + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
     {
-        DatagramStateContext::for_each_socket(self.core_ctx(), |_ctx, socket_state| {
-            inspector.record_unnamed_child(|node| {
+        DatagramStateContext::for_each_socket(self.core_ctx(), |_ctx, socket_id, socket_state| {
+            inspector.record_debug_child(socket_id, |node| {
                 socket_state.record_common_info(node);
 
                 let socket_info = socket_state.to_icmp_socket_info();

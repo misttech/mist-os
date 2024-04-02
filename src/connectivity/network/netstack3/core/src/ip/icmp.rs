@@ -3348,6 +3348,7 @@ mod tests {
         fn for_each_socket<
             F: FnMut(
                 &mut Self::SocketStateCtx<'_>,
+                &IcmpSocketId<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>,
                 &IcmpSocketState<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>,
             ),
         >(
@@ -3356,7 +3357,7 @@ mod tests {
         ) {
             self.outer.keys().for_each(|id| {
                 let id = IcmpSocketId::from(id.clone());
-                cb(&mut self.inner, &id.get());
+                cb(&mut self.inner, &id, &id.get());
             })
         }
     }

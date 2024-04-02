@@ -107,7 +107,12 @@ where
         // Do nothing, we use this function to assert on deferred destruction.
     }
 
-    fn for_each_socket<F: FnMut(&TcpSocketState<Ipv4, Self::WeakDeviceId, BC>)>(
+    fn for_each_socket<
+        F: FnMut(
+            &TcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
+            &TcpSocketState<Ipv4, Self::WeakDeviceId, BC>,
+        ),
+    >(
         &mut self,
         mut cb: F,
     ) {
@@ -117,7 +122,7 @@ where
             let mut locked = locked.adopt(id);
             let guard = locked
                 .read_lock_with::<crate::lock_ordering::TcpSocketState<Ipv4>, _>(|c| c.right());
-            cb(&*guard);
+            cb(id, &*guard);
         });
     }
 
@@ -195,7 +200,12 @@ where
         // Do nothing, we use this function to assert on deferred destruction.
     }
 
-    fn for_each_socket<F: FnMut(&TcpSocketState<Ipv6, Self::WeakDeviceId, BC>)>(
+    fn for_each_socket<
+        F: FnMut(
+            &TcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
+            &TcpSocketState<Ipv6, Self::WeakDeviceId, BC>,
+        ),
+    >(
         &mut self,
         mut cb: F,
     ) {
@@ -205,7 +215,7 @@ where
             let mut locked = locked.adopt(id);
             let guard = locked
                 .read_lock_with::<crate::lock_ordering::TcpSocketState<Ipv6>, _>(|c| c.right());
-            cb(&*guard);
+            cb(id, &*guard);
         });
     }
 
@@ -374,7 +384,11 @@ impl<I: Ip, BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpAllSocke
     }
 
     fn for_each_socket<
-        F: FnMut(&mut Self::SocketStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId, BC>),
+        F: FnMut(
+            &mut Self::SocketStateCtx<'_>,
+            &UdpSocketId<I, Self::WeakDeviceId, BC>,
+            &UdpSocketState<I, Self::WeakDeviceId, BC>,
+        ),
     >(
         &mut self,
         mut cb: F,
@@ -387,7 +401,7 @@ impl<I: Ip, BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpAllSocke
             let (socket_state, mut restricted) = locked
                 .read_lock_with_and::<crate::lock_ordering::UdpSocketState<I>, _>(|c| c.right());
             let mut restricted = restricted.cast_core_ctx();
-            cb(&mut restricted, &socket_state);
+            cb(&mut restricted, &id, &socket_state);
         });
     }
 }

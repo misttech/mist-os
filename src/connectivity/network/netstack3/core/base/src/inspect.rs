@@ -48,6 +48,15 @@ pub trait Inspector: Sized {
         self.record_child(&format!("{name}"), f)
     }
 
+    /// Records a child whose name is the Debug implementation of `T`.
+    fn record_debug_child<T: Debug, F: FnOnce(&mut Self::ChildInspector<'_>)>(
+        &mut self,
+        name: T,
+        f: F,
+    ) {
+        self.record_child(&format!("{name:?}"), f)
+    }
+
     /// Records anything that can be represented by a u64.
     fn record_uint<T: Into<u64>>(&mut self, name: &str, value: T);
 
