@@ -895,12 +895,14 @@ async fn handle_nl80211_message<I: IfaceManager>(
     match message.payload.cmd {
         Nl80211Cmd::GetWiphy => {
             info!("Nl80211Cmd::GetWiphy");
-            responder
-                .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
+            let phys = iface_manager.list_phys().await?;
+            let mut resp = vec![];
+            for phy_id in phys {
+                resp.push(build_nl80211_message(
                     Nl80211Cmd::NewWiphy,
                     vec![
                         // Phy ID
-                        Nl80211Attr::Wiphy(0),
+                        Nl80211Attr::Wiphy(phy_id as u32),
                         // Supported bands
                         Nl80211Attr::WiphyBands(vec![vec![Nl80211BandAttr::Frequencies(
                             get_supported_frequencies(),
@@ -913,8 +915,9 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         Nl80211Attr::FeatureFlags(0),
                         Nl80211Attr::ExtendedFeatures(vec![]),
                     ],
-                )])))
-                .context("Failed to send NewWiphy")?;
+                ));
+            }
+            responder.send(Ok(nl80211_message_resp(resp))).context("Failed to send NewWiphy")?;
         }
         Nl80211Cmd::GetInterface => {
             info!("Nl80211Cmd::GetInterface");
@@ -1091,6 +1094,34 @@ async fn handle_nl80211_message<I: IfaceManager>(
                 }
             }
         }
+        Nl80211Cmd::GetReg => {
+            info!("Nl80211Cmd::GetReg");
+            match find_phy_id(&message.payload.attrs[..]) {
+                Some(phy_id) => match iface_manager.get_country(phy_id.try_into()?).await {
+                    Ok(country) => {
+                        let resp = build_nl80211_message(
+                            Nl80211Cmd::GetReg,
+                            vec![Nl80211Attr::RegulatoryRegionAlpha2(country)],
+                        );
+                        responder
+                            .send(Ok(nl80211_message_resp(vec![resp])))
+                            .context("Failed to respond to GetReg")?;
+                    }
+                    Err(e) => {
+                        error!("Failed to get regulatory region from phy: {:?}", e);
+                        responder
+                            .send(Err(zx::sys::ZX_ERR_INTERNAL))
+                            .context("Failed to respond to GetReg with error")?;
+                    }
+                },
+                None => {
+                    responder
+                        .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
+                        .context("sending error status due to missing iface id on GetReg")?;
+                    bail!("GetReg did not include a phy id");
+                }
+            }
+        }
         _ => {
             warn!("Dropping nl80211 message: {:?}", message);
             responder
@@ -1119,6 +1150,17 @@ fn convert_scan_result(result: fidl_sme::ScanResult) -> Nl80211Attr {
             rssi: result.bss_description.rssi_dbm.into(),
         }]),
     ])
+}
+
+fn find_phy_id(attrs: &[Nl80211Attr]) -> Option<u32> {
+    attrs
+        .iter()
+        .filter_map(|attr| match attr {
+            Nl80211Attr::Wiphy(idx) => Some(idx),
+            _ => None,
+        })
+        .cloned()
+        .next()
 }
 
 fn find_iface_id(attrs: &[Nl80211Attr]) -> Option<u32> {
@@ -2522,5 +2564,39 @@ mod tests {
             exec.run_until_stalled(&mut get_scan_fut),
             Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INVALID_ARGS))),
         );
+    }
+
+    #[test]
+    fn get_reg() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) =
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let iface_manager = Arc::new(TestIfaceManager::new_with_client());
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        pin_mut!(nl80211_fut);
+
+        let get_reg_message =
+            build_nl80211_message(Nl80211Cmd::GetReg, vec![Nl80211Attr::Wiphy(123)]);
+        let get_reg_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
+            message: Some(get_reg_message),
+            ..Default::default()
+        });
+
+        pin_mut!(get_reg_fut);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        let responses = assert_variant!(
+            exec.run_until_stalled(&mut get_reg_fut),
+            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
+        );
+        assert_eq!(responses.len(), 1);
+        let message = expect_nl80211_message(&responses[0]);
+        assert_eq!(message.payload.cmd, Nl80211Cmd::GetReg);
+        assert!(message
+            .payload
+            .attrs
+            .iter()
+            .any(|attr| *attr == Nl80211Attr::RegulatoryRegionAlpha2([b'W', b'W'])));
     }
 }

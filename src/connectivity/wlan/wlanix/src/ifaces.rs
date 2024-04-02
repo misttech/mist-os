@@ -27,6 +27,7 @@ pub(crate) trait IfaceManager: Send + Sync {
 
     async fn list_phys(&self) -> Result<Vec<u16>, Error>;
     fn list_ifaces(&self) -> Vec<u16>;
+    async fn get_country(&self, phy_id: u16) -> Result<[u8; 2], Error>;
     async fn query_iface(
         &self,
         iface_id: u16,
@@ -61,6 +62,17 @@ impl IfaceManager for DeviceMonitorIfaceManager {
 
     fn list_ifaces(&self) -> Vec<u16> {
         self.ifaces.lock().keys().cloned().collect::<Vec<_>>()
+    }
+
+    async fn get_country(&self, phy_id: u16) -> Result<[u8; 2], Error> {
+        let result = self.monitor_svc.get_country(phy_id).await.map_err(Into::<Error>::into)?;
+        match result {
+            Ok(get_country_response) => Ok(get_country_response.alpha2),
+            Err(e) => match zx::Status::ok(e) {
+                Err(e) => Err(e.into()),
+                Ok(()) => Err(format_err!("get_country returned error with ok status")),
+            },
+        }
     }
 
     async fn query_iface(
@@ -610,6 +622,10 @@ pub mod test_utils {
             }
         }
 
+        async fn get_country(&self, _phy_id: u16) -> Result<[u8; 2], Error> {
+            Ok([b'W', b'W'])
+        }
+
         async fn query_iface(
             &self,
             iface_id: u16,
@@ -700,6 +716,25 @@ mod tests {
         let result =
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(info)) => info);
         assert_eq!(result, FAKE_IFACE_RESPONSE);
+    }
+
+    #[test]
+    fn test_get_country() {
+        let (mut exec, mut monitor_stream, manager) = setup_test();
+        let mut fut = manager.get_country(123);
+
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let (phy_id, responder) = assert_variant!(
+                 exec.run_until_stalled(&mut monitor_stream.select_next_some()),
+            Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::GetCountry { phy_id, responder })) => (phy_id, responder));
+        assert_eq!(phy_id, 123);
+        responder
+            .send(Ok(&fidl_device_service::GetCountryResponse { alpha2: [b'A', b'B'] }))
+            .expect("Failed to respond to GetCountry");
+
+        let country =
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(info)) => info);
+        assert_eq!(country, [b'A', b'B']);
     }
 
     #[test]
