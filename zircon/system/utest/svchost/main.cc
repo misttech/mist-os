@@ -65,14 +65,6 @@ TEST(SvchostTest, FuchsiaSchedulerProfileProviderPresent) {
   ASSERT_OK(result.status(), "fuchsia_scheduler_deprecated::ProfileProvider::GetProfile failed");
 }
 
-TEST(SvchostTest, FuchsiaRootResourcePresent) {
-  auto client_end = component::Connect<fuchsia_boot::RootResource>();
-  ASSERT_TRUE(client_end.is_ok(), "failed to connect to fuchsia_boot::RootResource");
-
-  auto result = fidl::WireCall(*client_end)->Get();
-  ASSERT_OK(result.status(), "fuchsia_boot::RootResource::Get failed");
-}
-
 TEST(SvchostTest, FuchsiaRootJobPresent) {
   auto client_end = component::Connect<fuchsia_kernel::RootJob>();
   ASSERT_TRUE(client_end.is_ok(), "failed to connect to fuchsia_kernel::RootJob");
