@@ -121,11 +121,6 @@ void TestFilesystem::TakeSnapshot(std::optional<InspectData>* out) const {
   loop.StartThread("inspect-snapshot-thread");
   async::Executor executor(loop.dispatcher());
 
-  auto context = sys::ComponentContext::Create();
-  fuchsia::diagnostics::ArchiveAccessorPtr accessor;
-  ASSERT_TRUE(context->svc()->Connect(accessor.NewRequest(executor.dispatcher())) == ZX_OK)
-      << "Failed to connect to ArchiveAccessor";
-
   std::condition_variable cv;
   std::mutex m;
   bool done = false;
@@ -133,23 +128,25 @@ void TestFilesystem::TakeSnapshot(std::optional<InspectData>* out) const {
   fpromise::result<std::vector<InspectData>, std::string> data_or_err;
   auto component_selector =
       diagnostics::reader::SanitizeMonikerForSelectors(filesystem_->GetMoniker());
-  diagnostics::reader::ArchiveReader reader(std::move(accessor), {component_selector + ":root"});
-  auto promise =
-      reader.SnapshotInspectUntilPresent({filesystem_->GetMoniker()})
-          .then([&](fpromise::result<std::vector<InspectData>, std::string>& inspect_data) {
-            {
-              std::unique_lock<std::mutex> lock(m);
-              data_or_err = std::move(inspect_data);
-              done = true;
-            }
-            cv.notify_all();
-          });
+  {
+    diagnostics::reader::ArchiveReader reader(executor.dispatcher(),
+                                              {component_selector + ":root"});
+    auto promise =
+        reader.SnapshotInspectUntilPresent({filesystem_->GetMoniker()})
+            .then([&](fpromise::result<std::vector<InspectData>, std::string>& inspect_data) {
+              {
+                std::unique_lock<std::mutex> lock(m);
+                data_or_err = std::move(inspect_data);
+                done = true;
+              }
+              cv.notify_all();
+            });
 
-  executor.schedule_task(std::move(promise));
+    executor.schedule_task(std::move(promise));
 
-  std::unique_lock<std::mutex> lock(m);
-  cv.wait(lock, [&done]() { return done; });
-
+    std::unique_lock<std::mutex> lock(m);
+    cv.wait(lock, [&done]() { return done; });
+  }
   loop.Quit();
   loop.JoinThreads();
 

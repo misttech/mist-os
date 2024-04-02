@@ -18,6 +18,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 
+#include "lib/fidl/cpp/wire/channel.h"
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/storage/blobfs/mkfs.h"
 #include "src/storage/lib/fs_management/cpp/admin.h"
@@ -95,43 +96,39 @@ void FdioTest::TakeSnapshot(inspect::Hierarchy* output) {
 
   async_dispatcher_t* dispatcher = executor.dispatcher();
 
-  const auto context = sys::ComponentContext::Create();
-  fuchsia::diagnostics::ArchiveAccessorPtr accessor;
-  ASSERT_EQ(ZX_OK, context->svc()->Connect(accessor.NewRequest(dispatcher)));
-
   std::condition_variable cv;
   std::mutex m;
   bool done = false;
-
-  diagnostics::reader::ArchiveReader reader(std::move(accessor), {"test:root"});
-  executor.schedule_task(reader.SnapshotInspectUntilPresent({"test"}).and_then(
-      [&](std::vector<diagnostics::reader::InspectData>& data) {
-        {
-          std::unique_lock<std::mutex> lock(m);
-          ASSERT_EQ(1ul, data.size());
-          auto& inspect_data = data[0];
-          if (!inspect_data.payload().has_value()) {
-            FX_LOGS(INFO) << "inspect_data had nullopt payload";
-          }
-          if (inspect_data.payload().has_value() && inspect_data.payload().value() == nullptr) {
-            FX_LOGS(INFO) << "inspect_data had nullptr for payload";
-          }
-          if (inspect_data.metadata().errors.has_value()) {
-            for (const auto& e : inspect_data.metadata().errors.value()) {
-              FX_LOGS(INFO) << e.message;
+  {
+    diagnostics::reader::ArchiveReader reader(dispatcher, {"test:root"});
+    executor.schedule_task(reader.SnapshotInspectUntilPresent({"test"}).and_then(
+        [&](std::vector<diagnostics::reader::InspectData>& data) {
+          {
+            std::unique_lock<std::mutex> lock(m);
+            ASSERT_EQ(1ul, data.size());
+            auto& inspect_data = data[0];
+            if (!inspect_data.payload().has_value()) {
+              FX_LOGS(INFO) << "inspect_data had nullopt payload";
             }
+            if (inspect_data.payload().has_value() && inspect_data.payload().value() == nullptr) {
+              FX_LOGS(INFO) << "inspect_data had nullptr for payload";
+            }
+            if (inspect_data.metadata().errors.has_value()) {
+              for (const auto& e : inspect_data.metadata().errors.value()) {
+                FX_LOGS(INFO) << e.message;
+              }
+            }
+
+            ASSERT_TRUE(inspect_data.payload().has_value());
+            *output = inspect_data.TakePayload();
+            done = true;
           }
+          cv.notify_all();
+        }));
 
-          ASSERT_TRUE(inspect_data.payload().has_value());
-          *output = inspect_data.TakePayload();
-          done = true;
-        }
-        cv.notify_all();
-      }));
-
-  std::unique_lock<std::mutex> lock(m);
-  cv.wait(lock, [&] { return done; });
-
+    std::unique_lock<std::mutex> lock(m);
+    cv.wait(lock, [&] { return done; });
+  }
   loop.Quit();
   loop.JoinThreads();
 }
