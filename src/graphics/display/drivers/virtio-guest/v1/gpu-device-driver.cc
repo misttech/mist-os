@@ -27,16 +27,6 @@ namespace virtio_display {
 
 // static
 zx_status_t GpuDeviceDriver::Create(zx_device_t* parent) {
-  char flag[32];
-  zx_status_t status =
-      device_get_variable(parent, "driver.virtio-gpu.disable", flag, sizeof(flag), nullptr);
-  // If gpu disabled:
-  if (status == ZX_OK && (!std::strncmp(flag, "1", 2) || !std::strncmp(flag, "true", 5) ||
-                          !std::strncmp(flag, "on", 3))) {
-    zxlogf(INFO, "driver.virtio-gpu.disabled=1, not binding to the GPU");
-    return ZX_ERR_NOT_FOUND;
-  }
-
   zx::result<std::unique_ptr<DisplayEngine>> display_engine_result = DisplayEngine::Create(parent);
   if (display_engine_result.is_error()) {
     // DisplayEngine::Create() logs on error.
