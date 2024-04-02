@@ -276,7 +276,7 @@ zx_status_t DeviceContext::SecondLevelMapDiscontiguous(const fbl::RefPtr<VmObjec
     }
 
     size_t map_len = chunk_size / PAGE_SIZE;
-    size_t mapped;
+    size_t mapped = 0;
     status = second_level_pt_.MapPages(base, paddrs, map_len, flags,
                                        SecondLevelPageTable::ExistingEntryAction::Error, &mapped);
     if (status != ZX_OK) {
