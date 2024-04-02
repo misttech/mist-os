@@ -181,9 +181,6 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
 
   auto context = sys::ComponentContext::Create();
 
-  fuchsia::diagnostics::ArchiveAccessorPtr accessor;
-  ASSERT_EQ(ZX_OK, context->svc()->Connect(accessor.NewRequest()));
-
   auto realm = RealmBuilder::Create(context->svc())
                    .AddChild(kInspectPublisher, kInspectPublisherUrl,
                              ChildOptions{.startup_mode = StartupMode::EAGER})
@@ -199,7 +196,7 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
   auto moniker =
       "test_suite/realm_builder\\:" + realm.component().GetChildName() + "/inspect-publisher";
   auto selector = moniker + ":root";
-  diagnostics::reader::ArchiveReader reader(std::move(accessor), {selector});
+  diagnostics::reader::ArchiveReader reader(loop.dispatcher(), {selector});
 
   fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string> actual_result;
   fpromise::single_threaded_executor executor;

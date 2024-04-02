@@ -496,11 +496,7 @@ TEST_F(InspectServiceTest, ReadFromComponentInspector) {
 
   fidl::WireSyncClient(std::move(*client_end));
 
-  auto context = sys::ComponentContext::Create();
-  fuchsia::diagnostics::ArchiveAccessorPtr accessor;
-  ASSERT_EQ(ZX_OK, context->svc()->Connect(accessor.NewRequest(dispatcher())));
-
-  diagnostics::reader::ArchiveReader reader(std::move(accessor), {});
+  diagnostics::reader::ArchiveReader reader(dispatcher(), {});
 
   auto result = RunPromise(reader.SnapshotInspectUntilPresent({"inspector_publisher"}));
 
@@ -539,11 +535,7 @@ TEST_F(InspectServiceTest, ReadFromPublishedVmo) {
 
   fidl::WireSyncClient(std::move(*client_end));
 
-  auto context = sys::ComponentContext::Create();
-  fuchsia::diagnostics::ArchiveAccessorPtr accessor;
-  ASSERT_EQ(ZX_OK, context->svc()->Connect(accessor.NewRequest(dispatcher())));
-
-  diagnostics::reader::ArchiveReader reader(std::move(accessor), {});
+  diagnostics::reader::ArchiveReader reader(dispatcher(), {});
 
   auto result = RunPromise(reader.SnapshotInspectUntilPresent({"vmo_publisher"}));
 
