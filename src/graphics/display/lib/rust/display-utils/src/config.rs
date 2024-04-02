@@ -31,7 +31,7 @@ pub enum LayerConfig {
         image_id: ImageId,
 
         /// Describes the dimensions, pixel format, and usage of the layer image.
-        image_config: fdisplay_types::ImageConfig,
+        image_metadata: fdisplay_types::ImageMetadata,
 
         /// When present, the display driver will not apply the configuration until the client
         /// signals this event.

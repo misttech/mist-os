@@ -111,7 +111,7 @@ impl<'a, S: Scene> DoubleBufferedFenceLoop<'a, S> {
                 id: self.layer_id,
                 config: LayerConfig::Primary {
                     image_id: presentation.image.id(),
-                    image_config: self.params.borrow().into(),
+                    image_metadata: self.params.borrow().into(),
                     unblock_event: None,
                     retirement_event: Some(presentation.retirement_event.id()),
                 },

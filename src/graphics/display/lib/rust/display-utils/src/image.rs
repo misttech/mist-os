@@ -112,7 +112,7 @@ impl Drop for Image {
     }
 }
 
-impl From<&ImageParameters> for fdisplay_types::ImageConfig {
+impl From<&ImageParameters> for fdisplay_types::ImageMetadata {
     fn from(src: &ImageParameters) -> Self {
         Self {
             width: src.width,
@@ -122,9 +122,9 @@ impl From<&ImageParameters> for fdisplay_types::ImageConfig {
     }
 }
 
-impl From<ImageParameters> for fdisplay_types::ImageConfig {
+impl From<ImageParameters> for fdisplay_types::ImageMetadata {
     fn from(src: ImageParameters) -> Self {
-        fdisplay_types::ImageConfig::from(&src)
+        fdisplay_types::ImageMetadata::from(&src)
     }
 }
 

@@ -49,7 +49,7 @@ class Image {
   fuchsia_images2::wire::PixelFormat format() { return format_; }
   fuchsia_images2::wire::PixelFormatModifier modifier() const { return modifier_; }
 
-  void GetConfig(fuchsia_hardware_display_types::wire::ImageConfig* config_out) const;
+  fuchsia_hardware_display_types::wire::ImageMetadata GetMetadata() const;
   bool Import(const fidl::WireSyncClient<fuchsia_hardware_display::Coordinator>& dc,
               display::ImageId image_id, image_import_t* info_out) const;
 

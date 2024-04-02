@@ -150,9 +150,11 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   EXPECT_FALSE(import_result);
 
   // Set the display constraints on the display coordinator.
-  fuchsia::hardware::display::types::ImageConfig display_constraints;
+  fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage = {
+      .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_LINEAR,
+  };
   bool res = scenic_impl::ImportBufferCollection(collection_id, *display_coordinator.get(),
-                                                 std::move(display_token), display_constraints);
+                                                 std::move(display_token), image_buffer_usage);
   ASSERT_TRUE(res);
   auto release_buffer_collection =
       fit::defer([display_coordinator = display_coordinator.get(), display_collection_id] {
@@ -197,13 +199,17 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   // We should now be able to also import an image to the display coordinator, using the
   // display-specific buffer collection id. If it returns OK, then we know that the renderer
   // did fully set the DC constraints.
-  fuchsia::hardware::display::types::ImageConfig image_config{};
+  fuchsia::hardware::display::types::ImageMetadata image_metadata = {
+      .width = kWidth,
+      .height = kHeight,
+      .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_LINEAR,
+  };
 
   // Try to import the image into the display coordinator API and make sure it succeeds.
   allocation::GlobalImageId display_image_id = allocation::GenerateUniqueImageId();
   fuchsia::hardware::display::Coordinator_ImportImage_Result import_image_result;
   (*display_coordinator.get())
-      ->ImportImage(image_config, /*buffer_id=*/
+      ->ImportImage(image_metadata, /*buffer_id=*/
                     {
                         .buffer_collection_id = display_collection_id,
                         .buffer_index = 0,
@@ -240,9 +246,8 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   auto tokens = flatland::SysmemTokens::Create(sysmem_allocator_.get());
 
   // Set the display constraints on the display coordinator.
-  fuchsia::hardware::display::types::ImageConfig image_config = {
-      .width = kWidth,
-      .height = kHeight,
+  fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage = {
+      .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_LINEAR,
   };
   auto global_collection_id = allocation::GenerateUniqueBufferCollectionId();
   ASSERT_NE(global_collection_id, ZX_KOID_INVALID);
@@ -250,20 +255,25 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       allocation::ToDisplayBufferCollectionId(global_collection_id);
 
   bool res = scenic_impl::ImportBufferCollection(global_collection_id, *display_coordinator.get(),
-                                                 std::move(tokens.dup_token), image_config);
+                                                 std::move(tokens.dup_token), image_buffer_usage);
   ASSERT_TRUE(res);
 
   flatland::SetClientConstraintsAndWaitForAllocated(
       sysmem_allocator_.get(), std::move(tokens.local_token), kNumVmos, kWidth, kHeight);
 
   // Import the images to the display.
+  fuchsia::hardware::display::types::ImageMetadata image_metadata = {
+      .width = kWidth,
+      .height = kHeight,
+      .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_LINEAR,
+  };
   allocation::GlobalImageId image_ids[kNumVmos];
   for (uint32_t i = 0; i < kNumVmos; i++) {
     image_ids[i] = allocation::GenerateUniqueImageId();
     fuchsia::hardware::display::Coordinator_ImportImage_Result import_image_result;
     auto transport_status =
         (*display_coordinator.get())
-            ->ImportImage(image_config, /*buffer_id=*/
+            ->ImportImage(image_metadata, /*buffer_id=*/
                           {
                               .buffer_collection_id = display_collection_id,
                               .buffer_index = i,
@@ -293,7 +303,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   EXPECT_NE(display_wait_event_id.value, display_signal_event_id.value);
 
   // Set the layer image and apply the config.
-  (*display_coordinator.get())->SetLayerPrimaryConfig(layer_id, image_config);
+  (*display_coordinator.get())->SetLayerPrimaryConfig(layer_id, image_metadata);
 
   static constexpr scenic_impl::DisplayEventId kInvalidEventId = {
       .value = fuchsia::hardware::display::types::INVALID_DISP_ID};

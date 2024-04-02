@@ -73,7 +73,7 @@ pub async fn run<'a>(coordinator: &Coordinator, args: Args<'a>) -> Result<()> {
             id: layer,
             config: LayerConfig::Primary {
                 image_id: image.id(),
-                image_config: params.into(),
+                image_metadata: params.into(),
                 unblock_event: None,
                 retirement_event: None,
             },

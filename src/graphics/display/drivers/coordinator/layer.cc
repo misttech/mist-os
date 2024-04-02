@@ -43,10 +43,10 @@ static void EarlyRetireUpTo(Image::DoublyLinkedList& list, Image::DoublyLinkedLi
   }
 }
 
-static void populate_image(const fhdt::wire::ImageConfig& image, image_t* image_out) {
-  image_out->width = image.width;
-  image_out->height = image.height;
-  image_out->tiling_type = image.tiling_type;
+static void populate_image(const fhdt::wire::ImageMetadata& image_metadata, image_t* image_out) {
+  image_out->width = image_metadata.width;
+  image_out->height = image_metadata.height;
+  image_out->tiling_type = image_metadata.tiling_type;
 }
 
 }  // namespace
@@ -236,12 +236,12 @@ bool Layer::AddToConfig(fbl::DoublyLinkedList<LayerNode*>* list, uint32_t z_inde
   }
 }
 
-void Layer::SetPrimaryConfig(fhdt::wire::ImageConfig image_config) {
+void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
   pending_layer_.type = LAYER_TYPE_PRIMARY;
   auto* primary = &pending_layer_.cfg.primary;
-  populate_image(image_config, &primary->image);
+  populate_image(image_metadata, &primary->image);
   const frame_t new_frame = {
-      .x_pos = 0, .y_pos = 0, .width = image_config.width, .height = image_config.height};
+      .x_pos = 0, .y_pos = 0, .width = image_metadata.width, .height = image_metadata.height};
   primary->src_frame = new_frame;
   primary->dest_frame = new_frame;
   pending_image_config_gen_++;

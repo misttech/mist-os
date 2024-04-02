@@ -417,12 +417,13 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     }
 
     // Set up buffer collection and image for recording a snapshot.
-    fuchsia::hardware::display::types::ImageConfig image_config = {
-        .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_CAPTURE};
+    fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage = {
+        .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_CAPTURE,
+    };
 
     auto tokens = SysmemTokens::Create(sysmem_allocator_.get());
-    auto result = scenic_impl::ImportBufferCollection(collection_id, *display_coordinator.get(),
-                                                      std::move(tokens.dup_token), image_config);
+    auto result = scenic_impl::ImportBufferCollection(
+        collection_id, *display_coordinator.get(), std::move(tokens.dup_token), image_buffer_usage);
     EXPECT_TRUE(result);
     fuchsia::sysmem::BufferCollectionSyncPtr collection;
     zx_status_t status = sysmem_allocator_->BindSharedCollection(std::move(tokens.local_token),
@@ -484,8 +485,16 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
       EXPECT_EQ(allocation_status, ZX_OK);
     }
 
+    // TODO(https://fxbug.dev/332521780): Display clients will be required to
+    // pass the captured display's mode information.
+    fuchsia::hardware::display::types::ImageMetadata image_metadata = {
+        .width = display->width_in_px(),
+        .height = display->height_in_px(),
+        .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_CAPTURE,
+    };
+
     zx_status_t import_status = scenic_impl::ImportImageForCapture(
-        *display_coordinator.get(), image_config, collection_id, 0, image_id);
+        *display_coordinator.get(), image_metadata, collection_id, 0, image_id);
     EXPECT_EQ(import_status, ZX_OK);
     if (import_status != ZX_OK) {
       return fpromise::error(import_status);

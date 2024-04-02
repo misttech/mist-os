@@ -19,10 +19,10 @@ using DisplayEventId = fuchsia::hardware::display::EventId;
 // Imports a sysmem buffer collection token to a display controller, and sets the constraints.
 // A successful import will return true, otherwise it will return false.
 bool ImportBufferCollection(
-    allocation::GlobalBufferCollectionId identifier,
+    allocation::GlobalBufferCollectionId buffer_collection_id,
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
     fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
-    const fuchsia::hardware::display::types::ImageConfig& image_config);
+    const fuchsia::hardware::display::types::ImageBufferUsage& image_buffer_usage);
 
 // Imports a zx::event to the provided display controller. The return value is an ID to
 // reference that event on other display controller functions that take an event as an
@@ -47,7 +47,7 @@ bool IsCaptureSupported(const fuchsia::hardware::display::CoordinatorSyncPtr& di
 // TODO(https://fxbug.dev/42080575): Unify this method with ImportBufferImage().
 zx_status_t ImportImageForCapture(
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
-    const fuchsia::hardware::display::types::ImageConfig& image_config,
+    const fuchsia::hardware::display::types::ImageMetadata& image_metadata,
     allocation::GlobalBufferCollectionId buffer_collection_id, uint32_t vmo_idx,
     allocation::GlobalImageId capture_image_id);
 

@@ -58,20 +58,21 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
 
   MOCK_METHOD(void, SetBufferCollectionConstraints,
               (fuchsia::hardware::display::BufferCollectionId,
-               fuchsia::hardware::display::types::ImageConfig,
+               fuchsia::hardware::display::types::ImageBufferUsage,
                SetBufferCollectionConstraintsCallback));
 
   MOCK_METHOD(void, ReleaseBufferCollection, (fuchsia::hardware::display::BufferCollectionId));
 
   MOCK_METHOD(void, ImportImage,
-              (fuchsia::hardware::display::types::ImageConfig, fuchsia::hardware::display::BufferId,
-               fuchsia::hardware::display::ImageId, ImportImageCallback));
+              (fuchsia::hardware::display::types::ImageMetadata,
+               fuchsia::hardware::display::BufferId, fuchsia::hardware::display::ImageId,
+               ImportImageCallback));
 
   MOCK_METHOD(void, ReleaseImage, (fuchsia::hardware::display::ImageId));
 
   MOCK_METHOD(void, SetLayerPrimaryConfig,
               (fuchsia::hardware::display::LayerId,
-               fuchsia::hardware::display::types::ImageConfig));
+               fuchsia::hardware::display::types::ImageMetadata));
 
   MOCK_METHOD(void, SetLayerPrimaryPosition,
               (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::types::Transform,

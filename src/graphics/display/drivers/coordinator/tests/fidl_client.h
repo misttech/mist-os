@@ -44,7 +44,7 @@ class TestFidlClient {
     fbl::String monitor_name_;
     fbl::String monitor_serial_;
 
-    fuchsia_hardware_display_types::wire::ImageConfig image_config_;
+    fuchsia_hardware_display_types::wire::ImageMetadata image_metadata_;
   };
 
   explicit TestFidlClient(const fidl::WireSyncClient<fuchsia_sysmem::Allocator>& sysmem)
@@ -63,7 +63,7 @@ class TestFidlClient {
   };
 
   zx::result<ImageId> ImportImageWithSysmem(
-      const fuchsia_hardware_display_types::wire::ImageConfig& image_config) TA_EXCL(mtx());
+      const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) TA_EXCL(mtx());
 
   zx::result<ImageId> CreateImage() TA_EXCL(mtx());
   zx::result<LayerId> CreateLayer() TA_EXCL(mtx());
@@ -113,7 +113,7 @@ class TestFidlClient {
   const fidl::WireSyncClient<fuchsia_sysmem::Allocator>& sysmem_;
 
   zx::result<ImageId> ImportImageWithSysmemLocked(
-      const fuchsia_hardware_display_types::wire::ImageConfig& image_config) TA_REQ(mtx());
+      const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) TA_REQ(mtx());
   zx::result<LayerId> CreateLayerLocked() TA_REQ(mtx());
   zx::result<EventInfo> CreateEventLocked() TA_REQ(mtx());
 

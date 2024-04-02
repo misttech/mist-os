@@ -62,11 +62,11 @@ class LayerTest : public TestBase {
 
 TEST_F(LayerTest, PrimaryBasic) {
   Layer layer(DriverLayerId(1));
-  fhdt::wire::ImageConfig image_config = {.width = kDisplayWidth,
-                                          .height = kDisplayHeight,
-                                          .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+  fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
+                                              .height = kDisplayHeight,
+                                              .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer.SetPrimaryConfig(image_config);
+  layer.SetPrimaryConfig(image_metadata);
   layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
   auto image = CreateReadyImage();
@@ -76,11 +76,11 @@ TEST_F(LayerTest, PrimaryBasic) {
 
 TEST_F(LayerTest, CleanUpImage) {
   Layer layer(DriverLayerId(1));
-  fhdt::wire::ImageConfig image_config = {.width = kDisplayWidth,
-                                          .height = kDisplayHeight,
-                                          .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+  fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
+                                              .height = kDisplayHeight,
+                                              .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer.SetPrimaryConfig(image_config);
+  layer.SetPrimaryConfig(image_metadata);
   layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
@@ -150,11 +150,11 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> current_layers;
 
   Layer layer(DriverLayerId(1));
-  fhdt::wire::ImageConfig image_config = {.width = kDisplayWidth,
-                                          .height = kDisplayHeight,
-                                          .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+  fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
+                                              .height = kDisplayHeight,
+                                              .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer.SetPrimaryConfig(image_config);
+  layer.SetPrimaryConfig(image_metadata);
   layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
@@ -198,11 +198,11 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
 
 TEST_F(LayerTest, CleanUpAllImages) {
   Layer layer(DriverLayerId(1));
-  fhdt::wire::ImageConfig image_config = {.width = kDisplayWidth,
-                                          .height = kDisplayHeight,
-                                          .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+  fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
+                                              .height = kDisplayHeight,
+                                              .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer.SetPrimaryConfig(image_config);
+  layer.SetPrimaryConfig(image_metadata);
   layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
@@ -249,9 +249,9 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> current_layers;
 
   Layer layer(DriverLayerId(1));
-  fhdt::wire::ImageConfig image_config = {.width = kDisplayWidth,
-                                          .height = kDisplayHeight,
-                                          .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+  fhdt::wire::ImageMetadata image_config = {.width = kDisplayWidth,
+                                            .height = kDisplayHeight,
+                                            .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
   layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);

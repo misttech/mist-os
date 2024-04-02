@@ -27,7 +27,7 @@ use display_utils::{
 };
 use euclid::size2;
 use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy};
-use fidl_fuchsia_hardware_display_types::ImageConfig;
+use fidl_fuchsia_hardware_display_types::{ImageBufferUsage, ImageMetadata};
 use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};
@@ -321,12 +321,6 @@ impl DisplayDirectViewStrategy {
             )),
         };
 
-        let mut image_config = ImageConfig {
-            width: unsize.width,
-            height: unsize.height,
-            tiling_type: fidl_fuchsia_hardware_display_types::IMAGE_TILING_TYPE_LINEAR,
-        };
-
         let coordinator_token = buffer_allocator.duplicate_token().await?;
         display
             .coordinator
@@ -335,7 +329,12 @@ impl DisplayDirectViewStrategy {
             .map_err(zx::Status::from_raw)?;
         display
             .coordinator
-            .set_buffer_collection_constraints(&collection_id.into(), &image_config)
+            .set_buffer_collection_constraints(
+                &collection_id.into(),
+                &ImageBufferUsage {
+                    tiling_type: fidl_fuchsia_hardware_display_types::IMAGE_TILING_TYPE_LINEAR,
+                },
+            )
             .await?
             .map_err(zx::Status::from_raw)?;
 
@@ -361,7 +360,11 @@ impl DisplayDirectViewStrategy {
                 fidl_fuchsia_hardware_display_types::IMAGE_TILING_TYPE_LINEAR
             };
 
-        image_config.tiling_type = image_tiling_type;
+        let image_metadata = ImageMetadata {
+            width: unsize.width,
+            height: unsize.height,
+            tiling_type: image_tiling_type,
+        };
 
         let mut image_ids = BTreeSet::new();
         let mut image_indexes = BTreeMap::new();
@@ -374,7 +377,7 @@ impl DisplayDirectViewStrategy {
             display
                 .coordinator
                 .import_image(
-                    &image_config,
+                    &image_metadata,
                     &BufferId::new(collection_id, uindex).into(),
                     &display_image_id.into(),
                 )
@@ -394,7 +397,7 @@ impl DisplayDirectViewStrategy {
 
         let frame_set = FrameSet::new(collection_id, image_ids);
 
-        display.coordinator.set_layer_primary_config(&display.layer_id.into(), &image_config)?;
+        display.coordinator.set_layer_primary_config(&display.layer_id.into(), &image_metadata)?;
 
         Ok(DisplayResources { context, image_indexes, frame_set, wait_events, signal_events })
     }

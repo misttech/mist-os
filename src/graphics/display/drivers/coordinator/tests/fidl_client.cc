@@ -39,9 +39,9 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
   manufacturer_name_ = fbl::String(info.manufacturer_name.data());
   monitor_name_ = fbl::String(info.monitor_name.data());
   monitor_serial_ = fbl::String(info.monitor_serial.data());
-  image_config_.height = modes_[0].vertical_resolution;
-  image_config_.width = modes_[0].horizontal_resolution;
-  image_config_.tiling_type = fhdt::wire::kImageTilingTypeLinear;
+  image_metadata_.height = modes_[0].vertical_resolution;
+  image_metadata_.width = modes_[0].horizontal_resolution;
+  image_metadata_.tiling_type = fhdt::wire::kImageTilingTypeLinear;
 }
 
 DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }
@@ -76,7 +76,7 @@ bool TestFidlClient::CreateChannel(const fidl::WireSyncClient<fhd::Provider>& pr
 }
 
 zx::result<ImageId> TestFidlClient::CreateImage() {
-  return ImportImageWithSysmem(displays_[0].image_config_);
+  return ImportImageWithSysmem(displays_[0].image_metadata_);
 }
 
 zx::result<LayerId> TestFidlClient::CreateLayer() {
@@ -100,7 +100,7 @@ zx::result<LayerId> TestFidlClient::CreateLayerLocked() {
     return zx::error(reply.value().error_value());
   }
   EXPECT_EQ(
-      dc_->SetLayerPrimaryConfig(reply.value()->layer_id, displays_[0].image_config_).status(),
+      dc_->SetLayerPrimaryConfig(reply.value()->layer_id, displays_[0].image_metadata_).status(),
       ZX_OK);
   return zx::ok(ToLayerId(reply.value()->layer_id));
 }
@@ -301,16 +301,16 @@ fhdt::wire::ConfigStamp TestFidlClient::GetRecentAppliedConfigStamp() {
 }
 
 zx::result<ImageId> TestFidlClient::ImportImageWithSysmem(
-    const fhdt::wire::ImageConfig& image_config) {
+    const fhdt::wire::ImageMetadata& image_metadata) {
   fbl::AutoLock lock(mtx());
-  return ImportImageWithSysmemLocked(image_config);
+  return ImportImageWithSysmemLocked(image_metadata);
 }
 
 std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPresentLayerInfo() {
   zx::result<LayerId> layer_result = CreateLayer();
   EXPECT_OK(layer_result.status_value());
 
-  zx::result<ImageId> image_result = ImportImageWithSysmem(displays_[0].image_config_);
+  zx::result<ImageId> image_result = ImportImageWithSysmem(displays_[0].image_metadata_);
   EXPECT_OK(image_result.status_value());
 
   return {
@@ -321,7 +321,7 @@ std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPrese
 }
 
 zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
-    const fhdt::wire::ImageConfig& image_config) {
+    const fhdt::wire::ImageMetadata& image_metadata) {
   // Create all the tokens.
   fidl::WireSyncClient<sysmem::BufferCollectionToken> local_token;
   {
@@ -377,8 +377,12 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     return zx::error(result.value().error_value());
   }
 
+  const fhdt::wire::ImageBufferUsage image_buffer_usage = {
+      .tiling_type = image_metadata.tiling_type,
+  };
+
   const auto set_constraints_result =
-      dc_->SetBufferCollectionConstraints(fidl_display_collection_id, image_config);
+      dc_->SetBufferCollectionConstraints(fidl_display_collection_id, image_buffer_usage);
 
   if (!set_constraints_result.ok()) {
     zxlogf(ERROR, "Failed to call FIDL SetBufferCollectionConstraints %lu (%s)",
@@ -387,8 +391,8 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     return zx::error(set_constraints_result.status());
   }
   if (set_constraints_result.value().is_error()) {
-    zxlogf(ERROR, "Failed to set buffer (%dx%d) collection constraints (%s)", image_config.width,
-           image_config.height, zx_status_get_string(set_constraints_result.value().error_value()));
+    zxlogf(ERROR, "Failed to set buffer collection constraints: %s",
+           zx_status_get_string(set_constraints_result.value().error_value()));
     (void)dc_->ReleaseBufferCollection(fidl_display_collection_id);
     return zx::error(set_constraints_result.value().error_value());
   }
@@ -444,7 +448,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   const ImageId image_id = next_image_id_++;
   const fhd::wire::ImageId fidl_image_id = ToFidlImageId(image_id);
   const auto import_result =
-      dc_->ImportImage(image_config,
+      dc_->ImportImage(image_metadata,
                        fhd::wire::BufferId{
                            .buffer_collection_id = fidl_display_collection_id,
                            .buffer_index = 0,

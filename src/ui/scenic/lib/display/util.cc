@@ -20,7 +20,7 @@ bool ImportBufferCollection(
     allocation::GlobalBufferCollectionId buffer_collection_id,
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
     fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
-    const fuchsia::hardware::display::types::ImageConfig& image_config) {
+    const fuchsia::hardware::display::types::ImageBufferUsage& image_buffer_usage) {
   const fuchsia::hardware::display::BufferCollectionId display_buffer_collection_id =
       allocation::ToDisplayBufferCollectionId(buffer_collection_id);
   fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result result;
@@ -39,7 +39,7 @@ bool ImportBufferCollection(
   fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result
       set_constraints_result;
   status = display_coordinator->SetBufferCollectionConstraints(
-      display_buffer_collection_id, image_config, &set_constraints_result);
+      display_buffer_collection_id, image_buffer_usage, &set_constraints_result);
   auto release_buffer_collection_on_failure = fit::defer([&] {
     if (display_coordinator->ReleaseBufferCollection(display_buffer_collection_id) != ZX_OK) {
       FX_LOGS(ERROR) << "ReleaseBufferCollection failed.";
@@ -106,7 +106,7 @@ bool IsCaptureSupported(const fuchsia::hardware::display::CoordinatorSyncPtr& di
 
 zx_status_t ImportImageForCapture(
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
-    const fuchsia::hardware::display::types::ImageConfig& image_config,
+    const fuchsia::hardware::display::types::ImageMetadata& image_metadata,
     allocation::GlobalBufferCollectionId buffer_collection_id, uint32_t vmo_idx,
     allocation::GlobalImageId image_id) {
   if (buffer_collection_id == 0) {
@@ -114,7 +114,7 @@ zx_status_t ImportImageForCapture(
     return 0;
   }
 
-  if (image_config.tiling_type != fuchsia::hardware::display::types::IMAGE_TILING_TYPE_CAPTURE) {
+  if (image_metadata.tiling_type != fuchsia::hardware::display::types::IMAGE_TILING_TYPE_CAPTURE) {
     FX_LOGS(ERROR) << "Image config tiling type must be IMAGE_TILING_TYPE_CAPTURE.";
     return 0;
   }
@@ -124,7 +124,7 @@ zx_status_t ImportImageForCapture(
   const fuchsia::hardware::display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
   fuchsia::hardware::display::Coordinator_ImportImage_Result import_result;
   const zx_status_t status =
-      display_coordinator->ImportImage(image_config, /*buffer_id=*/
+      display_coordinator->ImportImage(image_metadata, /*buffer_id=*/
                                        {
                                            .buffer_collection_id = display_buffer_collection_id,
                                            .buffer_index = vmo_idx,

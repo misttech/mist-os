@@ -42,18 +42,6 @@ const IMAGE_TILING_TYPE_CAPTURE ImageTilingTypeIdValue = 10;
 // The signal provided by IMAGE_TILING_TYPE_CAPTURE will be moved elsewhere in a
 // future revision of this API.
 
-/// Defines how data in an image buffer is interpreted.
-type ImageConfig = struct {
-    /// Image width, in pixels.
-    width uint32;
-
-    /// Image height, in pixels.
-    height uint32;
-
-    @allow_deprecated_struct_defaults
-    tiling_type ImageTilingTypeIdValue = IMAGE_TILING_TYPE_LINEAR;
-};
-
 /// The intended usage for a sysmem BufferCollection holding image buffers.
 ///
 /// Each buffer in the collection will store a single image, which is intended

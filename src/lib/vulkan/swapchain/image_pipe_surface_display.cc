@@ -283,23 +283,31 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     return false;
   }
 
-  fuchsia::hardware::display::types::ImageConfig image_config = {
-      .width = extent.width,
-      .height = extent.height,
-  };
 #if defined(__x86_64__)
   // Must be consistent with intel-gpu-core.h
-  const uint32_t kImageTilingTypeXTiled = 1;
-  image_config.tiling_type = kImageTilingTypeXTiled;
+  static constexpr uint32_t kImageTilingTypeXTiled = 1;
+  static constexpr uint32_t kImageTilingType = kImageTilingTypeXTiled;
 #elif defined(__aarch64__)
-  image_config.tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeLinear;
+  static constexpr uint32_t kImageTilingType =
+      fuchsia_hardware_display_types::wire::kImageTilingTypeLinear;
 #else
+  static constexpr uint32_t kImageTilingType =
+      fuchsia_hardware_display_types::wire::kImageTilingTypeLinear;
   // Unsupported display.
   return false;
 #endif
 
+  const fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage = {
+      .tiling_type = kImageTilingType,
+  };
+  const fuchsia::hardware::display::types::ImageMetadata image_metadata = {
+      .width = extent.width,
+      .height = extent.height,
+      .tiling_type = image_buffer_usage.tiling_type,
+  };
+
   display_coordinator_->SetBufferCollectionConstraints(
-      kBufferCollectionId, image_config,
+      kBufferCollectionId, image_buffer_usage,
       [this, &status](
           fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result result) {
         status = result.is_err() ? result.err() : ZX_OK;
@@ -496,7 +504,7 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     uint32_t image_id = next_image_id();
     const fuchsia::hardware::display::ImageId fidl_image_id = ToFidlImageId(image_id);
     display_coordinator_->ImportImage(
-        image_config, /*buffer_id=*/
+        image_metadata, /*buffer_id=*/
         {
             .buffer_collection_id = kBufferCollectionId,
             .buffer_index = i,
@@ -544,7 +552,7 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
 
   display_coordinator_->SetDisplayLayers(
       display_id_, std::vector<fuchsia::hardware::display::LayerId>{layer_id_});
-  display_coordinator_->SetLayerPrimaryConfig(layer_id_, image_config);
+  display_coordinator_->SetLayerPrimaryConfig(layer_id_, image_metadata);
 
   return true;
 }

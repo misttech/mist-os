@@ -177,10 +177,9 @@ bool PrimaryLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
       layer->import_info[alt_image_].events[WAIT_EVENT].signal(0, ZX_EVENT_SIGNALED);
     }
 
-    fhdt::wire::ImageConfig image_config;
-    images_[0]->GetConfig(&image_config);
+    fhdt::wire::ImageMetadata image_metadata = images_[0]->GetMetadata();
     const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
-    auto set_config_result = dc->SetLayerPrimaryConfig(fidl_layer_id, image_config);
+    auto set_config_result = dc->SetLayerPrimaryConfig(fidl_layer_id, image_metadata);
     if (!set_config_result.ok()) {
       printf("Setting layer config failed\n");
       return false;

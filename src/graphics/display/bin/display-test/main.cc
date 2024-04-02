@@ -307,7 +307,7 @@ zx_status_t set_minimum_rgb(uint8_t min_rgb) {
   return resp.status();
 }
 
-zx_status_t capture_setup() {
+zx_status_t capture_setup(Display& display) {
   // TODO(https://fxbug.dev/42117494): Pull common image setup code into a library
 
   // First make sure capture is supported on this platform
@@ -384,10 +384,11 @@ zx_status_t capture_setup() {
   }
 
   // set buffer constraints
-  fhdt::wire::ImageConfig image_config = {};
-  image_config.tiling_type = fhdt::wire::kImageTilingTypeCapture;
+  fhdt::wire::ImageBufferUsage image_buffer_usage = {
+      .tiling_type = fhdt::wire::kImageTilingTypeCapture,
+  };
   auto constraints_resp = dc->SetBufferCollectionConstraints(
-      display::ToFidlBufferCollectionId(kBufferCollectionId), image_config);
+      display::ToFidlBufferCollectionId(kBufferCollectionId), image_buffer_usage);
   if (constraints_resp.status() != ZX_OK) {
     printf("Could not set capture constraints %s\n", constraints_resp.FormatDescription().c_str());
     return constraints_resp.status();
@@ -454,10 +455,17 @@ zx_status_t capture_setup() {
   }
 
   capture_vmo = std::move(wait_resp.value().buffer_collection_info.buffers[0].vmo);
+
   // import image for capture
-  fhdt::wire::ImageConfig capture_cfg = {};  // will contain a handle
+  // TODO(https://fxbug.dev/332521780): Display clients will be required to
+  // pass the captured display's mode information.
+  fhdt::wire::ImageMetadata capture_metadata = {
+      .width = display.mode().horizontal_resolution,
+      .height = display.mode().vertical_resolution,
+      .tiling_type = fhdt::wire::kImageTilingTypeCapture,
+  };
   fidl::WireResult import_capture_result = dc->ImportImage(
-      capture_cfg,
+      capture_metadata,
       fhd::wire::BufferId{
           .buffer_collection_id = display::ToFidlBufferCollectionId(kBufferCollectionId),
           .buffer_index = 0,
@@ -911,7 +919,7 @@ int main(int argc, const char* argv[]) {
     }
   }
 
-  if (capture && capture_setup() != ZX_OK) {
+  if (capture && capture_setup(displays[0]) != ZX_OK) {
     printf("Could not setup capture\n");
     capture = false;
   }

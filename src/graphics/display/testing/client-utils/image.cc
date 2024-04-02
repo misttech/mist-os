@@ -126,12 +126,11 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
     return nullptr;
   }
 
-  fhdt::wire::ImageConfig image_config = {};
-  image_config.height = height;
-  image_config.width = width;
-  image_config.tiling_type = fhdt::wire::kImageTilingTypeLinear;
+  fhdt::wire::ImageBufferUsage image_buffer_usage = {
+      .tiling_type = fhdt::wire::kImageTilingTypeLinear,
+  };
   auto set_constraints_result =
-      dc->SetBufferCollectionConstraints(fidl_buffer_collection_id, image_config);
+      dc->SetBufferCollectionConstraints(fidl_buffer_collection_id, image_buffer_usage);
   if (!set_constraints_result.ok() || set_constraints_result.value().is_error()) {
     fprintf(stderr, "Failed to set constraints\n");
     return nullptr;
@@ -465,14 +464,17 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
   }
 }
 
-void Image::GetConfig(fhdt::wire::ImageConfig* config_out) const {
-  config_out->height = height_;
-  config_out->width = width_;
+fuchsia_hardware_display_types::wire::ImageMetadata Image::GetMetadata() const {
+  fuchsia_hardware_display_types::wire::ImageMetadata image_metadata = {
+      .width = width_,
+      .height = height_,
+  };
   if (modifier_ != fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled) {
-    config_out->tiling_type = IMAGE_TILING_TYPE_LINEAR;
+    image_metadata.tiling_type = IMAGE_TILING_TYPE_LINEAR;
   } else {
-    config_out->tiling_type = 2;  // IMAGE_TILING_TYPE_Y_LEGACY
+    image_metadata.tiling_type = 2;  // IMAGE_TILING_TYPE_Y_LEGACY
   }
+  return image_metadata;
 }
 
 bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::ImageId image_id,
@@ -504,10 +506,9 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::Im
     }
   }
 
-  fhdt::wire::ImageConfig image_config;
-  GetConfig(&image_config);
+  fhdt::wire::ImageMetadata image_metadata = GetMetadata();
   const fidl::WireResult import_result = dc->ImportImage(
-      image_config,
+      image_metadata,
       fhd::wire::BufferId{
           .buffer_collection_id = display::ToFidlBufferCollectionId(buffer_collection_id_),
           .buffer_index = 0,

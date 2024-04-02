@@ -220,7 +220,7 @@ TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
       .Times(1)
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
-             fuchsia::hardware::display::types::ImageConfig config,
+             fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
                          WithResponse({}));
@@ -322,7 +322,7 @@ TEST_F(DisplayCompositorTest,
       .WillOnce(testing::Invoke(
           [&display_token](
               fuchsia::hardware::display::BufferCollectionId collection_id,
-              fuchsia::hardware::display::types::ImageConfig config,
+              fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage,
               MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             auto sysmem_allocator = utils::CreateSysmemAllocatorSyncPtr("MockDisplayCoordinator");
             SetConstraintsAndClose(sysmem_allocator, std::move(display_token),
@@ -337,7 +337,7 @@ TEST_F(DisplayCompositorTest,
   EXPECT_CALL(*mock_display_coordinator_,
               ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), 0), _, _))
       .Times(1)
-      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageConfig,
+      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageMetadata,
                                    fuchsia::hardware::display::BufferId,
                                    fuchsia::hardware::display::ImageId,
                                    MockDisplayCoordinator::ImportImageCallback callback) {
@@ -457,7 +457,7 @@ TEST_F(DisplayCompositorTest,
       .WillOnce(testing::Invoke(
           [&display_token](
               fuchsia::hardware::display::BufferCollectionId collection_id,
-              fuchsia::hardware::display::types::ImageConfig config,
+              fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage,
               MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             auto sysmem_allocator = utils::CreateSysmemAllocatorSyncPtr("MockDisplayCoordinator");
             SetConstraintsAndClose(sysmem_allocator, std::move(display_token),
@@ -663,7 +663,7 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
       .Times(1)
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
-             fuchsia::hardware::display::types::ImageConfig config,
+             fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
                          WithResponse({}));
@@ -694,7 +694,7 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
   EXPECT_CALL(*mock_display_coordinator_,
               ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), 0), _, _))
       .Times(1)
-      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageConfig,
+      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageMetadata,
                                    fuchsia::hardware::display::BufferId,
                                    fuchsia::hardware::display::ImageId,
                                    MockDisplayCoordinator::ImportImageCallback callback) {
@@ -756,7 +756,7 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
               SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
-             fuchsia::hardware::display::types::ImageConfig config,
+             fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
                          WithResponse({}));
@@ -790,7 +790,7 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
               ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), kVmoIdx),
                           FidlEquals(kFidlImageId), _))
       .Times(1)
-      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageConfig image_config,
+      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageMetadata image_metadata,
                                    fuchsia::hardware::display::BufferId buffer_id,
                                    fuchsia::hardware::display::ImageId image_id,
                                    MockDisplayCoordinator::ImportImageCallback callback) {
@@ -816,7 +816,7 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
       *mock_display_coordinator_,
       ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), kVmoIdx), _, _))
       .Times(1)
-      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageConfig image_config,
+      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageMetadata image_metadata,
                                    fuchsia::hardware::display::BufferId buffer_id,
                                    fuchsia::hardware::display::ImageId image_id,
                                    MockDisplayCoordinator::ImportImageCallback callback) {
@@ -1040,7 +1040,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
       .Times(1)
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
-             fuchsia::hardware::display::types::ImageConfig config,
+             fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
                          WithResponse({}));
@@ -1065,7 +1065,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
               ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), 0),
                           FidlEquals(fidl_parent_image_id), _))
       .Times(1)
-      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageConfig,
+      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageMetadata,
                                    fuchsia::hardware::display::BufferId,
                                    fuchsia::hardware::display::ImageId,
                                    MockDisplayCoordinator::ImportImageCallback callback) {
@@ -1083,7 +1083,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
               ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), 1),
                           FidlEquals(fidl_child_image_id), _))
       .Times(1)
-      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageConfig,
+      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageMetadata,
                                    fuchsia::hardware::display::BufferId,
                                    fuchsia::hardware::display::ImageId,
                                    MockDisplayCoordinator::ImportImageCallback callback) {
@@ -1250,7 +1250,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
       .Times(1)
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
-             fuchsia::hardware::display::types::ImageConfig config,
+             fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
                          WithResponse({}));
@@ -1275,7 +1275,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
               ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), 0),
                           FidlEquals(fidl_parent_image_id), _))
       .Times(1)
-      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageConfig,
+      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageMetadata,
                                    fuchsia::hardware::display::BufferId,
                                    fuchsia::hardware::display::ImageId,
                                    MockDisplayCoordinator::ImportImageCallback callback) {
@@ -1580,7 +1580,7 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
       .Times(1)
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
-             fuchsia::hardware::display::types::ImageConfig config,
+             fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
             callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
                          WithResponse({}));
@@ -1603,7 +1603,7 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   EXPECT_CALL(*mock_display_coordinator_,
               ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), 0), _, _))
       .Times(1)
-      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageConfig,
+      .WillOnce(testing::Invoke([](fuchsia::hardware::display::types::ImageMetadata,
                                    fuchsia::hardware::display::BufferId,
                                    fuchsia::hardware::display::ImageId,
                                    MockDisplayCoordinator::ImportImageCallback callback) {

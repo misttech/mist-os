@@ -231,11 +231,11 @@ impl Coordinator {
                     }
                     LayerConfig::Primary {
                         image_id,
-                        image_config,
+                        image_metadata,
                         unblock_event,
                         retirement_event,
                     } => {
-                        proxy.set_layer_primary_config(&layer.id.into(), &image_config)?;
+                        proxy.set_layer_primary_config(&layer.id.into(), &image_metadata)?;
                         proxy.set_layer_image(
                             &layer.id.into(),
                             &(*image_id).into(),
@@ -281,11 +281,7 @@ impl Coordinator {
         proxy
             .set_buffer_collection_constraints(
                 &id.into(),
-                &display_types::ImageConfig {
-                    width: 0,
-                    height: 0,
-                    tiling_type: IMAGE_TILING_TYPE_LINEAR,
-                },
+                &display_types::ImageBufferUsage { tiling_type: IMAGE_TILING_TYPE_LINEAR },
             )
             .await?
             .map_err(zx::Status::from_raw)?;
@@ -302,10 +298,14 @@ impl Coordinator {
         &self,
         collection_id: BufferCollectionId,
         image_id: ImageId,
-        config: display_types::ImageConfig,
+        image_metadata: display_types::ImageMetadata,
     ) -> Result<()> {
         self.proxy()
-            .import_image(&config, &BufferId::new(collection_id, 0).into(), &image_id.into())
+            .import_image(
+                &image_metadata,
+                &BufferId::new(collection_id, 0).into(),
+                &image_id.into(),
+            )
             .await?
             .map_err(zx::Status::from_raw)?;
         Ok(())

@@ -95,7 +95,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   // currently in use.
   bool AddToConfig(fbl::DoublyLinkedList<LayerNode*>* list, uint32_t z_index);
 
-  void SetPrimaryConfig(fuchsia_hardware_display_types::wire::ImageConfig image_config);
+  void SetPrimaryConfig(fuchsia_hardware_display_types::wire::ImageMetadata image_metadata);
   void SetPrimaryPosition(fuchsia_hardware_display_types::wire::Transform transform,
                           fuchsia_hardware_display_types::wire::Frame src_frame,
                           fuchsia_hardware_display_types::wire::Frame dest_frame);

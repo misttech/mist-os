@@ -40,7 +40,7 @@ closed protocol Coordinator {
 
     /// Imports a Buffer-Collection backed image.
     ///
-    /// `image_config` must be compatible with that passed through
+    /// `image_metadata` must be compatible with the arguments passed to
     /// [`fuchsia.hardware.display/Coordinator.SetBufferCollectionConstraints`]
     /// on the `buffer_collection_id`.
     ///
@@ -49,7 +49,7 @@ closed protocol Coordinator {
     /// Returns `ZX_ERR_ALREADY_EXISTS` if `image_id` was used in a successful
     /// `ImportImage()` without a corresponding `ReleaseImage()`.
     strict ImportImage(struct {
-        image_config fuchsia.hardware.display.types.ImageConfig;
+        image_metadata fuchsia.hardware.display.types.ImageMetadata;
         buffer_id BufferId;
         image_id ImageId;
     }) -> () error zx.Status;
@@ -179,7 +179,7 @@ closed protocol Coordinator {
     // It is illegal to pass an invalid layer id.
     strict SetLayerPrimaryConfig(struct {
         layer_id LayerId;
-        image_config fuchsia.hardware.display.types.ImageConfig;
+        image_metadata fuchsia.hardware.display.types.ImageMetadata;
     });
 
     // Sets the layer transform, scaling, and positioning.
@@ -431,13 +431,11 @@ closed protocol Coordinator {
 
     // Takes an imported buffer collection and sets the constraints
     // on it so that it can be imported with a specific config.
-    // Dimensions, pixel format, and image type are ignored when
-    // setting constraints if set to zero.
     // TODO(https://fxbug.dev/42166207): Update this API to better support
     // optional fields.
     strict SetBufferCollectionConstraints(struct {
         buffer_collection_id BufferCollectionId;
-        config fuchsia.hardware.display.types.ImageConfig;
+        buffer_usage fuchsia.hardware.display.types.ImageBufferUsage;
     }) -> () error zx.Status;
 
     /// Returns true if Capture is supported on the platform.
