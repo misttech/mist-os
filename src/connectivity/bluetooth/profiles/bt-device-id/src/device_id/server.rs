@@ -106,8 +106,11 @@ impl DeviceIdServer {
     ) -> Result<BrEdrAdvertisement, Error> {
         let (connect_client, connect_server) =
             fidl::endpoints::create_request_stream::<bredr::ConnectionReceiverMarker>()?;
-        let adv_fut =
-            profile.advertise(&defs, &bredr::ChannelParameters::default(), connect_client);
+        let adv_fut = profile.advertise(bredr::ProfileAdvertiseRequest {
+            services: Some(defs),
+            receiver: Some(connect_client),
+            ..Default::default()
+        });
         Ok(BrEdrAdvertisement { adv_fut, connect_server })
     }
 
@@ -298,10 +301,9 @@ pub(crate) mod tests {
         pin_mut!(fidl_client_fut);
 
         // Should expect the server to attempt to advertise over BR/EDR.
-        let (_, _, _connect_proxy, responder) =
-            expect_advertise_request(&mut exec, &mut profile_server)
-                .into_advertise()
-                .expect("Advertise request");
+        let (_request, responder) = expect_advertise_request(&mut exec, &mut profile_server)
+            .into_advertise()
+            .expect("Advertise request");
 
         // FIDL client request should still be alive because the server is still advertising.
         let _ = exec.run_until_stalled(&mut fidl_client_fut).expect_pending("still active");

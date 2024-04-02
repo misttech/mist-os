@@ -113,7 +113,7 @@ async fn setup_spp_client(
         .connect_to_protocol::<bredr::ProfileMarker>(topology)
         .expect("Profile should be available");
     let spp = spp_service_definition();
-    ProfileClient::advertise(profile, &vec![spp], bredr::ChannelParameters::default()).unwrap()
+    ProfileClient::advertise(profile, vec![spp], bredr::ChannelParameters::default()).unwrap()
 }
 
 async fn expect_peer_advertising(
@@ -295,7 +295,7 @@ async fn passthrough_advertisement_is_discovered() {
         .expect("Profile should be available");
     let a2dp = a2dp_service_definition();
     let _client =
-        ProfileClient::advertise(profile.clone(), &vec![a2dp], bredr::ChannelParameters::default())
+        ProfileClient::advertise(profile.clone(), vec![a2dp], bredr::ChannelParameters::default())
             .unwrap();
 
     // Test driven peer searches for A2DP Sink.

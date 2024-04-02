@@ -128,9 +128,17 @@ impl MockPiconetServer {
     fn handle_profile_request(&self, id: PeerId, request: bredr::ProfileRequest) {
         info!("Received profile request: {:?}, {:?}", id, request);
         match request {
-            bredr::ProfileRequest::Advertise { services, receiver, responder, .. } => {
-                let proxy = receiver.into_proxy().expect("couldn't get connection receiver");
-                self.new_advertisement(id, services, proxy, responder);
+            bredr::ProfileRequest::Advertise { payload, responder, .. } => {
+                if payload.services.is_none() || payload.receiver.is_none() {
+                    let _ = responder.send(Err(ErrorCode::InvalidArguments));
+                    return;
+                }
+                let proxy = payload
+                    .receiver
+                    .unwrap()
+                    .into_proxy()
+                    .expect("couldn't get connection receiver");
+                self.new_advertisement(id, payload.services.unwrap(), proxy, responder);
             }
             bredr::ProfileRequest::Connect { peer_id, connection, responder, .. } => {
                 let channel = self
@@ -637,7 +645,11 @@ mod tests {
 
         // Advertise - the request should be handled by the server and remain active.
         let (target, receiver) = create_request_stream::<ConnectionReceiverMarker>().unwrap();
-        let mut adv_fut = c.advertise(&[], &ChannelParameters::default(), target);
+        let mut adv_fut = c.advertise(bredr::ProfileAdvertiseRequest {
+            services: Some(vec![]),
+            receiver: Some(target),
+            ..Default::default()
+        });
         exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
         exec.run_until_stalled(&mut mps_fut).expect_pending("server should still be running");
 

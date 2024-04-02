@@ -221,7 +221,7 @@ pub fn connect_and_advertise(profile_svc: bredr::ProfileProxy) -> Result<Profile
         ATTR_MAP_SUPPORTED_FEATURES,
     ];
 
-    let service_defs = [(&build_mns_service_definition()).try_into()?];
+    let service_defs = vec![(&build_mns_service_definition()).try_into()?];
     let channel_parameters = bredr::ChannelParameters {
         channel_mode: Some(bredr::ChannelMode::EnhancedRetransmission),
         ..Default::default()
@@ -229,7 +229,7 @@ pub fn connect_and_advertise(profile_svc: bredr::ProfileProxy) -> Result<Profile
 
     // MCE device advertises the MNS on it and and searches for MAS on remote peers.
     let mut profile_client =
-        ProfileClient::advertise(profile_svc.clone(), &service_defs, channel_parameters)?;
+        ProfileClient::advertise(profile_svc.clone(), service_defs, channel_parameters)?;
 
     profile_client.add_search(
         bredr::ServiceClassProfileIdentifier::MessageAccessServer,

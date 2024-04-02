@@ -145,7 +145,7 @@ async fn advertise(
 
     let audio_sink_uuid = Uuid::new16(0x110B); // Audio Sink
 
-    let svc_defs = &[ServiceDefinition {
+    let svc_defs = vec![ServiceDefinition {
         service_class_uuids: Some(vec![audio_sink_uuid.into()]),
         protocol_descriptor_list: Some(vec![ProtocolDescriptor {
             protocol: ProtocolIdentifier::L2Cap,
@@ -157,7 +157,14 @@ async fn advertise(
     let (connect_client, connect_requests) =
         create_request_stream().context("ConnectionReceiver creation")?;
 
-    let _ = profile_svc.advertise(svc_defs, &params, connect_client).check()?;
+    let _ = profile_svc
+        .advertise(ProfileAdvertiseRequest {
+            services: Some(svc_defs),
+            parameters: Some(params),
+            receiver: Some(connect_client),
+            ..Default::default()
+        })
+        .check()?;
 
     let (end_ad_sender, end_ad_receiver) = oneshot::channel::<()>();
     let service_id = state.lock().await.services.insert(SdpService {

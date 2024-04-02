@@ -138,14 +138,21 @@ impl ProfileClient {
     /// Incoming connections will request the `channel mode` provided.
     pub fn advertise(
         proxy: bredr::ProfileProxy,
-        services: &[bredr::ServiceDefinition],
+        services: Vec<bredr::ServiceDefinition>,
         channel_params: bredr::ChannelParameters,
     ) -> Result<Self> {
         if services.is_empty() {
             return Ok(Self::new(proxy));
         }
         let (connect_client, connection_receiver) = create_request_stream()?;
-        let advertisement = proxy.advertise(services, &channel_params, connect_client).check()?;
+        let advertisement = proxy
+            .advertise(bredr::ProfileAdvertiseRequest {
+                services: Some(services),
+                parameters: Some(channel_params),
+                receiver: Some(connect_client),
+                ..Default::default()
+            })
+            .check()?;
         Ok(Self {
             advertisement: Some(advertisement),
             connection_receiver: Some(connection_receiver),
@@ -274,14 +281,14 @@ mod tests {
             ..Default::default()
         };
 
-        let mut profile = ProfileClient::advertise(proxy, &defs, channel_params.clone())
+        let mut profile = ProfileClient::advertise(proxy, defs.clone(), channel_params.clone())
             .expect("Advertise succeeds");
 
         let (_connect_proxy, adv_responder) = expect_advertisement_registration(
             &mut exec,
             &mut profile_stream,
             defs,
-            channel_params.into(),
+            Some(channel_params.into()),
         );
 
         {
@@ -313,14 +320,14 @@ mod tests {
             ..Default::default()
         };
 
-        let mut profile = ProfileClient::advertise(proxy, &defs, channel_params.clone())
+        let mut profile = ProfileClient::advertise(proxy, defs.clone(), channel_params.clone())
             .expect("Advertise succeeds");
 
         let (connect_proxy, _adv_responder) = expect_advertisement_registration(
             &mut exec,
             &mut profile_stream,
             defs,
-            channel_params.into(),
+            Some(channel_params.into()),
         );
 
         let remote_peer = PeerId(12343);
@@ -357,18 +364,18 @@ mod tests {
         exec: &mut fasync::TestExecutor,
         profile_stream: &mut bredr::ProfileRequestStream,
         expected_defs: Vec<bredr::ServiceDefinition>,
-        expected_params: bredr::ChannelParameters,
+        expected_params: Option<bredr::ChannelParameters>,
     ) -> (bredr::ConnectionReceiverProxy, bredr::ProfileAdvertiseResponder) {
         match exec.run_until_stalled(&mut profile_stream.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise {
-                services,
-                parameters,
-                receiver,
-                responder,
-            }))) => {
-                assert_eq!(&services[..], expected_defs);
-                assert_eq!(parameters, expected_params);
-                (receiver.into_proxy().expect("proxy for connection receiver"), responder)
+            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise { payload, responder }))) => {
+                assert!(payload.services.is_some());
+                assert_eq!(payload.services.unwrap(), expected_defs);
+                assert_eq!(payload.parameters, expected_params);
+                assert!(payload.receiver.is_some());
+                (
+                    payload.receiver.unwrap().into_proxy().expect("proxy for connection receiver"),
+                    responder,
+                )
             }
             x => panic!("Expected ready advertisement request, got {:?}", x),
         }

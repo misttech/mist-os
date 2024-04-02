@@ -133,9 +133,7 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
   };
 
   // fuchsia::bluetooth::bredr::Profile overrides:
-  void Advertise(std::vector<fuchsia::bluetooth::bredr::ServiceDefinition> definitions,
-                 fuchsia::bluetooth::bredr::ChannelParameters parameters,
-                 fidl::InterfaceHandle<fuchsia::bluetooth::bredr::ConnectionReceiver> receiver,
+  void Advertise(fuchsia::bluetooth::bredr::ProfileAdvertiseRequest request,
                  AdvertiseCallback callback) override;
   void Search(fuchsia::bluetooth::bredr::ServiceClassProfileIdentifier service_uuid,
               std::vector<uint16_t> attr_ids,

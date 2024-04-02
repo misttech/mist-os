@@ -275,10 +275,13 @@ open protocol Profile {
     ///
     /// If the advertisement cannot be made for any reason, an error of `INVALID_ARGUMENTS`
     /// will be returned and the receiver will be closed with a suitable epitaph.
-    flexible Advertise(resource struct {
-        services vector<ServiceDefinition>:MAX_SERVICES_PER_ADVERTISEMENT;
-        parameters ChannelParameters;
-        receiver client_end:ConnectionReceiver;
+    flexible Advertise(resource table {
+        /// Required.
+        1: services vector<ServiceDefinition>:MAX_SERVICES_PER_ADVERTISEMENT;
+        /// Required.
+        2: receiver client_end:ConnectionReceiver;
+        /// Optional. See `ChannelParameters` for defaults.
+        3: parameters ChannelParameters;
     }) -> () error fuchsia.bluetooth.ErrorCode;
 
     /// Register a search for services on newly connected peers.  The SearchResults protocol will be

@@ -510,13 +510,19 @@ void ProfileServer::ScoConnectionServer::Close(zx_status_t epitaph) {
   }
 }
 
-void ProfileServer::Advertise(
-    std::vector<fidlbredr::ServiceDefinition> definitions, fidlbredr::ChannelParameters parameters,
-    fidl::InterfaceHandle<fuchsia::bluetooth::bredr::ConnectionReceiver> receiver,
-    AdvertiseCallback callback) {
+void ProfileServer::Advertise(fuchsia::bluetooth::bredr::ProfileAdvertiseRequest request,
+                              AdvertiseCallback callback) {
+  if (!request.has_services() || !request.has_receiver()) {
+    callback(fidlbredr::Profile_Advertise_Result::WithErr(
+        fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS));
+    return;
+  }
+  if (!request.has_parameters()) {
+    request.set_parameters(fidlbredr::ChannelParameters());
+  }
   std::vector<bt::sdp::ServiceRecord> registering;
 
-  for (auto& definition : definitions) {
+  for (auto& definition : request.services()) {
     auto rec = fidl_helpers::ServiceDefinitionToServiceRecord(definition);
     // Drop the receiver on error.
     if (rec.is_error()) {
@@ -534,7 +540,7 @@ void ProfileServer::Advertise(
   uint64_t next = advertised_total_ + 1;
 
   auto registration_handle = adapter()->bredr()->RegisterService(
-      std::move(registering), FidlToChannelParameters(parameters),
+      std::move(registering), FidlToChannelParameters(request.parameters()),
       [this, next](auto channel, const auto& protocol_list) {
         OnChannelConnected(next, std::move(channel), std::move(protocol_list));
       });
@@ -545,12 +551,12 @@ void ProfileServer::Advertise(
     return;
   };
 
-  auto receiverptr = receiver.Bind();
+  fidlbredr::ConnectionReceiverPtr receiver = request.mutable_receiver()->Bind();
 
-  receiverptr.set_error_handler(
+  receiver.set_error_handler(
       [this, next](zx_status_t /*status*/) { OnConnectionReceiverError(next); });
 
-  current_advertised_.try_emplace(next, std::move(receiverptr), registration_handle,
+  current_advertised_.try_emplace(next, std::move(receiver), registration_handle,
                                   std::move(callback));
   advertised_total_ = next;
 }

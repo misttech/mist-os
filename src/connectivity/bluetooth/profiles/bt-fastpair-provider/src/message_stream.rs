@@ -62,7 +62,7 @@ impl MessageStream {
             ]),
             ..Default::default()
         };
-        ProfileClient::advertise(profile.clone(), &[service], ChannelParameters::default())
+        ProfileClient::advertise(profile.clone(), vec![service], ChannelParameters::default())
             .map_err(Into::into)
     }
 
@@ -182,9 +182,8 @@ mod tests {
 
         // Expect the RFCOMM advertisement.
         let profile_event = profile_server.select_next_some().await.expect("FIDL response");
-        let (_, _, connect_receiver, _responder) =
-            profile_event.into_advertise().expect("Advertise request");
-        let connect_proxy = connect_receiver.into_proxy().unwrap();
+        let (request, _responder) = profile_event.into_advertise().expect("Advertise request");
+        let connect_proxy = request.receiver.unwrap().into_proxy().unwrap();
 
         // Remote peer connection.
         let id = PeerId(123);

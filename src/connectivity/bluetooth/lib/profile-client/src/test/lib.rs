@@ -64,7 +64,7 @@ impl TestProfileServer {
             None => ProfileClient::new(proxy.clone()),
             Some(service_definition) => {
                 let channel_params = bredr::ChannelParameters::default();
-                ProfileClient::advertise(proxy.clone(), &[service_definition], channel_params)
+                ProfileClient::advertise(proxy.clone(), vec![service_definition], channel_params)
                     .expect("Failed to advertise.")
             }
         };
@@ -94,8 +94,9 @@ impl TestProfileServer {
     pub async fn expect_advertise(&mut self) {
         let request = self.profile_request_stream.next().await;
         match request {
-            Some(Ok(bredr::ProfileRequest::Advertise { receiver, responder, .. })) => {
-                self.connection_receiver_proxy = Some(receiver.into_proxy().unwrap());
+            Some(Ok(bredr::ProfileRequest::Advertise { payload, responder, .. })) => {
+                self.connection_receiver_proxy =
+                    Some(payload.receiver.unwrap().into_proxy().unwrap());
                 if let Some(_old_responder) = self.advertise_responder.replace(responder) {
                     panic!("Got new advertise request before old request is comeplete.");
                 }

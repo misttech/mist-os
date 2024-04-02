@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 
 #include "fuchsia/bluetooth/bredr/cpp/fidl.h"
+#include "fuchsia/bluetooth/cpp/fidl.h"
 #include "lib/fidl/cpp/vector.h"
 #include "lib/zx/socket.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/adapter_test_fixture.h"
@@ -289,8 +290,10 @@ TEST_F(ProfileServerTest, ErrorOnInvalidDefinition) {
     EXPECT_EQ(result.err(), fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
   };
 
-  client()->Advertise(std::move(services), fidlbredr::ChannelParameters(),
-                      std::move(receiver_handle), std::move(cb));
+  fidlbredr::ProfileAdvertiseRequest adv_request;
+  adv_request.set_services(std::move(services));
+  adv_request.set_receiver(std::move(receiver_handle));
+  client()->Advertise(std::move(adv_request), std::move(cb));
 
   RunLoopUntilIdle();
 
@@ -311,8 +314,10 @@ TEST_F(ProfileServerTest, ErrorOnMultipleAdvertiseRequests) {
   size_t cb1_count = 0;
   auto cb1 = [&](auto) { cb1_count++; };
 
-  client()->Advertise(std::move(services1), fidlbredr::ChannelParameters(),
-                      std::move(receiver_handle1), std::move(cb1));
+  fidlbredr::ProfileAdvertiseRequest adv_request1;
+  adv_request1.set_services(std::move(services1));
+  adv_request1.set_receiver(std::move(receiver_handle1));
+  client()->Advertise(std::move(adv_request1), std::move(cb1));
 
   RunLoopUntilIdle();
 
@@ -332,8 +337,10 @@ TEST_F(ProfileServerTest, ErrorOnMultipleAdvertiseRequests) {
     EXPECT_EQ(response.err(), fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
   };
 
-  client()->Advertise(std::move(services2), fidlbredr::ChannelParameters(),
-                      std::move(receiver_handle2), std::move(cb2));
+  fidlbredr::ProfileAdvertiseRequest adv_request2;
+  adv_request2.set_services(std::move(services2));
+  adv_request2.set_receiver(std::move(receiver_handle2));
+  client()->Advertise(std::move(adv_request2), std::move(cb2));
 
   RunLoopUntilIdle();
 
@@ -403,9 +410,10 @@ TEST_F(ProfileServerTest, UnregisterAdvertisementTriggersCallback) {
     EXPECT_TRUE(result.is_response());
   };
 
-  client()->Advertise(std::move(services), fidlbredr::ChannelParameters(),
-                      std::move(receiver_handle), std::move(cb));
-
+  fidlbredr::ProfileAdvertiseRequest adv_request;
+  adv_request.set_services(std::move(services));
+  adv_request.set_receiver(std::move(receiver_handle));
+  client()->Advertise(std::move(adv_request), std::move(cb));
   RunLoopUntilIdle();
 
   // Advertisement is still active, callback shouldn't get triggered.
@@ -681,8 +689,11 @@ TEST_F(ProfileServerTestConnectedPeer,
   fidlbredr::ChannelParameters chan_params;
   chan_params.set_channel_mode(fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION);
 
-  client()->Advertise(std::move(services), std::move(chan_params),
-                      std::move(connect_receiver_handle), NopAdvertiseCallback);
+  fidlbredr::ProfileAdvertiseRequest adv_request;
+  adv_request.set_services(std::move(services));
+  adv_request.set_parameters(std::move(chan_params));
+  adv_request.set_receiver(std::move(connect_receiver_handle));
+  client()->Advertise(std::move(adv_request), NopAdvertiseCallback);
   RunLoopUntilIdle();
 
   ASSERT_EQ(connect_receiver.connected_count(), 0u);
@@ -804,8 +815,10 @@ TEST_F(AclPrioritySupportedTest, InboundConnectAndSetPriority) {
 
   std::vector<fidlbredr::ServiceDefinition> services;
   services.emplace_back(MakeFIDLServiceDefinition());
-  client()->Advertise(std::move(services), fidlbredr::ChannelParameters(),
-                      std::move(connect_receiver_handle), NopAdvertiseCallback);
+  fidlbredr::ProfileAdvertiseRequest adv_request;
+  adv_request.set_services(std::move(services));
+  adv_request.set_receiver(std::move(connect_receiver_handle));
+  client()->Advertise(std::move(adv_request), NopAdvertiseCallback);
   RunLoopUntilIdle();
 
   ASSERT_EQ(connect_receiver.connected_count(), 0u);
@@ -906,8 +919,11 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectionReceiverReturnsValidSocket) {
 
   std::vector<fidlbredr::ServiceDefinition> services;
   services.emplace_back(MakeFIDLServiceDefinition());
-  client()->Advertise(std::move(services), fidlbredr::ChannelParameters(),
-                      std::move(connect_receiver_handle), NopAdvertiseCallback);
+
+  fidlbredr::ProfileAdvertiseRequest adv_request;
+  adv_request.set_services(std::move(services));
+  adv_request.set_receiver(std::move(connect_receiver_handle));
+  client()->Advertise(std::move(adv_request), NopAdvertiseCallback);
   RunLoopUntilIdle();
 
   ASSERT_EQ(connect_receiver.connected_count(), 0u);
@@ -1159,8 +1175,11 @@ TEST_F(ProfileServerTestFakeAdapter, AdvertiseChannelParametersContainsFlushTime
   fidlbredr::ConnectionReceiverHandle connect_receiver_handle;
   FakeConnectionReceiver connect_receiver(connect_receiver_handle.NewRequest(), dispatcher());
 
-  client()->Advertise(std::move(services), std::move(chan_params),
-                      std::move(connect_receiver_handle), NopAdvertiseCallback);
+  fidlbredr::ProfileAdvertiseRequest adv_request;
+  adv_request.set_services(std::move(services));
+  adv_request.set_parameters(std::move(chan_params));
+  adv_request.set_receiver(std::move(connect_receiver_handle));
+  client()->Advertise(std::move(adv_request), NopAdvertiseCallback);
   RunLoopUntilIdle();
 
   ASSERT_EQ(adapter()->fake_bredr()->registered_services().size(), 1u);
@@ -1181,6 +1200,47 @@ TEST_F(ProfileServerTestFakeAdapter, AdvertiseChannelParametersContainsFlushTime
 
   channel->Close();
   RunLoopUntilIdle();
+}
+
+TEST_F(ProfileServerTestFakeAdapter, AdvertiseWithMissingFields) {
+  auto adv_ok_cb = [](fidlbredr::Profile_Advertise_Result result) {
+    EXPECT_TRUE(result.is_response());
+  };
+  auto adv_err_cb = [](fidlbredr::Profile_Advertise_Result result) {
+    ASSERT_TRUE(result.is_err());
+    EXPECT_EQ(result.err(), fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+  };
+
+  fidlbredr::ProfileAdvertiseRequest adv_request_missing_receiver;
+  std::vector<fidlbredr::ServiceDefinition> services1;
+  services1.emplace_back(MakeFIDLServiceDefinition());
+  adv_request_missing_receiver.set_services(std::move(services1));
+  adv_request_missing_receiver.set_parameters(::fuchsia::bluetooth::bredr::ChannelParameters());
+  client()->Advertise(std::move(adv_request_missing_receiver), adv_err_cb);
+  RunLoopUntilIdle();
+  ASSERT_EQ(adapter()->fake_bredr()->registered_services().size(), 0u);
+
+  fidlbredr::ConnectionReceiverHandle connect_receiver_handle1;
+  FakeConnectionReceiver connect_receiver1(connect_receiver_handle1.NewRequest(), dispatcher());
+
+  fidlbredr::ProfileAdvertiseRequest adv_request_missing_services;
+  adv_request_missing_services.set_receiver(std::move(connect_receiver_handle1));
+  adv_request_missing_services.set_parameters(::fuchsia::bluetooth::bredr::ChannelParameters());
+  client()->Advertise(std::move(adv_request_missing_services), adv_err_cb);
+  RunLoopUntilIdle();
+  ASSERT_EQ(adapter()->fake_bredr()->registered_services().size(), 0u);
+
+  // Missing parameters is allowed.
+  fidlbredr::ProfileAdvertiseRequest adv_request_missing_parameters;
+  std::vector<fidlbredr::ServiceDefinition> services2;
+  services2.emplace_back(MakeFIDLServiceDefinition());
+  adv_request_missing_parameters.set_services(std::move(services2));
+  fidlbredr::ConnectionReceiverHandle connect_receiver_handle2;
+  FakeConnectionReceiver connect_receiver2(connect_receiver_handle2.NewRequest(), dispatcher());
+  adv_request_missing_parameters.set_receiver(std::move(connect_receiver_handle2));
+  client()->Advertise(std::move(adv_request_missing_parameters), adv_ok_cb);
+  RunLoopUntilIdle();
+  ASSERT_EQ(adapter()->fake_bredr()->registered_services().size(), 1u);
 }
 
 TEST_F(ProfileServerTestFakeAdapter, L2capParametersExtRequestParametersSucceeds) {

@@ -8,8 +8,8 @@ use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_bluetooth_bredr::{
     Attribute, Channel, ChannelMode, ChannelParameters, ConnectParameters,
     ConnectionReceiverRequest, ConnectionReceiverRequestStream, DataElement, Information,
-    L2capParameters, ProfileDescriptor, ProfileMarker, ProfileProxy, ProtocolDescriptor,
-    ProtocolIdentifier, SearchResultsRequest, SearchResultsRequestStream,
+    L2capParameters, ProfileAdvertiseRequest, ProfileDescriptor, ProfileMarker, ProfileProxy,
+    ProtocolDescriptor, ProtocolIdentifier, SearchResultsRequest, SearchResultsRequestStream,
     ServiceClassProfileIdentifier, ServiceDefinition,
 };
 use fuchsia_async as fasync;
@@ -567,7 +567,7 @@ impl ProfileServerFacade {
             fx_err_and_bail!(&with_line!(tag), log_err)
         };
 
-        let service_defs = &[ServiceDefinition {
+        let service_defs = vec![ServiceDefinition {
             service_class_uuids: Some(service_class_uuids.into_iter().map(Into::into).collect()),
             protocol_descriptor_list: Some(protocol_descriptors),
             profile_descriptors: Some(profile_descriptors),
@@ -585,8 +585,11 @@ impl ProfileServerFacade {
 
         match &self.inner.read().profile_server_proxy {
             Some(server) => {
-                let _ =
-                    server.advertise(service_defs, &ChannelParameters::default(), connect_client);
+                let _ = server.advertise(ProfileAdvertiseRequest {
+                    services: Some(service_defs),
+                    receiver: Some(connect_client),
+                    ..Default::default()
+                });
             }
             None => fx_err_and_bail!(&with_line!(tag), "No Server Proxy created."),
         };

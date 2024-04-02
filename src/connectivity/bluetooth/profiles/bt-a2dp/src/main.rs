@@ -475,8 +475,7 @@ fn setup_profiles(
         service_defs.push(make_profile_service_definition(sink_uuid));
     }
 
-    let mut profile =
-        ProfileClient::advertise(proxy, &service_defs[..], config.channel_parameters())?;
+    let mut profile = ProfileClient::advertise(proxy, service_defs, config.channel_parameters())?;
 
     const ATTRS: [u16; 4] = [
         bredr::ATTR_PROTOCOL_DESCRIPTOR_LIST,

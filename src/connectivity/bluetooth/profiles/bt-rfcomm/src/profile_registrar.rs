@@ -254,9 +254,14 @@ impl ProfileRegistrar {
             .map(bredr::ServiceDefinition::try_from)
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-        profile_upstream
-            .advertise(&fidl_services, &(&params.parameters).try_into().unwrap(), connect_client)
-            .map(|_| ())
+        let request = bredr::ProfileAdvertiseRequest {
+            receiver: Some(connect_client),
+            parameters: Some((&params.parameters).try_into().unwrap()),
+            services: Some(fidl_services),
+            ..Default::default()
+        };
+
+        profile_upstream.advertise(request).map(|_| ())
     }
 
     /// Processes requests from the ConnectionReceiver stream and relays to the `sender`.
@@ -379,12 +384,10 @@ impl ProfileRegistrar {
     /// result to the `responder` upon termination.
     fn make_advertise_relay(
         &self,
-        services: Vec<bredr::ServiceDefinition>,
-        parameters: bredr::ChannelParameters,
-        receiver: ClientEnd<bredr::ConnectionReceiverMarker>,
+        request: bredr::ProfileAdvertiseRequest,
         responder: bredr::ProfileAdvertiseResponder,
     ) -> impl Future<Output = ()> {
-        let adv_fut = self.profile_upstream.advertise(&services, &parameters, receiver);
+        let adv_fut = self.profile_upstream.advertise(request);
         async move {
             let _ = adv_fut
                 .await
@@ -402,29 +405,39 @@ impl ProfileRegistrar {
         request: bredr::ProfileRequest,
     ) -> Option<AdvertiseResult> {
         match request {
-            bredr::ProfileRequest::Advertise { services, parameters, receiver, responder } => {
-                let services_local = services
+            bredr::ProfileRequest::Advertise { payload, responder } => {
+                if payload.services.is_none() || payload.receiver.is_none() {
+                    let _ =
+                        responder.send(Err(fidl_fuchsia_bluetooth::ErrorCode::InvalidArguments));
+                    return None;
+                }
+                let services_local = payload
+                    .services
+                    .as_ref()
+                    .unwrap()
                     .iter()
                     .map(ServiceDefinition::try_from)
                     .collect::<Result<Vec<_>, _>>()
                     .ok()?;
                 trace!("Advertise request: {services_local:?}");
                 if service_definitions_request_rfcomm(&services_local) {
-                    let receiver = receiver.into_proxy().ok()?;
-                    let parameters = ChannelParameters::try_from(&parameters).ok()?;
+                    let receiver = payload.receiver.unwrap().into_proxy().ok()?;
+                    let parameters =
+                        ChannelParameters::try_from(&payload.parameters.unwrap_or_default())
+                            .ok()?;
                     match self
                         .add_managed_advertisement(services_local, parameters, receiver, responder)
                         .await
                     {
-                        Err(e) => warn!("Error handling advertise request: {e:?}"),
+                        Err(e) => {
+                            warn!("Error handling advertise request: {e:?}");
+                            return None;
+                        }
                         Ok(evt_stream) => return Some(AdvertiseResult::EventStream(evt_stream)),
                     }
-                } else {
-                    let relay_fut =
-                        self.make_advertise_relay(services, parameters, receiver, responder);
-                    self.advertise_relay_tasks.push(fasync::Task::spawn(relay_fut));
-                    return None;
                 }
+                let relay_fut = self.make_advertise_relay(payload, responder);
+                self.advertise_relay_tasks.push(fasync::Task::spawn(relay_fut));
             }
             bredr::ProfileRequest::Connect { peer_id, connection, responder, .. } => {
                 let peer_id = peer_id.into();
@@ -624,7 +637,12 @@ mod tests {
     ) {
         let (connection, connection_stream) =
             create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
-        let adv_fut = client.advertise(&services, &bredr::ChannelParameters::default(), connection);
+        let request = bredr::ProfileAdvertiseRequest {
+            services: Some(services),
+            receiver: Some(connection),
+            ..Default::default()
+        };
+        let adv_fut = client.advertise(request);
         (connection_stream, adv_fut)
     }
 
@@ -879,7 +897,8 @@ mod tests {
 
         // Upstream should receive Advertise request for a service with an assigned server channel.
         match exec.run_until_stalled(&mut upstream_requests.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise { services, .. }))) => {
+            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise { payload, .. }))) => {
+                let services = payload.services.unwrap();
                 assert_eq!(services.len(), 1);
                 assert!(service_def_has_assigned_server_channel(&services[0]));
             }
@@ -922,7 +941,8 @@ mod tests {
         // Expect an advertise request with all n services - validate that the RFCOMM services
         // have assigned server channels.
         match exec.run_until_stalled(&mut upstream_requests.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise { services, .. }))) => {
+            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise { payload, .. }))) => {
+                let services = payload.services.unwrap();
                 assert_eq!(services.len(), n);
                 let res = services
                     .into_iter()
@@ -1038,8 +1058,8 @@ mod tests {
         // First advertisement request relayed upstream.
         let (_receiver1, responder1) = match exec.run_until_stalled(&mut upstream_requests.next()) {
             Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise {
-                receiver, responder, ..
-            }))) => (receiver, responder),
+                payload, responder, ..
+            }))) => (payload.receiver.unwrap(), responder),
             x => panic!("Expected advertise request, got: {:?}", x),
         };
 
@@ -1073,13 +1093,10 @@ mod tests {
         let (_receiver2, _responder2) = match exec.run_until_stalled(&mut upstream_requests.next())
         {
             Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise {
-                services,
-                receiver,
-                responder,
-                ..
+                payload, responder, ..
             }))) => {
-                assert_eq!(services.len(), n1 + n2);
-                (receiver, responder)
+                assert_eq!(payload.services.unwrap().len(), n1 + n2);
+                (payload.receiver.unwrap(), responder)
             }
             x => panic!("Expected advertise request, got: {:?}", x),
         };
@@ -1113,9 +1130,9 @@ mod tests {
         let (receiver, _adv_responder) = match exec.run_until_stalled(&mut upstream_requests.next())
         {
             Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise {
-                responder, receiver, ..
+                payload, responder, ..
             }))) => {
-                let receiver = receiver.into_proxy().unwrap();
+                let receiver = payload.receiver.unwrap().into_proxy().unwrap();
                 (receiver, responder)
             }
             x => panic!("Expected advertise request, got: {:?}", x),
@@ -1210,8 +1227,8 @@ mod tests {
             .run_until_stalled(&mut upstream_server.next())
         {
             Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise {
-                receiver, responder, ..
-            }))) => (receiver, responder),
+                payload, responder, ..
+            }))) => (payload.receiver.unwrap(), responder),
             x => panic!("Expected Advertise request but got: {:?}", x),
         };
 

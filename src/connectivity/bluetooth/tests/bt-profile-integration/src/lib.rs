@@ -11,8 +11,8 @@ use {
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_bluetooth::{DeviceClass, ErrorCode, MAJOR_DEVICE_CLASS_MISCELLANEOUS},
     fidl_fuchsia_bluetooth_bredr::{
-        ChannelParameters, ConnectParameters, ConnectionReceiverRequestStream, DataElement,
-        L2capParameters, ProfileDescriptor, ProtocolDescriptor, ProtocolIdentifier,
+        ConnectParameters, ConnectionReceiverRequestStream, DataElement, L2capParameters,
+        ProfileAdvertiseRequest, ProfileDescriptor, ProtocolDescriptor, ProtocolIdentifier,
         SearchResultsRequest, SearchResultsRequestStream, ServiceClassProfileIdentifier,
         ServiceDefinition, PSM_AVDTP,
     },
@@ -63,15 +63,15 @@ pub fn a2dp_sink_service_definition() -> ServiceDefinition {
 }
 
 fn add_service(profile: &ProfileHarness) -> Result<ConnectionReceiverRequestStream, anyhow::Error> {
-    let service_defs = &[service_definition_for_testing()];
+    let service_defs = vec![service_definition_for_testing()];
     let (connect_client, connect_requests) =
         create_request_stream().context("ConnectionReceiver creation")?;
 
-    let _ = profile.aux().profile.advertise(
-        service_defs,
-        &ChannelParameters::default(),
-        connect_client,
-    );
+    let _ = profile.aux().profile.advertise(ProfileAdvertiseRequest {
+        services: Some(service_defs),
+        receiver: Some(connect_client),
+        ..Default::default()
+    });
     Ok(connect_requests)
 }
 

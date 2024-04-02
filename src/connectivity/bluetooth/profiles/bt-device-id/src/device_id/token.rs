@@ -110,7 +110,7 @@ mod tests {
     use async_utils::PollExt;
     use fidl::client::QueryResponseFut;
     use fidl_fuchsia_bluetooth_bredr::{
-        ChannelParameters, ConnectionReceiverMarker, ConnectionReceiverProxy, ProfileMarker,
+        ConnectionReceiverMarker, ConnectionReceiverProxy, ProfileAdvertiseRequest, ProfileMarker,
     };
     use fuchsia_async as fasync;
     use futures::{future::MaybeDone, pin_mut};
@@ -158,7 +158,11 @@ mod tests {
             let (c, _s) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
             let (c2, _s2) =
                 fidl::endpoints::create_request_stream::<ConnectionReceiverMarker>().unwrap();
-            let fut = c.advertise(&[], &ChannelParameters::default(), c2);
+            let fut = c.advertise(ProfileAdvertiseRequest {
+                services: Some(vec![]),
+                receiver: Some(c2),
+                ..Default::default()
+            });
             let task = fasync::Task::local(async {
                 let (_s, _s2, _c) = (_s, _s2, c); // Keep everything alive.
                 futures::future::pending::<()>().await;

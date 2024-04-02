@@ -254,7 +254,7 @@ impl RfcommManager {
         let spp_service = vec![spp_service_definition()];
         let mut client = ProfileClient::advertise(
             profile_proxy,
-            &spp_service,
+            spp_service,
             bredr::ChannelParameters::default(),
         )?;
         let _ = client.add_search(bredr::ServiceClassProfileIdentifier::SerialPort, &[])?;
@@ -430,8 +430,8 @@ mod tests {
         let mut advertisement = None;
         while let Some(req) = profile.next().await {
             match req {
-                Ok(bredr::ProfileRequest::Advertise { receiver, responder, .. }) => {
-                    let connect_proxy = receiver.into_proxy().unwrap();
+                Ok(bredr::ProfileRequest::Advertise { payload, responder, .. }) => {
+                    let connect_proxy = payload.receiver.unwrap().into_proxy().unwrap();
                     advertisement = Some((connect_proxy, responder));
                 }
                 Ok(bredr::ProfileRequest::Search { results, .. }) => {

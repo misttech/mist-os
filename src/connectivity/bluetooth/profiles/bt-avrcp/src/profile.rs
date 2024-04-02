@@ -298,7 +298,7 @@ pub fn connect_and_advertise() -> Result<(ProfileProxy, ProfileClient), Error> {
         ..Default::default()
     };
     let mut profile_client =
-        ProfileClient::advertise(profile_svc.clone(), &service_defs, channel_parameters)?;
+        ProfileClient::advertise(profile_svc.clone(), service_defs, channel_parameters)?;
 
     profile_client
         .add_search(ServiceClassProfileIdentifier::AvRemoteControl, &SEARCH_ATTRIBUTES)?;

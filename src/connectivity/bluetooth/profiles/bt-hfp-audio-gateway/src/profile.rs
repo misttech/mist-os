@@ -14,7 +14,7 @@ fn register(
     let service_definition = service_definitions::audio_gateway(features);
     let mut profile = ProfileClient::advertise(
         proxy,
-        &[service_definition],
+        vec![service_definition],
         bredr::ChannelParameters::default(),
     )?;
 
@@ -77,12 +77,12 @@ pub(crate) mod test_server {
         pub async fn complete_registration(&mut self) {
             while let Some(request) = self.stream.next().await {
                 match request {
-                    Ok(bredr::ProfileRequest::Advertise { receiver, responder, .. }) => {
+                    Ok(bredr::ProfileRequest::Advertise { payload, responder, .. }) => {
                         if self.is_registration_complete() {
                             panic!("unexpected second advertise request");
                         }
                         self.responder = Some(responder);
-                        self.receiver = Some(receiver.into_proxy().unwrap());
+                        self.receiver = Some(payload.receiver.unwrap().into_proxy().unwrap());
                         if self.is_registration_complete() {
                             break;
                         }
