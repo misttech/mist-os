@@ -44,7 +44,6 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_get_backing_memory(true);
     config.supports_remote_dir(true);
     config.supports_get_token(true);
-    config.conformant_path_handling(true);
 
     // Unsupported options:
     config.supports_create(false);

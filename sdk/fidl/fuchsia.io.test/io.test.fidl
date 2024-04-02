@@ -66,10 +66,6 @@ type Io1Config = table {
     /// GetToken is supported.
     10: supports_get_token bool;
 
-    /// Path handling conforms to in-tree behavior.
-    // TODO(https://fxbug.dev/42070484): Remove this option when all harnesses have conformant path handling.
-    11: conformant_path_handling bool;
-
     /// Unlink is supported.
     12: supports_unlink bool;
 

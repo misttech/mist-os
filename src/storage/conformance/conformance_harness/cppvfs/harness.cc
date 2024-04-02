@@ -57,7 +57,6 @@ class TestHarness : public fio_test::Io1Harness {
     config.set_supports_get_backing_memory(true);
     config.set_supports_remote_dir(true);
     config.set_supports_get_token(true);
-    config.set_conformant_path_handling(true);
     config.set_supports_append(true);
 
     // Unsupported options

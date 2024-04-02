@@ -118,7 +118,6 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     supports_get_backing_memory: Some(true),
                     supports_rename: Some(true),
                     supports_get_token: Some(true),
-                    conformant_path_handling: Some(true),
                     supports_unlink: Some(true),
                     supports_get_attributes: Some(true),
                     supports_open2: Some(true),

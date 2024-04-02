@@ -54,9 +54,6 @@ async fn open_file_without_describe_flag() {
 #[fuchsia::test]
 async fn open_path() {
     let harness = TestHarness::new().await;
-    if !harness.config.conformant_path_handling.unwrap_or_default() {
-        return;
-    }
 
     let root = root_directory(vec![directory("dir", vec![])]);
     let root_dir = harness.get_directory(root, harness.dir_rights.all());
