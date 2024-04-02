@@ -7,7 +7,7 @@ import("//build/test.gni")
 
 sdk_source_set("sparse") {
   sdk_name = "storage_sdk_sparse"
-  category = "experimental"
+  category = "excluded"
   include_base = "//src/storage"
   sources = [
     "sparse.c",

@@ -42,7 +42,7 @@ sdk_documentation("docs") {
 sdk_documentation("firmware") {
   name = "firmware"
 
-  category = "experimental"
+  category = "excluded"
 
   files = [
     {

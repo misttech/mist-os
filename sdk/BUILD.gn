@@ -877,7 +877,9 @@ sdk_final_manifest_golden("firmware_manifest_golden") {
 sdk_collection("firmware_collection") {
   visibility += [ "*" ]
 
-  category = "experimental"
+  # The "Firmware SDK" is unrelated to the Fuchsia SDK but uses the same GN templates and thus must
+  # set a category. See https://fxbug.dev/331962496.
+  category = "excluded"
 
   deps = [
     "//sdk/docs:firmware",

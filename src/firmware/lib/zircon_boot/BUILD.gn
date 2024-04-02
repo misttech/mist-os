@@ -33,7 +33,7 @@ zx_library("zircon_boot") {
     "//src/firmware/lib/zbi",
     "//third_party/android/platform/external/avb",
   ]
-  sdk_publishable = "experimental"
+  sdk_publishable = "excluded"
 }
 
 # In-tree library.

@@ -23,7 +23,7 @@ sdk_source_set("storage") {
     "storage.h",
   ]
   sdk_name = "firmware_sdk_storage"
-  category = "experimental"
+  category = "excluded"
   include_base = "//src/firmware"
   public_deps = [
     "//src/storage/lib/sparse/c:sparse",

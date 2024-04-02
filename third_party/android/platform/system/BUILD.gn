@@ -21,7 +21,7 @@ license("sparse_format_license") {
 
 sdk_source_set("sparse_format") {
   sdk_name = "libsparse_sparse_format"
-  category = "experimental"
+  category = "excluded"
   include_base = "core/libsparse"
   sources = [
     "core/libsparse/sparse_defs.h",
