@@ -126,9 +126,9 @@ class AmlUsbPhyTest : public zxtest::Test {
     static constexpr uint32_t kMagicNumbers[8] = {};
     static constexpr uint8_t kPhyType = kG12A;
     static const std::vector<UsbPhyMode> kPhyModes = {
-        {UsbProtocol::Usb2_0, USB_MODE_HOST, false},
-        {UsbProtocol::Usb2_0, USB_MODE_OTG, true},
-        {UsbProtocol::Usb3_0, USB_MODE_HOST, false},
+        {UsbProtocol::Usb2_0, UsbMode::Host, false},
+        {UsbProtocol::Usb2_0, UsbMode::Otg, true},
+        {UsbProtocol::Usb3_0, UsbMode::Host, false},
     };
 
     fuchsia_driver_framework::DriverStartArgs start_args;
@@ -202,7 +202,7 @@ class AmlUsbPhyTest : public zxtest::Test {
   // This method fires the irq and then waits for the side effects of SetMode to have taken place.
   void TriggerInterruptAndCheckMode(UsbMode mode) {
     // Switch to appropriate mode. This will be read by the irq thread.
-    dut_->usbctrl_mmio().reg_values_[USB_R5_OFFSET >> 2] = (mode == UsbMode::PERIPHERAL) << 6;
+    dut_->usbctrl_mmio().reg_values_[USB_R5_OFFSET >> 2] = (mode == UsbMode::Peripheral) << 6;
     // Wake up the irq thread.
     incoming_.SyncCall([](IncomingNamespace* incoming) {
       incoming->pdev_server.irq().trigger(0, zx::clock::get_monotonic());
@@ -211,9 +211,9 @@ class AmlUsbPhyTest : public zxtest::Test {
 
     // Check that mode is as expected.
     auto& phy = dut_->device();
-    EXPECT_EQ(phy->usbphy(UsbProtocol::Usb2_0, 0)->phy_mode(), UsbMode::HOST);
+    EXPECT_EQ(phy->usbphy(UsbProtocol::Usb2_0, 0)->phy_mode(), UsbMode::Host);
     EXPECT_EQ(phy->usbphy(UsbProtocol::Usb2_0, 1)->phy_mode(), mode);
-    EXPECT_EQ(phy->usbphy(UsbProtocol::Usb3_0, 0)->phy_mode(), UsbMode::HOST);
+    EXPECT_EQ(phy->usbphy(UsbProtocol::Usb3_0, 0)->phy_mode(), UsbMode::Host);
   }
 
   void CheckDevices(fdf_testing::TestNode* test_node, std::vector<std::string> devices) {
@@ -260,16 +260,16 @@ TEST_F(AmlUsbPhyTest, SetMode) {
   CheckDevices(phy, {"xhci"});
 
   // Trigger interrupt configuring initial Host mode.
-  TriggerInterruptAndCheckMode(UsbMode::HOST);
+  TriggerInterruptAndCheckMode(UsbMode::Host);
   // Nothing should've changed.
   CheckDevices(phy, {"xhci"});
 
   // Trigger interrupt, and switch to Peripheral mode.
-  TriggerInterruptAndCheckMode(UsbMode::PERIPHERAL);
+  TriggerInterruptAndCheckMode(UsbMode::Peripheral);
   CheckDevices(phy, {"xhci", "dwc2"});
 
   // Trigger interrupt, and switch (back) to Host mode.
-  TriggerInterruptAndCheckMode(UsbMode::HOST);
+  TriggerInterruptAndCheckMode(UsbMode::Host);
   // The dwc2 device should be removed.
   CheckDevices(phy, {"xhci"});
 }

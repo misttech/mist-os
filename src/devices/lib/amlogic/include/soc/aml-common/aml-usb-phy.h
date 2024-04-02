@@ -7,16 +7,21 @@
 
 #include <zircon/types.h>
 
-#include <usb/usb.h>
-
 enum UsbProtocol : uint8_t {
   Usb2_0 = 2,
   Usb3_0 = 3,
 };
 
+enum UsbMode : uint8_t {
+  Unknown = 0,
+  Host = 1,
+  Peripheral = 2,
+  Otg = 3,
+};
+
 struct UsbPhyMode {
   UsbProtocol protocol;
-  usb_mode_t dr_mode;
+  UsbMode dr_mode;
   bool is_otg_capable;
 };
 

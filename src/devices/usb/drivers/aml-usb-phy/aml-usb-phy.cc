@@ -73,10 +73,10 @@ zx_status_t AmlUsbPhy::InitPhy2() {
     if (phy.is_otg_capable()) {
       u2p_ro_v2.set_idpullup0(1)
           .set_drvvbus0(1)
-          .set_host_device(phy.dr_mode() == USB_MODE_PERIPHERAL ? 0 : 1)
+          .set_host_device(phy.dr_mode() == UsbMode::Peripheral ? 0 : 1)
           .WriteTo(usbctrl_mmio);
     } else {
-      u2p_ro_v2.set_host_device(phy.dr_mode() == USB_MODE_HOST).WriteTo(usbctrl_mmio);
+      u2p_ro_v2.set_host_device(phy.dr_mode() == UsbMode::Peripheral).WriteTo(usbctrl_mmio);
     }
     u2p_ro_v2.set_por(0).WriteTo(usbctrl_mmio);
   }
@@ -159,14 +159,14 @@ void AmlUsbPhy::ChangeMode(UsbPhyBase& phy, UsbMode new_mode) {
   }
   phy.SetMode(new_mode, usbctrl_mmio_, pll_settings_);
 
-  if (new_mode == UsbMode::HOST) {
+  if (new_mode == UsbMode::Host) {
     ++controller_->xhci_;
-    if (old_mode != UsbMode::UNKNOWN) {
+    if (old_mode != UsbMode::Unknown) {
       --controller_->dwc2_;
     }
   } else {
     ++controller_->dwc2_;
-    if (old_mode != UsbMode::UNKNOWN) {
+    if (old_mode != UsbMode::Unknown) {
       --controller_->xhci_;
     }
   }
@@ -189,11 +189,11 @@ void AmlUsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, z
 
     // Read current host/device role.
     for (auto& phy : usbphy2_) {
-      if (phy.dr_mode() != USB_MODE_OTG) {
+      if (phy.dr_mode() != UsbMode::Otg) {
         continue;
       }
 
-      ChangeMode(phy, r5.iddig_curr() == 0 ? UsbMode::HOST : UsbMode::PERIPHERAL);
+      ChangeMode(phy, r5.iddig_curr() == 0 ? UsbMode::Host : UsbMode::Peripheral);
     }
   }
 
@@ -220,25 +220,25 @@ zx_status_t AmlUsbPhy::Init() {
 
   for (auto& phy : usbphy2_) {
     UsbMode mode;
-    if (phy.dr_mode() != USB_MODE_OTG) {
-      mode = phy.dr_mode() == USB_MODE_HOST ? UsbMode::HOST : UsbMode::PERIPHERAL;
+    if (phy.dr_mode() != UsbMode::Otg) {
+      mode = phy.dr_mode() == UsbMode::Host ? UsbMode::Host : UsbMode::Peripheral;
     } else {
       has_otg = true;
       // Wait for PHY to stabilize before reading initial mode.
       zx::nanosleep(zx::deadline_after(zx::sec(1)));
-      mode = USB_R5_V2::Get().ReadFrom(&usbctrl_mmio_).iddig_curr() == 0 ? UsbMode::HOST
-                                                                         : UsbMode::PERIPHERAL;
+      mode = USB_R5_V2::Get().ReadFrom(&usbctrl_mmio_).iddig_curr() == 0 ? UsbMode::Host
+                                                                         : UsbMode::Peripheral;
     }
 
     ChangeMode(phy, mode);
   }
 
   for (auto& phy : usbphy3_) {
-    if (phy.dr_mode() != USB_MODE_HOST) {
+    if (phy.dr_mode() != UsbMode::Host) {
       FDF_LOG(ERROR, "Not support USB3 in non-host mode yet");
     }
 
-    ChangeMode(phy, UsbMode::HOST);
+    ChangeMode(phy, UsbMode::Host);
   }
 
   if (has_otg) {
@@ -263,7 +263,7 @@ void AmlUsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
   }
 
   for (auto& phy : usbphy2_) {
-    if (phy.phy_mode() != UsbMode::PERIPHERAL) {
+    if (phy.phy_mode() != UsbMode::Peripheral) {
       continue;
     }
     auto* mmio = &phy.mmio();

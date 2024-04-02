@@ -11,17 +11,11 @@
 
 namespace aml_usb_phy {
 
-enum class UsbMode {
-  UNKNOWN,
-  HOST,
-  PERIPHERAL,
-};
-
 class UsbPhyBase {
  public:
   const fdf::MmioBuffer& mmio() const { return mmio_; }
   bool is_otg_capable() const { return is_otg_capable_; }
-  usb_mode_t dr_mode() const { return dr_mode_; }
+  UsbMode dr_mode() const { return dr_mode_; }
 
   UsbMode phy_mode() { return phy_mode_; }
   void SetMode(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
@@ -34,7 +28,7 @@ class UsbPhyBase {
   virtual void dump_regs() const = 0;
 
  protected:
-  UsbPhyBase(fdf::MmioBuffer mmio, bool is_otg_capable, usb_mode_t dr_mode)
+  UsbPhyBase(fdf::MmioBuffer mmio, bool is_otg_capable, UsbMode dr_mode)
       : mmio_(std::move(mmio)), is_otg_capable_(is_otg_capable), dr_mode_(dr_mode) {}
 
  private:
@@ -43,10 +37,10 @@ class UsbPhyBase {
 
   fdf::MmioBuffer mmio_;
   const bool is_otg_capable_;
-  const usb_mode_t dr_mode_;  // USB Controller Mode. Internal to Driver.
+  const UsbMode dr_mode_;  // USB Controller Mode. Internal to Driver.
 
   UsbMode phy_mode_ =
-      UsbMode::UNKNOWN;  // Physical USB mode. Must hold parent's lock_ while accessing.
+      UsbMode::Unknown;  // Physical USB mode. Must hold parent's lock_ while accessing.
 };
 
 }  // namespace aml_usb_phy

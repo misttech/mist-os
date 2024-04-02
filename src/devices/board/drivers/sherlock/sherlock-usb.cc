@@ -168,8 +168,8 @@ constexpr uint32_t pll_settings[] = {
 static const PhyType type = kG12A;
 
 static const std::vector<UsbPhyMode> phy_modes = {
-    {UsbProtocol::Usb2_0, USB_MODE_HOST, false},
-    {UsbProtocol::Usb2_0, USB_MODE_PERIPHERAL, true},
+    {UsbProtocol::Usb2_0, UsbMode::Host, false},
+    {UsbProtocol::Usb2_0, UsbMode::Peripheral, true},
 };
 
 static const std::vector<fpbus::Metadata> usb_phy_metadata{

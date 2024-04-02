@@ -90,21 +90,21 @@ void UsbPhy2::InitPll(PhyType type, const std::array<uint32_t, 8>& pll_settings)
 
 void UsbPhy2::SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
                               const std::array<uint32_t, 8>& pll_settings) {
-  ZX_DEBUG_ASSERT(mode == UsbMode::HOST || mode == UsbMode::PERIPHERAL);
-  if ((dr_mode() == USB_MODE_HOST && mode != UsbMode::HOST) ||
-      (dr_mode() == USB_MODE_PERIPHERAL && mode != UsbMode::PERIPHERAL)) {
+  ZX_DEBUG_ASSERT(mode == UsbMode::Host || mode == UsbMode::Peripheral);
+  if ((dr_mode() == UsbMode::Host && mode != UsbMode::Host) ||
+      (dr_mode() == UsbMode::Peripheral && mode != UsbMode::Peripheral)) {
     FDF_LOG(ERROR, "If dr_mode_ is not USB_MODE_OTG, dr_mode_ must match requested mode.");
     return;
   }
 
-  FDF_LOG(INFO, "Entering USB %s Mode", mode == UsbMode::HOST ? "Host" : "Peripheral");
+  FDF_LOG(INFO, "Entering USB %s Mode", mode == UsbMode::Host ? "Host" : "Peripheral");
 
   if (mode == phy_mode())
     return;
 
   if (is_otg_capable()) {
     auto r0 = USB_R0_V2::Get().ReadFrom(&usbctrl_mmio);
-    if (mode == UsbMode::HOST) {
+    if (mode == UsbMode::Host) {
       r0.set_u2d_act(0);
     } else {
       r0.set_u2d_act(1);
@@ -114,20 +114,20 @@ void UsbPhy2::SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
 
     USB_R4_V2::Get()
         .ReadFrom(&usbctrl_mmio)
-        .set_p21_sleepm0(mode == UsbMode::PERIPHERAL)
+        .set_p21_sleepm0(mode == UsbMode::Peripheral)
         .WriteTo(&usbctrl_mmio);
   }
 
   U2P_R0_V2::Get(idx_)
       .ReadFrom(&usbctrl_mmio)
-      .set_host_device(mode == UsbMode::HOST)
+      .set_host_device(mode == UsbMode::Host)
       .set_por(0)
       .WriteTo(&usbctrl_mmio);
 
   zx::nanosleep(zx::deadline_after(zx::usec(500)));
 
-  if (is_otg_capable() && phy_mode() != UsbMode::UNKNOWN) {
-    PHY2_R14::Get().FromValue(mode == UsbMode::HOST ? pll_settings[6] : 0).WriteTo(&mmio());
+  if (is_otg_capable() && phy_mode() != UsbMode::Unknown) {
+    PHY2_R14::Get().FromValue(mode == UsbMode::Host ? pll_settings[6] : 0).WriteTo(&mmio());
     PHY2_R13::Get().FromValue(pll_settings[5]).WriteTo(&mmio());
   }
 }

@@ -13,7 +13,7 @@ namespace aml_usb_phy {
 
 class UsbPhy3 final : public UsbPhyBase {
  public:
-  UsbPhy3(fdf::MmioBuffer mmio, bool is_otg_capable, usb_mode_t dr_mode)
+  UsbPhy3(fdf::MmioBuffer mmio, bool is_otg_capable, UsbMode dr_mode)
       : UsbPhyBase(std::move(mmio), is_otg_capable, dr_mode) {}
 
   zx_status_t Init(fdf::MmioBuffer& usbctrl_mmio);
@@ -24,7 +24,7 @@ class UsbPhy3 final : public UsbPhyBase {
   void SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
                        const std::array<uint32_t, 8>& pll_settings) override {
     // UsbPhy3 only supports host mode as of right now.
-    ZX_ASSERT(mode == UsbMode::HOST);
+    ZX_ASSERT(mode == UsbMode::Host);
   }
 
   zx_status_t CrBusAddr(uint32_t addr);

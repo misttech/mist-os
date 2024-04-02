@@ -88,11 +88,11 @@ zx::result<> AmlUsbPhyVisitor::DriverVisit(fdf_devicetree::Node& node,
     // not.
 
     if (*mode_string == "host") {
-      phy_mode.dr_mode = USB_MODE_HOST;
+      phy_mode.dr_mode = UsbMode::Host;
     } else if (*mode_string == "peripheral") {
-      phy_mode.dr_mode = USB_MODE_PERIPHERAL;
+      phy_mode.dr_mode = UsbMode::Peripheral;
     } else if (*mode_string == "otg") {
-      phy_mode.dr_mode = USB_MODE_OTG;
+      phy_mode.dr_mode = UsbMode::Otg;
     }
 
     auto phy_name = parser_output->at(kRegNames)[reg_name_index++].AsString();

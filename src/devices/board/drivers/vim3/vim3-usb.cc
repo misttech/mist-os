@@ -92,9 +92,9 @@ static const PhyType type = kG12B;
 // port is connected to the USB 2.0 OTG controller, however, we only want the USB-C port to be in
 // peripheral mode to support USB-CDC use-case.
 static const std::vector<UsbPhyMode> phy_modes = {
-    {UsbProtocol::Usb2_0, USB_MODE_HOST, false},
-    {UsbProtocol::Usb2_0, USB_MODE_PERIPHERAL, true},
-    {UsbProtocol::Usb3_0, USB_MODE_HOST, false},
+    {UsbProtocol::Usb2_0, UsbMode::Host, false},
+    {UsbProtocol::Usb2_0, UsbMode::Peripheral, true},
+    {UsbProtocol::Usb3_0, UsbMode::Host, false},
 };
 
 static const std::vector<fpbus::Metadata> usb_phy_metadata{
