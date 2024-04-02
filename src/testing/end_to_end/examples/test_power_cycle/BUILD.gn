@@ -8,7 +8,6 @@ import("//build/testing/environments.gni")
 assert(is_host, "Python E2E tests are host-only")
 
 python_mobly_test("power_cycle_test_sl4f") {
-  enable_mypy = true
   main_source = "test_power_cycle.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",
@@ -23,7 +22,6 @@ python_mobly_test("power_cycle_test_sl4f") {
 }
 
 python_mobly_test("power_cycle_test_fc") {
-  enable_mypy = true
   main_source = "test_power_cycle.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",

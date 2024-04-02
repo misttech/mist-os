@@ -8,7 +8,6 @@ import("//build/testing/environments.gni")
 assert(is_host, "Python E2E tests are host-only")
 
 python_mobly_test("run_wo_test_case_revive_fc") {
-  enable_mypy = true
   main_source = "test_case_revive_example.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",
@@ -26,7 +25,6 @@ python_mobly_test("run_wo_test_case_revive_fc") {
 }
 
 python_mobly_test("test_case_revive_with_with_idle_suspend_auto_resume_fc") {
-  enable_mypy = true
   main_source = "test_case_revive_example.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",
@@ -42,7 +40,6 @@ python_mobly_test("test_case_revive_with_with_idle_suspend_auto_resume_fc") {
 }
 
 python_mobly_test("test_case_revive_with_with_soft_reboot_fc") {
-  enable_mypy = true
   main_source = "test_case_revive_example.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",
@@ -61,7 +58,6 @@ python_mobly_test("test_case_revive_with_with_soft_reboot_fc") {
 }
 
 python_mobly_test("test_case_revive_with_hard_reboot_fc") {
-  enable_mypy = true
   main_source = "test_case_revive_example.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",

@@ -7,7 +7,6 @@ import("//build/testing/environments.gni")
 
 if (is_host) {
   python_mobly_test("system_power_state_controller_test_on_starnix_fc") {
-    enable_mypy = true
     main_source = "test_system_power_state_controller.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -19,7 +18,6 @@ if (is_host) {
   }
 
   python_mobly_test("system_power_state_controller_test_on_non_starnix_fc") {
-    enable_mypy = true
     main_source = "test_system_power_state_controller.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",

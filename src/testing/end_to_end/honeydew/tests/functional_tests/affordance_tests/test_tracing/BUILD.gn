@@ -14,7 +14,6 @@ if (is_host) {
   }
 
   python_mobly_test("tracing_test_sl4f") {
-    enable_mypy = true
     main_source = "test_tracing.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -26,7 +25,6 @@ if (is_host) {
   }
 
   python_mobly_test("tracing_test_fc") {
-    enable_mypy = true
     main_source = "test_tracing.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",

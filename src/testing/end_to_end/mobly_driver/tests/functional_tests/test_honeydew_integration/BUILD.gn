@@ -8,7 +8,6 @@ import("//build/testing/host_test_data.gni")
 
 if (is_host) {
   python_mobly_test("test_honeydew_integration_fc") {
-    enable_mypy = true
     main_source = "test_honeydew_integration.py"
 
     libraries = [ "//src/testing/end_to_end/mobly_controller" ]

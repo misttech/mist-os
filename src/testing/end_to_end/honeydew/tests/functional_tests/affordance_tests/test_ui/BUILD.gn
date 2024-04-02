@@ -7,7 +7,6 @@ import("//build/testing/environments.gni")
 
 if (is_host) {
   python_mobly_test("screenshot_test_ffx") {
-    enable_mypy = true
     main_source = "test_screenshot.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -18,7 +17,6 @@ if (is_host) {
   }
 
   python_mobly_test("user_input_test_sl4f") {
-    enable_mypy = true
     main_source = "test_user_input.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",

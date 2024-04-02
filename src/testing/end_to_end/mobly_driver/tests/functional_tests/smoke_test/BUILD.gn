@@ -9,12 +9,10 @@ import("//build/testing/host_test_data.gni")
 if (is_host) {
   # Define a Mobly `fuchsia_device` module.
   python_library("fuchsia_device") {
-    enable_mypy = true
     sources = [ "fuchsia_device.py" ]
   }
 
   python_mobly_test("smoke_test") {
-    enable_mypy = true
     main_source = "mobly_driver_smoke_test.py"
     sources = [ "fuchsia_device.py" ]
 

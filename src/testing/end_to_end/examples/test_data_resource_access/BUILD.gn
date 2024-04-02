@@ -9,7 +9,6 @@ import("//build/testing/environments.gni")
 assert(is_host, "Python E2E tests are host-only")
 
 python_mobly_test("data_resource_access_test_fc") {
-  enable_mypy = true
   main_source = "test_data_resource_access.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",

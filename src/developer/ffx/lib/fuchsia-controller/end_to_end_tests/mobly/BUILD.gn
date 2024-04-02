@@ -17,7 +17,6 @@ group("fuchsia_controller_tests") {
 }
 
 python_mobly_test("target_identity_tests") {
-  enable_mypy = true
   main_source = "target_identity_tests.py"
   libraries = [
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
@@ -41,7 +40,6 @@ python_mobly_test("target_identity_tests") {
 }
 
 python_mobly_test("reboot_test") {
-  enable_mypy = true
   main_source = "reboot_test.py"
   libraries = [
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
@@ -68,7 +66,6 @@ host_test_data("tracing_runtime_deps") {
 }
 
 python_mobly_test("tracing_test") {
-  enable_mypy = true
   main_source = "tracing_test.py"
   libraries = [
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
@@ -90,7 +87,6 @@ python_mobly_test("tracing_test") {
 }
 
 python_mobly_test("multi_device_test") {
-  enable_mypy = true
   main_source = "multi_device_test.py"
   libraries = [
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
