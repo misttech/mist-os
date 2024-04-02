@@ -216,10 +216,18 @@ impl PlatformBacking {
             match lookup_result {
                 Ok(fidl_fuchsia_net_name::LookupResult { addresses: Some(ip_vec), .. }) => {
                     info!("processed dns response, result: {:?}", &ip_vec);
-                    prefix = process_ail_dns_lookup_result(ip_vec).unwrap();
+                    match process_ail_dns_lookup_result(ip_vec) {
+                        Ok(prefix_output) => {
+                            prefix = prefix_output;
+                        }
+                        Err(_) => {
+                            warn!("malformed DNS response, dropping the prefix");
+                            prefix = Ip6Prefix::new(Ip6Address::new(0, 0, 0, 0, 0, 0, 0, 0), 0);
+                        }
+                    }
                 }
                 Ok(fidl_fuchsia_net_name::LookupResult { addresses: None, .. }) => {
-                    warn!("failed to process dns lookup result: empty result");
+                    info!("failed to process dns lookup result: empty result");
                     prefix = Ip6Prefix::new(Ip6Address::new(0, 0, 0, 0, 0, 0, 0, 0), 0);
                 }
                 Err(e) => {
