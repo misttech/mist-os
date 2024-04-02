@@ -245,7 +245,12 @@ async fn assert_interface_assigned_addr(
         || Err(anyhow::anyhow!("timed out")),
     )
     .await
-    .expect("failed to observe DHCP acquisition on client ep");
+    .unwrap_or_else(|e| {
+        panic!(
+            "failed to observe DHCP acquisition of {:?} on client ep: {:?}",
+            expected_acquired, e
+        )
+    });
 
     // Address acquired; bind is expected to succeed.
     let _: std::net::UdpSocket =
