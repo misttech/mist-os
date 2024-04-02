@@ -68,7 +68,10 @@ pub enum Admin {
 #[derive(Debug)]
 pub enum Signal {
     Statecontrol(Admin),
-    Sys2Shutdown(fsys::SystemControllerShutdownResponder),
+    Sys2Shutdown(
+        // TODO(https://fxbug.dev/332392008): Remove or explain #[allow(dead_code)].
+        #[allow(dead_code)] fsys::SystemControllerShutdownResponder,
+    ),
 }
 
 async fn run_statecontrol_admin(

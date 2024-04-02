@@ -181,6 +181,8 @@ pub enum WakeupReason {
 }
 
 /// A snapshot of all metrics collected at a specific point in time.
+// TODO(https://fxbug.dev/332385167): Remove or explain #[allow(dead_code)].
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Snapshot {
     pub tasks_created: usize,

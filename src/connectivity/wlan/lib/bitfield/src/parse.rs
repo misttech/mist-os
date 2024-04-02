@@ -62,9 +62,9 @@ impl Parse for Alias {
 }
 
 pub struct UserType {
-    pub as_keyword: Token![as],
+    _as_keyword: Token![as],
     pub type_name: Path,
-    pub paren: token::Paren,
+    _paren: token::Paren,
     pub inner_int_type: Type,
 }
 
@@ -72,20 +72,22 @@ impl Parse for UserType {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let inside_parens;
         Ok(UserType {
-            as_keyword: input.parse()?,
+            _as_keyword: input.parse()?,
             type_name: input.parse()?,
-            paren: parenthesized!(inside_parens in input),
+            _paren: parenthesized!(inside_parens in input),
             inner_int_type: inside_parens.parse()?,
         })
     }
 }
 
 pub enum AliasSpec {
-    Unnamed(Token![_]),
+    Unnamed {
+        _underscore: Token![_],
+    },
     SingleName(Alias),
     Union {
-        union_keyword: Token![union],
-        brace: token::Brace,
+        _union_keyword: Token![union],
+        _brace: token::Brace,
         aliases: Punctuated<Alias, Token![,]>,
     },
 }
@@ -93,7 +95,7 @@ pub enum AliasSpec {
 impl AliasSpec {
     pub fn all_aliases(&self) -> Vec<&Alias> {
         match self {
-            AliasSpec::Unnamed(_) => vec![],
+            AliasSpec::Unnamed { .. } => vec![],
             AliasSpec::SingleName(name) => vec![name],
             AliasSpec::Union { aliases, .. } => aliases.iter().collect(),
         }
@@ -101,7 +103,7 @@ impl AliasSpec {
 
     pub fn first_name(&self) -> String {
         match self {
-            AliasSpec::Unnamed(_) => "_".to_string(),
+            AliasSpec::Unnamed { .. } => "_".to_string(),
             AliasSpec::SingleName(alias) => alias.name.to_string(),
             AliasSpec::Union { aliases, .. } => match aliases.first() {
                 None => "_".to_string(),
@@ -115,12 +117,12 @@ impl Parse for AliasSpec {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let lookahead = input.lookahead1();
         Ok(if lookahead.peek(Token![_]) {
-            AliasSpec::Unnamed(input.parse()?)
+            AliasSpec::Unnamed { _underscore: input.parse()? }
         } else if lookahead.peek(Token![union]) {
             let brace_contents;
             AliasSpec::Union {
-                union_keyword: input.parse()?,
-                brace: braced!(brace_contents in input),
+                _union_keyword: input.parse()?,
+                _brace: braced!(brace_contents in input),
                 aliases: brace_contents.parse_terminated(Alias::parse)?,
             }
         } else {

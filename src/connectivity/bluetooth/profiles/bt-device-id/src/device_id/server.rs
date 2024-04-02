@@ -24,6 +24,8 @@ pub struct BrEdrAdvertisement {
     pub adv_fut: QueryResponseFut<bredr::ProfileAdvertiseResult>,
     // Although we don't expect any connection requests, this channel must be kept alive for the
     // duration of the advertisement.
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub connect_server: bredr::ConnectionReceiverRequestStream,
 }
 

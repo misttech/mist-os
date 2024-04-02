@@ -521,7 +521,11 @@ pub struct Association {
     /// A closed controlled port only processes EAP frames while an open one processes any frames.
     pub controlled_port_open: bool,
 
+    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub ap_ht_op: Option<ie::HtOperation>,
+    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub ap_vht_op: Option<ie::VhtOperation>,
 
     /// Whether to set QoS bit when MLME constructs an outgoing WLAN data frame.
@@ -539,6 +543,8 @@ pub struct Association {
     pub status_check_timeout: StatusCheckTimeout,
     pub signal_strength_average: SignalStrengthAverage,
 
+    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub block_ack_state: StateMachine<BlockAckState>,
 }
 

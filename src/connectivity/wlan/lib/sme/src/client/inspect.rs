@@ -34,6 +34,8 @@ const IDLE_STR: &'static str = "idle";
 /// Wrapper struct SME inspection nodes
 pub struct SmeTree {
     /// Base SME inspection node that holds all other nodes in the SmeTree.
+    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub root_node: Node,
     /// Inspection node to log recent state transitions, or cases where an event would that would
     /// normally cause a state transition doesn't due to an error.
@@ -41,6 +43,8 @@ pub struct SmeTree {
     /// Inspection node to log EAPOL frames processed by supplicant and its output.
     pub rsn_events: Mutex<BoundedListNode>,
     /// Inspection node to log recent join scan results.
+    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub join_scan_events: Mutex<BoundedListNode>,
     /// Inspect node to log periodic pulse check. For the most part, information logged in this
     /// node can be derived from (and is therefore redundant with) `state_events` node. This

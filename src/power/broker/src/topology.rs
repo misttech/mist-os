@@ -86,6 +86,8 @@ pub enum ModifyDependencyError {
     AlreadyExists,
     Invalid,
     NotAuthorized,
+    // TODO(https://fxbug.dev/332392008): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     NotFound(ElementID),
 }
 

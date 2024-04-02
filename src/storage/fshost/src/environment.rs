@@ -116,8 +116,17 @@ pub trait Environment: Send + Sync {
 pub enum Filesystem {
     Queue(Vec<ServerEnd<fio::DirectoryMarker>>),
     Serving(ServingSingleVolumeFilesystem),
-    ServingMultiVolume(CryptService, ServingMultiVolumeFilesystem, String),
-    ServingVolumeInFxblob(Option<CryptService>, String),
+    ServingMultiVolume(
+        // TODO(https://fxbug.dev/332407981): Remove or explain #[allow(dead_code)].
+        #[allow(dead_code)] CryptService,
+        ServingMultiVolumeFilesystem,
+        String,
+    ),
+    ServingVolumeInFxblob(
+        // TODO(https://fxbug.dev/332407981): Remove or explain #[allow(dead_code)].
+        #[allow(dead_code)] Option<CryptService>,
+        String,
+    ),
     Shutdown,
 }
 

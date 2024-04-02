@@ -9,8 +9,14 @@ const PCM_SAMPLE_SIZE: usize = 2;
 
 #[derive(Clone, Debug)]
 pub struct PcmAudio {
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub pcm_format: PcmFormat,
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub frequency: f32,
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub amplitude: f32,
     pub buffer: Vec<u8>,
 }

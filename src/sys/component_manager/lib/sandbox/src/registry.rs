@@ -49,6 +49,8 @@ pub(crate) fn remove(koid: zx::Koid) -> Option<Capability> {
 
 pub struct Entry {
     pub capability: Capability,
+    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub task: Option<fasync::Task<()>>,
 }
 

@@ -465,10 +465,14 @@ pub(crate) mod for_tests {
     /// This wraps the `Updater` in order to reduce test boilerplate.
     /// Should be constructed using `UpdaterBuilder`.
     pub struct UpdaterForTest {
+        // TODO(https://fxbug.dev/332408215): Remove or explain #[allow(dead_code)].
+        #[allow(dead_code)]
         pub served_repo: Arc<ServedRepository>,
         pub paver: Arc<MockPaverService>,
         pub expected_blobfs_contents: BTreeSet<Hash>,
         pub update_merkle_root: Hash,
+        // TODO(https://fxbug.dev/332408215): Remove or explain #[allow(dead_code)].
+        #[allow(dead_code)]
         pub repo_url: fuchsia_url::RepositoryUrl,
         pub resolver: ResolverForTest,
         pub updater: Updater,
@@ -499,6 +503,8 @@ pub(crate) mod for_tests {
         /// All the blobs that should be in blobfs after the update.
         pub expected_blobfs_contents: BTreeSet<Hash>,
         // The RealmInstance used to run this update, for introspection into component states.
+        // TODO(https://fxbug.dev/332408215): Remove or explain #[allow(dead_code)].
+        #[allow(dead_code)]
         pub realm_instance: RealmInstance,
     }
 

@@ -16,6 +16,8 @@ use crate::{a2dp, error::ScoConnectError, sco_connector::ScoConnection};
 pub struct ScoActive {
     pub params: ValidScoConnectionParameters,
     on_closed: Shared<BoxFuture<'static, ()>>,
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub pause_token: a2dp::PauseToken,
 }
 

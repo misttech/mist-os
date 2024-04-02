@@ -15,10 +15,18 @@ use utf8_path::path_relative_from_current_dir;
 
 #[derive(Debug)]
 pub struct SubpackageBlobsPackage {
+    // TODO(https://fxbug.dev/332406669): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub merkle: Hash,
+    // TODO(https://fxbug.dev/332406669): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub contents: BTreeMap<Utf8PathBuf, Utf8PathBuf>,
+    // TODO(https://fxbug.dev/332406669): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub path: Utf8PathBuf,
     pub manifest: PackageManifest,
+    // TODO(https://fxbug.dev/332406669): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub manifest_path: Utf8PathBuf,
 }
 

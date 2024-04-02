@@ -6,7 +6,8 @@ use fuchsia_sync::Mutex;
 use std::collections::VecDeque;
 
 pub struct WatchAccessorRequest(
-    pub fidl_fuchsia_bluetooth_map::MessagingClientWatchAccessorResponder,
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)] pub fidl_fuchsia_bluetooth_map::MessagingClientWatchAccessorResponder,
 );
 
 pub struct MessagingClient {

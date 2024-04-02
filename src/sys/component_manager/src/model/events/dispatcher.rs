@@ -47,6 +47,8 @@ pub struct EventDispatcher {
     tx: Mutex<mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>>,
 
     /// Route information used externally for evaluating scopes
+    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub route: Vec<ComponentEventRoute>,
 }
 

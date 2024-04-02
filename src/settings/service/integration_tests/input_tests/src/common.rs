@@ -23,6 +23,8 @@ pub trait Mocks {
 }
 
 pub struct InputTest {
+    // TODO(https://fxbug.dev/332407468): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub camera_sw_muted: Arc<AtomicBool>,
 }
 

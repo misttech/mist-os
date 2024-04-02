@@ -1464,6 +1464,8 @@ mod tests {
         pub client_update_sender: listener::ClientListenerMessageSender,
         pub client_update_receiver: mpsc::UnboundedReceiver<listener::ClientListenerMessage>,
         pub ap_update_sender: listener::ApListenerMessageSender,
+        // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+        #[allow(dead_code)]
         pub ap_update_receiver: mpsc::UnboundedReceiver<listener::ApMessage>,
         pub saved_networks: Arc<dyn SavedNetworksManagerApi>,
         pub local_roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,

@@ -11,6 +11,8 @@ use crate::features::{AgFeatures, CallHoldAction, HfFeatures, CVSD};
 pub struct ProcedureManipulatedState {
     /// Determines whether the SLCI procedure has completed and we
     /// can proceed to do other procedures.
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub initialized: bool,
     /// Features that the HF supports.
     pub hf_features: HfFeatures,
@@ -19,6 +21,8 @@ pub struct ProcedureManipulatedState {
     /// The current indicator status of the HF
     pub hf_indicators: HfIndicators,
     /// Determines whether the indicator status update function is enabled.
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub indicators_update_enabled: bool,
     /// Features supported from the three-way calling or call waiting
     pub three_way_features: Vec<CallHoldAction>,

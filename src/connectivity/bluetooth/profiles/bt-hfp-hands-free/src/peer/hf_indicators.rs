@@ -26,6 +26,8 @@ pub struct Indicator<T: Clone + Copy + Debug> {
     /// Whether this indicator is enabled or not.
     pub enabled: bool,
     /// The value of the indicator.
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub value: Option<T>,
 }
 

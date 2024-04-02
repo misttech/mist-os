@@ -15,6 +15,8 @@ const DEVICE_EVENTS_LIMIT: usize = 20;
 
 pub struct WlanMonitorTree {
     /// Root of the tree
+    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub inspector: Inspector,
     /// "device_events" subtree
     pub device_events: Mutex<BoundedListNode>,

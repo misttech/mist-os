@@ -161,7 +161,11 @@ fn autopresent(
 /// view is attached below their parent's root_transform.
 pub enum FlatlandInstance {
     Root {
+        // TODO(https://fxbug.dev/332408218): Remove or explain #[allow(dead_code)].
+        #[allow(dead_code)]
         flatland_display: flatland::FlatlandDisplayProxy,
+        // TODO(https://fxbug.dev/332408218): Remove or explain #[allow(dead_code)].
+        #[allow(dead_code)]
         root_instance: Arc<flatland::FlatlandProxy>,
         target_instance: Arc<flatland::FlatlandProxy>,
         target_root_transform: flatland::TransformId,

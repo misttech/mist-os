@@ -45,6 +45,8 @@ lazy_static! {
 
 pub struct AccessorStats {
     /// Inspect node for tracking usage/health metrics of diagnostics platform.
+    // TODO(https://fxbug.dev/332406747): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub node: Node,
 
     /// Metrics aggregated across all client connections.

@@ -487,18 +487,36 @@ pub struct BuiltinEnvironment {
 
     pub realm_query: Option<Arc<RealmQuery>>,
     pub lifecycle_controller: Option<Arc<LifecycleController>>,
+    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub event_registry: Arc<EventRegistry>,
     pub event_source_factory: Arc<EventSourceFactory>,
     pub factory_capability_host: Arc<FactoryCapabilityHost>,
     pub stop_notifier: Arc<RootStopNotifier>,
+    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub directory_ready_notifier: Arc<DirectoryReadyNotifier>,
+    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub inspect_sink_provider: Arc<InspectSinkProvider>,
+    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub event_stream_provider: Arc<EventStreamProvider>,
+    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub event_logger: Option<Arc<EventLogger>>,
+    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub component_tree_stats: Arc<ComponentTreeStats<DiagnosticsTask>>,
+    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub component_startup_time_stats: Arc<ComponentEarlyStartupTimeStats>,
     pub debug: bool,
+    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub num_threads: usize,
+    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
     pub root_component_input: ComponentInput,
     capability_passthrough: bool,

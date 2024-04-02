@@ -60,6 +60,8 @@ pub struct L2capChannel {
 
 #[derive(Debug)]
 pub struct SdpService {
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub advertisement_stopper: oneshot::Sender<()>,
     pub params: ChannelParameters,
 }

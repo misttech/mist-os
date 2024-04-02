@@ -253,6 +253,8 @@ pub struct RawCommand {
     pub opcode: u16,
 
     /// Payload length
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub paramater_total_length: u8,
 
     /// Range of the entire HCI command, relative to the original buffer
@@ -296,8 +298,14 @@ pub fn split_commands(bytes: &[u8]) -> Result<Vec<RawCommand>, Error> {
 #[derive(Debug)]
 pub struct InquiryResult {
     pub br_addr: [u8; 6],
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub page_scan_repetition_mode: u8,
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub class_of_device: [u8; 3],
+    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub clockoffset: u16,
 }
 

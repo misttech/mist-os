@@ -16,6 +16,8 @@ pub struct V2ComponentModel {
     #[serde(skip)]
     pub component_model: Arc<ComponentModelForAnalyzer>,
     // TODO(pesk): replace this with a serializable error type.
+    // TODO(https://fxbug.dev/332407032): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     #[serde(skip)]
     pub errors: Vec<anyhow::Error>,
 }

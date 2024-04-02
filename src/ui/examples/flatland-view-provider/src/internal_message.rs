@@ -39,6 +39,8 @@ pub enum InternalMessage {
         phase: fptr::EventPhase,
         position_in_viewport: Point2,
     },
+    // The example code does not use all the fields.
+    #[allow(dead_code)]
     MouseEvent {
         timestamp: i64,
         trace_flow_id: u64,

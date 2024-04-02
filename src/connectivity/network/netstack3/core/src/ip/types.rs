@@ -168,6 +168,8 @@ pub struct AddableEntryAndGeneration<A: IpAddress, D> {
 #[derive(GenericOverIp)]
 #[generic_over_ip(A, IpAddress)]
 pub struct EntryUpgrader<'a, A: IpAddress, DeviceId, WeakDeviceId>(
+    // TODO(https://fxbug.dev/42148629): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub  &'a mut dyn FnMut(
         AddableEntryAndGeneration<A, WeakDeviceId>,
     ) -> Option<EntryAndGeneration<A, DeviceId>>,

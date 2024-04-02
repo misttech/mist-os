@@ -126,9 +126,15 @@ mod ctx {
     /// Error observed while attempting to destroy the last remaining clone of `Ctx`.
     pub enum DestructionError {
         /// Another clone of `BindingsCtx` still exists.
-        BindingsCtxStillCloned(usize),
+        BindingsCtxStillCloned(
+            // TODO(https://fxbug.dev/42148629): Remove or explain #[allow(dead_code)].
+            #[allow(dead_code)] usize,
+        ),
         /// Another clone of `CoreCtx` still exists.
-        CoreCtxStillCloned(usize),
+        CoreCtxStillCloned(
+            // TODO(https://fxbug.dev/42148629): Remove or explain #[allow(dead_code)].
+            #[allow(dead_code)] usize,
+        ),
     }
 
     impl Ctx {

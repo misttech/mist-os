@@ -47,7 +47,11 @@ pub struct PhyDevice {
 pub struct IfaceDevice {
     pub phy_ownership: PhyOwnership,
     pub generic_sme: fidl_wlan_sme::GenericSmeProxy,
+    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub inspect_node: Option<std::sync::Arc<fuchsia_inspect::LazyNode>>,
+    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    #[allow(dead_code)]
     pub inspect_vmo: Option<std::sync::Arc<fuchsia_zircon::Vmo>>,
 }
 
