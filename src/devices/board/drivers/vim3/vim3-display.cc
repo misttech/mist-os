@@ -125,7 +125,7 @@ zx_status_t Vim3::DisplayInit() {
 
   std::vector<fpbus::Metadata> display_panel_metadata{
       {{
-          .type = DEVICE_METADATA_DISPLAY_CONFIG,
+          .type = DEVICE_METADATA_DISPLAY_PANEL_CONFIG,
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&display_panel_info),
               reinterpret_cast<const uint8_t*>(&display_panel_info) + sizeof(display_panel_info)),

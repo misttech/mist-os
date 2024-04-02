@@ -1079,12 +1079,8 @@ zx_status_t DisplayEngine::InitializeVout() {
   display_panel_t panel_info;
   size_t actual_bytes;
 
-  // TODO(https://fxbug.dev/42082205): `DEVICE_METADATA_DISPLAY_CONFIG` is defined to
-  // store metadata of `display_config_t` type rather than `display_panel_t`
-  // type, though currently all the board drivers use display_panel_t instead,
-  // which is defined on a side channel apart from the //src/lib/ddk library.
-  zx_status_t status = device_get_metadata(bus_device_, DEVICE_METADATA_DISPLAY_CONFIG, &panel_info,
-                                           sizeof(display_panel_t), &actual_bytes);
+  zx_status_t status = device_get_metadata(bus_device_, DEVICE_METADATA_DISPLAY_PANEL_CONFIG,
+                                           &panel_info, sizeof(display_panel_t), &actual_bytes);
   if (status == ZX_ERR_NOT_FOUND) {
     return InitializeHdmiVout();
   }
