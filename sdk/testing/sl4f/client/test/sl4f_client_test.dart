@@ -363,6 +363,14 @@ void main() {
       Sl4f client = Sl4f('1.2.3.4', null);
       expect(client.targetUrl.path, isEmpty);
     });
+    test('IPv6 hostname is OK, we will fix it up', () {
+      Sl4f client = Sl4f('::1', null);
+      expect(client.targetUrl.path, isEmpty);
+    });
+    test('IPv6 hostname is OK with brackets too', () {
+      Sl4f client = Sl4f('[::1]', null);
+      expect(client.targetUrl.path, isEmpty);
+    });
     test('throws exception if target ipv4 address has port', () {
       expect(() => Sl4f('1.2.3.4:8282', null),
           throwsA(TypeMatcher<FormatException>()));

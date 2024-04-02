@@ -72,17 +72,34 @@ class Sl4f {
   };
 
   static const _sl4fHttpDefaultPort = 80;
-  static final _portSuffixRe = RegExp(r':\d+$');
+  // `:80` is a port suffix, but `::80` is not (it's could be part of an IPv6
+  // address).
+  static final _portSuffixRe = RegExp(r'[^:]:\d+$');
 
   HttpClient? _client;
 
   /// Authority (IP, hostname, etc.) of the device under test.
   String get target {
     final host = targetUrl.host.replaceAll('%25', '%');
-    if (host.contains(':')) {
+    if (host.contains(':') && !host.contains('\[')) {
       return '[$host]';
     }
     return host;
+  }
+
+  // If [host] is something that looks like IPv6 hostname, such as `::1`, but
+  // not `[::1]` or `1.2.3.4:80`, then fix it up.
+  static String _fixupIpV6Host(String host) {
+    if (host.contains(':') && !host.contains('\[') && !host.contains('\.')) {
+      host = '[$host]';
+    }
+    return host;
+  }
+
+  // Returns a target URL with target and port combined.
+  static Uri _getTargetUrl(String target, int port) {
+    target = _fixupIpV6Host(target);
+    return Uri.http('$target:$port', '');
   }
 
   /// TCP port number that the SL4F HTTP server is listening on the target
@@ -115,14 +132,14 @@ class Sl4f {
       List<int> proxyPorts = const [],
       HttpClient? client])
       : assert(target != null && target.isNotEmpty),
-        targetUrl = Uri.http('$target:$port', ''),
+        targetUrl = _getTargetUrl(target, port),
         _client = client ?? HttpClient() {
     if (ssh != null) {
       this.ssh = ssh;
     }
 
     if (_portSuffixRe.hasMatch(target)) {
-      throw ArgumentError('Target argument cannot contain a port. '
+      throw ArgumentError('Target argument cannot contain a port: $target '
           'Use the port argument instead.');
     }
     _proxy = TcpProxyController(this, proxyPorts: proxyPorts);
@@ -195,12 +212,7 @@ class Sl4f {
           'Cannot start sl4f.');
     }
 
-    String host = address;
-    // This same code exists in the dart/sdk/lib/_http/http_impl.dart.
-    if (host.contains(':')) {
-      host = '[$host]';
-    }
-
+    String host = _fixupIpV6Host(address);
     int port = _sl4fHttpDefaultPort;
     if (!_isNullOrEmpty(environment['SL4F_HTTP_PORT'])) {
       port = int.parse(environment['SL4F_HTTP_PORT']!);
