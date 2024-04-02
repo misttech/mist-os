@@ -67,7 +67,35 @@ zx_status_t FtdiI2c::Enable() {
   return ZX_OK;
 }
 
-zx_status_t FtdiI2c::Bind() { return DdkAdd("ftdi-i2c"); }
+zx_status_t FtdiI2c::Bind() {
+  {
+    fuchsia_hardware_i2cimpl::Service::InstanceHandler handler({
+        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
+                                          fidl::kIgnoreBindingClosure),
+    });
+    auto result = outgoing_.AddService<fuchsia_hardware_i2cimpl::Service>(std::move(handler));
+    if (result.is_error()) {
+      zxlogf(ERROR, "AddService failed: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
+  auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+  {
+    auto result = outgoing_.Serve(std::move(directory_server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to serve the outgoing directory: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
+  std::array<const char*, 1> fidl_service_offers{fuchsia_hardware_i2cimpl::Service::Name};
+  return DdkAdd(ddk::DeviceAddArgs("ftdi-i2c")
+                    .set_outgoing_dir(directory_client.TakeChannel())
+                    .set_runtime_service_offers(fidl_service_offers)
+                    .forward_metadata(parent(), DEVICE_METADATA_I2C_CHANNELS));
+}
 
 void FtdiI2c::DdkInit(ddk::InitTxn txn) {
   fidl::Arena allocator;
@@ -339,44 +367,49 @@ zx_status_t FtdiI2c::WriteTransactionEndToBuf(size_t index, std::vector<uint8_t>
   return ZX_OK;
 }
 
-zx_status_t FtdiI2c::I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count) {
+void FtdiI2c::Transact(TransactRequestView request, fdf::Arena& arena,
+                       TransactCompleter::Sync& completer) {
   zx_status_t status;
   std::vector<uint8_t> write_data(kFtdiI2cMaxTransferSize);
   std::vector<uint8_t> read_data(kFtdiI2cMaxTransferSize);
+  std::vector<fuchsia_hardware_i2cimpl::wire::ReadData> out;
   size_t total_read_bytes = 0;
   size_t total_write_bytes = 0;
   size_t last_stopped_op = 0;
-  for (size_t i = 0; i < op_count; i++) {
-    if (op_list[i].is_read) {
-      total_read_bytes += op_list[i].data_size;
-    } else {
-      size_t copy_amt = op_list[i].data_size;
-      uint8_t* data_buffer = reinterpret_cast<uint8_t*>(op_list[i].data_buffer);
+  for (size_t i = 0; i < request->op.count(); i++) {
+    if (request->op[i].type.is_read_size()) {
+      total_read_bytes += request->op[i].type.read_size();
+    } else if (request->op[i].type.is_write_data()) {
+      size_t copy_amt = request->op[i].type.write_data().count();
+      uint8_t* data_buffer = request->op[i].type.write_data().data();
       size_t data_buffer_index = 0;
       while (copy_amt--) {
         if (total_write_bytes == kFtdiI2cMaxTransferSize) {
-          return ZX_ERR_INTERNAL;
+          return completer.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
         }
         write_data[total_write_bytes++] = data_buffer[data_buffer_index++];
       }
+    } else {
+      ZX_ASSERT_MSG(false, "Unknown i2cimpl transfer type");
     }
 
-    if (op_list[i].stop) {
+    if (request->op[i].stop) {
       write_data.resize(total_write_bytes);
       read_data.resize(total_read_bytes);
-      status = Transact(static_cast<uint8_t>(op_list[i].address), write_data, &read_data);
+      status = Transact(static_cast<uint8_t>(request->op[i].address), write_data, &read_data);
       if (status != ZX_OK) {
         zxlogf(ERROR, "I2c transact failed with %d", status);
-        return status;
+        return completer.buffer(arena).ReplyError(status);
       }
 
       if (total_read_bytes > 0) {
         size_t read_back_index = 0;
         for (size_t j = last_stopped_op + 1; j <= i; j++) {
-          if (op_list[j].is_read) {
-            memcpy(op_list[j].data_buffer, read_data.data() + read_back_index,
-                   op_list[j].data_size);
-            read_back_index += op_list[j].data_size;
+          if (request->op[j].type.is_read_size()) {
+            out.emplace_back().data = fidl::VectorView<uint8_t>(
+                arena, read_data.data() + read_back_index,
+                read_data.data() + read_back_index + request->op[j].type.read_size());
+            read_back_index += request->op[j].type.read_size();
           }
         }
       }
@@ -393,7 +426,14 @@ zx_status_t FtdiI2c::I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_cou
     }
   }
 
-  return ZX_OK;
+  completer.buffer(arena).ReplySuccess(
+      fidl::VectorView<fuchsia_hardware_i2cimpl::wire::ReadData>::FromExternal(out));
+}
+
+void FtdiI2c::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_i2cimpl::Device> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "Unknown method %lu", metadata.method_ordinal);
 }
 
 zx_status_t FtdiI2c::Create(zx_device_t* device,

@@ -25,7 +25,6 @@ fuchsia_driver("ftdi-driver") {
   ]
   deps = [
     ":ftdi_bind",
-    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
@@ -33,8 +32,11 @@ fuchsia_driver("ftdi-driver") {
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.ftdi:fuchsia.hardware.ftdi_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
+    "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
+    "//sdk/lib/driver/outgoing/cpp",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/usb/lib/usb",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",

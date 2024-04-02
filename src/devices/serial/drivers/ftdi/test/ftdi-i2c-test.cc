@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/serialimpl/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <stdio.h>
 
 #include <list>
@@ -204,6 +205,8 @@ TEST_F(FtdiI2cTest, PingTest) {
 }
 
 TEST_F(FtdiI2cTest, ReadTest) {
+  namespace fhi2cimpl = fuchsia_hardware_i2cimpl::wire;
+
   FtdiI2c device = FtdiBasicInit();
 
   serial_.FailOnUnexpectedReadWrite(false);
@@ -215,25 +218,39 @@ TEST_F(FtdiI2cTest, ReadTest) {
   };
   serial_.PushExpectedRead(std::move(serial_read_data));
 
-  i2c_impl_op_t op_list[2] = {};
-  op_list[0].is_read = false;
+  fdf::Arena arena('I2CI');
+
+  fhi2cimpl::I2cImplOp op_list[2] = {};
   op_list[0].stop = false;
   uint8_t write_data = 0xAB;
-  op_list[0].data_buffer = &write_data;
-  op_list[0].data_size = sizeof(write_data);
+  op_list[0].type = fhi2cimpl::I2cImplOpType::WithWriteData(arena, &write_data, &write_data + 1);
 
-  op_list[1].is_read = true;
   op_list[1].stop = true;
-  uint8_t read_data = 0;
-  op_list[1].data_buffer = &read_data;
-  op_list[1].data_size = sizeof(read_data);
+  op_list[1].type = fuchsia_hardware_i2cimpl::wire::I2cImplOpType::WithReadSize(1);
 
-  zx_status_t status = device.I2cImplTransact(op_list, 2);
-  ASSERT_OK(status);
-  ASSERT_EQ(0xDE, read_data);
+  auto [client_end, server_end] = fdf::Endpoints<fuchsia_hardware_i2cimpl::Device>::Create();
+
+  fdf::ServerBinding binding(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), &device,
+                             fidl::kIgnoreBindingClosure);
+
+  fdf::WireClient client(std::move(client_end), fdf::Dispatcher::GetCurrent()->get());
+
+  client.buffer(arena)
+      ->Transact(fidl::VectorView<fhi2cimpl::I2cImplOp>::FromExternal(op_list, 2))
+      .Then([](fdf::WireUnownedResult<fuchsia_hardware_i2cimpl::Device::Transact>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        ASSERT_EQ(result->value()->read.count(), 1);
+        ASSERT_EQ(result->value()->read[0].data.count(), 1);
+        EXPECT_EQ(result->value()->read[0].data[0], 0xDE);
+        mock_ddk::GetDriverRuntime()->Quit();
+      });
+  mock_ddk::GetDriverRuntime()->Run();
 }
 
 TEST_F(FtdiI2cTest, NackReadTest) {
+  namespace fhi2cimpl = fuchsia_hardware_i2cimpl::wire;
+
   FtdiI2c device = FtdiBasicInit();
 
   serial_.FailOnUnexpectedReadWrite(false);
@@ -245,21 +262,32 @@ TEST_F(FtdiI2cTest, NackReadTest) {
   };
   serial_.PushExpectedRead(std::move(serial_read_data));
 
-  i2c_impl_op_t op_list[2] = {};
-  op_list[0].is_read = false;
+  fdf::Arena arena('I2CI');
+
+  fhi2cimpl::I2cImplOp op_list[2] = {};
   op_list[0].stop = false;
   uint8_t write_data = 0xAB;
-  op_list[0].data_buffer = &write_data;
-  op_list[0].data_size = sizeof(write_data);
+  op_list[0].type = fhi2cimpl::I2cImplOpType::WithWriteData(arena, &write_data, &write_data + 1);
 
-  op_list[1].is_read = true;
   op_list[1].stop = true;
-  uint8_t read_data = 0;
-  op_list[1].data_buffer = &read_data;
-  op_list[1].data_size = sizeof(read_data);
+  op_list[1].type = fuchsia_hardware_i2cimpl::wire::I2cImplOpType::WithReadSize(1);
 
-  zx_status_t status = device.I2cImplTransact(op_list, 2);
-  ASSERT_EQ(ZX_ERR_INTERNAL, status);
+  auto [client_end, server_end] = fdf::Endpoints<fuchsia_hardware_i2cimpl::Device>::Create();
+
+  fdf::ServerBinding binding(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), &device,
+                             fidl::kIgnoreBindingClosure);
+
+  fdf::WireClient client(std::move(client_end), fdf::Dispatcher::GetCurrent()->get());
+
+  client.buffer(arena)
+      ->Transact(fidl::VectorView<fhi2cimpl::I2cImplOp>::FromExternal(op_list, 2))
+      .Then([](fdf::WireUnownedResult<fuchsia_hardware_i2cimpl::Device::Transact>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_error());
+        EXPECT_EQ(result->error_value(), ZX_ERR_INTERNAL);
+        mock_ddk::GetDriverRuntime()->Quit();
+      });
+  mock_ddk::GetDriverRuntime()->Run();
 }
 
 TEST_F(FtdiI2cTest, MetadataTest) {
