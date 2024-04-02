@@ -754,7 +754,7 @@ impl ComputationContext {
     }
 
     fn set_reg(&mut self, index: Register, reg_type: Type) -> Result<(), String> {
-        if index >= REGISTER_COUNT {
+        if index >= GENERAL_REGISTER_COUNT {
             return Err(format!("R{index} is invalid at pc {}", self.pc));
         }
         self.registers[index as usize] = reg_type;
