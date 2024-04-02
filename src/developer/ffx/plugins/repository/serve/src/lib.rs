@@ -143,8 +143,9 @@ async fn connect_to_target(
 
     let target = if tv.len() != 1 {
         return Err(anyhow!(
-            "Exactly one target is expected in the target collection, found {}.",
-            tv.len()
+            "Exactly one target is expected in the target collection, found {}, nodenames: {}",
+            tv.len(),
+            tv.into_iter().filter_map(|e| e.nodename.clone()).collect::<Vec<_>>().join(",")
         ));
     } else {
         &tv[0]
