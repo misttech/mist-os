@@ -126,6 +126,12 @@ void Dispatcher::FormatDump(DumpState* state, std::vector<std::string>* dump_out
       OutputFormattedString(dump_out, "* The request would have been reentrant: %lu times",
                             non_inlined_stats.reentrant);
     }
+    if (non_inlined_stats.channel_wait_not_yet_registered > 0) {
+      OutputFormattedString(
+          dump_out,
+          "* Channel wait was not yet registered when the message was received: %lu times",
+          non_inlined_stats.channel_wait_not_yet_registered);
+    }
   }
 
   if (state->queued_tasks.empty()) {

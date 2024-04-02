@@ -286,6 +286,8 @@ class Dispatcher : public async_dispatcher_t,
     kUnknownThread,
     // We are queueing to a dispatcher that is already in the callstack.
     kReentrant,
+    // The channel received a message, but no channel read was registered yet.
+    kChannelWaitNotYetRegistered,
   };
 
   struct DebugStats {
@@ -296,6 +298,7 @@ class Dispatcher : public async_dispatcher_t,
       size_t task = 0;
       size_t unknown_thread = 0;
       size_t reentrant = 0;
+      size_t channel_wait_not_yet_registered = 0;
     };
 
     NonInlinedStats non_inlined = {};
@@ -406,10 +409,12 @@ class Dispatcher : public async_dispatcher_t,
   // Asserts if no such callback is found.
   // |unowned_callback_request| is used to locate the callback.
   // |callback_reason| is the status that should be set for the callback.
+  // |was_deferred| is true if the request was not queued earlier due to a
+  // wait not yet been registered on the corresponding channel.
   // Depending on the dispatcher options set and which driver is calling this,
   // the callback can occur on the current thread or be queued up to run on a dispatcher thread.
   void QueueRegisteredCallback(CallbackRequest* unowned_callback_request,
-                               zx_status_t callback_reason);
+                               zx_status_t callback_reason, bool was_deferred = false);
 
   // Adds wait to |waits_|.
   void AddWaitLocked(std::unique_ptr<AsyncWait> wait) __TA_REQUIRES(&callback_lock_);

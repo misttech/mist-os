@@ -23,13 +23,18 @@ class DispatcherDumpTest : public RuntimeTestCase {
 
  protected:
   static constexpr std::string_view kDispatcherName = "synchronized";
+  static constexpr std::string_view kAdditionalDispatcherName = "additional";
 
   fdf_testing::internal::DriverRuntimeEnv runtime_env;
 
   fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion shutdown_completion_;
 
+  fdf::SynchronizedDispatcher dispatcher2_;
+  libsync::Completion shutdown_completion2_;
+
   const void* fake_driver_ = nullptr;
+  const void* fake_driver2_ = nullptr;
 };
 
 void DispatcherDumpTest::SetUp() {
@@ -43,12 +48,23 @@ void DispatcherDumpTest::SetUp() {
       fake_driver_, {}, kDispatcherName, shutdown_handler);
   ASSERT_OK(dispatcher.status_value());
   dispatcher_ = std::move(*dispatcher);
+
+  fake_driver2_ = CreateFakeDriver();
+  auto shutdown_handler2 = [&](fdf_dispatcher_t* shutdown_dispatcher) {
+    shutdown_completion2_.Signal();
+  };
+  auto dispatcher2 = fdf_internal::TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
+      fake_driver2_, {}, kAdditionalDispatcherName, shutdown_handler2);
+  ASSERT_OK(dispatcher2.status_value());
+  dispatcher2_ = std::move(*dispatcher2);
 }
 
 void DispatcherDumpTest::TearDown() {
   dispatcher_.ShutdownAsync();
+  dispatcher2_.ShutdownAsync();
   ASSERT_OK(fdf_testing_run_until_idle());
   shutdown_completion_.Wait();
+  shutdown_completion2_.Wait();
 }
 
 TEST_F(DispatcherDumpTest, DumpNoTasks) {
@@ -335,4 +351,65 @@ TEST_F(DispatcherDumpTest, DumpRequestsCount) {
 
   dispatcher2->ShutdownAsync();
   ASSERT_OK(fdf_testing_run_until_idle());
+}
+
+TEST_F(DispatcherDumpTest, DumpChannelWaitNotYetRegistered) {
+  auto channels = fdf::ChannelPair::Create(0);
+  ASSERT_OK(channels.status_value());
+
+  // Write to one end of the channel before registering a read on the other end.
+  fdf::Arena arena('TEST');
+  ASSERT_OK(async::PostTask(dispatcher_.async_dispatcher(), [&] {
+    ASSERT_OK(
+        channels->end0.Write(0, arena, nullptr, 0, cpp20::span<zx_handle_t>()).status_value());
+  }));
+  ASSERT_OK(fdf_testing_run_until_idle());
+
+  auto channel_read = std::make_unique<fdf::ChannelRead>(
+      channels->end1.get(), 0,
+      [&](fdf_dispatcher_t* dispatcher, fdf::ChannelRead* channel_read, zx_status_t status) {});
+  ASSERT_OK(async::PostTask(dispatcher2_.async_dispatcher(),
+                            [&] { ASSERT_OK(channel_read->Begin(dispatcher2_.get())); }));
+  ASSERT_OK(fdf_testing_run_until_idle());
+
+  {
+    driver_runtime::Dispatcher::DumpState state;
+    driver_runtime::Dispatcher* runtime_dispatcher =
+        static_cast<driver_runtime::Dispatcher*>(dispatcher2_.get());
+    runtime_dispatcher->Dump(&state);
+    ASSERT_EQ(state.debug_stats.num_inlined_requests, 0);
+    ASSERT_EQ(state.debug_stats.num_total_requests, 2);
+    ASSERT_EQ(state.debug_stats.non_inlined.task, 1);
+    ASSERT_EQ(state.debug_stats.non_inlined.channel_wait_not_yet_registered, 1);
+  }
+}
+
+TEST_F(DispatcherDumpTest, DumpChannelWaitRegistered) {
+  auto channels = fdf::ChannelPair::Create(0);
+  ASSERT_OK(channels.status_value());
+
+  auto channel_read = std::make_unique<fdf::ChannelRead>(
+      channels->end1.get(), 0,
+      [&](fdf_dispatcher_t* dispatcher, fdf::ChannelRead* channel_read, zx_status_t status) {});
+  ASSERT_OK(async::PostTask(dispatcher2_.async_dispatcher(),
+                            [&] { ASSERT_OK(channel_read->Begin(dispatcher2_.get())); }));
+  ASSERT_OK(fdf_testing_run_until_idle());
+
+  // Write to one end of the channel after the read has been registered on the other end.
+  fdf::Arena arena('TEST');
+  ASSERT_OK(async::PostTask(dispatcher_.async_dispatcher(), [&] {
+    ASSERT_OK(
+        channels->end0.Write(0, arena, nullptr, 0, cpp20::span<zx_handle_t>()).status_value());
+  }));
+  ASSERT_OK(fdf_testing_run_until_idle());
+
+  {
+    driver_runtime::Dispatcher::DumpState state;
+    driver_runtime::Dispatcher* runtime_dispatcher =
+        static_cast<driver_runtime::Dispatcher*>(dispatcher2_.get());
+    runtime_dispatcher->Dump(&state);
+    ASSERT_EQ(state.debug_stats.num_inlined_requests, 1);
+    ASSERT_EQ(state.debug_stats.num_total_requests, 2);
+    ASSERT_EQ(state.debug_stats.non_inlined.task, 1);
+  }
 }

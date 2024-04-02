@@ -989,7 +989,7 @@ fit::result<Dispatcher::NonInlinedReason> Dispatcher::ShouldInline(
 }
 
 void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* request,
-                                         zx_status_t callback_reason) {
+                                         zx_status_t callback_reason, bool was_deferred) {
   ZX_ASSERT(request);
 
   auto decrement_and_idle_check = fit::defer([this]() {
@@ -1041,29 +1041,42 @@ void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* reques
         event_waiter_->signal();
       }
 
-      switch (should_inline.error_value()) {
-        case kAllowSyncCalls:
-          debug_stats_.non_inlined.allow_sync_calls++;
-          break;
-        case kDispatchingOnAnotherThread:
-          debug_stats_.non_inlined.parallel_dispatch++;
-          break;
-        case kTask:
-          debug_stats_.non_inlined.task++;
-          break;
-        case kUnknownThread:
-          debug_stats_.non_inlined.unknown_thread++;
-          break;
-        case kReentrant:
-          debug_stats_.non_inlined.reentrant++;
-          break;
-        default:
-          LOGF(ERROR, "Unhandled NonInlinedReason");
-      };
+      // If the message was not inlined earlier due to the wait not yet been ready,
+      // we should make sure this reason is displayed even if any other of the
+      // reasons also apply.
+      if (was_deferred) {
+        debug_stats_.non_inlined.channel_wait_not_yet_registered++;
+      } else {
+        switch (should_inline.error_value()) {
+          case kAllowSyncCalls:
+            debug_stats_.non_inlined.allow_sync_calls++;
+            break;
+          case kDispatchingOnAnotherThread:
+            debug_stats_.non_inlined.parallel_dispatch++;
+            break;
+          case kTask:
+            debug_stats_.non_inlined.task++;
+            break;
+          case kUnknownThread:
+            debug_stats_.non_inlined.unknown_thread++;
+            break;
+          case kReentrant:
+            debug_stats_.non_inlined.reentrant++;
+            break;
+          default:
+            LOGF(ERROR, "Unhandled NonInlinedReason");
+        };
+      }
       return;
     }
+    // The request was not queued earlier, so we don't count it as inlined in the stats,
+    // even though it is getting inlined in this specific instance.
+    if (was_deferred) {
+      debug_stats_.non_inlined.channel_wait_not_yet_registered++;
+    } else {
+      debug_stats_.num_inlined_requests++;
+    }
     dispatching_sync_ = true;
-    debug_stats_.num_inlined_requests++;
   }
   DispatchCallback(std::move(callback_request));
 

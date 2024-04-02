@@ -236,8 +236,11 @@ zx_status_t Channel::WaitAsync(struct fdf_dispatcher* dispatcher, fdf_channel_re
       std::swap(queue_callback, callback_request_pending_queue_);
     }
   }
+  // If there is a message already available, that means it was not inlined earlier,
+  // so we set |was_deferred| to true.
   if (queue_callback) {
-    dispatcher_ref->QueueRegisteredCallback(unowned_callback_request_, ZX_OK);
+    dispatcher_ref->QueueRegisteredCallback(unowned_callback_request_, ZX_OK,
+                                            /* was_deferred */ true);
   }
   return ZX_OK;
 }
