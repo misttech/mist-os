@@ -23,6 +23,7 @@ using testing::FakeController;
 
 namespace gap {
 namespace {
+namespace pwemb = pw::bluetooth::emboss;
 using TestingBase = bt::testing::FakeDispatcherControllerTest<FakeController>;
 
 constexpr size_t kDefaultMaxAdSize = 23;
@@ -109,7 +110,7 @@ class FakeLowEnergyAdvertiser final : public hci::LowEnergyAdvertiser {
 
   void OnIncomingConnection(
       hci_spec::ConnectionHandle handle,
-      pw::bluetooth::emboss::ConnectionRole role,
+      pwemb::ConnectionRole role,
       const DeviceAddress& peer_address,
       const hci_spec::LEConnectionParameters& conn_params) override {
     // Right now, we call the first callback, because we can't call any other
@@ -135,14 +136,14 @@ class FakeLowEnergyAdvertiser final : public hci::LowEnergyAdvertiser {
       pw::bluetooth::emboss::GenericEnableParam enable,
       bool extended_pdu) override {
     return hci::EmbossCommandPacket::New<
-        pw::bluetooth::emboss::LESetExtendedAdvertisingEnableDataWriter>(
+        pwemb::LESetExtendedAdvertisingEnableDataWriter>(
         hci_spec::kLESetExtendedAdvertisingEnable);
   }
 
   std::optional<hci::EmbossCommandPacket> BuildSetAdvertisingParams(
       const DeviceAddress& address,
-      pw::bluetooth::emboss::LEAdvertisingType type,
-      pw::bluetooth::emboss::LEOwnAddressType own_address_type,
+      pwemb::LEAdvertisingType type,
+      pwemb::LEOwnAddressType own_address_type,
       hci::AdvertisingIntervalRange interval,
       bool extended_pdu) override {
     return std::nullopt;
@@ -153,14 +154,14 @@ class FakeLowEnergyAdvertiser final : public hci::LowEnergyAdvertiser {
                                                    AdvFlags flags,
                                                    bool extended_pdu) override {
     return hci::EmbossCommandPacket::New<
-        pw::bluetooth::emboss::LESetAdvertisingDataCommandWriter>(
+        pwemb::LESetAdvertisingDataCommandWriter>(
         hci_spec::kLESetAdvertisingData);
   }
 
   hci::EmbossCommandPacket BuildUnsetAdvertisingData(
       const DeviceAddress& address, bool extended_pdu) override {
     return hci::EmbossCommandPacket::New<
-        pw::bluetooth::emboss::LESetAdvertisingDataCommandWriter>(
+        pwemb::LESetAdvertisingDataCommandWriter>(
         hci_spec::kLESetAdvertisingData);
   }
 
@@ -168,21 +169,21 @@ class FakeLowEnergyAdvertiser final : public hci::LowEnergyAdvertiser {
                                                 const AdvertisingData& scan_rsp,
                                                 bool extended_pdu) override {
     return hci::EmbossCommandPacket::New<
-        pw::bluetooth::emboss::LESetScanResponseDataCommandWriter>(
+        pwemb::LESetScanResponseDataCommandWriter>(
         hci_spec::kLESetScanResponseData);
   }
 
   hci::EmbossCommandPacket BuildUnsetScanResponse(const DeviceAddress& address,
                                                   bool extended_pdu) override {
     return hci::EmbossCommandPacket::New<
-        pw::bluetooth::emboss::LESetScanResponseDataCommandWriter>(
+        pwemb::LESetScanResponseDataCommandWriter>(
         hci_spec::kLESetScanResponseData);
   }
 
   hci::EmbossCommandPacket BuildRemoveAdvertisingSet(
       const DeviceAddress& address, bool extended_pdu) override {
     return hci::EmbossCommandPacket::New<
-        pw::bluetooth::emboss::LERemoveAdvertisingSetCommandWriter>(
+        pwemb::LERemoveAdvertisingSetCommandWriter>(
         hci_spec::kLERemoveAdvertisingSet);
   }
 
@@ -385,8 +386,8 @@ TEST_F(LowEnergyAdvertisingManagerTest, RegisterUnregister) {
 
 //  - When the advertiser returns an error, we return an error
 TEST_F(LowEnergyAdvertisingManagerTest, AdvertiserError) {
-  advertiser()->ErrorOnNext(ToResult(
-      pw::bluetooth::emboss::StatusCode::INVALID_HCI_COMMAND_PARAMETERS));
+  advertiser()->ErrorOnNext(
+      ToResult(pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS));
 
   EXPECT_FALSE(adv_mgr()->advertising());
   adv_mgr()->StartAdvertising(CreateFakeAdvertisingData(),
@@ -429,11 +430,10 @@ TEST_F(LowEnergyAdvertisingManagerTest, ConnectCallback) {
 
   DeviceAddress peer_address(DeviceAddress::Type::kLEPublic,
                              {3, 2, 1, 1, 2, 3});
-  advertiser()->OnIncomingConnection(
-      1,
-      pw::bluetooth::emboss::ConnectionRole::PERIPHERAL,
-      peer_address,
-      hci_spec::LEConnectionParameters());
+  advertiser()->OnIncomingConnection(1,
+                                     pwemb::ConnectionRole::PERIPHERAL,
+                                     peer_address,
+                                     hci_spec::LEConnectionParameters());
   RunUntilIdle();
   ASSERT_TRUE(link);
 
