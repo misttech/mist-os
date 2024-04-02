@@ -745,11 +745,15 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
 
   void Activate() TA_REQ(lock()) override;
 
-  // Helper to share code between CreateSubVmar and CreateVmMapping
+  // Helpers to share code between CreateSubVmar and CreateVmMapping
   zx_status_t CreateSubVmarInternal(size_t offset, size_t size, uint8_t align_pow2,
                                     uint32_t vmar_flags, fbl::RefPtr<VmObject> vmo,
                                     uint64_t vmo_offset, uint arch_mmu_flags, const char* name,
                                     vaddr_t* base_out, fbl::RefPtr<VmAddressRegionOrMapping>* out);
+  zx_status_t CreateSubVmarInner(size_t offset, size_t size, uint8_t align_pow2,
+                                 uint32_t vmar_flags, fbl::RefPtr<VmObject> vmo,
+                                 uint64_t vmo_offset, uint arch_mmu_flags, const char* name,
+                                 vaddr_t* base_out, fbl::RefPtr<VmAddressRegionOrMapping>* out);
 
   // Create a new VmMapping within this region, overwriting any existing
   // mappings that are in the way.  If the range crosses a subregion, the call

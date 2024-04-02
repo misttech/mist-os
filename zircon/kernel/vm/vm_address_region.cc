@@ -8,6 +8,7 @@
 #include <align.h>
 #include <assert.h>
 #include <inttypes.h>
+#include <lib/counters.h>
 #include <lib/crypto/prng.h>
 #include <lib/userabi/vdso.h>
 #include <pow2.h>
@@ -30,6 +31,21 @@
 #include <ktl/enforce.h>
 
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
+
+namespace {
+// Number of attempted address range mapping, regardless arguments.
+KCOUNTER(vm_region_map_all_attempt, "vm.region.map.all.attempt")
+// Number of successful address range mapping.
+KCOUNTER(vm_region_map_all_success, "vm.region.map.all.success")
+// Number of attempted address range mapping with a requested upper limit.
+KCOUNTER(vm_region_map_specific_attempt, "vm.region.map.specific.attempt")
+// Number of successful address range mapping with a requested upper limit.
+KCOUNTER(vm_region_map_specific_success, "vm.region.map.specific.success")
+// Number of attempted mapping at a specified address.
+KCOUNTER(vm_region_map_upper_bound_attempt, "vm.region.map.upper_bound.attempt")
+// Number of successful mapping at a specified address.
+KCOUNTER(vm_region_map_upper_bound_success, "vm.region.map.upper_bound.success")
+}  // namespace
 
 VmAddressRegion::VmAddressRegion(VmAspace& aspace, vaddr_t base, size_t size, uint32_t vmar_flags)
     : VmAddressRegionOrMapping(base, size, vmar_flags | VMAR_CAN_RWX_FLAGS, &aspace, nullptr,
@@ -77,6 +93,36 @@ zx_status_t VmAddressRegion::CreateSubVmarInternal(size_t offset, size_t size, u
                                                    uint64_t vmo_offset, uint arch_mmu_flags,
                                                    const char* name, vaddr_t* base_out,
                                                    fbl::RefPtr<VmAddressRegionOrMapping>* out) {
+  zx_status_t status = CreateSubVmarInner(offset, size, align_pow2, vmar_flags, vmo, vmo_offset,
+                                          arch_mmu_flags, name, base_out, out);
+
+  const bool is_specific_overwrite = vmar_flags & VMAR_FLAG_SPECIFIC_OVERWRITE;
+  const bool is_specific = (vmar_flags & VMAR_FLAG_SPECIFIC) || is_specific_overwrite;
+  const bool is_upper_bound = vmar_flags & VMAR_FLAG_OFFSET_IS_UPPER_LIMIT;
+
+  kcounter_add(vm_region_map_all_attempt, 1);
+  if (is_specific) {
+    kcounter_add(vm_region_map_specific_attempt, 1);
+  } else if (is_upper_bound) {
+    kcounter_add(vm_region_map_upper_bound_attempt, 1);
+  }
+
+  if (status == ZX_OK) {
+    kcounter_add(vm_region_map_all_success, 1);
+    if (is_specific) {
+      kcounter_add(vm_region_map_specific_success, 1);
+    } else if (is_upper_bound) {
+      kcounter_add(vm_region_map_upper_bound_success, 1);
+    }
+  }
+  return status;
+}
+
+zx_status_t VmAddressRegion::CreateSubVmarInner(size_t offset, size_t size, uint8_t align_pow2,
+                                                uint32_t vmar_flags, fbl::RefPtr<VmObject> vmo,
+                                                uint64_t vmo_offset, uint arch_mmu_flags,
+                                                const char* name, vaddr_t* base_out,
+                                                fbl::RefPtr<VmAddressRegionOrMapping>* out) {
   DEBUG_ASSERT(out);
   MemoryPriority memory_priority;
   fbl::RefPtr<VmAddressRegionOrMapping> vmar;
@@ -1036,6 +1082,7 @@ zx_status_t VmAddressRegion::AllocSpotLocked(size_t size, uint8_t align_pow2, ui
 
   zx_status_t status = subregions_.GetAllocSpot(&alloc_spot, align_pow2, entropy, size, base_,
                                                 size_, prng, upper_limit);
+
   if (status != ZX_OK) {
     return status;
   }
