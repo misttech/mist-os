@@ -59,7 +59,10 @@ impl TaskDirectory {
         fs.create_node(
             current_task,
             Arc::new(TaskDirectory { pid: task.id, node_ops, file_ops }),
-            FsNodeInfo::new_factory(mode!(IFDIR, 0o777), task.as_fscred()),
+            // proc(5): "The files inside each /proc/pid directory are normally
+            // owned by the effective user and effective group ID of the
+            // process."
+            FsNodeInfo::new_factory(mode!(IFDIR, 0o777), task.creds().euid_as_fscred()),
         )
     }
 }
@@ -155,7 +158,9 @@ fn static_directory_builder_with_common_task_entries<'a>(
     scope: StatsScope,
 ) -> StaticDirectoryBuilder<'a> {
     let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.entry_creds(task.as_fscred());
+    // proc(5): "The files inside each /proc/pid directory are normally owned by
+    // the effective user and effective group ID of the process."
+    dir.entry_creds(task.creds().euid_as_fscred());
     dir.entry(
         current_task,
         "cgroup",
@@ -232,8 +237,10 @@ fn static_directory_builder_with_common_task_entries<'a>(
         mode!(IFREG, 0o644),
     );
     dir.subdir(current_task, "attr", 0o555, |dir| {
-        dir.entry_creds(task.as_fscred());
-        dir.dir_creds(task.as_fscred());
+        // proc(5): "The files inside each /proc/pid directory are normally
+        // owned by the effective user and effective group ID of the process."
+        dir.entry_creds(task.creds().euid_as_fscred());
+        dir.dir_creds(task.creds().euid_as_fscred());
         selinux_proc_attrs(current_task, task, dir);
     });
     dir.entry(current_task, "ns", NsDirectory { task: task.into() }, mode!(IFDIR, 0o777));
@@ -252,7 +259,9 @@ fn static_directory_builder_with_common_task_entries<'a>(
         OomScoreAdjFile::new_node(task.into()),
         mode!(IFREG, 0o744),
     );
-    dir.dir_creds(task.as_fscred());
+    // proc(5): "The files inside each /proc/pid directory are normally owned by
+    // the effective user and effective group ID of the process."
+    dir.dir_creds(task.creds().euid_as_fscred());
     dir
 }
 

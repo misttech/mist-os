@@ -45,6 +45,9 @@
                 "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/Read",
                 "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/ReadExecute",
 
+                // TODO(https://fxbug.dev/291962828)
+                "ProcTaskDirTest.PidDirCorrectIno",
+
                 // TODO(https://fxbug.dev/328412818)
                 "OverlayFs/FsMountTest.CantBypassDirectoryPermissions/0",
                 "OverlayFs/FsMountTest.ChmodWithDifferentModes/0",

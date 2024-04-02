@@ -3,11 +3,17 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <sys/fsuid.h>
+#include <sys/prctl.h>
 #include <unistd.h>
+
+#include <filesystem>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
+#include "src/lib/files/directory.h"
+#include "src/lib/fxl/strings/string_printf.h"
 #include "src/starnix/tests/syscalls/cpp/proc_test_base.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
@@ -174,4 +180,149 @@ TEST(ProcTest, CmdlineAfterFork) {
   });
 
   ASSERT_TRUE(helper.WaitForChildren());
+}
+
+class ProcTaskDirTest : public ProcTestBase {
+ protected:
+  void SetUp() override { ProcTestBase::SetUp(); }
+};
+
+bool ends_with(const std::string& haystack, const std::string needle) {
+  return haystack.rfind(needle) == (haystack.size() - needle.size());
+}
+
+std::string ProcSelfDirName() {
+  std::string proc_self = fxl::StringPrintf("/proc/%d", getpid());
+  struct stat statbuf;
+  SAFE_SYSCALL(stat(proc_self.c_str(), &statbuf));
+  return proc_self;
+}
+
+// Ensure that entries in /proc/pid/. have the correct ownership.  proc(2) says
+// that entries are owned by the effective uid of the task. This doesn't seem to
+// be exactly what Linux does - Linux seems to assign most directories to the
+// euid, and everything else to the real id - but it's not clear exactly what
+// Linux is doing from looking at its behavior, so we hew to the man page.
+//
+// This test ensures that the proc directories *are* set to be owned by the euid
+// of the task.
+TEST_F(ProcTaskDirTest, PidDirCorrectUidIsEuid) {
+  if (!test_helper::HasSysAdmin() || !test_helper::IsStarnix()) {
+    GTEST_SKIP() << "PidDirCorrectUid requires root access (to change euid), "
+                 << "and currently only works on Starnix";
+  }
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    std::string proc_path = ProcSelfDirName();
+
+    int dirfd;
+    struct stat pre_stat;
+    struct stat euid_stat;
+
+    // Get the original (presumably real) ownership
+    ASSERT_NE(-1, dirfd = open(proc_path.c_str(), O_RDONLY))
+        << "Error trying to open " << proc_path << ": " << strerror(errno);
+    SAFE_SYSCALL(fstat(dirfd, &pre_stat));
+    SAFE_SYSCALL(close(dirfd));
+
+    // Set the effective uid.
+    uid_t newuid = geteuid() + 1;
+    SAFE_SYSCALL(seteuid(newuid));
+
+    // From proc(5): The files inside each /proc/pid directory are normally
+    // owned by the effective user and effective group ID of the process.
+    // However, as a security measure, the ownership is made root:root
+    // if the process's "dumpable" attribute is set to a value other than 1.
+    SAFE_SYSCALL(prctl(PR_SET_DUMPABLE, 1));
+
+    // Make sure the effective uid appears to own /proc/self.
+    SAFE_SYSCALL(dirfd = open(proc_path.c_str(), O_RDONLY));
+    SAFE_SYSCALL(fstat(dirfd, &euid_stat));
+    SAFE_SYSCALL(close(dirfd));
+
+    EXPECT_EQ(euid_stat.st_uid, newuid)
+        << "owner for " << proc_path << " did not change to correct value";
+
+    std::vector<std::string> dirs;
+    files::ReadDirContents(proc_path, &dirs);
+    for (const auto& entry : dirs) {
+      if ((entry == ".") || (entry == "..")) {
+        continue;
+      }
+      struct stat info;
+      auto fname =
+          (entry[0] == '/') ? entry : fxl::StringPrintf("%s/%s", proc_path.c_str(), entry.c_str());
+
+      ASSERT_NE(-1, stat(fname.c_str(), &info))
+          << "Error reading " << fname << ": " << strerror(errno);
+
+      // Links to other parts of the fs have their original ownership.  S_ISLNK does
+      // not currently work on these files.  See https://fxbug.dev/331990255.
+      if (ends_with(fname, "/cwd") || ends_with(fname, "/root") || ends_with(fname, "/exe")) {
+        continue;
+      }
+
+      EXPECT_EQ(info.st_uid, euid_stat.st_uid) << "Wrong owner for file " << fname;
+    }
+  });
+}
+
+// This test ensures that the proc directories aren't set to be owned by the
+// fsuid of the task. This is separate from PidDirCorrectUidIsEuid because
+// setting the euid implicitly sets the fsuid. We want to check we're not
+// accidentally relying on the fsuid.
+TEST_F(ProcTaskDirTest, PidDirSetFsuidDoesntChangeOwnership) {
+  if (!test_helper::HasSysAdmin() || !test_helper::IsStarnix()) {
+    GTEST_SKIP() << "PidDirCorrectUid requires root access (to change euid), "
+                 << "and currently only works on Starnix";
+  }
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    std::string proc_path = ProcSelfDirName();
+
+    int dirfd;
+    struct stat pre_stat;
+    struct stat fsuid_stat;
+    uid_t newuid;
+
+    // Get the original (presumably real) ownership
+    ASSERT_NE(-1, dirfd = open(proc_path.c_str(), O_RDONLY))
+        << "Error trying to open " << proc_path << ": " << strerror(errno);
+    SAFE_SYSCALL(fstat(dirfd, &pre_stat));
+    SAFE_SYSCALL(close(dirfd));
+
+    // Set the fsuid.
+    newuid = pre_stat.st_uid + 1;
+    ASSERT_EQ(static_cast<const int>(pre_stat.st_uid), setfsuid(newuid)) << "Unexpected fsuid";
+    // This is how you check to see if a call to setfsuid worked correctly.
+    ASSERT_EQ(static_cast<const int>(newuid), setfsuid(-1)) << "setfsuid not supported";
+
+    // Make sure that the current owner has *not* changed to the fsuid
+    SAFE_SYSCALL(dirfd = open(proc_path.c_str(), O_RDONLY));
+    SAFE_SYSCALL(fstat(dirfd, &fsuid_stat));
+    SAFE_SYSCALL(close(dirfd));
+
+    EXPECT_NE(fsuid_stat.st_uid, newuid) << "fsuid seen to change incorrectly";
+    // Revert the fsuid
+    ASSERT_EQ(static_cast<const int>(newuid), setfsuid(pre_stat.st_uid));
+  });
+}
+
+TEST_F(ProcTaskDirTest, PidDirCorrectIno) {
+  const char kProcPath[] = "/proc/self/status";
+  int fd;
+  struct stat pre_stat;
+  struct stat post_stat;
+
+  SAFE_SYSCALL(fd = open(kProcPath, O_RDONLY));
+  SAFE_SYSCALL(fstat(fd, &pre_stat));
+  SAFE_SYSCALL(close(fd));
+
+  SAFE_SYSCALL(fd = open(kProcPath, O_RDONLY));
+  SAFE_SYSCALL(fstat(fd, &post_stat));
+  SAFE_SYSCALL(close(fd));
+
+  ASSERT_EQ(pre_stat.st_ino, post_stat.st_ino) << "Inode number incorrectly seen to change";
 }

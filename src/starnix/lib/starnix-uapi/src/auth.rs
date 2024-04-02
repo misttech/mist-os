@@ -430,6 +430,14 @@ impl Credentials {
         FsCred { uid: self.fsuid, gid: self.fsgid }
     }
 
+    pub fn euid_as_fscred(&self) -> FsCred {
+        FsCred { uid: self.euid, gid: self.egid }
+    }
+
+    pub fn uid_as_fscred(&self) -> FsCred {
+        FsCred { uid: self.uid, gid: self.gid }
+    }
+
     pub fn update_capabilities(
         &mut self,
         prev_uid: uid_t,
