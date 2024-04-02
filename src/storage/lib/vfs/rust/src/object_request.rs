@@ -11,21 +11,18 @@ use {
     fidl::{
         endpoints::{ControlHandle, ProtocolMarker, RequestStream, ServerEnd},
         epitaph::ChannelEpitaphExt,
-        AsHandleRef,
+        AsHandleRef, HandleBased,
     },
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon_status::Status,
     futures::future::BoxFuture,
-    std::{
-        future::Future,
-        ops::{Deref, DerefMut},
-        sync::Arc,
-    },
+    std::{future::Future, sync::Arc},
 };
 
 /// Wraps the channel provided in the open methods and provide convenience methods for sending
 /// appropriate responses.  It also records actions that should be taken upon successful connection
 /// such as truncating file objects.
+#[derive(Debug)]
 pub struct ObjectRequest {
     // The channel.
     object_request: fidl::Channel,
@@ -47,6 +44,7 @@ impl ObjectRequest {
         attributes: fio::NodeAttributesQuery,
         truncate: bool,
     ) -> Self {
+        assert!(!object_request.is_invalid_handle());
         Self { object_request, what_to_send, attributes, truncate }
     }
 
@@ -117,6 +115,9 @@ impl ObjectRequest {
 
     /// Terminates the object request with the given status.
     pub fn shutdown(self, status: Status) {
+        if self.object_request.is_invalid_handle() {
+            return;
+        }
         if let ObjectRequestSend::OnOpen = self.what_to_send {
             if let Ok((_, control_handle)) = ServerEnd::<fio::NodeMarker>::new(self.object_request)
                 .into_stream_and_control_handle()
@@ -130,14 +131,14 @@ impl ObjectRequest {
     }
 
     /// Calls `f` and sends an error on the object request channel upon failure.
-    pub fn handle<T>(self, f: impl FnOnce(ObjectRequestRef<'_>) -> Result<T, Status>) -> Option<T> {
-        let mut request = Some(self);
-        match f(ObjectRequestRef(&mut request)) {
+    pub fn handle<T>(
+        mut self,
+        f: impl FnOnce(ObjectRequestRef<'_>) -> Result<T, Status>,
+    ) -> Option<T> {
+        match f(&mut self) {
             Ok(o) => Some(o),
             Err(s) => {
-                if let Some(r) = request {
-                    r.shutdown(s);
-                }
+                self.shutdown(s);
                 None
             }
         }
@@ -176,12 +177,10 @@ impl ObjectRequest {
         scope.spawn(async {
             // This avoids paying the stack cost for ObjectRequest for the lifetime of the task.
             let fut = {
-                let mut object_request = Some(self);
-                match f(ObjectRequestRef(&mut object_request)).await {
+                let mut this = self;
+                match f(&mut this).await {
                     Err(s) => {
-                        if let Some(object_request) = object_request {
-                            object_request.shutdown(s);
-                        }
+                        this.shutdown(s);
                         return;
                     }
                     Ok(fut) => fut,
@@ -191,6 +190,8 @@ impl ObjectRequest {
         });
     }
 
+    /// Waits until the request has a request waiting in its channel.  Returns immediately if this
+    /// request requires sending an initial event such as OnOpen or OnRepresentation.
     pub async fn wait_till_ready(&self) {
         if !matches!(self.what_to_send, ObjectRequestSend::Nothing) {
             return;
@@ -202,29 +203,32 @@ impl ObjectRequest {
         .await
         .unwrap();
     }
-}
 
-/// Holds a reference to an ObjectRequest.
-// Whilst it contains an option, it is guaranteed to always hold a request so it is safe to unwrap
-// the Option.  It is designed this way for the benefit of `handle` and `spawn` above.
-pub struct ObjectRequestRef<'a>(&'a mut Option<ObjectRequest>);
-
-impl ObjectRequestRef<'_> {
     /// Take the ObjectRequest.  The caller is responsible for sending errors.
-    pub fn take(self) -> ObjectRequest {
-        self.0.take().unwrap()
+    pub fn take(&mut self) -> ObjectRequest {
+        assert!(!self.object_request.is_invalid_handle());
+        Self {
+            object_request: std::mem::replace(
+                &mut self.object_request,
+                fidl::Handle::invalid().into(),
+            ),
+            what_to_send: self.what_to_send,
+            attributes: self.attributes,
+            truncate: self.truncate,
+        }
     }
 
     /// Returns a future that will run the connection. `f` is a callback that returns a future
     /// that will run the connection but it will not be called if the connection is supposed
     /// to be a node connection.
     pub fn create_connection<N: Node, F: Future<Output = ()> + Send + 'static, P: ProtocolsExt>(
-        self,
+        &mut self,
         scope: ExecutionScope,
         node: Arc<N>,
         protocols: P,
-        f: impl FnOnce(ExecutionScope, Arc<N>, P, Self) -> Result<F, Status>,
+        f: impl FnOnce(ExecutionScope, Arc<N>, P, &mut Self) -> Result<F, Status>,
     ) -> Result<BoxFuture<'static, ()>, Status> {
+        assert!(!self.object_request.is_invalid_handle());
         if protocols.is_node() {
             Ok(Box::pin(node::Connection::create(scope.clone(), node, protocols, self)?))
         } else {
@@ -234,12 +238,13 @@ impl ObjectRequestRef<'_> {
 
     /// Spawns a new connection for this request. `f` is similar to `create_connection` above.
     pub fn spawn_connection<N: Node, F: Future<Output = ()> + Send + 'static, P: ProtocolsExt>(
-        self,
+        &mut self,
         scope: ExecutionScope,
         node: Arc<N>,
         protocols: P,
-        f: impl FnOnce(ExecutionScope, Arc<N>, P, Self) -> Result<F, Status>,
+        f: impl FnOnce(ExecutionScope, Arc<N>, P, &mut Self) -> Result<F, Status>,
     ) -> Result<(), Status> {
+        assert!(!self.object_request.is_invalid_handle());
         if protocols.is_node() {
             scope.spawn(node::Connection::create(scope.clone(), node, protocols, self)?);
         } else {
@@ -249,21 +254,9 @@ impl ObjectRequestRef<'_> {
     }
 }
 
-impl Deref for ObjectRequestRef<'_> {
-    type Target = ObjectRequest;
+pub type ObjectRequestRef<'a> = &'a mut ObjectRequest;
 
-    fn deref(&self) -> &Self::Target {
-        self.0.as_ref().unwrap()
-    }
-}
-
-impl DerefMut for ObjectRequestRef<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.as_mut().unwrap()
-    }
-}
-
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum ObjectRequestSend {
     OnOpen,
     OnRepresentation,

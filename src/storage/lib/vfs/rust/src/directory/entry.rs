@@ -22,7 +22,7 @@ use {
     fidl::endpoints::{create_endpoints, ClientEnd},
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
-    std::{fmt, sync::Arc},
+    std::{fmt, future::Future, sync::Arc},
 };
 
 /// Information about a directory entry, used to populate ReadDirents() output.
@@ -75,6 +75,15 @@ pub trait DirectoryEntry: IntoAny + Sync + Send + 'static {
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status>;
 }
 
+/// Trait that can be implemented to process open requests asynchronously.
+pub trait DirectoryEntryAsync: DirectoryEntry {
+    /// Implementers may use this if desired by using the `spawn` method below.
+    fn open_entry_async(
+        self: Arc<Self>,
+        request: OpenRequest<'_>,
+    ) -> impl Future<Output = Result<(), Status>> + Send;
+}
+
 impl<T: DirectoryEntry> IsDirectory for T {
     fn is_directory(&self) -> bool {
         self.entry_info().type_() == fio::DirentType::Directory
@@ -82,6 +91,7 @@ impl<T: DirectoryEntry> IsDirectory for T {
 }
 
 /// An open request.
+#[derive(Debug)]
 pub struct OpenRequest<'a> {
     scope: ExecutionScope,
     flags_or_protocols: FlagsOrProtocols<'a>,
@@ -90,6 +100,7 @@ pub struct OpenRequest<'a> {
 }
 
 /// Wraps flags (io1) or protocols (io2).
+#[derive(Debug)]
 pub enum FlagsOrProtocols<'a> {
     /// io1
     Flags(fio::OpenFlags),
@@ -118,6 +129,27 @@ impl<'a> OpenRequest<'a> {
         object_request: ObjectRequestRef<'a>,
     ) -> Self {
         Self { scope, flags_or_protocols: flags_or_protocols.into(), path, object_request }
+    }
+
+    /// Returns the path for this request.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Prepends `prefix` to the path.
+    pub fn prepend_path(&mut self, prefix: &Path) {
+        self.path = self.path.with_prefix(prefix);
+    }
+
+    /// Sets the path to `path`.
+    pub fn set_path(&mut self, path: Path) {
+        self.path = path;
+    }
+
+    /// Waits until the request has a request waiting in its channel.  Returns immediately if this
+    /// request requires sending an initial event such as OnOpen or OnRepresentation.
+    pub async fn wait_till_ready(&self) {
+        self.object_request.wait_till_ready().await;
     }
 
     /// Opens a directory.
@@ -278,6 +310,56 @@ impl<'a> OpenRequest<'a> {
             }
         }
     }
+
+    /// Spawns a task to handle the request.  `entry` must implement DirectoryEntryAsync.
+    pub fn spawn(self, entry: Arc<impl DirectoryEntryAsync>) {
+        let OpenRequest { scope, flags_or_protocols, path, object_request } = self;
+        let mut object_request = object_request.take();
+        match flags_or_protocols {
+            FlagsOrProtocols::Flags(flags) => scope.clone().spawn(async move {
+                match entry
+                    .open_entry_async(OpenRequest::new(
+                        scope,
+                        FlagsOrProtocols::Flags(flags),
+                        path,
+                        &mut object_request,
+                    ))
+                    .await
+                {
+                    Ok(()) => {}
+                    Err(s) => object_request.shutdown(s),
+                }
+            }),
+            FlagsOrProtocols::Protocols(protocols) => {
+                let protocols = protocols.clone();
+                scope.clone().spawn(async move {
+                    match entry
+                        .open_entry_async(OpenRequest::new(
+                            scope,
+                            FlagsOrProtocols::Protocols(&protocols),
+                            path,
+                            &mut object_request,
+                        ))
+                        .await
+                    {
+                        Ok(()) => {}
+                        Err(s) => object_request.shutdown(s),
+                    }
+                });
+            }
+        }
+    }
+
+    /// Returns the execution scope for this request.
+    pub fn scope(&self) -> &ExecutionScope {
+        &self.scope
+    }
+
+    /// Replaces the scope in this request.  This is the right thing to do if any subsequently
+    /// spawned tasks should be in a different scope to the task that received this open request.
+    pub fn set_scope(&mut self, scope: ExecutionScope) {
+        self.scope = scope;
+    }
 }
 
 /// A sub-node of a directory.  This will work with types that implement Directory as well as
@@ -326,16 +408,21 @@ pub fn serve_directory(
     Ok(client)
 }
 
-#[cfg(all(test, target_os = "fuchsia"))]
+#[cfg(test)]
 mod tests {
     use {
-        super::SubNode,
+        super::{
+            DirectoryEntry, DirectoryEntryAsync, EntryInfo, FlagsOrProtocols, OpenRequest, SubNode,
+        },
         crate::{
             assert_read, directory::entry_container::Directory, execution_scope::ExecutionScope,
-            file::vmo::read_only, path::Path, pseudo_directory,
+            file::read_only, path::Path, pseudo_directory, ToObjectRequest,
         },
-        fidl::endpoints::{create_endpoints, ClientEnd},
+        assert_matches::assert_matches,
+        fidl::endpoints::{create_endpoints, create_proxy, ClientEnd},
         fidl_fuchsia_io as fio,
+        fuchsia_zircon_status::Status,
+        futures::StreamExt,
         std::sync::Arc,
     };
 
@@ -371,6 +458,110 @@ mod tests {
         assert_read!(
             ClientEnd::<fio::FileMarker>::from(client.into_channel()).into_proxy().unwrap(),
             "foo"
+        );
+    }
+
+    #[fuchsia::test]
+    async fn object_request_spawn() {
+        struct MockNode<F: Send + Sync + 'static>
+        where
+            for<'a> F: Fn(OpenRequest<'a>) -> Status,
+        {
+            callback: F,
+        }
+        impl<F: Send + Sync + 'static> DirectoryEntry for MockNode<F>
+        where
+            for<'a> F: Fn(OpenRequest<'a>) -> Status,
+        {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Unknown)
+            }
+            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+                request.spawn(self);
+                Ok(())
+            }
+        }
+        impl<F: Send + Sync + 'static> DirectoryEntryAsync for MockNode<F>
+        where
+            for<'a> F: Fn(OpenRequest<'a>) -> Status,
+        {
+            async fn open_entry_async(
+                self: Arc<Self>,
+                request: OpenRequest<'_>,
+            ) -> Result<(), Status> {
+                Err((self.callback)(request))
+            }
+        }
+
+        let scope = ExecutionScope::new();
+        let (proxy, server) = create_proxy::<fio::NodeMarker>().unwrap();
+        let flags = fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE;
+        let mut object_request = flags.to_object_request(server);
+
+        let flags_copy = flags;
+        Arc::new(MockNode {
+            callback: move |request| {
+                assert_matches!(
+                    request,
+                    OpenRequest {
+                        flags_or_protocols: FlagsOrProtocols::Flags(f),
+                        path,
+                        ..
+                    } if f == flags_copy && path.as_ref() == "a/b/c"
+                );
+                Status::BAD_STATE
+            },
+        })
+        .open_entry(OpenRequest::new(
+            scope.clone(),
+            flags,
+            "a/b/c".try_into().unwrap(),
+            &mut object_request,
+        ))
+        .unwrap();
+
+        assert_matches!(
+            proxy.take_event_stream().next().await,
+            Some(Err(fidl::Error::ClientChannelClosed { status, .. }))
+                if status == Status::BAD_STATE
+        );
+
+        let (proxy, server) = create_proxy::<fio::NodeMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            protocols: Some(fio::NodeProtocols {
+                file: Some(fio::FileProtocolFlags::APPEND),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        let mut object_request = protocols.to_object_request(server);
+
+        let protocols_copy = protocols.clone();
+        Arc::new(MockNode {
+            callback: move |request| {
+                assert_matches!(
+                    request,
+                    OpenRequest {
+                        flags_or_protocols: FlagsOrProtocols::Protocols(p),
+                        path,
+                        ..
+                    } if p == &protocols_copy && path.as_ref() == "a/b/c"
+                );
+                Status::BAD_STATE
+            },
+        })
+        .open_entry(OpenRequest::new(
+            scope.clone(),
+            &protocols,
+            "a/b/c".try_into().unwrap(),
+            &mut object_request,
+        ))
+        .unwrap();
+
+        assert_matches!(
+            proxy.take_event_stream().next().await,
+            Some(Err(fidl::Error::ClientChannelClosed { status, .. }))
+                if status == Status::BAD_STATE
         );
     }
 }
