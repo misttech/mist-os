@@ -485,7 +485,26 @@ impl CurrentTask {
         match parent.lookup_child(self, &mut child_context, basename) {
             Ok(name) => {
                 if name.entry.node.is_lnk() {
-                    if context.symlink_mode == SymlinkMode::NoFollow
+                    if flags.contains(OpenFlags::PATH)
+                        && context.symlink_mode == SymlinkMode::NoFollow
+                    {
+                        // When O_PATH is specified in flags, if pathname is a symbolic link
+                        // and the O_NOFOLLOW flag is also specified, then the call returns
+                        // a file descriptor referring to the symbolic link.
+                        // See https://man7.org/linux/man-pages/man2/openat.2.html
+                        //
+                        // If the trailing component (i.e., basename) of
+                        // pathname is a symbolic link, how.resolve contains
+                        // RESOLVE_NO_SYMLINKS, and how.flags contains both
+                        // O_PATH and O_NOFOLLOW, then an O_PATH file
+                        // descriptor referencing the symbolic link will be
+                        // returned.
+                        // See https://man7.org/linux/man-pages/man2/openat2.2.html
+                        return Ok((name, false));
+                    }
+
+                    if (!flags.contains(OpenFlags::PATH)
+                        && context.symlink_mode == SymlinkMode::NoFollow)
                         || context.resolve_flags.contains(ResolveFlags::NO_SYMLINKS)
                         || context.remaining_follows == 0
                     {
@@ -494,8 +513,10 @@ impl CurrentTask {
                             // instead of ELOOP.
                             return error!(EEXIST);
                         }
-                        // A symlink was found, but too many symlink traversals have been
-                        // attempted.
+                        // A symlink was found, but one of the following is true:
+                        // * flags specified O_NOFOLLOW but not O_PATH.
+                        // * how.resolve contains RESOLVE_NO_SYMLINKS
+                        // * too many symlink traversals have been attempted
                         return error!(ELOOP);
                     }
 
@@ -592,7 +613,8 @@ impl CurrentTask {
     {
         // 64-bit kernels force the O_LARGEFILE flag to be on.
         let mut flags = flags | OpenFlags::LARGEFILE;
-        if flags.contains(OpenFlags::PATH) {
+        let opath = flags.contains(OpenFlags::PATH);
+        if opath {
             // When O_PATH is specified in flags, flag bits other than O_CLOEXEC,
             // O_DIRECTORY, and O_NOFOLLOW are ignored.
             const ALLOWED_FLAGS: OpenFlags = OpenFlags::from_bits_truncate(
@@ -665,7 +687,7 @@ impl CurrentTask {
             // Similarly, we never need to call `truncate` because `O_TMPFILE` is newly created
             // and therefor already an empty file.
 
-            if nofollow && mode.is_lnk() {
+            if !opath && nofollow && mode.is_lnk() {
                 return error!(ELOOP);
             }
 

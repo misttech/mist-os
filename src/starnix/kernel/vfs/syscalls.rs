@@ -61,8 +61,8 @@ use starnix_uapi::{
     F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID, F_SETFD,
     F_SETFL, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD,
     MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX,
-    O_CLOEXEC, O_CREAT, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT,
-    POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED,
+    O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP,
+    POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED,
     POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL,
     POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK, TFD_TIMER_ABSTIME,
     TFD_TIMER_CANCEL_ON_SET, UMOUNT_NOFOLLOW, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
@@ -602,7 +602,8 @@ impl LookupFlags {
             track_stub!(TODO("https://fxbug.dev/297370602"), "LookupFlags::automount");
         }
         Ok(LookupFlags {
-            allow_empty_path: flags & AT_EMPTY_PATH != 0,
+            allow_empty_path: (flags & AT_EMPTY_PATH != 0)
+                || (flags & O_PATH != 0 && flags & O_NOFOLLOW != 0),
             symlink_mode: if follow_symlinks { SymlinkMode::Follow } else { SymlinkMode::NoFollow },
             automount,
         })
@@ -877,7 +878,20 @@ pub fn sys_readlinkat(
     buffer: UserAddress,
     buffer_size: usize,
 ) -> Result<usize, Errno> {
-    let name = lookup_at(current_task, dir_fd, user_path, LookupFlags::no_follow())?;
+    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let lookup_flags = if path.is_empty() {
+        if dir_fd == FdNumber::AT_FDCWD {
+            return error!(ENOENT);
+        }
+        LookupFlags {
+            allow_empty_path: true,
+            symlink_mode: SymlinkMode::NoFollow,
+            ..Default::default()
+        }
+    } else {
+        LookupFlags::no_follow()
+    };
+    let name = lookup_at(current_task, dir_fd, user_path, lookup_flags)?;
 
     let target = match name.readlink(current_task)? {
         SymlinkTarget::Path(path) => path,

@@ -146,7 +146,6 @@
 
                 // Depends on IO stats in /proc/<pid>/io .
                 "readahead02",
-                "readlinkat01",
                 "remap_file_pages02",
                 "request_key01",
                 "request_key02",
