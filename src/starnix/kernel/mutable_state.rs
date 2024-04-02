@@ -148,7 +148,7 @@
 //! }
 //! ```
 
-use starnix_sync::{RwLockReadGuard, RwLockWriteGuard};
+use starnix_sync::{MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 use std::ops::{Deref, DerefMut};
 
 /// Create the read() and write() accessor to respectively access the read guard and write guard.
@@ -249,6 +249,15 @@ pub type ReadGuard<'a, B, S> = Guard<'a, B, RwLockReadGuard<'a, S>>;
 pub type WriteGuard<'a, B, S> = Guard<'a, B, RwLockWriteGuard<'a, S>>;
 pub type StateRef<'a, B, S> = Guard<'a, B, &'a S>;
 pub type StateMutRef<'a, B, S> = Guard<'a, B, &'a mut S>;
+
+impl<'a, B, S> Guard<'a, B, MutexGuard<'a, S>> {
+    pub fn unlocked<F, U>(s: &mut Self, f: F) -> U
+    where
+        F: FnOnce() -> U,
+    {
+        MutexGuard::unlocked(&mut s.guard, f)
+    }
+}
 
 impl<'guard, B, S, G: 'guard + Deref<Target = S>> Guard<'guard, B, G> {
     pub fn new(base: &'guard B, guard: G) -> Self {

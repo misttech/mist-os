@@ -4,6 +4,7 @@
 
 use crate::{
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
+    mutable_state::Guard,
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
     vfs::{
         buffers::{Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback},
@@ -35,8 +36,7 @@ use starnix_uapi::{
     statfs,
     time::time_from_timespec,
     uapi,
-    vfs::default_statfs,
-    vfs::FdEvents,
+    vfs::{default_statfs, FdEvents},
     FUSE_SUPER_MAGIC,
 };
 use std::{
@@ -68,7 +68,7 @@ impl FileOps for DevFuse {
     fileops_impl_nonseekable!();
 
     fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
-        self.connection.disconnect();
+        self.connection.lock().disconnect();
     }
 
     fn read(
@@ -80,7 +80,7 @@ impl FileOps for DevFuse {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLIN, None, || self.connection.read(data))
+        file.blocking_op(current_task, FdEvents::POLLIN, None, || self.connection.lock().read(data))
     }
 
     fn write(
@@ -92,7 +92,7 @@ impl FileOps for DevFuse {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        self.connection.write(data)
+        self.connection.lock().write(data)
     }
 
     fn wait_async(
@@ -103,7 +103,7 @@ impl FileOps for DevFuse {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        self.connection.wait_async(waiter, events, handler)
+        self.connection.lock().wait_async(waiter, events, handler)
     }
 
     fn query_events(
@@ -111,7 +111,7 @@ impl FileOps for DevFuse {
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        Ok(self.connection.query_events())
+        Ok(self.connection.lock().query_events())
     }
 }
 
@@ -131,7 +131,6 @@ pub fn new_fuse_fs(
         .ok_or_else(|| errno!(EINVAL))?
         .connection
         .clone();
-    connection.state.lock().connect();
 
     let fs = FileSystem::new(
         current_task.kernel(),
@@ -149,7 +148,11 @@ pub fn new_fuse_fs(
     let mut root_node = FsNode::new_root(fuse_node.clone());
     root_node.node_id = uapi::FUSE_ROOT_ID as u64;
     fs.set_root_node(root_node);
-    connection.execute_operation(current_task, &fuse_node, FuseOperation::Init)?;
+    {
+        let mut state = connection.lock();
+        state.connect();
+        state.execute_operation(current_task, &fuse_node, FuseOperation::Init)?;
+    }
     Ok(fs)
 }
 
@@ -213,7 +216,7 @@ impl FileSystemOps for FuseFs {
             return error!(EINVAL);
         };
         let response =
-            self.connection.execute_operation(current_task, node, FuseOperation::Statfs)?;
+            self.connection.lock().execute_operation(current_task, node, FuseOperation::Statfs)?;
         let statfs_out = if let FuseResponse::Statfs(statfs_out) = response {
             statfs_out
         } else {
@@ -236,7 +239,7 @@ impl FileSystemOps for FuseFs {
         "fuse".into()
     }
     fn unmount(&self) {
-        self.connection.disconnect();
+        self.connection.lock().disconnect();
     }
 }
 
@@ -401,7 +404,7 @@ impl FileOps for AbortFile {
     ) -> Result<usize, Errno> {
         let drained = data.drain();
         if drained > 0 {
-            self.connection.disconnect();
+            self.connection.lock().disconnect();
         }
         Ok(drained)
     }
@@ -529,7 +532,7 @@ impl FileOps for FuseFileObject {
             return;
         };
         let mode = file.node().info().mode;
-        if let Err(e) = self.connection.execute_operation(
+        if let Err(e) = self.connection.lock().execute_operation(
             current_task,
             node,
             FuseOperation::Release { flags: file.flags(), mode, open_out: self.open_out },
@@ -545,7 +548,7 @@ impl FileOps for FuseFileObject {
             log_error!("Unexpected file type");
             return;
         };
-        if let Err(e) = self.connection.execute_operation(
+        if let Err(e) = self.connection.lock().execute_operation(
             current_task,
             node,
             FuseOperation::Flush(self.open_out),
@@ -567,7 +570,7 @@ impl FileOps for FuseFileObject {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let node = self.get_fuse_node(file)?;
-        let response = self.connection.execute_operation(
+        let response = self.connection.lock().execute_operation(
             current_task,
             node,
             FuseOperation::Read(uapi::fuse_read_in {
@@ -598,7 +601,7 @@ impl FileOps for FuseFileObject {
     ) -> Result<usize, Errno> {
         let node = self.get_fuse_node(file)?;
         let content = data.peek_all()?;
-        let response = self.connection.execute_operation(
+        let response = self.connection.lock().execute_operation(
             current_task,
             node,
             FuseOperation::Write {
@@ -636,7 +639,7 @@ impl FileOps for FuseFileObject {
         // Only delegate SEEK_DATA and SEEK_HOLE to the userspace process.
         if matches!(target, SeekTarget::Data(_) | SeekTarget::Hole(_)) {
             let node = self.get_fuse_node(file)?;
-            let response = self.connection.execute_operation(
+            let response = self.connection.lock().execute_operation(
                 current_task,
                 node,
                 FuseOperation::Seek(uapi::fuse_lseek_in {
@@ -685,7 +688,7 @@ impl FileOps for FuseFileObject {
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         let node = self.get_fuse_node(file)?;
-        let response = self.connection.execute_operation(
+        let response = self.connection.lock().execute_operation(
             current_task,
             node,
             FuseOperation::Poll(uapi::fuse_poll_in {
@@ -709,7 +712,8 @@ impl FileOps for FuseFileObject {
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        let configuration = self.connection.get_configuration(current_task)?;
+        let mut state = self.connection.lock();
+        let configuration = state.get_configuration(current_task)?;
         let use_readdirplus = {
             if configuration.flags.contains(FuseInitFlags::DO_READDIRPLUS) {
                 if configuration.flags.contains(FuseInitFlags::READDIRPLUS_AUTO) {
@@ -734,7 +738,7 @@ impl FileOps for FuseFileObject {
             *PAGE_SIZE as usize
         };
         let node = self.get_fuse_node(file)?;
-        let response = self.connection.execute_operation(
+        let response = state.execute_operation(
             current_task,
             node,
             FuseOperation::Readdir {
@@ -750,6 +754,7 @@ impl FileOps for FuseFileObject {
                 use_readdirplus,
             },
         )?;
+        std::mem::drop(state);
         let dirents = if let FuseResponse::Readdir(dirents) = response {
             dirents
         } else {
@@ -819,7 +824,7 @@ impl FsNodeOps for Arc<FuseNode> {
             return Errno::fail(ENOSYS);
         }
 
-        let response = self.connection.execute_operation(
+        let response = self.connection.lock().execute_operation(
             current_task,
             self,
             FuseOperation::Access { mask: (access & Access::ACCESS_MASK).bits() },
@@ -841,7 +846,7 @@ impl FsNodeOps for Arc<FuseNode> {
         // The node already exists. The creation has been handled before calling this method.
         let flags = flags & !(OpenFlags::CREAT | OpenFlags::EXCL);
         let mode = node.info().mode;
-        let response = self.connection.execute_operation(
+        let response = self.connection.lock().execute_operation(
             current_task,
             self,
             FuseOperation::Open { flags, mode },
@@ -860,7 +865,7 @@ impl FsNodeOps for Arc<FuseNode> {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        let response = self.connection.execute_operation(
+        let response = self.connection.lock().execute_operation(
             current_task,
             self,
             FuseOperation::Lookup { name: name.to_owned() },
@@ -878,7 +883,7 @@ impl FsNodeOps for Arc<FuseNode> {
         dev: DeviceType,
         _owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let response = self.connection.execute_operation(
+        let response = self.connection.lock().execute_operation(
             current_task,
             self,
             FuseOperation::Mknod {
@@ -902,7 +907,7 @@ impl FsNodeOps for Arc<FuseNode> {
         mode: FileMode,
         _owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let response = self.connection.execute_operation(
+        let response = self.connection.lock().execute_operation(
             current_task,
             self,
             FuseOperation::Mkdir {
@@ -924,7 +929,7 @@ impl FsNodeOps for Arc<FuseNode> {
         target: &FsStr,
         _owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let response = self.connection.execute_operation(
+        let response = self.connection.lock().execute_operation(
             current_task,
             self,
             FuseOperation::Symlink { target: target.to_owned(), name: name.to_owned() },
@@ -933,8 +938,11 @@ impl FsNodeOps for Arc<FuseNode> {
     }
 
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
-        let response =
-            self.connection.execute_operation(current_task, self, FuseOperation::Readlink)?;
+        let response = self.connection.lock().execute_operation(
+            current_task,
+            self,
+            FuseOperation::Readlink,
+        )?;
         let read_out = if let FuseResponse::Read(read_out) = response {
             read_out
         } else {
@@ -952,6 +960,7 @@ impl FsNodeOps for Arc<FuseNode> {
     ) -> Result<(), Errno> {
         let child_node = FuseNode::from_node(child)?;
         self.connection
+            .lock()
             .execute_operation(
                 current_task,
                 self,
@@ -972,6 +981,7 @@ impl FsNodeOps for Arc<FuseNode> {
         _child: &FsNodeHandle,
     ) -> Result<(), Errno> {
         self.connection
+            .lock()
             .execute_operation(current_task, self, FuseOperation::Unlink { name: name.to_owned() })
             .map(|_| ())
     }
@@ -990,7 +1000,7 @@ impl FsNodeOps for Arc<FuseNode> {
                 ..Default::default()
             };
 
-            let response = self.connection.execute_operation(
+            let response = self.connection.lock().execute_operation(
                 current_task,
                 self,
                 FuseOperation::SetAttr(attributes),
@@ -1024,7 +1034,7 @@ impl FsNodeOps for Arc<FuseNode> {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let response =
-            self.connection.execute_operation(current_task, self, FuseOperation::GetAttr)?;
+            self.connection.lock().execute_operation(current_task, self, FuseOperation::GetAttr)?;
         let attr = if let FuseResponse::Attr(attr) = response {
             attr
         } else {
@@ -1042,7 +1052,7 @@ impl FsNodeOps for Arc<FuseNode> {
         name: &FsStr,
         max_size: usize,
     ) -> Result<ValueOrSize<FsString>, Errno> {
-        let response = self.connection.execute_operation(
+        let response = self.connection.lock().execute_operation(
             current_task,
             self,
             FuseOperation::GetXAttr {
@@ -1068,7 +1078,7 @@ impl FsNodeOps for Arc<FuseNode> {
         value: &FsStr,
         op: XattrOp,
     ) -> Result<(), Errno> {
-        self.connection.execute_operation(
+        self.connection.lock().execute_operation(
             current_task,
             self,
             FuseOperation::SetXAttr {
@@ -1091,7 +1101,7 @@ impl FsNodeOps for Arc<FuseNode> {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<(), Errno> {
-        self.connection.execute_operation(
+        self.connection.lock().execute_operation(
             current_task,
             self,
             FuseOperation::RemoveXAttr { name: name.to_owned() },
@@ -1105,7 +1115,7 @@ impl FsNodeOps for Arc<FuseNode> {
         current_task: &CurrentTask,
         max_size: usize,
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
-        let response = self.connection.execute_operation(
+        let response = self.connection.lock().execute_operation(
             current_task,
             self,
             FuseOperation::ListXAttr(uapi::fuse_getxattr_in {
@@ -1127,12 +1137,13 @@ impl FsNodeOps for Arc<FuseNode> {
     }
 
     fn forget(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<(), Errno> {
-        if !self.connection.state.lock().is_connected() {
+        let nlookup = self.state.lock().nlookup;
+        let mut state = self.connection.lock();
+        if !state.is_connected() {
             return Ok(());
         }
-        let nlookup = self.state.lock().nlookup;
         if nlookup > 0 {
-            self.connection.execute_operation(
+            state.execute_operation(
                 current_task,
                 self,
                 FuseOperation::Forget(uapi::fuse_forget_in { nlookup }),
@@ -1166,109 +1177,11 @@ struct FuseConnection {
     state: Mutex<FuseMutableState>,
 }
 
+type FuseMutableStateGuard<'a> = Guard<'a, FuseConnection, MutexGuard<'a, FuseMutableState>>;
+
 impl FuseConnection {
-    fn disconnect(&self) {
-        self.state.lock().disconnect()
-    }
-
-    fn get_configuration(
-        &self,
-        current_task: &CurrentTask,
-    ) -> Result<Arc<FuseConfiguration>, Errno> {
-        let mut state = self.state.lock();
-        if let Some(configuration) = state.configuration.as_ref() {
-            return Ok(configuration.clone());
-        }
-        loop {
-            if !state.is_connected() {
-                return error!(ECONNABORTED);
-            }
-            let waiter = Waiter::new();
-            state.waiters.wait_async_value(&waiter, CONFIGURATION_AVAILABLE_EVENT);
-            if let Some(configuration) = state.configuration.as_ref() {
-                return Ok(configuration.clone());
-            }
-            MutexGuard::unlocked(&mut state, || waiter.wait(current_task))?;
-        }
-    }
-
-    /// Execute the given operation on the `node`. If the operation is not asynchronous, this
-    /// method will wait on the userspace process for a response. If the operation is interrupted,
-    /// an interrupt will be sent to the userspace process and the operation will then block until
-    /// the initial operation has a response. This block can only be interrupted by the filesystem
-    /// being unmounted.
-    fn execute_operation(
-        &self,
-        current_task: &CurrentTask,
-        node: &FuseNode,
-        operation: FuseOperation,
-    ) -> Result<FuseResponse, Errno> {
-        let configuration = match operation {
-            FuseOperation::Init => Arc::new(FuseConfiguration::for_init()),
-            _ => self.get_configuration(current_task)?,
-        };
-        let mut state = self.state.lock();
-        if let Some(result) = state.operations_state.get(&operation.opcode()) {
-            return result.clone();
-        }
-        if !operation.has_response() {
-            state.queue_operation(current_task, node, operation, configuration, None)?;
-            return Ok(FuseResponse::None);
-        }
-        let waiter = Waiter::new();
-        let is_async = operation.is_async();
-        let unique_id = state.queue_operation(
-            current_task,
-            node,
-            operation,
-            configuration.clone(),
-            Some(&waiter),
-        )?;
-        if is_async {
-            return Ok(FuseResponse::None);
-        }
-        let mut first_loop = true;
-        loop {
-            if let Some(response) = state.get_response(unique_id) {
-                return response;
-            }
-            match MutexGuard::unlocked(&mut state, || waiter.wait(current_task)) {
-                Ok(()) => {}
-                Err(e) if e == EINTR => {
-                    // If interrupted by another process, send an interrupt command to the server
-                    // the first time, then wait unconditionally.
-                    if first_loop {
-                        state.interrupt(current_task, node, unique_id, configuration.clone())?;
-                        first_loop = false;
-                    }
-                }
-                Err(e) => {
-                    log_error!("Unexpected error: {e:?}");
-                    return Err(e);
-                }
-            }
-        }
-    }
-
-    fn wait_async(
-        &self,
-        waiter: &Waiter,
-        events: FdEvents,
-        handler: EventHandler,
-    ) -> Option<WaitCanceler> {
-        Some(self.state.lock().waiters.wait_async_fd_events(waiter, events, handler))
-    }
-
-    fn query_events(&self) -> FdEvents {
-        self.state.lock().query_events()
-    }
-
-    fn read(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
-        self.state.lock().read(data)
-    }
-
-    fn write(&self, data: &mut dyn InputBuffer) -> Result<usize, Errno> {
-        self.state.lock().write(data)
+    fn lock(&self) -> FuseMutableStateGuard<'_> {
+        FuseMutableStateGuard::new(self, self.state.lock())
     }
 }
 
@@ -1336,7 +1249,95 @@ struct FuseMutableState {
     operations_state: OperationsState,
 }
 
+impl<'a> FuseMutableStateGuard<'a> {
+    fn get_configuration(
+        &mut self,
+        current_task: &CurrentTask,
+    ) -> Result<Arc<FuseConfiguration>, Errno> {
+        if let Some(configuration) = self.configuration.as_ref() {
+            return Ok(configuration.clone());
+        }
+        loop {
+            if !self.is_connected() {
+                return error!(ECONNABORTED);
+            }
+            let waiter = Waiter::new();
+            self.waiters.wait_async_value(&waiter, CONFIGURATION_AVAILABLE_EVENT);
+            if let Some(configuration) = self.configuration.as_ref() {
+                return Ok(configuration.clone());
+            }
+            Self::unlocked(self, || waiter.wait(current_task))?;
+        }
+    }
+
+    /// Execute the given operation on the `node`. If the operation is not asynchronous, this
+    /// method will wait on the userspace process for a response. If the operation is interrupted,
+    /// an interrupt will be sent to the userspace process and the operation will then block until
+    /// the initial operation has a response. This block can only be interrupted by the filesystem
+    /// being unmounted.
+    fn execute_operation(
+        &mut self,
+        current_task: &CurrentTask,
+        node: &FuseNode,
+        operation: FuseOperation,
+    ) -> Result<FuseResponse, Errno> {
+        let configuration = match operation {
+            FuseOperation::Init => Arc::new(FuseConfiguration::for_init()),
+            _ => self.get_configuration(current_task)?,
+        };
+        if let Some(result) = self.operations_state.get(&operation.opcode()) {
+            return result.clone();
+        }
+        if !operation.has_response() {
+            self.queue_operation(current_task, node, operation, configuration, None)?;
+            return Ok(FuseResponse::None);
+        }
+        let waiter = Waiter::new();
+        let is_async = operation.is_async();
+        let unique_id = self.queue_operation(
+            current_task,
+            node,
+            operation,
+            configuration.clone(),
+            Some(&waiter),
+        )?;
+        if is_async {
+            return Ok(FuseResponse::None);
+        }
+        let mut first_loop = true;
+        loop {
+            if let Some(response) = self.get_response(unique_id) {
+                return response;
+            }
+            match Self::unlocked(self, || waiter.wait(current_task)) {
+                Ok(()) => {}
+                Err(e) if e == EINTR => {
+                    // If interrupted by another process, send an interrupt command to the server
+                    // the first time, then wait unconditionally.
+                    if first_loop {
+                        self.interrupt(current_task, node, unique_id, configuration.clone())?;
+                        first_loop = false;
+                    }
+                }
+                Err(e) => {
+                    log_error!("Unexpected error: {e:?}");
+                    return Err(e);
+                }
+            }
+        }
+    }
+}
+
 impl FuseMutableState {
+    fn wait_async(
+        &self,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> Option<WaitCanceler> {
+        Some(self.waiters.wait_async_fd_events(waiter, events, handler))
+    }
+
     fn is_connected(&self) -> bool {
         matches!(self.state, FuseConnectionState::Connected)
     }
