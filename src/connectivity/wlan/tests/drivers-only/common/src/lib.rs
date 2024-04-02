@@ -7,11 +7,12 @@ use {
     fidl_test_wlan_realm as fidl_realm, fidl_test_wlan_testcontroller as fidl_testcontroller,
     fuchsia_component::client::connect_to_protocol,
     realm_proxy_client::{extend_namespace, InstalledNamespace},
-    test_realm_helpers::constants::TESTCONTROLLER_DRIVER_TOPOLOGICAL_PATH,
+    test_realm_helpers::{constants::TESTCONTROLLER_DRIVER_TOPOLOGICAL_PATH, tracing::Tracing},
 };
 
 pub struct DriversOnlyTestRealm {
     pub testcontroller_proxy: fidl_testcontroller::TestControllerProxy,
+    _tracing: Option<Tracing>,
     _test_ns: InstalledNamespace,
 }
 
@@ -67,6 +68,11 @@ impl DriversOnlyTestRealm {
         let test_ns =
             extend_namespace(realm_factory, dict_client).await.expect("Failed to extend ns");
 
-        Self { testcontroller_proxy, _test_ns: test_ns }
+        let tracing = Tracing::create_and_initialize_tracing(test_ns.prefix())
+            .await
+            .map_err(|e| tracing::warn!("{e:?}"))
+            .ok();
+
+        Self { testcontroller_proxy, _tracing: tracing, _test_ns: test_ns }
     }
 }

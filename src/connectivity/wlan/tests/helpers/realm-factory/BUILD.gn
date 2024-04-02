@@ -68,7 +68,10 @@ fuchsia_package("realm-factory") {
 }
 
 fuchsia_unittest_package("realm-factory-tests") {
-  deps = [ ":bin_test" ]
+  deps = [
+    ":bin_test",
+    "//src/performance/trace_manager:component_hermetic",
+  ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

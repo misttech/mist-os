@@ -18,6 +18,7 @@ rustc_library("common") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/testing/realm_proxy/client",
+    "//third_party/rust_crates:tracing",
   ]
   sources = [ "src/lib.rs" ]
 }

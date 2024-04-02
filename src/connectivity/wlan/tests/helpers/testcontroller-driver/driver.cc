@@ -16,6 +16,8 @@
 #include <sstream>
 #include <vector>
 
+#include <wlan/drivers/log.h>
+
 namespace wlan_testcontroller {
 namespace {
 
@@ -71,7 +73,9 @@ class WlanFullmacImplIfcToDriverBridge
       fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc> bridge_client_end)
       : binding_(fdf_dispatcher_get_async_dispatcher(driver_dispatcher), std::move(server_end),
                  this, fidl::kIgnoreBindingClosure),
-        bridge_client_(std::move(bridge_client_end), driver_dispatcher) {}
+        bridge_client_(std::move(bridge_client_end), driver_dispatcher) {
+    WLAN_TRACE_DURATION();
+  }
 
   void OnScanResult(OnScanResultRequest& request, OnScanResultCompleter::Sync& completer) override {
   }
@@ -119,9 +123,12 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
       : binding_(driver_dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure),
         bridge_client_(std::move(bridge_client_end),
                        fdf_dispatcher_get_async_dispatcher(driver_dispatcher)),
-        driver_dispatcher_(driver_dispatcher) {}
+        driver_dispatcher_(driver_dispatcher) {
+    WLAN_TRACE_DURATION();
+  }
 
   void Start(StartRequest& request, StartCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
     // Start has to swap out the fdf::ClientEnd and instead pass along a fidl::ClientEnd to the
     // bridge server. This is necessary because the test case runs in a non-driver component, which
     // cannot use the fdf::ClientEnd.
@@ -140,6 +147,7 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
     bridge_client_->Start(std::move(endpoints->client))
         .ThenExactlyOnce([completer = completer.ToAsync()](
                              fidl::Result<WlanFullmacImplBridge::Start>& result) mutable {
+          WLAN_LAMBDA_TRACE_DURATION("WlanFullmacImplBridge::Start callback");
           // Unlike all the other methods in WlanFullmacImpl,
           // WlanFullmacImpl::Start and WlanFullmacImplBridge::Start results are
           // considered different types by the compiler. So we need to convert between the two
@@ -157,24 +165,29 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
 
   void Stop(StopCompleter::Sync& completer) override {}
   void Query(QueryCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
     bridge_client_->Query().ThenExactlyOnce(
         ForwardResult<WlanFullmacImplBridge::Query>(completer.ToAsync()));
   }
   void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
     bridge_client_->QueryMacSublayerSupport().ThenExactlyOnce(
         ForwardResult<WlanFullmacImplBridge::QueryMacSublayerSupport>(completer.ToAsync()));
   }
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
     bridge_client_->QuerySecuritySupport().ThenExactlyOnce(
         ForwardResult<WlanFullmacImplBridge::QuerySecuritySupport>(completer.ToAsync()));
   }
   void QuerySpectrumManagementSupport(
       QuerySpectrumManagementSupportCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
     bridge_client_->QuerySpectrumManagementSupport().ThenExactlyOnce(
         ForwardResult<WlanFullmacImplBridge::QuerySpectrumManagementSupport>(completer.ToAsync()));
   }
   void StartScan(StartScanRequest& request, StartScanCompleter::Sync& completer) override {}
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
     bridge_client_->Connect(request).ThenExactlyOnce(
         ForwardResult<WlanFullmacImplBridge::Connect>(completer.ToAsync()));
   }
@@ -219,6 +232,7 @@ class TestController : public fdf::DriverBase,
   }
 
   zx::result<> Start() override {
+    WLAN_TRACE_DURATION();
     node_.Bind(std::move(node()));
     fidl::Arena arena;
 
@@ -252,9 +266,11 @@ class TestController : public fdf::DriverBase,
 
   void CreateFullmac(CreateFullmacRequest& request,
                      CreateFullmacCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
     auto protocol_handler =
         [this, bridge_client = std::move(request.bridge_client())](
             fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) mutable {
+          WLAN_LAMBDA_TRACE_DURATION("WlanFullmacImpl::Service protocol handler");
           auto impl = std::make_unique<WlanFullmacImplToChannelBridge>(
               driver_dispatcher()->get(), std::move(server_end), std::move(bridge_client));
           fullmac_bridges_.push_back(std::move(impl));

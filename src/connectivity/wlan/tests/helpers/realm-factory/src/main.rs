@@ -80,6 +80,11 @@ async fn create_realm(mut options: RealmOptions) -> Result<RealmInstance, Error>
         match topology {
             Topology::DriversOnly(config, ..) => {
                 builder.driver_test_realm_setup().await?;
+                setup_trace_manager(
+                    &builder,
+                    vec![Ref::child(fuchsia_driver_test::COMPONENT_NAME)],
+                )
+                .await?;
                 let realm = builder.build().await?;
                 let driver_config = config.driver_config.ok_or(format_err!(
                     "DriversOnly topology requires driver_config, but none found"
@@ -148,11 +153,40 @@ async fn start_and_connect_to_driver_test_realm(
     Ok(())
 }
 
-async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> Result<(), Error> {
-    // Create child components.
+// Adds trace_manager to the test realm and routes `fuchsia.tracing.provider.Registry` to
+// |tracing_consumers| and `fuchsia.tracing.controller.Controller to the parent component.
+async fn setup_trace_manager(
+    builder: &RealmBuilder,
+    tracing_consumers: Vec<Ref>,
+) -> Result<(), Error> {
     let trace_manager =
         builder.add_child("trace_manager", "#meta/trace_manager.cm", ChildOptions::new()).await?;
 
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.tracing.controller.Controller"))
+                .from(&trace_manager)
+                .to(Ref::parent()),
+        )
+        .await?;
+
+    for consumer in tracing_consumers {
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry"))
+                    .from(&trace_manager)
+                    .to(consumer),
+            )
+            .await?;
+    }
+
+    Ok(())
+}
+
+async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> Result<(), Error> {
+    // Create child components.
     let wlandevicemonitor = builder
         .add_child("wlandevicemonitor", "#meta/wlandevicemonitor.cm", ChildOptions::new())
         .await?;
@@ -163,6 +197,17 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
         builder.add_child("wlancfg", "#meta/wlancfg.cm", ChildOptions::new().eager()).await?;
 
     let stash = builder.add_child("stash", "#meta/stash_secure.cm", ChildOptions::new()).await?;
+
+    setup_trace_manager(
+        &builder,
+        vec![
+            Ref::child(fuchsia_driver_test::COMPONENT_NAME),
+            (&wlancfg).into(),
+            (&wlandevicemonitor).into(),
+            (&stash).into(),
+        ],
+    )
+    .await?;
 
     // Configure components
     let use_legacy_privacy = config.use_legacy_privacy.unwrap_or(false);
@@ -218,27 +263,6 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
                     "fuchsia.wlan.device.service.DeviceMonitor",
                 ))
                 .from(&wlandevicemonitor)
-                .to(Ref::parent()),
-        )
-        .await?;
-
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry"))
-                .from(&trace_manager)
-                .to(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
-                .to(&wlancfg)
-                .to(&wlandevicemonitor)
-                .to(&stash),
-        )
-        .await?;
-
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.tracing.controller.Controller"))
-                .from(&trace_manager)
                 .to(Ref::parent()),
         )
         .await?;
