@@ -42,6 +42,10 @@ def main():
 
     app_file = args.out
     app_path = os.path.dirname(app_file)
+    if app_path == "":
+        # This script is intended for non-device tests, which do not sit
+        # in the root of the output directory. Get that out of the way here.
+        raise ValueError("empty directory for --out parameter is not expected")
     if not os.path.exists(app_path):
         os.makedirs(app_path)
 
