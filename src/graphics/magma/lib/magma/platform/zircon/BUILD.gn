@@ -272,6 +272,12 @@ source_set("logger_for_dfv2") {
   ]
 }
 
+source_set("logger_for_stderr") {
+  public_deps = [ "..:logger_header" ]
+
+  sources = [ "zircon_platform_logger_stderr.cc" ]
+}
+
 source_set("object") {
   configs += [ "..:platform_include_config" ]
 
