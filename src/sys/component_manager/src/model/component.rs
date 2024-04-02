@@ -655,7 +655,8 @@ impl ComponentInstance {
                 let mut entries = dict.lock_entries();
                 std::mem::replace(&mut *entries, std::collections::BTreeMap::new())
             };
-            let mut child_dict_entries = child_input.capabilities.lock_entries();
+            let capabilities = child_input.capabilities();
+            let mut child_dict_entries = capabilities.lock_entries();
             for (key, value) in dict_entries.into_iter() {
                 // The child/collection Dict normally contains Routers created by component manager.
                 // ChildArgs.dict may contain capabilities created by an external client.
@@ -2164,7 +2165,7 @@ impl ResolvedInstanceState {
             None,
             None,
             None,
-            ComponentInput::empty(),
+            ComponentInput::default(),
         )
         .await
         .map(|_| ())
@@ -3383,7 +3384,7 @@ pub mod tests {
             resolved_component,
             ComponentAddress::from(&comp.component_url, &comp).await.unwrap(),
             Default::default(),
-            ComponentInput::empty(),
+            Default::default(),
         )
         .await
         .unwrap();
@@ -3391,7 +3392,7 @@ pub mod tests {
     }
 
     async fn new_unresolved() -> InstanceState {
-        InstanceState::Unresolved(UnresolvedInstanceState::new(ComponentInput::empty()))
+        InstanceState::Unresolved(UnresolvedInstanceState::new(ComponentInput::default()))
     }
 
     #[fuchsia::test]

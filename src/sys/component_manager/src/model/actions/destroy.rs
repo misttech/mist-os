@@ -52,7 +52,7 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
     // Require the component to be discovered before deleting it so a Destroyed event is
     // always preceded by a Discovered.
     // TODO: wait for a discover, don't register a new one
-    ActionSet::register(component.clone(), DiscoverAction::new(ComponentInput::empty())).await?;
+    ActionSet::register(component.clone(), DiscoverAction::new(ComponentInput::default())).await?;
 
     // For destruction to behave correctly, the component has to be shut down first.
     // NOTE: This will recursively shut down the whole subtree. If this component has children,
@@ -357,7 +357,7 @@ pub mod tests {
             .await
             .expect("subscribe to event stream");
         let model = test.model.clone();
-        fasync::Task::spawn(async move { model.start(ComponentInput::empty()).await }).detach();
+        fasync::Task::spawn(async move { model.start(ComponentInput::default()).await }).detach();
         event_stream
     }
 
@@ -370,7 +370,7 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        test.model.start(ComponentInput::empty()).await;
+        test.model.start(ComponentInput::default()).await;
 
         let component_root = test.model.root().clone();
         let component_a = match *component_root.lock_state().await {
@@ -465,7 +465,7 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        test.model.start(ComponentInput::empty()).await;
+        test.model.start(ComponentInput::default()).await;
 
         let component_root = test.model.root().clone();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;

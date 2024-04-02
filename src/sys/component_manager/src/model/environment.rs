@@ -300,7 +300,7 @@ mod tests {
             )
             .await
             .unwrap();
-            model.discover_root_component(ComponentInput::empty()).await;
+            model.discover_root_component(ComponentInput::default()).await;
             assert_matches!(
                 model.root().resolve().await,
                 Err(ActionError::ResolveError {
@@ -382,7 +382,7 @@ mod tests {
         )
         .await
         .unwrap();
-        model.discover_root_component(ComponentInput::empty()).await;
+        model.discover_root_component(ComponentInput::default()).await;
         let component = model
             .root()
             .start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager)
@@ -486,7 +486,7 @@ mod tests {
             InstanceRegistry::new(),
         )
         .await?;
-        model.discover_root_component(ComponentInput::empty()).await;
+        model.discover_root_component(ComponentInput::default()).await;
         let component = model
             .root()
             .start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager)
@@ -617,7 +617,7 @@ mod tests {
             InstanceRegistry::new(),
         )
         .await?;
-        model.discover_root_component(ComponentInput::empty()).await;
+        model.discover_root_component(ComponentInput::default()).await;
         // Add instance to collection.
         {
             let parent = model
@@ -727,7 +727,7 @@ mod tests {
         )
         .await
         .unwrap();
-        model.discover_root_component(ComponentInput::empty()).await;
+        model.discover_root_component(ComponentInput::default()).await;
 
         let component = model
             .root()
@@ -804,7 +804,7 @@ mod tests {
             InstanceRegistry::new(),
         )
         .await?;
-        model.discover_root_component(ComponentInput::empty()).await;
+        model.discover_root_component(ComponentInput::default()).await;
         assert_matches!(
             model
                 .root()

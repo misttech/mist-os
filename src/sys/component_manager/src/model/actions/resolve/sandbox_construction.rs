@@ -24,6 +24,7 @@ use {
     fidl_fuchsia_component_decl as fdecl,
     futures::FutureExt,
     itertools::Itertools,
+    lazy_static::lazy_static,
     moniker::{ChildName, ChildNameBase, MonikerBase},
     sandbox::{Capability, Dict, Unit},
     std::{collections::HashMap, sync::Arc},
@@ -31,36 +32,37 @@ use {
     vfs::execution_scope::ExecutionScope,
 };
 
-/// The dicts a component receives from its parent.
-#[derive(Default, Clone)]
-pub struct ComponentInput {
-    /// Capabilities offered to a component by its parent.
-    pub capabilities: Dict,
+// Dictionary keys for different kinds of sandboxes.
+lazy_static! {
+    /// Dictionary of capabilities from the parent.
+    static ref PARENT: Name = "parent".parse().unwrap();
 
-    /// Capabilities available to a component through its environment.
-    pub environment: ComponentEnvironment,
+    /// Dictionary of capabilities from a component's environment.
+    static ref ENVIRONMENT: Name = "environment".parse().unwrap();
+
+    /// Dictionary of debug capabilities in a component's environment.
+    static ref DEBUG: Name = "debug".parse().unwrap();
+}
+
+/// Contains the capabilities component receives from its parent and environment. Stored as a
+/// [Dict] containing two nested [Dict]s for the parent and environment.
+#[derive(Clone, Debug)]
+pub struct ComponentInput(Dict);
+
+impl Default for ComponentInput {
+    fn default() -> Self {
+        Self::new(ComponentEnvironment::new())
+    }
 }
 
 impl ComponentInput {
-    pub fn empty() -> Self {
-        Self::default()
-    }
-
-    pub fn new(
-        capabilities: Dict,
-        default_environment: &ComponentEnvironment,
-        environments: &HashMap<Name, ComponentEnvironment>,
-        environment_name: Option<Name>,
-    ) -> Self {
-        let environment = if let Some(environment_name) = environment_name {
-            environments
-                .get(&environment_name)
-                .expect("child references nonexistent environment, this should be prevented in manifest validation")
-                .clone()
-        } else {
-            default_environment.clone()
-        };
-        Self { capabilities, environment }
+    pub fn new(environment: ComponentEnvironment) -> Self {
+        let dict = Dict::new();
+        let mut entries = dict.lock_entries();
+        entries.insert(PARENT.clone(), Dict::new().into());
+        entries.insert(ENVIRONMENT.clone(), Dict::from(environment).into());
+        drop(entries);
+        Self(dict)
     }
 
     /// Creates a new ComponentInput with entries cloned from this ComponentInput.
@@ -68,26 +70,55 @@ impl ComponentInput {
     /// This is a shallow copy. Values are cloned, not copied, so are new references to the same
     /// underlying data.
     pub fn shallow_copy(&self) -> Self {
-        Self {
-            capabilities: self.capabilities.copy(),
-            environment: self.environment.shallow_copy(),
-        }
+        // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
+        // [Dict::copy] only goes one level deep and we want to copy the contents of the
+        // inner sandboxes.
+        let dict = Dict::new();
+        let mut entries = dict.lock_entries();
+        entries.insert(PARENT.clone(), self.capabilities().shallow_copy().into());
+        entries.insert(ENVIRONMENT.clone(), Dict::from(self.environment()).shallow_copy().into());
+        drop(entries);
+        Self(dict)
     }
 
-    pub fn environment(&self) -> &ComponentEnvironment {
-        &self.environment
+    /// Returns the sub-dictionary containing capabilities routed by the component's parent.
+    pub fn capabilities(&self) -> Dict {
+        let entries = self.0.lock_entries();
+        let cap = entries.get(&*PARENT).unwrap();
+        let Capability::Dictionary(dict) = cap else {
+            unreachable!("parent entry must be a dict: {cap:?}");
+        };
+        dict.clone()
+    }
+
+    /// Returns the sub-dictionary containing capabilities routed by the component's environment.
+    pub fn environment(&self) -> ComponentEnvironment {
+        let entries = self.0.lock_entries();
+        let cap = entries.get(&*ENVIRONMENT).unwrap();
+        let Capability::Dictionary(dict) = cap else {
+            unreachable!("environment entry must be a dict: {cap:?}");
+        };
+        ComponentEnvironment(dict.clone())
     }
 
     pub fn insert_capability(&self, path: &impl IterablePath, capability: Capability) {
-        self.capabilities.insert_capability(path, capability.into())
+        self.capabilities().insert_capability(path, capability.into())
     }
 }
 
-/// The capabilities a component has in its environment.
-#[derive(Default, Clone)]
-pub struct ComponentEnvironment {
-    /// Capabilities listed in the `debug_capabilities` portion of its environment.
-    debug_capabilities: Dict,
+/// The capabilities a component has in its environment. Stored as a [Dict] containing a nested
+/// [Dict] holding the environment's debug capabilities.
+#[derive(Clone, Debug)]
+pub struct ComponentEnvironment(Dict);
+
+impl Default for ComponentEnvironment {
+    fn default() -> Self {
+        let dict = Dict::new();
+        let mut entries = dict.lock_entries();
+        entries.insert(DEBUG.clone(), Dict::new().into());
+        drop(entries);
+        Self(dict)
+    }
 }
 
 impl ComponentEnvironment {
@@ -95,8 +126,31 @@ impl ComponentEnvironment {
         Self::default()
     }
 
+    /// Capabilities listed in the `debug_capabilities` portion of its environment.
+    pub fn debug(&self) -> Dict {
+        let entries = self.0.lock_entries();
+        let cap = entries.get(&*DEBUG).unwrap();
+        let Capability::Dictionary(dict) = cap else {
+            unreachable!("debug entry must be a dict: {cap:?}");
+        };
+        dict.clone()
+    }
+
     pub fn shallow_copy(&self) -> Self {
-        Self { debug_capabilities: self.debug_capabilities.copy() }
+        // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
+        // [Dict::copy] only goes one level deep and we want to copy the contents of the
+        // inner sandboxes.
+        let dict = Dict::new();
+        let mut entries = dict.lock_entries();
+        entries.insert(DEBUG.clone(), self.debug().shallow_copy().into());
+        drop(entries);
+        Self(dict)
+    }
+}
+
+impl From<ComponentEnvironment> for Dict {
+    fn from(e: ComponentEnvironment) -> Self {
+        e.0
     }
 }
 
@@ -131,35 +185,36 @@ pub fn build_component_sandbox(
     }
 
     for child in &decl.children {
-        let mut input = ComponentInput::empty();
-        if let Some(environment_name) = &child.environment {
-            input.environment = environments
-                .get(&Name::new(environment_name.clone()).unwrap())
+        let environment;
+        if let Some(environment_name) = child.environment.as_ref() {
+            environment = environments
+                .get(&Name::new(environment_name).unwrap())
                 .expect(
                     "child references nonexistent environment, \
                     this should be prevented in manifest validation",
                 )
                 .clone();
         } else {
-            input.environment = component_input.environment.clone();
+            environment = component_input.environment();
         }
-        let child_name = Name::new(&child.name).unwrap();
-        child_inputs.insert(child_name, input);
+        let input = ComponentInput::new(environment);
+        child_inputs.insert(Name::new(&child.name).unwrap(), input);
     }
 
     for collection in &decl.collections {
-        let mut input = ComponentInput::empty();
-        if let Some(environment_name) = &collection.environment {
-            input.environment = environments
-                .get(&Name::new(environment_name.clone()).unwrap())
+        let environment;
+        if let Some(environment_name) = collection.environment.as_ref() {
+            environment = environments
+                .get(&Name::new(environment_name).unwrap())
                 .expect(
                     "collection references nonexistent environment, \
                     this should be prevented in manifest validation",
                 )
                 .clone();
         } else {
-            input.environment = component_input.environment.clone();
+            environment = component_input.environment();
         }
+        let input = ComponentInput::new(environment);
         collection_inputs.insert(collection.name.clone(), input);
     }
 
@@ -192,32 +247,26 @@ pub fn build_component_sandbox(
         if !is_supported_offer(offer) {
             continue;
         }
-        let mut _placeholder_dict = None;
-        let target_dict = match offer.target() {
+        let mut target_dict = match offer.target() {
             cm_rust::OfferTarget::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
                 let child_name = Name::new(&child_ref.name).unwrap();
-                &mut child_inputs.entry(child_name).or_insert(ComponentInput::empty()).capabilities
+                child_inputs.entry(child_name).or_insert(ComponentInput::default()).capabilities()
             }
-            cm_rust::OfferTarget::Collection(name) => {
-                &mut collection_inputs
-                    .entry(name.clone())
-                    .or_insert(ComponentInput::empty())
-                    .capabilities
-            }
+            cm_rust::OfferTarget::Collection(name) => collection_inputs
+                .entry(name.clone())
+                .or_insert(ComponentInput::default())
+                .capabilities(),
             cm_rust::OfferTarget::Capability(name) => {
                 let mut entries = declared_dictionaries.lock_entries();
-                _placeholder_dict = Some(
-                    entries
-                        .entry(name.clone())
-                        .or_insert_with(|| Capability::Dictionary(Dict::new()))
-                        .clone(),
-                );
-                let ref_: &mut Dict = match _placeholder_dict.as_mut().unwrap() {
-                    Capability::Dictionary(d) => d,
-                    _ => panic!("wrong type in dict"),
+                let dict = entries
+                    .entry(name.clone())
+                    .or_insert_with(|| Capability::Dictionary(Dict::new()))
+                    .clone();
+                let Capability::Dictionary(dict) = dict else {
+                    panic!("wrong type in dict");
                 };
-                ref_
+                dict
             }
         };
         extend_dict_with_offer(
@@ -226,7 +275,7 @@ pub fn build_component_sandbox(
             component_input,
             program_output_dict,
             offer,
-            target_dict,
+            &mut target_dict,
         );
     }
 
@@ -308,14 +357,15 @@ fn extend_dict_with_dictionary(
             .as_ref()
             .expect("source_dictionary must be set if source is set");
         let source_dict_router = match &source {
-            cm_rust::DictionarySource::Parent => component_input.capabilities.get_router_or_error(
-                source_path,
-                RoutingError::use_from_parent_not_found(
-                    &component.moniker,
-                    source_path.iter_segments().join("/"),
+            cm_rust::DictionarySource::Parent => {
+                component_input.capabilities().get_router_or_error(
+                    source_path,
+                    RoutingError::use_from_parent_not_found(
+                        &component.moniker,
+                        source_path.iter_segments().join("/"),
+                    ),
                 )
-                .into(),
-            ),
+            }
             cm_rust::DictionarySource::Self_ => program_output_dict.get_router_or_error(
                 source_path,
                 RoutingError::use_from_self_not_found(
@@ -362,7 +412,7 @@ fn build_environment(
 ) -> ComponentEnvironment {
     let mut environment = ComponentEnvironment::new();
     if environment_decl.extends == fdecl::EnvironmentExtends::Realm {
-        environment = component_input.environment.shallow_copy();
+        environment = component_input.environment().shallow_copy();
     }
     for debug_registration in &environment_decl.debug_capabilities {
         let cm_rust::DebugRegistration::Protocol(debug_protocol) = debug_registration;
@@ -397,9 +447,7 @@ fn build_environment(
                 )
             }
         };
-        environment
-            .debug_capabilities
-            .insert_capability(&debug_protocol.target_name, router.into());
+        environment.debug().insert_capability(&debug_protocol.target_name, router.into());
     }
     environment
 }
@@ -470,7 +518,7 @@ pub fn extend_dict_with_offers(
             component_input,
             program_output_dict,
             offer,
-            &mut target_input.capabilities,
+            &mut target_input.capabilities(),
         );
     }
 }
@@ -554,16 +602,14 @@ fn extend_dict_with_use(
             )
             .into_router()
         }
-        cm_rust::UseSource::Debug => {
-            component_input.environment.debug_capabilities.get_router_or_error(
+        cm_rust::UseSource::Debug => component_input.environment().debug().get_router_or_error(
+            &use_protocol.source_name,
+            RoutingError::use_from_environment_not_found(
+                &component.moniker,
+                "protocol",
                 &use_protocol.source_name,
-                RoutingError::use_from_environment_not_found(
-                    &component.moniker,
-                    "protocol",
-                    &use_protocol.source_name,
-                ),
-            )
-        }
+            ),
+        ),
         // UseSource::Environment is not used for protocol capabilities
         cm_rust::UseSource::Environment => return,
     };
@@ -582,7 +628,7 @@ fn use_from_parent_router(
     source_path: impl IterablePath + 'static,
     weak_component: WeakComponentInstance,
 ) -> Router {
-    let component_input_capability = component_input.capabilities.get_router_or_error(
+    let component_input_capability = component_input.capabilities().get_router_or_error(
         &source_path,
         RoutingError::use_from_parent_not_found(
             &weak_component.moniker,
@@ -668,7 +714,7 @@ fn extend_dict_with_offer(
         return;
     }
     let router = match offer.source() {
-        cm_rust::OfferSource::Parent => component_input.capabilities.get_router_or_error(
+        cm_rust::OfferSource::Parent => component_input.capabilities().get_router_or_error(
             &source_path,
             RoutingError::offer_from_parent_not_found(
                 &component.moniker,

@@ -165,7 +165,7 @@ pub mod tests {
                 .await
                 .unwrap();
 
-        model.start(ComponentInput::empty()).await;
+        model.start(ComponentInput::default()).await;
     }
 
     #[fuchsia::test]
@@ -214,7 +214,7 @@ pub mod tests {
             )])
             .await;
 
-        model.start(ComponentInput::empty()).await;
+        model.start(ComponentInput::default()).await;
     }
 
     #[should_panic]
@@ -230,6 +230,6 @@ pub mod tests {
         let TestModelResult { model, .. } =
             TestEnvironmentBuilder::new().set_components(components).build().await;
 
-        model.start(ComponentInput::empty()).await;
+        model.start(ComponentInput::default()).await;
     }
 }

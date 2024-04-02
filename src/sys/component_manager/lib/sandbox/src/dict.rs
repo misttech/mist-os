@@ -94,7 +94,7 @@ impl Dict {
     ///
     /// This is a shallow copy. Values are cloned, not copied, so are new references to the same
     /// underlying data.
-    pub fn copy(&self) -> Self {
+    pub fn shallow_copy(&self) -> Self {
         let copy = Dict::new();
         copy.lock_entries().clone_from(&self.lock_entries());
         copy
@@ -168,7 +168,7 @@ impl Dict {
                     let server_end: ServerEnd<fsandbox::DictionaryMarker> =
                         request.into_channel().into();
                     let stream = server_end.into_stream().unwrap();
-                    self.copy().serve_and_register(stream, koid);
+                    self.shallow_copy().serve_and_register(stream, koid);
                 }
                 fsandbox::DictionaryRequest::Enumerate { contents: server_end, .. } => {
                     let items = self
@@ -541,7 +541,7 @@ mod tests {
         let dict = Dict::new();
         dict.lock_entries().insert("unit1".parse().unwrap(), Capability::Unit(Unit::default()));
 
-        let copy = dict.copy();
+        let copy = dict.shallow_copy();
 
         // Insert a Unit into the copy.
         copy.lock_entries().insert("unit2".parse().unwrap(), Capability::Unit(Unit::default()));

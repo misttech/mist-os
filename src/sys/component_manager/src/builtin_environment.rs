@@ -387,7 +387,7 @@ impl RootComponentInputBuilder {
         runtime_config: &Arc<RuntimeConfig>,
     ) -> Self {
         Self {
-            input: ComponentInput::empty(),
+            input: ComponentInput::default(),
             top_instance,
             policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
             builtin_capabilities: runtime_config.builtin_capabilities.clone(),

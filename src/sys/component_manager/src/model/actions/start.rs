@@ -990,7 +990,7 @@ mod tests {
         // Checks based on InstanceState:
         assert!(should_return_early(&InstanceState::New, &es, &m).is_none());
         assert!(should_return_early(
-            &InstanceState::Unresolved(UnresolvedInstanceState::new(ComponentInput::empty())),
+            &InstanceState::Unresolved(UnresolvedInstanceState::new(ComponentInput::default())),
             &es,
             &m
         )
@@ -1014,7 +1014,7 @@ mod tests {
             resolved_component,
             ComponentAddress::from_absolute_url(&child.component_url).unwrap(),
             Default::default(),
-            ComponentInput::empty(),
+            ComponentInput::default(),
         )
         .await
         .unwrap();
