@@ -45,6 +45,7 @@ class _Sl4fMethods(enum.StrEnum):
     GET_PHY_ID_LIST = "wlan.get_phy_id_list"
     QUERY_IFACE = "wlan.query_iface"
     SCAN_FOR_BSS_INFO = "wlan.scan_for_bss_info"
+    SET_REGION = "wlan.set_region"
     STATUS = "wlan.status"
 
 
@@ -302,6 +303,18 @@ class Wlan(wlan.Wlan):
             bss_descriptions[key] = bss_block
 
         return bss_descriptions
+
+    def set_region(self, region_code: str) -> None:
+        """Set regulatory region.
+
+        Args:
+            region_code: 2-byte ASCII string.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+        """
+        method_params = {"region_code": region_code}
+        self._sl4f.run(method=_Sl4fMethods.SET_REGION, params=method_params)
 
     def status(self) -> ClientStatusResponse:
         """Request connection status

@@ -112,6 +112,14 @@ class Wlan(abc.ABC):
         """
 
     @abc.abstractmethod
+    def set_region(self, region_code: str) -> None:
+        """Set regulatory region.
+
+        Args:
+            region_code: 2-byte ASCII string.
+        """
+
+    @abc.abstractmethod
     def status(self) -> ClientStatusResponse:
         """Request client state and network status.
 

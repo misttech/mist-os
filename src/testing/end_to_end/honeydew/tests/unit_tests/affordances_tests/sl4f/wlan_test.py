@@ -271,6 +271,11 @@ class WlanSL4FTests(unittest.TestCase):
             self.wlan_obj.scan_for_bss_info()
         self.sl4f_obj.run.assert_called()
 
+    def test_set_region_success(self) -> None:
+        """Test for Wlan.set_region()."""
+        self.wlan_obj.set_region("US")
+        self.sl4f_obj.run.assert_called()
+
     def test_status_success(self) -> None:
         """Test for Wlan.status()."""
         self.sl4f_obj.run.return_value = {
