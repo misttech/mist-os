@@ -487,6 +487,8 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
         const fuchsia_power_broker::LeaseStatus lease_status = result->status;
         switch (lease_status) {
           case fuchsia_power_broker::LeaseStatus::kSatisfied: {
+            const zx::time start = zx::clock::get_monotonic();
+
             fbl::AutoLock lock(&lock_);
             // Actually raise the hardware's power level.
             zx_status_t status = ResumePower();
@@ -498,6 +500,9 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
             last_lease_status = lease_status;
             // Communicate to Power Broker that the hardware power level has been raised.
             UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOn);
+
+            const zx::duration duration = zx::clock::get_monotonic() - start;
+            inspect_.wake_on_request_latency_us.Insert(duration.to_usecs());
 
             // Serve delayed requests that were received during power suspension, if any.
             if (delayed_requests_.size()) {
@@ -593,6 +598,10 @@ void AmlSdmmc::Inspect::Init(const pdev_device_info_t& device_info, inspect::Nod
   distance_to_failing_point = root.CreateUint("distance_to_failing_point", 0);
   power_suspended = root.CreateBool("power_suspended", is_power_suspended);
   wake_on_request_count = root.CreateUint("wake_on_request_count", 0);
+  // 14 buckets spanning from 1us to ~8ms.
+  wake_on_request_latency_us = root.CreateExponentialUintHistogram(
+      "wake_on_request_latency_us", /*floor=*/1, /*initial_step=*/1, /*step_multiplier=*/2,
+      /*buckets=*/14);
 }
 
 zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInterrupt(

@@ -190,6 +190,7 @@ class AmlSdmmc : public fdf::DriverBase,
     inspect::UintProperty distance_to_failing_point;
     inspect::BoolProperty power_suspended;
     inspect::UintProperty wake_on_request_count;
+    inspect::ExponentialUintHistogram wake_on_request_latency_us;
 
     void Init(const pdev_device_info_t& device_info, inspect::Node& parent,
               bool is_power_suspended);
