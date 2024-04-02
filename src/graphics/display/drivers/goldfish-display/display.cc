@@ -160,67 +160,6 @@ zx_status_t Display::Bind() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  display::DisplayId next_display_id = kPrimaryDisplayId;
-
-  // Parse optional display params. This is comma seperated list of
-  // display devices. The format is:
-  //
-  // widthxheight[-xpos+ypos][@refresh][%scale]
-  char* flag = getenv("driver.goldfish.displays");
-  if (flag) {
-    std::stringstream devices_stream(flag);
-    std::string device_string;
-    while (std::getline(devices_stream, device_string, ',')) {
-      Device device;
-      char delim = 0;
-      std::stringstream device_stream(device_string);
-      do {
-        switch (delim) {
-          case 0:
-            device_stream >> device.width;
-            break;
-          case 'x':
-            device_stream >> device.height;
-            break;
-          case '-':
-            device_stream >> device.x;
-            break;
-          case '+':
-            device_stream >> device.y;
-            break;
-          case '@':
-            device_stream >> device.refresh_rate_hz;
-            break;
-          case '%':
-            device_stream >> device.scale;
-            break;
-        }
-      } while (device_stream >> delim);
-
-      if (!device.width || !device.height) {
-        zxlogf(ERROR, "%s: skip device=%s, missing size", kTag, device_string.c_str());
-        continue;
-      }
-      if (!device.refresh_rate_hz) {
-        zxlogf(ERROR, "%s: skip device=%s, refresh rate is zero", kTag, device_string.c_str());
-        continue;
-      }
-      if (device.scale < 0.1f || device.scale > 100.f) {
-        zxlogf(ERROR, "%s: skip device=%s, scale is not in range 0.1-100", kTag,
-               device_string.c_str());
-        continue;
-      }
-
-      auto& new_device = devices_[next_display_id++];
-      new_device.width = device.width;
-      new_device.height = device.height;
-      new_device.x = device.x;
-      new_device.y = device.y;
-      new_device.refresh_rate_hz = device.refresh_rate_hz;
-      new_device.scale = device.scale;
-    }
-  }
-
   // Create primary device if needed.
   if (devices_.empty()) {
     auto& device = devices_[kPrimaryDisplayId];
