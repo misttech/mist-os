@@ -4,7 +4,6 @@
 {
     include: [
         "//sdk/lib/sys/component/realm_builder.shard.cml",
-        "//src/sys/test_runners/tmp_storage.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
@@ -13,7 +12,9 @@
         binary: "bin/diagnostics_detect_realm_factory_bin",
     },
     capabilities: [
-        { protocol: "test.detect.factory.RealmFactory" },
+        {
+            protocol: [ "test.detect.factory.RealmFactory" ],
+        },
     ],
     use: [
         {
@@ -23,7 +24,7 @@
     ],
     expose: [
         {
-            protocol: "test.detect.factory.RealmFactory",
+            protocol: [ "test.detect.factory.RealmFactory" ],
             from: "self",
         },
     ],

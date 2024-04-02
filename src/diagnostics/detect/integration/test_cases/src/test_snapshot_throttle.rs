@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use super::{TestData, TestEvent};
+use std::time::Duration;
 
 const INSPECT: &str = r#"
 [
@@ -41,7 +42,7 @@ const TRIAGE_CONFIG: &str = r#"
         fire_rarely: {
             trigger: "widgets > 2",
             type: "Snapshot",
-            repeat: "Seconds(6)",
+            repeat: "Seconds(9)",
             signature: "rarely"
         }
     }
@@ -55,34 +56,50 @@ pub(crate) fn test() -> TestData {
         .add_inspect_data(INSPECT)
         .set_program_config("{enable_filing: true}")
         .add_triage_config(TRIAGE_CONFIG)
-        .expect_events(vec![
-            TestEvent::OnCrashReportingProductRegistration {
-                product_name: "FuchsiaDetect".to_string(),
-                program_name: "triage_detect".to_string(),
-            },
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnCrashReport {
-                crash_signature: "fuchsia-detect-frequently".to_string(),
-                crash_program_name: "triage_detect".to_string(),
-            },
-            TestEvent::OnCrashReport {
-                crash_signature: "fuchsia-detect-rarely".to_string(),
-                crash_program_name: "triage_detect".to_string(),
-            },
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnCrashReport {
-                crash_signature: "fuchsia-detect-frequently".to_string(),
-                crash_program_name: "triage_detect".to_string(),
-            },
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnCrashReport {
-                crash_signature: "fuchsia-detect-frequently".to_string(),
-                crash_program_name: "triage_detect".to_string(),
-            },
-            TestEvent::OnCrashReport {
-                crash_signature: "fuchsia-detect-rarely".to_string(),
-                crash_program_name: "triage_detect".to_string(),
-            },
-            TestEvent::OnDiagnosticFetch,
-        ])
+        .events_then_advance(
+            vec![
+                TestEvent::OnCrashReportingProductRegistration {
+                    product_name: "FuchsiaDetect".to_string(),
+                    program_name: "triage_detect".to_string(),
+                },
+                TestEvent::OnDiagnosticFetch,
+                TestEvent::OnCrashReport {
+                    crash_signature: "fuchsia-detect-frequently".to_string(),
+                    crash_program_name: "triage_detect".to_string(),
+                },
+                TestEvent::OnCrashReport {
+                    crash_signature: "fuchsia-detect-rarely".to_string(),
+                    crash_program_name: "triage_detect".to_string(),
+                },
+            ],
+            Duration::from_secs(8),
+        )
+        .events_then_advance(
+            vec![
+                TestEvent::OnDiagnosticFetch,
+                TestEvent::OnCrashReport {
+                    crash_signature: "fuchsia-detect-frequently".to_string(),
+                    crash_program_name: "triage_detect".to_string(),
+                },
+            ],
+            Duration::from_secs(5),
+        )
+        .events_then_advance(
+            vec![
+                TestEvent::OnDiagnosticFetch,
+                TestEvent::OnCrashReport {
+                    crash_signature: "fuchsia-detect-frequently".to_string(),
+                    crash_program_name: "triage_detect".to_string(),
+                },
+                TestEvent::OnCrashReport {
+                    crash_signature: "fuchsia-detect-rarely".to_string(),
+                    crash_program_name: "triage_detect".to_string(),
+                },
+            ],
+            Duration::from_secs(5),
+        )
+        .events_then_advance(
+            vec![TestEvent::OnDiagnosticFetch, TestEvent::OnDone],
+            Duration::from_secs(5),
+        )
 }

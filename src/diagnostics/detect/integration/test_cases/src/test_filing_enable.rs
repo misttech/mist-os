@@ -41,6 +41,7 @@ pub(crate) fn test_with_enable() -> TestData {
                 crash_program_name: "triage_detect".to_string(),
             },
             TestEvent::OnDiagnosticFetch,
+            TestEvent::OnDone,
         ])
 }
 
@@ -64,6 +65,7 @@ pub(crate) fn test_false_enable() -> TestData {
             },
             TestEvent::OnDiagnosticFetch,
             TestEvent::OnDiagnosticFetch,
+            TestEvent::OnDone,
         ])
 }
 
@@ -79,6 +81,7 @@ pub(crate) fn test_no_enable() -> TestData {
             },
             TestEvent::OnDiagnosticFetch,
             TestEvent::OnDiagnosticFetch,
+            TestEvent::OnDone,
         ])
 }
 
@@ -93,5 +96,6 @@ pub(crate) fn test_without_file() -> TestData {
             },
             TestEvent::OnDiagnosticFetch,
             TestEvent::OnDiagnosticFetch,
+            TestEvent::OnDone,
         ])
 }

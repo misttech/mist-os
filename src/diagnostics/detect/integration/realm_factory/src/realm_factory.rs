@@ -65,7 +65,8 @@ impl RealmFactory {
         self.events_client.replace(client);
 
         let builder = RealmBuilder::new().await?;
-        let detect = builder.add_child("detect", DETECT_URL, ChildOptions::new().eager()).await?;
+        // Instead of starting eagerly, we'll start with DetectBinder the way it's started in products.
+        let detect = builder.add_child("detect", DETECT_URL, ChildOptions::new()).await?;
 
         let options = RealmOptions::from(options);
         // This is necessary because add_local_child takes a Fn rather than FnOnce, so we cannot move
@@ -77,6 +78,37 @@ impl RealmFactory {
                 |handles| async move { serve_mocks(options, event_sender.clone(), handles).await };
             Arc::new(Mutex::new(Some(closure)))
         };
+
+        let fake_clock = builder
+            .add_child("fake_clock", "fake_clock#meta/fake_clock.cm", ChildOptions::new())
+            .await?;
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("fuchsia.testing.FakeClock"))
+                    .from(&fake_clock)
+                    .to(&detect),
+            )
+            .await?;
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("fuchsia.testing.FakeClockControl"))
+                    .from(&fake_clock)
+                    .to(Ref::parent()),
+            )
+            .await?;
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::protocol_by_name("fuchsia.component.Binder")
+                            .as_("fuchsia.component.DetectBinder"),
+                    )
+                    .from(&detect)
+                    .to(Ref::parent()),
+            )
+            .await?;
 
         let mocks = builder
             .add_local_child(
@@ -121,7 +153,6 @@ impl RealmFactory {
                     .to(&mocks),
             )
             .await?;
-
         let realm = builder.build().await?;
 
         // Notify the test when triage-detect terminates.

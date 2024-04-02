@@ -19,13 +19,19 @@
  *  report requests sent between each fetch of Diagnostic data. Order of the inner vector does
  *  not matter, but duplicates do matter.
  */
-use {
-    anyhow::Error, fidl::endpoints::create_endpoints,
-    fidl_fuchsia_testing_harness::RealmProxy_Marker, fidl_test_detect_factory as ftest,
-    fuchsia_component::client::connect_to_protocol, fuchsia_zircon as zx, futures::StreamExt,
-    realm_proxy_client::Error::OperationError, std::cmp::Ordering, test_case::test_case,
-    tracing::*,
-};
+use anyhow::Error;
+use fidl::endpoints;
+// fidl_fuchsia_testing is unrelated to fidl_fuchsia_testing_harness
+use fidl_fuchsia_testing::{self as fake_clock_fidl, Increment};
+use fidl_fuchsia_testing_harness::{self as ffth, RealmProxy_Marker};
+use fidl_test_detect_factory as ftest;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon as zx;
+use futures::StreamExt;
+use realm_proxy_client::Error::OperationError;
+use std::{cmp::Ordering, time::Duration};
+use test_case::test_case;
+use tracing::*;
 
 // Test that the "repeat" field of snapshots works correctly.
 mod test_snapshot_throttle;
@@ -47,39 +53,74 @@ mod test_snapshot_sanitizing;
 #[fuchsia::test]
 async fn triage_detect_test(test_data: TestData) -> Result<(), Error> {
     info!("running test case {}", test_data.name);
-
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
-    // The realm is disposed once _ignore is dropped.
-    let (_ignore, realm_server) = create_endpoints::<RealmProxy_Marker>();
+    let (realm_proxy, realm_server) =
+        endpoints::create_proxy::<RealmProxy_Marker>().expect("infallible");
     realm_factory
         .create_realm(test_data.realm_options, realm_server)
         .await?
         .map_err(OperationError)?;
+    let (_proxy, server_end) =
+        endpoints::create_proxy::<fidl_fuchsia_component::BinderMarker>().expect("infallible");
+    let _result = realm_proxy
+        .connect_to_named_protocol("fuchsia.component.DetectBinder", server_end.into_channel())
+        .await
+        .expect("connection failed");
 
     let event_proxy = realm_factory.get_triage_detect_events().await?.into_proxy()?;
-    let mut actual_events = drain(event_proxy.take_event_stream()).await;
-    let mut expected_events = test_data.expected_events;
-
-    actual_events.sort_unstable_by(compare_crash_signatures_only);
-    expected_events.sort_unstable_by(compare_crash_signatures_only);
-    assert_events_eq(&expected_events, &actual_events);
+    let mut event_stream = event_proxy.take_event_stream();
+    let fake_clock_control_proxy =
+        connect_into_realm::<fake_clock_fidl::FakeClockControlMarker>(&realm_proxy).await;
+    // If there's only one group of EventsThenAdvance, then this test does not depend on
+    // clock control, but it might depend on a running clock, so leave the clock free-running.
+    let controlled_clock_advance = if test_data.expected_events.len() == 1 {
+        false
+    } else {
+        fake_clock_control_proxy.pause().await.expect("Clock pause");
+        true
+    };
+    for EventsThenAdvance { events, advance } in test_data.expected_events {
+        let mut expected_events = events;
+        let mut actual_events = get_n_events(&mut event_stream, expected_events.len()).await;
+        actual_events.sort_by(compare_crash_signatures_only);
+        expected_events.sort_by(compare_crash_signatures_only);
+        assert_events_eq(&expected_events, &actual_events);
+        if controlled_clock_advance {
+            fake_clock_control_proxy
+                .advance(&Increment::Determined(advance.as_nanos() as i64))
+                .await
+                .expect("Clock advance")
+                .expect("Clock advance args");
+        }
+    }
     Ok(())
 }
 
-async fn drain(mut stream: ftest::TriageDetectEventsEventStream) -> Vec<TestEvent> {
+// May return fewer than requested if OnDone or OnBail is received early, or fail an
+// assert if the stream ends before N events are received.
+async fn get_n_events(
+    stream: &mut ftest::TriageDetectEventsEventStream,
+    n: usize,
+) -> Vec<TestEvent> {
     let mut events = vec![];
-    while let Some(Ok(event)) = stream.next().await {
-        info!("received event: {:?}", event);
-        let event = TestEvent::from(event);
-        match event {
-            TestEvent::OnDone {} => return events,
-            TestEvent::OnBail {} => {
-                // Record the event so tests can assert whether we bailed early.
-                events.push(event);
-                return events;
-            }
-            _ => events.push(event),
-        };
+    for event_index in 0..n {
+        if let Some(Ok(event)) = stream.next().await {
+            let event = TestEvent::from(event);
+            match event {
+                TestEvent::OnDone | TestEvent::OnBail => {
+                    // Record the event so tests can assert whether we bailed early.
+                    events.push(event);
+                    return events;
+                }
+                _ => events.push(event),
+            };
+        } else {
+            // This assert will fail if the stream runs out too soon
+            assert_eq!(
+                n, event_index,
+                "Stream emptied too soon: count expected vs. index where it failed"
+            );
+        }
     }
     events
 }
@@ -113,8 +154,10 @@ fn find_first_different_index(left: &Vec<TestEvent>, right: &Vec<TestEvent>) -> 
 }
 
 // A comparator used to sort test events by crash signature.
-// Subgroups of crash reports that occur between diagnostics fetches are sorted,
-// but fetch events are not sorted. For example: the events
+// Subgroups of crash reports that occur between non-crash-reports (such as diagnostics fetches)
+//   are sorted internally, but the list is not sorted between crash-report subgroups if
+//   the comparator is used in a stable sort.
+// For example: the events
 // {C, A, FETCH, D, B, FETCH, G} are sorted as:
 // {A, C, FETCH, B, D, FETCH, G}.
 fn compare_crash_signatures_only(prev: &TestEvent, next: &TestEvent) -> Ordering {
@@ -136,10 +179,15 @@ pub(crate) fn create_vmo(contents: impl Into<String>) -> zx::Vmo {
     vmo
 }
 
+pub(crate) struct EventsThenAdvance {
+    events: Vec<TestEvent>,
+    advance: Duration,
+}
+
 pub(crate) struct TestData {
     name: String,
     realm_options: ftest::RealmOptions,
-    expected_events: Vec<TestEvent>,
+    expected_events: Vec<EventsThenAdvance>,
 }
 
 impl TestData {
@@ -169,12 +217,17 @@ impl TestData {
     }
 
     pub fn expect_events(mut self, events: Vec<TestEvent>) -> Self {
-        self.expected_events = events;
+        self.expected_events.push(EventsThenAdvance { events, advance: Duration::from_nanos(0) });
+        self
+    }
+
+    pub fn events_then_advance(mut self, events: Vec<TestEvent>, advance: Duration) -> Self {
+        self.expected_events.push(EventsThenAdvance { events, advance });
         self
     }
 }
 
-// An TriageDetectEventsEvent representation that allows us to compare events.
+// A TriageDetectEventsEvent representation that allows us to compare events.
 #[derive(Debug, PartialEq)]
 pub(crate) enum TestEvent {
     OnBail,
@@ -201,4 +254,29 @@ impl From<ftest::TriageDetectEventsEvent> for TestEvent {
             _ => panic!("unknown event {:?}", event),
         }
     }
+}
+
+// This next function is copied from
+// src/sys/time/timekeeper_integration/tests/faketime/integration.rs
+// It should probably be part of the TRF affordances.
+
+/// Connect to the FIDL protocol defined by the marker `T`, which served from
+/// the realm associated with the realm proxy `p`. Since `ConnectToNamedProtocol`
+/// is "stringly typed", this function allows us to use a less error prone protocol
+/// marker instead of a string name.
+async fn connect_into_realm<T>(
+    realm_proxy: &ffth::RealmProxy_Proxy,
+) -> <T as endpoints::ProtocolMarker>::Proxy
+where
+    T: endpoints::ProtocolMarker,
+{
+    let (proxy, server_end) = endpoints::create_proxy::<T>().expect("infallible");
+    let _result = realm_proxy
+        .connect_to_named_protocol(
+            <T as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+            server_end.into_channel(),
+        )
+        .await
+        .expect("connection failed");
+    proxy
 }

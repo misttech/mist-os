@@ -18,7 +18,7 @@
     ],
     offer: [
         {
-            protocol: "test.detect.factory.RealmFactory",
+            protocol: [ "test.detect.factory.RealmFactory" ],
             from: "#realm_factory",
             to: "#test_cases",
         },

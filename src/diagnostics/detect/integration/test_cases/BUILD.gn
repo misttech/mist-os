@@ -7,13 +7,6 @@ import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 
-group("tests") {
-  testonly = true
-
-  # No unit tests here. Integration test enters at this file's package.
-  deps = [ ":pkg" ]
-}
-
 rustc_test("bin") {
   testonly = true
   edition = "2021"
@@ -21,7 +14,11 @@ rustc_test("bin") {
   name = "diagnostics_detect_test_cases_bin"
   deps = [
     "../realm_factory/fidl/test.detect.factory:fidl_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
+
+    # fake-clock/fidl defines library fuchsia.testing, unrelated to fuchsia.testing.harness.
+    "//src/lib/fake-clock/fidl:fidl_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",

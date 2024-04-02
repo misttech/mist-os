@@ -38,15 +38,18 @@ rustc_binary("bin") {
 }
 
 fuchsia_component("component") {
-  component_name = "realm_factory"
   testonly = true
+  component_name = "realm_factory"
   manifest = "meta/realm_factory.cml"
   deps = [ ":bin" ]
 }
 
 fuchsia_package("pkg") {
-  package_name = "diagnostics_detect_realm_factory"
   testonly = true
+  package_name = "diagnostics_detect_realm_factory"
   deps = [ ":component" ]
-  subpackages = [ "../target:pkg" ]
+  subpackages = [
+    "//src/lib/fake-clock/svc:pkg",
+    "../target:pkg",
+  ]
 }

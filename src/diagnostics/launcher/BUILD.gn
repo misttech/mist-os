@@ -6,21 +6,41 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 
+launcher_sources = [ "src/main.rs" ]
+
+launcher_deps = [
+  "//src/diagnostics/detect:lib",
+  "//src/diagnostics/kcounter:lib",
+  "//src/diagnostics/lib/util/v2-argh-wrapper",
+  "//src/diagnostics/persistence:lib",
+  "//src/diagnostics/sampler:lib",
+  "//src/lib/diagnostics/log/rust",
+  "//src/lib/fuchsia",
+  "//third_party/rust_crates:anyhow",
+  "//third_party/rust_crates:argh",
+]
+
 rustc_binary("bin") {
   name = "launcher"
   edition = "2021"
 
-  deps = [
-    "//src/diagnostics/detect:lib",
-    "//src/diagnostics/kcounter:lib",
-    "//src/diagnostics/lib/util/v2-argh-wrapper",
-    "//src/diagnostics/persistence:lib",
-    "//src/diagnostics/sampler:lib",
-    "//src/lib/diagnostics/log/rust",
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:argh",
-  ]
+  deps = launcher_deps
 
-  sources = [ "src/main.rs" ]
+  sources = launcher_sources
+}
+
+# The Detect integration test needs a "with fake time" version of Launcher.
+
+rustc_binary("bin_with_fake_time") {
+  testonly = true
+  name = "launcher_with_fake_time"
+  edition = "2021"
+
+  deps = launcher_deps
+
+  sources = launcher_sources
+
+  non_rust_deps = [ "//src/lib/fake-clock/lib" ]
+
+  visibility = [ "//src/diagnostics/detect/integration/target:*" ]
 }

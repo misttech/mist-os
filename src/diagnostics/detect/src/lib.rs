@@ -34,6 +34,7 @@ const MINIMUM_CHECK_TIME_NANOS: i64 = 60 * 1_000_000_000;
 const CONFIG_GLOB: &str = "/config/data/*.triage";
 const PROGRAM_CONFIG_PATH: &str = "/config/data/config.json";
 const SIGNATURE_PREFIX: &str = "fuchsia-detect-";
+// Minimum time between sending any particular signature (except in test mode)
 const MINIMUM_SIGNATURE_INTERVAL_NANOS: i64 = 3600 * 1_000_000_000;
 
 /// The name of the subcommand and the logs-tag.

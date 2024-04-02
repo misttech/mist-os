@@ -69,5 +69,6 @@ pub(crate) fn test() -> TestData {
                 crash_program_name: "triage_detect".to_string(),
             },
             TestEvent::OnDiagnosticFetch,
+            TestEvent::OnDone,
         ])
 }
