@@ -16,6 +16,9 @@ namespace pwemb = pw::bluetooth::emboss;
 // Android range -70 to +20, select the middle for now
 constexpr int8_t kTransmitPower = -25;
 
+// AndroidExtendedLowEnergyAdvertiser doesn't support extended advertising PDUs
+constexpr bool kUseExtendedPdu = false;
+
 namespace hci_android = hci_spec::vendor::android;
 namespace android_hci = pw::bluetooth::vendor::android_hci;
 
@@ -49,7 +52,7 @@ AndroidExtendedLowEnergyAdvertiser::~AndroidExtendedLowEnergyAdvertiser() {
 EmbossCommandPacket AndroidExtendedLowEnergyAdvertiser::BuildEnablePacket(
     const DeviceAddress& address, pwemb::GenericEnableParam enable) {
   std::optional<hci_spec::AdvertisingHandle> handle =
-      advertising_handle_map_.GetHandle(address);
+      advertising_handle_map_.GetHandle(address, kUseExtendedPdu);
   BT_ASSERT(handle);
 
   auto packet = hci::EmbossCommandPacket::New<
@@ -69,7 +72,7 @@ AndroidExtendedLowEnergyAdvertiser::BuildSetAdvertisingParams(
     pwemb::LEOwnAddressType own_address_type,
     AdvertisingIntervalRange interval) {
   std::optional<hci_spec::AdvertisingHandle> handle =
-      advertising_handle_map_.MapHandle(address);
+      advertising_handle_map_.MapHandle(address, kUseExtendedPdu);
   if (!handle) {
     bt_log(WARN,
            "hci-le",
@@ -106,7 +109,7 @@ AndroidExtendedLowEnergyAdvertiser::BuildSetAdvertisingParams(
 EmbossCommandPacket AndroidExtendedLowEnergyAdvertiser::BuildSetAdvertisingData(
     const DeviceAddress& address, const AdvertisingData& data, AdvFlags flags) {
   std::optional<hci_spec::AdvertisingHandle> handle =
-      advertising_handle_map_.GetHandle(address);
+      advertising_handle_map_.GetHandle(address, kUseExtendedPdu);
   BT_ASSERT(handle);
 
   uint8_t adv_data_length =
@@ -137,7 +140,7 @@ EmbossCommandPacket
 AndroidExtendedLowEnergyAdvertiser::BuildUnsetAdvertisingData(
     const DeviceAddress& address) {
   std::optional<hci_spec::AdvertisingHandle> handle =
-      advertising_handle_map_.GetHandle(address);
+      advertising_handle_map_.GetHandle(address, kUseExtendedPdu);
   BT_ASSERT(handle);
 
   size_t packet_size =
@@ -158,7 +161,7 @@ AndroidExtendedLowEnergyAdvertiser::BuildUnsetAdvertisingData(
 EmbossCommandPacket AndroidExtendedLowEnergyAdvertiser::BuildSetScanResponse(
     const DeviceAddress& address, const AdvertisingData& scan_rsp) {
   std::optional<hci_spec::AdvertisingHandle> handle =
-      advertising_handle_map_.GetHandle(address);
+      advertising_handle_map_.GetHandle(address, kUseExtendedPdu);
   BT_ASSERT(handle);
 
   uint8_t scan_rsp_length = static_cast<uint8_t>(scan_rsp.CalculateBlockSize());
@@ -186,7 +189,7 @@ EmbossCommandPacket AndroidExtendedLowEnergyAdvertiser::BuildSetScanResponse(
 EmbossCommandPacket AndroidExtendedLowEnergyAdvertiser::BuildUnsetScanResponse(
     const DeviceAddress& address) {
   std::optional<hci_spec::AdvertisingHandle> handle =
-      advertising_handle_map_.GetHandle(address);
+      advertising_handle_map_.GetHandle(address, kUseExtendedPdu);
   BT_ASSERT(handle);
 
   size_t packet_size =
@@ -209,7 +212,7 @@ EmbossCommandPacket
 AndroidExtendedLowEnergyAdvertiser::BuildRemoveAdvertisingSet(
     const DeviceAddress& address) {
   std::optional<hci_spec::AdvertisingHandle> handle =
-      advertising_handle_map_.GetHandle(address);
+      advertising_handle_map_.GetHandle(address, kUseExtendedPdu);
   BT_ASSERT(handle);
 
   auto packet = hci::EmbossCommandPacket::New<
@@ -311,7 +314,7 @@ void AndroidExtendedLowEnergyAdvertiser::StopAdvertising(
   }
 
   LowEnergyAdvertiser::StopAdvertisingInternal(address);
-  advertising_handle_map_.RemoveAddress(address);
+  advertising_handle_map_.RemoveAddress(address, kUseExtendedPdu);
 }
 
 void AndroidExtendedLowEnergyAdvertiser::OnIncomingConnection(
