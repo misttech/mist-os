@@ -96,13 +96,7 @@ Display::Display(zx_device_t* parent)
   }
 }
 
-Display::~Display() {
-  loop_.Shutdown();
-
-  for (auto& it : devices_) {
-    TeardownDisplay(it.first);
-  }
-}
+Display::~Display() { loop_.Shutdown(); }
 
 zx_status_t Display::Bind() {
   fbl::AutoLock lock(&lock_);
@@ -160,23 +154,24 @@ zx_status_t Display::Bind() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // Create primary device if needed.
-  if (devices_.empty()) {
-    auto& device = devices_[kPrimaryDisplayId];
-    device.width = static_cast<uint32_t>(rc_->GetFbParam(FB_WIDTH, 1024));
-    device.height = static_cast<uint32_t>(rc_->GetFbParam(FB_HEIGHT, 768));
-    device.refresh_rate_hz = static_cast<uint32_t>(rc_->GetFbParam(FB_FPS, 60));
-  }
+  // Create primary display device.
+  static constexpr int32_t kFallbackWidthPx = 1024;
+  static constexpr int32_t kFallbackHeightPx = 768;
+  static constexpr int32_t kFallbackRefreshRateHz = 60;
+  primary_display_device_ = DisplayDevice{
+      .width_px = rc_->GetFbParam(FB_WIDTH, kFallbackWidthPx),
+      .height_px = rc_->GetFbParam(FB_HEIGHT, kFallbackHeightPx),
+      .refresh_rate_hz = rc_->GetFbParam(FB_FPS, kFallbackRefreshRateHz),
+  };
 
   // Set up display and set up flush task for each device.
-  for (auto& it : devices_) {
-    zx_status_t status = SetupDisplay(it.first);
-    ZX_DEBUG_ASSERT(status == ZX_OK);
-
-    async::PostTask(loop_.dispatcher(), [this, display_id = it.first] {
-      FlushDisplay(loop_.dispatcher(), display_id);
-    });
+  status = SetupPrimaryDisplay();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to set up the primary display: %s", zx_status_get_string(status));
+    return status;
   }
+
+  async::PostTask(loop_.dispatcher(), [this] { FlushPrimaryDisplay(loop_.dispatcher()); });
 
   // Start async event thread.
   loop_.StartThread("goldfish_display_event_thread");
@@ -189,44 +184,43 @@ void Display::DdkRelease() { delete this; }
 void Display::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* interface) {
   std::vector<added_display_args_t> args;
-  for (auto& it : devices_) {
-    const uint32_t width = it.second.width;
-    const uint32_t height = it.second.height;
-    const uint32_t refresh_rate_hz = it.second.refresh_rate_hz;
 
-    const int64_t pixel_clock_hz = int64_t{width} * height * refresh_rate_hz;
-    ZX_DEBUG_ASSERT(pixel_clock_hz >= 0);
-    ZX_DEBUG_ASSERT(pixel_clock_hz <= display::kMaxPixelClockHz);
+  const int32_t width = primary_display_device_.width_px;
+  const int32_t height = primary_display_device_.height_px;
+  const int32_t refresh_rate_hz = primary_display_device_.refresh_rate_hz;
 
-    const display::DisplayTiming timing = {
-        .horizontal_active_px = static_cast<int32_t>(width),
-        .horizontal_front_porch_px = 0,
-        .horizontal_sync_width_px = 0,
-        .horizontal_back_porch_px = 0,
-        .vertical_active_lines = static_cast<int32_t>(height),
-        .vertical_front_porch_lines = 0,
-        .vertical_sync_width_lines = 0,
-        .vertical_back_porch_lines = 0,
-        .pixel_clock_frequency_hz = pixel_clock_hz,
-        .fields_per_frame = display::FieldsPerFrame::kProgressive,
-        .hsync_polarity = display::SyncPolarity::kNegative,
-        .vsync_polarity = display::SyncPolarity::kNegative,
-        .vblank_alternates = false,
-        .pixel_repetition = 0,
-    };
+  const int64_t pixel_clock_hz = int64_t{width} * height * refresh_rate_hz;
+  ZX_DEBUG_ASSERT(pixel_clock_hz >= 0);
+  ZX_DEBUG_ASSERT(pixel_clock_hz <= display::kMaxPixelClockHz);
 
-    added_display_args_t display = {
-        .display_id = display::ToBanjoDisplayId(it.first),
-        .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
-        .panel =
-            {
-                .mode = display::ToBanjoDisplayMode(timing),
-            },
-        .pixel_format_list = kPixelFormats,
-        .pixel_format_count = sizeof(kPixelFormats) / sizeof(kPixelFormats[0]),
-    };
-    args.push_back(display);
-  }
+  const display::DisplayTiming timing = {
+      .horizontal_active_px = width,
+      .horizontal_front_porch_px = 0,
+      .horizontal_sync_width_px = 0,
+      .horizontal_back_porch_px = 0,
+      .vertical_active_lines = height,
+      .vertical_front_porch_lines = 0,
+      .vertical_sync_width_lines = 0,
+      .vertical_back_porch_lines = 0,
+      .pixel_clock_frequency_hz = pixel_clock_hz,
+      .fields_per_frame = display::FieldsPerFrame::kProgressive,
+      .hsync_polarity = display::SyncPolarity::kNegative,
+      .vsync_polarity = display::SyncPolarity::kNegative,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+
+  added_display_args_t display = {
+      .display_id = display::ToBanjoDisplayId(kPrimaryDisplayId),
+      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
+      .panel =
+          {
+              .mode = display::ToBanjoDisplayMode(timing),
+          },
+      .pixel_format_list = kPixelFormats,
+      .pixel_format_count = sizeof(kPixelFormats) / sizeof(kPixelFormats[0]),
+  };
+  args.push_back(display);
 
   {
     fbl::AutoLock lock(&flush_lock_);
@@ -455,11 +449,9 @@ void Display::DisplayControllerImplReleaseImage(uint64_t image_handle) {
   }
 
   async::PostTask(loop_.dispatcher(), [this, color_buffer] {
-    for (auto& kv : devices_) {
-      if (kv.second.incoming_config.has_value() &&
-          kv.second.incoming_config->color_buffer == color_buffer) {
-        kv.second.incoming_config = std::nullopt;
-      }
+    if (primary_display_device_.incoming_config.has_value() &&
+        primary_display_device_.incoming_config->color_buffer == color_buffer) {
+      primary_display_device_.incoming_config = std::nullopt;
     }
     delete color_buffer;
   });
@@ -496,8 +488,7 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
 
     const display::DisplayId display_id = display::ToDisplayId(display_configs[i]->display_id);
     if (layer_count > 0) {
-      ZX_DEBUG_ASSERT(devices_.find(display_id) != devices_.end());
-      const Device& device = devices_[display_id];
+      ZX_DEBUG_ASSERT(display_id == kPrimaryDisplayId);
 
       if (display_configs[i]->cc_flags != 0) {
         // Color Correction is not supported, but we will pretend we do.
@@ -518,8 +509,8 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
         frame_t dest_frame = {
             .x_pos = 0,
             .y_pos = 0,
-            .width = device.width,
-            .height = device.height,
+            .width = static_cast<uint32_t>(primary_display_device_.width_px),
+            .height = static_cast<uint32_t>(primary_display_device_.height_px),
         };
         frame_t src_frame = {
             .x_pos = 0,
@@ -559,9 +550,8 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-zx_status_t Display::PresentDisplayConfig(display::DisplayId display_id,
-                                          const DisplayConfig& display_config) {
-  auto* color_buffer = display_config.color_buffer;
+zx_status_t Display::PresentPrimaryDisplayConfig(const DisplayConfig& display_config) {
+  ColorBuffer* color_buffer = display_config.color_buffer;
   if (!color_buffer) {
     return ZX_OK;
   }
@@ -573,15 +563,14 @@ zx_status_t Display::PresentDisplayConfig(display::DisplayId display_id,
     return status;
   }
 
-  auto& device = devices_[display_id];
-
   // Set up async wait for the goldfish sync event. The zx::eventpair will be
   // stored in the async wait callback, which will be destroyed only when the
   // event is signaled or the wait is cancelled.
-  device.pending_config_waits.emplace_back(event_display.get(), ZX_EVENTPAIR_SIGNALED, 0);
-  auto& wait = device.pending_config_waits.back();
+  primary_display_device_.pending_config_waits.emplace_back(event_display.get(),
+                                                            ZX_EVENTPAIR_SIGNALED, 0);
+  async::WaitOnce& wait = primary_display_device_.pending_config_waits.back();
 
-  wait.Begin(loop_.dispatcher(), [event = std::move(event_display), &device,
+  wait.Begin(loop_.dispatcher(), [this, event = std::move(event_display),
                                   pending_config_stamp = display_config.config_stamp](
                                      async_dispatcher_t* dispatcher, async::WaitOnce* current_wait,
                                      zx_status_t status, const zx_packet_signal_t*) {
@@ -597,8 +586,8 @@ zx_status_t Display::PresentDisplayConfig(display::DisplayId display_id,
     // that are queued earlier than that eventpair will be removed from the list
     // and the async WaitOnce will be cancelled.
     // Note that the cancelled waits will return early and will not reach here.
-    ZX_DEBUG_ASSERT(std::any_of(device.pending_config_waits.begin(),
-                                device.pending_config_waits.end(),
+    ZX_DEBUG_ASSERT(std::any_of(primary_display_device_.pending_config_waits.begin(),
+                                primary_display_device_.pending_config_waits.end(),
                                 [current_wait](const async::WaitOnce& wait) {
                                   return wait.object() == current_wait->object();
                                 }));
@@ -606,14 +595,16 @@ zx_status_t Display::PresentDisplayConfig(display::DisplayId display_id,
     // wait, and the current wait itself. In WaitOnce, the callback is moved to
     // stack before current wait is removed, so it's safe to remove any item in
     // the list.
-    for (auto it = device.pending_config_waits.begin(); it != device.pending_config_waits.end();) {
+    for (auto it = primary_display_device_.pending_config_waits.begin();
+         it != primary_display_device_.pending_config_waits.end();) {
       if (it->object() == current_wait->object()) {
-        device.pending_config_waits.erase(it);
+        primary_display_device_.pending_config_waits.erase(it);
         break;
       }
-      it = device.pending_config_waits.erase(it);
+      it = primary_display_device_.pending_config_waits.erase(it);
     }
-    device.latest_config_stamp = std::max(device.latest_config_stamp, pending_config_stamp);
+    primary_display_device_.latest_config_stamp =
+        std::max(primary_display_device_.latest_config_stamp, pending_config_stamp);
   });
 
   // Update host-writeable display buffers before presenting.
@@ -630,26 +621,18 @@ zx_status_t Display::PresentDisplayConfig(display::DisplayId display_id,
 
   // Present the buffer.
   {
-    HostDisplayId host_display_id = devices_[display_id].host_display_id;
-    if (host_display_id != kInvalidHostDisplayId) {
-      // Set color buffer for secondary displays.
-      auto status = rc_->SetDisplayColorBuffer(host_display_id, color_buffer->host_color_buffer_id);
-      if (status.is_error() || status.value()) {
-        zxlogf(ERROR, "%s: failed to set display color buffer", kTag);
-        return status.is_error() ? status.status_value() : ZX_ERR_INTERNAL;
-      }
-    } else {
-      status = rc_->FbPost(color_buffer->host_color_buffer_id);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "%s: FbPost failed: %d", kTag, status);
-        return status;
-      }
+    zx_status_t status = rc_->FbPost(color_buffer->host_color_buffer_id);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to call render control command FbPost: %s",
+             zx_status_get_string(status));
+      return status;
     }
 
     fbl::AutoLock lock(&lock_);
     status = control_.CreateSyncFence(std::move(event_sync_device));
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: CreateSyncFence failed: %d", kTag, status);
+      zxlogf(ERROR, "Failed to call render control command CreateSyncFence: %s",
+             zx_status_get_string(status));
       return status;
     }
   }
@@ -662,75 +645,83 @@ void Display::DisplayControllerImplApplyConfiguration(const display_config_t** d
                                                       const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
-  for (const auto& it : devices_) {
-    uint64_t handle = 0;
-    for (unsigned i = 0; i < display_count; i++) {
-      if (display::ToDisplayId(display_configs[i]->display_id) == it.first) {
-        if (display_configs[i]->layer_count) {
-          handle = display_configs[i]->layer_list[0]->cfg.primary.image.handle;
-        }
-        break;
-      }
-    }
+  display::DriverImageId driver_image_id = display::kInvalidDriverImageId;
 
-    if (handle == 0u) {
-      // The display doesn't have any active layers right now. For layers that
-      // previously existed, we should cancel waiting events on the pending
-      // color buffer and remove references to both pending and current color
-      // buffers.
-      async::PostTask(loop_.dispatcher(), [this, display_id = it.first, config_stamp] {
-        if (devices_.find(display_id) != devices_.end()) {
-          auto& device = devices_[display_id];
-          device.pending_config_waits.clear();
-          device.incoming_config = std::nullopt;
-          device.latest_config_stamp = std::max(device.latest_config_stamp, config_stamp);
-        }
-      });
+  cpp20::span<const display_config_t*> display_configs_span(display_configs, display_count);
+  for (const display_config* display_config : display_configs_span) {
+    if (display::ToDisplayId(display_config->display_id) == kPrimaryDisplayId) {
+      if (display_config->layer_count) {
+        driver_image_id =
+            display::ToDriverImageId(display_config->layer_list[0]->cfg.primary.image.handle);
+      }
+      break;
+    }
+  }
+
+  if (driver_image_id == display::kInvalidDriverImageId) {
+    // The display doesn't have any active layers right now. For layers that
+    // previously existed, we should cancel waiting events on the pending
+    // color buffer and remove references to both pending and current color
+    // buffers.
+    async::PostTask(loop_.dispatcher(), [this, config_stamp] {
+      primary_display_device_.pending_config_waits.clear();
+      primary_display_device_.incoming_config = std::nullopt;
+      primary_display_device_.latest_config_stamp =
+          std::max(primary_display_device_.latest_config_stamp, config_stamp);
+    });
+    return;
+  }
+
+  ColorBuffer* color_buffer =
+      reinterpret_cast<ColorBuffer*>(display::ToBanjoDriverImageId(driver_image_id));
+  ZX_DEBUG_ASSERT(color_buffer != nullptr);
+  if (color_buffer->host_color_buffer_id == kInvalidHostColorBufferId) {
+    zx::vmo vmo;
+
+    zx_status_t status = color_buffer->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to duplicate vmo: %s", zx_status_get_string(status));
       return;
     }
 
-    auto color_buffer = reinterpret_cast<ColorBuffer*>(handle);
-    if (color_buffer && color_buffer->host_color_buffer_id == kInvalidHostColorBufferId) {
-      zx::vmo vmo;
+    {
+      fbl::AutoLock lock(&lock_);
 
-      zx_status_t status = color_buffer->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
+      uint32_t render_control_encoded_color_buffer_id = kInvalidHostColorBufferId.value();
+      zx_status_t status =
+          control_.GetColorBuffer(std::move(vmo), &render_control_encoded_color_buffer_id);
       if (status != ZX_OK) {
-        zxlogf(ERROR, "%s: failed to duplicate vmo: %d", kTag, status);
-      } else {
-        fbl::AutoLock lock(&lock_);
+        zxlogf(ERROR, "Failed to get color buffer: %s", zx_status_get_string(status));
+        return;
+      }
+      color_buffer->host_color_buffer_id =
+          ToHostColorBufferId(render_control_encoded_color_buffer_id);
 
-        uint32_t render_control_encoded_color_buffer_id = kInvalidHostColorBufferId.value();
-        status = control_.GetColorBuffer(std::move(vmo), &render_control_encoded_color_buffer_id);
-        if (status != ZX_OK) {
-          zxlogf(ERROR, "%s: failed to get color buffer: %d", kTag, status);
+      // Color buffers are in vulkan-only mode by default as that avoids
+      // unnecessary copies on the host in some cases. The color buffer
+      // needs to be moved out of vulkan-only mode before being used for
+      // presentation.
+      if (color_buffer->host_color_buffer_id != kInvalidHostColorBufferId) {
+        static constexpr uint32_t kVulkanGlSharedMode = 0;
+        zx::result<RenderControl::RcResult> status = rc_->SetColorBufferVulkanMode(
+            color_buffer->host_color_buffer_id, /*mode=*/kVulkanGlSharedMode);
+        if (status.is_error()) {
+          zxlogf(ERROR, "Failed to call render control SetColorBufferVulkanMode: %s",
+                 status.status_string());
         }
-        color_buffer->host_color_buffer_id =
-            ToHostColorBufferId(render_control_encoded_color_buffer_id);
-
-        // Color buffers are in vulkan-only mode by default as that avoids
-        // unnecessary copies on the host in some cases. The color buffer
-        // needs to be moved out of vulkan-only mode before being used for
-        // presentation.
-        if (color_buffer->host_color_buffer_id != kInvalidHostColorBufferId) {
-          auto status = rc_->SetColorBufferVulkanMode(color_buffer->host_color_buffer_id, 0);
-          if (status.is_error() || status.value()) {
-            zxlogf(ERROR, "%s: failed to set vulkan mode: %d %d", kTag, status.status_value(),
-                   status.value_or(0));
-          }
+        if (status.value() != 0) {
+          zxlogf(ERROR, "Render control host failed to set vulkan mode: %d", status.value());
         }
       }
     }
-
-    if (color_buffer) {
-      async::PostTask(loop_.dispatcher(),
-                      [this, config_stamp, color_buffer, display_id = it.first] {
-                        devices_[display_id].incoming_config = {
-                            .color_buffer = color_buffer,
-                            .config_stamp = config_stamp,
-                        };
-                      });
-    }
   }
+
+  async::PostTask(loop_.dispatcher(), [this, config_stamp, color_buffer] {
+    primary_display_device_.incoming_config = {
+        .color_buffer = color_buffer,
+        .config_stamp = config_stamp,
+    };
+  });
 }
 
 zx_status_t Display::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
@@ -805,48 +796,33 @@ zx_status_t Display::DisplayControllerImplSetBufferCollectionConstraints(
   return ZX_OK;
 }
 
-zx_status_t Display::SetupDisplay(display::DisplayId display_id) {
-  Device& device = devices_[display_id];
-
-  // Create secondary displays.
-  if (display_id != kPrimaryDisplayId) {
-    auto status = rc_->CreateDisplay();
-    if (status.is_error()) {
-      return status.error_value();
-    }
-    device.host_display_id = status.value();
+zx_status_t Display::SetupPrimaryDisplay() {
+  // On the host render control protocol, the "invalid" host display ID is used
+  // to configure the primary display device.
+  const HostDisplayId kPrimaryHostDisplayId = kInvalidHostDisplayId;
+  zx::result<RenderControl::RcResult> status =
+      rc_->SetDisplayPose(kPrimaryHostDisplayId, /*x=*/0, /*y=*/0, primary_display_device_.width_px,
+                          primary_display_device_.height_px);
+  if (status.is_error()) {
+    zxlogf(ERROR, "Failed to call render control SetDisplayPose command: %s",
+           status.status_string());
+    return status.error_value();
   }
-  uint32_t width = static_cast<uint32_t>(static_cast<float>(device.width) * device.scale);
-  uint32_t height = static_cast<uint32_t>(static_cast<float>(device.height) * device.scale);
-  auto status = rc_->SetDisplayPose(device.host_display_id, device.x, device.y, width, height);
-  if (status.is_error() || status.value()) {
-    zxlogf(ERROR, "%s: failed to set display pose: %d %d", kTag, status.status_value(),
-           status.value_or(0));
-    return status.is_error() ? status.error_value() : ZX_ERR_INTERNAL;
+  if (status.value() != 0) {
+    zxlogf(ERROR, "Render control host failed to set display pose: %d", status.value());
+    return ZX_ERR_INTERNAL;
   }
-  device.expected_next_flush = async::Now(loop_.dispatcher());
+  primary_display_device_.expected_next_flush = async::Now(loop_.dispatcher());
 
   return ZX_OK;
 }
 
-void Display::TeardownDisplay(display::DisplayId display_id) {
-  Device& device = devices_[display_id];
+void Display::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
+  zx::duration period = zx::sec(1) / primary_display_device_.refresh_rate_hz;
+  zx::time expected_next_flush = primary_display_device_.expected_next_flush + period;
 
-  if (device.host_display_id != kInvalidHostDisplayId) {
-    zx::result<uint32_t> status = rc_->DestroyDisplay(device.host_display_id);
-    ZX_DEBUG_ASSERT(status.is_ok());
-    ZX_DEBUG_ASSERT(!status.value());
-  }
-}
-
-void Display::FlushDisplay(async_dispatcher_t* dispatcher, display::DisplayId display_id) {
-  Device& device = devices_[display_id];
-
-  zx::duration period = zx::sec(1) / device.refresh_rate_hz;
-  zx::time expected_next_flush = device.expected_next_flush + period;
-
-  if (device.incoming_config.has_value()) {
-    zx_status_t status = PresentDisplayConfig(display_id, *device.incoming_config);
+  if (primary_display_device_.incoming_config.has_value()) {
+    zx_status_t status = PresentPrimaryDisplayConfig(*primary_display_device_.incoming_config);
     ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_SHOULD_WAIT);
   }
 
@@ -855,9 +831,9 @@ void Display::FlushDisplay(async_dispatcher_t* dispatcher, display::DisplayId di
 
     if (dc_intf_.is_valid()) {
       zx::time now = async::Now(dispatcher);
-      const uint64_t banjo_display_id = display::ToBanjoDisplayId(display_id);
+      const uint64_t banjo_display_id = display::ToBanjoDisplayId(kPrimaryDisplayId);
       const config_stamp_t banjo_config_stamp =
-          display::ToBanjoConfigStamp(device.latest_config_stamp);
+          display::ToBanjoConfigStamp(primary_display_device_.latest_config_stamp);
       dc_intf_.OnDisplayVsync(banjo_display_id, now.get(), &banjo_config_stamp);
     }
   }
@@ -870,10 +846,18 @@ void Display::FlushDisplay(async_dispatcher_t* dispatcher, display::DisplayId di
         period * (((now - expected_next_flush + period).get() - 1L) / period.get());
   }
 
-  device.expected_next_flush = expected_next_flush;
+  primary_display_device_.expected_next_flush = expected_next_flush;
   async::PostTaskForTime(
-      dispatcher, [this, dispatcher, display_id] { FlushDisplay(dispatcher, display_id); },
-      expected_next_flush);
+      dispatcher, [this, dispatcher] { FlushPrimaryDisplay(dispatcher); }, expected_next_flush);
+}
+
+void Display::SetupPrimaryDisplayForTesting(int32_t width_px, int32_t height_px,
+                                            int32_t refresh_rate_hz) {
+  primary_display_device_ = {
+      .width_px = width_px,
+      .height_px = height_px,
+      .refresh_rate_hz = refresh_rate_hz,
+  };
 }
 
 }  // namespace goldfish

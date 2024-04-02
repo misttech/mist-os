@@ -103,25 +103,7 @@ class Display : public DisplayType,
     sysmem_allocator_client_ = std::move(sysmem_allocator_client);
   }
 
-  // TESTING ONLY
-  void CreateDevices(int num_devices) {
-    constexpr uint32_t dummy_width = 1024;
-    constexpr uint32_t dummy_height = 768;
-    constexpr uint32_t dummy_fr = 60;
-    ZX_DEBUG_ASSERT(devices_.empty());
-    for (int i = 0; i < num_devices; i++) {
-      display::DisplayId display_id(i + 1);
-      auto& device = devices_[display_id];
-      device.width = dummy_width;
-      device.height = dummy_height;
-      device.refresh_rate_hz = dummy_fr;
-    }
-  }
-  void RemoveDevices() {
-    ZX_DEBUG_ASSERT(!devices_.empty());
-    devices_.clear();
-    ZX_DEBUG_ASSERT(devices_.empty());
-  }
+  void SetupPrimaryDisplayForTesting(int32_t width_px, int32_t height_px, int32_t refresh_rate_hz);
 
  private:
   struct ColorBuffer {
@@ -156,16 +138,11 @@ class Display : public DisplayType,
     display::ConfigStamp config_stamp = display::kInvalidConfigStamp;
   };
 
-  struct Device {
-    uint32_t width = 0;
-    uint32_t height = 0;
-    uint32_t x = 0;
-    uint32_t y = 0;
-    uint32_t refresh_rate_hz = 60;
-    // Display ID used for host framebuffer rendering. Not to be confused with
-    // display::DisplayId or banjo display ID.
-    HostDisplayId host_display_id = kInvalidHostDisplayId;
-    float scale = 1.0;
+  struct DisplayDevice {
+    int32_t width_px = 0;
+    int32_t height_px = 0;
+    int32_t refresh_rate_hz = 60;
+
     zx::time expected_next_flush = zx::time::infinite_past();
     display::ConfigStamp latest_config_stamp = display::kInvalidConfigStamp;
 
@@ -181,7 +158,7 @@ class Display : public DisplayType,
     // the pending Waits that are queued no later than the frame's async Wait
     // (including the frame's Wait itself) will be popped out from the queue
     // and destroyed.
-    std::list<async::WaitOnce> pending_config_waits = {};
+    std::list<async::WaitOnce> pending_config_waits;
   };
 
   // Initializes the sysmem Allocator client used to import incoming buffer
@@ -194,12 +171,10 @@ class Display : public DisplayType,
   zx::result<display::DriverImageId> ImportVmoImage(const image_metadata_t& image_metadata,
                                                     const fuchsia_sysmem::PixelFormat& pixel_format,
                                                     zx::vmo vmo, size_t offset);
-  zx_status_t PresentDisplayConfig(display::DisplayId display_id,
-                                   const DisplayConfig& display_config);
-  zx_status_t SetupDisplay(display::DisplayId display_id);
 
-  void TeardownDisplay(display::DisplayId display_id);
-  void FlushDisplay(async_dispatcher_t* dispatcher, display::DisplayId display_id);
+  zx_status_t SetupPrimaryDisplay();
+  zx_status_t PresentPrimaryDisplayConfig(const DisplayConfig& display_config);
+  void FlushPrimaryDisplay(async_dispatcher_t* dispatcher);
 
   fbl::Mutex lock_;
   ddk::GoldfishControlProtocolClient control_ TA_GUARDED(lock_);
@@ -217,7 +192,7 @@ class Display : public DisplayType,
   zx::bti bti_;
   ddk::IoBuffer cmd_buffer_ TA_GUARDED(lock_);
   ddk::IoBuffer io_buffer_ TA_GUARDED(lock_);
-  std::map<display::DisplayId, Device> devices_;
+  DisplayDevice primary_display_device_ = {};
   fbl::Mutex flush_lock_;
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(flush_lock_);
 

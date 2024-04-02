@@ -25,8 +25,14 @@
 namespace goldfish {
 
 namespace {
-constexpr size_t kNumDisplays = 2;
+
+constexpr int32_t kDisplayWidthPx = 1024;
+constexpr int32_t kDisplayHeightPx = 768;
+constexpr int32_t kDisplayRefreshRateHz = 60;
+
+constexpr size_t kDisplayCount = 1;
 constexpr size_t kMaxLayerCount = 3;  // This is the max size of layer array.
+
 }  // namespace
 
 // TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
@@ -44,13 +50,13 @@ class GoldfishDisplayTest : public testing::Test {
 
   void SetUp() override;
   void TearDown() override;
-  std::array<std::array<layer_t, kMaxLayerCount>, kNumDisplays> layer_ = {};
-  std::array<const layer_t*, kNumDisplays> layer_ptrs = {};
+  std::array<std::array<layer_t, kMaxLayerCount>, kDisplayCount> layer_ = {};
+  std::array<const layer_t*, kDisplayCount> layer_ptrs = {};
 
-  std::array<display_config_t, kNumDisplays> configs_ = {};
-  std::array<display_config_t*, kNumDisplays> configs_ptrs_ = {};
+  std::array<display_config_t, kDisplayCount> configs_ = {};
+  std::array<display_config_t*, kDisplayCount> configs_ptrs_ = {};
 
-  std::array<client_composition_opcode_t, kMaxLayerCount * kNumDisplays> results_ = {};
+  std::array<client_composition_opcode_t, kMaxLayerCount * kDisplayCount> results_ = {};
 
   std::unique_ptr<Display> display_ = {};
 
@@ -64,7 +70,7 @@ class GoldfishDisplayTest : public testing::Test {
 void GoldfishDisplayTest::SetUp() {
   display_ = std::make_unique<Display>(nullptr);
 
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  for (size_t i = 0; i < kDisplayCount; i++) {
     configs_ptrs_[i] = &configs_[i];
     layer_ptrs[i] = layer_[i].data();
     configs_[i].display_id = i + 1;
@@ -72,9 +78,9 @@ void GoldfishDisplayTest::SetUp() {
     configs_[i].layer_count = 1;
   }
 
-  // Need CreateDevices and RemoveDevices to ensure we can test CheckConfiguration without any
-  // dependency on proper driver binding/loading
-  display_->CreateDevices(kNumDisplays);
+  // Call SetupPrimaryDisplayForTesting() so that we can set up the display
+  // devices without any dependency on proper driver binding.
+  display_->SetupPrimaryDisplayForTesting(kDisplayWidthPx, kDisplayHeightPx, kDisplayRefreshRateHz);
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
   ASSERT_TRUE(endpoints.is_ok());
@@ -83,10 +89,7 @@ void GoldfishDisplayTest::SetUp() {
   display_->SetSysmemAllocatorForTesting(fidl::WireSyncClient(std::move(endpoints->client)));
 }
 
-void GoldfishDisplayTest::TearDown() {
-  allocator_binding_->Unbind();
-  display_->RemoveDevices();
-}
+void GoldfishDisplayTest::TearDown() { allocator_binding_->Unbind(); }
 
 TEST_F(GoldfishDisplayTest, CheckConfigNoDisplay) {
   // Test No display
@@ -99,18 +102,18 @@ TEST_F(GoldfishDisplayTest, CheckConfigNoDisplay) {
 
 TEST_F(GoldfishDisplayTest, CheckConfigMultiLayer) {
   // ensure we fail correctly if layers more than 1
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  for (size_t i = 0; i < kDisplayCount; i++) {
     configs_[i].layer_count = kMaxLayerCount;
   }
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
-      const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays, results_.data(),
+      const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
-  EXPECT_EQ(actual_result_size, kNumDisplays * kMaxLayerCount);
+  EXPECT_EQ(actual_result_size, kDisplayCount * kMaxLayerCount);
   int result_cfg_offset = 0;
-  for (size_t j = 0; j < kNumDisplays; j++) {
+  for (size_t j = 0; j < kDisplayCount; j++) {
     EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_MERGE_BASE,
               results_[result_cfg_offset] & CLIENT_COMPOSITION_OPCODE_MERGE_BASE);
     for (unsigned i = 1; i < kMaxLayerCount; i++) {
@@ -123,17 +126,17 @@ TEST_F(GoldfishDisplayTest, CheckConfigMultiLayer) {
 TEST_F(GoldfishDisplayTest, CheckConfigLayerColor) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].type = LAYER_TYPE_COLOR;
   }
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
-      const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays, results_.data(),
+      const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
-  EXPECT_EQ(actual_result_size, kNumDisplays * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
+  for (size_t i = 0; i < kDisplayCount; i++) {
     EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_USE_PRIMARY,
               results_[i] & CLIENT_COMPOSITION_OPCODE_USE_PRIMARY);
   }
@@ -154,7 +157,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerPrimary) {
       .width = 1024,
       .height = 768,
   };
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].cfg.primary.dest_frame = dest_frame;
     layer_[i][0].cfg.primary.src_frame = src_frame;
     layer_[i][0].cfg.primary.image.width = 1024;
@@ -165,11 +168,11 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerPrimary) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
-      const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays, results_.data(),
+      const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
-  EXPECT_EQ(actual_result_size, kNumDisplays * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
+  for (size_t i = 0; i < kDisplayCount; i++) {
     EXPECT_EQ(0u, results_[i]);
   }
 }
@@ -189,7 +192,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerDestFrame) {
       .width = 1024,
       .height = 768,
   };
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].cfg.primary.dest_frame = dest_frame;
     layer_[i][0].cfg.primary.src_frame = src_frame;
     layer_[i][0].cfg.primary.image.width = 1024;
@@ -198,11 +201,11 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerDestFrame) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
-      const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays, results_.data(),
+      const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
-  EXPECT_EQ(actual_result_size, kNumDisplays * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
+  for (size_t i = 0; i < kDisplayCount; i++) {
     EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_FRAME_SCALE, results_[i]);
   }
 }
@@ -222,7 +225,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerSrcFrame) {
       .width = 768,
       .height = 768,
   };
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].cfg.primary.dest_frame = dest_frame;
     layer_[i][0].cfg.primary.src_frame = src_frame;
     layer_[i][0].cfg.primary.image.width = 1024;
@@ -231,11 +234,11 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerSrcFrame) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
-      const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays, results_.data(),
+      const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
-  EXPECT_EQ(actual_result_size, kNumDisplays * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
+  for (size_t i = 0; i < kDisplayCount; i++) {
     EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_SRC_FRAME, results_[i]);
   }
 }
@@ -255,7 +258,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerAlpha) {
       .width = 1024,
       .height = 768,
   };
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].cfg.primary.dest_frame = dest_frame;
     layer_[i][0].cfg.primary.src_frame = src_frame;
     layer_[i][0].cfg.primary.image.width = 1024;
@@ -265,11 +268,11 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerAlpha) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
-      const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays, results_.data(),
+      const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
-  EXPECT_EQ(actual_result_size, kNumDisplays * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
+  for (size_t i = 0; i < kDisplayCount; i++) {
     EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_ALPHA, results_[i]);
   }
 }
@@ -289,7 +292,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerTransform) {
       .width = 1024,
       .height = 768,
   };
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].cfg.primary.dest_frame = dest_frame;
     layer_[i][0].cfg.primary.src_frame = src_frame;
     layer_[i][0].cfg.primary.image.width = 1024;
@@ -299,11 +302,11 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerTransform) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
-      const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays, results_.data(),
+      const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
-  EXPECT_EQ(actual_result_size, kNumDisplays * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
+  for (size_t i = 0; i < kDisplayCount; i++) {
     EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_TRANSFORM, results_[i]);
   }
 }
@@ -323,7 +326,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColorCoversion) {
       .width = 1024,
       .height = 768,
   };
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].cfg.primary.dest_frame = dest_frame;
     layer_[i][0].cfg.primary.src_frame = src_frame;
     layer_[i][0].cfg.primary.image.width = 1024;
@@ -333,11 +336,11 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColorCoversion) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
-      const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays, results_.data(),
+      const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
-  EXPECT_EQ(actual_result_size, kNumDisplays * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
+  for (size_t i = 0; i < kDisplayCount; i++) {
     // TODO(payamm): For now, driver will pretend it supports color conversion.
     // It should return CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION instead.
     EXPECT_EQ(0u, results_[i]);
@@ -359,7 +362,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigAllFeatures) {
       .width = 768,
       .height = 768,
   };
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].cfg.primary.dest_frame = dest_frame;
     layer_[i][0].cfg.primary.src_frame = src_frame;
     layer_[i][0].cfg.primary.image.width = 1024;
@@ -371,11 +374,11 @@ TEST_F(GoldfishDisplayTest, CheckConfigAllFeatures) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
-      const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays, results_.data(),
+      const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
-  EXPECT_EQ(actual_result_size, kNumDisplays * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kNumDisplays; i++) {
+  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
+  for (size_t i = 0; i < kDisplayCount; i++) {
     // TODO(https://fxbug.dev/42080897): Driver will pretend it supports color conversion
     // for now. Instead this should contain
     // CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION bit.
