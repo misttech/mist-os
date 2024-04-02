@@ -433,14 +433,13 @@ impl MediaInfo {
                 }
                 _ => {
                     trace!(
-                        "Media metadata {:?} ({:?}) variant not supported.",
+                        value = %property.value, "Media metadata ({:?}) not supported",
                         property.label,
-                        property.value
                     );
                 }
             }
         }
-        debug!("Media metadata updated: {:?}", self);
+        debug!("Media metadata after update: {:?}", self);
     }
 }
 

@@ -25,7 +25,8 @@ use crate::types::{
     bounded_queue::BoundedQueue, NotificationData, MAX_NOTIFICATION_EVENT_QUEUE_SIZE,
 };
 
-/// The system-wide ID of a MediaSession, as created and assigned by the media system.
+/// The system-wide ID assigned to a specific MediaSession. This identifier is created and assigned
+/// by the Fuchsia media system.
 /// These IDs are used internally to disambiguate media sessions.
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct MediaSessionId(pub u64);
@@ -102,6 +103,7 @@ impl MediaSessions {
         pos_change_interval: u32,
         responder: fidl_avrcp::TargetHandlerWatchNotificationResponder,
     ) -> Result<(), fidl::Error> {
+        trace!(?current, %pos_change_interval, "Registering notification for {event_id:?}");
         let timeout = {
             let mut write = self.inner.write();
             write.register_notification(event_id, current, pos_change_interval, responder)?
@@ -135,7 +137,7 @@ impl MediaSessions {
                     responder,
                 } => {
                     responder.send()?;
-                    trace!("MediaSession update: id[{}], delta[{:?}]", id, delta);
+                    trace!(%id, ?delta, "MediaSession update");
 
                     // Since we are listening to all sessions, update the currently
                     // active media session id every time a watcher event is triggered and
@@ -162,7 +164,7 @@ impl MediaSessions {
                         &create_session_control_proxy,
                     )?;
 
-                    trace!("MediaSession state after update: state[{:?}]", sessions_inner);
+                    trace!(state = ?sessions_inner, "MediaSession state after update");
                 }
                 SessionsWatcherRequest::SessionRemoved { session_id, responder } => {
                     // A media session with id `session_id` has been removed.
@@ -172,10 +174,8 @@ impl MediaSessions {
                     // Clear the currently active session, if it equals `session_id`.
                     // Clear entry in state map.
                     let _ = sessions_inner.write().clear_session(&MediaSessionId(session_id));
-                    trace!(
-                        "Removed session [{:?}] from state map: {:?}",
-                        session_id,
-                        sessions_inner
+                    trace!(%session_id, state = ?sessions_inner,
+                        "Removed session from MediaSession state",
                     );
                 }
             }
@@ -253,7 +253,7 @@ impl MediaSessionsInner {
                 &fidl_avrcp::NotificationEvent::TrackChanged, // Irrelevant Event ID.
                 Err(fidl_avrcp::TargetAvcError::RejectedAddressedPlayerChanged),
             ) {
-                warn!("There was an error clearing the responder: {:?}", e);
+                warn!("Error clearing the responder: {e:?}");
             }
         }
         trace!("After evicting cleared responders: {:?}", self.notifications);
@@ -266,6 +266,7 @@ impl MediaSessionsInner {
         &mut self,
         id: Option<MediaSessionId>,
     ) -> Option<MediaSessionId> {
+        // No change in the active session so we maintain any existing notifications.
         if id == self.active_session_id {
             return None;
         }

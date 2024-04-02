@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, fuchsia_async as fasync,
-    tracing::warn,
-};
+use anyhow::{format_err, Error};
+use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
+use fuchsia_async as fasync;
+use std::fmt::Debug;
+use tracing::warn;
 
 pub mod bounded_queue;
 
@@ -19,7 +19,6 @@ use crate::media::media_types::Notification;
 pub(crate) const MAX_NOTIFICATION_EVENT_QUEUE_SIZE: usize = 64;
 
 /// The data stored for an outstanding notification.
-#[derive(Debug)]
 pub(crate) struct NotificationData {
     /// The event_id of the notification.
     event_id: fidl_avrcp::NotificationEvent,
@@ -56,11 +55,10 @@ impl NotificationData {
         &mut self,
         value: Result<Notification, fidl_avrcp::TargetAvcError>,
     ) -> Result<(), fidl::Error> {
-        if let Some(responder) = self.responder.take() {
-            responder.send(value.map(Into::into).as_ref().map_err(|e| *e))
-        } else {
-            Err(fidl::Error::NotNullable)
-        }
+        let Some(responder) = self.responder.take() else {
+            return Err(fidl::Error::NotNullable);
+        };
+        responder.send(value.map(Into::into).as_ref().map_err(|e| *e))
     }
 
     /// Send the `updated_val` over the responder.
@@ -83,7 +81,7 @@ impl NotificationData {
             updated_val
         };
 
-        self.send(response).map(|_| None).map_err(|_| format_err!("Responder send error"))
+        self.send(response).map(|_| None).map_err(Into::into)
     }
 
     /// Compares the initial value, `self.current_value` to the given new
@@ -141,6 +139,19 @@ impl Drop for NotificationData {
         // which case this is a no-op.
         let curr_value = self.current_value.clone().only_event(&self.event_id);
         let _ = self.send(Ok(curr_value));
+    }
+}
+
+impl Debug for NotificationData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let responder = if self.responder.is_some() { "Some(responder)" } else { "None" };
+        f.debug_struct("NotificationData")
+            .field("event_id", &self.event_id)
+            .field("current_value", &self.current_value)
+            .field("pos_change_interval", &self.pos_change_interval)
+            .field("expected_response_time", &self.expected_response_time)
+            .field("responder", &responder)
+            .finish()
     }
 }
 

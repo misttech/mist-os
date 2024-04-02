@@ -24,7 +24,7 @@ async fn handle_target_request(
     request: TargetHandlerRequest,
     media_sessions: Arc<MediaSessions>,
 ) -> Result<(), fidl::Error> {
-    trace!("Received target request: {:?}", request);
+    trace!(request = request.method_name(), "Received target request");
     match request {
         TargetHandlerRequest::GetEventsSupported { responder } => {
             // Send a static response of TG supported events.

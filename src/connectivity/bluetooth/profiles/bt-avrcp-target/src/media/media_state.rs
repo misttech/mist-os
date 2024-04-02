@@ -5,7 +5,8 @@
 use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
 use fidl_fuchsia_media as fidl_media_types;
 use fidl_fuchsia_media_sessions2::{self as fidl_media, SessionControlProxy, SessionInfoDelta};
-use tracing::{info, warn};
+use std::fmt::Debug;
+use tracing::{info, trace, warn};
 
 use crate::media::media_types::{
     avrcp_repeat_mode_to_media, avrcp_shuffle_mode_to_media, media_repeat_mode_to_avrcp,
@@ -25,7 +26,7 @@ pub(crate) const MEDIA_SESSION_ADDRESSED_PLAYER_ID: u16 = 1;
 /// This name is used for AVRCP Browse channel related identification.
 pub(crate) const MEDIA_SESSION_DISPLAYABLE_NAME: &str = "Fuchsia Media Player";
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct MediaState {
     session_control: SessionControlProxy,
     session_info: SessionInfo,
@@ -95,6 +96,7 @@ impl MediaState {
         command: fidl_avrcp::AvcPanelCommand,
         pressed: bool,
     ) -> Result<(), fidl_avrcp::TargetPassthroughError> {
+        trace!(?command, %pressed, "Handling AVC passthrough command");
         if pressed {
             return self.is_supported_passthrough_command(command);
         }
@@ -144,6 +146,12 @@ impl MediaState {
             fidl_avrcp::PlayerApplicationSettingAttributeId::RepeatStatusMode,
             fidl_avrcp::PlayerApplicationSettingAttributeId::ShuffleMode,
         ]
+    }
+}
+
+impl Debug for MediaState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MediaState").field("session_info", &self.session_info).finish()
     }
 }
 
@@ -245,6 +253,7 @@ impl SessionInfo {
         &self,
         event_id: &fidl_avrcp::NotificationEvent,
     ) -> Result<Notification, fidl_avrcp::TargetAvcError> {
+        trace!(?event_id, "Getting notification value");
         let mut notification = Notification::default();
         match event_id {
             fidl_avrcp::NotificationEvent::PlaybackStatusChanged => {
@@ -253,7 +262,7 @@ impl SessionInfo {
             fidl_avrcp::NotificationEvent::PlayerApplicationSettingChanged => {
                 notification.application_settings = Some(
                     self.get_player_application_settings(vec![])
-                        .expect("Should get application settings."),
+                        .expect("Should get application settings"),
                 );
             }
             fidl_avrcp::NotificationEvent::TrackChanged => {
@@ -269,7 +278,7 @@ impl SessionInfo {
                 notification.battery_status = Some(self.battery_status);
             }
             _ => {
-                warn!(?event_id, "Unsupported notification request");
+                warn!(?event_id, "Unsupported notification request type");
                 return Err(fidl_avrcp::TargetAvcError::RejectedInvalidParameter);
             }
         }
