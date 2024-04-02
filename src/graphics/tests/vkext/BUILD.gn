@@ -106,9 +106,6 @@ fuchsia_package("vkext-child-package") {
     ":default_config",
     ":vkext_cmp",
   ]
-
-  # Structured config validation complains about the gtest runner, but in practice it works fine.
-  validate_structured_config = false
 }
 
 protected_libvulkan_envs = []
