@@ -860,7 +860,9 @@ idk("firmware.exported") {
   output_name = "firmware"
   sdk_collection_label = ":firmware_collection"
   target_cpus = idk_target_cpus
-  api_levels = platform_version.build_time_supported_api_levels
+
+  # TODO(https://fxbug.dev/331991540): Define how the Firmware SDK is versioned.
+  api_levels = []
 }
 
 idk_archive("firmware.archive") {
