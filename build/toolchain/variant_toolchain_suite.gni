@@ -136,7 +136,7 @@ template("_variant_toolchain") {
 # Defines a standard suite of toolchain variants.
 #
 # This creates one or more GN toolchain() instances based on the values of
-# $know_variants, $universal_variants and $select_variant_canonical as
+# $known_variants, $universal_variants and $select_variant_canonical as
 # defined in BUILDCONFIG.gn.
 #
 # $target_name corresponds to the name of the base toolchain, and all
