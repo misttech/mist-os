@@ -96,9 +96,7 @@ class InspectTest : public gtest::RealLoopFixture {
   }
 
   fpromise::result<InspectData> GetInspect() {
-    fuchsia::diagnostics::ArchiveAccessorPtr archive;
-    context_->svc()->Connect(archive.NewRequest());
-    diagnostics::reader::ArchiveReader reader(std::move(archive), {ChildSelector()});
+    diagnostics::reader::ArchiveReader reader(dispatcher(), {ChildSelector()});
     fpromise::result<std::vector<InspectData>, std::string> result;
     async::Executor executor(dispatcher());
     executor.schedule_task(
