@@ -1,8 +1,10 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#include <fidl/fuchsia.diagnostics/cpp/natural_types.h>
 #include <lib/diagnostics/reader/cpp/constants.h>
 #include <lib/diagnostics/reader/cpp/logs.h>
+#include <lib/fpromise/promise.h>
 #include <lib/fpromise/scope.h>
 
 #include <src/lib/fsl/vmo/strings.h>
@@ -11,38 +13,72 @@ namespace diagnostics::reader {
 
 namespace {
 
-inline fuchsia::diagnostics::Severity StringToSeverity(const std::string& input) {
+inline fuchsia_diagnostics::Severity StringToSeverity(const std::string& input) {
   if (strcasecmp(input.c_str(), "trace") == 0) {
-    return fuchsia::diagnostics::Severity::TRACE;
+    return fuchsia_diagnostics::Severity::kTrace;
   }
   if (strcasecmp(input.c_str(), "debug") == 0) {
-    return fuchsia::diagnostics::Severity::DEBUG;
+    return fuchsia_diagnostics::Severity::kDebug;
   }
   if (strcasecmp(input.c_str(), "info") == 0) {
-    return fuchsia::diagnostics::Severity::INFO;
+    return fuchsia_diagnostics::Severity::kInfo;
   }
   if (strcasecmp(input.c_str(), "warn") == 0) {
-    return fuchsia::diagnostics::Severity::WARN;
+    return fuchsia_diagnostics::Severity::kWarn;
   }
   if (strcasecmp(input.c_str(), "error") == 0) {
-    return fuchsia::diagnostics::Severity::ERROR;
+    return fuchsia_diagnostics::Severity::kError;
   }
   if (strcasecmp(input.c_str(), "fatal") == 0) {
-    return fuchsia::diagnostics::Severity::FATAL;
+    return fuchsia_diagnostics::Severity::kFatal;
   }
   // We must never get here as long as we are reading data from Archivist.
-  return fuchsia::diagnostics::Severity::INFO;
+  return fuchsia_diagnostics::Severity::kInfo;
 }
 
 }  // namespace
 
-LogsSubscription::LogsSubscription(fuchsia::diagnostics::BatchIteratorPtr iterator)
-    : iterator_(std::move(iterator)), done_(false) {}
+LogsSubscription::LogsSubscription(
+    fpromise::promise<fidl::Client<fuchsia_diagnostics::BatchIterator>> iterator,
+    async::Executor& executor)
+    : iterator_promise_(std::move(iterator)), done_(false), executor_(executor) {}
 
 bool LogsSubscription::Done() { return done_; }
 
 LogsSubscription::Promise LogsSubscription::Next() {
   return fpromise::make_promise([this] { return ReadBatch(); }).wrap_with(scope_);
+}
+
+void LogsSubscription::GetIterator(
+    fit::function<void(fidl::Client<fuchsia_diagnostics::BatchIterator>&)> callback) {
+  if (maybe_client_.has_value()) {
+    callback(*maybe_client_);
+    return;
+  }
+  if (callback_.has_value()) {
+    // Chain callbacks
+    auto prev = std::move(*callback_);
+    callback_ = [prev = std::move(prev), next = std::move(callback)](
+                    fidl::Client<fuchsia_diagnostics::BatchIterator>& client) {
+      prev(client);
+      next(client);
+    };
+    return;
+  }
+  // Set first callback
+  callback_ = std::move(callback);
+
+  if (iterator_promise_.has_value()) {
+    auto promise = std::move(iterator_promise_);
+    executor_.schedule_task(
+        (*promise).and_then([this](fidl::Client<fuchsia_diagnostics::BatchIterator>& client) {
+          maybe_client_ = std::move(client);
+          if (callback_.has_value()) {
+            auto callback = std::move(callback_);
+            (*callback)(*maybe_client_);
+          }
+        }));
+  }
 }
 
 LogsSubscription::Promise LogsSubscription::ReadBatch() {
@@ -56,33 +92,37 @@ LogsSubscription::Promise LogsSubscription::ReadBatch() {
     return fpromise::make_result_promise<std::optional<LogsData>, std::string>(
         fpromise::ok(std::nullopt));
   }
-  iterator_->GetNext([this, completer = std::move(bridge.completer)](auto result) mutable {
-    if (result.is_err()) {
-      completer.complete_error("Batch iterator returned error: " +
-                               std::to_string(static_cast<size_t>(result.err())));
-      return;
-    }
-
-    if (result.response().batch.empty()) {
-      done_ = true;
-      completer.complete_ok(std::nullopt);
-      return;
-    }
-
-    for (const auto& content : result.response().batch) {
-      if (!content.is_json()) {
-        completer.complete_error("Received an unexpected content format");
+  GetIterator([this, completer = std::move(bridge.completer)](
+                  fidl::Client<fuchsia_diagnostics::BatchIterator>& iterator) mutable {
+    iterator->GetNext().Then([this, completer = std::move(completer)](auto& result) mutable {
+      if (result.is_error()) {
+        completer.complete_error("Batch iterator returned error: " +
+                                 result.error_value().FormatDescription());
         return;
       }
-      std::string json;
-      if (!fsl::StringFromVmo(content.json(), &json)) {
-        completer.complete_error("Failed to read returned VMO");
+
+      if (result->batch().empty()) {
+        done_ = true;
+        completer.complete_ok(std::nullopt);
         return;
       }
-      rapidjson::Document document;
-      document.Parse(json);
-      completer.complete_ok(LoadJson(std::move(document)));
-    }
+
+      for (auto& content : result->batch()) {
+        if (content.Which() != fuchsia_diagnostics::FormattedContent::Tag::kJson) {
+          completer.complete_error("Received an unexpected content format");
+          return;
+        }
+        std::string json;
+        fsl::SizedVmo vmo(std::move(content.json()->vmo()), content.json()->size());
+        if (!fsl::StringFromVmo(vmo, &json)) {
+          completer.complete_error("Failed to read returned VMO");
+          return;
+        }
+        rapidjson::Document document;
+        document.Parse(json);
+        completer.complete_ok(LoadJson(std::move(document)));
+      }
+    });
   });
   return bridge.consumer.promise_or(fpromise::error("Failed to obtain consumer promise"));
 }

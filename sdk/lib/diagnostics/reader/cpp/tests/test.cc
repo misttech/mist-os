@@ -15,7 +15,7 @@
 #include <rapidjson/pointer.h>
 #include <re2/re2.h>
 
-#include "fuchsia/diagnostics/cpp/fidl.h"
+#include "lib/fpromise/promise.h"
 #include "lib/sys/cpp/service_directory.h"
 #include "rapidjson/document.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
@@ -116,7 +116,7 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
   }
 
   void CheckLog(std::optional<diagnostics::reader::LogsData> maybeLog,
-                fuchsia::diagnostics::Severity severity, const std::string& message,
+                fuchsia_diagnostics::Severity severity, const std::string& message,
                 const std::vector<std::string>& tags) {
     ASSERT_TRUE(maybeLog.has_value());
     auto& log = maybeLog.value();
@@ -143,28 +143,6 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
 using InspectResult = fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string>;
 using LogsResult = fpromise::result<std::optional<diagnostics::reader::LogsData>, std::string>;
 
-TEST_F(ArchiveReaderTest, ReadHierarchyHLCPP) {
-  std::cerr << "RUNNING TEST" << std::endl;
-  diagnostics::reader::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
-                                            {cm1_selector(), cm2_selector()});
-
-  InspectResult result;
-  executor().schedule_task(reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()})
-                               .then([&](InspectResult& r) { result = std::move(r); }));
-  RunLoopUntil([&] { return !!result; });
-
-  ASSERT_TRUE(result.is_ok()) << "Error: " << result.error();
-
-  auto value = result.take_value();
-  std::sort(value.begin(), value.end(), [](auto& a, auto& b) { return a.moniker() < b.moniker(); });
-
-  EXPECT_EQ(cm1_moniker(), value[0].moniker());
-  EXPECT_EQ(cm2_moniker(), value[1].moniker());
-
-  EXPECT_STREQ("v1", value[0].content()["root"]["version"].GetString());
-  EXPECT_STREQ("v1", value[1].content()["root"]["version"].GetString());
-}
-
 TEST_F(ArchiveReaderTest, ReadHierarchy) {
   diagnostics::reader::ArchiveReader reader(executor().dispatcher(),
                                             {cm1_selector(), cm2_selector()});
@@ -188,10 +166,8 @@ TEST_F(ArchiveReaderTest, ReadHierarchy) {
 
 TEST_F(ArchiveReaderTest, ReadHierarchyWithAlternativeDispatcher) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  fuchsia::diagnostics::ArchiveAccessorPtr archive;
-  svc()->Connect(archive.NewRequest(loop.dispatcher()));
   async::Executor local_executor(loop.dispatcher());
-  diagnostics::reader::ArchiveReader reader(std::move(archive), {cm1_selector(), cm2_selector()});
+  diagnostics::reader::ArchiveReader reader(loop.dispatcher(), {cm1_selector(), cm2_selector()});
 
   InspectResult result;
   local_executor.schedule_task(reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()})
@@ -218,8 +194,7 @@ TEST_F(ArchiveReaderTest, ReadHierarchyWithAlternativeDispatcher) {
 }
 
 TEST_F(ArchiveReaderTest, Sort) {
-  diagnostics::reader::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
-                                            {cm1_selector(), cm2_selector()});
+  diagnostics::reader::ArchiveReader reader(dispatcher(), {cm1_selector(), cm2_selector()});
 
   InspectResult result;
   executor().schedule_task(reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()})
@@ -258,10 +233,9 @@ TEST_F(ArchiveReaderTest, Sort) {
 }
 
 TEST_F(ArchiveReaderTest, ReadLogs) {
-  diagnostics::reader::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
-                                            {cm1_selector()});
+  diagnostics::reader::ArchiveReader reader(dispatcher(), {cm1_selector()});
 
-  auto subscription = reader.GetLogs(fuchsia::diagnostics::StreamMode::SNAPSHOT_THEN_SUBSCRIBE);
+  auto subscription = reader.GetLogs(fuchsia_diagnostics::StreamMode::kSnapshotThenSubscribe);
 
   auto next_log = [&]() -> std::optional<diagnostics::reader::LogsData> {
     LogsResult result;
@@ -271,10 +245,10 @@ TEST_F(ArchiveReaderTest, ReadLogs) {
     return result.take_value();
   };
 
-  CheckLog(next_log(), fuchsia::diagnostics::Severity::INFO, "I'm an info log",
+  CheckLog(next_log(), fuchsia_diagnostics::Severity::kInfo, "I'm an info log",
            {"test_program", "hello"});
-  CheckLog(next_log(), fuchsia::diagnostics::Severity::WARN, "I'm a warn log", {"test_program"});
-  CheckLog(next_log(), fuchsia::diagnostics::Severity::ERROR, "I'm an error log", {"test_program"});
+  CheckLog(next_log(), fuchsia_diagnostics::Severity::kWarn, "I'm a warn log", {"test_program"});
+  CheckLog(next_log(), fuchsia_diagnostics::Severity::kError, "I'm an error log", {"test_program"});
 }
 
 }  // namespace

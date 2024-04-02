@@ -5,7 +5,7 @@
 #ifndef LIB_DIAGNOSTICS_READER_CPP_INSPECT_H_
 #define LIB_DIAGNOSTICS_READER_CPP_INSPECT_H_
 
-#include <fuchsia/diagnostics/cpp/fidl.h>
+#include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>

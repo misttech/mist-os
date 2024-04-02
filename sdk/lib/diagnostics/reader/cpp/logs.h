@@ -5,7 +5,8 @@
 #ifndef LIB_DIAGNOSTICS_READER_CPP_LOGS_H_
 #define LIB_DIAGNOSTICS_READER_CPP_LOGS_H_
 
-#include <fuchsia/diagnostics/cpp/fidl.h>
+#include <fidl/fuchsia.diagnostics/cpp/fidl.h>
+#include <lib/async/cpp/executor.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/scope.h>
@@ -47,7 +48,7 @@ class LogsData {
   struct Metadata final {
     std::string component_url;
     uint64_t timestamp;
-    fuchsia::diagnostics::Severity severity;
+    fuchsia_diagnostics::Severity severity;
     std::vector<std::string> tags;
     std::optional<uint64_t> pid;
     std::optional<uint64_t> tid;
@@ -103,7 +104,9 @@ class LogsSubscription {
  public:
   using Promise = fpromise::promise<std::optional<LogsData>, std::string>;
 
-  explicit LogsSubscription(fuchsia::diagnostics::BatchIteratorPtr iterator);
+  explicit LogsSubscription(
+      fpromise::promise<fidl::Client<fuchsia_diagnostics::BatchIterator>> iterator,
+      async::Executor& executor);
 
   // Not movable nor copyable.
   LogsSubscription(const LogsSubscription&) = delete;
@@ -123,14 +126,27 @@ class LogsSubscription {
   LogsSubscription::Promise ReadBatch();
   std::optional<LogsData> LoadJson(rapidjson::Document document);
 
+  void GetIterator(fit::function<void(fidl::Client<fuchsia_diagnostics::BatchIterator>&)> callback);
+
   // Iterator connection.
-  fuchsia::diagnostics::BatchIteratorPtr iterator_;
+  std::optional<fpromise::promise<fidl::Client<fuchsia_diagnostics::BatchIterator>>>
+      iterator_promise_;
+
+  // Callback to be invoked when the iterator becomes available.
+  std::optional<fit::function<void(fidl::Client<fuchsia_diagnostics::BatchIterator>&)>> callback_;
+
+  // Connection to BatchIterator which is empty while the FIDL connection is being established.
+  // It is set when the connection has been established.
+  std::optional<fidl::Client<fuchsia_diagnostics::BatchIterator>> maybe_client_;
   // Pending data to return before calling BatchIterator/GetNext again.
   std::queue<LogsData> pending_;
   // The scope to tie async task lifetimes to this object.
   fpromise::scope scope_;
   // Whether or not this subscription has completed and will return more data.
   bool done_;
+
+  // Executor owned by the ArchiveReader.
+  async::Executor& executor_;
 };
 
 }  // namespace diagnostics::reader
