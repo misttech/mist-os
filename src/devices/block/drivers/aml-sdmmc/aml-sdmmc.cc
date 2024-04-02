@@ -18,6 +18,7 @@
 #include <lib/mmio/mmio.h>
 #include <lib/sdmmc/hw.h>
 #include <lib/sync/completion.h>
+#include <lib/trace/event.h>
 #include <lib/zx/interrupt.h>
 #include <stdint.h>
 #include <string.h>
@@ -852,6 +853,7 @@ zx_status_t AmlSdmmc::SuspendPower() {
     }
   }
 
+  TRACE_DURATION_BEGIN("aml-sdmmc", "suspend");
   power_suspended_ = true;
   inspect_.power_suspended.Set(power_suspended_);
   FDF_LOGL(INFO, logger(), "Power suspended.");
@@ -882,6 +884,7 @@ zx_status_t AmlSdmmc::ResumePower() {
   auto clk = AmlSdmmcClock::Get().ReadFrom(&*mmio_);
   clk.set_cfg_div(clk_div_saved_).WriteTo(&*mmio_);
 
+  TRACE_DURATION_END("aml-sdmmc", "suspend");
   power_suspended_ = false;
   inspect_.power_suspended.Set(power_suspended_);
   FDF_LOGL(INFO, logger(), "Power resumed.");

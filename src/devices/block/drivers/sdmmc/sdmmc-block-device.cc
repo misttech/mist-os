@@ -852,6 +852,7 @@ zx_status_t SdmmcBlockDevice::SuspendPower() {
     return status;
   }
 
+  TRACE_DURATION_BEGIN("sdmmc", "suspend");
   power_suspended_ = true;
   properties_.power_suspended_.Set(power_suspended_);
   return ZX_OK;
@@ -874,6 +875,7 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
     return status;
   }
 
+  TRACE_DURATION_END("sdmmc", "suspend");
   power_suspended_ = false;
   properties_.power_suspended_.Set(power_suspended_);
   return ZX_OK;

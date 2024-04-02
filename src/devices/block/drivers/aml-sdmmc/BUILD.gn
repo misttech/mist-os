@@ -61,6 +61,7 @@ fuchsia_driver("aml-sdmmc-driver") {
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
@@ -115,6 +116,7 @@ test("aml-sdmmc-test-bin") {
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
     "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
