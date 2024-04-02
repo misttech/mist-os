@@ -27,7 +27,10 @@ rustc_macro("fake-test-case") {
   edition = "2021"
   deps = [
     "//third_party/rust_crates:quote",
-    "//third_party/rust_crates:syn",
+
+    # FIXME(https://fxbug.dev/332277415): Please update to syn 2.x.
+    # "//third_party/rust_crates:syn",
+    "//third_party/rust_crates:syn-v1_0_98",
   ]
 
   sources = [ "fake_test_case/lib.rs" ]

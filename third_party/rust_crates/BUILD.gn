@@ -934,7 +934,7 @@ if (!(current_os == "fuchsia")) {
 
 if (!(current_os == "fuchsia")) {
   group("syn") {
-    public_deps = [ ":syn-v1_0_98" ]
+    public_deps = [ ":syn-v2_0_52" ]
   }
 }
 
@@ -14873,7 +14873,50 @@ rust_library("syn-v1_0_98") {
     "--cfg=feature=\"visit-mut\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//src/connectivity/bluetooth/testing/test-harness-macro:*" ]
+  visibility += [ "//src/connectivity/lib/ip-test-macro:*" ]
+  visibility += [ "//src/connectivity/lib/ip-test-macro/test:*" ]
+  visibility += [ "//src/connectivity/lib/net-declare:*" ]
+  visibility += [ "//src/connectivity/lib/net-types:*" ]
+  visibility +=
+      [ "//src/connectivity/lowpan/lib/spinel_pack/spinel_pack_macros:*" ]
+  visibility += [ "//src/connectivity/network/lib/todo_unused:*" ]
+  visibility += [ "//src/connectivity/network/netstack3/core/macros:*" ]
+  visibility += [ "//src/connectivity/network/tests/integration/macros:*" ]
+  visibility += [ "//src/connectivity/network/tests/integration/multicast-forwarding/macros:*" ]
+  visibility += [ "//src/connectivity/wlan/lib/bitfield:*" ]
+  visibility += [ "//src/connectivity/wlan/lib/frame_writer/macro:*" ]
+  visibility += [ "//src/connectivity/wlan/lib/statemachine/macro:*" ]
+  visibility += [ "//src/developer/ffx/config/macro/proc_macro:*" ]
+  visibility += [ "//src/developer/ffx/core/macro:*" ]
+  visibility += [ "//src/developer/ffx/lib/fho/macro:*" ]
+  visibility += [ "//src/developer/ffx/lib/protocols/macros:*" ]
+  visibility += [ "//src/developer/ffx/lib/validation/proc_macro:*" ]
+  visibility += [ "//src/developer/ffx/plugins/fuzz/shell_args:*" ]
+  visibility += [ "//src/lib/assembly/file_relative_path:*" ]
+  visibility += [ "//src/lib/diagnostics/inspect/derive/macro:*" ]
+  visibility +=
+      [ "//src/lib/fidl_table_validation/fidl_table_validation_derive:*" ]
+  visibility += [ "//src/lib/from-enum:*" ]
+  visibility += [ "//src/lib/fuchsia-async-macro:*" ]
+  visibility += [ "//src/lib/fuchsia/macro:*" ]
+  visibility += [ "//src/lib/fuzzing/rust:*" ]
+  visibility += [ "//src/lib/include_bytes_from_working_dir:*" ]
+  visibility += [ "//src/lib/include_str_from_working_dir:*" ]
+  visibility += [ "//src/lib/testing/fixture:*" ]
+  visibility += [ "//src/starnix/lib/filter_methods_macro:*" ]
+  visibility += [ "//src/storage/fxfs:*" ]
+  visibility += [ "//src/storage/fxfs/trace/macros:*" ]
+  visibility += [ "//src/storage/lib/vfs/rust/macros:*" ]
+  visibility += [ "//src/storage/type-fprint:*" ]
+  visibility += [ "//src/sys/lib/cm_rust:*" ]
+  visibility += [ "//src/sys/time/lib/inspect-writable/macro:*" ]
+  visibility += [ "//tools/lib/cml/macro:*" ]
+  visibility += [ "//tools/lib/config_client:*" ]
+  visibility += [ "//tools/lib/reference_doc/macro:*" ]
+  visibility += [ "//tools/shush:*" ]
 
   applicable_licenses = [ ":syn-v1_0_98.license" ]
 }
@@ -14913,6 +14956,7 @@ rust_library("syn-v2_0_55") {
     "--cfg=feature=\"printing\"",
     "--cfg=feature=\"proc-macro\"",
     "--cfg=feature=\"quote\"",
+    "--cfg=feature=\"visit\"",
     "--cfg=feature=\"visit-mut\"",
   ]
 

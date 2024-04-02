@@ -306,7 +306,7 @@ signal-hook = "0.3.17"
 simplelog = "0.10.2"
 strum = "0.25.0"
 strum_macros = "0.25.3"
-syn = { version = "1.0.98", features = ["full", "visit", "visit-mut", "extra-traits"] }
+syn = { version = "2.0.52", features = ["full", "visit", "visit-mut", "extra-traits"] }
 synstructure = "0.12.1"
 tar = "0.4.25"
 term_grid = "0.2.0"
@@ -791,6 +791,52 @@ rustflags = []
 
 [gn.package.syn."1.0.98"]
 # Has build script but no config needed.
+# FIXME(https://fxbug.dev/332277415): temporarily allow legacy targets to
+# depend on 1.0.98 to enable a soft migration. New projects should be using syn
+# 2.x.
+visibility = [
+  ":*",
+  "//src/connectivity/bluetooth/testing/test-harness-macro:*",
+  "//src/connectivity/lib/ip-test-macro:*",
+  "//src/connectivity/lib/ip-test-macro/test:*",
+  "//src/connectivity/lib/net-declare:*",
+  "//src/connectivity/lib/net-types:*",
+  "//src/connectivity/lowpan/lib/spinel_pack/spinel_pack_macros:*",
+  "//src/connectivity/network/lib/todo_unused:*",
+  "//src/connectivity/network/netstack3/core/macros:*",
+  "//src/connectivity/network/tests/integration/macros:*",
+  "//src/connectivity/network/tests/integration/multicast-forwarding/macros:*",
+  "//src/connectivity/wlan/lib/bitfield:*",
+  "//src/connectivity/wlan/lib/frame_writer/macro:*",
+  "//src/connectivity/wlan/lib/statemachine/macro:*",
+  "//src/developer/ffx/config/macro/proc_macro:*",
+  "//src/developer/ffx/core/macro:*",
+  "//src/developer/ffx/lib/fho/macro:*",
+  "//src/developer/ffx/lib/protocols/macros:*",
+  "//src/developer/ffx/lib/validation/proc_macro:*",
+  "//src/developer/ffx/plugins/fuzz/shell_args:*",
+  "//src/lib/assembly/file_relative_path:*",
+  "//src/lib/diagnostics/inspect/derive/macro:*",
+  "//src/lib/fidl_table_validation/fidl_table_validation_derive:*",
+  "//src/lib/from-enum:*",
+  "//src/lib/fuchsia-async-macro:*",
+  "//src/lib/fuchsia/macro:*",
+  "//src/lib/fuzzing/rust:*",
+  "//src/lib/include_bytes_from_working_dir:*",
+  "//src/lib/include_str_from_working_dir:*",
+  "//src/lib/testing/fixture:*",
+  "//src/starnix/lib/filter_methods_macro:*",
+  "//src/storage/fxfs:*",
+  "//src/storage/fxfs/trace/macros:*",
+  "//src/storage/lib/vfs/rust/macros:*",
+  "//src/storage/type-fprint:*",
+  "//src/sys/lib/cm_rust:*",
+  "//src/sys/time/lib/inspect-writable/macro:*",
+  "//tools/lib/cml/macro:*",
+  "//tools/lib/config_client:*",
+  "//tools/lib/reference_doc/macro:*",
+  "//tools/shush:*",
+]
 
 [gn.package.thiserror."1.0.57"]
 # Has build script but no config needed.

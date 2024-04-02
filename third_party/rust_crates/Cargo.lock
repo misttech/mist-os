@@ -1462,7 +1462,7 @@ dependencies = [
  "structopt",
  "strum",
  "strum_macros",
- "syn 1.0.98",
+ "syn 2.0.52",
  "synstructure",
  "tar",
  "tempfile",
