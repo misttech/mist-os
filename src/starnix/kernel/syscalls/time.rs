@@ -110,6 +110,8 @@ pub fn sys_gettimeofday(
         current_task.write_object(user_tv, &tv)?;
     }
     if !user_tz.is_null() {
+        // Return early if the user passes an obviously invalid pointer. This check is not a guarantee.
+        current_task.mm().check_plausible(user_tz.addr(), std::mem::size_of::<timezone>())?;
         track_stub!(TODO("https://fxbug.dev/322874502"), "gettimeofday tz argument");
     }
     Ok(())

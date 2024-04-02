@@ -55,7 +55,6 @@
 
                 // Fails due to: "No supported filesystems"
                 "getxattr03",
-                "gettimeofday01",
 
                 // 23 requires F_SETLEASE
                 "fcntl23",
