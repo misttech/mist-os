@@ -48,6 +48,8 @@ source_set("codec_impl") {
     ":fourcc",
     "//sdk/fidl/fuchsia.media.drm:fuchsia.media.drm_hlcpp",
     "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_hlcpp_conversion",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/fit",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/stdcompat",
@@ -60,6 +62,7 @@ source_set("codec_impl") {
     "//zircon/system/ulib/closure-queue",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/thread-safe-deleter",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-vthread",
@@ -71,6 +74,7 @@ source_set("codec_impl") {
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp:cpp",
     "//sdk/lib/vfs/cpp",
+    "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
 
     # Only for <ddk/debug.h>'s severity levels.
     "//src/lib/ddk",

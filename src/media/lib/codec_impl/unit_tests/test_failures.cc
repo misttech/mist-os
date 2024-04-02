@@ -7,6 +7,7 @@
 #include <fuchsia/mediacodec/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl_test_base.h>
+#include <fuchsia/sysmem2/cpp/fidl_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 
@@ -56,12 +57,12 @@ class CodecImplFailures : public gtest::RealLoopFixture {
   void TearDown() override { token_request_ = nullptr; }
 
   void Create(fidl::InterfaceRequest<fuchsia::media::StreamProcessor> request) {
-    fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem;
+    fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem;
     sysmem_request_ = sysmem.NewRequest();
 
-    codec_impl_ =
-        std::make_unique<CodecImpl>(std::move(sysmem), nullptr, dispatcher(), thrd_current(),
-                                    CreateDecoderParams(), std::move(request));
+    codec_impl_ = std::make_unique<CodecImpl>(
+        fidl::ClientEnd<fuchsia_sysmem2::Allocator>(sysmem.TakeChannel()), nullptr, dispatcher(),
+        thrd_current(), CreateDecoderParams(), std::move(request));
 
     auto codec_adapter = std::make_unique<FakeCodecAdapter>(codec_impl_->lock(), codec_impl_.get());
     codec_adapter_ = codec_adapter.get();
@@ -75,7 +76,7 @@ class CodecImplFailures : public gtest::RealLoopFixture {
 
  protected:
   // Just cache this request so that we can have a valid sysmem handle
-  std::optional<fidl::InterfaceRequest<fuchsia::sysmem::Allocator>> sysmem_request_;
+  std::optional<fidl::InterfaceRequest<fuchsia::sysmem2::Allocator>> sysmem_request_;
   std::optional<fidl::InterfaceRequest<fuchsia::sysmem::BufferCollectionToken>> token_request_;
 
   bool error_handler_ran_ = false;
@@ -132,45 +133,48 @@ TEST_F(CodecImplFailures, InputBufferCollectionConstraintsMinBufferCount) {
   ASSERT_TRUE(error_handler_ran_);
 }
 
-class TestBufferCollection : public fuchsia::sysmem::testing::BufferCollection_TestBase {
+class TestBufferCollection : public fuchsia::sysmem2::testing::BufferCollection_TestBase {
  public:
   TestBufferCollection() : binding_(this) {}
 
-  void Bind(fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection> request) {
+  void Bind(fidl::InterfaceRequest<fuchsia::sysmem2::BufferCollection> request) {
     binding_.Bind(std::move(request));
   }
   void NotImplemented_(const std::string& name) override {}
 
-  void WaitForBuffersAllocated(WaitForBuffersAllocatedCallback callback) override {
+  void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCallback callback) override {
     wait_callback_ = std::move(callback);
   }
   void FailAllocation() {
-    WaitForBuffersAllocatedCallback callback;
+    WaitForAllBuffersAllocatedCallback callback;
     callback.swap(wait_callback_);
 
-    callback(ZX_ERR_NOT_SUPPORTED, fuchsia::sysmem::BufferCollectionInfo_2());
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result result;
+    result.set_err(fuchsia::sysmem2::Error::CONSTRAINTS_INTERSECTION_EMPTY);
+    callback(std::move(result));
   }
 
   bool is_waiting() { return !!wait_callback_; }
 
  private:
-  fidl::Binding<fuchsia::sysmem::BufferCollection> binding_;
-  WaitForBuffersAllocatedCallback wait_callback_;
+  fidl::Binding<fuchsia::sysmem2::BufferCollection> binding_;
+  WaitForAllBuffersAllocatedCallback wait_callback_;
 };
 
-class TestAllocator : public fuchsia::sysmem::testing::Allocator_TestBase {
+class TestAllocator : public fuchsia::sysmem2::testing::Allocator_TestBase {
  public:
   TestAllocator() : binding_(this) {}
 
-  void Bind(fidl::InterfaceRequest<fuchsia::sysmem::Allocator> request) {
+  void Bind(fidl::InterfaceRequest<fuchsia::sysmem2::Allocator> request) {
     binding_.Bind(std::move(request));
   }
-  void BindSharedCollection(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
-                            fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection>
-                                buffer_collection_request) override {
-    collection_.Bind(std::move(buffer_collection_request));
+  void BindSharedCollection(
+      ::fuchsia::sysmem2::AllocatorBindSharedCollectionRequest request) override {
+    collection_.Bind(std::move(*request.mutable_buffer_collection_request()));
   }
-  void SetDebugClientInfo(std::string name, uint64_t id) override {}
+
+  void SetDebugClientInfo(::fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest request) override {
+  }
 
   void NotImplemented_(const std::string& name) override {
     // Unexpected.
@@ -180,7 +184,7 @@ class TestAllocator : public fuchsia::sysmem::testing::Allocator_TestBase {
   TestBufferCollection& collection() { return collection_; }
 
  private:
-  fidl::Binding<fuchsia::sysmem::Allocator> binding_;
+  fidl::Binding<fuchsia::sysmem2::Allocator> binding_;
 
   TestBufferCollection collection_;
 };
