@@ -8,10 +8,76 @@ mod msdu;
 
 pub use {amsdu::*, fields::*, msdu::*};
 
+/// Test harnesses and fixtures.
+#[cfg(test)]
+pub mod harness {
+    use {
+        super::*,
+        itertools::{EitherOrBoth, Itertools},
+        std::fmt::Debug,
+        zerocopy::ByteSlice,
+    };
+
+    pub fn assert_msdus_exactly_one_eq<M, E>(
+        msdus: impl IntoIterator<Item = Msdu<M>>,
+        expected: Msdu<E>,
+    ) where
+        M: ByteSlice + Debug,
+        E: ByteSlice + Debug,
+    {
+        let mut msdus = msdus.into_iter().peekable();
+        let Msdu { dst_addr, src_addr, llc_frame } =
+            msdus.next().expect("expected exactly one MSDU, but got zero");
+        assert_eq!(dst_addr, expected.dst_addr);
+        assert_eq!(src_addr, expected.src_addr);
+        assert_eq!(llc_frame.hdr.protocol_id, expected.llc_frame.hdr.protocol_id);
+        assert_eq!(&*llc_frame.body, &*expected.llc_frame.body);
+        if msdus.peek().is_some() {
+            panic!(
+                "expected exactly one MSDU, but got more\n{}",
+                format!("unexpected MSDU: {:x?}", msdus.map(Msdu::into_body).format("\n"))
+            );
+        }
+    }
+
+    pub fn assert_msdus_llc_frame_eq<M, E>(
+        msdus: impl IntoIterator<Item = Msdu<M>>,
+        expected: impl IntoIterator<Item = LlcFrame<E>>,
+    ) where
+        M: ByteSlice + Debug,
+        E: ByteSlice + Debug,
+    {
+        let mut msdus = msdus.into_iter().zip_longest(expected).peekable();
+        while let Some(EitherOrBoth::Both(Msdu { llc_frame, .. }, expected)) = msdus.peek() {
+            // Only LLC frame data is asserted here. Other `Msdu` fixture fields are not exposed to
+            // tests, but these fields are validated by other assertions.
+            assert_eq!(llc_frame.hdr.protocol_id, expected.hdr.protocol_id);
+            assert_eq!(&*llc_frame.body, &*expected.body);
+            msdus.next();
+        }
+        if let Some(zipped) = msdus.peek() {
+            let difference = if zipped.is_left() { "more" } else { "fewer" };
+            panic!(
+                "expected some number of MSDUs, but got {}\n{}",
+                difference,
+                msdus
+                    .map(|zipped| match zipped {
+                        EitherOrBoth::Left(msdu) =>
+                            format!("unexpected MSDU: {:x?}", msdu.into_body()),
+                        EitherOrBoth::Right(expected) =>
+                            format!("expected MSDU (not found): {:x?}", expected.into_body()),
+                        _ => unreachable!(),
+                    })
+                    .join("\n"),
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
-        crate::mac::*,
+        crate::mac,
         crate::{assert_variant, test_utils::fake_frames::*},
     };
 
@@ -19,20 +85,20 @@ mod tests {
     fn parse_data_frame() {
         let bytes = make_data_frame_single_llc(None, None);
         assert_variant!(
-            MacFrame::parse(&bytes[..], false),
-            Some(MacFrame::Data { fixed_fields, addr4, qos_ctrl, ht_ctrl, body }) => {
+            mac::DataFrame::parse(bytes.as_slice(), false),
+            Some(mac::DataFrame { fixed_fields, addr4, qos_ctrl, ht_ctrl, body }) => {
                 assert_eq!(0b00000000_10001000, { fixed_fields.frame_ctrl.0 });
                 assert_eq!(0x0202, { fixed_fields.duration });
-                assert_eq!(MacAddr::from([3, 3, 3, 3, 3, 3]), fixed_fields.addr1);
-                assert_eq!(MacAddr::from([4, 4, 4, 4, 4, 4]), fixed_fields.addr2);
-                assert_eq!(MacAddr::from([5, 5, 5, 5, 5, 5]), fixed_fields.addr3);
+                assert_eq!(mac::MacAddr::from([3, 3, 3, 3, 3, 3]), fixed_fields.addr1);
+                assert_eq!(mac::MacAddr::from([4, 4, 4, 4, 4, 4]), fixed_fields.addr2);
+                assert_eq!(mac::MacAddr::from([5, 5, 5, 5, 5, 5]), fixed_fields.addr3);
                 assert_eq!(0x0606, { fixed_fields.seq_ctrl.0 });
                 assert!(addr4.is_none());
-                assert_eq!(0x0101, qos_ctrl.expect("qos_ctrl not present").get().0);
+                assert_eq!(qos_ctrl.expect("qos_ctrl not present").get().0, 0x0101);
                 assert!(ht_ctrl.is_none());
                 assert_eq!(&body[..], &[7, 7, 7, 8, 8, 8, 9, 10, 11, 11, 11]);
             },
-            "expected data frame"
+            "failed to parse data frame",
         );
     }
 
@@ -40,12 +106,12 @@ mod tests {
     fn parse_data_frame_with_padding() {
         let bytes = make_data_frame_with_padding();
         assert_variant!(
-            MacFrame::parse(&bytes[..], true),
-            Some(MacFrame::Data { qos_ctrl, body, .. }) => {
-                assert_eq!(0x0101, qos_ctrl.expect("qos_ctrl not present").get().0);
-                assert_eq!(&[7, 7, 7, 8, 8, 8, 9, 10, 11, 11, 11, 11, 11], &body[..]);
+            mac::DataFrame::parse(bytes.as_slice(), true),
+            Some(mac::DataFrame { qos_ctrl, body, .. }) => {
+                assert_eq!(qos_ctrl.expect("qos_ctrl not present").get().0, 0x0101);
+                assert_eq!(&body[..], &[7, 7, 7, 8, 8, 8, 9, 10, 11, 11, 11, 11, 11]);
             },
-            "expected data frame"
+            "failed to parse padded data frame",
         );
     }
 }

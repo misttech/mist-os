@@ -437,23 +437,23 @@ impl InfraBss {
     pub fn handle_data_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
-        fixed_fields: mac::FixedDataHdrFields,
-        addr4: Option<mac::Addr4>,
-        qos_ctrl: Option<mac::QosControl>,
-        body: B,
+        data_frame: mac::DataFrame<B>,
     ) -> Result<(), Rejection> {
-        if mac::data_receiver_addr(&fixed_fields).as_array() != ctx.bssid.as_array() {
+        if mac::data_receiver_addr(&data_frame.fixed_fields).as_array() != ctx.bssid.as_array() {
             // Frame is not for this BSSID.
             return Err(Rejection::OtherBss);
         }
 
-        if !*&{ fixed_fields.frame_ctrl }.to_ds() || *&{ fixed_fields.frame_ctrl }.from_ds() {
+        let frame_ctrl = data_frame.frame_ctrl();
+        if !*&frame_ctrl.to_ds() || *&frame_ctrl.from_ds() {
             // IEEE Std 802.11-2016, 9.2.4.1.4 and Table 9-3: Frame was not sent to a distribution
             // system (e.g. an AP), or was received from another distribution system.
             return Err(Rejection::BadDsBits);
         }
 
-        let src_addr = mac::data_src_addr(&fixed_fields, addr4).ok_or(Rejection::NoSrcAddr)?;
+        let src_addr =
+            mac::data_src_addr(&data_frame.fixed_fields, data_frame.addr4.as_deref().copied())
+                .ok_or(Rejection::NoSrcAddr)?;
 
         // Handle the frame, pretending that the client is an unauthenticated client if we don't
         // know about it.
@@ -463,13 +463,11 @@ impl InfraBss {
             .get_mut(&src_addr)
             .unwrap_or_else(|| maybe_client.get_or_insert(RemoteClient::new(src_addr)));
 
-        client
-            .handle_data_frame(ctx, fixed_fields, addr4, qos_ctrl, body)
-            .map_err(|e| Rejection::Client(client.addr, e))?;
+        client.handle_data_frame(ctx, data_frame).map_err(|e| Rejection::Client(client.addr, e))?;
 
         // IEEE Std 802.11-2016, 9.2.4.1.7: The value [of the Power Management subfield] indicates
         // the mode of the STA after the successful completion of the frame exchange sequence.
-        match client.set_power_state(ctx, { fixed_fields.frame_ctrl }.power_mgmt()) {
+        match client.set_power_state(ctx, frame_ctrl.power_mgmt()) {
             Err(ClientRejection::NotAssociated) => {
                 error!("client {:02X?} tried to doze but is not associated", client.addr);
             }
@@ -1313,25 +1311,29 @@ mod tests {
 
         bss.handle_data_frame(
             &mut ctx,
-            mac::FixedDataHdrFields {
-                frame_ctrl: mac::FrameControl(0)
-                    .with_frame_type(mac::FrameType::DATA)
-                    .with_to_ds(true),
-                duration: 0,
-                addr1: (*BSSID).into(),
-                addr2: *CLIENT_ADDR,
-                addr3: *CLIENT_ADDR2,
-                seq_ctrl: mac::SequenceControl(10),
+            mac::DataFrame {
+                fixed_fields: mac::FixedDataHdrFields {
+                    frame_ctrl: mac::FrameControl(0)
+                        .with_frame_type(mac::FrameType::DATA)
+                        .with_to_ds(true),
+                    duration: 0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: *CLIENT_ADDR2,
+                    seq_ctrl: mac::SequenceControl(10),
+                }
+                .as_bytes_ref(),
+                addr4: None,
+                qos_ctrl: None,
+                ht_ctrl: None,
+                body: &[
+                    7, 7, 7, // DSAP, SSAP & control
+                    8, 8, 8, // OUI
+                    0x12, 0x34, // eth type
+                    // Trailing bytes
+                    1, 2, 3, 4, 5,
+                ][..],
             },
-            None,
-            None,
-            &[
-                7, 7, 7, // DSAP, SSAP & control
-                8, 8, 8, // OUI
-                0x12, 0x34, // eth type
-                // Trailing bytes
-                1, 2, 3, 4, 5,
-            ][..],
         )
         .expect("expected OK");
 
@@ -1357,25 +1359,29 @@ mod tests {
         assert_variant!(
             bss.handle_data_frame(
                 &mut ctx,
-                mac::FixedDataHdrFields {
-                    frame_ctrl: mac::FrameControl(0)
-                        .with_frame_type(mac::FrameType::DATA)
-                        .with_to_ds(false),
-                    duration: 0,
-                    addr1: (*BSSID).into(),
-                    addr2: *CLIENT_ADDR,
-                    addr3: *CLIENT_ADDR2,
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::DataFrame {
+                    fixed_fields: mac::FixedDataHdrFields {
+                        frame_ctrl: mac::FrameControl(0)
+                            .with_frame_type(mac::FrameType::DATA)
+                            .with_to_ds(false),
+                        duration: 0,
+                        addr1: (*BSSID).into(),
+                        addr2: *CLIENT_ADDR,
+                        addr3: *CLIENT_ADDR2,
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    addr4: None,
+                    qos_ctrl: None,
+                    ht_ctrl: None,
+                    body: &[
+                        7, 7, 7, // DSAP, SSAP & control
+                        8, 8, 8, // OUI
+                        0x12, 0x34, // eth type
+                        // Trailing bytes
+                        1, 2, 3, 4, 5,
+                    ][..],
                 },
-                None,
-                None,
-                &[
-                    7, 7, 7, // DSAP, SSAP & control
-                    8, 8, 8, // OUI
-                    0x12, 0x34, // eth type
-                    // Trailing bytes
-                    1, 2, 3, 4, 5,
-                ][..],
             )
             .expect_err("expected error"),
             Rejection::BadDsBits
@@ -1458,25 +1464,29 @@ mod tests {
         assert_variant!(
             bss.handle_data_frame(
                 &mut ctx,
-                mac::FixedDataHdrFields {
-                    frame_ctrl: mac::FrameControl(0)
-                        .with_frame_type(mac::FrameType::DATA)
-                        .with_to_ds(true),
-                    duration: 0,
-                    addr1: (*BSSID).into(),
-                    addr2: *CLIENT_ADDR,
-                    addr3: *CLIENT_ADDR2,
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::DataFrame {
+                    fixed_fields: mac::FixedDataHdrFields {
+                        frame_ctrl: mac::FrameControl(0)
+                            .with_frame_type(mac::FrameType::DATA)
+                            .with_to_ds(true),
+                        duration: 0,
+                        addr1: (*BSSID).into(),
+                        addr2: *CLIENT_ADDR,
+                        addr3: *CLIENT_ADDR2,
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    addr4: None,
+                    qos_ctrl: None,
+                    ht_ctrl: None,
+                    body: &[
+                        7, 7, 7, // DSAP, SSAP & control
+                        8, 8, 8, // OUI
+                        0x12, 0x34, // eth type
+                        // Trailing bytes
+                        1, 2, 3, 4, 5,
+                    ][..],
                 },
-                None,
-                None,
-                &[
-                    7, 7, 7, // DSAP, SSAP & control
-                    8, 8, 8, // OUI
-                    0x12, 0x34, // eth type
-                    // Trailing bytes
-                    1, 2, 3, 4, 5,
-                ][..],
             )
             .expect_err("expected error"),
             Rejection::Client(_, ClientRejection::NotPermitted)
@@ -1521,25 +1531,29 @@ mod tests {
         assert_variant!(
             bss.handle_data_frame(
                 &mut ctx,
-                mac::FixedDataHdrFields {
-                    frame_ctrl: mac::FrameControl(0)
-                        .with_frame_type(mac::FrameType::DATA)
-                        .with_to_ds(true),
-                    duration: 0,
-                    addr1: (*BSSID).into(),
-                    addr2: *CLIENT_ADDR,
-                    addr3: *CLIENT_ADDR2,
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::DataFrame {
+                    fixed_fields: mac::FixedDataHdrFields {
+                        frame_ctrl: mac::FrameControl(0)
+                            .with_frame_type(mac::FrameType::DATA)
+                            .with_to_ds(true),
+                        duration: 0,
+                        addr1: (*BSSID).into(),
+                        addr2: *CLIENT_ADDR,
+                        addr3: *CLIENT_ADDR2,
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    addr4: None,
+                    qos_ctrl: None,
+                    ht_ctrl: None,
+                    body: &[
+                        7, 7, 7, // DSAP, SSAP & control
+                        8, 8, 8, // OUI
+                        0x12, 0x34, // eth type
+                        // Trailing bytes
+                        1, 2, 3, 4, 5,
+                    ][..],
                 },
-                None,
-                None,
-                &[
-                    7, 7, 7, // DSAP, SSAP & control
-                    8, 8, 8, // OUI
-                    0x12, 0x34, // eth type
-                    // Trailing bytes
-                    1, 2, 3, 4, 5,
-                ][..],
             )
             .expect_err("expected error"),
             Rejection::Client(_, ClientRejection::NotPermitted)
@@ -1778,25 +1792,29 @@ mod tests {
 
         bss.handle_data_frame(
             &mut ctx,
-            mac::FixedDataHdrFields {
-                frame_ctrl: mac::FrameControl(0)
-                    .with_frame_type(mac::FrameType::DATA)
-                    .with_to_ds(true),
-                duration: 0,
-                addr1: (*BSSID).into(),
-                addr2: *CLIENT_ADDR,
-                addr3: *CLIENT_ADDR2,
-                seq_ctrl: mac::SequenceControl(10),
+            mac::DataFrame {
+                fixed_fields: mac::FixedDataHdrFields {
+                    frame_ctrl: mac::FrameControl(0)
+                        .with_frame_type(mac::FrameType::DATA)
+                        .with_to_ds(true),
+                    duration: 0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: *CLIENT_ADDR2,
+                    seq_ctrl: mac::SequenceControl(10),
+                }
+                .as_bytes_ref(),
+                addr4: None,
+                qos_ctrl: None,
+                ht_ctrl: None,
+                body: &[
+                    7, 7, 7, // DSAP, SSAP & control
+                    8, 8, 8, // OUI
+                    0x12, 0x34, // eth type
+                    // Trailing bytes
+                    1, 2, 3, 4, 5,
+                ][..],
             },
-            None,
-            None,
-            &[
-                7, 7, 7, // DSAP, SSAP & control
-                8, 8, 8, // OUI
-                0x12, 0x34, // eth type
-                // Trailing bytes
-                1, 2, 3, 4, 5,
-            ][..],
         )
         .expect("expected OK");
 

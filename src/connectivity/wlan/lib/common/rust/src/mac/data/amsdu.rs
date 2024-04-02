@@ -59,52 +59,32 @@ impl<B: ByteSlice> AmsduSubframe<B> {
 
 #[cfg(test)]
 mod tests {
-    use {crate::mac::*, crate::test_utils::fake_frames::*};
+    use {
+        crate::mac::{self, data},
+        crate::test_utils::fake_frames::*,
+        zerocopy::Ref,
+    };
 
     #[test]
-    fn parse_data_amsdu() {
-        let amsdu_data_frame = make_data_frame_amsdu();
-
-        let msdus = MsduIterator::from_raw_data_frame(&amsdu_data_frame[..], false);
-        assert!(msdus.is_some());
-        let mut found_msdus = (false, false);
-        for Msdu { dst_addr, src_addr, llc_frame } in msdus.unwrap() {
-            match found_msdus {
-                (false, false) => {
-                    assert_eq!(dst_addr, MacAddr::from([0x78, 0x8a, 0x20, 0x0d, 0x67, 0x03]));
-                    assert_eq!(src_addr, MacAddr::from([0xb4, 0xf7, 0xa1, 0xbe, 0xb9, 0xab]));
-                    assert_eq!(llc_frame.hdr.protocol_id.to_native(), 0x0800);
-                    assert_eq!(llc_frame.body, MSDU_1_PAYLOAD);
-                    found_msdus = (true, false);
-                }
-                (true, false) => {
-                    assert_eq!(dst_addr, MacAddr::from([0x78, 0x8a, 0x20, 0x0d, 0x67, 0x04]));
-                    assert_eq!(src_addr, MacAddr::from([0xb4, 0xf7, 0xa1, 0xbe, 0xb9, 0xac]));
-                    assert_eq!(llc_frame.hdr.protocol_id.to_native(), 0x0801);
-                    assert_eq!(llc_frame.body, MSDU_2_PAYLOAD);
-                    found_msdus = (true, true);
-                }
-                _ => panic!("unexepcted MSDU: {:x?}", llc_frame.body),
-            }
-        }
-        assert_eq!(found_msdus, (true, true));
+    fn msdu_iter_aggregated() {
+        let bytes = make_data_frame_amsdu();
+        data::harness::assert_msdus_llc_frame_eq(
+            mac::DataFrame::parse(bytes.as_slice(), false)
+                .expect("failed to parse aggregated data frame"),
+            [
+                mac::LlcFrame { hdr: Ref::new(MSDU_1_LLC_HDR).unwrap(), body: MSDU_1_PAYLOAD },
+                mac::LlcFrame { hdr: Ref::new(MSDU_2_LLC_HDR).unwrap(), body: MSDU_2_PAYLOAD },
+            ],
+        );
     }
 
     #[test]
-    fn parse_data_amsdu_padding_too_short() {
-        let amsdu_data_frame = make_data_frame_amsdu_padding_too_short();
-
-        let msdus = MsduIterator::from_raw_data_frame(&amsdu_data_frame[..], false);
-        assert!(msdus.is_some());
-        let mut found_one_msdu = false;
-        for Msdu { dst_addr, src_addr, llc_frame } in msdus.unwrap() {
-            assert!(!found_one_msdu);
-            assert_eq!(dst_addr, MacAddr::from([0x78, 0x8a, 0x20, 0x0d, 0x67, 0x03]));
-            assert_eq!(src_addr, MacAddr::from([0xb4, 0xf7, 0xa1, 0xbe, 0xb9, 0xab]));
-            assert_eq!(llc_frame.hdr.protocol_id.to_native(), 0x0800);
-            assert_eq!(llc_frame.body, MSDU_1_PAYLOAD);
-            found_one_msdu = true;
-        }
-        assert!(found_one_msdu);
+    fn msdu_iter_aggregated_with_padding_too_short() {
+        let bytes = make_data_frame_amsdu_padding_too_short();
+        data::harness::assert_msdus_llc_frame_eq(
+            mac::DataFrame::parse(bytes.as_slice(), false)
+                .expect("failed to parse aggregated data frame"),
+            [mac::LlcFrame { hdr: Ref::new(MSDU_1_LLC_HDR).unwrap(), body: MSDU_1_PAYLOAD }],
+        );
     }
 }

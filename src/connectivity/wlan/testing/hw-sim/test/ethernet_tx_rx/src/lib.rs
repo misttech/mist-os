@@ -70,7 +70,7 @@ async fn verify_tx_and_rx(
                 5.seconds(),
                 "verify ethernet_tx_rx",
                 event::on_transmit(event::extract(|frame: Buffered<DataFrame>| {
-                    for mac::Msdu { dst_addr, src_addr, llc_frame } in frame.msdus() {
+                    for mac::Msdu { dst_addr, src_addr, llc_frame } in frame.get() {
                         if dst_addr == *ETH_DST_MAC && src_addr == *CLIENT_MAC_ADDR {
                             assert_eq!(llc_frame.hdr.protocol_id.to_native(), mac::ETHER_TYPE_IPV4);
                             sent_payload.clear();

@@ -15,7 +15,9 @@ pub enum FrameClass {
 impl<B: ByteSlice> From<&mac::MacFrame<B>> for FrameClass {
     fn from(mac_frame: &mac::MacFrame<B>) -> FrameClass {
         match mac_frame {
-            mac::MacFrame::Data { fixed_fields, .. } => frame_class(&{ fixed_fields.frame_ctrl }),
+            mac::MacFrame::Data(mac::DataFrame { fixed_fields, .. }) => {
+                frame_class(&{ fixed_fields.frame_ctrl })
+            }
             mac::MacFrame::Mgmt(mac::MgmtFrame { mgmt_hdr, .. }) => {
                 frame_class(&{ mgmt_hdr.frame_ctrl })
             }

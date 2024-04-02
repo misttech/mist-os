@@ -430,7 +430,7 @@ where
     }));
     let eapol = event::extract(Stateful(|tap: &mut Tap<'_, H>, frame: Buffered<DataFrame>| {
         // EAPOL frames are transmitted as LLC data frames.
-        for mac::Msdu { llc_frame, .. } in frame.msdus() {
+        for mac::Msdu { llc_frame, .. } in frame.get() {
             assert_eq!(llc_frame.hdr.protocol_id.to_native(), mac::ETHER_TYPE_EAPOL);
             let mic_size = tap.control.authenticator.get_negotiated_protection().mic_size;
             let key_frame_rx = eapol::KeyFrameRx::parse(mic_size as usize, llc_frame.body)

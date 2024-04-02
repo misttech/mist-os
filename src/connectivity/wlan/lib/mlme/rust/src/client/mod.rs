@@ -641,7 +641,7 @@ impl Client {
             mac::MacFrame::Mgmt(mac::MgmtFrame { mgmt_hdr, .. }) => {
                 (Some(mgmt_hdr.addr3), mgmt_hdr.addr1)
             }
-            mac::MacFrame::Data { fixed_fields, .. } => {
+            mac::MacFrame::Data(mac::DataFrame { fixed_fields, .. }) => {
                 (mac::data_bssid(&fixed_fields), mac::data_dst_addr(&fixed_fields))
             }
             // Control frames are not supported. Drop them.

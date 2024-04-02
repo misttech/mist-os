@@ -1016,26 +1016,18 @@ impl RemoteClient {
     pub fn handle_data_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
-        fixed_data_fields: mac::FixedDataHdrFields,
-        addr4: Option<mac::Addr4>,
-        qos_ctrl: Option<mac::QosControl>,
-        body: B,
+        data_frame: mac::DataFrame<B>,
     ) -> Result<(), ClientRejection> {
-        self.reject_frame_class_if_not_permitted(
-            ctx,
-            mac::frame_class(&{ fixed_data_fields.frame_ctrl }),
-        )?;
+        self.reject_frame_class_if_not_permitted(ctx, mac::frame_class(&data_frame.frame_ctrl()))?;
 
         self.reset_bss_max_idle_timeout(ctx);
 
-        for msdu in
-            mac::MsduIterator::from_data_frame_parts(fixed_data_fields, addr4, qos_ctrl, body)
-        {
-            let mac::Msdu { dst_addr, src_addr, llc_frame } = &msdu;
+        for msdu in data_frame {
+            let mac::Msdu { dst_addr, src_addr, llc_frame } = msdu;
             match llc_frame.hdr.protocol_id.to_native() {
                 // Handle EAPOL LLC frames.
                 mac::ETHER_TYPE_EAPOL => {
-                    self.handle_eapol_llc_frame(ctx, *dst_addr, *src_addr, &llc_frame.body)?
+                    self.handle_eapol_llc_frame(ctx, dst_addr, src_addr, &llc_frame.body)?
                 }
                 // Non-EAPOL frames...
                 _ => match self.state.as_ref() {
@@ -1048,8 +1040,8 @@ impl RemoteClient {
                     // is not EAPOL. If there is no controlled port, sending frames is OK.
                     _ => self.handle_llc_frame(
                         ctx,
-                        *dst_addr,
-                        *src_addr,
+                        dst_addr,
+                        src_addr,
                         llc_frame.hdr.protocol_id.to_native(),
                         &llc_frame.body,
                     )?,
@@ -1147,6 +1139,7 @@ mod tests {
             test_utils::fake_frames::*,
             timer::{self, create_timer},
         },
+        zerocopy::Unalign,
     };
 
     lazy_static! {
@@ -2085,23 +2078,27 @@ mod tests {
             r_sta
                 .handle_data_frame(
                     &mut ctx,
-                    mac::FixedDataHdrFields {
-                        frame_ctrl: mac::FrameControl(0b000000010_00001000),
-                        duration: 0,
-                        addr1: *CLIENT_ADDR,
-                        addr2: (*AP_ADDR).into(),
-                        addr3: *CLIENT_ADDR2,
-                        seq_ctrl: mac::SequenceControl(10),
+                    mac::DataFrame {
+                        fixed_fields: mac::FixedDataHdrFields {
+                            frame_ctrl: mac::FrameControl(0b000000010_00001000),
+                            duration: 0,
+                            addr1: *CLIENT_ADDR,
+                            addr2: (*AP_ADDR).into(),
+                            addr3: *CLIENT_ADDR2,
+                            seq_ctrl: mac::SequenceControl(10),
+                        }
+                        .as_bytes_ref(),
+                        addr4: None,
+                        qos_ctrl: None,
+                        ht_ctrl: None,
+                        body: &[
+                            7, 7, 7, // DSAP, SSAP & control
+                            8, 8, 8, // OUI
+                            9, 10, // eth type
+                            // Trailing bytes
+                            11, 11, 11,
+                        ][..],
                     },
-                    None,
-                    None,
-                    &[
-                        7, 7, 7, // DSAP, SSAP & control
-                        8, 8, 8, // OUI
-                        9, 10, // eth type
-                        // Trailing bytes
-                        11, 11, 11,
-                    ][..],
                 )
                 .expect_err("expected err"),
             ClientRejection::NotPermitted
@@ -2148,23 +2145,27 @@ mod tests {
             r_sta
                 .handle_data_frame(
                     &mut ctx,
-                    mac::FixedDataHdrFields {
-                        frame_ctrl: mac::FrameControl(0b000000010_00001000),
-                        duration: 0,
-                        addr1: *CLIENT_ADDR,
-                        addr2: (*AP_ADDR).into(),
-                        addr3: *CLIENT_ADDR2,
-                        seq_ctrl: mac::SequenceControl(10),
+                    mac::DataFrame {
+                        fixed_fields: mac::FixedDataHdrFields {
+                            frame_ctrl: mac::FrameControl(0b000000010_00001000),
+                            duration: 0,
+                            addr1: *CLIENT_ADDR,
+                            addr2: (*AP_ADDR).into(),
+                            addr3: *CLIENT_ADDR2,
+                            seq_ctrl: mac::SequenceControl(10),
+                        }
+                        .as_bytes_ref(),
+                        addr4: None,
+                        qos_ctrl: None,
+                        ht_ctrl: None,
+                        body: &[
+                            7, 7, 7, // DSAP, SSAP & control
+                            8, 8, 8, // OUI
+                            9, 10, // eth type
+                            // Trailing bytes
+                            11, 11, 11,
+                        ][..],
                     },
-                    None,
-                    None,
-                    &[
-                        7, 7, 7, // DSAP, SSAP & control
-                        8, 8, 8, // OUI
-                        9, 10, // eth type
-                        // Trailing bytes
-                        11, 11, 11,
-                    ][..],
                 )
                 .expect_err("expected err"),
             ClientRejection::NotPermitted
@@ -2215,23 +2216,27 @@ mod tests {
         r_sta
             .handle_data_frame(
                 &mut ctx,
-                mac::FixedDataHdrFields {
-                    frame_ctrl: mac::FrameControl(0b000000010_00001000),
-                    duration: 0,
-                    addr1: *CLIENT_ADDR,
-                    addr2: (*AP_ADDR).into(),
-                    addr3: *CLIENT_ADDR2,
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::DataFrame {
+                    fixed_fields: mac::FixedDataHdrFields {
+                        frame_ctrl: mac::FrameControl(0b000000010_00001000),
+                        duration: 0,
+                        addr1: *CLIENT_ADDR,
+                        addr2: (*AP_ADDR).into(),
+                        addr3: *CLIENT_ADDR2,
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    addr4: None,
+                    qos_ctrl: None,
+                    ht_ctrl: None,
+                    body: &[
+                        7, 7, 7, // DSAP, SSAP & control
+                        8, 8, 8, // OUI
+                        9, 10, // eth type
+                        // Trailing bytes
+                        11, 11, 11,
+                    ][..],
                 },
-                None,
-                None,
-                &[
-                    7, 7, 7, // DSAP, SSAP & control
-                    8, 8, 8, // OUI
-                    9, 10, // eth type
-                    // Trailing bytes
-                    11, 11, 11,
-                ][..],
             )
             .expect("expected OK");
 
@@ -2279,17 +2284,23 @@ mod tests {
         r_sta
             .handle_data_frame(
                 &mut ctx,
-                mac::FixedDataHdrFields {
-                    frame_ctrl: mac::FrameControl(0b000000010_00001000),
-                    duration: 0,
-                    addr1: *CLIENT_ADDR,
-                    addr2: (*AP_ADDR).into(),
-                    addr3: *CLIENT_ADDR2,
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::DataFrame {
+                    fixed_fields: mac::FixedDataHdrFields {
+                        frame_ctrl: mac::FrameControl(0b000000010_00001000),
+                        duration: 0,
+                        addr1: *CLIENT_ADDR,
+                        addr2: (*AP_ADDR).into(),
+                        addr3: *CLIENT_ADDR2,
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    addr4: None,
+                    qos_ctrl: Some(
+                        Unalign::new(mac::QosControl(0).with_amsdu_present(true)).as_bytes_ref(),
+                    ),
+                    ht_ctrl: None,
+                    body: &amsdu_data_frame_body[..],
                 },
-                None,
-                Some(mac::QosControl(0).with_amsdu_present(true)),
-                &amsdu_data_frame_body[..],
             )
             .expect("expected OK");
 

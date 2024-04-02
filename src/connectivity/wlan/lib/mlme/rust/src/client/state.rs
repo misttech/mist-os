@@ -650,43 +650,36 @@ impl Associated {
     fn on_data_frame<B: ByteSlice, D: DeviceOps>(
         &self,
         sta: &mut BoundClient<'_, D>,
-        fixed_data_fields: &mac::FixedDataHdrFields,
-        addr4: Option<mac::Addr4>,
-        qos_ctrl: Option<mac::QosControl>,
-        body: B,
+        data_frame: mac::DataFrame<B>,
         async_id: TraceId,
     ) {
+        const MSDU_TRACE_NAME: &'static std::ffi::CStr = cstr!("States::on_data_frame => MSDU");
+
         wtrace::duration!(c"States::on_data_frame");
 
         self.request_bu_if_available(
             sta,
-            fixed_data_fields.frame_ctrl,
-            mac::data_dst_addr(&fixed_data_fields),
+            data_frame.frame_ctrl(),
+            mac::data_dst_addr(&data_frame.fixed_fields),
         );
 
-        let msdus =
-            mac::MsduIterator::from_data_frame_parts(*fixed_data_fields, addr4, qos_ctrl, body);
-
-        // Handle NULL data frames independent of the controlled port's status.
-        if let mac::MsduIterator::Null = msdus {
+        // Handle NULL data frames independently of the controlled port's status.
+        if data_frame.data_subtype().null() {
             if let Err(e) = sta.send_keep_alive_resp_frame() {
                 error!("error sending keep alive frame: {}", e);
             }
         }
 
-        const MSDU_TRACE_NAME: &'static std::ffi::CStr = cstr!("States::on_data_frame => MSDU");
-
         // Handle aggregated and non-aggregated MSDUs.
-        for msdu in msdus {
+        for msdu in data_frame {
             wtrace::duration_begin!(MSDU_TRACE_NAME);
 
-            let mac::Msdu { dst_addr, src_addr, llc_frame } = &msdu;
-            match llc_frame.hdr.protocol_id.to_native() {
-                // Forward EAPoL frames to SME independent of the controlled port's
-                // status.
+            match msdu.llc_frame.hdr.protocol_id.to_native() {
+                // Forward EAPoL frames to SME independently of the controlled port's status.
                 mac::ETHER_TYPE_EAPOL => {
+                    let mac::Msdu { dst_addr, src_addr, llc_frame } = msdu;
                     if let Err(e) =
-                        sta.send_eapol_indication(*src_addr, *dst_addr, &llc_frame.body[..])
+                        sta.send_eapol_indication(src_addr, dst_addr, &llc_frame.body[..])
                     {
                         wtrace::duration_end!(
                             MSDU_TRACE_NAME,
@@ -1066,16 +1059,9 @@ impl States {
                 );
                 states
             }
-            mac::MacFrame::Data { fixed_fields, addr4, qos_ctrl, body, .. } => {
+            mac::MacFrame::Data(data_frame) => {
                 if let States::Associated(state) = &mut self {
-                    state.on_data_frame(
-                        sta,
-                        &fixed_fields,
-                        addr4.map(|x| *x),
-                        qos_ctrl.map(|x| x.get()),
-                        body,
-                        async_id,
-                    );
+                    state.on_data_frame(sta, data_frame, async_id);
                     state.extract_and_record_signal_dbm(rx_info);
                 } else {
                     // Drop data frames in all other states
@@ -2208,9 +2194,9 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = Associated(empty_association(&mut sta));
 
-        let data_frame = make_data_frame_single_llc(None, None);
-        let (fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
+        let bytes = make_data_frame_single_llc(None, None);
+        let data_frame = mac::DataFrame::parse(bytes.as_slice(), false).unwrap();
+        state.on_data_frame(&mut sta, data_frame, 0.into());
 
         // Verify data frame was dropped.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2225,9 +2211,9 @@ mod tests {
         let state =
             Associated(Association { controlled_port_open: true, ..empty_association(&mut sta) });
 
-        let data_frame = make_data_frame_single_llc(None, None);
-        let (fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
+        let bytes = make_data_frame_single_llc(None, None);
+        let data_frame = mac::DataFrame::parse(bytes.as_slice(), false).unwrap();
+        state.on_data_frame(&mut sta, data_frame, 0.into());
 
         // Verify data frame was processed.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
@@ -2249,9 +2235,9 @@ mod tests {
         let state =
             Associated(Association { controlled_port_open: true, ..empty_association(&mut sta) });
 
-        let data_frame = make_data_frame_single_llc_payload(None, None, &[]);
-        let (fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
+        let bytes = make_data_frame_single_llc_payload(None, None, &[]);
+        let data_frame = mac::DataFrame::parse(bytes.as_slice(), false).unwrap();
+        state.on_data_frame(&mut sta, data_frame, 0.into());
 
         // Verify data frame was discarded.
         assert!(m.fake_device_state.lock().eth_queue.is_empty());
@@ -2273,19 +2259,19 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = Associated(Association { controlled_port_open, ..empty_association(&mut sta) });
 
-        let data_frame = make_null_data_frame();
-        let (fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
+        let bytes = make_null_data_frame();
+        let data_frame = mac::DataFrame::parse(bytes.as_slice(), false).unwrap();
+        state.on_data_frame(&mut sta, data_frame, 0.into());
 
         // Verify data frame was not forwarded up.
         assert!(m.fake_device_state.lock().eth_queue.is_empty());
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
-        let data_frame = &m.fake_device_state.lock().wlan_queue[0].0;
-        let (resp_header, _, _, resp_body) = parse_data_frame(&data_frame[..]);
-        let fc = resp_header.frame_ctrl;
-        assert_eq!(fc.to_ds(), true);
-        assert_eq!(fc.from_ds(), false);
-        assert!(resp_body.is_empty());
+        let bytes = &m.fake_device_state.lock().wlan_queue[0].0;
+        let data_frame = mac::DataFrame::parse(bytes.as_slice(), false).unwrap();
+        let frame_ctrl = data_frame.frame_ctrl();
+        assert_eq!(frame_ctrl.to_ds(), true);
+        assert_eq!(frame_ctrl.from_ds(), false);
+        assert!(data_frame.body.is_empty());
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -2296,9 +2282,9 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = Associated(empty_association(&mut sta));
 
-        let (src_addr, dst_addr, eapol_frame) = make_eapol_frame(*IFACE_MAC);
-        let (fixed, addr4, qos, body) = parse_data_frame(&eapol_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
+        let (src_addr, dst_addr, bytes) = make_eapol_frame(*IFACE_MAC);
+        let data_frame = mac::DataFrame::parse(bytes.as_slice(), false).unwrap();
+        state.on_data_frame(&mut sta, data_frame, 0.into());
 
         // Verify EAPOL frame was not sent to netstack.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2327,9 +2313,9 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = Associated(empty_association(&mut sta));
 
-        let (src_addr, dst_addr, eapol_frame) = make_eapol_frame(*IFACE_MAC);
-        let (fixed, addr4, qos, body) = parse_data_frame(&eapol_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
+        let (src_addr, dst_addr, bytes) = make_eapol_frame(*IFACE_MAC);
+        let data_frame = mac::DataFrame::parse(bytes.as_slice(), false).unwrap();
+        state.on_data_frame(&mut sta, data_frame, 0.into());
 
         // Verify EAPOL frame was not sent to netstack.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2359,9 +2345,9 @@ mod tests {
         let state =
             Associated(Association { controlled_port_open: true, ..empty_association(&mut sta) });
 
-        let data_frame = make_data_frame_amsdu();
-        let (fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
+        let bytes = make_data_frame_amsdu();
+        let data_frame = mac::DataFrame::parse(bytes.as_slice(), false).unwrap();
+        state.on_data_frame(&mut sta, data_frame, 0.into());
 
         let queue = &m.fake_device_state.lock().eth_queue;
         assert_eq!(queue.len(), 2);
@@ -2395,10 +2381,11 @@ mod tests {
             ..empty_association(&mut sta)
         });
 
-        let data_frame = make_data_frame_single_llc(None, None);
-        let (mut fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        fixed.frame_ctrl = fixed.frame_ctrl.with_more_data(true);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
+        let mut bytes = make_data_frame_single_llc(None, None);
+        let mut data_frame = mac::DataFrame::parse(bytes.as_mut_slice(), false).unwrap();
+        data_frame.fixed_fields.frame_ctrl =
+            data_frame.fixed_fields.frame_ctrl.with_more_data(true);
+        state.on_data_frame(&mut sta, data_frame, 0.into());
 
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -2460,10 +2447,11 @@ mod tests {
 
         // Closed Controlled port
         let state = Associated(empty_association(&mut sta));
-        let data_frame = make_data_frame_single_llc(None, None);
-        let (mut fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        fixed.frame_ctrl = fixed.frame_ctrl.with_more_data(true);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
+        let mut bytes = make_data_frame_single_llc(None, None);
+        let mut data_frame = mac::DataFrame::parse(bytes.as_mut_slice(), false).unwrap();
+        data_frame.fixed_fields.frame_ctrl =
+            data_frame.fixed_fields.frame_ctrl.with_more_data(true);
+        state.on_data_frame(&mut sta, data_frame, 0.into());
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
 
         // Foreign management frame
@@ -3213,18 +3201,6 @@ mod tests {
         state = state.on_mac_frame(&mut sta, &deauth[..], rx_info, 0.into());
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
-    }
-
-    fn parse_data_frame(
-        bytes: &[u8],
-    ) -> (mac::FixedDataHdrFields, Option<MacAddr>, Option<mac::QosControl>, &[u8]) {
-        let parsed_frame = mac::MacFrame::parse(bytes, false).expect("invalid frame");
-        match parsed_frame {
-            mac::MacFrame::Data { fixed_fields, addr4, qos_ctrl, body, .. } => {
-                (*fixed_fields, addr4.map(|x| *x), qos_ctrl.map(|x| x.get()), body)
-            }
-            _ => panic!("error parsing data frame"),
-        }
     }
 
     #[test_case(false, false; "unprotected bss, not scanning")]

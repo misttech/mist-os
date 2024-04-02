@@ -53,7 +53,6 @@ pub trait AsBytesExt: AsBytes + NoCell + Sized {
 
 impl<T> AsBytesExt for T where T: AsBytes + NoCell + Sized {}
 
-// TODO(https://fxbug.dev/42079361): Use this in the `MacFrame::Data` variant.
 pub struct DataFrame<B> {
     // Data Header: fixed fields
     pub fixed_fields: Ref<B, FixedDataHdrFields>,
@@ -69,38 +68,47 @@ impl<B> DataFrame<B>
 where
     B: ByteSlice,
 {
-    pub fn parse(bytes: B, is_body_aligned: bool) -> Option<Self> {
-        let mut reader = BufferReader::new(bytes);
+    pub fn parse(reader: impl IntoBufferReader<B>, is_body_aligned: bool) -> Option<Self> {
+        let reader = reader.into_buffer_reader();
         let fc = FrameControl(reader.peek_value()?);
         matches!(fc.frame_type(), FrameType::DATA)
-            .then(|| {
-                // Parse fixed header fields
-                let fixed_fields = reader.read()?;
-
-                // Parse optional header fields
-                let addr4 = if fc.to_ds() && fc.from_ds() { Some(reader.read()?) } else { None };
-                let qos_ctrl =
-                    if fc.data_subtype().qos() { Some(reader.read_unaligned()?) } else { None };
-                let ht_ctrl = if fc.htc_order() { Some(reader.read_unaligned()?) } else { None };
-
-                // Skip optional padding if body alignment is used.
-                if is_body_aligned {
-                    let full_hdr_len = FixedDataHdrFields::len(
-                        Presence::<Addr4>::from_bool(addr4.is_some()),
-                        Presence::<QosControl>::from_bool(qos_ctrl.is_some()),
-                        Presence::<HtControl>::from_bool(ht_ctrl.is_some()),
-                    );
-                    skip_body_alignment_padding(full_hdr_len, &mut reader)?
-                };
-                Some(DataFrame {
-                    fixed_fields,
-                    addr4,
-                    qos_ctrl,
-                    ht_ctrl,
-                    body: reader.into_remaining(),
-                })
-            })
+            .then(|| DataFrame::parse_frame_type_unchecked(reader, is_body_aligned))
             .flatten()
+    }
+
+    fn parse_frame_type_unchecked(
+        reader: impl IntoBufferReader<B>,
+        is_body_aligned: bool,
+    ) -> Option<Self> {
+        let mut reader = reader.into_buffer_reader();
+        let fc = FrameControl(reader.peek_value()?);
+
+        // Parse fixed header fields
+        let fixed_fields = reader.read()?;
+
+        // Parse optional header fields
+        let addr4 = if fc.to_ds() && fc.from_ds() { Some(reader.read()?) } else { None };
+        let qos_ctrl = if fc.data_subtype().qos() { Some(reader.read_unaligned()?) } else { None };
+        let ht_ctrl = if fc.htc_order() { Some(reader.read_unaligned()?) } else { None };
+
+        // Skip optional padding if body alignment is used.
+        if is_body_aligned {
+            let full_hdr_len = FixedDataHdrFields::len(
+                Presence::<Addr4>::from_bool(addr4.is_some()),
+                Presence::<QosControl>::from_bool(qos_ctrl.is_some()),
+                Presence::<HtControl>::from_bool(ht_ctrl.is_some()),
+            );
+            skip_body_alignment_padding(full_hdr_len, &mut reader)?
+        };
+        Some(DataFrame { fixed_fields, addr4, qos_ctrl, ht_ctrl, body: reader.into_remaining() })
+    }
+
+    pub fn frame_ctrl(&self) -> FrameControl {
+        self.fixed_fields.frame_ctrl
+    }
+
+    pub fn data_subtype(&self) -> DataSubtype {
+        self.frame_ctrl().data_subtype()
     }
 }
 
@@ -108,7 +116,7 @@ impl<B> IntoIterator for DataFrame<B>
 where
     B: ByteSlice,
 {
-    type IntoIter = MsduIterator<B>;
+    type IntoIter = IntoMsduIter<B>;
     type Item = Msdu<B>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -182,17 +190,7 @@ where
 
 pub enum MacFrame<B> {
     Mgmt(MgmtFrame<B>),
-    // TODO(https://fxbug.dev/42079361): Implement a dedicated type for control frames.
-    Data {
-        // Data Header: fixed fields
-        fixed_fields: Ref<B, FixedDataHdrFields>,
-        // Data Header: optional fields
-        addr4: Option<Ref<B, Addr4>>,
-        qos_ctrl: Option<UnalignedView<B, QosControl>>,
-        ht_ctrl: Option<UnalignedView<B, HtControl>>,
-        // Body
-        body: B,
-    },
+    Data(DataFrame<B>),
     // TODO(https://fxbug.dev/42079361): Implement a dedicated type for control frames.
     Ctrl {
         // Control Header: frame control
@@ -216,33 +214,7 @@ impl<B: ByteSlice> MacFrame<B> {
                 MgmtFrame::parse_frame_type_unchecked(reader, body_aligned).map(From::from)
             }
             FrameType::DATA => {
-                // Parse fixed header fields
-                let fixed_fields = reader.read()?;
-
-                // Parse optional header fields
-                let addr4 = if fc.to_ds() && fc.from_ds() { Some(reader.read()?) } else { None };
-
-                let qos_ctrl =
-                    if fc.data_subtype().qos() { Some(reader.read_unaligned()?) } else { None };
-
-                let ht_ctrl = if fc.htc_order() { Some(reader.read_unaligned()?) } else { None };
-
-                // Skip optional padding if body alignment is used.
-                if body_aligned {
-                    let full_hdr_len = FixedDataHdrFields::len(
-                        Presence::<Addr4>::from_bool(addr4.is_some()),
-                        Presence::<QosControl>::from_bool(qos_ctrl.is_some()),
-                        Presence::<HtControl>::from_bool(ht_ctrl.is_some()),
-                    );
-                    skip_body_alignment_padding(full_hdr_len, &mut reader)?
-                };
-                Some(MacFrame::Data {
-                    fixed_fields,
-                    addr4,
-                    qos_ctrl,
-                    ht_ctrl,
-                    body: reader.into_remaining(),
-                })
+                DataFrame::parse_frame_type_unchecked(reader, body_aligned).map(From::from)
             }
             FrameType::CTRL => {
                 // Parse frame control.
@@ -251,6 +223,12 @@ impl<B: ByteSlice> MacFrame<B> {
             }
             _type => Some(MacFrame::Unsupported { frame_ctrl: fc }),
         }
+    }
+}
+
+impl<B> From<DataFrame<B>> for MacFrame<B> {
+    fn from(data: DataFrame<B>) -> Self {
+        MacFrame::Data(data)
     }
 }
 
@@ -323,7 +301,7 @@ mod tests {
         let bytes = make_data_frame_single_llc(None, None);
         assert_variant!(
             MacFrame::parse(&bytes[..], false),
-            Some(MacFrame::Data { fixed_fields, addr4, qos_ctrl, ht_ctrl, body }) => {
+            Some(MacFrame::Data(DataFrame { fixed_fields, addr4, qos_ctrl, ht_ctrl, body })) => {
                 assert_eq!(0b00000000_10001000, { fixed_fields.frame_ctrl.0 });
                 assert_eq!(0x0202, { fixed_fields.duration });
                 assert_eq!(MacAddr::from([3, 3, 3, 3, 3, 3]), fixed_fields.addr1);

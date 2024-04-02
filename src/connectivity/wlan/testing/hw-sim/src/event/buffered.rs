@@ -20,7 +20,7 @@ use {
         self, ActionBody, AssocReqFrame as ParsedAssocReqFrame,
         AssocRespFrame as ParsedAssocRespFrame, AuthFrame as ParsedAuthFrame,
         DataFrame as ParsedDataFrame, MacFrame as ParsedMacFrame, MgmtFrame as ParsedMgmtFrame,
-        MsduIterator, NoAck, ProbeReqFrame as ParsedProbeReqFrame,
+        NoAck, ProbeReqFrame as ParsedProbeReqFrame,
     },
     zerocopy::ByteSlice,
 };
@@ -388,13 +388,6 @@ where
     /// Gets the parsed `zerocopy` type.
     pub fn get(&self) -> T::Output<&'_ [u8]> {
         T::parse(self.buffer.as_slice()).expect("buffered data failed to reparse")
-    }
-}
-
-impl Buffered<DataFrame> {
-    /// Gets an iterator over the MSDUs in a MAC data frame.
-    pub fn msdus(&self) -> MsduIterator<&'_ [u8]> {
-        self.get().into()
     }
 }
 

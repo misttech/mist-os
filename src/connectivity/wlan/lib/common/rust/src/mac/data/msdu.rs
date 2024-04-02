@@ -6,7 +6,7 @@ use {
     crate::{
         big_endian::BigEndianU16,
         buffer_reader::BufferReader,
-        mac::{data::*, DataFrame, MacAddr, MacFrame},
+        mac::{data::*, DataFrame, MacAddr},
     },
     zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned},
 };
@@ -33,15 +33,23 @@ pub struct LlcFrame<B> {
     pub body: B,
 }
 
-/// An LLC frame is only valid if it contains enough bytes for header AND at least 1 byte for body
-impl<B: ByteSlice> LlcFrame<B> {
-    pub fn parse(bytes: B) -> Option<Self> {
+impl<B> LlcFrame<B> {
+    pub fn parse(bytes: B) -> Option<Self>
+    where
+        B: ByteSlice,
+    {
+        // An LLC frame is only valid if it contains enough bytes for the header and one or more
+        // bytes for the body.
         let (hdr, body) = Ref::new_unaligned_from_prefix(bytes)?;
         if body.is_empty() {
             None
         } else {
             Some(Self { hdr, body })
         }
+    }
+
+    pub fn into_body(self) -> B {
+        self.body
     }
 }
 
@@ -52,86 +60,76 @@ pub struct Msdu<B> {
     pub llc_frame: LlcFrame<B>,
 }
 
-/// An iterator to iterate over aggregated and non-aggregated MSDUs.
-/// For convenience, the iterator also supports NULL data frames.
-pub enum MsduIterator<B> {
-    /// Iterator for a regular data frame carrying a single MSDU.
+impl<B> Msdu<B> {
+    pub fn into_body(self) -> B {
+        self.llc_frame.into_body()
+    }
+}
+
+/// Iterator over the MSDUs of a data frame.
+///
+/// This iterator supports NULL, non-aggregated, and aggregated data fields, which yield zero, one,
+/// and zero or more MSDUs, respectively.
+pub struct IntoMsduIter<B> {
+    subtype: MsduIterSubtype<B>,
+}
+
+impl<B> From<DataFrame<B>> for IntoMsduIter<B>
+where
+    B: ByteSlice,
+{
+    fn from(frame: DataFrame<B>) -> Self {
+        IntoMsduIter { subtype: frame.into() }
+    }
+}
+
+impl<B> Iterator for IntoMsduIter<B>
+where
+    B: ByteSlice,
+{
+    // TODO(https://fxbug.dev/330761628): The item should probably be `Result<Msdu<B>, _>` so that
+    //                                    client code can distinguish between exhausting the
+    //                                    iterator and a parse failure (which is unexpected and
+    //                                    likely indicates a meaningful error).
+    type Item = Msdu<B>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.subtype {
+            MsduIterSubtype::Null => None,
+            MsduIterSubtype::Llc { dst_addr, src_addr, ref mut body } => body
+                .take()
+                .and_then(LlcFrame::parse)
+                .map(|llc_frame| Msdu { dst_addr, src_addr, llc_frame }),
+            MsduIterSubtype::Amsdu(ref mut reader) => AmsduSubframe::parse(reader)
+                .and_then(|AmsduSubframe { hdr, body }| {
+                    LlcFrame::parse(body).map(|llc_frame| (hdr, llc_frame))
+                })
+                .map(|(hdr, llc_frame)| Msdu { dst_addr: hdr.da, src_addr: hdr.sa, llc_frame }),
+        }
+    }
+}
+
+enum MsduIterSubtype<B> {
+    /// Non-aggregated data frame (exactly one MSDU).
     Llc { dst_addr: MacAddr, src_addr: MacAddr, body: Option<B> },
-    /// Iterator for data frames carrying aggregated MSDUs.
+    /// Aggregated data frame (zero or more MSDUs).
     Amsdu(BufferReader<B>),
-    /// Iterator for NULL data frames.
+    /// NULL data frame (zero MSDUs).
     Null,
 }
 
-impl<B: ByteSlice> Iterator for MsduIterator<B> {
-    type Item = Msdu<B>;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            MsduIterator::Null => None,
-            MsduIterator::Llc { dst_addr, src_addr, body } => {
-                let body = body.take()?;
-                let llc_frame = LlcFrame::parse(body)?;
-                Some(Msdu { dst_addr: *dst_addr, src_addr: *src_addr, llc_frame })
-            }
-            MsduIterator::Amsdu(reader) => {
-                let AmsduSubframe { hdr, body } = AmsduSubframe::parse(reader)?;
-                let llc_frame = LlcFrame::parse(body)?;
-                Some(Msdu { dst_addr: hdr.da, src_addr: hdr.sa, llc_frame })
-            }
-        }
-    }
-}
-
-impl<B: ByteSlice> MsduIterator<B> {
-    pub fn from_data_frame_parts(
-        fixed_fields: FixedDataHdrFields,
-        addr4: Option<Addr4>,
-        qos_ctrl: Option<QosControl>,
-        body: B,
-    ) -> Self {
-        let fc = fixed_fields.frame_ctrl;
-        if fc.data_subtype().null() {
-            MsduIterator::Null
-        } else if qos_ctrl.is_some_and(|x| x.amsdu_present()) {
-            MsduIterator::Amsdu(BufferReader::new(body))
-        } else {
-            MsduIterator::Llc {
-                dst_addr: data_dst_addr(&fixed_fields),
-                // Safe to unwrap because data frame parsing has been successful.
-                src_addr: data_src_addr(&fixed_fields, addr4).unwrap(),
-                body: Some(body),
-            }
-        }
-    }
-
-    /// If `body_aligned` is |true| the frame's body is expected to be 4 byte aligned.
-    pub fn from_raw_data_frame(data_frame: B, body_aligned: bool) -> Option<Self> {
-        match MacFrame::parse(data_frame, body_aligned)? {
-            MacFrame::Data { fixed_fields, addr4, qos_ctrl, body, .. } => {
-                Some(Self::from_data_frame_parts(
-                    *fixed_fields,
-                    addr4.map(|a| *a),
-                    qos_ctrl.map(|x| x.get()),
-                    body,
-                ))
-            }
-            _ => None,
-        }
-    }
-}
-
-impl<B> From<DataFrame<B>> for MsduIterator<B>
+impl<B> From<DataFrame<B>> for MsduIterSubtype<B>
 where
     B: ByteSlice,
 {
     fn from(frame: DataFrame<B>) -> Self {
         let fc = frame.fixed_fields.frame_ctrl;
         if fc.data_subtype().null() {
-            MsduIterator::Null
+            MsduIterSubtype::Null
         } else if frame.qos_ctrl.is_some_and(|qos_ctrl| qos_ctrl.get().amsdu_present()) {
-            MsduIterator::Amsdu(BufferReader::new(frame.body))
+            MsduIterSubtype::Amsdu(BufferReader::new(frame.body))
         } else {
-            MsduIterator::Llc {
+            MsduIterSubtype::Llc {
                 dst_addr: data_dst_addr(&frame.fixed_fields),
                 src_addr: data_src_addr(&frame.fixed_fields, frame.addr4.map(|addr4| *addr4))
                     .expect("failed to reparse data frame source address"),
@@ -145,68 +143,73 @@ where
 mod tests {
     use {
         super::*,
-        crate::{assert_variant, test_utils::fake_frames::*},
+        crate::{
+            assert_variant,
+            mac::{self, data},
+            test_utils::fake_frames::*,
+        },
     };
 
     #[test]
-    fn msdu_iterator_single_llc() {
+    fn msdu_iter_non_aggregated() {
         let bytes = make_data_frame_single_llc(None, None);
-        let msdus = MsduIterator::from_raw_data_frame(&bytes[..], false);
-        assert!(msdus.is_some());
-        let mut found_msdu = false;
-        for Msdu { dst_addr, src_addr, llc_frame } in msdus.unwrap() {
-            assert!(!found_msdu, "unexpected MSDU: {:x?}", llc_frame.body);
-            assert_eq!(dst_addr, MacAddr::from([3; 6]));
-            assert_eq!(src_addr, MacAddr::from([4; 6]));
-            assert_eq!(llc_frame.hdr.protocol_id.to_native(), 9 << 8 | 10);
-            assert_eq!(llc_frame.body, [11; 3]);
-            found_msdu = true;
-        }
-        assert!(found_msdu);
-    }
-
-    #[test]
-    fn msdu_iterator_single_llc_padding() {
-        let bytes = make_data_frame_with_padding();
-        let msdus = MsduIterator::from_raw_data_frame(&bytes[..], true);
-        assert!(msdus.is_some());
-        let mut found_msdu = false;
-        for Msdu { dst_addr, src_addr, llc_frame } in msdus.unwrap() {
-            assert!(!found_msdu, "unexpected MSDU: {:x?}", llc_frame.body);
-            assert_eq!(dst_addr, MacAddr::from([3; 6]));
-            assert_eq!(src_addr, MacAddr::from([4; 6]));
-            assert_eq!(llc_frame.hdr.protocol_id.to_native(), 9 << 8 | 10);
-            assert_eq!(llc_frame.body, [11; 5]);
-            found_msdu = true;
-        }
-        assert!(found_msdu);
-    }
-
-    #[test]
-    fn parse_llc_with_addr4_ht_ctrl() {
-        let bytes =
-            make_data_frame_single_llc(Some(MacAddr::from([1, 2, 3, 4, 5, 6])), Some([4, 3, 2, 1]));
-        assert_variant!(
-            MacFrame::parse(&bytes[..], false),
-            Some(MacFrame::Data { body, .. }) => {
-                let llc = LlcFrame::parse(body).expect("LLC frame too short");
-                assert_eq!(7, llc.hdr.dsap);
-                assert_eq!(7, llc.hdr.ssap);
-                assert_eq!(7, llc.hdr.control);
-                assert_eq!([8, 8, 8], llc.hdr.oui);
-                assert_eq!([9, 10], llc.hdr.protocol_id.0);
-                assert_eq!(0x090A, llc.hdr.protocol_id.to_native());
-                assert_eq!(&[11, 11, 11], llc.body);
+        data::harness::assert_msdus_exactly_one_eq(
+            mac::DataFrame::parse(bytes.as_slice(), false)
+                .expect("failed to parse non-aggregated data frame"),
+            mac::Msdu {
+                dst_addr: mac::MacAddr::from([3; 6]),
+                src_addr: mac::MacAddr::from([4; 6]),
+                llc_frame: mac::LlcFrame {
+                    hdr: Ref::new(&[7, 7, 7, 8, 8, 8, 9, 10][..]).unwrap(),
+                    body: &[11; 3][..],
+                },
             },
-            "expected data frame"
         );
     }
 
     #[test]
-    fn parse_null_data() {
+    fn msdu_iter_non_aggregated_with_padding() {
+        let bytes = make_data_frame_with_padding();
+        data::harness::assert_msdus_exactly_one_eq(
+            mac::DataFrame::parse(bytes.as_slice(), true)
+                .expect("failed to parse non-aggregated data frame with padding"),
+            mac::Msdu {
+                dst_addr: mac::MacAddr::from([3; 6]),
+                src_addr: mac::MacAddr::from([4; 6]),
+                llc_frame: mac::LlcFrame {
+                    hdr: Ref::new(&[7, 7, 7, 8, 8, 8, 9, 10][..]).unwrap(),
+                    body: &[11; 5][..],
+                },
+            },
+        );
+    }
+
+    #[test]
+    fn msdu_iter_null() {
         let bytes = make_null_data_frame();
-        let msdus = MsduIterator::from_raw_data_frame(&bytes[..], true);
-        assert_variant!(msdus, Some(MsduIterator::Null), "expected NULL MSDU-Iterator");
-        assert!(msdus.unwrap().next().is_none());
+        let data_frame = mac::DataFrame::parse(bytes.as_slice(), false)
+            .expect("failed to parse NULL data frame");
+        let n = data_frame.into_iter().count();
+        assert_eq!(0, n, "expected no MSDUs, but read {}", n);
+    }
+
+    #[test]
+    fn parse_llc_frame_with_addr4_ht_ctrl() {
+        let bytes =
+            make_data_frame_single_llc(Some(MacAddr::from([1, 2, 3, 4, 5, 6])), Some([4, 3, 2, 1]));
+        assert_variant!(
+            mac::DataFrame::parse(bytes.as_slice(), false),
+            Some(mac::DataFrame { body, .. }) => {
+                let llc_frame = LlcFrame::parse(body).expect("failed to parse LLC frame");
+                assert_eq!(7, llc_frame.hdr.dsap);
+                assert_eq!(7, llc_frame.hdr.ssap);
+                assert_eq!(7, llc_frame.hdr.control);
+                assert_eq!([8, 8, 8], llc_frame.hdr.oui);
+                assert_eq!([9, 10], llc_frame.hdr.protocol_id.0);
+                assert_eq!(0x090A, llc_frame.hdr.protocol_id.to_native());
+                assert_eq!(&[11, 11, 11], llc_frame.body);
+            },
+            "failed to parse data frame",
+        );
     }
 }
