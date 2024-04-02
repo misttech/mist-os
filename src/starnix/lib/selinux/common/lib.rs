@@ -198,7 +198,7 @@ permission_enum! {
 
 macro_rules! class_permission_enum {
     ($(#[$meta:meta])* $name:ident {
-        $($(#[$variant_meta:meta])* $variant:ident),*,
+        $($(#[$variant_meta:meta])* $variant:ident ($variant_name:literal)),*,
     }) => {
         enumerable_enum! {
             $(#[$meta])* $name {
@@ -211,6 +211,14 @@ macro_rules! class_permission_enum {
                 Permission::from(self.clone()).class()
             }
         }
+
+        impl $name {
+            fn name(&self) -> &'static str {
+                match self {
+                    $($name::$variant => $variant_name),*
+                }
+            }
+        }
     }
 }
 
@@ -220,45 +228,27 @@ class_permission_enum! {
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     ProcessPermission {
         /// Permission to fork the current running process.
-        Fork,
+        Fork("fork"),
         /// Permission to transition to a different security domain.
-        Transition,
+        Transition("transition"),
         /// Permission to get scheduling policy currently applied to a process.
-        GetSched,
+        GetSched("getsched"),
         /// Permission to set scheduling policy for a process.
-        SetSched,
+        SetSched("setsched"),
         /// Permission to get the process group ID.
-        GetPgid,
+        GetPgid("getpgid"),
         /// Permission to set the process group ID.
-        SetPgid,
+        SetPgid("setpgid"),
         /// Permission to send a signal other than SIGKILL, SIGSTOP, or SIGCHLD to a process.
-        Signal,
+        Signal("signal"),
         /// Permission to send SIGKILL to a process.
-        SigKill,
+        SigKill("sigkill"),
         /// Permission to send SIGSTOP to a process.
-        SigStop,
+        SigStop("sigstop"),
         /// Permission to send SIGCHLD to a process.
-        SigChld,
+        SigChld("sigchld"),
         /// Permission to trace a process.
-        Ptrace,
-    }
-}
-
-impl ProcessPermission {
-    pub fn name(&self) -> &'static str {
-        match self {
-            ProcessPermission::Fork => "fork",
-            ProcessPermission::Transition => "transition",
-            ProcessPermission::GetSched => "getsched",
-            ProcessPermission::SetSched => "setsched",
-            ProcessPermission::GetPgid => "getpgid",
-            ProcessPermission::SetPgid => "setpgid",
-            ProcessPermission::Signal => "signal",
-            ProcessPermission::SigKill => "sigkill",
-            ProcessPermission::SigStop => "sigstop",
-            ProcessPermission::SigChld => "sigchld",
-            ProcessPermission::Ptrace => "ptrace",
-        }
+        Ptrace("ptrace"),
     }
 }
 
@@ -268,18 +258,9 @@ class_permission_enum! {
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     FilePermission {
         /// Permission to create a file.
-        Create,
+        Create("create"),
         /// Permission to open a file.
-        Open,
-    }
-}
-
-impl FilePermission {
-    pub fn name(&self) -> &'static str {
-        match self {
-            FilePermission::Create => "create",
-            FilePermission::Open => "open",
-        }
+        Open("open"),
     }
 }
 
@@ -325,7 +306,7 @@ pub const FIRST_UNUSED_SID: u32 = ReferenceInitialSid::FirstUnused as u32;
 
 macro_rules! initial_sid_enum {
     ($(#[$meta:meta])* $name:ident {
-        $($(#[$variant_meta:meta])* $variant:ident),*,
+        $($(#[$variant_meta:meta])* $variant:ident ($variant_name: literal)),*,
     }) => {
         $(#[$meta])*
         pub enum $name {
@@ -338,6 +319,12 @@ macro_rules! initial_sid_enum {
                     $($name::$variant),*
                 ]
             }
+
+            pub fn name(&self) -> &'static str {
+                match self {
+                    $($name::$variant => $variant_name),*
+                }
+            }
         }
     }
 }
@@ -347,17 +334,8 @@ initial_sid_enum! {
 /// These must be present in the policy, for it to be valid.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
     InitialSid {
-        Kernel,
-        Unlabeled,
-    }
-}
-
-impl InitialSid {
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Kernel => "kernel",
-            Self::Unlabeled => "unlabeled",
-        }
+        Kernel("kernel"),
+        Unlabeled("unlabeled"),
     }
 }
 
