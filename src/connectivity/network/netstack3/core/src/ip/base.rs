@@ -2079,6 +2079,11 @@ pub(crate) fn receive_ipv4_packet<
             if ttl > 1 {
                 trace!("receive_ipv4_packet: forwarding");
 
+                match core_ctx.filter_handler().forwarding_hook(&mut packet, device, &dst_device) {
+                    crate::filter::Verdict::Drop => return,
+                    crate::filter::Verdict::Accept => {}
+                }
+
                 packet.set_ttl(ttl - 1);
                 let (src, dst, proto, meta) = packet.into_metadata();
                 let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
@@ -2378,6 +2383,11 @@ pub(crate) fn receive_ipv6_packet<
                         trace!("receive_ipv6_packet: handled IPv6 extension headers: forwarding packet");
                     }
                     Ipv6PacketAction::ProcessFragment => unreachable!("When forwarding packets, we should only ever look at the hop by hop options extension header (if present)"),
+                }
+
+                match core_ctx.filter_handler().forwarding_hook(&mut packet, device, &dst_device) {
+                    crate::filter::Verdict::Drop => return,
+                    crate::filter::Verdict::Accept => {}
                 }
 
                 let next_hop = match next_hop {

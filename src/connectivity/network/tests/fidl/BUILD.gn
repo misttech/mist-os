@@ -111,7 +111,7 @@ fuchsia_sharded_test_package("netstack-filter-fidl-tests") {
                "//src/lib/testing/expectation:expectation_comparer",
              ]
       expectations = "expectations/filter.json5"
-      num_shards = 4
+      num_shards = 8
 
       # Matches the first two '::'-delimited parts of the test name, or just the
       # whole name if there are no occurrences of '::'. For example, from
