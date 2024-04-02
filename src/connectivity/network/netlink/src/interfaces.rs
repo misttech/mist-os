@@ -222,7 +222,8 @@ fn map_existing_interface_terminal_error(
 }
 
 /// A request associated with links or addresses.
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
 pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
     /// The resource and operation-specific argument(s) for this request.
     pub args: RequestArgs,

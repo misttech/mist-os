@@ -78,7 +78,7 @@ pub mod route {
         interfaces,
         netlink_packet::{self, errno::Errno, ip_addr_from_bytes},
         routes,
-        rules::{RuleRequest, RuleRequestArgs, RuleRequestHandler, RuleTable},
+        rules::{RuleRequest, RuleRequestArgs},
     };
 
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP, NLM_F_REPLACE};
@@ -148,8 +148,7 @@ pub mod route {
 
     impl ProtocolFamily for NetlinkRoute {
         type InnerMessage = RtnlMessage;
-        type RequestHandler<S: Sender<Self::InnerMessage>> =
-            NetlinkRouteRequestHandler<S, RuleTable>;
+        type RequestHandler<S: Sender<Self::InnerMessage>> = NetlinkRouteRequestHandler<S>;
 
         const NAME: &'static str = "NETLINK_ROUTE";
     }
@@ -157,10 +156,8 @@ pub mod route {
     #[derive(Clone)]
     pub(crate) struct NetlinkRouteRequestHandler<
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
-        R: RuleRequestHandler<S>,
     > {
         pub(crate) unified_request_sink: mpsc::Sender<UnifiedRequest<S>>,
-        pub(crate) rules_request_handler: R,
     }
 
     struct ExtractedAddressRequest {
@@ -616,15 +613,15 @@ pub mod route {
     }
 
     #[async_trait]
-    impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, R: RuleRequestHandler<S>>
-        NetlinkFamilyRequestHandler<NetlinkRoute, S> for NetlinkRouteRequestHandler<S, R>
+    impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>
+        NetlinkFamilyRequestHandler<NetlinkRoute, S> for NetlinkRouteRequestHandler<S>
     {
         async fn handle_request(
             &mut self,
             req: NetlinkMessage<RtnlMessage>,
             client: &mut InternalClient<NetlinkRoute, S>,
         ) {
-            let Self { unified_request_sink, rules_request_handler } = self;
+            let Self { unified_request_sink } = self;
 
             let (req_header, payload) = req.into_parts();
             let req = match payload {
@@ -921,7 +918,10 @@ pub mod route {
                                 sequence_number: req_header.sequence_number,
                                 client: client.clone(),
                         };
-                        match rules_request_handler.handle_request(request) {
+                        let (completer, receiver) = oneshot::channel();
+                        unified_request_sink.send(UnifiedRequest::RuleRequest(request, completer))
+                            .await.expect("event loop should never terminate");
+                        match receiver.await.expect("completer should not be dropped") {
                             Ok(()) => {},
                             Err(e) => {
                                 client.send_unicast(netlink_packet::new_error(Err(e), req_header));
@@ -957,13 +957,16 @@ pub mod route {
                             sequence_number: req_header.sequence_number,
                             client: client.clone(),
                     };
-                    match rules_request_handler.handle_request(request) {
+                    let (completer, receiver) = oneshot::channel();
+                    unified_request_sink.send(UnifiedRequest::RuleRequest(request, completer))
+                        .await.expect("event loop should never terminate");
+                    match receiver.await.expect("completer should not be dropped") {
                         Ok(()) => if expects_ack {
                             client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
                         },
-                        Err(e) => client.send_unicast(
-                            netlink_packet::new_error(Err(e), req_header)
-                        ),
+                        Err(e) => {
+                            client.send_unicast(netlink_packet::new_error(Err(e), req_header));
+                        }
                     }
                 }
                 DelRule(msg) => {
@@ -985,13 +988,16 @@ pub mod route {
                             sequence_number: req_header.sequence_number,
                             client: client.clone(),
                     };
-                    match rules_request_handler.handle_request(request) {
+                    let (completer, receiver) = oneshot::channel();
+                    unified_request_sink.send(UnifiedRequest::RuleRequest(request, completer))
+                        .await.expect("event loop should never terminate");
+                    match receiver.await.expect("completer should not be dropped") {
                         Ok(()) => if expects_ack {
                             client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
                         },
-                        Err(e) => client.send_unicast(
-                            netlink_packet::new_error(Err(e), req_header)
-                        ),
+                        Err(e) => {
+                            client.send_unicast(netlink_packet::new_error(Err(e), req_header));
+                        }
                     }
                 }
                 NewRoute(ref message) => {
@@ -1375,7 +1381,7 @@ mod test {
         netlink_packet::{self, errno::Errno},
         protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler},
         routes,
-        rules::{RuleRequest, RuleRequestArgs, RuleRequestHandler, RuleTable},
+        rules::{RuleRequest, RuleRequestArgs, RuleRequestHandler},
     };
 
     enum ExpectedResponse {
@@ -1452,10 +1458,7 @@ mod test {
     ) {
         let (unified_request_sink, _unified_request_stream) = mpsc::channel(0);
 
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
-            unified_request_sink,
-            rules_request_handler: RuleTable::new(),
-        };
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { unified_request_sink };
 
         let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_1,
@@ -1514,10 +1517,7 @@ mod test {
         );
 
         let (unified_request_sink, unified_request_stream) = mpsc::channel(0);
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
-            unified_request_sink,
-            rules_request_handler: RuleTable::new(),
-        };
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { unified_request_sink };
 
         let mut interfaces_request_stream = unified_request_stream.filter_map(|req| {
             futures::future::ready(match req {
@@ -2856,10 +2856,8 @@ mod test {
         );
 
         let (unified_request_sink, unified_request_stream) = mpsc::channel(0);
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
-            unified_request_sink,
-            rules_request_handler: RuleTable::new(),
-        };
+
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { unified_request_sink };
 
         let (v4_routes_request_sink, mut v4_routes_request_stream) = mpsc::channel(0);
         let (v6_routes_request_sink, mut v6_routes_request_stream) = mpsc::channel(0);
@@ -3325,11 +3323,10 @@ mod test {
         requests_and_responses: Vec<FakeRuleRequestResponse>,
         expected_response: Option<ExpectedResponse>,
     ) {
-        let (unified_request_sink, _unified_request_stream) = mpsc::channel(0);
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
-            unified_request_sink,
-            rules_request_handler: FakeRuleRequestHandler::new(requests_and_responses),
-        };
+        let rules_request_handler = FakeRuleRequestHandler::new(requests_and_responses);
+        let (unified_request_sink, unified_request_stream) = mpsc::channel(0);
+        futures::pin_mut!(unified_request_stream);
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { unified_request_sink };
 
         let (mut client_sink, mut client) = {
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
@@ -3340,15 +3337,29 @@ mod test {
 
         let header = header_with_flags(flags);
 
-        handler
-            .handle_request(
+        futures::select! {
+            () = handler.handle_request(
                 NetlinkMessage::new(
                     header,
                     NetlinkPayload::InnerMessage(rule_fn(default_rule_for_family(address_family))),
                 ),
                 &mut client,
-            )
-            .await;
+            ).fuse() => {},
+            _rules_request_handler = unified_request_stream.fold(
+                rules_request_handler,
+                |mut rules_request_handler, req| async move {
+                    match req {
+                        UnifiedRequest::RuleRequest(request, completer) => {
+                            completer
+                                .send(rules_request_handler.handle_request(request))
+                                .expect("send should succeed");
+                            rules_request_handler
+                        }
+                        _ => panic!("not RuleRequest"),
+                    }
+                }
+            ).fuse() => {},
+        }
 
         match expected_response {
             Some(ExpectedResponse::Ack) => {
@@ -3641,66 +3652,52 @@ mod test {
         };
 
         let (unified_request_sink, unified_request_stream) = mpsc::channel(0);
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
-            unified_request_sink,
-            rules_request_handler: RuleTable::new(),
-        };
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { unified_request_sink };
 
-        let (v4_routes_request_sink, mut v4_routes_request_stream) = mpsc::channel(0);
-        let (v6_routes_request_sink, mut v6_routes_request_stream) = mpsc::channel(0);
-
-        let split_route_requests_background_work = split_route_requests(
-            unified_request_stream,
-            v4_routes_request_sink,
-            v6_routes_request_sink,
-        )
-        .fuse();
-
-        futures::pin_mut!(split_route_requests_background_work);
+        futures::pin_mut!(unified_request_stream);
 
         match req_and_resp {
             None => {
-                {
-                    let handler_fut = handler.handle_request(request, &mut client).fuse();
-                    futures::pin_mut!(handler_fut);
-
-                    futures::select! {
-                        () = split_route_requests_background_work => unreachable!(),
-                        () = handler_fut => (),
-                    }
-                }
-                match I::VERSION {
-                    IpVersion::V4 => {
-                        assert_matches!(v4_routes_request_stream.next().now_or_never(), None)
-                    }
-                    IpVersion::V6 => {
-                        assert_matches!(v6_routes_request_stream.next().now_or_never(), None)
-                    }
-                }
+                handler.handle_request(request, &mut client).await;
+                assert_matches!(unified_request_stream.next().now_or_never(), None);
             }
             Some(RouteRequestAndResponse { request: expected_request, response }) => {
-                let handler_fut =
-                    futures::future::join(handler.handle_request(request, &mut client), async {
+                let ((), ()) =
+                    futures::join!(handler.handle_request(request, &mut client), async {
                         let args = match I::VERSION {
                             IpVersion::V4 => {
-                                let next = v4_routes_request_stream.next();
+                                let next = unified_request_stream.next();
                                 let routes::Request {
                                     args,
                                     sequence_number: _,
                                     client: _,
                                     completer,
-                                } = next.await.expect("handler should send request");
+                                } = match next.await.expect("handler should send request") {
+                                    UnifiedRequest::RoutesV4Request(request) => request,
+                                    UnifiedRequest::InterfacesRequest(_)
+                                    | UnifiedRequest::RoutesV6Request(_)
+                                    | UnifiedRequest::RuleRequest(_, _) => {
+                                        panic!("not RoutesV4Request")
+                                    }
+                                };
                                 completer.send(response).expect("handler should be alive");
                                 RouteRequestArgsEither::V4(args)
                             }
                             IpVersion::V6 => {
-                                let next = v6_routes_request_stream.next();
+                                let next = unified_request_stream.next();
                                 let routes::Request {
                                     args,
                                     sequence_number: _,
                                     client: _,
                                     completer,
-                                } = next.await.expect("handler should send request");
+                                } = match next.await.expect("handler should send request") {
+                                    UnifiedRequest::RoutesV6Request(request) => request,
+                                    UnifiedRequest::InterfacesRequest(_)
+                                    | UnifiedRequest::RoutesV4Request(_)
+                                    | UnifiedRequest::RuleRequest(_, _) => {
+                                        panic!("not RoutesV6Request")
+                                    }
+                                };
                                 completer.send(response).expect("handler should be alive");
                                 RouteRequestArgsEither::V6(args)
                             }
@@ -3733,14 +3730,7 @@ mod test {
                                 assert_eq!(args, expected_request);
                             },
                         );
-                    })
-                    .fuse();
-                futures::pin_mut!(handler_fut);
-
-                futures::select! {
-                    () = split_route_requests_background_work => unreachable!(),
-                    ((), ()) = handler_fut => (),
-                }
+                    });
             }
         }
 

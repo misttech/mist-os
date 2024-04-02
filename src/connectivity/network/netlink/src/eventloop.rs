@@ -12,7 +12,10 @@ use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use futures::{channel::mpsc, FutureExt as _, StreamExt as _};
+use futures::{
+    channel::{mpsc, oneshot},
+    FutureExt as _, StreamExt as _,
+};
 use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 
 use crate::{
@@ -20,14 +23,19 @@ use crate::{
     interfaces,
     logging::{log_debug, log_info},
     messaging::Sender,
+    netlink_packet::errno::Errno,
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
     routes,
+    rules::{self, RuleRequestHandler as _},
 };
 
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
 pub(crate) enum UnifiedRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
     InterfacesRequest(interfaces::Request<S>),
     RoutesV4Request(routes::Request<S, Ipv4>),
     RoutesV6Request(routes::Request<S, Ipv6>),
+    RuleRequest(rules::RuleRequest<S>, oneshot::Sender<Result<(), Errno>>),
 }
 
 impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip> From<routes::Request<S, I>>
@@ -132,6 +140,8 @@ impl<
         .await
         .context("create interfaces worker")?;
 
+        let mut rule_table = rules::RuleTable::new_with_defaults();
+
         let mut unified_pending_request = None::<UnifiedPendingRequest<_>>;
         let mut unified_request_stream = unified_request_stream.chain(futures::stream::pending());
 
@@ -221,6 +231,10 @@ impl<
                             unified_pending_request = routes_v6_worker
                                 .handle_request(&interfaces_proxy, request).await
                                 .map(UnifiedPendingRequest::RoutesV6);
+                        }
+                        UnifiedRequest::RuleRequest(request, completer) => {
+                            completer.send(rule_table.handle_request(request))
+                                .expect("receiving end of completer should not be dropped");
                         }
                     }
                 }

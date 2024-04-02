@@ -11,6 +11,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use derivative::Derivative;
 use either::Either;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
@@ -175,7 +176,7 @@ impl RuleTableInner {
         let matching_rule = candidate_rules
             .into_iter()
             .find(|(_key, rule)| rule_matches_del_pattern(rule, del_pattern));
-        let Some((RuleKey{priority, index} , _rule)) = matching_rule else {
+        let Some((RuleKey { priority, index }, _rule)) = matching_rule else {
             return Err(DelRuleError::NoMatchesForPattern);
         };
 
@@ -329,6 +330,8 @@ pub(crate) enum RuleRequestArgs {
 }
 
 /// A Netlink request related to PBR rules.
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
 pub(crate) struct RuleRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
     /// The arguments for this request.
     pub(crate) args: RuleRequestArgs,

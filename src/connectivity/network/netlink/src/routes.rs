@@ -200,7 +200,8 @@ fn map_route_set_error<I: Ip + fnet_routes_ext::FidlRouteIpExt>(
 }
 
 /// A request associated with routes.
-#[derive(Debug, GenericOverIp)]
+#[derive(Derivative, GenericOverIp)]
+#[derivative(Debug(bound = ""))]
 #[generic_over_ip(I, Ip)]
 pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip> {
     /// The resource and operation-specific argument(s) for this request.
