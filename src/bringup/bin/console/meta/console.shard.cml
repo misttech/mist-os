@@ -208,6 +208,7 @@
             protocol: "fuchsia.hardware.pty.Device",
             from: "#ptysvc",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.sysinfo.SysInfo",

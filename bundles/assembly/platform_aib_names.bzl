@@ -45,6 +45,7 @@ BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
     "kernel_args_eng",
     "kernel_args_userdebug",
     "netsvc",
+    "ptysvc",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap

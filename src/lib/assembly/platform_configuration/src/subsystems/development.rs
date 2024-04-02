@@ -34,6 +34,9 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
         if matches!(config.enabled, Some(true)) || matches!(context.build_type, BuildType::Eng) {
             builder.platform_bundle("netsvc");
         }
+        if matches!(context.build_type, BuildType::Eng | BuildType::UserDebug) {
+            builder.platform_bundle("ptysvc");
+        }
 
         match (context.build_type, &config.authorized_ssh_keys_path) {
             (BuildType::User, Some(_)) => {

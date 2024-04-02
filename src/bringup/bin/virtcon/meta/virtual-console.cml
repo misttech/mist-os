@@ -39,7 +39,6 @@
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.hardware.pty.Device",
                 "fuchsia.sysmem.Allocator",
             ],
         },
@@ -49,6 +48,10 @@
             // Trace manager may be excluded from builds where tracing is not
             // expected to be used for observability, such as in the bringup
             // product and non-eng builds of any product.
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.hardware.pty.Device",
             availability: "optional",
         },
     ],

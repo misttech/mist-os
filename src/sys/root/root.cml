@@ -246,7 +246,6 @@
                 "fuchsia.fshost.BlockWatcher",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-                "fuchsia.hardware.pty.Device",
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
@@ -282,6 +281,12 @@
             from: "#bootstrap",
             to: "#core",
             availability: "optional",
+        },
+        {
+            protocol: "fuchsia.hardware.pty.Device",
+            from: "#bootstrap",
+            to: "#core",
+            availability: "same_as_target",
         },
 
         // Non-zircon services for archivist, svchost, and console.

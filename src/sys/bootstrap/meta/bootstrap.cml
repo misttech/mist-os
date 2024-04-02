@@ -22,10 +22,6 @@
             url: "fuchsia-boot:///miscsvc#meta/miscsvc.cm",
         },
         {
-            name: "ptysvc",
-            url: "fuchsia-boot:///ptysvc#meta/ptysvc.cm",
-        },
-        {
             name: "pwrbtn-monitor",
             url: "fuchsia-boot:///pwrbtn-monitor#meta/pwrbtn-monitor.cm",
 
@@ -175,7 +171,6 @@
             from: "parent",
             to: [
                 "#fshost",
-                "#ptysvc",
                 "#pwrbtn-monitor",
                 "#shutdown_shim",
                 "#sysinfo",
@@ -266,7 +261,6 @@
                 "#device_name_provider",
                 "#fshost",
                 "#miscsvc",
-                "#ptysvc",
                 "#pwrbtn-monitor",
                 "#role_manager",
                 "#shutdown_shim",
@@ -438,6 +432,11 @@
             from: "#device_name_provider",
         },
         {
+            protocol: "fuchsia.hardware.pty.Device",
+            from: "#ptysvc",
+            source_availability: "unknown",
+        },
+        {
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],
             from: "#virtual_console",
             source_availability: "unknown",
@@ -445,10 +444,6 @@
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
-        },
-        {
-            protocol: "fuchsia.hardware.pty.Device",
-            from: "#ptysvc",
         },
         {
             protocol: [

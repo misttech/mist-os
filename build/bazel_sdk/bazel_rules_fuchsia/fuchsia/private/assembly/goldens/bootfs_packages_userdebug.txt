@@ -34,7 +34,7 @@ pkg-cache
 platform-bus
 power
 power-manager
-ptysvc
+?ptysvc
 pwm
 pwrbtn-monitor
 ramdisk

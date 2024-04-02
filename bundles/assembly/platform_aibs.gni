@@ -75,6 +75,7 @@ bootstrap_userdebug_platform_aib_names = [
 
   # Developer
   "netsvc",
+  "ptysvc",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap

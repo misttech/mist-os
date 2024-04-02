@@ -89,7 +89,6 @@
                 "fuchsia.fshost.BlockWatcher",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-                "fuchsia.hardware.pty.Device",
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.kernel.DebugResource",
@@ -130,6 +129,7 @@
         },
         {
             protocol: [
+                "fuchsia.hardware.pty.Device",
                 "fuchsia.tpm.cr50.Cr50",
                 "fuchsia.virtualconsole.SessionManager",
             ],

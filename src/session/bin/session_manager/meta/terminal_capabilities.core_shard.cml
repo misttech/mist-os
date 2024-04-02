@@ -24,7 +24,6 @@
         {
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.hardware.pty.Device",
                 "fuchsia.logger.Log",
                 "fuchsia.space.Manager",
                 "fuchsia.sys2.RealmExplorer.root",
@@ -57,6 +56,12 @@
             from: "#bluetooth-core",
             to: "#session-manager",
             source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.hardware.pty.Device",
+            from: "parent",
+            to: "#session-manager",
+            availability: "optional",
         },
         {
             protocol: "fuchsia.virtualization.LinuxManager",

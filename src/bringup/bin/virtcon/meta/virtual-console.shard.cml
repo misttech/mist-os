@@ -55,6 +55,7 @@
             protocol: "fuchsia.hardware.pty.Device",
             from: "#ptysvc",
             to: "#virtual_console",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",

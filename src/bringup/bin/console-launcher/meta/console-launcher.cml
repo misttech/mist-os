@@ -84,7 +84,6 @@
                 "fuchsia.feedback.DataProvider",
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.hardware.pty.Device",
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.kernel.InfoResource",
@@ -158,6 +157,13 @@
             protocol: "fuchsia.boot.RootResource",
 
             // This is not available on user builds.
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.hardware.pty.Device",
+
+            // The source of this protocol, ptysvc,
+            // may not be available on all products.
             availability: "optional",
         },
     ],
