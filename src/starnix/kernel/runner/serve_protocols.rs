@@ -25,9 +25,9 @@ use starnix_core::{
     },
 };
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, TaskRelease, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, TaskRelease};
 use starnix_uapi::{open_flags::OpenFlags, uapi};
-use std::{ffi::CString, sync::Arc};
+use std::{ffi::CString, ops::DerefMut, sync::Arc};
 
 use super::start_component;
 
@@ -143,7 +143,6 @@ pub async fn serve_container_controller(
     request_stream
         .map_err(Error::from)
         .try_for_each_concurrent(None, |event| async {
-            let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320465852): Reuse an existing Locked context
             match event {
                 fstarcontainer::ControllerRequest::VsockConnect {
                     payload:
@@ -163,8 +162,14 @@ pub async fn serve_container_controller(
                     });
                 }
                 fstarcontainer::ControllerRequest::SpawnConsole { payload, responder } => {
-                    responder
-                        .send(spawn_console(&mut locked, system_task.kernel(), payload).await?)?;
+                    responder.send(
+                        spawn_console(
+                            system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
+                            system_task.kernel(),
+                            payload,
+                        )
+                        .await?,
+                    )?;
                 }
                 fstarcontainer::ControllerRequest::GetVmoReferences { payload, responder } => {
                     if let Some(koid) = payload.koid {

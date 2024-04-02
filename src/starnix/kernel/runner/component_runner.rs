@@ -27,7 +27,7 @@ use starnix_core::{
     vfs::{FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount},
 };
 use starnix_logging::{log_error, log_info};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex};
 use starnix_uapi::{
     auth::{Capabilities, Credentials},
     device_type::DeviceType,
@@ -39,7 +39,7 @@ use starnix_uapi::{
     ownership::WeakRef,
     signals::{SIGINT, SIGKILL},
 };
-use std::{ffi::CString, os::unix::ffi::OsStrExt, path::Path, sync::Arc};
+use std::{ffi::CString, ops::DerefMut, os::unix::ffi::OsStrExt, path::Path, sync::Arc};
 
 /// Component controller epitaph value used as the base value to pass non-zero error
 /// codes to the calling component.
@@ -62,12 +62,14 @@ pub async fn start_component(
     controller: ServerEnd<ComponentControllerMarker>,
     system_task: &CurrentTask,
 ) -> Result<(), Error> {
-    let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320465852): Reuse an existing Locked context
     let url = start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
     log_info!("start_component: {}", url);
 
     // TODO(https://fxbug.dev/42076551): We leak the directory created by this function.
-    let component_path = generate_component_path(&mut locked, system_task)?;
+    let component_path = generate_component_path(
+        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
+        system_task,
+    )?;
 
     let mount_record = Arc::new(Mutex::new(MountRecord::default()));
 
@@ -88,7 +90,7 @@ pub async fn start_component(
                     // We may want to transition to have these directories unique per component
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
                     mount_record.lock().mount_remote(
-                        &mut locked,
+                        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
                         system_task,
                         &dir_proxy,
                         &dir_path,
@@ -97,7 +99,7 @@ pub async fn start_component(
                 _ => {
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
                     mount_record.lock().mount_remote(
-                        &mut locked,
+                        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
                         system_task,
                         &dir_proxy,
                         &format!("{component_path}/{dir_path}"),
@@ -156,8 +158,11 @@ pub async fn start_component(
     );
 
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
-    let current_task =
-        CurrentTask::create_init_child_process(&mut locked, system_task.kernel(), &binary_path)?;
+    let current_task = CurrentTask::create_init_child_process(
+        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
+        system_task.kernel(),
+        &binary_path,
+    )?;
 
     let weak_task = execute_task_with_prerun_result(
         current_task,

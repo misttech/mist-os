@@ -45,7 +45,6 @@ rustc_binary("starnix_kernel_bin") {
     ":starnix_core",
     ":starnix_kernel_runner",
     ":starnix_logging",
-    ":starnix_sync",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",

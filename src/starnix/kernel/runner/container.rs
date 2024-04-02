@@ -45,7 +45,7 @@ use starnix_kernel_config::Config;
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::{
     errno,
     errors::{SourceContext, ENOENT},
@@ -54,7 +54,7 @@ use starnix_uapi::{
     resource_limits::Resource,
     rlimit,
 };
-use std::{collections::BTreeMap, ffi::CString, sync::Arc};
+use std::{collections::BTreeMap, ffi::CString, ops::DerefMut, sync::Arc};
 
 /// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
 /// handles for the container's component controller and `/pkg` directory.
@@ -165,7 +165,6 @@ impl Container {
 
     async fn serve_outgoing_directory(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
         outgoing_dir: Option<zx::Channel>,
     ) -> Result<(), Error> {
         if let Some(outgoing_dir) = outgoing_dir {
@@ -181,7 +180,11 @@ impl Container {
             // Expose the root of the container's filesystem.
             let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
             fs.add_remote("fs_root", fs_root);
-            expose_root(locked, self.system_task(), fs_root_server_end)?;
+            expose_root(
+                self.kernel.kthreads.unlocked_for_async().deref_mut(),
+                self.system_task(),
+                fs_root_server_end,
+            )?;
 
             fs.serve_connection(outgoing_dir.into()).map_err(|_| errno!(EINVAL))?;
 
@@ -217,13 +220,9 @@ impl Container {
         Ok(())
     }
 
-    pub async fn serve(
-        &self,
-        locked: &mut Locked<'_, Unlocked>,
-        service_config: ContainerServiceConfig,
-    ) -> Result<(), Error> {
+    pub async fn serve(&self, service_config: ContainerServiceConfig) -> Result<(), Error> {
         let (r, _) = futures::join!(
-            self.serve_outgoing_directory(locked, service_config.config.outgoing_dir),
+            self.serve_outgoing_directory(service_config.config.outgoing_dir),
             server_component_controller(service_config.request_stream, service_config.receiver)
         );
         r
@@ -284,14 +283,13 @@ pub async fn create_component_from_stream(
     if let Some(event) = request_stream.try_next().await? {
         match event {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
-                let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320465852): Reuse an existing Locked context
                 let request_stream = controller.into_stream()?;
                 let mut config = get_config_from_component_start_info(start_info);
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
                 let container =
-                    create_container(&mut locked, &mut config, sender).await.with_source_context(
-                        || format!("creating container \"{}\"", &config.config.name),
-                    )?;
+                    create_container(&mut config, sender).await.with_source_context(|| {
+                        format!("creating container \"{}\"", &config.config.name)
+                    })?;
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
 
                 container.kernel.kthreads.spawn_future({
@@ -316,7 +314,6 @@ pub async fn create_component_from_stream(
 }
 
 async fn create_container(
-    locked: &mut Locked<'_, Unlocked>,
     config: &mut ConfigWrapper,
     task_complete: oneshot::Sender<TaskResult>,
 ) -> Result<Container, Error> {
@@ -379,14 +376,24 @@ async fn create_container(
         security_server,
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
-    let fs_context = create_fs_context(locked, &kernel, &features, config, &pkg_dir_proxy)
-        .source_context("creating FsContext")?;
+    let fs_context = create_fs_context(
+        kernel.kthreads.unlocked_for_async().deref_mut(),
+        &kernel,
+        &features,
+        config,
+        &pkg_dir_proxy,
+    )
+    .source_context("creating FsContext")?;
     let init_pid = kernel.pids.write().allocate_pid();
     // Lots of software assumes that the pid for the init process is 1.
     debug_assert_eq!(init_pid, 1);
 
-    let system_task = CurrentTask::create_system_task(locked, &kernel, Arc::clone(&fs_context))
-        .source_context("create system task")?;
+    let system_task = CurrentTask::create_system_task(
+        kernel.kthreads.unlocked_for_async().deref_mut(),
+        &kernel,
+        Arc::clone(&fs_context),
+    )
+    .source_context("create system task")?;
     // The system task gives pid 2. This value is less critical than giving
     // pid 1 to init, but this value matches what is supposed to happen.
     debug_assert_eq!(system_task.id, 2);
@@ -401,14 +408,23 @@ async fn create_container(
     }
 
     // Register common devices and add them in sysfs and devtmpfs.
-    init_common_devices(locked, &system_task);
+    init_common_devices(kernel.kthreads.unlocked_for_async().deref_mut(), &system_task);
 
-    mount_filesystems(locked, &system_task, config, &pkg_dir_proxy)
-        .source_context("mounting filesystems")?;
+    mount_filesystems(
+        kernel.kthreads.unlocked_for_async().deref_mut(),
+        &system_task,
+        config,
+        &pkg_dir_proxy,
+    )
+    .source_context("mounting filesystems")?;
 
     // Run all common features that were specified in the .cml.
     {
-        run_container_features(locked, &system_task, &features)?;
+        run_container_features(
+            kernel.kthreads.unlocked_for_async().deref_mut(),
+            &system_task,
+            &features,
+        )?;
     }
 
     // If there is an init binary path, run it, optionally waiting for the
@@ -422,7 +438,11 @@ async fn create_container(
             .collect::<Vec<_>>();
 
     let executable = system_task
-        .open_file(locked, argv[0].as_bytes().into(), OpenFlags::RDONLY)
+        .open_file(
+            kernel.kthreads.unlocked_for_async().deref_mut(),
+            argv[0].as_bytes().into(),
+            OpenFlags::RDONLY,
+        )
         .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
 
     let initial_name = if config.init.is_empty() {
@@ -433,7 +453,7 @@ async fn create_container(
 
     let rlimits = parse_rlimits(&config.rlimits)?;
     let init_task = CurrentTask::create_init_process(
-        locked,
+        kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
         init_pid,
         initial_name,

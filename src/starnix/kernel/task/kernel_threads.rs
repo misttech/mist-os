@@ -15,6 +15,7 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{errno, error, errors::Errno, ownership::WeakRef};
 use std::{
     cell::RefCell,
+    cell::RefMut,
     ffi::CString,
     future::Future,
     pin::Pin,
@@ -42,6 +43,9 @@ pub struct KernelThreads {
     /// Information about the main system task that is bound to the kernel main thread.
     system_task: OnceCell<SystemTask>,
 
+    /// A `RefCell` containing an `Unlocked` state for the lock ordering purposes.
+    unlocked_for_async: UnlockedForAsync,
+
     /// A weak reference to the kernel owning this struct.
     kernel: Weak<Kernel>,
 }
@@ -55,6 +59,7 @@ impl KernelThreads {
             ehandle: fasync::EHandle::local(),
             spawner: Default::default(),
             system_task: Default::default(),
+            unlocked_for_async: UnlockedForAsync::new(),
             kernel,
         }
     }
@@ -78,6 +83,12 @@ impl KernelThreads {
     /// kernel main thread itself.
     pub fn system_task(&self) -> &CurrentTask {
         self.system_task.get().expect("KernelThreads::init must be called").system_task.get()
+    }
+
+    /// Access the `Unlocked` state. This is intended for limited use in async contexts and can
+    /// only be called from the kernel main thread.
+    pub fn unlocked_for_async(&self) -> RefMut<'_, Locked<'static, Unlocked>> {
+        self.unlocked_for_async.unlocked.get().borrow_mut()
     }
 
     /// Access the `ThreadGroup` for the system tasks. This can be safely called from anywhere as
@@ -151,6 +162,16 @@ struct SystemTask {
 
     /// The system `ThreadGroup` is accessible from everywhere.
     system_thread_group: Arc<ThreadGroup>,
+}
+
+struct UnlockedForAsync {
+    unlocked: Fragile<RefCell<Locked<'static, Unlocked>>>,
+}
+
+impl UnlockedForAsync {
+    fn new() -> Self {
+        Self { unlocked: Fragile::new(RefCell::new(Unlocked::new())) }
+    }
 }
 
 impl SystemTask {
