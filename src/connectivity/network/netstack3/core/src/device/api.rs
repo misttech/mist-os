@@ -4,6 +4,7 @@
 
 //! Device layer api.
 
+use alloc::fmt::Debug;
 use core::marker::PhantomData;
 
 use net_types::ip::{Ipv4, Ipv6};
@@ -176,7 +177,7 @@ where
     }
 
     /// Receive a device layer frame from the network.
-    pub fn receive_frame<B: BufferMut>(
+    pub fn receive_frame<B: BufferMut + Debug>(
         &mut self,
         meta: D::FrameMetadata<BaseDeviceId<D, C::BindingsContext>>,
         frame: B,

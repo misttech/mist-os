@@ -5,7 +5,7 @@
 //! Implementations of traits defined in foreign modules for the types defined
 //! in the pure_ip module.
 
-use alloc::vec::Vec;
+use alloc::{fmt::Debug, vec::Vec};
 use lock_order::{
     lock::{LockFor, RwLockFor, UnlockedAccess},
     relation::LockBefore,
@@ -101,7 +101,7 @@ where
         + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
 {
-    fn receive_frame<B: BufferMut>(
+    fn receive_frame<B: BufferMut + Debug>(
         &mut self,
         bindings_ctx: &mut BC,
         metadata: PureIpDeviceReceiveFrameMetadata<CC::DeviceId>,

@@ -4,6 +4,7 @@
 
 //! The Address Resolution Protocol (ARP).
 
+use alloc::fmt::Debug;
 use core::time::Duration;
 
 use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
@@ -315,7 +316,7 @@ impl<D: ArpDevice, BC: ArpBindingsContext<D, CC::DeviceId>, CC: ArpSenderContext
 }
 
 pub(crate) trait ArpPacketHandler<D: ArpDevice, BC>: DeviceIdContext<D> {
-    fn handle_packet<B: BufferMut>(
+    fn handle_packet<B: BufferMut + Debug>(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: Self::DeviceId,
@@ -334,7 +335,7 @@ impl<
     > ArpPacketHandler<D, BC> for CC
 {
     /// Handles an inbound ARP packet.
-    fn handle_packet<B: BufferMut>(
+    fn handle_packet<B: BufferMut + Debug>(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: Self::DeviceId,
@@ -348,7 +349,7 @@ impl<
 fn handle_packet<
     D: ArpDevice,
     BC: ArpBindingsContext<D, CC::DeviceId>,
-    B: BufferMut,
+    B: BufferMut + Debug,
     CC: ArpContext<D, BC>
         + SendFrameContext<BC, ArpFrameMetadata<D, CC::DeviceId>>
         + NudHandler<Ipv4, D, BC>
@@ -539,8 +540,7 @@ fn handle_packet<
                 core_ctx.increment(|counters| &counters.tx_responses);
                 debug!("sending ARP response for {target_addr} to {sender_addr}");
 
-                // TODO(joshlf): Do something if send_frame returns an error?
-                let _: Result<(), _> = SendFrameContext::send_frame(
+                SendFrameContext::send_frame(
                     core_ctx,
                     bindings_ctx,
                     ArpFrameMetadata { device_id, dst_addr: sender_hw_addr },
@@ -552,7 +552,13 @@ fn handle_packet<
                         sender_addr,
                     )
                     .into_serializer_with(buffer),
-                );
+                )
+                .unwrap_or_else(|serializer| {
+                    warn!(
+                        "failed to send ARP response for {target_addr} to {sender_addr}: \
+                        {serializer:?}"
+                    )
+                });
             }
             DynamicNeighborUpdateSource::Confirmation(_flags) => {}
         },
@@ -581,11 +587,10 @@ fn send_arp_request<
 ) {
     if let Some(sender_protocol_addr) = core_ctx.get_protocol_addr(bindings_ctx, device_id) {
         let self_hw_addr = core_ctx.get_hardware_addr(bindings_ctx, device_id);
-        // TODO(joshlf): Do something if send_frame returns an error?
         let dst_addr = remote_link_addr.unwrap_or(D::HType::BROADCAST);
         core_ctx.increment(|counters| &counters.tx_requests);
         debug!("sending ARP request for {lookup_addr} to {dst_addr:?}");
-        let _ = SendFrameContext::send_frame(
+        SendFrameContext::send_frame(
             core_ctx,
             bindings_ctx,
             ArpFrameMetadata { device_id: device_id.clone(), dst_addr },
@@ -600,7 +605,10 @@ fn send_arp_request<
                 lookup_addr,
             )
             .into_serializer(),
-        );
+        )
+        .unwrap_or_else(|serializer| {
+            warn!("failed to send ARP request for {lookup_addr} to {dst_addr:?}: {serializer:?}")
+        });
     } else {
         // RFC 826 does not specify what to do if we don't have a local address,
         // but there is no reasonable way to send an ARP request without one (as

@@ -179,7 +179,12 @@ pub trait RecvFrameContext<BC, Meta> {
     /// Receive a frame.
     ///
     /// `receive_frame` receives a frame with the given metadata.
-    fn receive_frame<B: BufferMut>(&mut self, bindings_ctx: &mut BC, metadata: Meta, frame: B);
+    fn receive_frame<B: BufferMut + Debug>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        metadata: Meta,
+        frame: B,
+    );
 }
 
 /// Any type can implement a receive frame context with uninstantiable metadata.

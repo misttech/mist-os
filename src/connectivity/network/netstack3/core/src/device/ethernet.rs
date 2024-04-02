@@ -973,7 +973,7 @@ where
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>
         + ResourceCounterContext<CC::DeviceId, EthernetDeviceCounters>,
 {
-    fn receive_frame<B: BufferMut>(
+    fn receive_frame<B: BufferMut + Debug>(
         &mut self,
         bindings_ctx: &mut BC,
         metadata: RecvEthernetFrameMeta<CC::DeviceId>,
