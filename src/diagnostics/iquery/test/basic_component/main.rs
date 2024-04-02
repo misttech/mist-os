@@ -2,21 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::{component, health::Reporter},
-    futures::StreamExt,
-};
+use fuchsia_inspect::{component, health::Reporter};
+use inspect_runtime::PublishOptions;
 
 #[fuchsia::main(logging_tags = [ "iquery_basic_component" ])]
-async fn main() -> Result<(), Error> {
+async fn main() {
     let inspector = component::inspector();
     inspector.root().record_string("iquery", "rocks");
     component::health().set_ok();
-
-    let mut fs = ServiceFs::new();
-    inspect_runtime::deprecated::serve(&inspector, &mut fs)?;
-    fs.take_and_serve_directory_handle()?;
-    Ok(fs.collect().await)
+    let task = inspect_runtime::publish(&inspector, PublishOptions::default());
+    task.unwrap().await;
 }

@@ -3,7 +3,6 @@
         "data_source": "Inspect",
         "metadata": {
             "component_url": "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm",
-            "filename": "fuchsia.inspect.Tree",
             "timestamp": "TIMESTAMP"
         },
         "moniker": "realm_builder:CHILD_NAME/basic-1",
@@ -21,7 +20,6 @@
         "data_source": "Inspect",
         "metadata": {
             "component_url": "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm",
-            "filename": "fuchsia.inspect.Tree",
             "timestamp": "TIMESTAMP"
         },
         "moniker": "realm_builder:CHILD_NAME/basic-2",
@@ -36,7 +34,6 @@
         "data_source": "Inspect",
         "metadata": {
             "component_url": "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm",
-            "filename": "fuchsia.inspect.Tree",
             "timestamp": "TIMESTAMP"
         },
         "moniker": "realm_builder:CHILD_NAME/basic-3",

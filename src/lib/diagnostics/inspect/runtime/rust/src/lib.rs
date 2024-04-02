@@ -156,94 +156,10 @@ pub fn publish(inspector: &Inspector, options: PublishOptions) -> Option<fasync:
     Some(server_task)
 }
 
-/// This module contains the inspect_runtime functions that utilize the diagnostics
-/// directory. This functionality is deprecated and will eventually be completely removed.
-/// New code should use `inspect_runtime::publish` instead.
-pub mod deprecated {
-    use crate::{service, PublishOptions};
-    use fidl::endpoints::DiscoverableProtocolMarker;
-    use fidl_fuchsia_inspect::TreeMarker;
-    use fidl_fuchsia_io as fio;
-    use fuchsia_component::server::{ServiceFs, ServiceObjTrait};
-    use fuchsia_inspect::{Error, Inspector};
-    use futures::prelude::*;
-    use std::sync::Arc;
-    use tracing::warn;
-    use vfs::{
-        directory::{entry_container::Directory, immutable::Simple},
-        execution_scope::ExecutionScope,
-        path::Path,
-        pseudo_directory,
-    };
-
-    /// Directory within the outgoing directory of a component where the diagnostics service should be
-    /// added.
-    pub const DIAGNOSTICS_DIR: &str = "diagnostics";
-
-    /// Spawns a server with options for handling `fuchsia.inspect.Tree` requests in
-    /// the outgoing diagnostics directory.
-    pub fn serve_with_options<'a, ServiceObjTy: ServiceObjTrait>(
-        inspector: &Inspector,
-        options: PublishOptions,
-        service_fs: &mut ServiceFs<ServiceObjTy>,
-    ) -> Result<(), Error> {
-        let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .map_err(|e| Error::fidl(e.into()))?;
-        let dir = create_diagnostics_dir_with_options(inspector.clone(), options);
-        let server_end = server.into_channel().into();
-        let scope = ExecutionScope::new();
-        dir.open(scope, fio::OpenFlags::RIGHT_READABLE, Path::dot(), server_end);
-        service_fs.add_remote(DIAGNOSTICS_DIR, proxy);
-
-        Ok(())
-    }
-
-    /// Spawns a server for handling `fuchsia.inspect.Tree` requests in the outgoing diagnostics
-    /// directory.
-    pub fn serve<'a, ServiceObjTy: ServiceObjTrait>(
-        inspector: &Inspector,
-        service_fs: &mut ServiceFs<ServiceObjTy>,
-    ) -> Result<(), Error> {
-        serve_with_options(inspector, PublishOptions::default(), service_fs)
-    }
-
-    /// Creates the outgoing diagnostics directory with options. Should be added to the component's
-    /// outgoing directory at `DIAGNOSTICS_DIR`. Use `serve_with_options` if the component's outgoing
-    /// directory is served by `ServiceFs`.
-    pub fn create_diagnostics_dir_with_options(
-        inspector: fuchsia_inspect::Inspector,
-        options: PublishOptions,
-    ) -> Arc<Simple> {
-        pseudo_directory! {
-            TreeMarker::PROTOCOL_NAME =>
-                vfs::service::host(move |stream| {
-                    service::handle_request_stream(
-                        inspector.clone(),
-                        options.vmo_preference.clone(),
-                        stream
-                    ).unwrap_or_else(|e| {
-                        warn!(
-                            "error handling fuchsia.inspect/Tree connection: {e:#}"
-                        );
-                    })
-                }),
-        }
-    }
-
-    /// Creates the outgoing diagnostics directory. Should be added to the component's outgoing
-    /// directory at `DIAGNOSTICS_DIR`. Use `serve` if the component's outgoing directory is served by
-    /// `ServiceFs`.
-    pub fn create_diagnostics_dir(inspector: Inspector) -> Arc<Simple> {
-        create_diagnostics_dir_with_options(inspector, PublishOptions::default())
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::deprecated::*;
     use super::*;
     use assert_matches::assert_matches;
-    use component_debug::dirs::{open_instance_dir_root_readable, OpenDirType};
     use component_events::{
         events::{EventStream, Started},
         matcher::EventMatcher,
@@ -251,18 +167,13 @@ mod tests {
     use diagnostics_assertions::assert_json_diff;
     use diagnostics_reader::{ArchiveReader, Inspect};
     use fidl::endpoints::RequestStream;
-    use fidl_fuchsia_inspect::{InspectSinkRequest, InspectSinkRequestStream, TreeMarker};
-    use fidl_fuchsia_io as fio;
-    use fidl_fuchsia_sys2 as fsys;
-    use fuchsia_async as fasync;
-    use fuchsia_component::server::{ServiceFs, ServiceObj};
+    use fidl_fuchsia_inspect::{InspectSinkRequest, InspectSinkRequestStream};
     use fuchsia_component_test::ScopedInstance;
-    use fuchsia_inspect::{reader::read, Error, InspectorConfig};
-    use fuchsia_zircon::{self as zx, DurationNum};
+    use fuchsia_inspect::{reader::read, InspectorConfig};
+    use fuchsia_zircon as zx;
     use futures::{FutureExt, StreamExt};
 
     const TEST_PUBLISH_COMPONENT_URL: &str = "#meta/inspect_test_component.cm";
-    const TEST_SERVE_COMPONENT_URL: &str = "#meta/inspect_test_component_serve_fn.cm";
 
     #[fuchsia::test]
     async fn new_no_op() {
@@ -321,66 +232,12 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn serve_new_no_op() -> Result<(), Error> {
-        let mut fs: ServiceFs<ServiceObj<'_, ()>> = ServiceFs::new();
-
+    async fn publish_new_no_op() {
         let inspector = Inspector::new(InspectorConfig::default().no_op());
         assert!(!inspector.is_valid());
 
-        // Ensure serve doesn't crash on a No-Op inspector
-        serve(&inspector, &mut fs)
-    }
-
-    #[fuchsia::test]
-    async fn serve_connect_to_service() -> Result<(), anyhow::Error> {
-        let mut event_stream = EventStream::open().await.unwrap();
-
-        let app = ScopedInstance::new("coll".to_string(), TEST_SERVE_COMPONENT_URL.to_string())
-            .await
-            .expect("failed to create test component");
-
-        let started_stream = EventMatcher::ok()
-            .moniker_regex(app.child_name().to_owned())
-            .wait::<Started>(&mut event_stream);
-
-        app.connect_to_binder().expect("failed to connect to Binder protocol");
-
-        started_stream.await.expect("failed to observe Started event");
-
-        let realm_query = client::connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
-        let moniker = format!("./coll:{}", app.child_name());
-        let moniker = moniker.as_str().try_into().unwrap();
-        let out_dir = loop {
-            if let Ok(out_dir) =
-                open_instance_dir_root_readable(&moniker, OpenDirType::Outgoing, &realm_query).await
-            {
-                break out_dir;
-            }
-            fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
-        };
-        let diagnostics_dir = fuchsia_fs::directory::open_directory(
-            &out_dir,
-            "diagnostics",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .expect("opened diagnostics");
-
-        let tree = client::connect_to_protocol_at_dir_root::<TreeMarker>(&diagnostics_dir)
-            .expect("connected to tree");
-
-        let hierarchy = read(&tree).await?;
-        assert_json_diff!(hierarchy, root: {
-            int: 3i64,
-            "lazy-node": {
-                a: "test",
-                child: {
-                    double: 3.25,
-                },
-            }
-        });
-
-        Ok(())
+        // Ensure publish doesn't crash on a No-Op inspector
+        let _task = publish(&inspector, PublishOptions::default());
     }
 
     #[fuchsia::test]

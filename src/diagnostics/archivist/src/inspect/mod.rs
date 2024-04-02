@@ -379,428 +379,137 @@ impl ReaderServer {
 #[cfg(test)]
 mod tests {
     use {
-        super::collector::InspectData,
         super::*,
         crate::{
             accessor::BatchIterator,
             diagnostics::AccessorStats,
             events::{
                 router::EventConsumer,
-                types::{
-                    DiagnosticsReadyPayload, Event, EventPayload, InspectSinkRequestedPayload,
-                },
+                types::{Event, EventPayload, InspectSinkRequestedPayload},
             },
             identity::ComponentIdentity,
-            inspect::{repository::InspectRepository, servers::InspectSinkServer},
+            inspect::{
+                container::InspectHandle, repository::InspectRepository, servers::InspectSinkServer,
+            },
             pipeline::Pipeline,
         },
         diagnostics_assertions::{assert_data_tree, AnyProperty},
-        fidl::endpoints::{create_proxy_and_stream, ClientEnd, DiscoverableProtocolMarker},
+        fidl::endpoints::{create_proxy_and_stream, ClientEnd},
         fidl_fuchsia_diagnostics::{BatchIteratorMarker, BatchIteratorProxy, Format, StreamMode},
-        fidl_fuchsia_inspect::{InspectSinkMarker, InspectSinkPublishRequest, TreeMarker},
-        fidl_fuchsia_io as fio,
+        fidl_fuchsia_inspect::{
+            InspectSinkMarker, InspectSinkPublishRequest, TreeMarker, TreeProxy,
+        },
         fuchsia_async::{self as fasync, Task},
-        fuchsia_component::server::ServiceFs,
-        fuchsia_inspect::{reader, Inspector},
+        fuchsia_inspect::{Inspector, InspectorConfig},
         fuchsia_zircon as zx,
         fuchsia_zircon::Peered,
-        futures::future::join_all,
-        futures::{FutureExt, StreamExt},
+        futures::StreamExt,
         inspect_runtime::{service, TreeServerSendPreference},
         moniker::ExtendedMoniker,
         selectors::VerboseError,
         serde_json::json,
+        std::collections::HashMap,
+        test_case::test_case,
     };
 
     const TEST_URL: &str = "fuchsia-pkg://test";
     const BATCH_RETRIEVAL_TIMEOUT_SECONDS: i64 = 300;
-
-    fn get_vmo(text: &[u8]) -> zx::Vmo {
-        let vmo = zx::Vmo::create(4096).unwrap();
-        vmo.write(text, 0).unwrap();
-        vmo
-    }
-
-    #[fuchsia::test]
-    async fn inspect_data_collector() {
-        let path = "/test-bindings/out";
-        // Make a ServiceFs containing two files.
-        // One is an inspect file, and one is not.
-        let mut fs = ServiceFs::new();
-        let vmo = get_vmo(b"test1");
-        let vmo2 = get_vmo(b"test2");
-        let vmo3 = get_vmo(b"test3");
-        let vmo4 = get_vmo(b"test4");
-        fs.dir("diagnostics").add_vmo_file_at("root.inspect", vmo);
-        fs.dir("diagnostics").add_vmo_file_at("root_not_inspect", vmo2);
-        fs.dir("diagnostics").dir("a").add_vmo_file_at("root.inspect", vmo3);
-        fs.dir("diagnostics").dir("b").add_vmo_file_at("root.inspect", vmo4);
-        // Create a connection to the ServiceFs.
-        let (h0, h1) = fidl::endpoints::create_endpoints();
-        fs.serve_connection(h1).unwrap();
-
-        let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path, h0).unwrap();
-
-        fasync::Task::spawn(fs.collect()).detach();
-
-        let (done0, done1) = zx::Channel::create();
-
-        // Run the actual test in a separate thread so that it does not block on FS operations.
-        // Use signalling on a zx::Channel to indicate that the test is done.
-        std::thread::spawn(move || {
-            let done = done1;
-            let mut executor = fasync::LocalExecutor::new();
-
-            executor.run_singlethreaded(async {
-                let extra_data = collector::collect(&format!("{path}/diagnostics"))
-                    .await
-                    .expect("collector missing data");
-                assert_eq!(3, extra_data.len());
-
-                let assert_extra_data = |path: &str, content: &[u8]| {
-                    let extra = extra_data.get(&Some(InspectHandleName::filename(path)));
-                    assert!(extra.is_some());
-
-                    match extra.unwrap() {
-                        InspectData::Vmo(vmo) => {
-                            let mut buf = [0u8; 5];
-                            vmo.read(&mut buf, 0).expect("reading vmo");
-                            assert_eq!(content, &buf);
-                        }
-                        v => {
-                            panic!("Expected Vmo, got {v:?}");
-                        }
-                    }
-                };
-
-                assert_extra_data("root.inspect", b"test1");
-                assert_extra_data("a/root.inspect", b"test3");
-                assert_extra_data("b/root.inspect", b"test4");
-
-                done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
-            });
-        });
-
-        fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path).unwrap();
-    }
-
-    // TODO(https://fxbug.dev/299973540): remove this test when the out/diagnostics dir is removed
-    #[fuchsia::test]
-    async fn inspect_data_collector_tree() {
-        let path = "/test-bindings2/out";
-
-        // Make a ServiceFs serving an inspect tree.
-        let mut fs = ServiceFs::new();
-        let inspector = Inspector::default();
-        inspector.root().record_int("a", 1);
-        inspector.root().record_lazy_child("lazy", || {
-            async move {
-                let inspector = Inspector::default();
-                inspector.root().record_double("b", 3.25);
-                Ok(inspector)
-            }
-            .boxed()
-        });
-        inspect_runtime::deprecated::serve(&inspector, &mut fs).expect("failed to serve inspector");
-
-        // Create a connection to the ServiceFs.
-        let (h0, h1) = fidl::endpoints::create_endpoints();
-        fs.serve_connection(h1).unwrap();
-
-        let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path, h0).unwrap();
-
-        fasync::Task::spawn(fs.collect()).detach();
-
-        let (done0, done1) = zx::Channel::create();
-
-        // Run the actual test in a separate thread so that it does not block on FS operations.
-        // Use signalling on a zx::Channel to indicate that the test is done.
-        std::thread::spawn(move || {
-            let done = done1;
-            let mut executor = fasync::LocalExecutor::new();
-
-            executor.run_singlethreaded(async {
-                let extra_data = collector::collect(&format!("{path}/diagnostics"))
-                    .await
-                    .expect("collector missing data");
-                assert_eq!(1, extra_data.len());
-
-                let extra =
-                    extra_data.get(&Some(InspectHandleName::filename(TreeMarker::PROTOCOL_NAME)));
-                assert!(extra.is_some());
-
-                match extra.unwrap() {
-                    InspectData::Tree(tree) => {
-                        // Assert we can read the tree proxy and get the data we expected.
-                        let hierarchy =
-                            reader::read(tree).await.expect("failed to read hierarchy from tree");
-                        assert_data_tree!(hierarchy, root: {
-                            a: 1i64,
-                            lazy: {
-                                b: 3.25,
-                            }
-                        });
-                    }
-                    v => {
-                        panic!("Expected Tree, got {v:?}");
-                    }
-                }
-
-                done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
-            });
-        });
-
-        fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path).unwrap();
-    }
-
-    #[fuchsia::test]
-    async fn reader_server_formatting() {
-        let path = "/test-bindings3/out";
-
-        // Make a ServiceFs containing two files.
-        // One is an inspect file, and one is not.
-        let mut fs = ServiceFs::new();
-        let vmo = zx::Vmo::create(4096).unwrap();
-        let inspector = inspector_for_reader_test();
-
-        let data = inspector.copy_vmo_data().unwrap();
-        vmo.write(&data, 0).unwrap();
-        fs.dir("diagnostics").add_vmo_file_at("test.inspect", vmo);
-
-        // Create a connection to the ServiceFs.
-        let (h0, h1) = fidl::endpoints::create_endpoints();
-        fs.serve_connection(h1).unwrap();
-
-        let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path, h0).unwrap();
-
-        fasync::Task::spawn(fs.collect()).detach();
-        let (done0, done1) = zx::Channel::create();
-
-        // Run the actual test in a separate thread so that it does not block on FS operations.
-        // Use signalling on a zx::Channel to indicate that the test is done.
-        std::thread::spawn(move || {
-            let done = done1;
-            let mut executor = fasync::LocalExecutor::new();
-            executor.run_singlethreaded(async {
-                let directory = collector::find_directory_proxy(path).unwrap();
-                verify_reader(InspectServiceMethod::DiagnosticsDir(directory)).await;
-                done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
-            });
-        });
-
-        fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path).unwrap();
-    }
-
-    #[fuchsia::test]
-    async fn read_server_formatting_tree() {
-        let path = "/test-bindings4/out";
-
-        // Make a ServiceFs containing two files.
-        // One is an inspect file, and one is not.
-        let mut fs = ServiceFs::new();
-        let inspector = inspector_for_reader_test();
-        inspect_runtime::deprecated::serve(&inspector, &mut fs).expect("failed to serve inspector");
-
-        // Create a connection to the ServiceFs.
-        let (h0, h1) = fidl::endpoints::create_endpoints();
-        fs.serve_connection(h1).unwrap();
-
-        let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path, h0).unwrap();
-
-        fasync::Task::spawn(fs.collect()).detach();
-        let (done0, done1) = zx::Channel::create();
-
-        // Run the actual test in a separate thread so that it does not block on FS operations.
-        // Use signalling on a zx::Channel to indicate that the test is done.
-        std::thread::spawn(move || {
-            let done = done1;
-            let mut executor = fasync::LocalExecutor::new();
-            executor.run_singlethreaded(async {
-                let directory = collector::find_directory_proxy(path).unwrap();
-                verify_reader(InspectServiceMethod::DiagnosticsDir(directory)).await;
-                done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
-            });
-        });
-        fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path).unwrap();
-    }
 
     #[fuchsia::test]
     async fn read_server_formatting_tree_inspect_sink() {
         let inspector = inspector_for_reader_test();
         let (_inspect_server, tree_client) =
             service::spawn_tree_server(inspector, TreeServerSendPreference::default()).unwrap();
-        verify_reader(InspectServiceMethod::InspectSink(tree_client)).await;
+        verify_reader(tree_client).await;
     }
 
     #[fuchsia::test]
     async fn reader_server_reports_errors() {
-        let path = "/test-bindings-errors-01/out";
-
-        // Make a ServiceFs containing something that looks like an inspect file but is not.
-        let mut fs = ServiceFs::new();
-        let vmo = zx::Vmo::create(4096).unwrap();
-        fs.dir("diagnostics").add_vmo_file_at("test.inspect", vmo);
-
-        // Create a connection to the ServiceFs.
-        let (h0, h1) = fidl::endpoints::create_endpoints();
-        fs.serve_connection(h1).unwrap();
-
-        let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path, h0).unwrap();
-
-        fasync::Task::spawn(fs.collect()).detach();
+        // This inspector doesn't contain valid inspect data.
+        let vmo = Arc::new(zx::Vmo::create(4096).unwrap());
+        let inspector = Inspector::new(InspectorConfig::default().vmo(vmo));
+        let (_inspect_server, tree_client) =
+            service::spawn_tree_server(inspector, TreeServerSendPreference::default()).unwrap();
         let (done0, done1) = zx::Channel::create();
-
         // Run the actual test in a separate thread so that it does not block on FS operations.
         // Use signalling on a zx::Channel to indicate that the test is done.
         std::thread::spawn(move || {
             let done = done1;
             let mut executor = fasync::LocalExecutor::new();
             executor.run_singlethreaded(async {
-                let directory = collector::find_directory_proxy(path).unwrap();
-                verify_reader_with_mode(
-                    InspectServiceMethod::DiagnosticsDir(directory),
-                    VerifyMode::ExpectComponentFailure,
-                )
-                .await;
+                verify_reader_with_mode(tree_client, VerifyMode::ExpectComponentFailure).await;
                 done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
             });
         });
 
         fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path).unwrap();
     }
 
+    #[test_case(vec![63, 65], vec![64, 64] ; "merge_errorful_component_into_next_batch")]
+    #[test_case(vec![64, 65, 64, 64], vec![64, 64, 64, 64, 1] ; "errorful_component_doesnt_halt_iteration")]
+    #[test_case(vec![65], vec![64, 1] ; "component_with_more_than_max_batch_size_is_split_in_two")]
+    #[test_case(vec![1usize; 64], vec![64] ; "sixty_four_vmos_packed_into_one_batch")]
+    #[test_case(vec![64, 63, 1], vec![64, 64] ; "max_batch_intact_two_batches_merged")]
+    #[test_case(vec![33, 33, 33], vec![64, 35] ; "three_directories_two_batches")]
     #[fuchsia::test]
-    async fn three_directories_two_batches() {
-        stress_test_diagnostics_repository(vec![33, 33, 33], vec![64, 35]).await;
-    }
-
-    #[fuchsia::test]
-    async fn max_batch_intact_two_batches_merged() {
-        stress_test_diagnostics_repository(vec![64, 63, 1], vec![64, 64]).await;
-    }
-
-    #[fuchsia::test]
-    async fn sixty_four_vmos_packed_into_one_batch() {
-        stress_test_diagnostics_repository([1usize; 64].to_vec(), vec![64]).await;
-    }
-
-    #[fuchsia::test]
-    async fn component_with_more_than_max_batch_size_is_split_in_two() {
-        stress_test_diagnostics_repository(vec![65], vec![64, 1]).await;
-    }
-
-    #[fuchsia::test]
-    async fn errorful_component_doesnt_halt_iteration() {
-        stress_test_diagnostics_repository(vec![64, 65, 64, 64], vec![64, 64, 64, 64, 1]).await;
-    }
-
-    #[fuchsia::test]
-    async fn merge_errorful_component_into_next_batch() {
-        stress_test_diagnostics_repository(vec![63, 65], vec![64, 64]).await;
-    }
-
     async fn stress_test_diagnostics_repository(
-        directory_vmo_counts: Vec<usize>,
+        component_handle_counts: Vec<usize>,
         expected_batch_results: Vec<usize>,
     ) {
-        let path = "/stress_test_root_directory";
-
-        let dir_name_and_filecount: Vec<(String, usize)> = directory_vmo_counts
+        let component_name_handle_counts: Vec<(String, usize)> = component_handle_counts
             .into_iter()
             .enumerate()
-            .map(|(index, filecount)| (format!("diagnostics_{index}"), filecount))
+            .map(|(index, handle_count)| (format!("diagnostics_{index}"), handle_count))
             .collect();
-
-        // Make a ServiceFs that will host inspect vmos under each
-        // of the new diagnostics directories.
-        let mut fs = ServiceFs::new();
 
         let inspector = inspector_for_reader_test();
 
-        for (directory_name, filecount) in dir_name_and_filecount.clone() {
-            for i in 0..filecount {
-                let vmo = inspector.duplicate_vmo().expect("Failed to duplicate vmo");
-
-                fs.dir(directory_name.clone()).add_vmo_file_at(format!("root_{i}.inspect"), vmo);
+        let mut clients = HashMap::<String, Vec<TreeProxy>>::new();
+        let mut servers = vec![];
+        let vmo = Arc::new(inspector.duplicate_vmo().expect("Failed to duplicate vmo"));
+        for (component_name, handle_count) in component_name_handle_counts.clone() {
+            for _ in 0..handle_count {
+                let inspector_dup =
+                    Inspector::new(InspectorConfig::default().vmo(Arc::clone(&vmo)));
+                let (server, client) =
+                    service::spawn_tree_server(inspector_dup, TreeServerSendPreference::default())
+                        .unwrap();
+                servers.push(server);
+                clients
+                    .entry(component_name.clone())
+                    .or_default()
+                    .push(client.into_proxy().unwrap());
             }
         }
-        let (h0, h1) = fidl::endpoints::create_endpoints();
-        fs.serve_connection(h1).unwrap();
 
-        // We bind the root of the FS that hosts our 3 test dirs to
-        // stress_test_root_dir. Now each directory can be found at
-        // stress_test_root_dir/diagnostics_<i>
-        let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path, h0).unwrap();
+        let pipeline = Arc::new(Pipeline::for_test(None));
+        let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
 
-        fasync::Task::spawn(fs.collect()).detach();
+        for (component, handles) in clients {
+            let moniker = ExtendedMoniker::parse_str(&component).unwrap();
+            let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
+            for (i, handle) in handles.into_iter().enumerate() {
+                inspect_repo.add_inspect_handle(
+                    Arc::clone(&identity),
+                    InspectHandle::from_named_tree_proxy(handle, Some(format!("tree_{i}"))),
+                );
+            }
+        }
 
-        let (done0, done1) = zx::Channel::create();
+        let inspector = Inspector::default();
+        let root = inspector.root();
+        let test_archive_accessor_node = root.create_child("test_archive_accessor_node");
 
-        // Run the actual test in a separate thread so that it does not block on FS operations.
-        // Use signalling on a zx::Channel to indicate that the test is done.
-        std::thread::spawn(move || {
-            let done = done1;
-            let mut executor = fasync::LocalExecutor::new();
+        let test_accessor_stats = Arc::new(AccessorStats::new(test_archive_accessor_node));
+        let test_batch_iterator_stats1 = Arc::new(test_accessor_stats.new_inspect_batch_iterator());
 
-            executor.run_singlethreaded(async {
-                let id_and_directory_proxy =
-                    join_all(dir_name_and_filecount.iter().map(|(dir, _)| async move {
-                        let full_path = format!("{path}/{dir}");
-                        let proxy = collector::find_directory_proxy(&full_path).unwrap();
-                        let unique_cid =
-                            ExtendedMoniker::parse_str(&format!("./component_{dir}")).unwrap();
-                        (unique_cid, proxy)
-                    }))
-                    .await;
-
-                let pipeline = Arc::new(Pipeline::for_test(None));
-                let inspect_repo =
-                    Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
-
-                for (cid, proxy) in id_and_directory_proxy {
-                    let identity = Arc::new(ComponentIdentity::new(cid, TEST_URL));
-                    Arc::clone(&inspect_repo).handle(Event {
-                        timestamp: zx::Time::get_monotonic(),
-                        payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                            component: Arc::clone(&identity),
-                            directory: proxy,
-                        }),
-                    });
-                }
-
-                let inspector = Inspector::default();
-                let root = inspector.root();
-                let test_archive_accessor_node = root.create_child("test_archive_accessor_node");
-
-                let test_accessor_stats = Arc::new(AccessorStats::new(test_archive_accessor_node));
-                let test_batch_iterator_stats1 =
-                    Arc::new(test_accessor_stats.new_inspect_batch_iterator());
-
-                let _result_json = read_snapshot_verify_batch_count_and_batch_size(
-                    Arc::clone(&inspect_repo),
-                    Arc::clone(&pipeline),
-                    expected_batch_results,
-                    test_batch_iterator_stats1,
-                )
-                .await;
-
-                done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
-            });
-        });
-
-        fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path).unwrap();
+        let _result_json = read_snapshot_verify_batch_count_and_batch_size(
+            Arc::clone(&inspect_repo),
+            Arc::clone(&pipeline),
+            expected_batch_results,
+            test_batch_iterator_stats1,
+        )
+        .await;
     }
 
     fn inspector_for_reader_test() -> Inspector {
@@ -824,21 +533,13 @@ mod tests {
         ExpectComponentFailure,
     }
 
-    enum InspectServiceMethod {
-        InspectSink(ClientEnd<TreeMarker>),
-        DiagnosticsDir(fio::DirectoryProxy),
-    }
-
     /// Verify that data can be read via InspectRepository, and that `AccessorStats` are updated
     /// accordingly.
-    async fn verify_reader(inspect_service_method: InspectServiceMethod) {
-        verify_reader_with_mode(inspect_service_method, VerifyMode::ExpectSuccess).await;
+    async fn verify_reader(tree_client: ClientEnd<TreeMarker>) {
+        verify_reader_with_mode(tree_client, VerifyMode::ExpectSuccess).await;
     }
 
-    async fn verify_reader_with_mode(
-        inspect_service_method: InspectServiceMethod,
-        mode: VerifyMode,
-    ) {
+    async fn verify_reader_with_mode(tree_client: ClientEnd<TreeMarker>, mode: VerifyMode) {
         let child_1_1_selector =
             selectors::parse_selector::<VerboseError>(r#"*:root/child_1/*:some-int"#).unwrap();
         let child_2_selector =
@@ -922,42 +623,24 @@ mod tests {
 
         let identity = Arc::new(ComponentIdentity::new(component_id, TEST_URL));
 
-        match inspect_service_method {
-            InspectServiceMethod::DiagnosticsDir(directory) => {
-                Arc::clone(&inspect_repo).handle(Event {
-                    timestamp: zx::Time::get_monotonic(),
-                    payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                        component: Arc::clone(&identity),
-                        directory,
-                    }),
-                });
-            }
-            InspectServiceMethod::InspectSink(tree_client) => {
-                let (proxy, request_stream) =
-                    create_proxy_and_stream::<InspectSinkMarker>().unwrap();
-                proxy
-                    .publish(InspectSinkPublishRequest {
-                        tree: Some(tree_client),
-                        ..Default::default()
-                    })
-                    .unwrap();
+        let (proxy, request_stream) = create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+        proxy
+            .publish(InspectSinkPublishRequest { tree: Some(tree_client), ..Default::default() })
+            .unwrap();
 
-                let inspect_sink_server =
-                    Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
-                Arc::clone(&inspect_sink_server).handle(Event {
-                    timestamp: zx::Time::get_monotonic(),
-                    payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
-                        component: Arc::clone(&identity),
-                        request_stream,
-                    }),
-                });
+        let inspect_sink_server = Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
+        Arc::clone(&inspect_sink_server).handle(Event {
+            timestamp: zx::Time::get_monotonic(),
+            payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+                component: Arc::clone(&identity),
+                request_stream,
+            }),
+        });
 
-                drop(proxy);
+        drop(proxy);
 
-                inspect_sink_server.stop();
-                inspect_sink_server.wait_for_servers_to_complete().await;
-            }
-        }
+        inspect_sink_server.stop();
+        inspect_sink_server.wait_for_servers_to_complete().await;
 
         let expected_get_next_result_errors = match mode {
             VerifyMode::ExpectComponentFailure => 1u64,

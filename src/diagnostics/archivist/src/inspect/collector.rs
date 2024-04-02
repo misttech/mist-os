@@ -15,9 +15,6 @@ use {
     tracing::error,
 };
 
-#[cfg(test)]
-use anyhow::Context as _;
-
 /// Mapping from a diagnostics filename to the underlying encoding of that
 /// diagnostics data.
 pub type DataMap = HashMap<Option<InspectHandleName>, InspectData>;
@@ -161,21 +158,6 @@ async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> Data
     data_map
 }
 
-/// Convert a fully-qualified path to a directory-proxy in the executing namespace.
-#[cfg(test)]
-pub fn find_directory_proxy(
-    path: &str,
-) -> Result<fio::DirectoryProxy, fuchsia_fs::node::OpenError> {
-    fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
-}
-
-#[cfg(test)]
-pub async fn collect(path: &str) -> Result<DataMap, anyhow::Error> {
-    let inspect_proxy = find_directory_proxy(path)
-        .with_context(|| format!("Failed to open out directory at {path}"))?;
-    Ok(populate_data_map(&[inspect_proxy.into()]).await)
-}
-
 #[cfg(test)]
 mod tests {
     use {
@@ -188,7 +170,6 @@ mod tests {
         fuchsia_inspect::{reader, Inspector},
         fuchsia_zircon as zx,
         fuchsia_zircon::Peered,
-        futures::FutureExt,
         inspect_runtime::{service::spawn_tree_server_with_stream, TreeServerSendPreference},
     };
 
@@ -283,8 +264,7 @@ mod tests {
             let mut executor = fasync::LocalExecutor::new();
 
             executor.run_singlethreaded(async {
-                let extra_data =
-                    collect(&format!("{path}/diagnostics")).await.expect("collector missing data");
+                let extra_data = collect(&format!("{path}/diagnostics")).await;
                 assert_eq!(3, extra_data.len());
 
                 let assert_extra_data = |path: &str, content: &[u8]| {
@@ -315,73 +295,10 @@ mod tests {
         ns.unbind(path).unwrap();
     }
 
-    // TODO(https://fxbug.dev/42175119): remove this test when the out/diagnostics dir is removed
-    #[fuchsia::test]
-    async fn inspect_data_collector_tree() {
-        let path = "/test-bindings2/out";
-
-        // Make a ServiceFs serving an inspect tree.
-        let mut fs = ServiceFs::new();
-        let inspector = Inspector::default();
-        inspector.root().record_int("a", 1);
-        inspector.root().record_lazy_child("lazy", || {
-            async move {
-                let inspector = Inspector::default();
-                inspector.root().record_double("b", 3.25);
-                Ok(inspector)
-            }
-            .boxed()
-        });
-        inspect_runtime::deprecated::serve(&inspector, &mut fs).expect("failed to serve inspector");
-
-        // Create a connection to the ServiceFs.
-        let (h0, h1) = fidl::endpoints::create_endpoints();
-        fs.serve_connection(h1).unwrap();
-
-        let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path, h0).unwrap();
-
-        fasync::Task::spawn(fs.collect()).detach();
-
-        let (done0, done1) = zx::Channel::create();
-
-        // Run the actual test in a separate thread so that it does not block on FS operations.
-        // Use signalling on a zx::Channel to indicate that the test is done.
-        std::thread::spawn(move || {
-            let done = done1;
-            let mut executor = fasync::LocalExecutor::new();
-
-            executor.run_singlethreaded(async {
-                let extra_data =
-                    collect(&format!("{path}/diagnostics")).await.expect("collector missing data");
-                assert_eq!(1, extra_data.len());
-
-                let extra =
-                    extra_data.get(&Some(InspectHandleName::filename(TreeMarker::PROTOCOL_NAME)));
-                assert!(extra.is_some());
-
-                match extra.unwrap() {
-                    InspectData::Tree(tree) => {
-                        // Assert we can read the tree proxy and get the data we expected.
-                        let hierarchy =
-                            reader::read(tree).await.expect("failed to read hierarchy from tree");
-                        assert_data_tree!(hierarchy, root: {
-                            a: 1i64,
-                            lazy: {
-                                b: 3.25,
-                            }
-                        });
-                    }
-                    v => {
-                        panic!("Expected Tree, got {v:?}");
-                    }
-                }
-
-                done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
-            });
-        });
-
-        fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path).unwrap();
+    async fn collect(path: &str) -> DataMap {
+        let inspect_proxy =
+            fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
+                .expect("Failed to open directory");
+        populate_data_map(&[inspect_proxy.into()]).await
     }
 }

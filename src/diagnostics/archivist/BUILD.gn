@@ -91,6 +91,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [

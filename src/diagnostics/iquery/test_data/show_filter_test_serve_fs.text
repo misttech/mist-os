@@ -1,6 +1,5 @@
 realm_builder:CHILD_NAME/basic:
   metadata:
-    filename = fuchsia.inspect.Tree
     component_url = fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm
     timestamp = TIMESTAMP
   payload:
