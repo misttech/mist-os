@@ -36,6 +36,7 @@ rustc_library("fuchsia-inspect-contrib") {
 
   sources = [
     "src/auto_persist.rs",
+    "src/graph/mod.rs",
     "src/inspectable/mod.rs",
     "src/lib.rs",
     "src/log/impls.rs",

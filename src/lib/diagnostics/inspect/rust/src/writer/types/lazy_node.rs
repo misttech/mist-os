@@ -24,7 +24,7 @@ struct InnerLazyNodeType;
 
 impl InnerType for InnerLazyNodeType {
     type Data = ();
-    fn free(state: &State, block_index: BlockIndex) -> Result<(), Error> {
+    fn free(state: &State, _: &Self::Data, block_index: BlockIndex) -> Result<(), Error> {
         let mut state_lock = state.try_lock()?;
         state_lock
             .free_lazy_node(block_index)

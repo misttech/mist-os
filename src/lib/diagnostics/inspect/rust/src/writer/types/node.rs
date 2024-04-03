@@ -5,7 +5,7 @@
 use crate::writer::{
     private::InspectTypeInternal, BoolProperty, BytesProperty, DoubleArrayProperty,
     DoubleExponentialHistogramProperty, DoubleLinearHistogramProperty, DoubleProperty, Error,
-    Inner, InnerType, InspectType, InspectTypeReparentable, Inspector, IntArrayProperty,
+    Inner, InnerData, InnerType, InspectType, InspectTypeReparentable, Inspector, IntArrayProperty,
     IntExponentialHistogramProperty, IntLinearHistogramProperty, IntProperty, LazyNode, State,
     StringArrayProperty, StringProperty, StringReference, UintArrayProperty,
     UintExponentialHistogramProperty, UintLinearHistogramProperty, UintProperty, ValueList,
@@ -13,6 +13,7 @@ use crate::writer::{
 use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams, LinearHistogramParams};
 use futures::future::BoxFuture;
 use inspect_format::{BlockIndex, LinkNodeDisposition, PropertyFormat};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Inspect Node data type.
 ///
@@ -76,12 +77,12 @@ impl Node {
 
     /// Keeps track of the given property for the lifetime of the node.
     pub fn record(&self, property: impl InspectType + 'static) {
-        self.inner.inner_ref().map(|inner_ref| inner_ref.data.record(property));
+        self.inner.inner_ref().map(|inner_ref| inner_ref.data.values.record(property));
     }
 
     /// Drop all recorded data from the node.
     pub fn clear_recorded(&self) {
-        self.inner.inner_ref().map(|inner_ref| inner_ref.data.clear());
+        self.inner.inner_ref().map(|inner_ref| inner_ref.data.values.clear());
     }
 
     /// Creates a new `IntProperty` with the given `name` and `value`.
@@ -507,6 +508,16 @@ impl Node {
         child.reparent(self)
     }
 
+    /// Removes this node from the Inspect tree. Typically, just dropping the Node must be
+    /// preferred. However, this is a convenience method meant for power user implementations that
+    /// need more control over the lifetime of a Node. For example, by being able to remove the node
+    /// from a weak clone of it.
+    pub fn forget(&self) {
+        if let Some(inner_ref) = self.inner.inner_ref() {
+            let _ = InnerNodeType::free(&inner_ref.state, &inner_ref.data, inner_ref.block_index);
+        }
+    }
+
     /// Creates a new root node.
     pub(crate) fn new_root(state: State) -> Node {
         Node::new(state, BlockIndex::ROOT)
@@ -516,15 +527,30 @@ impl Node {
 #[derive(Default, Debug)]
 pub(crate) struct InnerNodeType;
 
+#[derive(Default, Debug)]
+pub(crate) struct NodeData {
+    values: ValueList,
+    destroyed: AtomicBool,
+}
+
+impl InnerData for NodeData {
+    fn is_valid(&self) -> bool {
+        !self.destroyed.load(Ordering::SeqCst)
+    }
+}
+
 impl InnerType for InnerNodeType {
     // Each node has a list of recorded values.
-    type Data = ValueList;
+    type Data = NodeData;
 
-    fn free(state: &State, block_index: BlockIndex) -> Result<(), Error> {
+    fn free(state: &State, data: &Self::Data, block_index: BlockIndex) -> Result<(), Error> {
         if block_index == BlockIndex::ROOT {
             return Ok(());
         }
         let mut state_lock = state.try_lock()?;
+        if data.destroyed.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
         state_lock.free_value(block_index).map_err(|err| Error::free("node", block_index, err))
     }
 }
@@ -889,6 +915,23 @@ mod tests {
                 my_string_array: vec!["test"]
             }
         });
+    }
+
+    #[fuchsia::test]
+    fn we_can_delete_a_node_explicitly_with_the_weak_clone() {
+        let insp = Inspector::default();
+        let a = insp.root().create_child("a");
+        let _property = a.create_int("foo", 1);
+        assert_data_tree!(insp, root: {
+            a: {
+                foo: 1i64,
+            }
+        });
+
+        let a_weak = a.clone_weak();
+        a_weak.forget();
+        assert!(a.inner.inner_ref().is_none());
+        assert_data_tree!(insp, root: {});
     }
 }
 

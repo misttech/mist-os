@@ -146,8 +146,11 @@ impl<T: InnerType> Inner<T> {
     pub(crate) fn is_valid(&self) -> bool {
         match self {
             Self::None => false,
-            Self::Weak(weak_ref) => weak_ref.strong_count() > 0,
-            Self::Strong(_) => true,
+            Self::Weak(weak_ref) => match weak_ref.upgrade() {
+                None => false,
+                Some(inner_ref) => inner_ref.data.is_valid(),
+            },
+            Self::Strong(inner_ref) => inner_ref.data.is_valid(),
         }
     }
 
@@ -158,8 +161,21 @@ impl<T: InnerType> Inner<T> {
     pub(crate) fn inner_ref(&self) -> Option<Arc<InnerRef<T>>> {
         match self {
             Self::None => None,
-            Self::Weak(weak_ref) => weak_ref.upgrade(),
-            Self::Strong(inner_ref) => Some(Arc::clone(inner_ref)),
+            Self::Weak(weak_ref) => {
+                if let Some(inner_ref) = weak_ref.upgrade() {
+                    if inner_ref.data.is_valid() {
+                        return Some(inner_ref);
+                    }
+                }
+                None
+            }
+            Self::Strong(inner_ref) => {
+                if inner_ref.data.is_valid() {
+                    Some(Arc::clone(inner_ref))
+                } else {
+                    None
+                }
+            }
         }
     }
 
@@ -168,7 +184,13 @@ impl<T: InnerType> Inner<T> {
         match self {
             Self::None => Self::None,
             Self::Weak(weak_ref) => Self::Weak(weak_ref.clone()),
-            Self::Strong(inner_ref) => Self::Weak(Arc::downgrade(inner_ref)),
+            Self::Strong(inner_ref) => {
+                if inner_ref.data.is_valid() {
+                    Self::Weak(Arc::downgrade(inner_ref))
+                } else {
+                    Self::None
+                }
+            }
         }
     }
 }
@@ -204,17 +226,27 @@ impl<T: InnerType> Drop for InnerRef<T> {
     /// InnerRef has a manual drop impl, to guarantee a single deallocation in
     /// the case of multiple strong references.
     fn drop(&mut self) {
-        T::free(&self.state, self.block_index).unwrap();
+        T::free(&self.state, &self.data, self.block_index).unwrap();
     }
 }
 
 /// De-allocation behavior and associated data for an inner type.
 pub(crate) trait InnerType {
     /// Associated data stored on the InnerRef
-    type Data: Default + Debug;
+    type Data: Default + Debug + InnerData;
 
     /// De-allocation behavior for when the InnerRef gets dropped
-    fn free(state: &State, block_index: BlockIndex) -> Result<(), Error>;
+    fn free(state: &State, data: &Self::Data, block_index: BlockIndex) -> Result<(), Error>;
+}
+
+pub(crate) trait InnerData {
+    fn is_valid(&self) -> bool;
+}
+
+impl InnerData for () {
+    fn is_valid(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Default, Debug)]
@@ -222,7 +254,7 @@ pub(crate) struct InnerValueType;
 
 impl InnerType for InnerValueType {
     type Data = ();
-    fn free(state: &State, block_index: BlockIndex) -> Result<(), Error> {
+    fn free(state: &State, _: &Self::Data, block_index: BlockIndex) -> Result<(), Error> {
         let mut state_lock = state.try_lock()?;
         state_lock.free_value(block_index).map_err(|err| Error::free("value", block_index, err))
     }

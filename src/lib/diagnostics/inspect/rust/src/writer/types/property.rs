@@ -93,7 +93,7 @@ pub(crate) struct InnerPropertyType;
 
 impl InnerType for InnerPropertyType {
     type Data = ();
-    fn free(state: &State, block_index: BlockIndex) -> Result<(), Error> {
+    fn free(state: &State, _: &Self::Data, block_index: BlockIndex) -> Result<(), Error> {
         let mut state_lock = state.try_lock()?;
         state_lock
             .free_property(block_index)
