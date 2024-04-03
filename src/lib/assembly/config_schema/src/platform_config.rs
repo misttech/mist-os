@@ -30,6 +30,7 @@ pub mod storage_config;
 pub mod swd_config;
 pub mod timekeeper_config;
 pub mod ui_config;
+pub mod usb_config;
 pub mod virtualization_config;
 
 /// Platform configuration options.  These are the options that pertain to the
@@ -173,6 +174,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for time maintenance and timekeeping.
     #[serde(default)]
     pub timekeeper: timekeeper_config::TimekeeperConfig,
+
+    /// Platform configuration options for USB peripheral.
+    #[serde(default)]
+    pub usb: usb_config::UsbConfig,
 }
 
 // LINT.IfChange

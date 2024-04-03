@@ -56,6 +56,7 @@ mod swd;
 mod thermal;
 mod timekeeper;
 mod ui;
+mod usb;
 mod virtualization;
 
 /// ffx config flag for enabling configuring the assembly+structured config example.
@@ -379,6 +380,9 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'timekeeper' subsystem")?;
+
+    usb::UsbSubsystemConfig::define_configuration(context, &config.platform.usb, builder)
+        .context("Configuring the 'usb' subsystem")?;
 
     Ok(())
 }

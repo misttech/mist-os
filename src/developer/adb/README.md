@@ -30,18 +30,20 @@ capabilities etc. and are closer to `ffx` counterparts in terms of the behavior.
 
 ## How to include adb in a Fuchsia image
 
-adb support is not included by default in any of the products. To manually include it, add these
-labels to `fx set`
+To include adb support into the build, add the usb peripheral configuration shown below to platform
+assembly configuration and include `adb_support` assembly input bundle.
 
-```GN
---args='dev_kernel_cmdline=["driver.usb.peripheral=adb"]'\
---args='dev_bootfs_labels=["//src/developer/adb:drivers"]'\
---with-base '//src/developer/adb:adb'\
---args='core_realm_shards+=["//src/developer/adb:core_shards"]'
+```bzl
+"usb": {
+    "peripheral": {
+        "functions": [
+            "cdc",
+            "adb",
+        ],
+    },
+},
+
 ```
-
-Alternatively, you can use `driver.usb.peripheral=cdc_adb`, to have both networking and adb
-interfaces enabled simultaneously.
 
 adb can only be used on boards that support USB peripheral mode.
 
