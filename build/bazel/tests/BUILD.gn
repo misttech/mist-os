@@ -3,5 +3,12 @@
 # found in the LICENSE file.
 
 group("tests") {
-  deps = [ "build_action" ]
+  # NOT: Do not add //build/bazel/tests/build_action to
+  # the dependency list of this group, as this slows down
+  # all incremental builds considerably due to each
+  # GN > Bazel invocation taking at least a second on a
+  # powerful workstation.
+  #
+  # Instead, it is possible to add //build/bazel/tests/build_action
+  # to the host_test_labels list in args.gn to enable these.
 }
