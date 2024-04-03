@@ -46,12 +46,8 @@ class SquareloadTest(fuchsia_power_base_test.FuchsiaPowerBaseTest):
             super().test_launch_hermetic_test()
 
         # Process trace-based CPU metrics.
-        trace_json_path: os.PathLike = (
-            trace_importing.convert_trace_file_to_json(
-                trace_path=os.path.join(
-                    self.log_path, f"{self.metric_name}.fxt"
-                )
-            )
+        trace_json_path: str = trace_importing.convert_trace_file_to_json(
+            trace_path=os.path.join(self.log_path, f"{self.metric_name}.fxt")
         )
 
         model: trace_model.Model = trace_importing.create_model_from_file_path(
