@@ -28,7 +28,8 @@ pub struct PbDownloadTool {
 
 #[async_trait(?Send)]
 impl FfxMain for PbDownloadTool {
-    type Writer = VerifiedMachineWriter<MachineOutput<String>>;
+    type Writer = VerifiedMachineWriter<MachineOutput<()>>;
+
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         let client = Client::initial()?;
 

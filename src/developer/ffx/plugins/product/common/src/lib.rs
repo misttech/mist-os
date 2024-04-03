@@ -29,6 +29,9 @@ pub enum CommandStatus {
 pub enum MachineOutput<T: JsonSchema + Serialize> {
     CommandStatus(CommandStatus),
     Notice { title: Option<String>, message: Option<String> },
+    // Since we are using a tag field to identify the enum variant,
+    // T cannot be simple type since there is no field name to associate
+    // the value with.
     Data(T),
 }
 
@@ -63,5 +66,86 @@ impl<T: Serialize + JsonSchema> MachineUi<T> {
 
     pub fn machine(&self, data: MachineOutput<T>) -> Result<()> {
         self.writer.borrow_mut().machine(&data).map_err(move |e| e.into())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use fho::{Format, TestBuffers};
+
+    #[derive(Debug, Serialize, JsonSchema)]
+    struct TestBundle {
+        pub base_url: String,
+        pub value: u32,
+        pub name: String,
+    }
+
+    impl TestBundle {
+        fn new() -> Self {
+            Self { base_url: "/some/url".into(), value: 42, name: "Sample_Bundle".into() }
+        }
+    }
+
+    #[fuchsia::test]
+    fn test_machine_schema() {
+        let outputs = vec![
+            MachineOutput::CommandStatus(CommandStatus::Ok { message: None }),
+            MachineOutput::CommandStatus(CommandStatus::Ok {
+                message: Some("Ok with message".into()),
+            }),
+            MachineOutput::CommandStatus(CommandStatus::UnexpectedError {
+                message: "an error".into(),
+            }),
+            MachineOutput::CommandStatus(CommandStatus::UserError { message: "an error".into() }),
+            MachineOutput::Notice { title: None, message: None },
+            MachineOutput::Notice { title: Some("The title".into()), message: None },
+            MachineOutput::Notice {
+                title: Some("The title".into()),
+                message: Some("a message".into()),
+            },
+            MachineOutput::Notice { title: None, message: Some("a message".into()) },
+            MachineOutput::Data(TestBundle::new()),
+        ];
+
+        for o in outputs {
+            let test_buffers = TestBuffers::default();
+            let mut writer = VerifiedMachineWriter::<MachineOutput<TestBundle>>::new_test(
+                Some(Format::JsonPretty),
+                &test_buffers,
+            );
+            writer.machine(&o).expect("write data");
+            let data_str = test_buffers.into_stdout_str();
+            let data = serde_json::from_str(&data_str).expect("json value");
+            match writer.verify_schema(&data) {
+                Ok(_) => (),
+                Err(e) => {
+                    println!("Error verifying schema: {e}");
+                    println!("{data:?}");
+                }
+            };
+        }
+    }
+    #[fuchsia::test]
+    fn test_machine_no_value_schema() {
+        let outputs = vec![MachineOutput::Data(())];
+
+        for o in outputs {
+            let test_buffers = TestBuffers::default();
+            let mut writer = VerifiedMachineWriter::<MachineOutput<()>>::new_test(
+                Some(Format::JsonPretty),
+                &test_buffers,
+            );
+            writer.machine(&o).expect("write data");
+            let data_str = test_buffers.into_stdout_str();
+            let data = serde_json::from_str(&data_str).expect("json value");
+            match writer.verify_schema(&data) {
+                Ok(_) => (),
+                Err(e) => {
+                    println!("Error verifying schema: {e}");
+                    println!("{data:?}");
+                }
+            };
+        }
     }
 }

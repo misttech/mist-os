@@ -18,10 +18,13 @@ rustc_library("lib") {
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
   ]
-  test_deps = []
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:serde_json",
+  ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":ffx_product_common_test" ]
+  deps = [ ":lib_test" ]
 }

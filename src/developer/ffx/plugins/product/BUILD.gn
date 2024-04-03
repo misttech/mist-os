@@ -65,5 +65,8 @@ group("bin") {
 
 group("tests") {
   testonly = true
-  deps = [ ":ffx_product_tests($host_toolchain)" ]
+  deps = [
+    ":ffx_product_tests($host_toolchain)",
+    "common:tests",
+  ]
 }
