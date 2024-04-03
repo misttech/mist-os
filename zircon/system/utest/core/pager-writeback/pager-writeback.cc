@@ -534,10 +534,10 @@ TEST(PagerWriteback, DirtyRequestsOverlap) {
   // if the test thread is blocked on pagers outside of the test. WaitForBlocked() can only be
   // relied upon in a non-component environment. The pager-writeback tests cannot run as standalone
   // bootfs tests either because they need the next vDSO. Hence the only supported mode for this
-  // test is unified mode, where the root resource will be available.
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  // test is unified mode, where the system resource will be available.
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
@@ -1547,10 +1547,10 @@ TEST(PagerWriteback, DirtyDuringWriteback) {
   // if the test thread is blocked on pagers outside of the test. WaitForBlocked() can only be
   // relied upon in a non-component environment. The pager-writeback tests cannot run as standalone
   // bootfs tests either because they need the next vDSO. Hence the only supported mode for this
-  // test is unified mode, where the root resource will be available.
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  // test is unified mode, where the system resource will be available.
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
@@ -2111,10 +2111,10 @@ TEST(PagerWriteback, ResizeDirtyRequest) {
   // if the test thread is blocked on pagers outside of the test. WaitForBlocked() can only be
   // relied upon in a non-component environment. The pager-writeback tests cannot run as standalone
   // bootfs tests either because they need the next vDSO. Hence the only supported mode for this
-  // test is unified mode, where the root resource will be available.
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  // test is unified mode, where the system resource will be available.
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
@@ -4650,11 +4650,16 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroWithMarkers, 0) {
 
 // Tests that zeroing across a pinned page clips expansion of the tail.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroPinned, ZX_VMO_RESIZABLE) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -4670,7 +4675,7 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroPinned, ZX_VMO_RESIZABLE) {
   zx::bti bti;
   zx::pmt pmt;
   zx_iommu_desc_dummy_t desc;
-  ASSERT_OK(zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+  ASSERT_OK(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                             iommu.reset_and_get_address()));
   ASSERT_OK(zx::bti::create(iommu, 0, 0xdeadbeef, &bti));
   zx_paddr_t addr;
@@ -5515,11 +5520,16 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnFailedVmoWrite, 0) {
 
 // Tests that a VMO is not marked modified on a failed resize.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnFailedResize, ZX_VMO_RESIZABLE) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -5541,7 +5551,7 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnFailedResize, ZX_VMO_RESIZABLE) {
   zx::bti bti;
   zx::pmt pmt;
   zx_iommu_desc_dummy_t desc;
-  ASSERT_OK(zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+  ASSERT_OK(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                             iommu.reset_and_get_address()));
   ASSERT_OK(zx::bti::create(iommu, 0, 0xdeadbeef, &bti));
   zx_paddr_t addr;
@@ -5776,11 +5786,16 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedNoReset, 0) {
 
 // Tests that pinning a page for read does not dirty it and does not mark the VMO modified.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForRead, 0) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -5802,7 +5817,7 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForRead, 0) {
   zx::bti bti;
   zx::pmt pmt;
   zx_iommu_desc_dummy_t desc;
-  ASSERT_OK(zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+  ASSERT_OK(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                             iommu.reset_and_get_address()));
   ASSERT_OK(zx::bti::create(iommu, 0, 0xdeadbeef, &bti));
   zx_paddr_t addr;
@@ -5829,11 +5844,16 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForRead, 0) {
 
 // Tests that pinning a page for write dirties it and marks the VMO modified.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForWrite, 0) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -5852,11 +5872,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForWrite, 0) {
 
   // Pin a page for write.
   zx::pmt pmt;
-  TestThread t([&pmt, &root_resource, vmo]() -> bool {
+  TestThread t([&pmt, &iommu_resource, vmo]() -> bool {
     zx::iommu iommu;
     zx::bti bti;
     zx_iommu_desc_dummy_t desc;
-    if (zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+    if (zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                         iommu.reset_and_get_address()) != ZX_OK) {
       return false;
     }
@@ -5902,11 +5922,16 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForWrite, 0) {
 
 // Tests that a page cannot be marked clean while it is pinned.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinnedWriteback, 0) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -5925,11 +5950,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinnedWriteback, 0) {
 
   // Pin a page for write.
   zx::pmt pmt;
-  TestThread t([&pmt, &root_resource, vmo]() -> bool {
+  TestThread t([&pmt, &iommu_resource, vmo]() -> bool {
     zx::iommu iommu;
     zx::bti bti;
     zx_iommu_desc_dummy_t desc;
-    if (zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+    if (zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                         iommu.reset_and_get_address()) != ZX_OK) {
       return false;
     }
@@ -5996,11 +6021,16 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinnedWriteback, 0) {
 
 // Tests pinned read with interleaved writeback.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ReadPinAwaitingClean, 0) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -6050,7 +6080,7 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ReadPinAwaitingClean, 0) {
   zx::iommu iommu;
   zx::bti bti;
   zx_iommu_desc_dummy_t desc;
-  ASSERT_OK(zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+  ASSERT_OK(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                             iommu.reset_and_get_address()));
   ASSERT_OK(zx::bti::create(iommu, 0, 0xdeadbeef, &bti));
   zx_paddr_t addr;
@@ -6077,11 +6107,16 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ReadPinAwaitingClean, 0) {
 
 // Tests pinned write with interleaved writeback.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritePinAwaitingClean, 0) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -6128,11 +6163,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritePinAwaitingClean, 0) {
 
   // Pin a page for write.
   zx::pmt pmt;
-  TestThread t2([&pmt, &root_resource, vmo]() -> bool {
+  TestThread t2([&pmt, &iommu_resource, vmo]() -> bool {
     zx::iommu iommu;
     zx::bti bti;
     zx_iommu_desc_dummy_t desc;
-    if (zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+    if (zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                         iommu.reset_and_get_address()) != ZX_OK) {
       return false;
     }
@@ -6193,11 +6228,16 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritePinAwaitingClean, 0) {
 
 // Tests delayed pinned write with interleaved writeback.
 TEST(PagerWriteback, DelayedPinAwaitingClean) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -6242,11 +6282,11 @@ TEST(PagerWriteback, DelayedPinAwaitingClean) {
 
   // Try to pin for write.
   zx::pmt pmt;
-  TestThread t([&pmt, &root_resource, vmo]() -> bool {
+  TestThread t([&pmt, &iommu_resource, vmo]() -> bool {
     zx::iommu iommu;
     zx::bti bti;
     zx_iommu_desc_dummy_t desc;
-    if (zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+    if (zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                         iommu.reset_and_get_address()) != ZX_OK) {
       return false;
     }
@@ -6299,11 +6339,16 @@ TEST(PagerWriteback, DelayedPinAwaitingClean) {
 
 // Tests failed pin with interleaved writeback.
 TEST(PagerWriteback, FailedPinAwaitingClean) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -6348,11 +6393,11 @@ TEST(PagerWriteback, FailedPinAwaitingClean) {
 
   // Try to pin for write.
   zx::pmt pmt;
-  TestThread t([&pmt, &root_resource, vmo]() -> bool {
+  TestThread t([&pmt, &iommu_resource, vmo]() -> bool {
     zx::iommu iommu;
     zx::bti bti;
     zx_iommu_desc_dummy_t desc;
-    if (zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+    if (zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                         iommu.reset_and_get_address()) != ZX_OK) {
       return false;
     }
@@ -6398,11 +6443,16 @@ TEST(PagerWriteback, FailedPinAwaitingClean) {
 
 // Tests that writing to a page after pinning does not generate additional DIRTY requests.
 TEST(PagerWriteback, DirtyAfterPin) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -6421,11 +6471,11 @@ TEST(PagerWriteback, DirtyAfterPin) {
 
   // Pin a page for write.
   zx::pmt pmt;
-  TestThread t([&pmt, &root_resource, vmo]() -> bool {
+  TestThread t([&pmt, &iommu_resource, vmo]() -> bool {
     zx::iommu iommu;
     zx::bti bti;
     zx_iommu_desc_dummy_t desc;
-    if (zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+    if (zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                         iommu.reset_and_get_address()) != ZX_OK) {
       return false;
     }
@@ -6482,11 +6532,16 @@ TEST(PagerWriteback, DirtyAfterPin) {
 
 // Tests that pinning an already dirty page does not generate additional DIRTY requests.
 TEST(PagerWriteback, PinAfterDirty) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -6529,7 +6584,7 @@ TEST(PagerWriteback, PinAfterDirty) {
   zx::iommu iommu;
   zx::bti bti;
   zx_iommu_desc_dummy_t desc;
-  ASSERT_OK(zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+  ASSERT_OK(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                             iommu.reset_and_get_address()));
   ASSERT_OK(zx::bti::create(iommu, 0, 0xdeadbeef, &bti));
   zx_paddr_t addr;
@@ -6563,11 +6618,16 @@ TEST(PagerWriteback, PinAfterDirty) {
 // Tests that both READ and DIRTY requests are generated as expected when pinning an unpopulated
 // range for write.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForWriteUnpopulated, 0) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -6587,11 +6647,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForWriteUnpopulated, 0) {
 
   // Pin both pages for write.
   zx::pmt pmt;
-  TestThread t([&pmt, &root_resource, vmo]() -> bool {
+  TestThread t([&pmt, &iommu_resource, vmo]() -> bool {
     zx::iommu iommu;
     zx::bti bti;
     zx_iommu_desc_dummy_t desc;
-    if (zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+    if (zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                         iommu.reset_and_get_address()) != ZX_OK) {
       return false;
     }
@@ -6648,11 +6708,16 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForWriteUnpopulated, 0) {
 
 // Tests that a failed pin write does not mark the VMO modified.
 TEST(PagerWriteback, NotModifiedFailedPinWrite) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -6671,11 +6736,11 @@ TEST(PagerWriteback, NotModifiedFailedPinWrite) {
 
   // Pin a page for write.
   zx::pmt pmt;
-  TestThread t([&pmt, &root_resource, vmo]() -> bool {
+  TestThread t([&pmt, &iommu_resource, vmo]() -> bool {
     zx::iommu iommu;
     zx::bti bti;
     zx_iommu_desc_dummy_t desc;
-    if (zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+    if (zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                         iommu.reset_and_get_address()) != ZX_OK) {
       return false;
     }
@@ -6717,11 +6782,16 @@ TEST(PagerWriteback, NotModifiedFailedPinWrite) {
 
 // Tests that a pin write that fails part of the way does not mark the VMO modified.
 TEST(PagerWriteback, NotModifiedPartialFailedPinWrite) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -6740,11 +6810,11 @@ TEST(PagerWriteback, NotModifiedPartialFailedPinWrite) {
 
   // Pin both pages for write.
   zx::pmt pmt;
-  TestThread t([&pmt, &root_resource, vmo]() -> bool {
+  TestThread t([&pmt, &iommu_resource, vmo]() -> bool {
     zx::iommu iommu;
     zx::bti bti;
     zx_iommu_desc_dummy_t desc;
-    if (zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+    if (zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                         iommu.reset_and_get_address()) != ZX_OK) {
       return false;
     }
@@ -6790,11 +6860,16 @@ TEST(PagerWriteback, NotModifiedPartialFailedPinWrite) {
 
 // Tests pinning for write through a slice.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(SlicePinWrite, 0) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -6817,11 +6892,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(SlicePinWrite, 0) {
 
   // Pin both pages for write through a slice.
   zx::pmt pmt;
-  TestThread t([&pmt, &root_resource, &slice]() -> bool {
+  TestThread t([&pmt, &iommu_resource, &slice]() -> bool {
     zx::iommu iommu;
     zx::bti bti;
     zx_iommu_desc_dummy_t desc;
-    if (zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+    if (zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                         iommu.reset_and_get_address()) != ZX_OK) {
       return false;
     }
@@ -7092,11 +7167,16 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(CommitResizeRace, ZX_VMO_RESIZABLE) {
 // Tests that a write completes successfully if a clean page is evicted after the generation of a
 // DIRTY request but before it has been resolved.
 TEST(PagerWriteback, EvictAfterDirtyRequest) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUG_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource debug_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -7137,7 +7217,7 @@ TEST(PagerWriteback, EvictAfterDirtyRequest) {
                                 zx_system_get_page_size(), nullptr, 0));
   // Request a scanner reclaim.
   constexpr char k_command[] = "scanner reclaim_all";
-  ASSERT_OK(zx_debug_send_command(root_resource->get(), k_command, strlen(k_command)));
+  ASSERT_OK(zx_debug_send_command(debug_resource.get(), k_command, strlen(k_command)));
 
   // Check if the middle page has been evicted yet.
   // Eviction is asynchronous. Wait for the eviction to occur.

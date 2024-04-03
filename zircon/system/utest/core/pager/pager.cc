@@ -1758,8 +1758,8 @@ TEST(Pager, InvalidPagerSupplyPages) {
   ASSERT_EQ(zx_pager_supply_pages(pager.get(), vmo.get(), 0, 0, aux_vmo.get(), 1),
             ZX_ERR_INVALID_ARGS);
 
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (root_resource->is_valid()) {
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (system_resource->is_valid()) {
     zx::result<vmo_test::PhysVmo> result = vmo_test::GetTestPhysVmo(zx_system_get_page_size());
     ASSERT_TRUE(result.is_ok());
     zx_handle_t physical_vmo_handle = result.value().vmo.get();
@@ -1775,7 +1775,7 @@ TEST(Pager, InvalidPagerSupplyPages) {
     kViolationCount,
   };
   for (uint32_t i = 0; i < kViolationCount; i++) {
-    if (i == kHasPinned && !root_resource->is_valid()) {
+    if (i == kHasPinned && !system_resource->is_valid()) {
       continue;
     }
 
@@ -1809,9 +1809,14 @@ TEST(Pager, InvalidPagerSupplyPages) {
     zx::iommu iommu;
     zx::bti bti;
     zx::pmt pmt;
+
     if (i == kHasPinned) {
+      zx::result<zx::resource> result =
+          maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+      ASSERT_OK(result.status_value());
+      zx::resource iommu_resource = std::move(result.value());
       zx_iommu_desc_dummy_t desc;
-      ASSERT_EQ(zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+      ASSERT_EQ(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                                 iommu.reset_and_get_address()),
                 ZX_OK);
       ASSERT_EQ(zx::bti::create(iommu, 0, 0xdeadbeef, &bti), ZX_OK);
@@ -1887,10 +1892,15 @@ TEST(Pager, MappedSupplyPages) {
 
 // Tests that supply_pages works when the destination has some pinned pages.
 TEST(Pager, PinnedSupplyPages) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   zx::pager pager;
   ASSERT_OK(zx::pager::create(0, &pager));
@@ -1928,7 +1938,7 @@ TEST(Pager, PinnedSupplyPages) {
   zx::bti bti;
   zx::pmt pmt;
   zx_iommu_desc_dummy_t desc;
-  ASSERT_OK(zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+  ASSERT_OK(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                             iommu.reset_and_get_address()));
   ASSERT_OK(zx::bti::create(iommu, 0, 0xdeadbeef, &bti));
   zx_paddr_t addr;
@@ -2405,9 +2415,19 @@ TEST(Pager, WritingZeroFork) {
   // zero scanner to run, since the zero fork queue looks close enough to the pager backed queue
   // that most things will 'just work'.
   constexpr char k_command[] = "scanner reclaim_all";
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid() ||
-      zx_debug_send_command(root_resource->get(), k_command, strlen(k_command)) != ZX_OK) {
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
+  }
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUG_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource debug_resource = std::move(result.value());
+
+  if (!debug_resource.is_valid() ||
+      zx_debug_send_command(debug_resource.get(), k_command, strlen(k_command)) != ZX_OK) {
     // Failed to manually force the zero scanner to run, fall back to sleeping for a moment and hope
     // it runs.
     zx::nanosleep(zx::deadline_after(zx::sec(1)));
@@ -2421,11 +2441,16 @@ TEST(Pager, WritingZeroFork) {
 // Test that if we resize a vmo while it is waiting on a page to fullfill the commit for a pin
 // request that neither the resize nor the pin cause a crash and fail gracefully.
 TEST(Pager, ResizeBlockedPin) {
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -2438,7 +2463,7 @@ TEST(Pager, ResizeBlockedPin) {
   zx::bti bti;
   zx::pmt pmt;
   zx_iommu_desc_dummy_t desc;
-  ASSERT_EQ(zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+  ASSERT_EQ(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                             iommu.reset_and_get_address()),
             ZX_OK);
   ASSERT_EQ(zx::bti::create(iommu, 0, 0xdeadbeef, &bti), ZX_OK);
@@ -2858,17 +2883,22 @@ TEST(Pager, EvictionHintDontNeed) {
   uint64_t offset, length;
   ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
 
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUG_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource debug_resource = std::move(result.value());
 
   // Trigger reclamation of only oldest evictable memory. This will include the pages we hinted
   // DONT_NEED.
   constexpr char k_command_reclaim[] = "scanner reclaim 1 only_old";
   ASSERT_OK(
-      zx_debug_send_command(root_resource->get(), k_command_reclaim, strlen(k_command_reclaim)));
+      zx_debug_send_command(debug_resource.get(), k_command_reclaim, strlen(k_command_reclaim)));
 
   // Verify that the vmo has no committed pages after eviction.
   // Eviction is asynchronous. Poll in a loop until we see the committed page count drop. In case
@@ -3440,8 +3470,8 @@ TEST(Pager, OpCommitCloneVmar) {
   ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
 }
 
-// Regression test for https://fxbug.dev/42173905. Tests that a port dequeue racing with pager destruction on a
-// detached VMO does not result in use-after-frees.
+// Regression test for https://fxbug.dev/42173905. Tests that a port dequeue racing with pager
+// destruction on a detached VMO does not result in use-after-frees.
 TEST(Pager, RacyPortDequeue) {
   // Repeat multiple times so we can hit the race. 1000 is a good balance between trying to
   // reproduce the race without drastically increasing the test runtime.
