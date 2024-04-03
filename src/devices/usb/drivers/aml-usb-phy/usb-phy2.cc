@@ -79,13 +79,6 @@ void UsbPhy2::InitPll(PhyType type, const std::array<uint32_t, 8>& pll_settings)
 
   // Disconnect threshold
   PHY2_R3::Get().FromValue(type == PhyType::kG12A ? 0x3c : 0x34).WriteTo(&mmio());
-
-  if (type == PhyType::kG12A) {
-    zx::nanosleep(zx::deadline_after(zx::usec(100)));
-    PHY2_R14::Get().FromValue(pll_settings[6]).WriteTo(&mmio());
-    PHY2_R13::Get().FromValue(pll_settings[5]).WriteTo(&mmio());
-    zx::nanosleep(zx::deadline_after(zx::usec(100)));
-  }
 }
 
 void UsbPhy2::SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
@@ -123,13 +116,6 @@ void UsbPhy2::SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
       .set_host_device(mode == UsbMode::Host)
       .set_por(0)
       .WriteTo(&usbctrl_mmio);
-
-  zx::nanosleep(zx::deadline_after(zx::usec(500)));
-
-  if (is_otg_capable() && phy_mode() != UsbMode::Unknown) {
-    PHY2_R14::Get().FromValue(mode == UsbMode::Host ? pll_settings[6] : 0).WriteTo(&mmio());
-    PHY2_R13::Get().FromValue(pll_settings[5]).WriteTo(&mmio());
-  }
 }
 
 }  // namespace aml_usb_phy
