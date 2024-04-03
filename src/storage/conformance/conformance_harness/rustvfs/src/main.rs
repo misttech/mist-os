@@ -110,12 +110,10 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
             Io1HarnessRequest::GetConfig { responder } => {
                 let config = Io1Config {
                     // Supported options:
-                    mutable_file: Some(true),
                     supports_create: Some(true),
                     supports_executable_file: Some(true),
                     supports_vmo_file: Some(true),
                     supports_remote_dir: Some(true),
-                    supports_get_backing_memory: Some(true),
                     supports_rename: Some(true),
                     supports_get_token: Some(true),
                     supports_unlink: Some(true),

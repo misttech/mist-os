@@ -122,27 +122,12 @@ async fn validate_file_rights() {
     // Opening as READABLE must succeed.
     open_node::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
 
-    if harness.config.mutable_file.unwrap_or_default() {
-        // Opening as WRITABLE must succeed.
-        open_node::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
-        // Opening as EXECUTABLE must fail (W^X).
-        open_node_status::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_EXECUTABLE, TEST_FILE)
-            .await
-            .expect_err("open succeeded");
-    } else {
-        // If files are immutable, check that opening as WRITABLE results in access denied.
-        // All other combinations are valid in this case.
-        assert_eq!(
-            open_node_status::<fio::NodeMarker>(
-                &root_dir,
-                fio::OpenFlags::RIGHT_WRITABLE,
-                TEST_FILE
-            )
-            .await
-            .expect_err("open succeeded"),
-            zx::Status::ACCESS_DENIED
-        );
-    }
+    // Opening as WRITABLE must succeed.
+    open_node::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
+    // Opening as EXECUTABLE must fail (W^X).
+    open_node_status::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_EXECUTABLE, TEST_FILE)
+        .await
+        .expect_err("open succeeded");
 }
 
 // Validate allowed rights for VmoFile objects (ensures cannot be opened as executable).

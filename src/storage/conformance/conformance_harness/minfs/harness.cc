@@ -70,7 +70,6 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     fuchsia::io::test::Io1Config config;
 
     // Supported options
-    config.set_mutable_file(true);
     config.set_supports_create(true);
     config.set_supports_rename(true);
     config.set_supports_link(true);
@@ -84,7 +83,6 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     config.set_supports_executable_file(false);
     config.set_supports_vmo_file(false);
     config.set_supports_remote_dir(false);
-    config.set_supports_get_backing_memory(false);
     config.set_supports_get_attributes(false);
     config.set_supports_update_attributes(false);
 

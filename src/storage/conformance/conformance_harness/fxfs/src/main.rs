@@ -81,12 +81,10 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
         match request {
             Io1HarnessRequest::GetConfig { responder } => {
                 responder.send(&Io1Config {
-                    mutable_file: Some(true),
                     supports_create: Some(true),
                     supports_executable_file: Some(false),
                     supports_vmo_file: Some(false),
                     supports_remote_dir: Some(false),
-                    supports_get_backing_memory: Some(true),
                     supports_rename: Some(true),
                     supports_link: Some(true),
                     supports_set_attr: Some(true),

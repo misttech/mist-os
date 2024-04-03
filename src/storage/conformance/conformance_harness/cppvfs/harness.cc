@@ -52,12 +52,9 @@ class TestHarness : public fio_test::Io1Harness {
     fio_test::Io1Config config;
 
     // Supported options
-    config.set_mutable_file(true);
     config.set_supports_vmo_file(true);
-    config.set_supports_get_backing_memory(true);
     config.set_supports_remote_dir(true);
     config.set_supports_get_token(true);
-    config.set_supports_append(true);
 
     // Unsupported options
     config.set_supports_create(false);
@@ -69,6 +66,9 @@ class TestHarness : public fio_test::Io1Harness {
     config.set_supports_get_attributes(false);
     config.set_supports_update_attributes(false);
     config.set_supports_directory_watchers(false);
+    config.set_supports_open2(false);
+    // TODO(https://fxbug.dev/324112857): Support append mode when adding open2 support.
+    config.set_supports_append(false);
 
     callback(std::move(config));
   }
@@ -119,13 +119,14 @@ class TestHarness : public fio_test::Io1Harness {
       }
       case fio_test::DirectoryEntry::Tag::kFile: {
         fio_test::File file = std::move(entry.file());
-        std::vector<uint8_t> contents = std::move(*file.mutable_contents());
-        auto reader = [contents = std::move(contents)](fbl::String* output) {
-          *output = fbl::String(reinterpret_cast<const char*>(contents.data()), contents.size());
-          return ZX_OK;
-        };
+        zx::vmo vmo;
+        zx_status_t status = zx::vmo::create(file.contents().size(), {}, &vmo);
+        ZX_ASSERT_MSG(status == ZX_OK, "Failed to create VMO: %s", zx_status_get_string(status));
+        status = vmo.write(file.contents().data(), 0, file.contents().size());
+        ZX_ASSERT_MSG(status == ZX_OK, "Failed to write to VMO: %s", zx_status_get_string(status));
         dest.AddEntry(file.name(),
-                      fbl::MakeRefCounted<fs::BufferedPseudoFile>(reader, &DummyWriter));
+                      fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), file.contents().size(),
+                                                       /*writable=*/true));
         break;
       }
       case fio_test::DirectoryEntry::Tag::kVmoFile: {
@@ -133,7 +134,8 @@ class TestHarness : public fio_test::Io1Harness {
         zx::vmo& vmo = *vmo_file.mutable_vmo();
         uint64_t size;
         zx_status_t status = vmo.get_prop_content_size(&size);
-        ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
+        ZX_ASSERT_MSG(status == ZX_OK, "Failed to get VMO content size: %s",
+                      zx_status_get_string(status));
         dest.AddEntry(vmo_file.name(), fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), size,
                                                                         /*writable=*/true));
         break;

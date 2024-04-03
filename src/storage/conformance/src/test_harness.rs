@@ -36,12 +36,6 @@ impl TestHarness {
         let config = proxy.get_config().await.expect("Could not get config from proxy");
 
         // Validate configuration options for consistency, disallow invalid combinations.
-        if config.supports_executable_file.unwrap_or_default() {
-            assert!(
-                config.supports_get_backing_memory.unwrap_or_default(),
-                "GetBackingMemory must be supported for testing ExecutableFile objects!"
-            );
-        }
         if config.supports_rename.unwrap_or_default() || config.supports_link.unwrap_or_default() {
             assert!(
                 config.supports_get_token.unwrap_or_default(),
@@ -51,9 +45,12 @@ impl TestHarness {
 
         // Generate set of supported open rights for each object type.
         let dir_rights = Rights::new(get_supported_dir_rights(&config));
-        let file_rights = Rights::new(get_supported_file_rights(&config));
-        let vmo_file_rights = Rights::new(get_supported_vmo_file_rights());
-        let executable_file_rights = Rights::new(get_supported_executable_file_rights());
+        let file_rights =
+            Rights::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let vmo_file_rights =
+            Rights::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let executable_file_rights =
+            Rights::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE);
 
         TestHarness {
             proxy,
@@ -116,29 +113,4 @@ fn get_supported_dir_rights(config: &io_test::Io1Config) -> fio::OpenFlags {
         } else {
             fio::OpenFlags::empty()
         }
-}
-
-/// Returns the aggregate of all rights that are supported for [`io_test::File`] objects.
-///
-/// Must support read, and optionally, write (if mutable_file is true).
-fn get_supported_file_rights(config: &io_test::Io1Config) -> fio::OpenFlags {
-    let mut rights = fio::OpenFlags::RIGHT_READABLE;
-    if config.mutable_file.unwrap_or_default() {
-        rights |= fio::OpenFlags::RIGHT_WRITABLE;
-    }
-    rights
-}
-
-/// Returns the aggregate of all rights that are supported for [`io_test::VmoFile`] objects.
-///
-/// Must support both read and write.
-fn get_supported_vmo_file_rights() -> fio::OpenFlags {
-    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE
-}
-
-/// Returns the aggregate of all rights that are supported for [`io_test::ExecutableFile`] objects.
-///
-/// Must support both read and execute.
-fn get_supported_executable_file_rights() -> fio::OpenFlags {
-    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE
 }

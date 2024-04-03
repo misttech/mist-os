@@ -39,9 +39,7 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
     // test harness should be the exact same as the current SDK VFS one.
 
     // Supported options:
-    config.mutable_file(true);
     config.supports_vmo_file(true);
-    config.supports_get_backing_memory(true);
     config.supports_remote_dir(true);
     config.supports_get_token(true);
 
@@ -55,6 +53,9 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_get_attributes(false);
     config.supports_update_attributes(false);
     config.supports_directory_watchers(false);
+    config.supports_open2(false);
+    // TODO(https://fxbug.dev/324112857): Support append when adding Open2.
+    config.supports_append(false);
 
     completer.Reply(std::move(config));
   }
@@ -104,15 +105,13 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
       }
       case fio_test::DirectoryEntry::Tag::kFile: {
         fio_test::File file = std::move(entry.file().value());
-        std::vector<uint8_t> contents = std::move(*file.contents());
-        auto read_handler = [contents = std::move(contents)](std::vector<uint8_t>* output,
-                                                             size_t max_bytes) -> zx_status_t {
-          ZX_ASSERT(contents.size() <= max_bytes);
-          *output = std::vector<uint8_t>(contents);
-          return ZX_OK;
-        };
-        auto file_entry = std::make_unique<vfs::PseudoFile>(std::numeric_limits<size_t>::max(),
-                                                            read_handler, &DummyWriter);
+        zx::vmo vmo;
+        zx_status_t status = zx::vmo::create(file.contents()->size(), {}, &vmo);
+        ZX_ASSERT_MSG(status == ZX_OK, "Failed to create VMO: %s", zx_status_get_string(status));
+        status = vmo.write(file.contents()->data(), 0, file.contents()->size());
+        ZX_ASSERT_MSG(status == ZX_OK, "Failed to write to VMO: %s", zx_status_get_string(status));
+        auto file_entry = std::make_unique<vfs::VmoFile>(std::move(vmo), file.contents()->size(),
+                                                         vfs::VmoFile::WriteOption::WRITABLE);
         ZX_ASSERT_MSG(dest.AddEntry(*file.name(), std::move(file_entry)) == ZX_OK,
                       "Failed to add File entry!");
         break;
@@ -122,7 +121,8 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
         zx::vmo& vmo = *vmo_file.vmo();
         uint64_t size;
         zx_status_t status = vmo.get_prop_content_size(&size);
-        ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
+        ZX_ASSERT_MSG(status == ZX_OK, "Failed to get VMO content size: %s",
+                      zx_status_get_string(status));
         auto vmo_file_entry = std::make_unique<vfs::VmoFile>(std::move(vmo), size,
                                                              vfs::VmoFile::WriteOption::WRITABLE);
         ZX_ASSERT_MSG(dest.AddEntry(*vmo_file.name(), std::move(vmo_file_entry)) == ZX_OK,
