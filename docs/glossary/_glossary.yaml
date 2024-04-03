@@ -530,7 +530,7 @@
 
 - term: "Configuration Capability"
   short_description: "A
-  A <a href=\"/docs/glossary#capability\">capability</a> that provides a data
+  <a href=\"/docs/glossary#capability\">capability</a> that provides a data
   value that a component can use for configuration. A component
   <a href=\"/docs/glossary#use\">using</a> a configuration capability will be
   able to read the value in it's structured configuration."
@@ -618,12 +618,12 @@
 
 - term: "Directory capability"
   short_description: "A
-  A <a href=\"/docs/glossary#capability\">capability</a> that permits access to a filesystem
+  <a href=\"/docs/glossary#capability\">capability</a> that permits access to a filesystem
   directory by adding it to the <a href=\"/docs/glossary#namespace\">namespace</a> of the
   <a href=\"/docs/glossary#component-instance\">component instance</a>
   that <a href=\"/docs/glossary#use\">uses</a> it."
   full_description: "A
-  A <a href=\"/docs/glossary#capability\">capability</a> that permits access to a filesystem
+  <a href=\"/docs/glossary#capability\">capability</a> that permits access to a filesystem
   directory by adding it to the <a href=\"/docs/glossary#namespace\">namespace</a> of the
   <a href=\"/docs/glossary#component-instance\">component instance</a>
   that <a href=\"/docs/glossary#use\">uses</a> it. If multiple
