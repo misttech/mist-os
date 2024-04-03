@@ -331,6 +331,7 @@ impl From<(fac::DeviceInfo, Selector)> for DeviceInfoResult {
 
         let device_path = match selector {
             Selector::Devfs(devfs) => Some(devfs.path()),
+            Selector::Registry(_) => None,
         };
 
         match device_info {

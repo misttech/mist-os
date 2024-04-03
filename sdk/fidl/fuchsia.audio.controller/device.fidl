@@ -71,6 +71,8 @@ type DeviceSelector = flexible union {
         /// Device type.
         device_type fuchsia.audio.device.DeviceType;
     };
+    /// A device available through the `fuchsia.audio.device/Registry` protocol.
+    2: registry fuchsia.audio.device.TokenId;
 };
 
 /// Enumerate, query, and control audio devices from clients.

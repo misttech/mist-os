@@ -6,7 +6,7 @@ use {
     crate::list::DeviceQuery,
     async_trait::async_trait,
     blocking::Unblock,
-    ffx_audio_common::ffxtool::exposed_dir,
+    ffx_audio_common::ffxtool::{exposed_dir, optional_moniker},
     ffx_audio_device_args::{DeviceCommand, DeviceRecordCommand, SubCommand},
     ffx_command::{bug, user_error},
     fho::{moniker, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO},
@@ -16,7 +16,7 @@ use {
         DeviceControlProxy, PlayerPlayRequest, PlayerProxy, RecordCancelerMarker, RecordSource,
         RecorderProxy, RecorderRecordRequest,
     },
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_io as fio,
     fidl_fuchsia_media::AudioStreamType,
     fuchsia_audio::device::Selector,
     fuchsia_zircon_status::Status,
@@ -26,6 +26,8 @@ use {
 };
 
 pub mod list;
+
+use list::QueryExt;
 
 #[derive(Debug, Serialize)]
 pub enum DeviceResult {
@@ -47,6 +49,8 @@ pub struct DeviceTool {
     play_controller: PlayerProxy,
     #[with(exposed_dir("/bootstrap/devfs", "dev-class"))]
     dev_class: fio::DirectoryProxy,
+    #[with(optional_moniker("/core/audio_device_registry"))]
+    registry: Option<fadevice::RegistryProxy>,
 }
 
 fho::embedded_plugin!(DeviceTool);
@@ -55,24 +59,29 @@ impl FfxMain for DeviceTool {
     type Writer = MachineWriter<DeviceResult>;
 
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        let mut selectors = {
+        let devices = {
             let query = DeviceQuery::try_from(&self.cmd)
                 .map_err(|msg| user_error!("Invalid device query: {msg}"))?;
-            list::get_devices(&self.dev_class)
+            let mut devices = list::get_devices(&self.dev_class, self.registry.as_ref())
                 .await
-                .bug_context("Failed to get devices")?
-                .into_iter()
-                .filter(move |selector| query.matches(selector))
+                .bug_context("Failed to get devices")?;
+            match &mut devices {
+                list::Devices::Devfs(selectors) => {
+                    selectors.retain(|selector| selector.matches(&query))
+                }
+                list::Devices::Registry(infos) => infos.retain(|info| info.matches(&query)),
+            }
+            devices
         };
 
-        // The list command consumes all device selectors to print them.
+        // The list command consumes all devices to print them.
         if let SubCommand::List(_) = self.cmd.subcommand {
-            return device_list(selectors.collect::<Vec<_>>(), writer);
+            return device_list(devices, writer);
         }
 
         // For all other commands, pick the first matching device.
         let selector =
-            selectors.next().ok_or_else(|| user_error!("Could not find a matching device"))?;
+            devices.first().ok_or_else(|| user_error!("Could not find a matching device"))?;
 
         match self.cmd.subcommand {
             SubCommand::List(_) => unreachable!(),
@@ -263,11 +272,8 @@ async fn device_set_gain_state(
         .bug_context("Failed to set gain state")
 }
 
-fn device_list(
-    selectors: Vec<Selector>,
-    mut writer: MachineWriter<DeviceResult>,
-) -> fho::Result<()> {
-    let list_result = list::ListResult::from(selectors);
+fn device_list(devices: list::Devices, mut writer: MachineWriter<DeviceResult>) -> fho::Result<()> {
+    let list_result = list::ListResult::from(devices);
     let result = DeviceResult::List(list_result.clone());
     writer
         .machine_or_else(&result, || format!("{}", list_result))
@@ -277,10 +283,10 @@ fn device_list(
 // TODO(https://fxbug.dev/330584540): Remove this method and make all device
 // machine output use #[serde(untagged)].
 pub fn device_list_untagged(
-    selectors: Vec<Selector>,
+    devices: list::Devices,
     mut writer: MachineWriter<list::ListResult>,
 ) -> fho::Result<()> {
-    let list_result = list::ListResult::from(selectors);
+    let list_result = list::ListResult::from(devices);
     writer
         .machine_or_else(&list_result, || format!("{}", &list_result))
         .bug_context("Failed to write result")
@@ -294,7 +300,7 @@ mod tests {
     use ffx_writer::{SimpleWriter, TestBuffer, TestBuffers};
     use fidl_fuchsia_audio_controller as fac;
     use fidl_fuchsia_audio_device as fadevice;
-    use fuchsia_audio::Format;
+    use fuchsia_audio::{device::DevfsSelector, Format};
     use std::fs;
     use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
@@ -543,18 +549,18 @@ mod tests {
         let test_buffers = TestBuffers::default();
         let writer: MachineWriter<DeviceResult> = MachineWriter::new_test(None, &test_buffers);
 
-        let selectors = vec![
-            Selector::from(fac::Devfs {
+        let devices = list::Devices::Devfs(vec![
+            DevfsSelector(fac::Devfs {
                 id: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Input,
             }),
-            Selector::from(fac::Devfs {
+            DevfsSelector(fac::Devfs {
                 id: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Output,
             }),
-        ];
+        ]);
 
-        device_list(selectors, writer).unwrap();
+        device_list(devices, writer).unwrap();
 
         let stdout = test_buffers.into_stdout_str();
         let stdout_expected = format!(
@@ -573,18 +579,18 @@ mod tests {
         let writer: MachineWriter<list::ListResult> =
             MachineWriter::new_test(Some(ffx_writer::Format::Json), &test_buffers);
 
-        let selectors = vec![
-            Selector::from(fac::Devfs {
+        let devices = list::Devices::Devfs(vec![
+            DevfsSelector(fac::Devfs {
                 id: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Input,
             }),
-            Selector::from(fac::Devfs {
+            DevfsSelector(fac::Devfs {
                 id: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Output,
             }),
-        ];
+        ]);
 
-        device_list_untagged(selectors, writer).unwrap();
+        device_list_untagged(devices, writer).unwrap();
 
         let stdout = test_buffers.into_stdout_str();
         let stdout_expected = format!(

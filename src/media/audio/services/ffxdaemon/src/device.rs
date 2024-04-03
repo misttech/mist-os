@@ -14,7 +14,7 @@ use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fuchsia_audio::{
-    device::{DevfsSelector, Selector},
+    device::{DevfsSelector, RegistrySelector, Selector},
     stop_listener, Format,
 };
 use fuchsia_component::client::connect_to_protocol_at_path;
@@ -172,7 +172,7 @@ fn validate_format(
 }
 
 /// Connects to the device protocol for a device in devfs.
-pub fn connect_to_device_controller(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl>, Error> {
+pub fn connect_to_devfs(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl>, Error> {
     let protocol_path = devfs.path().join("device_protocol");
 
     match devfs.0.device_type {
@@ -200,14 +200,20 @@ pub fn connect_to_device_controller(devfs: DevfsSelector) -> Result<Box<dyn Devi
     }
 }
 
+fn connect_to_registry(_selector: RegistrySelector) -> Result<Box<dyn DeviceControl>, Error> {
+    Err(anyhow!("TODO(https://fxbug.dev/329150383) ffx audio supports fuchsia.audio (ADR) devices"))
+}
+
 pub struct Device {
     pub device_controller: Box<dyn DeviceControl>,
 }
 
 impl Device {
     pub fn new_from_selector(selector: Selector) -> Result<Self, Error> {
-        let Selector::Devfs(devfs) = selector;
-        let device_controller = connect_to_device_controller(devfs)?;
+        let device_controller = match selector {
+            Selector::Devfs(selector) => connect_to_devfs(selector)?,
+            Selector::Registry(selector) => connect_to_registry(selector)?,
+        };
         Ok(Self { device_controller })
     }
 

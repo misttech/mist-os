@@ -168,6 +168,7 @@ impl FromStr for Direction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Selector {
     Devfs(DevfsSelector),
+    Registry(RegistrySelector),
 }
 
 impl TryFrom<fac::DeviceSelector> for Selector {
@@ -176,6 +177,7 @@ impl TryFrom<fac::DeviceSelector> for Selector {
     fn try_from(value: fac::DeviceSelector) -> Result<Self, Self::Error> {
         match value {
             fac::DeviceSelector::Devfs(devfs) => Ok(Self::Devfs(devfs.into())),
+            fac::DeviceSelector::Registry(token_id) => Ok(Self::Registry(token_id.into())),
             _ => Err("unknown selector variant".to_string()),
         }
     }
@@ -191,6 +193,7 @@ impl From<Selector> for fac::DeviceSelector {
     fn from(value: Selector) -> Self {
         match value {
             Selector::Devfs(devfs_selector) => devfs_selector.into(),
+            Selector::Registry(registry_selector) => registry_selector.into(),
         }
     }
 }
@@ -234,6 +237,63 @@ impl From<fac::Devfs> for DevfsSelector {
 impl From<DevfsSelector> for fac::DeviceSelector {
     fn from(value: DevfsSelector) -> Self {
         Self::Devfs(value.0)
+    }
+}
+
+/// Identifies a device available through the `fuchsia.audio.device/Registry` protocol.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistrySelector(pub fadevice::TokenId);
+
+impl Display for RegistrySelector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl TryFrom<fac::DeviceSelector> for RegistrySelector {
+    type Error = String;
+
+    fn try_from(value: fac::DeviceSelector) -> Result<Self, Self::Error> {
+        match value {
+            fac::DeviceSelector::Registry(token_id) => Ok(Self(token_id)),
+            _ => Err("unknown selector type".to_string()),
+        }
+    }
+}
+
+impl From<fadevice::TokenId> for RegistrySelector {
+    fn from(value: fadevice::TokenId) -> Self {
+        Self(value)
+    }
+}
+
+impl From<RegistrySelector> for fac::DeviceSelector {
+    fn from(value: RegistrySelector) -> Self {
+        Self::Registry(value.0)
+    }
+}
+
+/// Device info from the `fuchsia.audio.device/Registry` protocol.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Info(pub fadevice::Info);
+
+impl Info {
+    pub fn token_id(&self) -> fadevice::TokenId {
+        self.0.token_id.expect("missing token_id")
+    }
+
+    pub fn registry_selector(&self) -> RegistrySelector {
+        RegistrySelector(self.token_id())
+    }
+
+    pub fn device_type(&self) -> Type {
+        Type(self.0.device_type.expect("missing device_type"))
+    }
+}
+
+impl From<fadevice::Info> for Info {
+    fn from(value: fadevice::Info) -> Self {
+        Self(value)
     }
 }
 
@@ -289,9 +349,35 @@ pub async fn list_devfs(
     Ok(selectors)
 }
 
+#[derive(Error, Debug)]
+pub enum ListRegistryError {
+    #[error(transparent)]
+    Fidl(#[from] fidl::Error),
+
+    #[error("failed to get devices: {:?}", .0)]
+    WatchDevicesAdded(fadevice::RegistryWatchDevicesAddedError),
+}
+
+/// Returns info for all audio devices in the `fuchsia.audio.device` registry.
+pub async fn list_registry(
+    registry: &fadevice::RegistryProxy,
+) -> Result<Vec<Info>, ListRegistryError> {
+    Ok(registry
+        .watch_devices_added()
+        .await
+        .map_err(ListRegistryError::Fidl)?
+        .map_err(ListRegistryError::WatchDevicesAdded)?
+        .devices
+        .expect("missing devices")
+        .into_iter()
+        .map(Info::from)
+        .collect())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use fidl::endpoints::spawn_stream_handler;
     use std::sync::Arc;
     use test_case::test_case;
     use vfs::pseudo_directory;
@@ -438,6 +524,47 @@ mod test {
                 }),
             ],
             selectors
+        );
+    }
+
+    fn serve_registry(devices: Vec<fadevice::Info>) -> fadevice::RegistryProxy {
+        let devices = Arc::new(devices);
+        spawn_stream_handler(move |request| {
+            let devices = devices.clone();
+            async move {
+                match request {
+                    fadevice::RegistryRequest::WatchDevicesAdded { responder } => responder
+                        .send(Ok(&fadevice::RegistryWatchDevicesAddedResponse {
+                            devices: Some((*devices).clone()),
+                            ..Default::default()
+                        }))
+                        .unwrap(),
+                    _ => unimplemented!(),
+                }
+            }
+        })
+        .unwrap()
+    }
+
+    #[fuchsia::test]
+    async fn test_list_registry() {
+        let devices = vec![
+            fadevice::Info { token_id: Some(1), ..Default::default() },
+            fadevice::Info { token_id: Some(2), ..Default::default() },
+            fadevice::Info { token_id: Some(3), ..Default::default() },
+        ];
+
+        let registry = serve_registry(devices);
+
+        let infos = list_registry(&registry).await.unwrap();
+
+        assert_eq!(
+            infos,
+            vec![
+                Info::from(fadevice::Info { token_id: Some(1), ..Default::default() }),
+                Info::from(fadevice::Info { token_id: Some(2), ..Default::default() }),
+                Info::from(fadevice::Info { token_id: Some(3), ..Default::default() }),
+            ]
         );
     }
 }

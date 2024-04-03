@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use ffx_audio_common::ffxtool::exposed_dir;
+use ffx_audio_common::ffxtool::{exposed_dir, optional_moniker};
 use ffx_audio_device::{
     device_list_untagged,
     list::{get_devices, ListResult},
 };
 use ffx_audio_listdevices_args::ListDevicesCommand;
 use fho::{FfxMain, FfxTool, MachineWriter};
+use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_io as fio;
 
 #[derive(FfxTool)]
@@ -18,6 +19,8 @@ pub struct ListDevicesTool {
     _cmd: ListDevicesCommand,
     #[with(exposed_dir("/bootstrap/devfs", "dev-class"))]
     dev_class: fio::DirectoryProxy,
+    #[with(optional_moniker("/core/audio_device_registry"))]
+    registry: Option<fadevice::RegistryProxy>,
 }
 
 fho::embedded_plugin!(ListDevicesTool);
@@ -26,7 +29,7 @@ impl FfxMain for ListDevicesTool {
     type Writer = MachineWriter<ListResult>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        let selectors = get_devices(&self.dev_class).await?;
+        let selectors = get_devices(&self.dev_class, self.registry.as_ref()).await?;
         device_list_untagged(selectors, writer)
     }
 }
