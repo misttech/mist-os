@@ -13,6 +13,7 @@ pub type Point2 = [f32; 2];
 // Internal event loop messages used by flatland-view-provider-example.  The example communicates
 // asynchronously with a number of (mostly Scenic) protocols; InternalMessage helps to centralize
 // the app's responses in a single handler, and thus greatly simplifies control flow.
+#[allow(dead_code)] // The example code does not use all the fields.
 pub enum InternalMessage {
     CreateView(fviews::ViewCreationToken, fviews::ViewIdentityOnCreation),
     OnPresentError {
@@ -22,7 +23,6 @@ pub enum InternalMessage {
         additional_present_credits: u32,
         future_presentation_infos: Vec<flatland::PresentationInfo>,
     },
-    #[allow(dead_code)]
     OnFramePresented {
         frame_presented_info: fidl_fuchsia_scenic_scheduling::FramePresentedInfo,
     },
@@ -39,8 +39,6 @@ pub enum InternalMessage {
         phase: fptr::EventPhase,
         position_in_viewport: Point2,
     },
-    // The example code does not use all the fields.
-    #[allow(dead_code)]
     MouseEvent {
         timestamp: i64,
         trace_flow_id: u64,
