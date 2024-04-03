@@ -17,7 +17,6 @@ ffx_plugin("ffx_audio_gen") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/media/audio/lib/rust",

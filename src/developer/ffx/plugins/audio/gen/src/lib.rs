@@ -11,12 +11,12 @@ use {
         TriangleCommand, WhiteNoiseCommand,
     },
     fho::{FfxMain, FfxTool, SimpleWriter},
-    fuchsia_audio::Format,
+    fuchsia_audio::{format::SampleType, Format},
     rand::{rngs::ThreadRng, thread_rng, Rng},
     std::{f64::consts::PI, io, io::Write, time::Duration},
 };
 
-// Conversion constants for `AudioSampleFormat::Unsigned8`.
+// Conversion constants for `SampleType::Uint8`.
 // Note: Sample data in WAV file are stored as unsigned 8 bit values. However, the hound rust
 // crate API accepts signed 8 bit Ints, and converts to unsigned 8 bit before writing.
 const FLOAT_TO_INT8: i32 = -(i8::MIN as i32);
@@ -25,14 +25,14 @@ fn float_to_i8(value: f64) -> i8 {
     ((value * FLOAT_TO_INT8 as f64).round() as i16).clamp(i8::MIN as i16, i8::MAX as i16) as i8
 }
 
-// Conversion constants for `AudioSampleFormat::Signed16`.
+// Conversion constants for `SampleType::Int16`.
 const FLOAT_TO_INT16: i32 = -(i16::MIN as i32);
 
 fn float_to_i16(value: f64) -> i16 {
     ((value * FLOAT_TO_INT16 as f64).round() as i32).clamp(i16::MIN as i32, i16::MAX as i32) as i16
 }
 
-// Conversion constants for `AudioSampleFormat::Signed24In32`.
+// Conversion constants for `SampleType::Int32`.
 const FLOAT_TO_INT32: i64 = -(i32::MIN as i64);
 
 fn float_to_i32(value: f64) -> i32 {
@@ -204,7 +204,7 @@ async fn generate_signal(cmd: GenericSignal) -> Result<()> {
 
 fn write_signal(command: GenericSignal, cursor_writer: &mut io::Cursor<Vec<u8>>) -> Result<()> {
     let mut writer =
-        hound::WavWriter::new(cursor_writer, hound::WavSpec::from(&command.format)).unwrap();
+        hound::WavWriter::new(cursor_writer, hound::WavSpec::from(command.format)).unwrap();
     let frames_per_period =
         (command.format.frames_per_second as f64) / command.frequency.unwrap_or(1) as f64;
     let rads_per_frame = (2.0 * PI) / frames_per_period;
@@ -262,19 +262,19 @@ fn write_signal(command: GenericSignal, cursor_writer: &mut io::Cursor<Vec<u8>>)
             };
 
             match command.format.sample_type {
-                fidl_fuchsia_media::AudioSampleFormat::Unsigned8 => {
+                SampleType::Uint8 => {
                     let converted_sample = float_to_i8(value * command.amplitude().unwrap());
                     writer.write_sample(converted_sample).unwrap()
                 }
-                fidl_fuchsia_media::AudioSampleFormat::Signed16 => {
+                SampleType::Int16 => {
                     let converted_sample: i16 = float_to_i16(value * command.amplitude().unwrap());
                     writer.write_sample(converted_sample).unwrap()
                 }
-                fidl_fuchsia_media::AudioSampleFormat::Signed24In32 => {
+                SampleType::Int32 => {
                     let converted_sample: i32 = float_to_i32(value * command.amplitude().unwrap());
                     writer.write_sample(converted_sample).unwrap()
                 }
-                fidl_fuchsia_media::AudioSampleFormat::Float => {
+                SampleType::Float32 => {
                     writer.write_sample((value * command.amplitude().unwrap()) as f32).unwrap()
                 }
             }
@@ -341,7 +341,7 @@ pub mod test {
                 amplitude: Some(1.0),
                 format: Format {
                     frames_per_second: 48000,
-                    sample_type: fidl_fuchsia_media::AudioSampleFormat::Unsigned8,
+                    sample_type: SampleType::Uint8,
                     channels: 1,
                 },
                 signal_type: SignalType::Sine,
@@ -353,7 +353,7 @@ pub mod test {
                 amplitude: Some(0.5),
                 format: Format {
                     frames_per_second: 48000,
-                    sample_type: fidl_fuchsia_media::AudioSampleFormat::Unsigned8,
+                    sample_type: SampleType::Uint8,
                     channels: 1,
                 },
                 signal_type: SignalType::Sine,
@@ -366,7 +366,7 @@ pub mod test {
                 amplitude: Some(0.0),
                 format: Format {
                     frames_per_second: 48000,
-                    sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed16,
+                    sample_type: SampleType::Int16,
                     channels: 1,
                 },
                 signal_type: SignalType::Sine,
@@ -378,7 +378,7 @@ pub mod test {
                 amplitude: Some(1.0),
                 format: Format {
                     frames_per_second: 48000,
-                    sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed16,
+                    sample_type: SampleType::Int16,
                     channels: 1,
                 },
                 signal_type: SignalType::Sine,
@@ -390,7 +390,7 @@ pub mod test {
                 amplitude: Some(1.0),
                 format: Format {
                     frames_per_second: 48000,
-                    sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed24In32,
+                    sample_type: SampleType::Int32,
                     channels: 1,
                 },
                 signal_type: SignalType::Sine,
@@ -402,7 +402,7 @@ pub mod test {
                 amplitude: Some(1.0),
                 format: Format {
                     frames_per_second: 48000,
-                    sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed16,
+                    sample_type: SampleType::Int16,
                     channels: 1,
                 },
                 signal_type: SignalType::Square,
@@ -414,7 +414,7 @@ pub mod test {
                 amplitude: Some(1.0),
                 format: Format {
                     frames_per_second: 48000,
-                    sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed24In32,
+                    sample_type: SampleType::Int32,
                     channels: 1,
                 },
                 signal_type: SignalType::Square,
@@ -426,7 +426,7 @@ pub mod test {
                 amplitude: Some(0.5),
                 format: Format {
                     frames_per_second: 48000,
-                    sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed24In32,
+                    sample_type: SampleType::Int32,
                     channels: 2,
                 },
                 signal_type: SignalType::Square,
@@ -438,7 +438,7 @@ pub mod test {
                 amplitude: Some(0.5),
                 format: Format {
                     frames_per_second: 48000,
-                    sample_type: fidl_fuchsia_media::AudioSampleFormat::Float,
+                    sample_type: SampleType::Float32,
                     channels: 1,
                 },
                 signal_type: SignalType::Square,
@@ -450,7 +450,7 @@ pub mod test {
                 amplitude: Some(1.0),
                 format: Format {
                     frames_per_second: 48000,
-                    sample_type: fidl_fuchsia_media::AudioSampleFormat::Float,
+                    sample_type: SampleType::Float32,
                     channels: 2,
                 },
                 signal_type: SignalType::Square,
@@ -861,7 +861,7 @@ pub mod test {
             amplitude: Some(0.0),
             format: Format {
                 frames_per_second: 48000,
-                sample_type: fidl_fuchsia_media::AudioSampleFormat::Signed16,
+                sample_type: SampleType::Int16,
                 channels: 1,
             },
             signal_type: SignalType::Sine,

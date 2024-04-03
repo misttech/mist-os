@@ -50,7 +50,7 @@ pub async fn handle_play_request(
     match destination {
         fac::PlayDestination::Renderer(config) => {
             let spec = wav_socket.read_header().await?;
-            let format = Format::from(&spec);
+            let format = Format::from(spec);
 
             let renderer =
                 Renderer::new(config, format, request.gain_settings).await.map_err(|err| {
@@ -120,10 +120,12 @@ pub async fn handle_record_request(
     };
     let duration = request.duration.map(|duration| Duration::from_nanos(duration as u64));
 
+    let format = Format::from(stream_type);
+
     match source {
         fac::RecordSource::Capturer(..) | fac::RecordSource::Loopback(..) => {
             let mut capturer =
-                Capturer::new(source, stream_type, request.gain_settings).await.map_err(|err| {
+                Capturer::new(source, format, request.gain_settings).await.map_err(|err| {
                     ControllerError::new(
                         fac::Error::DeviceNotReachable,
                         format!("Failed to connect to capturer: {err}"),
@@ -139,7 +141,6 @@ pub async fn handle_record_request(
                     format!("invalid selector: {msg}"),
                 )
             })?;
-            let format = Format::from(&stream_type);
 
             let mut device = Device::new_from_selector(selector).map_err(|err| {
                 ControllerError::new(

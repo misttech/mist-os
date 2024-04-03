@@ -56,7 +56,7 @@ impl Renderer {
                     proxy.set_usage(usage)?;
                 }
 
-                proxy.set_pcm_stream_type(&fmedia::AudioStreamType::from(&format))?;
+                proxy.set_pcm_stream_type(&fmedia::AudioStreamType::from(format))?;
 
                 if let Some(gain_settings) = gain_settings {
                     let (gain_control_proxy, gain_control_server_end) =
@@ -77,16 +77,12 @@ impl Renderer {
                 let (_reference_clock, got_stream_type) =
                     ultrasound_factory.create_renderer(renderer_server_end).await?;
 
-                if format.channels != got_stream_type.channels
-                    || format.sample_type != got_stream_type.sample_format
-                    || format.frames_per_second != got_stream_type.frames_per_second
-                {
+                let got_format = Format::from(got_stream_type);
+                if format != got_format {
                     return Err(anyhow!(
-                        "Requested format for ultrasound renderer does not match available\
-                            format. Expected: {}hz, {:?}, {:?}ch\n",
-                        got_stream_type.frames_per_second,
-                        got_stream_type.sample_format,
-                        got_stream_type.channels,
+                        "Requested format {} for ultrasound renderer does not match available format: {}",
+                        format,
+                        got_format
                     ));
                 }
             }

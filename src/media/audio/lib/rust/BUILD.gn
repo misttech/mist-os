@@ -15,6 +15,7 @@ rustc_library("fuchsia-audio") {
   with_unit_tests = !is_host
 
   deps = [
+    "//sdk/fidl/fuchsia.audio:fuchsia.audio_rust",
     "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_rust",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",

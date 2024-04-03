@@ -96,7 +96,7 @@ impl DeviceControl for StreamConfigDevice {
     async fn create_ring_buffer(&mut self, format: Format) -> Result<Box<dyn RingBuffer>, Error> {
         let (ring_buffer_proxy, ring_buffer_server) =
             create_proxy::<fhaudio::RingBufferMarker>().unwrap();
-        self.proxy.create_ring_buffer(&fhaudio::Format::from(&format), ring_buffer_server)?;
+        self.proxy.create_ring_buffer(&fhaudio::Format::from(format), ring_buffer_server)?;
         let ring_buffer = HardwareRingBuffer::new(ring_buffer_proxy, format).await?;
 
         Ok(Box::new(ring_buffer))
@@ -266,7 +266,7 @@ impl Device {
         mut socket: WavSocket,
     ) -> Result<fac::PlayerPlayResponse, ControllerError> {
         let spec = socket.read_header().await?;
-        let format = Format::from(&spec);
+        let format = Format::from(spec);
 
         let supported_formats = self.device_controller.get_supported_formats().await?;
         validate_format(&format, supported_formats)?;
@@ -385,7 +385,7 @@ impl Device {
                 late_wakeups += 1;
             }
 
-            let mut buf = vec![format.silence_value(); num_bytes_to_write as usize];
+            let mut buf = vec![format.sample_type.silence_value(); num_bytes_to_write as usize];
 
             let bytes_read_from_socket = socket.read_until_full(&mut buf).await?;
 
@@ -470,10 +470,10 @@ impl Device {
         let mut last_frame_read = 0u64;
 
         let mut timer = fuchsia_async::Interval::new(wakeup_interval);
-        let mut buf = vec![format.silence_value(); bytes_per_wakeup_interval as usize];
+        let mut buf = vec![format.sample_type.silence_value(); bytes_per_wakeup_interval as usize];
         let stop_signal = AtomicBool::new(false);
 
-        socket.write_header(duration, &format).await?;
+        socket.write_header(duration, format).await?;
         let packet_fut = async {
             loop {
                 timer.next().await;
@@ -524,7 +524,7 @@ impl Device {
                     late_wakeups += 1;
                 }
 
-                buf[..bytes_missed].fill(format.silence_value());
+                buf[..bytes_missed].fill(format.sample_type.silence_value());
                 let _ = ring_buffer
                     .vmo_buffer()
                     .read_from_frame(last_frame_read, &mut buf[bytes_missed..])?;

@@ -267,15 +267,12 @@ impl Drop for VmoBuffer {
 mod test {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_media::AudioSampleFormat;
+    use fuchsia_audio::format::SampleType;
 
     #[test]
     fn vmobuffer_vmo_too_small() {
-        let format = Format {
-            frames_per_second: 48000,
-            sample_type: AudioSampleFormat::Unsigned8,
-            channels: 2,
-        };
+        let format =
+            Format { frames_per_second: 48000, sample_type: SampleType::Uint8, channels: 2 };
 
         // VMO size is rounded up to the system page size.
         let page_size = zx::system_get_page_size() as u64;
@@ -290,11 +287,8 @@ mod test {
 
     #[test]
     fn vmobuffer_read_write() {
-        let format = Format {
-            frames_per_second: 48000,
-            sample_type: AudioSampleFormat::Unsigned8,
-            channels: 2,
-        };
+        let format =
+            Format { frames_per_second: 48000, sample_type: SampleType::Uint8, channels: 2 };
         const NUM_FRAMES_VMO: u64 = 10;
         const NUM_FRAMES_BUF: u64 = 5;
         const SAMPLE: u8 = 42;
@@ -322,11 +316,8 @@ mod test {
 
     #[test]
     fn vmobuffer_read_write_wrapping() {
-        let format = Format {
-            frames_per_second: 48000,
-            sample_type: AudioSampleFormat::Unsigned8,
-            channels: 2,
-        };
+        let format =
+            Format { frames_per_second: 48000, sample_type: SampleType::Uint8, channels: 2 };
         let page_size = zx::system_get_page_size() as u64;
         let num_frames_vmo: u64 = page_size;
         let num_frames_buf: u64 = page_size / 2;

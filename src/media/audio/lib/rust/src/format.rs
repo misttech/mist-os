@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error, Result};
+use fidl_fuchsia_audio as faudio;
 use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fidl_fuchsia_media as fmedia;
 use regex::Regex;
+use std::fmt::Display;
 use std::io::{Cursor, Seek, SeekFrom, Write};
 use std::{str::FromStr, time::Duration};
 
@@ -14,43 +16,18 @@ pub const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct Format {
-    pub sample_type: fmedia::AudioSampleFormat,
+    pub sample_type: SampleType,
     pub frames_per_second: u32,
     pub channels: u32,
 }
 
 impl Format {
     pub const fn bytes_per_frame(&self) -> u32 {
-        self.bytes_per_sample() * self.channels
-    }
-
-    pub const fn bytes_per_sample(&self) -> u32 {
-        match self.sample_type {
-            fmedia::AudioSampleFormat::Unsigned8 => 1,
-            fmedia::AudioSampleFormat::Signed16 => 2,
-            fmedia::AudioSampleFormat::Signed24In32 => 4,
-            fmedia::AudioSampleFormat::Float => 4,
-        }
+        self.sample_type.bytes_per_sample() * self.channels
     }
 
     pub fn frames_in_duration(&self, duration: std::time::Duration) -> u64 {
         (self.frames_per_second as f64 * duration.as_secs_f64()).ceil() as u64
-    }
-
-    pub const fn valid_bits_per_sample(&self) -> u32 {
-        match self.sample_type {
-            fmedia::AudioSampleFormat::Unsigned8 => 8,
-            fmedia::AudioSampleFormat::Signed16 => 16,
-            fmedia::AudioSampleFormat::Signed24In32 => 24,
-            fmedia::AudioSampleFormat::Float => 32,
-        }
-    }
-
-    pub const fn silence_value(&self) -> u8 {
-        match self.sample_type {
-            fmedia::AudioSampleFormat::Unsigned8 => 128,
-            _ => 0,
-        }
     }
 
     pub fn wav_header_for_duration(&self, duration: Duration) -> Result<Vec<u8>, Error> {
@@ -64,7 +41,7 @@ impl Format {
             // This written header has the file size field and data chunk size field both set
             // to 0, since the number of samples (and resulting file and chunk sizes) are
             // unknown to the WavWriter at this point.
-            let _writer = hound::WavWriter::new(&mut cursor_writer, self.into())
+            let _writer = hound::WavWriter::new(&mut cursor_writer, (*self).into())
                 .map_err(|e| anyhow!("Failed to create WavWriter from spec: {}", e))?;
         }
 
@@ -95,14 +72,17 @@ impl Format {
     }
 
     pub fn is_supported_by(&self, supported_formats: &Vec<fhaudio::SupportedFormats>) -> bool {
-        let hardware_format = fhaudio::Format::from(self);
+        let hardware_format = fhaudio::Format::from(self.clone());
         let mut is_format_supported = false;
 
         for supported_format in supported_formats {
             let pcm_formats = supported_format.pcm_supported_formats.as_ref().unwrap().clone();
 
             if pcm_formats.frame_rates.unwrap().contains(&self.frames_per_second)
-                && pcm_formats.bytes_per_sample.unwrap().contains(&(self.bytes_per_sample() as u8))
+                && pcm_formats
+                    .bytes_per_sample
+                    .unwrap()
+                    .contains(&(self.sample_type.bytes_per_sample() as u8))
                 && pcm_formats
                     .sample_formats
                     .unwrap()
@@ -110,7 +90,7 @@ impl Format {
                 && pcm_formats
                     .valid_bits_per_sample
                     .unwrap()
-                    .contains(&(self.valid_bits_per_sample() as u8))
+                    .contains(&(self.sample_type.valid_bits_per_sample() as u8))
                 && pcm_formats.channel_sets.unwrap().into_iter().any(|channel_set| {
                     channel_set.attributes.unwrap().len() == self.channels as usize
                 })
@@ -123,79 +103,108 @@ impl Format {
     }
 }
 
-impl From<&hound::WavSpec> for Format {
-    fn from(item: &hound::WavSpec) -> Self {
+impl From<hound::WavSpec> for Format {
+    fn from(value: hound::WavSpec) -> Self {
         Format {
-            sample_type: match item.sample_format {
-                hound::SampleFormat::Int => match item.bits_per_sample {
-                    0..=8 => fmedia::AudioSampleFormat::Unsigned8,
-                    9..=16 => fmedia::AudioSampleFormat::Signed16,
-                    17.. => fmedia::AudioSampleFormat::Signed24In32,
-                },
-                hound::SampleFormat::Float => fmedia::AudioSampleFormat::Float,
+            sample_type: (value.sample_format, value.bits_per_sample).into(),
+            frames_per_second: value.sample_rate,
+            channels: value.channels as u32,
+        }
+    }
+}
+
+impl From<fmedia::AudioStreamType> for Format {
+    fn from(value: fmedia::AudioStreamType) -> Self {
+        Format {
+            sample_type: value.sample_format.into(),
+            frames_per_second: value.frames_per_second,
+            channels: value.channels,
+        }
+    }
+}
+
+impl From<Format> for fhaudio::PcmFormat {
+    fn from(value: Format) -> Self {
+        Self {
+            number_of_channels: value.channels as u8,
+            sample_format: value.sample_type.into(),
+            bytes_per_sample: value.sample_type.bytes_per_sample() as u8,
+            valid_bits_per_sample: value.sample_type.valid_bits_per_sample() as u8,
+            frame_rate: value.frames_per_second,
+        }
+    }
+}
+
+impl From<Format> for fhaudio::Format {
+    fn from(value: Format) -> Self {
+        fhaudio::Format { pcm_format: Some(value.into()), ..Default::default() }
+    }
+}
+
+impl From<Format> for faudio::Format {
+    fn from(value: Format) -> Self {
+        Self {
+            sample_type: Some(value.sample_type.into()),
+            channel_count: Some(value.channels),
+            frames_per_second: Some(value.frames_per_second),
+            channel_layout: {
+                let channel_config = match value.channels {
+                    1 => faudio::ChannelConfig::Mono,
+                    2 => faudio::ChannelConfig::Stereo,
+                    // The following are just a guess.
+                    3 => faudio::ChannelConfig::Surround3,
+                    4 => faudio::ChannelConfig::Surround4,
+                    6 => faudio::ChannelConfig::Surround51,
+                    _ => panic!("channel count not representable as a ChannelConfig"),
+                };
+                Some(faudio::ChannelLayout::Config(channel_config))
             },
-            frames_per_second: item.sample_rate,
-            channels: item.channels as u32,
-        }
-    }
-}
-
-impl From<&fmedia::AudioStreamType> for Format {
-    fn from(item: &fmedia::AudioStreamType) -> Self {
-        Format {
-            sample_type: item.sample_format,
-            frames_per_second: item.frames_per_second,
-            channels: item.channels,
-        }
-    }
-}
-
-impl From<&Format> for fhaudio::Format {
-    fn from(item: &Format) -> fhaudio::Format {
-        fhaudio::Format {
-            pcm_format: Some(fhaudio::PcmFormat {
-                number_of_channels: item.channels as u8,
-                sample_format: match item.sample_type {
-                    fmedia::AudioSampleFormat::Unsigned8 => fhaudio::SampleFormat::PcmUnsigned,
-                    fmedia::AudioSampleFormat::Signed16 => fhaudio::SampleFormat::PcmSigned,
-                    fmedia::AudioSampleFormat::Signed24In32 => fhaudio::SampleFormat::PcmSigned,
-                    fmedia::AudioSampleFormat::Float => fhaudio::SampleFormat::PcmFloat,
-                },
-                bytes_per_sample: item.bytes_per_sample() as u8,
-                valid_bits_per_sample: item.valid_bits_per_sample() as u8,
-                frame_rate: item.frames_per_second,
-            }),
             ..Default::default()
         }
     }
 }
 
-impl From<&Format> for hound::WavSpec {
-    fn from(item: &Format) -> Self {
-        hound::WavSpec {
-            channels: item.channels as u16,
-            sample_format: match item.sample_type {
-                fmedia::AudioSampleFormat::Float => hound::SampleFormat::Float,
-                _ => hound::SampleFormat::Int,
-            },
-            sample_rate: item.frames_per_second,
-            bits_per_sample: match item.sample_type {
-                fmedia::AudioSampleFormat::Unsigned8 => 8,
-                fmedia::AudioSampleFormat::Signed16 => 16,
-                fmedia::AudioSampleFormat::Signed24In32 => 32,
-                fmedia::AudioSampleFormat::Float => 32,
-            },
+impl TryFrom<faudio::Format> for Format {
+    type Error = String;
+
+    fn try_from(value: faudio::Format) -> Result<Self, Self::Error> {
+        let sample_type = value.sample_type.ok_or_else(|| "missing sample_type".to_string())?;
+        let channel_count =
+            value.channel_count.ok_or_else(|| "missing channel_count".to_string())?;
+        let frames_per_second =
+            value.frames_per_second.ok_or_else(|| "missing frames_per_second".to_string())?;
+        Ok(Self {
+            sample_type: SampleType::try_from(sample_type)?,
+            channels: channel_count,
+            frames_per_second,
+        })
+    }
+}
+
+impl From<Format> for hound::WavSpec {
+    fn from(value: Format) -> Self {
+        Self {
+            channels: value.channels as u16,
+            sample_format: value.sample_type.into(),
+            sample_rate: value.frames_per_second,
+            bits_per_sample: value.sample_type.bits_per_sample() as u16,
         }
     }
 }
 
-impl From<&Format> for fmedia::AudioStreamType {
-    fn from(item: &Format) -> Self {
-        fmedia::AudioStreamType {
-            sample_format: item.sample_type,
-            channels: item.channels,
-            frames_per_second: item.frames_per_second,
+impl From<Format> for fmedia::AudioStreamType {
+    fn from(value: Format) -> Self {
+        Self {
+            sample_format: value.sample_type.into(),
+            channels: value.channels,
+            frames_per_second: value.frames_per_second,
         }
+    }
+}
+
+impl Display for Format {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{},{},{}ch", self.frames_per_second, self.sample_type, self.channels)
     }
 }
 
@@ -222,7 +231,7 @@ impl FromStr for Format {
             Err(_) => Err(anyhow!("First value (sample rate) should be an integer.")),
         }?;
 
-        let sample_type = match CommandSampleType::from_str(splits[1]) {
+        let sample_type = match SampleType::from_str(splits[1]) {
             Ok(sample_type) => Ok(sample_type),
             Err(_) => Err(anyhow!(
                 "Second value (sample type) should be one of: uint8, int16, int32, float32."
@@ -230,49 +239,163 @@ impl FromStr for Format {
         }?;
 
         let channels = match splits[2].strip_suffix("ch") {
-            Some(channels) => match channels.parse::<u16>() {
-                Ok(channels) => Ok(channels as u32),
+            Some(channels) => match channels.parse::<u32>() {
+                Ok(channels) => Ok(channels),
                 Err(_) => Err(anyhow!("Third value (channels) should have form \"<uint>ch\".")),
             },
             None => Err(anyhow!("Channel argument should have form \"<uint>ch\".")),
         }?;
 
-        Ok(Self {
-            frames_per_second: frame_rate,
-            sample_type: fmedia::AudioSampleFormat::from(sample_type),
-            channels,
-        })
+        Ok(Self { frames_per_second: frame_rate, sample_type, channels })
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum CommandSampleType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SampleType {
     Uint8,
     Int16,
     Int32,
     Float32,
 }
 
-impl FromStr for CommandSampleType {
+impl SampleType {
+    pub const fn bytes_per_sample(&self) -> u32 {
+        match self {
+            Self::Uint8 => 1,
+            Self::Int16 => 2,
+            Self::Int32 => 4,
+            Self::Float32 => 4,
+        }
+    }
+
+    pub const fn bits_per_sample(&self) -> u32 {
+        match self {
+            Self::Uint8 => 8,
+            Self::Int16 => 16,
+            Self::Int32 => 32,
+            Self::Float32 => 32,
+        }
+    }
+
+    pub const fn valid_bits_per_sample(&self) -> u32 {
+        match self {
+            Self::Uint8 => 8,
+            Self::Int16 => 16,
+            // Assuming Int32 is really "24 in 32".
+            Self::Int32 => 24,
+            Self::Float32 => 32,
+        }
+    }
+
+    pub const fn silence_value(&self) -> u8 {
+        match self {
+            Self::Uint8 => 128,
+            _ => 0,
+        }
+    }
+}
+
+impl Display for SampleType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Uint8 => "uint8",
+            Self::Int16 => "int16",
+            Self::Int32 => "int32",
+            Self::Float32 => "float32",
+        };
+        f.write_str(s)
+    }
+}
+
+impl FromStr for SampleType {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Error> {
         match s {
-            "uint8" => Ok(CommandSampleType::Uint8),
-            "int16" => Ok(CommandSampleType::Int16),
-            "int32" => Ok(CommandSampleType::Int32),
-            "float32" => Ok(CommandSampleType::Float32),
+            "uint8" => Ok(Self::Uint8),
+            "int16" => Ok(Self::Int16),
+            "int32" => Ok(Self::Int32),
+            "float32" => Ok(Self::Float32),
             _ => Err(anyhow!("Invalid sampletype: {}.", s)),
         }
     }
 }
 
-impl From<CommandSampleType> for fmedia::AudioSampleFormat {
-    fn from(item: CommandSampleType) -> fmedia::AudioSampleFormat {
+impl From<SampleType> for fmedia::AudioSampleFormat {
+    fn from(item: SampleType) -> fmedia::AudioSampleFormat {
         match item {
-            CommandSampleType::Uint8 => fmedia::AudioSampleFormat::Unsigned8,
-            CommandSampleType::Int16 => fmedia::AudioSampleFormat::Signed16,
-            CommandSampleType::Int32 => fmedia::AudioSampleFormat::Signed24In32,
-            CommandSampleType::Float32 => fmedia::AudioSampleFormat::Float,
+            SampleType::Uint8 => Self::Unsigned8,
+            SampleType::Int16 => Self::Signed16,
+            SampleType::Int32 => Self::Signed24In32,
+            SampleType::Float32 => Self::Float,
+        }
+    }
+}
+
+impl From<SampleType> for faudio::SampleType {
+    fn from(value: SampleType) -> Self {
+        match value {
+            SampleType::Uint8 => Self::Uint8,
+            SampleType::Int16 => Self::Int16,
+            SampleType::Int32 => Self::Int32,
+            SampleType::Float32 => Self::Float32,
+        }
+    }
+}
+
+impl From<SampleType> for fhaudio::SampleFormat {
+    fn from(value: SampleType) -> Self {
+        match value {
+            SampleType::Uint8 => Self::PcmUnsigned,
+            SampleType::Int16 | SampleType::Int32 => Self::PcmSigned,
+            SampleType::Float32 => Self::PcmFloat,
+        }
+    }
+}
+
+impl From<SampleType> for hound::SampleFormat {
+    fn from(value: SampleType) -> Self {
+        match value {
+            SampleType::Uint8 | SampleType::Int16 | SampleType::Int32 => Self::Int,
+            SampleType::Float32 => Self::Float,
+        }
+    }
+}
+
+impl From<fmedia::AudioSampleFormat> for SampleType {
+    fn from(item: fmedia::AudioSampleFormat) -> Self {
+        match item {
+            fmedia::AudioSampleFormat::Unsigned8 => Self::Uint8,
+            fmedia::AudioSampleFormat::Signed16 => Self::Int16,
+            fmedia::AudioSampleFormat::Signed24In32 => Self::Int32,
+            fmedia::AudioSampleFormat::Float => Self::Float32,
+        }
+    }
+}
+
+impl TryFrom<faudio::SampleType> for SampleType {
+    type Error = String;
+
+    fn try_from(value: faudio::SampleType) -> Result<Self, Self::Error> {
+        match value {
+            faudio::SampleType::Uint8 => Ok(Self::Uint8),
+            faudio::SampleType::Int16 => Ok(Self::Int16),
+            faudio::SampleType::Int32 => Ok(Self::Int32),
+            faudio::SampleType::Float32 => Ok(Self::Float32),
+            other => Err(format!("unsupported SampleType: {:?}", other)),
+        }
+    }
+}
+
+impl From<(hound::SampleFormat, u16)> for SampleType {
+    fn from(value: (hound::SampleFormat, u16)) -> Self {
+        let (sample_format, bits_per_sample) = value;
+        match sample_format {
+            hound::SampleFormat::Int => match bits_per_sample {
+                0..=8 => Self::Uint8,
+                9..=16 => Self::Int16,
+                17.. => Self::Int32,
+            },
+            hound::SampleFormat::Float => Self::Float32,
         }
     }
 }
@@ -334,20 +457,12 @@ pub mod test {
     #[test]
     fn test_format_parse() {
         assert_eq!(
-            Format {
-                frames_per_second: 48000,
-                sample_type: fmedia::AudioSampleFormat::Unsigned8,
-                channels: 2,
-            },
+            Format { frames_per_second: 48000, sample_type: SampleType::Uint8, channels: 2 },
             Format::from_str("48000,uint8,2ch").unwrap()
         );
 
         assert_eq!(
-            Format {
-                frames_per_second: 44100,
-                sample_type: fmedia::AudioSampleFormat::Float,
-                channels: 1,
-            },
+            Format { frames_per_second: 44100, sample_type: SampleType::Float32, channels: 1 },
             Format::from_str("44100,float32,1ch").unwrap()
         );
 
@@ -361,5 +476,20 @@ pub mod test {
         assert!(Format::from_str("44100,float32").is_err());
 
         assert!(Format::from_str(",,").is_err());
+    }
+
+    #[test]
+    fn test_display() {
+        assert_eq!(
+            Format { frames_per_second: 48000, sample_type: SampleType::Uint8, channels: 2 }
+                .to_string(),
+            "48000,uint8,2ch",
+        );
+
+        assert_eq!(
+            Format { frames_per_second: 44100, sample_type: SampleType::Float32, channels: 1 }
+                .to_string(),
+            "44100,float32,1ch"
+        );
     }
 }

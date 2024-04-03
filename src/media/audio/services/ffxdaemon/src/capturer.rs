@@ -24,11 +24,9 @@ pub struct Capturer {
 impl Capturer {
     pub async fn new(
         source: fac::RecordSource,
-        stream_type: fmedia::AudioStreamType,
+        format: Format,
         gain_settings: Option<fac::GainSettings>,
     ) -> Result<Self, Error> {
-        let format = Format::from(&stream_type);
-
         let (proxy, capturer_server_end) = create_proxy::<fmedia::AudioCapturerMarker>().unwrap();
 
         match source {
@@ -41,7 +39,7 @@ impl Capturer {
                     // Check that connection to AudioCore is valid.
                     proxy.get_reference_clock().await.context("Failed to get reference clock")?;
 
-                    proxy.set_pcm_stream_type(&stream_type)?;
+                    proxy.set_pcm_stream_type(&fmedia::AudioStreamType::from(format))?;
 
                     if let Some(gain_settings) = gain_settings {
                         let (gain_control_proxy, gain_control_server_end) =
@@ -66,20 +64,15 @@ impl Capturer {
                     let ultrasound_factory = connect_to_protocol::<fultrasound::FactoryMarker>()
                         .context("Failed to connect to fuchsia.ultrasound.Factory")?;
 
-                    let (_reference_clock, available_stream_type) =
+                    let (_reference_clock, got_stream_type) =
                         ultrasound_factory.create_capturer(capturer_server_end).await?;
 
-                    if stream_type.channels != available_stream_type.channels
-                        || stream_type.sample_format != available_stream_type.sample_format
-                        || stream_type.frames_per_second != available_stream_type.frames_per_second
-                    {
+                    let got_format = Format::from(got_stream_type);
+                    if format != got_format {
                         return Err(anyhow!(
-                            "Requested format for ultrasound capturer\
-                            does not match available format.
-                            Expected {}hz, {:?}, {:?}ch\n",
-                            available_stream_type.frames_per_second,
-                            available_stream_type.sample_format,
-                            available_stream_type.channels,
+                            "Requested format {} for ultrasound capturer does not match available format: {}",
+                            format,
+                            got_format
                         ));
                     }
                 }
@@ -89,7 +82,7 @@ impl Capturer {
                 let audio_proxy = connect_to_protocol::<fmedia::AudioMarker>()
                     .context("Failed to connect to fuchsia.media.Audio")?;
                 audio_proxy.create_audio_capturer(capturer_server_end, true)?;
-                proxy.set_pcm_stream_type(&stream_type)?;
+                proxy.set_pcm_stream_type(&fmedia::AudioStreamType::from(format))?;
             }
             _ => return Err(anyhow!("Unsupported RecordSource")),
         };
@@ -132,7 +125,7 @@ impl Capturer {
         let mut stream = self.proxy.take_event_stream();
         let mut packets_so_far = 0;
 
-        socket.write_header(duration, &self.format).await?;
+        socket.write_header(duration, self.format).await?;
         let packet_fut = async {
             while let Some(event) = stream.try_next().await? {
                 if stop_signal.load(Ordering::SeqCst) {

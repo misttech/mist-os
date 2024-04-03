@@ -16,7 +16,7 @@ impl WavSocket {
     pub async fn write_header(
         &mut self,
         duration: Option<std::time::Duration>,
-        format: &Format,
+        format: Format,
     ) -> Result<(), Error> {
         let spec = hound::WavSpec::from(format);
         let header = match duration {

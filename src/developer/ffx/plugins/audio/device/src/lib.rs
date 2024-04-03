@@ -232,7 +232,7 @@ where
 
     let request = RecorderRecordRequest {
         source: Some(RecordSource::DeviceRingBuffer(selector.into())),
-        stream_type: Some(AudioStreamType::from(&record_command.format)),
+        stream_type: Some(AudioStreamType::from(record_command.format)),
         duration: record_command.duration.map(|duration| duration.as_nanos() as i64),
         canceler: Some(cancel_server),
         wav_data: Some(record_remote),
@@ -300,7 +300,7 @@ mod tests {
     use ffx_writer::{SimpleWriter, TestBuffer, TestBuffers};
     use fidl_fuchsia_audio_controller as fac;
     use fidl_fuchsia_audio_device as fadevice;
-    use fuchsia_audio::{device::DevfsSelector, Format};
+    use fuchsia_audio::{device::DevfsSelector, format::SampleType, Format};
     use std::fs;
     use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
@@ -397,7 +397,7 @@ mod tests {
         let record_command = DeviceRecordCommand {
             duration: Some(std::time::Duration::from_nanos(500)),
             format: Format {
-                sample_type: fidl_fuchsia_media::AudioSampleFormat::Unsigned8,
+                sample_type: SampleType::Uint8,
                 frames_per_second: 48000,
                 channels: 1,
             },
@@ -449,7 +449,7 @@ mod tests {
         let record_command = DeviceRecordCommand {
             duration: None,
             format: Format {
-                sample_type: fidl_fuchsia_media::AudioSampleFormat::Unsigned8,
+                sample_type: SampleType::Uint8,
                 frames_per_second: 48000,
                 channels: 1,
             },

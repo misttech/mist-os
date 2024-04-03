@@ -68,7 +68,7 @@ impl FfxMain for RecordTool {
 
         let request = RecorderRecordRequest {
             source: Some(location),
-            stream_type: Some(AudioStreamType::from(&self.cmd.format)),
+            stream_type: Some(AudioStreamType::from(self.cmd.format)),
             duration: self.cmd.duration.map(|duration| duration.as_nanos() as i64),
             canceler: Some(cancel_server),
             gain_settings,
