@@ -265,8 +265,6 @@ async fn start_component(
     mut pending_runtime: StartedInstanceState,
     start_context: StartContext,
 ) -> Result<(), StartActionError> {
-    let _actions = component.lock_actions().await;
-
     let runtime_info;
     let timestamp;
     let runtime_dir;
@@ -320,27 +318,36 @@ async fn start_component(
                 component_instance,
             };
 
-            pending_runtime.set_program(
-                Program::start(
-                    &runner,
-                    start_info,
-                    escrowed_state,
-                    diagnostics_sender,
-                    namespace_scope,
-                )
-                .map_err(|err| StartActionError::StartProgramError {
-                    moniker: moniker.clone(),
-                    err,
-                })?,
-                component.as_weak(),
-            );
+            // Create the `Program` and install it in the `Runtime`. Make sure that the
+            // `ExecutionState` lock is held while calling `Start` on the runner
+            // ([Program::start]). This guarantees that if the component exits and a `StopAction`
+            // is registered in response, the `StopAction` will find the `Runtime` and perform the
+            // appropriate actions.
+            let mut execution = component.lock_execution();
+            let program = Program::start(
+                &runner,
+                start_info,
+                escrowed_state,
+                diagnostics_sender,
+                namespace_scope,
+            )
+            .map_err(|err| StartActionError::StartProgramError { moniker: moniker.clone(), err })?;
+            pending_runtime.set_program(program, component.as_weak());
+            timestamp = pending_runtime.timestamp;
+            runtime_info = RuntimeInfo::new(timestamp, diagnostics_receiver);
+            runtime_dir = pending_runtime.runtime_dir().cloned();
+            execution.runtime = Some(pending_runtime);
+        } else {
+            // Set the runtime on this component even if there is no program associated with it.
+            // Formally, the component is still considered to be in the Started state. (This is
+            // still a meaningful state to represent, since a non-executable component can have
+            // executable eager children which are launched when this component is started.)
+            let mut execution = component.lock_execution();
+            timestamp = pending_runtime.timestamp;
+            runtime_info = RuntimeInfo::new(timestamp, diagnostics_receiver);
+            runtime_dir = None;
+            execution.runtime = Some(pending_runtime);
         }
-
-        timestamp = pending_runtime.timestamp;
-        runtime_info = RuntimeInfo::new(timestamp, diagnostics_receiver);
-        runtime_dir = pending_runtime.runtime_dir().cloned();
-
-        component.lock_execution().runtime = Some(pending_runtime);
 
         // TODO(b/322564390): Move program_input_dict_additions into `ExecutionState`.
         {
