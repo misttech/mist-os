@@ -2716,7 +2716,7 @@ From //BUILD.gn:75
 List of GN paths to source files to NOT instrument by `profile` variants.
 These take precedence over `profile_source_files`.
 
-**Current value (from the default):** `["//prebuilt/*"]`
+**Current value (from the default):** `[]`
 
 From //build/config/profile/config.gni:15
 
@@ -5582,7 +5582,7 @@ and functions to be instrumented by `profile` variants.
 
 **Current value (from the default):** `[]`
 
-From //build/config/profile/config.gni:26
+From //build/config/profile/config.gni:24
 
 ### proprietary_codecs
 
@@ -7418,7 +7418,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"19.99991231.0.1"`
+**Current value (from the default):** `"20.99991231.0.1"`
 
 From //sdk/config.gni:7
 
