@@ -8,8 +8,8 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::{
-            ComponentInstance, ComponentRuntime, ExecutionState, IncomingCapabilities,
-            InstanceState, StartReason,
+            ComponentInstance, ExecutionState, IncomingCapabilities, InstanceState, StartReason,
+            StartedInstanceState,
         },
         error::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
@@ -262,7 +262,7 @@ async fn do_start(
 async fn start_component(
     component: &Arc<ComponentInstance>,
     decl: ComponentDecl,
-    mut pending_runtime: ComponentRuntime,
+    mut pending_runtime: StartedInstanceState,
     start_context: StartContext,
 ) -> Result<(), StartActionError> {
     let _actions = component.lock_actions().await;
@@ -579,7 +579,7 @@ async fn make_execution_runtime(
     decl: &cm_rust::ComponentDecl,
     start_reason: StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
-) -> Result<ComponentRuntime, StartActionError> {
+) -> Result<StartedInstanceState, StartActionError> {
     // TODO(https://fxbug.dev/42071809): Consider moving this check to ComponentInstance::add_child
     match component.on_terminate {
         fdecl::OnTerminate::Reboot => {
@@ -605,7 +605,7 @@ async fn make_execution_runtime(
         None
     };
 
-    Ok(ComponentRuntime::new(start_reason, execution_controller_task, logger))
+    Ok(StartedInstanceState::new(start_reason, execution_controller_task, logger))
 }
 
 /// Returns the UseProtocolDecl for the LogSink protocol, if any.
@@ -1029,7 +1029,7 @@ mod tests {
             .await
             .unwrap();
             let mut es = ExecutionState::new();
-            es.runtime = Some(ComponentRuntime::new(StartReason::Debug, None, None));
+            es.runtime = Some(StartedInstanceState::new(StartReason::Debug, None, None));
             assert_matches!(
                 should_return_early(&InstanceState::Resolved(ris), &es, &m),
                 Some(Ok(()))

@@ -1278,7 +1278,7 @@ impl ComponentInstance {
     pub async fn with_logger_as_default<T>(&self, op: impl FnOnce() -> T) -> T {
         let execution = self.lock_execution();
         match &execution.runtime {
-            Some(ComponentRuntime { logger: Some(ref logger), .. }) => {
+            Some(StartedInstanceState { logger: Some(ref logger), .. }) => {
                 let logger = logger.clone() as Arc<dyn tracing::Subscriber + Send + Sync>;
                 tracing::subscriber::with_default(logger, op)
             }
@@ -1524,7 +1524,7 @@ impl std::fmt::Debug for ComponentInstance {
 pub struct ExecutionState {
     /// Runtime support for the component. From component manager's point of view, the component
     /// instance is running iff this field is set.
-    pub runtime: Option<ComponentRuntime>,
+    pub runtime: Option<StartedInstanceState>,
 }
 
 impl ExecutionState {
@@ -2588,7 +2588,7 @@ impl ProgramRuntime {
 /// The execution state for a component instance that has started running.
 ///
 /// If the component instance has a program, it may also have a [`ProgramRuntime`].
-pub struct ComponentRuntime {
+pub struct StartedInstanceState {
     /// If set, that means this component is associated with a running program.
     program: Option<ProgramRuntime>,
 
@@ -2613,14 +2613,14 @@ pub struct ComponentRuntime {
     logger: Option<Arc<ScopedLogger>>,
 }
 
-impl ComponentRuntime {
+impl StartedInstanceState {
     pub fn new(
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
     ) -> Self {
         let timestamp = zx::Time::get_monotonic();
-        ComponentRuntime {
+        StartedInstanceState {
             program: None,
             timestamp,
             binder_server_ends: vec![],
@@ -2636,7 +2636,7 @@ impl ComponentRuntime {
         self.program.as_ref().map(|program_runtime| program_runtime.program.runtime())
     }
 
-    /// Associates the [ComponentRuntime] with a running [Program].
+    /// Associates the [StartedInstanceState] with a running [Program].
     ///
     /// Creates a background task waiting for the program to terminate. When that happens, use the
     /// [WeakComponentInstance] to stop the component.
@@ -2647,7 +2647,7 @@ impl ComponentRuntime {
     /// Stop the program, if any. The timer defines how long the runner is given to stop the
     /// program gracefully before we request the controller to terminate the program.
     ///
-    /// Regardless if the runner honored our request, after this method, the [`ComponentRuntime`] is
+    /// Regardless if the runner honored our request, after this method, the [`StartedInstanceState`] is
     /// no longer associated with a [Program].
     pub async fn stop_program<'a, 'b>(
         &'a mut self,
