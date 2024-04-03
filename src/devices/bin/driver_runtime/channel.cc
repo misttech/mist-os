@@ -5,6 +5,7 @@
 #include "src/devices/bin/driver_runtime/channel.h"
 
 #include <lib/fdf/channel.h>
+#include <lib/trace/event.h>
 
 #include <fbl/auto_lock.h>
 
@@ -106,6 +107,9 @@ zx_status_t Channel::CheckWriteArgs(uint32_t options, fdf_arena_t* arena, void* 
 
 zx_status_t Channel::Write(uint32_t options, fdf_arena_t* arena, void* data, uint32_t num_bytes,
                            zx_handle_t* handles, uint32_t num_handles) {
+  TRACE_DURATION("driver_runtime", "Channel::Write", "num_bytes", TA_UINT32(num_bytes),
+                 "num_handles", TA_UINT32(num_handles));
+
   zx_status_t status = CheckWriteArgs(options, arena, data, num_bytes, handles, num_handles);
   if (status != ZX_OK) {
     return status;
@@ -137,6 +141,8 @@ zx_status_t Channel::Write(uint32_t options, fdf_arena_t* arena, void* data, uin
 
 bool Channel::WriteSelfLocked(MessagePacketOwner msg, CallbackRequest** out_callback_request,
                               fbl::RefPtr<Dispatcher>* out_dispatcher) {
+  TRACE_DURATION("driver_runtime", "Channel::WriteSelfLocked");
+
   if (!waiters_.is_empty()) {
     // If the far side is waiting for replies to messages sent via "call",
     // see if this message has a matching txid to one of the waiters, and if so, deliver it.
@@ -173,6 +179,8 @@ bool Channel::WriteSelfLocked(MessagePacketOwner msg, CallbackRequest** out_call
 zx_status_t Channel::Read(uint32_t options, fdf_arena_t** out_arena, void** out_data,
                           uint32_t* out_num_bytes, zx_handle_t** out_handles,
                           uint32_t* out_num_handles) {
+  TRACE_DURATION("driver_runtime", "Channel::Read");
+
   zx_status_t status =
       CheckReadArgs(options, out_arena, out_data, out_num_bytes, out_handles, out_num_handles);
   if (status != ZX_OK) {
@@ -274,6 +282,9 @@ bool Channel::IsTxidInUseLocked(fdf_txid_t txid) {
 
 zx_status_t Channel::Call(uint32_t options, zx_time_t deadline,
                           const fdf_channel_call_args_t* args) {
+  TRACE_DURATION("driver_runtime", "Channel::Call", "wr_num_bytes", TA_UINT32(args->wr_num_bytes),
+                 "wr_num_handles", TA_UINT32(args->wr_num_handles));
+
   if (!args) {
     return ZX_ERR_INVALID_ARGS;
   }

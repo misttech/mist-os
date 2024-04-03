@@ -49,6 +49,7 @@ source_set("driver_runtime_impl") {
     "//sdk/lib/fidl/cpp/wire",
     "//src/devices/lib/log",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/trace",
   ]
 }
 

@@ -14,6 +14,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/fit/defer.h>
+#include <lib/trace/event.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/thread.h>
 #include <stdlib.h>
@@ -990,6 +991,10 @@ fit::result<Dispatcher::NonInlinedReason> Dispatcher::ShouldInline(
 
 void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* request,
                                          zx_status_t callback_reason, bool was_deferred) {
+  TRACE_DURATION("driver_runtime", "Dispatcher::QueueRegisteredCallback", "dispatcher_name",
+                 name_.c_str(), "callback_reason", zx_status_get_string(callback_reason),
+                 "was_deferred", TA_BOOL(was_deferred));
+
   ZX_ASSERT(request);
 
   auto decrement_and_idle_check = fit::defer([this]() {
@@ -1216,6 +1221,9 @@ std::unique_ptr<CallbackRequest> Dispatcher::CancelAsyncOperationLocked(void* op
 
 void Dispatcher::DispatchCallback(
     std::unique_ptr<driver_runtime::CallbackRequest> callback_request) {
+  TRACE_DURATION("driver_runtime", "Dispatcher::DispatchCallback", "dispatcher_name",
+                 name_.c_str());
+
   driver_context::PushDriver(owner_, this);
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
