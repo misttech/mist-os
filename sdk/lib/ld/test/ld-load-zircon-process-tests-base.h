@@ -10,6 +10,8 @@
 #include <lib/zx/thread.h>
 #include <lib/zx/vmar.h>
 
+#include <string_view>
+
 #include "ld-load-zircon-ldsvc-tests-base.h"
 
 namespace ld::testing {
@@ -17,6 +19,10 @@ namespace ld::testing {
 // This is the common base class for test fixtures to launch a Zircon process.
 class LdLoadZirconProcessTestsBase : public LdLoadZirconLdsvcTestsBase {
  public:
+  // The Fuchsia test executables (via modules/zircon-test-start.cc) link
+  // directly to the vDSO, so it appears before other modules.
+  static constexpr std::string_view kTestExecutableNeedsVdso = "libzircon.so";
+
   static constexpr int64_t kRunFailureForTrap = ZX_TASK_RETCODE_EXCEPTION_KILL;
   static constexpr int64_t kRunFailureForBadPointer = ZX_TASK_RETCODE_EXCEPTION_KILL;
 

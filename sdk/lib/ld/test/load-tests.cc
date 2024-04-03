@@ -13,10 +13,10 @@
 #include <gtest/gtest.h>
 
 #ifdef __Fuchsia__
+#include "ld-remote-process-tests.h"
 #include "ld-startup-create-process-tests.h"
 #include "ld-startup-in-process-tests-zircon.h"
 #include "ld-startup-spawn-process-tests-zircon.h"
-#include "lib/ld/test/ld-remote-process-tests.h"
 #else
 #include "ld-startup-in-process-tests-posix.h"
 #include "ld-startup-spawn-process-tests-posix.h"
@@ -57,15 +57,6 @@ using FailTypes = TestTypes<>;
 
 TYPED_TEST_SUITE(LdLoadTests, LoadTypes);
 TYPED_TEST_SUITE(LdLoadFailureTests, FailTypes);
-
-// The Fuchsia test executables (via modules/zircon-test-start.cc) link
-// directly to the vDSO, so it appears before other modules.
-template <class TestFixture>
-#ifdef __Fuchsia__
-constexpr std::string_view kTestExecutableNeedsVdso = "libzircon.so"sv;
-#else
-constexpr std::string_view kTestExecutableNeedsVdso = {};
-#endif
 
 TYPED_TEST(LdLoadTests, Basic) {
   constexpr int64_t kReturnValue = 17;
@@ -491,13 +482,13 @@ TYPED_TEST(LdLoadTests, SymbolizerMarkup) {
                 "<application>");
 
   size_t idx = 1;
-  if constexpr (!kTestExecutableNeedsVdso<TestFixture>.empty()) {
+  if constexpr (!TestFixture::kTestExecutableNeedsVdso.empty()) {
     // The vDSO will be the first dependency.  We don't know its build ID,
     // so just check the name.
     std::optional<std::string_view> line = next_line();
     EXPECT_THAT(
         line, ::testing::Optional(::testing::StartsWith(
-                  "{{{module:1:"s + std::string(kTestExecutableNeedsVdso<TestFixture>) + ":elf:")))
+                  "{{{module:1:"s + std::string(TestFixture::kTestExecutableNeedsVdso) + ":elf:")))
         << line.value_or("<EOF>"sv);
     ++idx;
   }
@@ -505,7 +496,7 @@ TYPED_TEST(LdLoadTests, SymbolizerMarkup) {
   expect_module("libindirect-deps-a.so", idx++, std::nullopt,
                 // If we expected the vDSO module line, we expect mmap lines
                 // for it too, though we don't know what they'll say.
-                !kTestExecutableNeedsVdso<TestFixture>.empty());
+                !TestFixture::kTestExecutableNeedsVdso.empty());
 
   expect_module("libindirect-deps-b.so", idx++);
 
@@ -517,7 +508,7 @@ TYPED_TEST(LdLoadTests, SymbolizerMarkup) {
   std::optional<std::string_view> module_line = next_line();
   ASSERT_THAT(module_line, ::testing::Optional(
                                ::testing::StartsWith("{{{module:"s + std::to_string(idx) + ":")));
-  if (kTestExecutableNeedsVdso<TestFixture>.empty() &&
+  if (TestFixture::kTestExecutableNeedsVdso.empty() &&
       !cpp20::starts_with(*module_line, "{{{module:"s + std::to_string(idx) + ":ld.so.1")) {
     // This must be the vDSO.  The ld.so module will be after it.  We don't
     // know what the vDSO's mmap lines should look like, so just skip them all.

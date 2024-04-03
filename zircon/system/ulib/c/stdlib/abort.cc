@@ -5,17 +5,11 @@
 #include "src/stdlib/abort.h"
 
 #include <lib/zircon-internal/unique-backtrace.h>
-#include <zircon/syscalls.h>
 
 #include "src/__support/common.h"
 
 namespace LIBC_NAMESPACE {
 
-LLVM_LIBC_FUNCTION(void, abort, ()) {
-  for (;;) {
-    CRASH_WITH_UNIQUE_BACKTRACE();
-    _zx_process_exit(ZX_TASK_RETCODE_EXCEPTION_KILL);
-  }
-}
+LLVM_LIBC_FUNCTION(void, abort, ()) { CRASH_WITH_UNIQUE_BACKTRACE(); }
 
 }  // namespace LIBC_NAMESPACE

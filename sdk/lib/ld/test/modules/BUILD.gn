@@ -405,6 +405,7 @@ template("test_dep") {
 
 config("test-executable.in-process.config") {
   visibility = [ ":*" ]
+  defines = [ "IN_PROCESS_TEST" ]
   ldflags = [ "-Wl,-e,TestStart" ]
 }
 

@@ -29,12 +29,7 @@ llvm_libc_source_set("stdlib") {
 llvm_libc_source_set("abort") {
   functions = [ "abort" ]
   os_functions = functions
-  if (is_fuchsia) {
-    local_deps = [
-      "//src/zircon/lib/zircon",
-      "//zircon/system/ulib/zircon-internal",
-    ]
-  }
+  local_deps = [ "//zircon/system/ulib/zircon-internal" ]
 }
 
 # This provides an archive library of the universally safe stdlib functions.

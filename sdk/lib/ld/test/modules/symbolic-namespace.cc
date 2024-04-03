@@ -11,9 +11,12 @@
 extern "C" int64_t a();
 
 extern "C" int64_t TestStart() {
-  // We expect to return 17 here. a() returns 13. We add 1 for every global object in the module
-  // list. This includes the executable, libld-dep-a.so, and ld.so.1. On Fuchsia for out of process
-  // tests we will also have a dependency on the libzircon.so.
+  // We expect to return 17 here.  a() returns 13.  We add 1 for every global
+  // object in the module list.  This includes:
+  //  1. the executable
+  //  2. libld-dep-a.so
+  //  3. ld.so.1
+  //  4. On Fuchsia only for out-of-process tests only, libzircon.so
 #if defined(__Fuchsia__) && !defined(IN_PROCESS_TEST)
   constexpr int kExtraDeps = 0;
 #else

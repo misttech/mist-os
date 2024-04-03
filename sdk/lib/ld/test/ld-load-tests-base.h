@@ -24,6 +24,10 @@ namespace ld::testing {
 // called (unless the test is bailing out anyway).
 class LdLoadTestsBase {
  public:
+  // Non-Fuchsia cases and in-process cases don't have an implicit dependency
+  // on a vDSO from the module/test-start.cc code.
+  static constexpr std::string_view kTestExecutableNeedsVdso{};
+
   // An indicator to GTEST of whether the test fixture supports the following
   // features so that it may skip related tests if not supported.
   static constexpr bool kCanCollectLog = true;
