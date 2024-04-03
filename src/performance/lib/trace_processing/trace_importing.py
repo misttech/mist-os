@@ -292,55 +292,16 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
     # or is of a different type than what is asserted here, then the JSON trace
     # event is considered to be malformed.
     def check_trace_event(json_trace_event: Dict[str, Any]) -> None:
-        if not (
-            "ph" in json_trace_event and isinstance(json_trace_event["ph"], str)
-        ):
-            raise TypeError(
-                f"Expected {json_trace_event} to have field 'ph' of type str"
-            )
-        if json_trace_event["ph"] != "M" and not (
-            "cat" in json_trace_event
-            and isinstance(json_trace_event["cat"], str)
-        ):
-            raise TypeError(
-                f"Expected {json_trace_event} to have field 'cat' of type str"
-            )
-        if not (
-            "name" in json_trace_event
-            and isinstance(json_trace_event["name"], str)
-        ):
-            raise TypeError(
-                f"Expected {json_trace_event} to have field 'name' of type str"
-            )
-        if json_trace_event["ph"] != "M" and not (
-            "ts" in json_trace_event
-            and isinstance(json_trace_event["ts"], (float, int))
-        ):
-            raise TypeError(
-                f"Expected {json_trace_event} to have field 'ts' of type float "
-                f"or int"
-            )
-        if not (
-            "pid" in json_trace_event
-            and isinstance(json_trace_event["pid"], int)
-        ):
-            raise TypeError(
-                f"Expected {json_trace_event} to have field 'pid' of type int"
-            )
-        if not (
-            "tid" in json_trace_event
-            and isinstance(json_trace_event["tid"], (float, int))
-        ):
-            raise TypeError(
-                f"Expected {json_trace_event} to have field 'tid' of type "
-                f"float or int"
-            )
+        validate_field_type(json_trace_event, "ph", str)
+        if json_trace_event["ph"] != "M":
+            validate_field_type(json_trace_event, "cat", str)
+        validate_field_type(json_trace_event, "name", str)
+        if json_trace_event["ph"] != "M":
+            validate_field_type(json_trace_event, "ts", float | int)
+        validate_field_type(json_trace_event, "pid", int)
+        validate_field_type(json_trace_event, "tid", float | int)
         if "args" in json_trace_event:
-            if not isinstance(json_trace_event["args"], dict):
-                raise TypeError(
-                    f"Expected {json_trace_event} with 'args' field to have "
-                    f"'args' field of type dict"
-                )
+            validate_field_type(json_trace_event, "args", dict)
 
     # A helper lambda to add duration events to the appropriate duration stack
     # and do the appropriate duration/flow graph setup.  It is used for both
@@ -357,13 +318,7 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
             top_parent.child_durations.append(duration_event)
 
     # Obtain the overall list of trace events.
-    if not (
-        "traceEvents" in root_object
-        and isinstance(root_object["traceEvents"], list)
-    ):
-        raise TypeError(
-            f"Expected {root_object} to have field 'traceEvents' of type List"
-        )
+    validate_field_type(root_object, "traceEvents", list)
     trace_events: List[Dict[str, Any]] = root_object["traceEvents"].copy()
 
     # Add synthetic end events for each complete event in the trace data to
@@ -663,86 +618,30 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
             )
 
         system_trace_events_list = root_object["systemTraceEvents"]
-        if not (
-            "type" in system_trace_events_list
-            and isinstance(system_trace_events_list["type"], str)
-        ):
-            raise TypeError(
-                f"Expected {system_trace_events_list} to have field 'type' of "
-                f"type str"
-            )
+        validate_field_type(system_trace_events_list, "type", str)
         if not system_trace_events_list["type"] == "fuchsia":
             raise TypeError(
                 f"Expected {system_trace_events_list} to have field 'type' "
                 f"equal to value 'fuchsia'"
             )
-        if not (
-            "events" in system_trace_events_list
-            and isinstance(system_trace_events_list["events"], list)
-        ):
-            raise TypeError(
-                f"Expected {system_trace_events_list} to have field 'events' "
-                f"of type list"
-            )
+        validate_field_type(system_trace_events_list, "events", list)
 
         system_trace_events = system_trace_events_list["events"]
         for system_trace_event in system_trace_events:
-            if not (
-                "ph" in system_trace_event
-                and isinstance(system_trace_event["ph"], str)
-            ):
-                raise TypeError(
-                    f"Expected {system_trace_event} to have field 'ph' of type "
-                    f"String"
-                )
+            validate_field_type(system_trace_event, "ph", str)
 
             system_event_type: str = system_trace_event["ph"]
             if system_event_type == "p":
-                if not (
-                    "pid" in system_trace_event
-                    and isinstance(system_trace_event["pid"], int)
-                ):
-                    raise TypeError(
-                        f"Expected {system_trace_event} to have field 'pid' "
-                        f"of type int"
-                    )
-                if not (
-                    "name" in system_trace_event
-                    and isinstance(system_trace_event["name"], str)
-                ):
-                    raise TypeError(
-                        f"Expected {system_trace_event} to have field 'name' "
-                        f"of type str"
-                    )
+                validate_field_type(system_trace_event, "pid", int)
+                validate_field_type(system_trace_event, "name", str)
 
                 pid = system_trace_event["pid"]
                 name = system_trace_event["name"]
                 pid_to_name[pid] = name
             elif system_event_type == "t":
-                if not (
-                    "pid" in system_trace_event
-                    and isinstance(system_trace_event["pid"], int)
-                ):
-                    raise TypeError(
-                        f"Expected {system_trace_event} to have field 'pid' "
-                        f"of type int"
-                    )
-                if not (
-                    "name" in system_trace_event
-                    and isinstance(system_trace_event["name"], str)
-                ):
-                    raise TypeError(
-                        f"Expected {system_trace_event} to have field 'name' "
-                        f"of type str"
-                    )
-                if not (
-                    "tid" in system_trace_event
-                    and isinstance(system_trace_event["tid"], (float, int))
-                ):
-                    raise TypeError(
-                        f"Expected {system_trace_event} to have field 'tid' of "
-                        f"type int or float"
-                    )
+                validate_field_type(system_trace_event, "pid", int)
+                validate_field_type(system_trace_event, "name", str)
+                validate_field_type(system_trace_event, "tid", float | int)
 
                 tid = int(system_trace_event["tid"])
                 name = system_trace_event["name"]
