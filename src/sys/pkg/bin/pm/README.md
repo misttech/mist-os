@@ -129,13 +129,8 @@ download size. Fortunately, `pm` has a few subcommands to help.
 
 A Package Snapshot contains package and file metadata from a set of Fuchsia
 packages, and two package snapshots can be compared to simulate updating from
-one snapshot of packages to another.
-
-Within the Platform Source Tree, a build automatically produces a package
-snapshot of all products and packages enabled by `fx set`. The automatically
-generated snapshot is stored in the output directory at
-`obj/build/images/system.snapshot`. Outside of the Platform Source Tree,
-snapshots can be built from a set of packages using `fx snapshot`.
+one snapshot of packages to another. Snapshots can be built from a set of
+packages using `fx snapshot`.
 
 To manually produce a package snapshot file:
 1. When building a Fuchsia package with `pm build`, pass in an `-blobsfile`
