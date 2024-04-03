@@ -10,6 +10,9 @@ BOT_ENV_TESTBED_CONFIG = "FUCHSIA_TESTBED_CONFIG"
 # Defined in https://osscs.corp.google.com/fuchsia/fuchsia/+/main:tools/botanist/targets/target.go
 FUCHSIA_DEVICE = "FuchsiaDevice"
 
+# Defined as an Auxiliary device in https://osscs.corp.google.com/fuchsia/fuchsia/+/main:tools/botanist/targets/auxiliary.go
+ACCESS_POINT = "AccessPoint"
+
 # LINT.IfChange
 TESTPARSER_PREAMBLE = "======== Mobly config content ========"
 

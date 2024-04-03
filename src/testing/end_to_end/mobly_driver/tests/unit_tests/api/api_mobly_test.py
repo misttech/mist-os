@@ -133,15 +133,30 @@ class ApiMoblyTest(unittest.TestCase):
                 override_args={
                     "mobly_controllers": [
                         {"type": "FuchsiaDevice", "nodename": "fuchsia_abcd"},
-                        {"type": "AccessPoint", "ip": "192.168.42.11"},
+                        {
+                            "type": "AccessPoint",
+                            "ip": "192.168.42.11",
+                            "user": "root",
+                            "ssh_key": "some/key/path",
+                        },
                     ],
+                    "ssh_path": "some/ssh_binary/path",
                 },
                 expected_config_obj={
                     "MoblyParams": {"LogPath": "output_path"},
                     "TestBeds": [
                         {
                             "Controllers": {
-                                "AccessPoint": [{"ip": "192.168.42.11"}],
+                                "AccessPoint": [
+                                    {
+                                        "ssh_config": {
+                                            "ssh_binary_path": "some/ssh_binary/path",
+                                            "host": "192.168.42.11",
+                                            "user": "root",
+                                            "identity_file": "some/key/path",
+                                        },
+                                    },
+                                ],
                                 "FuchsiaDevice": [
                                     {
                                         "ffx_path": "ffx_path",
@@ -219,6 +234,41 @@ class ApiMoblyTest(unittest.TestCase):
                     ],
                 },
             ),
+            param(
+                "success_access_point_ssh_config",
+                override_args={
+                    "mobly_controllers": [
+                        {
+                            "type": "AccessPoint",
+                            "ip": "192.168.42.11",
+                            "user": "root",
+                            "ssh_key": "some/key/path",
+                        },
+                    ],
+                    "ssh_path": "some/ssh_binary/path",
+                },
+                expected_config_obj={
+                    "MoblyParams": {"LogPath": "output_path"},
+                    "TestBeds": [
+                        {
+                            "Controllers": {
+                                "AccessPoint": [
+                                    {
+                                        "ssh_config": {
+                                            "ssh_binary_path": "some/ssh_binary/path",
+                                            "host": "192.168.42.11",
+                                            "user": "root",
+                                            "identity_file": "some/key/path",
+                                        },
+                                    },
+                                ],
+                            },
+                            "Name": "tb_name",
+                            "TestParams": {},
+                        }
+                    ],
+                },
+            ),
         ]
     )
     def test_new_testbed_config(
@@ -241,6 +291,7 @@ class ApiMoblyTest(unittest.TestCase):
             ffx_subtools_search_path=override_args.get(
                 "ffx_subtools_search_path", None
             ),
+            ssh_path=override_args.get("ssh_path", None),
         )
         self.assertEqual(config_obj, expected_config_obj)
 

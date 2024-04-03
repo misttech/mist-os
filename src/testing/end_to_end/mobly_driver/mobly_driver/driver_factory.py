@@ -28,6 +28,7 @@ class DriverFactory:
         config_path: Optional[str] = None,
         params_path: Optional[str] = None,
         ffx_subtools_search_path: Optional[str] = None,
+        ssh_path: Optional[str] = None,
     ) -> None:
         """Initializes the instance.
         Args:
@@ -37,6 +38,7 @@ class DriverFactory:
           config_path: absolute path to the Mobly test config file.
           params_path: absolute path to the Mobly testbed params file.
           ffx_subtools_search_path: absolute path to where to search for FFX plugins.
+          ssh_path: absolute path to the SSH binary.
         """
         self._ffx_path = ffx_path
         self._transport = transport
@@ -44,6 +46,7 @@ class DriverFactory:
         self._config_path = config_path
         self._params_path = params_path
         self._ffx_subtools_search_path = ffx_subtools_search_path
+        self._ssh_path = ssh_path
 
     def get_driver(self) -> base.BaseDriver:
         """Returns an environment-specific Mobly Driver implementation.
@@ -71,6 +74,7 @@ class DriverFactory:
                 transport=self._transport,
                 params_path=self._params_path,
                 ffx_subtools_search_path=self._ffx_subtools_search_path,
+                ssh_path=self._ssh_path,
             )
         except KeyError as e:
             raise common.DriverException(

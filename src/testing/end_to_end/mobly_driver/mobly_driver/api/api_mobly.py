@@ -21,6 +21,12 @@ MOBLY_CONTROLLER_FUCHSIA_DEVICE: str = "FuchsiaDevice"
 TRANSPORT_KEY: str = "transport"
 FFX_PATH_KEY: str = "ffx_path"
 FFX_SUBTOOLS_SEARCH_PATH_KEY: str = "ffx_subtools_search_path"
+SSH_PATH_KEY: str = "ssh_binary_path"
+SSH_CONFIG_KEY: str = "ssh_config"
+SSH_HOST_KEY: str = "host"
+SSH_USER_KEY: str = "user"
+SSH_IDENTITY_FILE_KEY: str = "identity_file"
+
 
 MoblyConfigComponent = dict[str, Any]
 
@@ -87,11 +93,13 @@ def new_testbed_config(
     test_params_dict: MoblyConfigComponent,
     botanist_honeydew_map: dict[str, str],
     ffx_subtools_search_path: str | None,
+    ssh_path: str | None = None,
 ) -> MoblyConfigComponent:
     """Returns a Mobly testbed config which is required for running Mobly tests.
 
     This method expects the |controller| object to follow the schema of
-    tools/botanist/cmd/run.go's |targetInfo| struct.
+    tools/botanist/cmd/target.go's |targetInfo| struct or the
+    tools/botanist/cmd/auxiliary.go's |Auxiliary| struct.
 
     Example |mobly_controllers|:
        [{
@@ -101,10 +109,20 @@ def new_testbed_config(
           "ipv6":"",
           "serial_socket":"/tmp/fuchsia-54b2-030e-eb19_mux",
           "ssh_key":"/etc/botanist/keys/pkey_infra"
-       }, {
+       },
+       {
           "type": "AccessPoint",
           "ip": "192.168.42.11",
-       }]
+          "mac": "98:de:d0:81:cf:30",
+          "pdu": {
+              "ip": "192.168.42.23",
+              "mac": "0c:73:eb:b0:86:fa",
+              "port": 1
+          },
+          "ssh_key": "/etc/botanist/keys/chrome_os_testing_rsa",
+          "user": "root",
+          "wan_interface": "eth0"
+        }]
 
     Example output:
        {
@@ -126,7 +144,18 @@ def new_testbed_config(
                 ],
                 "AccessPoint": [
                   {
-                    "ip": "192.168.42.11"
+                    "wan_interface": "eth0",
+                    "ssh_config": {
+                      "ssh_binary_path": host_x64/test_data/third_party/antlion/tests/wlan_policy/hidden_networks_test/ssh
+                      "host": "192.168.42.11",
+                      "user": "root",
+                      "identity_file": "/etc/botanist/keys/chrome_os_testing_rsa"
+                    },
+                    "PduDevice" : {
+                      "device": synaccess.np02b,
+                      "host": "192.168.42.33",
+                      "port": 1
+                    },
                   }
                 ]
               },
@@ -147,6 +176,7 @@ def new_testbed_config(
         botanist_honeydew_map: Dictionary that maps Botanist config names to
                                Honeydew config names.
         ffx_subtools_search_path: absolute path to where to search for FFX plugins.
+        ssh_path: absolute path to the SSH binary or None for local test case.
     Returns:
       A Mobly Config that corresponds to the user-specified arguments.
     """
@@ -170,6 +200,14 @@ def new_testbed_config(
                 controller[
                     FFX_SUBTOOLS_SEARCH_PATH_KEY
                 ] = ffx_subtools_search_path
+        elif api_infra.ACCESS_POINT == controller_type:
+            controller[SSH_CONFIG_KEY] = {
+                SSH_PATH_KEY: ssh_path,
+                SSH_HOST_KEY: controller.pop("ip"),
+                SSH_USER_KEY: controller.pop("user"),
+                SSH_IDENTITY_FILE_KEY: controller.pop("ssh_key"),
+            }
+
         if controller_type in controllers:
             controllers[controller_type].append(controller)
         else:

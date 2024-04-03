@@ -115,6 +115,11 @@ import("//build/testing/host_test_data.gni")
 #    host-target interactions. Valid values are "sl4f", "fuchsia-controller".
 #    Type: String
 #
+#  ssh_path (optional)
+#    Path to the ssh binary to be used by Antlion connectivity testbeds for connecting
+#    to access points.
+#    Type: String
+#
 #  test_data_deps (optional)
 #    List of test data GN targets that are needed at runtime.
 #    Type: list(string)
@@ -248,6 +253,23 @@ template("python_mobly_test") {
   }
 
   #
+  # Define SSH binary host_test_data().
+  #
+
+  # This is currently required by Honeydew for auxiliary device (access points and
+  # iperf servers) interactions when running wlan affordance functional tests.
+
+  _ssh_binary_test_data_target = "${_test_name}_test_data_ssh"
+  host_test_data(_ssh_binary_test_data_target) {
+    testonly = true
+    visibility = [ ":*" ]
+    sources = [
+      "//prebuilt/third_party/openssh-portable/${host_os}-${host_cpu}/bin/ssh",
+    ]
+    outputs = [ "${_test_dir}/ssh" ]
+  }
+
+  #
   # Construct host test arguments.
   #
 
@@ -272,6 +294,8 @@ template("python_mobly_test") {
     invoker.transport,
     "-ffx_subtools_search_path",
     rebase_path(host_tools_dir, root_build_dir),
+    "-ssh_path",
+    rebase_path("${_test_dir}/ssh", root_build_dir),
   ]
   if (defined(invoker.multi_fuchsia_device) && invoker.multi_fuchsia_device) {
     _host_test_args += [ "-multi_device" ]
@@ -380,6 +404,7 @@ template("python_mobly_test") {
         [
           ":${_fastboot_test_data_target}",
           ":${_mobly_test_data_target}",
+          ":${_ssh_binary_test_data_target}",
           "//build/python:interpreter",
           "//src/testing/end_to_end/mobly_driver:mobly_driver_test_data_target",
         ] + _additional_deps

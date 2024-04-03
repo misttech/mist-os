@@ -39,6 +39,11 @@ parser.add_argument(
 )
 parser.add_argument("-ffx_path", default=None, help="path to FFX.")
 parser.add_argument(
+    "-ssh_path",
+    default=None,
+    help="path to SSH binary used by test connectivity labs access points.",
+)
+parser.add_argument(
     "-ffx_subtools_search_path",
     default=None,
     help="path to FFX subtools search path.",
@@ -81,6 +86,7 @@ def main() -> None:
         ffx_subtools_search_path=os.path.abspath(args.ffx_subtools_search_path)
         if args.ffx_subtools_search_path
         else None,
+        ssh_path=os.path.abspath(args.ssh_path) if args.ssh_path else None,
     )
     driver = factory.get_driver()
 

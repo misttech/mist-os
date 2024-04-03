@@ -37,6 +37,7 @@ class InfraDriver(base.BaseDriver):
         transport: str,
         output_path: Optional[str] = None,
         params_path: Optional[str] = None,
+        ssh_path: Optional[str] = None,
         ffx_subtools_search_path: Optional[str] = None,
     ) -> None:
         """Initializes the instance.
@@ -60,6 +61,7 @@ class InfraDriver(base.BaseDriver):
             ffx_subtools_search_path=ffx_subtools_search_path,
         )
         self._tb_json_path = tb_json_path
+        self._ssh_path = ssh_path
 
     def generate_test_config(self) -> str:
         """Returns a Mobly test config in YAML format.
@@ -110,6 +112,7 @@ class InfraDriver(base.BaseDriver):
                 test_params_dict=test_params,
                 botanist_honeydew_map=botanist_honeydew_translation_map,
                 ffx_subtools_search_path=self._ffx_subtools_search_path,
+                ssh_path=self._ssh_path,
             )
             return yaml.dump(config)
         except (IOError, OSError) as e:
