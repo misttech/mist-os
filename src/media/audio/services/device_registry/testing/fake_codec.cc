@@ -30,7 +30,6 @@ const std::vector<fuchsia_hardware_audio::DaiFrameFormat> FakeCodec::kDefaultFra
 const std::vector<uint32_t> FakeCodec::kDefaultFrameRatesSet{FakeCodec::kDefaultFrameRates};
 const std::vector<uint8_t> FakeCodec::kDefaultBitsPerSlotSet{FakeCodec::kDefaultBitsPerSlot};
 const std::vector<uint8_t> FakeCodec::kDefaultBitsPerSampleSet{FakeCodec::kDefaultBitsPerSample};
-
 const fuchsia_hardware_audio::DaiSupportedFormats FakeCodec::kDefaultDaiFormatSet{{
     .number_of_channels = FakeCodec::kDefaultNumberOfChannelsSet,
     .sample_formats = FakeCodec::kDefaultSampleFormatsSet,

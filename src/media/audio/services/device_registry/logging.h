@@ -51,13 +51,17 @@ inline constexpr bool kLogObjectCounts = true;
 inline constexpr bool kLogNotifyMethods = false;
 
 // Driver FIDL methods
-inline constexpr bool kLogStreamConfigFidlCalls = false;
-inline constexpr bool kLogStreamConfigFidlResponses = false;
-inline constexpr bool kLogStreamConfigFidlResponseValues = false;
-
 inline constexpr bool kLogCodecFidlCalls = false;
 inline constexpr bool kLogCodecFidlResponses = false;
 inline constexpr bool kLogCodecFidlResponseValues = false;
+
+inline constexpr bool kLogCompositeFidlCalls = true;
+inline constexpr bool kLogCompositeFidlResponses = true;
+inline constexpr bool kLogCompositeFidlResponseValues = true;
+
+inline constexpr bool kLogStreamConfigFidlCalls = false;
+inline constexpr bool kLogStreamConfigFidlResponses = false;
+inline constexpr bool kLogStreamConfigFidlResponseValues = false;
 
 inline constexpr bool kLogSignalProcessingFidlCalls = true;
 inline constexpr bool kLogSignalProcessingFidlResponses = true;
@@ -95,6 +99,8 @@ void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state);
 
 void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_props);
 void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> format_info);
+
+void LogCompositeProperties(const fuchsia_hardware_audio::CompositeProperties& composite_props);
 
 void LogDeviceInfo(const fuchsia_audio_device::Info& device_info);
 

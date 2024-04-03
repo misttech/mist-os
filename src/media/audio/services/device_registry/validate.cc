@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdint>
 #include <string>
+#include <unordered_set>
 
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/signal_processing_utils.h"
@@ -624,6 +625,25 @@ zx_status_t ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInf
   return ZX_OK;
 }
 
+zx_status_t ValidateCompositeProperties(
+    const fuchsia_hardware_audio::CompositeProperties& composite_props) {
+  LogCompositeProperties(composite_props);
+
+  if (!composite_props.clock_domain()) {
+    FX_LOGS(WARNING) << "Incomplete Composite/GetProperties response";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if ((composite_props.manufacturer().has_value() && composite_props.manufacturer()->empty()) ||
+      (composite_props.product().has_value() && composite_props.product()->empty())) {
+    FX_LOGS(WARNING) << __func__
+                     << ": manufacturer and product, if present, must not be empty strings";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t ValidateGainState(
     const fuchsia_hardware_audio::GainState& gain_state,
     std::optional<const fuchsia_hardware_audio::StreamProperties> stream_props) {
@@ -733,6 +753,19 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
         return false;
       }
       break;
+    case fuchsia_audio_device::DeviceType::kComposite:
+      if (!device_info.clock_domain().has_value() ||
+          !device_info.signal_processing_elements().has_value() ||
+          !device_info.signal_processing_topologies().has_value()) {
+        FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance";
+        return false;
+      }
+      if (device_info.is_input().has_value() || device_info.gain_caps().has_value() ||
+          device_info.plug_detect_caps().has_value()) {
+        FX_LOGS(WARNING) << __func__ << ": invalid DeviceInfo fields are populated";
+        return false;
+      }
+      break;
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
       if (!device_info.is_input().has_value() || !device_info.gain_caps().has_value() ||
@@ -747,7 +780,6 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
         return false;
       }
       break;
-    case fuchsia_audio_device::DeviceType::kComposite:
     case fuchsia_audio_device::DeviceType::kDai:
     default:
       FX_LOGS(WARNING) << __func__ << ": unsupported DeviceType: " << device_info.device_type();
@@ -1071,6 +1103,12 @@ zx_status_t ValidateElements(
   if (elements.empty()) {
     FX_LOGS(WARNING) << "Reported SignalProcessing.elements[] is empty";
     return ZX_ERR_INVALID_ARGS;
+  }
+
+  for (const auto& element : elements) {
+    if (auto status = ValidateElement(element); status != ZX_OK) {
+      return status;
+    }
   }
 
   return (MapElements(elements).empty() ? ZX_ERR_INVALID_ARGS : ZX_OK);

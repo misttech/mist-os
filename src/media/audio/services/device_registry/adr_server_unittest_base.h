@@ -27,6 +27,7 @@
 #include "src/media/audio/services/device_registry/registry_server.h"
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
+#include "src/media/audio/services/device_registry/testing/fake_composite.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
@@ -48,6 +49,16 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   std::unique_ptr<FakeCodec> CreateFakeCodecInput() { return CreateFakeCodec(true); }
   std::unique_ptr<FakeCodec> CreateFakeCodecOutput() { return CreateFakeCodec(false); }
   std::unique_ptr<FakeCodec> CreateFakeCodecNoDirection() { return CreateFakeCodec(std::nullopt); }
+
+  // Create a FakeComposite that can mock a real device that has been detected, using default
+  // settings. From here, the fake Composite can be customized before it is enabled.
+  std::unique_ptr<FakeComposite> CreateFakeComposite() {
+    EXPECT_EQ(dispatcher(), test_loop().dispatcher());
+    auto composite_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Composite>();
+    EXPECT_TRUE(composite_endpoints.is_ok());
+    return std::make_unique<FakeComposite>(composite_endpoints->server.TakeChannel(),
+                                           composite_endpoints->client.TakeChannel(), dispatcher());
+  }
 
   // Create a FakeStreamConfig that can mock a real device that has been detected, using default
   // settings. From here, the fake StreamConfig can be customized before it is enabled.

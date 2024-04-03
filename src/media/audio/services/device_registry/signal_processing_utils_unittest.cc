@@ -1,22 +1,18 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include "src/media/audio/services/device_registry/signal_processing_utils.h"
 
-// #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
-
-// #include <optional>
-// #include <vector>
 
 #include <gtest/gtest.h>
 
-#include "src/media/audio/services/device_registry/validate_unittest.h"
-
-// These cases unittest the Validate... functions with inputs that cause INFO logging (if any).
+#include "src/media/audio/services/device_registry/signal_processing_utils_unittest.h"
 
 namespace media_audio {
+
+// These cases unittest the Map... functions with inputs that cause INFO logging (if any).
 
 TEST(SignalProcessingUtilsTest, MapElements) {
   auto map = MapElements(kElements);

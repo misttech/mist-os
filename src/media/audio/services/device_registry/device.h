@@ -99,6 +99,9 @@ class Device : public std::enable_shared_from_this<Device> {
   //
   fuchsia_audio_device::DeviceType device_type() const { return device_type_; }
   bool is_codec() const { return (device_type_ == fuchsia_audio_device::DeviceType::kCodec); }
+  bool is_composite() const {
+    return (device_type_ == fuchsia_audio_device::DeviceType::kComposite);
+  }
   bool is_stream_config() const {
     return (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
             device_type_ == fuchsia_audio_device::DeviceType::kOutput);
@@ -134,6 +137,7 @@ class Device : public std::enable_shared_from_this<Device> {
   bool codec_is_started() const { return codec_start_state_.started; }
 
   bool has_codec_properties() const { return codec_properties_.has_value(); }
+  bool has_composite_properties() const { return composite_properties_.has_value(); }
   bool has_stream_config_properties() const { return stream_config_properties_.has_value(); }
   bool has_health_state() const { return health_state_.has_value(); }
   bool dai_format_sets_retrieved() const { return dai_format_sets_retrieved_; }
@@ -153,6 +157,7 @@ class Device : public std::enable_shared_from_this<Device> {
   friend class DeviceTestBase;
   friend class DeviceTest;
   friend class CodecTest;
+  friend class CompositeTest;
   friend class StreamConfigTest;
   friend class DeviceWarningTest;
   friend class AudioDeviceRegistryServerTestBase;
@@ -181,6 +186,11 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveCodecDaiFormatSets();
   void RetrieveCodecPlugState();
 
+  void RetrieveCompositeProperties();
+  void RetrieveCompositeHealthState();
+  void RetrieveCompositeDaiFormatSets();
+  void RetrieveCompositeRingBufferFormatSets();
+
   void RetrieveSignalProcessingState();
   void RetrieveSignalProcessingTopologies();
   void RetrieveSignalProcessingElements();
@@ -202,6 +212,8 @@ class Device : public std::enable_shared_from_this<Device> {
       std::optional<fuchsia_hardware_audio::StreamProperties>& stream_properties);
   static void SanitizeCodecPropertiesStrings(
       std::optional<fuchsia_hardware_audio::CodecProperties>& codec_properties);
+  static void SanitizeCompositePropertiesStrings(
+      std::optional<fuchsia_hardware_audio::CompositeProperties>& composite_properties);
 
   fuchsia_audio_device::Info CreateDeviceInfo();
   void SetDeviceInfo();
@@ -300,6 +312,9 @@ class Device : public std::enable_shared_from_this<Device> {
       sig_proc_client_;
   FidlErrorHandler<fuchsia_hardware_audio_signalprocessing::SignalProcessing> sig_proc_handler_;
 
+  std::optional<fidl::Client<fuchsia_hardware_audio::Composite>> composite_client_;
+  FidlErrorHandler<fuchsia_hardware_audio::Composite> composite_handler_;
+
   // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
   const TokenId token_id_;
 
@@ -311,6 +326,8 @@ class Device : public std::enable_shared_from_this<Device> {
   std::optional<bool> health_state_;
 
   std::optional<fuchsia_hardware_audio::CodecProperties> codec_properties_;
+
+  std::optional<fuchsia_hardware_audio::CompositeProperties> composite_properties_;
 
   std::optional<bool> supports_signalprocessing_;
   std::vector<fuchsia_hardware_audio_signalprocessing::Element> sig_proc_elements_;

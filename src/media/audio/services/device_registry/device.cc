@@ -83,16 +83,17 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
       codec_handler_ = {this, "Codec"};
       codec_client_ = {driver_client_.codec().take().value(), dispatcher, &codec_handler_};
       break;
+    case fuchsia_audio_device::DeviceType::kComposite:
+      composite_handler_ = {this, "Composite"};
+      composite_client_ = {driver_client_.composite().take().value(), dispatcher,
+                           &composite_handler_};
+      break;
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
       stream_config_handler_ = {this, "StreamConfig"};
       stream_config_client_ = {driver_client_.stream_config().take().value(), dispatcher,
                                &stream_config_handler_};
       break;
-    case fuchsia_audio_device::DeviceType::kComposite:
-      ADR_WARN_METHOD() << "Composite device type is not yet implemented";
-      OnError(ZX_ERR_WRONG_TYPE);
-      return;
     case fuchsia_audio_device::DeviceType::kDai:
       ADR_WARN_METHOD() << "Dai device type is not yet implemented";
       OnError(ZX_ERR_WRONG_TYPE);
@@ -112,7 +113,6 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
 Device::~Device() {
   ADR_LOG_METHOD(kLogObjectLifetimes);
   --count_;
-
   LogObjectCounts();
 }
 
@@ -183,8 +183,8 @@ void Device::FidlErrorHandler<T>::on_fidl_error(fidl::UnbindInfo info) {
     ADR_WARN_METHOD() << name_ << " disconnected: " << info;
     device_->OnError(info.status());
   } else {
-    ADR_LOG_METHOD(kLogCodecFidlResponses || kLogStreamConfigFidlResponses || kLogDeviceState ||
-                   kLogObjectLifetimes)
+    ADR_LOG_METHOD(kLogCodecFidlResponses || kLogCompositeFidlResponses ||
+                   kLogStreamConfigFidlResponses || kLogDeviceState || kLogObjectLifetimes)
         << name_ << " disconnected: " << info;
   }
   device_->OnRemoval();
@@ -253,14 +253,14 @@ bool Device::IsFullyInitialized() {
     case fuchsia_audio_device::DeviceType::kCodec:
       return has_codec_properties() && has_health_state() && checked_for_signalprocessing() &&
              dai_format_sets_retrieved() && has_plug_state();
+    case fuchsia_audio_device::DeviceType::kComposite:
+      return has_composite_properties() && has_health_state() && checked_for_signalprocessing() &&
+             dai_format_sets_retrieved() && ring_buffer_format_sets_retrieved();
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
       return has_stream_config_properties() && has_health_state() &&
              checked_for_signalprocessing() && ring_buffer_format_sets_retrieved() &&
              has_gain_state() && has_plug_state();
-    case fuchsia_audio_device::DeviceType::kComposite:
-      ADR_WARN_METHOD() << "Don't yet support Composite";
-      return false;
     case fuchsia_audio_device::DeviceType::kDai:
       ADR_WARN_METHOD() << "Don't yet support Dai";
       return false;
@@ -291,6 +291,15 @@ void Device::OnInitializationResponse() {
           << "   " << (dai_format_sets_retrieved() ? "DAIFORMATS" : "daiformats")  //
           << "   " << (has_plug_state() ? "PLUG" : "plug");
       break;
+    case fuchsia_audio_device::DeviceType::kComposite:
+      ADR_LOG_METHOD(kLogDeviceInitializationProgress)
+          << " (RECEIVED|pending)"                                                 //
+          << "   " << (has_composite_properties() ? "PROPS" : "props")             //
+          << "   " << (has_health_state() ? "HEALTH" : "health")                   //
+          << "   " << (checked_for_signalprocessing() ? "SIGPROC" : "sigproc")     //
+          << "   " << (dai_format_sets_retrieved() ? "DAIFORMATS" : "daiformats")  //
+          << "   " << (ring_buffer_format_sets_retrieved() ? "RB_FORMATS" : "rb_formats");
+      break;
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
       ADR_LOG_METHOD(kLogDeviceInitializationProgress)
@@ -302,7 +311,6 @@ void Device::OnInitializationResponse() {
           << "   " << (has_plug_state() ? "PLUG" : "plug")                                 //
           << "   " << (has_gain_state() ? "GAIN" : "gain");
       break;
-    case fuchsia_audio_device::DeviceType::kComposite:
     case fuchsia_audio_device::DeviceType::kDai:
     default:
       ADR_WARN_METHOD() << "Invalid device_type_";
@@ -507,6 +515,10 @@ void Device::Initialize() {
     RetrieveSignalProcessingState();
     RetrieveCodecDaiFormatSets();
     RetrieveCodecPlugState();
+  } else if (is_composite()) {
+    RetrieveCompositeProperties();
+    RetrieveCompositeHealthState();
+    RetrieveSignalProcessingState();  // On completion, this starts format-set-retrieval.
   } else if (is_stream_config()) {
     RetrieveStreamProperties();
     RetrieveStreamHealthState();
@@ -531,7 +543,8 @@ bool Device::LogResultError(const ResultT& result, const char* debug_context) {
     if (result.error_value().is_framework_error()) {
       if (result.error_value().framework_error().is_canceled() ||
           result.error_value().framework_error().is_peer_closed()) {
-        ADR_LOG_METHOD(kLogCodecFidlResponses || kLogStreamConfigFidlResponses)
+        ADR_LOG_METHOD(kLogCodecFidlResponses || kLogCompositeFidlResponses ||
+                       kLogStreamConfigFidlResponses)
             << debug_context << ": will take no action on " << result.error_value();
       } else {
         FX_LOGS(ERROR) << debug_context << " failed: " << result.error_value() << ")";
@@ -554,7 +567,8 @@ bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_co
   }
   if (result.is_error()) {
     if (result.error_value().is_canceled() || result.error_value().is_peer_closed()) {
-      ADR_LOG_METHOD(kLogCodecFidlResponses || kLogStreamConfigFidlResponses)
+      ADR_LOG_METHOD(kLogCodecFidlResponses || kLogCompositeFidlResponses ||
+                     kLogStreamConfigFidlResponses)
           << debug_context << ": will take no action on " << result.error_value();
     } else {
       FX_LOGS(ERROR) << debug_context << " failed: " << result.error_value().status() << " ("
@@ -670,6 +684,59 @@ void Device::SanitizeCodecPropertiesStrings(
   }
 }
 
+void Device::RetrieveCompositeProperties() {
+  ADR_LOG_METHOD(kLogCompositeFidlCalls);
+
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error; ignoring this";
+    return;
+  }
+  // TODO(https://fxbug.dev/113429): handle command timeouts
+
+  (*composite_client_)
+      ->GetProperties()
+      .Then([this](fidl::Result<fuchsia_hardware_audio::Composite::GetProperties>& result) {
+        if (LogResultFrameworkError(result, "GetProperties response")) {
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogCompositeFidlResponses) << "Composite/GetProperties: success";
+        auto status = ValidateCompositeProperties(result->properties());
+        if (status != ZX_OK) {
+          OnError(status);
+          return;
+        }
+
+        FX_CHECK(!has_composite_properties())
+            << "Composite/GetProperties response: composite_properties_ already set";
+        composite_properties_ = result->properties();
+        SanitizeCompositePropertiesStrings(composite_properties_);
+        // We have our clock domain now. Create the device clock.
+        CreateDeviceClock();
+
+        OnInitializationResponse();
+      });
+}
+
+void Device::SanitizeCompositePropertiesStrings(
+    std::optional<fuchsia_hardware_audio::CompositeProperties>& composite_properties) {
+  if (!composite_properties) {
+    FX_LOGS(ERROR) << __func__ << " called with unspecified CompositeProperties";
+    return;
+  }
+
+  if (composite_properties->manufacturer()) {
+    composite_properties->manufacturer(composite_properties->manufacturer()->substr(
+        0, std::min<uint64_t>(composite_properties->manufacturer()->find('\0'),
+                              fuchsia_hardware_audio::kMaxUiStringSize - 1)));
+  }
+  if (composite_properties->product()) {
+    composite_properties->product(composite_properties->product()->substr(
+        0, std::min<uint64_t>(composite_properties->product()->find('\0'),
+                              fuchsia_hardware_audio::kMaxUiStringSize - 1)));
+  }
+}
+
 void Device::RetrieveStreamRingBufferFormatSets() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
@@ -689,7 +756,6 @@ void Device::RetrieveStreamRingBufferFormatSets() {
           OnError(ZX_ERR_INVALID_ARGS);
           return;
         };
-
         element_driver_ring_buffer_format_sets_ = {{
             {
                 element_id,
@@ -786,6 +852,23 @@ void Device::RetrieveSignalProcessingState() {
       OnError(status.error_value().status());
       return;
     }
+  } else if (is_composite()) {
+    ADR_LOG_METHOD(kLogCompositeFidlCalls) << "calling SignalProcessingConnect";
+    auto status = (*composite_client_)->SignalProcessingConnect(std::move(sig_proc_server_end));
+
+    if (status.is_error()) {
+      if (status.error_value().is_canceled()) {
+        // These indicate that we are already shutting down, so they aren't error conditions.
+        ADR_LOG_METHOD(kLogCompositeFidlResponses)
+            << "SignalProcessingConnect response will take no action on error "
+            << status.error_value().FormatDescription();
+        return;
+      }
+
+      FX_PLOGS(ERROR, status.error_value().status()) << __func__ << " returned error:";
+      OnError(status.error_value().status());
+      return;
+    }
   } else if (is_stream_config()) {
     ADR_LOG_METHOD(kLogStreamConfigFidlCalls) << "calling SignalProcessingConnect";
     if (!stream_config_client_->is_valid()) {
@@ -855,6 +938,11 @@ void Device::RetrieveSignalProcessingElements() {
               return;
             }
             RetrieveSignalProcessingTopologies();
+
+            if (is_composite()) {
+              RetrieveCompositeDaiFormatSets();
+              RetrieveCompositeRingBufferFormatSets();
+            }
           });
 }
 
@@ -989,11 +1077,32 @@ void Device::RetrieveCodecDaiFormatSets() {
       fuchsia_audio_device::kDefaultDaiInterconnectElementId);
 }
 
+// We have our signalprocessing Elements now; GetDaiFormats on each DAI Endpoint.
+void Device::RetrieveCompositeDaiFormatSets() {
+  ADR_LOG_METHOD(kLogCompositeFidlCalls);
+  dai_endpoint_ids_ = dai_endpoints(sig_proc_element_map_);
+  temp_dai_endpoint_ids_ = dai_endpoint_ids_;
+  element_dai_format_sets_.clear();
+  for (auto element_id : temp_dai_endpoint_ids_) {
+    RetrieveDaiFormatSets(
+        [this](uint64_t element_id,
+               const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_formats) {
+          element_dai_format_sets_.push_back({{element_id, dai_formats}});
+          temp_dai_endpoint_ids_.extract(element_id);
+          if (temp_dai_endpoint_ids_.empty()) {
+            dai_format_sets_retrieved_ = true;
+            OnInitializationResponse();
+          }
+        },
+        element_id);
+  }
+}
+
 void Device::RetrieveDaiFormatSets(
     fit::callback<void(ElementId, const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>&)>
         dai_format_sets_callback,
     ElementId element_id) {
-  ADR_LOG_METHOD(kLogCodecFidlCalls);
+  ADR_LOG_METHOD(kLogCodecFidlCalls || kLogCompositeFidlCalls);
 
   if (state_ == State::Error) {
     ADR_WARN_METHOD() << "device already has an error";
@@ -1022,6 +1131,75 @@ void Device::RetrieveDaiFormatSets(
             return;
           }
           callback(element_id, result->formats());
+        });
+  } else if (is_composite()) {
+    ADR_LOG_METHOD(kLogCompositeFidlCalls) << " GetDaiFormats (element " << element_id << ")";
+    (*composite_client_)
+        ->GetDaiFormats(element_id)
+        .Then([this, element_id, callback = std::move(dai_format_sets_callback)](
+                  fidl::Result<fuchsia_hardware_audio::Composite::GetDaiFormats>& result) mutable {
+          std::string str{"GetDaiFormats (element "};
+          str.append(std::to_string(element_id)).append(") response");
+          ADR_LOG_OBJECT(kLogCompositeFidlResponses) << str;
+          if (state_ == State::Error) {
+            ADR_WARN_OBJECT() << "device already has error during " << str;
+            return;
+          }
+          if (LogResultError(result, str.c_str())) {
+            return;
+          }
+          auto status = ValidateDaiFormatSets(result->dai_formats());
+          if (status != ZX_OK) {
+            OnError(status);
+            return;
+          }
+
+          callback(element_id, result->dai_formats());
+        });
+  }
+}
+
+// We have our signalprocessing Elements now; GetDaiFormats on each RingBuffer Endpoint.
+void Device::RetrieveCompositeRingBufferFormatSets() {
+  ADR_LOG_METHOD(kLogCompositeFidlCalls);
+  ring_buffer_endpoint_ids_ = ring_buffer_endpoints(sig_proc_element_map_);
+  element_ring_buffer_format_sets_.clear();
+  for (auto id : ring_buffer_endpoint_ids_) {
+    ADR_LOG_METHOD(kLogCompositeFidlCalls) << " GetRingBufferFormats (element " << id << ")";
+    (*composite_client_)
+        ->GetRingBufferFormats(id)
+        .Then([this,
+               id](fidl::Result<fuchsia_hardware_audio::Composite::GetRingBufferFormats>& result) {
+          std::string str{"GetRingBufferFormats (element "};
+          str.append(std::to_string(id)).append(") response");
+          ADR_LOG_OBJECT(kLogCompositeFidlResponses) << str;
+          if (state_ == State::Error) {
+            ADR_WARN_OBJECT() << "device already has error during " << str;
+            return;
+          }
+          if (LogResultError(result, str.c_str())) {
+            return;
+          }
+          auto status = ValidateRingBufferFormatSets(result->ring_buffer_formats());
+          if (status != ZX_OK) {
+            OnError(status);
+            return;
+          }
+          auto translated_ring_buffer_format_sets =
+              TranslateRingBufferFormatSets(result->ring_buffer_formats());
+          if (translated_ring_buffer_format_sets.empty()) {
+            ADR_WARN_OBJECT() << "Failed to translate " << str;
+            OnError(ZX_ERR_INVALID_ARGS);
+            return;
+          }
+
+          element_driver_ring_buffer_format_sets_.emplace_back(id, result->ring_buffer_formats());
+          element_ring_buffer_format_sets_.push_back({{id, translated_ring_buffer_format_sets}});
+          ring_buffer_endpoint_ids_.extract(id);
+          if (ring_buffer_endpoint_ids_.empty()) {
+            ring_buffer_format_sets_retrieved_ = true;
+            OnInitializationResponse();
+          }
         });
   }
 }
@@ -1244,6 +1422,44 @@ void Device::RetrieveCodecHealthState() {
       });
 }
 
+void Device::RetrieveCompositeHealthState() {
+  ADR_LOG_METHOD(kLogCompositeFidlCalls);
+
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error; ignoring this";
+    return;
+  }
+
+  // TODO(https://fxbug.dev/113429): handle command timeouts, because that's the most likely
+  // indicator of an unhealthy driver/device.
+
+  (*composite_client_)
+      ->GetHealthState()
+      .Then([this](fidl::Result<fuchsia_hardware_audio::Composite::GetHealthState>& result) {
+        if (LogResultFrameworkError(result, "HealthState response")) {
+          return;
+        }
+
+        auto old_health_state = health_state_;
+
+        // An empty health state is permitted; it still indicates that the driver is responsive.
+        health_state_ = result->state().healthy().value_or(true);
+        // ...but if the driver actually self-reported as unhealthy, this is a problem.
+        if (!*health_state_) {
+          FX_LOGS(WARNING)
+              << "RetrieveCompositeHealthState response: .healthy is FALSE (unhealthy)";
+          OnError(ZX_ERR_IO);
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogCompositeFidlResponses)
+            << "RetrieveCompositeHealthState response: healthy";
+        if (!old_health_state) {
+          OnInitializationResponse();
+        }
+      });
+}
+
 // Return a fuchsia_audio_device::Info object based on this device's member values.
 // Required fields (guaranteed for the caller) include: token_id, device_type, device_name.
 // Other fields are required for some driver types but optional or absent for others.
@@ -1281,6 +1497,17 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
              fuchsia_audio_device::kUniqueInstanceIdSize);
       info.unique_instance_id(uid);
     }
+  } else if (is_composite()) {
+    // Optional for all device types:
+    info.manufacturer(composite_properties_->manufacturer())
+        .product(composite_properties_->product())
+        .unique_instance_id(composite_properties_->unique_id())
+        // Required for Dai and StreamConfig; optional for Composite; absent for Codec:
+        .ring_buffer_format_sets(element_ring_buffer_format_sets_)
+        // Required for Codec and Dai; optional for Composite; absent for StreamConfig:
+        .dai_format_sets(element_dai_format_sets_)
+        // Required for Composite, Dai and StreamConfig; absent for Codec:
+        .clock_domain(composite_properties_->clock_domain());
   } else if (is_stream_config()) {
     // Optional for all device types:
     info.manufacturer(stream_config_properties_->manufacturer())
@@ -1324,6 +1551,10 @@ void Device::CreateDeviceClock() {
   if (is_stream_config()) {
     FX_CHECK(stream_config_properties_->clock_domain()) << "Clock domain is required";
     clock_domain = stream_config_properties_->clock_domain().value_or(
+        fuchsia_hardware_audio::kClockDomainMonotonic);
+  } else if (is_composite()) {
+    FX_CHECK(composite_properties_->clock_domain()) << "Clock domain is required";
+    clock_domain = composite_properties_->clock_domain().value_or(
         fuchsia_hardware_audio::kClockDomainMonotonic);
   } else {
     ADR_WARN_METHOD() << "Cannot create a device clock for device_type " << device_type();

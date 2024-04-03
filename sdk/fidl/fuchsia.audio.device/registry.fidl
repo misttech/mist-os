@@ -54,7 +54,7 @@ type Info = table {
 
     /// Whether the device is a source (is_input TRUE) or destination (is_input FALSE) of audio.
     ///
-    /// Required for StreamConfig; optional for Codec.
+    /// Required for StreamConfig; optional for Codec; absent for Composite.
     7: is_input bool;
 
     /// The union of all formats the device can support, across all combinations of device
@@ -64,7 +64,7 @@ type Info = table {
     /// If the device exposes NO RingBuffer ENDPOINT elements, this field must be omitted (entirely
     /// absent, rather than populated with an empty vector).
     ///
-    /// Required for StreamConfig; absent for Codec.
+    /// Required for StreamConfig; optional for Composite; absent for Codec.
     8: ring_buffer_format_sets vector<ElementRingBufferFormatSet>:MAX_COUNT_PROCESSING_ELEMENTS;
 
     /// The union of all DAI formats the device can support, across all combinations
@@ -74,12 +74,12 @@ type Info = table {
     /// If the device exposes NO Dai ENDPOINT elements, this field must be omitted (entirely absent,
     /// rather than populated with an empty vector).
     ///
-    /// Required for Codec; absent for StreamConfig.
+    /// Required for Codec; optional for Composite; absent for StreamConfig.
     9: dai_format_sets vector<ElementDaiFormatSet>:MAX_COUNT_PROCESSING_ELEMENTS;
 
     /// The device's gain/mute capabilities.
     ///
-    /// Required for StreamConfig; absent for Codec.
+    /// Required for StreamConfig; absent for Codec and Composite.
     //
     // TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
     // Going forward, gain will be handled by `SignalProcessing`.
@@ -87,7 +87,7 @@ type Info = table {
 
     /// The device's hot-plug capabilities.
     ///
-    /// Required.
+    /// Required for Codec and StreamConfig; absent for Composite.
     11: plug_detect_caps PlugDetectCapabilities;
 
     /// An identifier for the clock domain in which the device's clock hardware
@@ -105,20 +105,20 @@ type Info = table {
     /// *  `CLOCK_DOMAIN_EXTERNAL` means the hardware is not synchronized with any
     ///    other known clocks (even any other clocks in `CLOCK_DOMAIN_EXTERNAL`).
     ///
-    /// Required for StreamConfig; absent for Codec.
+    /// Required for Composite and StreamConfig; absent for Codec.
     12: clock_domain ClockDomain;
 
     /// The vector of supported signal-processing elements.
     /// If present, must contain at least one element.
     ///
-    /// Optional.
+    /// Required for Composite; optional for Codec and StreamConfig.
     13: signal_processing_elements
             vector<fuchsia.hardware.audio.signalprocessing.Element>:fuchsia.hardware.audio.signalprocessing.MAX_COUNT_PROCESSING_ELEMENTS;
 
     /// The vector of supported signal-processing topologies.
     /// If present, must contain at least one element.
     ///
-    /// Optional.
+    /// Required for Composite; optional for Codec and StreamConfig.
     14: signal_processing_topologies
             vector<fuchsia.hardware.audio.signalprocessing.Topology>:fuchsia.hardware.audio.signalprocessing.MAX_COUNT_TOPOLOGIES;
 };

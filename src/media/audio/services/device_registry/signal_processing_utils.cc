@@ -1,4 +1,4 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,8 +6,6 @@
 
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <lib/syslog/cpp/macros.h>
-
-#include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
 
@@ -45,8 +43,8 @@ std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element> 
       std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>{};
 
   for (const auto& element : elements) {
-    if (ValidateElement(element) != ZX_OK) {
-      FX_LOGS(WARNING) << "invalid element";
+    if (!element.id().has_value()) {
+      FX_LOGS(WARNING) << "invalid element_id";
       return {};
     }
     if (!element_map.insert({*element.id(), element}).second) {

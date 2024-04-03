@@ -17,6 +17,7 @@
 #include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/device_unittest.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
+#include "src/media/audio/services/device_registry/testing/fake_composite.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
@@ -562,6 +563,206 @@ TEST_F(CodecTest, DynamicPlugUpdate) {
   ASSERT_TRUE(notify()->plug_state());
   EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), unplug_time.get());
+}
+
+/////////////////////
+// Composite tests
+//
+// Validate that a fake composite is initialized successfully.
+TEST_F(CompositeTest, Initialization) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  EXPECT_TRUE(InInitializedState(device));
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+
+  EXPECT_TRUE(device->is_composite());
+
+  ASSERT_TRUE(device->info().has_value());
+  EXPECT_FALSE(device->info()->is_input().has_value());
+}
+
+// Validate that a fake composite is initialized to the expected default values.
+TEST_F(CompositeTest, DeviceInfo) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+
+  ASSERT_TRUE(device->info().has_value());
+  auto info = *device->info();
+
+  EXPECT_TRUE(info.token_id().has_value());
+
+  ASSERT_TRUE(info.device_type().has_value());
+  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kComposite);
+
+  ASSERT_TRUE(info.device_name().has_value());
+  EXPECT_FALSE(info.device_name()->empty());
+
+  ASSERT_TRUE(info.manufacturer().has_value());
+  EXPECT_EQ(*info.manufacturer(), FakeComposite::kDefaultManufacturer);
+
+  ASSERT_TRUE(info.product().has_value());
+  EXPECT_EQ(*info.product(), FakeComposite::kDefaultProduct);
+
+  ASSERT_TRUE(info.unique_instance_id().has_value());
+  EXPECT_EQ(*info.unique_instance_id(), FakeComposite::kDefaultUniqueInstanceId);
+
+  EXPECT_FALSE(info.is_input().has_value());
+
+  ASSERT_TRUE(info.ring_buffer_format_sets().has_value());
+  ASSERT_FALSE(info.ring_buffer_format_sets()->empty());
+  ASSERT_EQ(info.ring_buffer_format_sets()->size(), 2u);
+
+  ASSERT_TRUE(info.ring_buffer_format_sets()->at(0).element_id().has_value());
+  EXPECT_EQ(*info.ring_buffer_format_sets()->at(0).element_id(), FakeComposite::kSourceRbElementId);
+  ASSERT_TRUE(info.ring_buffer_format_sets()->at(0).format_sets().has_value());
+  ASSERT_FALSE(info.ring_buffer_format_sets()->at(0).format_sets()->empty());
+  EXPECT_EQ(info.ring_buffer_format_sets()->at(0).format_sets()->size(), 1u);
+  auto format_set0 = info.ring_buffer_format_sets()->at(0).format_sets()->at(0);
+  ASSERT_TRUE(format_set0.frame_rates().has_value());
+  EXPECT_THAT(*format_set0.frame_rates(),
+              testing::ElementsAreArray(FakeComposite::kDefaultRbFrameRates2));
+  ASSERT_TRUE(format_set0.channel_sets().has_value());
+  ASSERT_FALSE(format_set0.channel_sets()->empty());
+  EXPECT_EQ(format_set0.channel_sets()->size(), 1u);
+  ASSERT_TRUE(format_set0.channel_sets()->at(0).attributes().has_value());
+  ASSERT_FALSE(format_set0.channel_sets()->at(0).attributes()->empty());
+  EXPECT_EQ(format_set0.channel_sets()->at(0).attributes()->size(), 1u);
+  ASSERT_FALSE(format_set0.channel_sets()->at(0).attributes()->at(0).max_frequency().has_value());
+  ASSERT_TRUE(format_set0.channel_sets()->at(0).attributes()->at(0).min_frequency().has_value());
+  EXPECT_EQ(*format_set0.channel_sets()->at(0).attributes()->at(0).min_frequency(),
+            FakeComposite::kDefaultRbChannelAttributeMinFrequency2);
+
+  ASSERT_TRUE(info.ring_buffer_format_sets()->at(1).element_id().has_value());
+  EXPECT_EQ(*info.ring_buffer_format_sets()->at(1).element_id(), FakeComposite::kDestRbElementId);
+  ASSERT_TRUE(info.ring_buffer_format_sets()->at(1).format_sets().has_value());
+  ASSERT_FALSE(info.ring_buffer_format_sets()->at(1).format_sets()->empty());
+  EXPECT_EQ(info.ring_buffer_format_sets()->at(1).format_sets()->size(), 1u);
+  auto format_set1 = info.ring_buffer_format_sets()->at(1).format_sets()->at(0);
+  ASSERT_TRUE(format_set1.frame_rates().has_value());
+  EXPECT_THAT(*format_set1.frame_rates(),
+              testing::ElementsAreArray(FakeComposite::kDefaultRbFrameRates));
+  ASSERT_TRUE(format_set1.channel_sets().has_value());
+  ASSERT_FALSE(format_set1.channel_sets()->empty());
+  EXPECT_EQ(format_set1.channel_sets()->size(), 1u);
+  ASSERT_TRUE(format_set1.channel_sets()->at(0).attributes().has_value());
+  ASSERT_FALSE(format_set1.channel_sets()->at(0).attributes()->empty());
+  EXPECT_EQ(format_set1.channel_sets()->at(0).attributes()->size(), 1u);
+  ASSERT_TRUE(format_set1.channel_sets()->at(0).attributes()->at(0).max_frequency().has_value());
+  EXPECT_EQ(*format_set1.channel_sets()->at(0).attributes()->at(0).max_frequency(),
+            FakeComposite::kDefaultRbChannelAttributeMaxFrequency);
+  ASSERT_TRUE(format_set1.channel_sets()->at(0).attributes()->at(0).min_frequency().has_value());
+  EXPECT_EQ(*format_set1.channel_sets()->at(0).attributes()->at(0).min_frequency(),
+            FakeComposite::kDefaultRbChannelAttributeMinFrequency);
+
+  ASSERT_TRUE(info.dai_format_sets().has_value());
+  ASSERT_FALSE(info.dai_format_sets()->empty());
+  ASSERT_EQ(info.dai_format_sets()->size(), 2u);
+
+  ASSERT_TRUE(info.dai_format_sets()->at(0).element_id().has_value());
+  EXPECT_EQ(*info.dai_format_sets()->at(0).element_id(), FakeComposite::kDestDaiElementId);
+  ASSERT_TRUE(info.dai_format_sets()->at(0).format_sets().has_value());
+  EXPECT_EQ(info.dai_format_sets()->at(0).format_sets()->size(), 1u);
+  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).number_of_channels(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiNumberOfChannelsSet2));
+  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).frame_rates(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameRates2));
+  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).bits_per_slot(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSlotSet2));
+  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).bits_per_sample(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSampleSet2));
+  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).frame_formats(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameFormatsSet2));
+  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).sample_formats(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiSampleFormatsSet2));
+
+  ASSERT_TRUE(info.dai_format_sets()->at(1).element_id().has_value());
+  EXPECT_EQ(*info.dai_format_sets()->at(1).element_id(), FakeComposite::kSourceDaiElementId);
+  ASSERT_TRUE(info.dai_format_sets()->at(1).format_sets().has_value());
+  EXPECT_EQ(info.dai_format_sets()->at(1).format_sets()->size(), 1u);
+  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).number_of_channels(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiNumberOfChannelsSet));
+  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).frame_rates(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameRates));
+  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).bits_per_slot(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSlotSet));
+  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).bits_per_sample(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSampleSet));
+  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).frame_formats(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameFormatsSet));
+  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).sample_formats(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiSampleFormatsSet));
+
+  EXPECT_FALSE(info.gain_caps().has_value());
+
+  EXPECT_FALSE(info.plug_detect_caps().has_value());
+
+  EXPECT_TRUE(info.clock_domain().has_value());
+
+  ASSERT_TRUE(info.signal_processing_elements().has_value());
+  ASSERT_TRUE(info.signal_processing_topologies().has_value());
+  EXPECT_FALSE(info.signal_processing_elements()->empty());
+  EXPECT_FALSE(info.signal_processing_topologies()->empty());
+}
+
+// Validate that a driver's dropping the Composite causes a DeviceIsRemoved notification.
+TEST_F(CompositeTest, Disconnect) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+
+  fake_driver->DropComposite();
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_from_ready_count(), 1u);
+}
+
+// Validate that a GetHealthState response of an empty struct is considered "healthy".
+TEST_F(CompositeTest, EmptyHealthResponse) {
+  auto fake_driver = MakeFakeComposite();
+  fake_driver->set_health_state(std::nullopt);
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  EXPECT_TRUE(InInitializedState(device));
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+}
+
+TEST_F(CompositeTest, Observer) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+
+  EXPECT_TRUE(AddObserver(device));
+}
+
+TEST_F(CompositeTest, Control) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+
+  EXPECT_TRUE(DropControl(device));
 }
 
 /////////////////////

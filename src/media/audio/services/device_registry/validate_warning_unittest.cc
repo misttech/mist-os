@@ -18,8 +18,8 @@
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/signal_processing_utils.h"
+#include "src/media/audio/services/device_registry/signal_processing_utils_unittest.h"
 #include "src/media/audio/services/device_registry/validate.h"
-#include "src/media/audio/services/device_registry/validate_unittest.h"
 
 // These cases unittest the Validate... functions with inputs that cause WARNING log output.
 

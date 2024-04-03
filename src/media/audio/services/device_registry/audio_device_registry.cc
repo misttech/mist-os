@@ -49,12 +49,12 @@ zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
           case fuchsia_audio_device::DriverClient::Tag::kCodec:
             FX_CHECK(driver_client.codec()->is_valid());
             break;
+          case fuchsia_audio_device::DriverClient::Tag::kComposite:
+            FX_CHECK(driver_client.composite()->is_valid());
+            break;
           case fuchsia_audio_device::DriverClient::Tag::kStreamConfig:
             FX_CHECK(driver_client.stream_config()->is_valid());
             break;
-          case fuchsia_audio_device::DriverClient::Tag::kComposite:
-            ADR_WARN_OBJECT() << "Composite device detected but not yet supported";
-            return;
           case fuchsia_audio_device::DriverClient::Tag::kDai:
             ADR_WARN_OBJECT() << "Dai device detected but not yet supported";
             return;

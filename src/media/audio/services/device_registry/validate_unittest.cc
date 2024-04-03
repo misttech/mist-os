@@ -19,11 +19,21 @@
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/signal_processing_utils.h"
-#include "src/media/audio/services/device_registry/validate_unittest.h"
+#include "src/media/audio/services/device_registry/signal_processing_utils_unittest.h"
+
+namespace media_audio {
 
 // These cases unittest the Validate... functions with inputs that cause INFO logging (if any).
 
-namespace media_audio {
+const std::vector<uint8_t> kChannels = {1, 8, 255};
+const std::vector<std::pair<uint8_t, fuchsia_hardware_audio::SampleFormat>> kFormats = {
+    {1, fuchsia_hardware_audio::SampleFormat::kPcmUnsigned},
+    {2, fuchsia_hardware_audio::SampleFormat::kPcmSigned},
+    {4, fuchsia_hardware_audio::SampleFormat::kPcmSigned},
+    {4, fuchsia_hardware_audio::SampleFormat::kPcmFloat},
+    {8, fuchsia_hardware_audio::SampleFormat::kPcmFloat},
+};
+const std::vector<uint32_t> kFrameRates = {1000, 44100, 48000, 19200};
 
 // Unittest ValidateCodecProperties -- the missing, minimal and maximal possibilities
 TEST(ValidateTest, ValidateCodecProperties) {
@@ -58,6 +68,36 @@ TEST(ValidateTest, ValidateCodecProperties) {
                     fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
             }}),
             ZX_OK);
+}
+
+// Unittest ValidateCompositeProperties -- the missing, minimal and maximal possibilities
+TEST(ValidateTest, ValidateCompositeProperties) {
+  EXPECT_EQ(ValidateCompositeProperties(fuchsia_hardware_audio::CompositeProperties{{
+                // manufacturer missing
+                .product = " ",  // minimal value (empty is disallowed)
+                .unique_id = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  //
+                               0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}},
+                .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
+            }}),
+            ZX_OK);
+  EXPECT_EQ(
+      ValidateCompositeProperties(fuchsia_hardware_audio::CompositeProperties{{
+          .manufacturer = " ",  // minimal value (empty is disallowed)
+          .product =            // maximal value
+          "Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name extends to 321X",
+          // unique_id missing
+          .clock_domain = fuchsia_hardware_audio::kClockDomainExternal,
+      }}),
+      ZX_OK);
+  EXPECT_EQ(
+      ValidateCompositeProperties(fuchsia_hardware_audio::CompositeProperties{{
+          .manufacturer =  // maximal value
+          "Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long, which extends to... 321X",
+          // product missing
+          .unique_id = {{}},  // minimal value
+          .clock_domain = fuchsia_hardware_audio::kClockDomainExternal,
+      }}),
+      ZX_OK);
 }
 
 TEST(ValidateTest, ValidateStreamProperties) {

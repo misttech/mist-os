@@ -15,6 +15,7 @@
 namespace media_audio {
 
 class CodecWarningTest : public CodecTest {};
+class CompositeWarningTest : public CompositeTest {};
 class StreamConfigWarningTest : public StreamConfigTest {};
 
 // TODO(https://fxbug.dev/42069012): test non-compliant driver behavior (e.g. min_gain>max_gain).
@@ -276,6 +277,148 @@ TEST_F(CodecWarningTest, StopBeforeSetDaiFormat) {
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
+
+////////////////////
+// Composite tests
+//
+TEST_F(CompositeWarningTest, UnhealthyIsError) {
+  auto fake_driver = MakeFakeComposite();
+  fake_driver->set_health_state(false);
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+
+  EXPECT_TRUE(HasError(device));
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, UnhealthyCanBeRemoved) {
+  auto fake_driver = MakeFakeComposite();
+  fake_driver->set_health_state(false);
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+
+  ASSERT_TRUE(HasError(device));
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+
+  fake_driver->DropComposite();
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_from_error_count(), 1u);
+}
+
+TEST_F(CompositeWarningTest, UnhealthyFailsSetControl) {
+  auto fake_driver = MakeFakeComposite();
+  fake_driver->set_health_state(false);
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(HasError(device));
+
+  EXPECT_FALSE(SetControl(device));
+}
+
+TEST_F(CompositeWarningTest, UnhealthyFailsAddObserver) {
+  auto fake_driver = MakeFakeComposite();
+  fake_driver->set_health_state(false);
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(HasError(device));
+
+  EXPECT_FALSE(AddObserver(device));
+}
+
+// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test:
+//    * device becomes unhealthy before any Device method. Expect method-specific failure +
+//      State::Error notif. Would include Reset, SetDaiFormat, Start, Stop.
+//    * device becomes unhealthy after being Observed / Controlled. Expect both to drop.
+// For this reason, the only "UnhealthyComposite" tests needed at this time are
+// SetControl/AddObserver.
+
+TEST_F(CompositeWarningTest, AlreadyControlledFailsSetControl) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+
+  EXPECT_TRUE(SetControl(device));
+
+  EXPECT_FALSE(SetControl(device));
+  EXPECT_TRUE(IsControlled(device));
+
+  // Even though SetControl failed, the device should still be healthy and configurable.
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, AlreadyObservedFailsAddObserver) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(AddObserver(device));
+
+  EXPECT_FALSE(AddObserver(device));
+
+  // Even though AddObserver failed, the device should still be healthy and configurable.
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, CannotDropUnknownCompositeControl) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+
+  EXPECT_FALSE(DropControl(device));
+
+  // Even though DropControl failed, the device should still be healthy and configurable.
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, CannotDropCompositeControlTwice) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+  ASSERT_TRUE(DropControl(device));
+
+  EXPECT_FALSE(DropControl(device));
+
+  // Even though DropControl failed, the device should still be healthy and configurable.
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+// GetDaiFormats for FakeComposite that fails the GetDaiFormats call
+
+// GetDaiFormats for FakeComposite that returns bad dai_format_sets
 
 ////////////////////
 // StreamConfig tests

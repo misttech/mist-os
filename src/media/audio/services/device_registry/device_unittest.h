@@ -26,6 +26,7 @@
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
+#include "src/media/audio/services/device_registry/testing/fake_composite.h"
 #include "src/media/audio/services/device_registry/testing/fake_device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
@@ -268,6 +269,33 @@ class CodecTest : public DeviceTestBase {
         codec_endpoints->server.TakeChannel(), codec_endpoints->client.TakeChannel(), dispatcher());
     fake_codec->set_is_input(is_input);
     return fake_codec;
+  }
+};
+
+class CompositeTest : public DeviceTestBase {
+ protected:
+  std::unique_ptr<FakeComposite> MakeFakeComposite() {
+    auto composite_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Composite>();
+    EXPECT_TRUE(composite_endpoints.is_ok());
+    auto fake_composite =
+        std::make_unique<FakeComposite>(composite_endpoints->server.TakeChannel(),
+                                        composite_endpoints->client.TakeChannel(), dispatcher());
+    return fake_composite;
+  }
+
+  std::shared_ptr<Device> InitializeDeviceForFakeComposite(
+      const std::unique_ptr<FakeComposite>& driver) {
+    auto composite_client_end = driver->Enable();
+    EXPECT_TRUE(composite_client_end.is_valid());
+    auto device = Device::Create(
+        std::weak_ptr<FakeDevicePresenceWatcher>(device_presence_watcher()), dispatcher(),
+        "Device name", fuchsia_audio_device::DeviceType::kComposite,
+        fuchsia_audio_device::DriverClient::WithComposite(std::move(composite_client_end)));
+
+    RunLoopUntilIdle();
+    EXPECT_FALSE(device->state_ == Device::State::DeviceInitializing) << "Device is initializing";
+
+    return device;
   }
 };
 

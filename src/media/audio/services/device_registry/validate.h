@@ -49,6 +49,9 @@ zx_status_t ValidateCodecProperties(
     std::optional<const fuchsia_hardware_audio::PlugState> plug_state = std::nullopt);
 zx_status_t ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInfo& format_info);
 
+zx_status_t ValidateCompositeProperties(
+    const fuchsia_hardware_audio::CompositeProperties& composite_props);
+
 bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info);
 
 zx_status_t ValidateElements(

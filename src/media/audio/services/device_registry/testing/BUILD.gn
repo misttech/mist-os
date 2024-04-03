@@ -18,6 +18,9 @@ source_set("fakes") {
   sources = [
     "fake_codec.cc",
     "fake_codec.h",
+    "fake_composite.cc",
+    "fake_composite.h",
+    "fake_composite_consts.cc",
     "fake_device_presence_watcher.h",
     "fake_stream_config.cc",
     "fake_stream_config.h",
