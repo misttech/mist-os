@@ -26,11 +26,7 @@ rustc_library("cm_rust") {
   ]
   sources = [ "src/lib.rs" ]
 
-  # TODO: https://fxbug.dev/325448727 - Make Rust support for API levels more systematic.
   features = []
-  if (clang_fuchsia_api_level == CLANG_FUCHSIA_HEAD_VALUE) {
-    features += [ "target_api_level_head" ]
-  }
 
   test_deps = [ "//third_party/rust_crates:difference" ]
 

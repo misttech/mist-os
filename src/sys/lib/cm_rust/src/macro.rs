@@ -170,9 +170,9 @@ fn fidl_decl_derive_impl(input: syn::DeriveInput) -> TokenStream {
                         lazy_static::lazy_static! {
                             static ref DOT: RelativePath = RelativePath::dot();
                         }
-                        #[cfg(feature = "target_api_level_head")]
+                        #[cfg(fuchsia_api_level_at_least = "HEAD")]
                         let dirname = &self.source_dictionary;
-                        #[cfg(not(feature = "target_api_level_head"))]
+                        #[cfg(fuchsia_api_level_less_than = "HEAD")]
                         let dirname = &*DOT;
                         BorrowedSeparatedPath {
                             dirname,

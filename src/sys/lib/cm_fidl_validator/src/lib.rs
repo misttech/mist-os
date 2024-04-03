@@ -36,13 +36,13 @@ impl HasAvailability for fdecl::OfferService {
     }
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 macro_rules! get_source_dictionary {
     ($decl:ident) => {
         $decl.source_dictionary.as_ref()
     };
 }
-#[cfg(not(feature = "target_api_level_head"))]
+#[cfg(fuchsia_api_level_less_than = "HEAD")]
 macro_rules! get_source_dictionary {
     ($decl:ident) => {
         None
@@ -285,7 +285,7 @@ struct ValidationContext<'a> {
     all_runners: HashSet<&'a str>,
     all_resolvers: HashSet<&'a str>,
     all_dictionaries: HashMap<&'a str, Option<&'a fdecl::Ref>>,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     all_configs: HashSet<&'a str>,
     all_environment_names: HashSet<&'a str>,
     strong_dependencies: DirectedGraph<DependencyNode<'a>>,
@@ -571,11 +571,11 @@ impl<'a> ValidationContext<'a> {
                     self.errors.push(Error::CapabilityMustBeBuiltin(DeclType::EventStream))
                 }
             }
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Capability::Dictionary(dictionary) => {
                 self.validate_dictionary_decl(&dictionary);
             }
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Capability::Config(config) => {
                 self.validate_configuration_decl(&config);
             }
@@ -594,7 +594,7 @@ impl<'a> ValidationContext<'a> {
         }
         self.validate_use_paths(&uses);
 
-        #[cfg(feature = "target_api_level_head")]
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
         {
             let mut use_runner_name = None;
             let mut use_runner_source = None;
@@ -610,7 +610,7 @@ impl<'a> ValidationContext<'a> {
             }
             return (use_runner_name, use_runner_source);
         }
-        #[cfg(not(feature = "target_api_level_head"))]
+        #[cfg(fuchsia_api_level_less_than = "HEAD")]
         return (None, None);
     }
 
@@ -729,7 +729,7 @@ impl<'a> ValidationContext<'a> {
                     }
                 }
             }
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Use::Runner(u) => {
                 const DEPENDENCY_TYPE: Option<fdecl::DependencyType> =
                     Some(fdecl::DependencyType::Strong);
@@ -746,7 +746,7 @@ impl<'a> ValidationContext<'a> {
                     AVAILABILITY.as_ref(),
                 );
             }
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Use::Config(u) => {
                 const DEPENDENCY_TYPE: Option<fdecl::DependencyType> =
                     Some(fdecl::DependencyType::Strong);
@@ -778,7 +778,7 @@ impl<'a> ValidationContext<'a> {
         match &program.runner {
             Some(_) =>
             {
-                #[cfg(feature = "target_api_level_head")]
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
                 if use_runner_name.is_some() {
                     if use_runner_name != program.runner.as_ref()
                         || use_runner_source
@@ -914,7 +914,7 @@ impl<'a> ValidationContext<'a> {
             Some(fdecl::Ref::Framework(_)) => {}
             Some(fdecl::Ref::Debug(_)) => {}
             Some(fdecl::Ref::Self_(_)) => {}
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Some(fdecl::Ref::Environment(_)) => {}
             Some(fdecl::Ref::Child(child)) => {
                 if self.validate_child_ref(decl, "source", &child, OfferType::Static)
@@ -1351,7 +1351,7 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn validate_dictionary_decl(&mut self, dictionary: &'a fdecl::Dictionary) {
         let decl = DeclType::Dictionary;
         if check_name(dictionary.name.as_ref(), decl, "name", &mut self.errors) {
@@ -1402,7 +1402,7 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn validate_configuration_decl(&mut self, config: &'a fdecl::Configuration) {
         let decl = DeclType::Configuration;
         if check_name(config.name.as_ref(), decl, "name", &mut self.errors) {
@@ -1757,7 +1757,7 @@ impl<'a> ValidationContext<'a> {
                     }
                 }
             }
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Expose::Dictionary(e) => {
                 let decl = DeclType::ExposeDictionary;
                 self.validate_expose_fields(
@@ -1779,7 +1779,7 @@ impl<'a> ValidationContext<'a> {
                     }
                 }
             }
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Expose::Config(e) => {
                 let decl = DeclType::ExposeConfig;
                 self.validate_expose_fields(
@@ -2167,7 +2167,7 @@ impl<'a> ValidationContext<'a> {
             fdecl::Offer::EventStream(e) => {
                 self.validate_event_stream_offer_fields(e, offer_type);
             }
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Offer::Dictionary(o) => {
                 let decl = DeclType::OfferDictionary;
                 let source_dictionary = get_source_dictionary!(o);
@@ -2202,7 +2202,7 @@ impl<'a> ValidationContext<'a> {
                     self.target_dependency_from_ref(o.target.as_ref()),
                 );
             }
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Offer::Config(o) => {
                 let decl = DeclType::OfferConfig;
                 self.validate_offer_fields(

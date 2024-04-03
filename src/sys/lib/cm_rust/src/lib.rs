@@ -173,7 +173,7 @@ pub struct ComponentDecl {
 
 impl ComponentDecl {
     /// Returns the runner used by this component, or `None` if this is a non-executable component.
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     pub fn get_runner(&self) -> Option<UseRunnerDecl> {
         self.program
             .as_ref()
@@ -301,9 +301,9 @@ pub enum UseDecl {
     Directory(UseDirectoryDecl),
     Storage(UseStorageDecl),
     EventStream(UseEventStreamDecl),
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Runner(UseRunnerDecl),
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Config(UseConfigurationDecl),
 }
 
@@ -313,7 +313,7 @@ pub enum UseDecl {
 pub struct UseServiceDecl {
     pub source: UseSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target_path: Path,
@@ -328,7 +328,7 @@ pub struct UseServiceDecl {
 pub struct UseProtocolDecl {
     pub source: UseSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target_path: Path,
@@ -343,7 +343,7 @@ pub struct UseProtocolDecl {
 pub struct UseDirectoryDecl {
     pub source: UseSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target_path: Path,
@@ -410,26 +410,26 @@ pub struct UseEventStreamDecl {
     pub availability: Availability,
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::UseRunner", source_path = "dictionary")]
 pub struct UseRunnerDecl {
     pub source: UseSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl SourceName for UseRunnerDecl {
     fn source_name(&self) -> &Name {
         &self.source_name
     }
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl UseDeclCommon for UseRunnerDecl {
     fn source(&self) -> &UseSource {
         &self.source
@@ -440,7 +440,7 @@ impl UseDeclCommon for UseRunnerDecl {
     }
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::UseConfiguration", source_path = "name_only")]
@@ -453,14 +453,14 @@ pub struct UseConfigurationDecl {
     pub type_: ConfigValueType,
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl SourceName for UseConfigurationDecl {
     fn source_name(&self) -> &Name {
         &self.source_name
     }
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl UseDeclCommon for UseConfigurationDecl {
     fn source(&self) -> &UseSource {
         &self.source
@@ -486,9 +486,9 @@ pub enum OfferDecl {
     Runner(OfferRunnerDecl),
     Resolver(OfferResolverDecl),
     EventStream(OfferEventStreamDecl),
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Dictionary(OfferDictionaryDecl),
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Config(OfferConfigurationDecl),
 }
 
@@ -530,7 +530,7 @@ impl FidlIntoNative<NameMapping> for fdecl::NameMapping {
 pub struct OfferServiceDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: OfferTarget,
@@ -547,7 +547,7 @@ pub struct OfferServiceDecl {
 pub struct OfferProtocolDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: OfferTarget,
@@ -563,7 +563,7 @@ pub struct OfferProtocolDecl {
 pub struct OfferDirectoryDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: OfferTarget,
@@ -603,7 +603,7 @@ pub struct OfferStorageDecl {
 pub struct OfferRunnerDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: OfferTarget,
@@ -616,21 +616,21 @@ pub struct OfferRunnerDecl {
 pub struct OfferResolverDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::OfferDictionary", source_path = "dictionary")]
 pub struct OfferDictionaryDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: OfferTarget,
@@ -640,7 +640,7 @@ pub struct OfferDictionaryDecl {
     pub availability: Availability,
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::OfferConfiguration", source_path = "name_only")]
@@ -663,9 +663,9 @@ impl SourceName for OfferDecl {
             OfferDecl::Runner(o) => o.source_name(),
             OfferDecl::Resolver(o) => o.source_name(),
             OfferDecl::EventStream(o) => o.source_name(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Dictionary(o) => o.source_name(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Config(o) => o.source_name(),
         }
     }
@@ -681,9 +681,9 @@ impl SourcePath for OfferDecl {
             OfferDecl::Runner(o) => o.source_path(),
             OfferDecl::Resolver(o) => o.source_path(),
             OfferDecl::EventStream(o) => o.source_path(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Dictionary(o) => o.source_path(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Config(o) => o.source_path(),
         }
     }
@@ -697,9 +697,9 @@ impl UseDeclCommon for UseDecl {
             UseDecl::Directory(u) => u.source(),
             UseDecl::Storage(u) => u.source(),
             UseDecl::EventStream(u) => u.source(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Runner(u) => u.source(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Config(u) => u.source(),
         }
     }
@@ -711,9 +711,9 @@ impl UseDeclCommon for UseDecl {
             UseDecl::Directory(u) => u.availability(),
             UseDecl::Storage(u) => u.availability(),
             UseDecl::EventStream(u) => u.availability(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Runner(u) => u.availability(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Config(u) => u.availability(),
         }
     }
@@ -729,9 +729,9 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Runner(o) => o.target_name(),
             OfferDecl::Resolver(o) => o.target_name(),
             OfferDecl::EventStream(o) => o.target_name(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Dictionary(o) => o.target_name(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Config(o) => o.target_name(),
         }
     }
@@ -745,9 +745,9 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Runner(o) => o.target(),
             OfferDecl::Resolver(o) => o.target(),
             OfferDecl::EventStream(o) => o.target(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Dictionary(o) => o.target(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Config(o) => o.target(),
         }
     }
@@ -761,9 +761,9 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Runner(o) => o.source(),
             OfferDecl::Resolver(o) => o.source(),
             OfferDecl::EventStream(o) => o.source(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Dictionary(o) => o.source(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Config(o) => o.source(),
         }
     }
@@ -777,9 +777,9 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Runner(o) => o.availability(),
             OfferDecl::Resolver(o) => o.availability(),
             OfferDecl::EventStream(o) => o.availability(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Dictionary(o) => o.availability(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Config(o) => o.availability(),
         }
     }
@@ -822,9 +822,9 @@ pub enum ExposeDecl {
     Directory(ExposeDirectoryDecl),
     Runner(ExposeRunnerDecl),
     Resolver(ExposeResolverDecl),
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Dictionary(ExposeDictionaryDecl),
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Config(ExposeConfigurationDecl),
 }
 
@@ -836,9 +836,9 @@ impl SourceName for ExposeDecl {
             Self::Directory(e) => e.source_name(),
             Self::Runner(e) => e.source_name(),
             Self::Resolver(e) => e.source_name(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Dictionary(e) => e.source_name(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Config(e) => e.source_name(),
         }
     }
@@ -852,9 +852,9 @@ impl SourcePath for ExposeDecl {
             Self::Directory(e) => e.source_path(),
             Self::Runner(e) => e.source_path(),
             Self::Resolver(e) => e.source_path(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Dictionary(e) => e.source_path(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Config(e) => e.source_path(),
         }
     }
@@ -868,9 +868,9 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Directory(e) => e.source(),
             Self::Runner(e) => e.source(),
             Self::Resolver(e) => e.source(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Dictionary(e) => e.source(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Config(e) => e.source(),
         }
     }
@@ -882,9 +882,9 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Directory(e) => e.target(),
             Self::Runner(e) => e.target(),
             Self::Resolver(e) => e.target(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Dictionary(e) => e.target(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Config(e) => e.target(),
         }
     }
@@ -896,9 +896,9 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Directory(e) => e.target_name(),
             Self::Runner(e) => e.target_name(),
             Self::Resolver(e) => e.target_name(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Dictionary(e) => e.target_name(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Config(e) => e.target_name(),
         }
     }
@@ -910,9 +910,9 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Directory(e) => e.availability(),
             Self::Runner(e) => e.availability(),
             Self::Resolver(e) => e.availability(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Dictionary(e) => e.availability(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Config(e) => e.availability(),
         }
     }
@@ -924,7 +924,7 @@ impl ExposeDeclCommon for ExposeDecl {
 pub struct ExposeServiceDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
@@ -939,7 +939,7 @@ pub struct ExposeServiceDecl {
 pub struct ExposeProtocolDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
@@ -954,7 +954,7 @@ pub struct ExposeProtocolDecl {
 pub struct ExposeDirectoryDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
@@ -982,7 +982,7 @@ pub struct ExposeDirectoryDecl {
 pub struct ExposeRunnerDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
@@ -995,21 +995,21 @@ pub struct ExposeRunnerDecl {
 pub struct ExposeResolverDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
     pub target_name: Name,
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, ExposeDeclCommon, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::ExposeDictionary", source_path = "dictionary")]
 pub struct ExposeDictionaryDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fidl_decl(default_preserve_none)]
     pub source_dictionary: RelativePath,
     pub target: ExposeTarget,
@@ -1018,7 +1018,7 @@ pub struct ExposeDictionaryDecl {
     pub availability: Availability,
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, ExposeDeclCommon, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::ExposeConfiguration", source_path = "name_only")]
@@ -1046,9 +1046,9 @@ pub enum CapabilityDecl {
     Runner(RunnerDecl),
     Resolver(ResolverDecl),
     EventStream(EventStreamDecl),
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Dictionary(DictionaryDecl),
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Config(ConfigurationDecl),
 }
 
@@ -1123,7 +1123,7 @@ pub struct EventStreamDecl {
     pub name: Name,
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Dictionary")]
@@ -1133,7 +1133,7 @@ pub struct DictionaryDecl {
     pub source_dictionary: Option<RelativePath>,
 }
 
-#[cfg(feature = "target_api_level_head")]
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Configuration")]
@@ -1152,9 +1152,9 @@ impl CapabilityDecl {
             CapabilityDecl::Service(decl) => &decl.name,
             CapabilityDecl::Storage(decl) => &decl.name,
             CapabilityDecl::EventStream(decl) => &decl.name,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             CapabilityDecl::Dictionary(decl) => &decl.name,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             CapabilityDecl::Config(decl) => &decl.name,
         }
     }
@@ -1168,9 +1168,9 @@ impl CapabilityDecl {
             CapabilityDecl::Service(decl) => decl.source_path.as_ref(),
             CapabilityDecl::Storage(_) => None,
             CapabilityDecl::EventStream(_) => None,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             CapabilityDecl::Dictionary(_) => None,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             CapabilityDecl::Config(_) => None,
         }
     }
@@ -1924,9 +1924,9 @@ impl UseDecl {
             UseDecl::Directory(d) => Some(&d.target_path),
             UseDecl::Storage(d) => Some(&d.target_path),
             UseDecl::EventStream(d) => Some(&d.target_path),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Runner(_) => None,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Config(_) => None,
         }
     }
@@ -1936,9 +1936,9 @@ impl UseDecl {
             UseDecl::Storage(storage_decl) => Some(&storage_decl.source_name),
             UseDecl::EventStream(_) => None,
             UseDecl::Service(_) | UseDecl::Protocol(_) | UseDecl::Directory(_) => None,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Runner(_) => None,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Config(_) => None,
         }
     }
@@ -1952,9 +1952,9 @@ impl SourceName for UseDecl {
             UseDecl::Protocol(protocol_decl) => &protocol_decl.source_name,
             UseDecl::Directory(directory_decl) => &directory_decl.source_name,
             UseDecl::EventStream(event_stream_decl) => &event_stream_decl.source_name,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Runner(runner_decl) => &runner_decl.source_name,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Config(u) => &u.source_name,
         }
     }
@@ -1968,9 +1968,9 @@ impl SourcePath for UseDecl {
             UseDecl::Directory(u) => u.source_path(),
             UseDecl::Storage(u) => u.source_path(),
             UseDecl::EventStream(u) => u.source_path(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Runner(u) => u.source_path(),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Config(u) => u.source_path(),
         }
     }
@@ -2071,9 +2071,9 @@ impl From<&UseDecl> for CapabilityTypeName {
             UseDecl::Directory(_) => Self::Directory,
             UseDecl::Storage(_) => Self::Storage,
             UseDecl::EventStream(_) => Self::EventStream,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Runner(_) => Self::Runner,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseDecl::Config(_) => Self::Config,
         }
     }
@@ -2089,9 +2089,9 @@ impl From<&OfferDecl> for CapabilityTypeName {
             OfferDecl::Runner(_) => Self::Runner,
             OfferDecl::Resolver(_) => Self::Resolver,
             OfferDecl::EventStream(_) => Self::EventStream,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Dictionary(_) => Self::Dictionary,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OfferDecl::Config(_) => Self::Config,
         }
     }
@@ -2105,9 +2105,9 @@ impl From<&ExposeDecl> for CapabilityTypeName {
             ExposeDecl::Directory(_) => Self::Directory,
             ExposeDecl::Runner(_) => Self::Runner,
             ExposeDecl::Resolver(_) => Self::Resolver,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             ExposeDecl::Dictionary(_) => Self::Dictionary,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             ExposeDecl::Config(_) => Self::Config,
         }
     }
@@ -2123,9 +2123,9 @@ impl From<&CapabilityDecl> for CapabilityTypeName {
             CapabilityDecl::Runner(_) => Self::Runner,
             CapabilityDecl::Resolver(_) => Self::Resolver,
             CapabilityDecl::EventStream(_) => Self::EventStream,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             CapabilityDecl::Dictionary(_) => Self::Dictionary,
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             CapabilityDecl::Config(_) => Self::Config,
         }
     }
@@ -2252,7 +2252,7 @@ pub enum UseSource {
     Self_,
     Capability(Name),
     Child(String),
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Environment,
 }
 
@@ -2265,7 +2265,7 @@ impl std::fmt::Display for UseSource {
             Self::Self_ => write!(f, "self"),
             Self::Capability(c) => write!(f, "capability `{}`", c),
             Self::Child(c) => write!(f, "child `#{}`", c),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Environment => write!(f, "environment"),
         }
     }
@@ -2281,7 +2281,7 @@ impl FidlIntoNative<UseSource> for fdecl::Ref {
             // cm_fidl_validator should have already validated this
             fdecl::Ref::Capability(c) => UseSource::Capability(c.name.parse().unwrap()),
             fdecl::Ref::Child(c) => UseSource::Child(c.name),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Ref::Environment(_) => UseSource::Environment,
             _ => panic!("invalid UseSource variant"),
         }
@@ -2299,7 +2299,7 @@ impl NativeIntoFidl<fdecl::Ref> for UseSource {
                 fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.to_string() })
             }
             UseSource::Child(name) => fdecl::Ref::Child(fdecl::ChildRef { name, collection: None }),
-            #[cfg(feature = "target_api_level_head")]
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseSource::Environment => fdecl::Ref::Environment(fdecl::EnvironmentRef {}),
         }
     }
