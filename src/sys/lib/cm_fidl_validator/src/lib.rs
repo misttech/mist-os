@@ -14,7 +14,7 @@ use {
     fidl_fuchsia_component_decl as fdecl,
     itertools::Itertools,
     std::{
-        collections::{BTreeSet, HashMap, HashSet},
+        collections::{BTreeMap, BTreeSet, HashMap, HashSet},
         fmt,
         path::Path,
     },
@@ -395,9 +395,7 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Validate "config"
-        if let Some(config) = decl.config.as_ref() {
-            self.validate_config(&config);
-        }
+        self.validate_config(decl.config.as_ref(), decl.uses.as_ref());
 
         // Check that there are no strong cyclical dependencies
         if let Err(e) = self.strong_dependencies.topological_sort() {
@@ -424,7 +422,43 @@ impl<'a> ValidationContext<'a> {
 
     // Validates a config schema. Checks that each field's layout matches the expected constraints
     // and properties.
-    fn validate_config(&mut self, config: &fdecl::ConfigSchema) {
+    fn validate_config(
+        &mut self,
+        config: Option<&fdecl::ConfigSchema>,
+        uses: Option<&Vec<fdecl::Use>>,
+    ) {
+        // Get all of the `use` configs that are optional.
+        let optional_use_keys: BTreeMap<String, fdecl::ConfigType> =
+            uses.map_or(BTreeMap::new(), |u| {
+                u.iter()
+                    .map(|u| {
+                        let fdecl::Use::Config(config) = u else {
+                            return None;
+                        };
+                        if config.availability == Some(fdecl::Availability::Required)
+                            || config.availability == None
+                        {
+                            return None;
+                        }
+                        let Some(key) = config.target_name.clone() else {
+                            return None;
+                        };
+                        let Some(value) = config.type_.clone() else {
+                            return None;
+                        };
+                        Some((key, value))
+                    })
+                    .flatten()
+                    .collect()
+            });
+
+        let Some(config) = config else {
+            if !optional_use_keys.is_empty() {
+                self.errors.push(Error::missing_field(DeclType::ConfigField, "config"))
+            }
+            return;
+        };
+
         if let Some(fields) = &config.fields {
             for field in fields {
                 if field.key.is_none() {
@@ -451,9 +485,31 @@ impl<'a> ValidationContext<'a> {
             self.errors.push(Error::missing_field(DeclType::ConfigSchema, "checksum"));
         }
 
-        if config.value_source.is_none() {
-            self.errors.push(Error::missing_field(DeclType::ConfigSchema, "value_source"));
+        'outer: for (key, value) in optional_use_keys.iter() {
+            for field in config.fields.iter().flatten() {
+                if field.key.as_ref() == Some(key) {
+                    if field.type_.as_ref() != Some(value) {
+                        self.errors.push(Error::invalid_field(DeclType::ConfigField, key.clone()));
+                    }
+                    continue 'outer;
+                }
+            }
+            self.errors.push(Error::missing_field(DeclType::ConfigField, key.clone()));
         }
+
+        match config.value_source {
+            None => self.errors.push(Error::missing_field(DeclType::ConfigSchema, "value_source")),
+            Some(fdecl::ConfigValueSource::Capabilities(_)) => {
+                if !optional_use_keys.is_empty() {
+                    self.errors
+                        .push(Error::invalid_field(DeclType::ConfigValueSource, "ValueSource"))
+                }
+            }
+            Some(fdecl::ConfigValueSource::__SourceBreaking { .. }) => {
+                self.errors.push(Error::invalid_field(DeclType::ConfigValueSource, "ValueSource"))
+            }
+            _ => (),
+        };
     }
 
     fn validate_config_type(&mut self, type_: &fdecl::ConfigType, accept_vectors: bool) {
@@ -3098,6 +3154,136 @@ mod tests {
             results = vec![
                 Err(ErrorList::new(vec![
                     Error::pkg_path_overlap(DeclType::UseDirectory, "/pkg/foo"),
+                ])),
+            ],
+        },
+        test_validate_use_optional_config_correct => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.uses = Some(vec![
+                    fdecl::Use::Config(fdecl::UseConfiguration {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        source_name: Some("abc".to_string()),
+                        target_name: Some("foo".to_string()),
+                        availability: Some(fdecl::Availability::Optional),
+                        type_: Some(fdecl::ConfigType {
+                            layout: fdecl::ConfigTypeLayout::Bool,
+                            parameters: Some(Vec::new()),
+                            constraints: Vec::new(),
+                        }),
+                        ..Default::default()
+                    }),
+                ]);
+                decl.config = Some(fdecl::ConfigSchema {
+                    fields: Some(vec![fdecl::ConfigField {
+                        key: Some("foo".into()),
+                        type_: Some(fdecl::ConfigType {
+                            layout: fdecl::ConfigTypeLayout::Bool,
+                            parameters: Some(Vec::new()),
+                            constraints: Vec::new(),
+                        }),
+                        mutability: None,
+                        ..Default::default()}]),
+                    checksum: Some(fdecl::ConfigChecksum::Sha256([0;32])),
+                    value_source: Some(fdecl::ConfigValueSource::PackagePath("path".into())),
+                    ..Default::default()
+                     });
+                decl
+            },
+            results = vec![Ok(())],
+        },
+        test_validate_use_optional_config_no_config_schema => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.uses = Some(vec![
+                    fdecl::Use::Config(fdecl::UseConfiguration {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        source_name: Some("abc".to_string()),
+                        target_name: Some("foo".to_string()),
+                        availability: Some(fdecl::Availability::Optional),
+                        type_: Some(fdecl::ConfigType {
+                            layout: fdecl::ConfigTypeLayout::Bool,
+                            parameters: None,
+                            constraints: Vec::new(),
+                        }),
+                        ..Default::default()
+                    }),
+                ]);
+                decl
+            },
+            results = vec![
+                Err(ErrorList::new(vec![
+                    Error::missing_field(DeclType::ConfigField, "config"),
+                ])),
+            ],
+        },
+        test_validate_use_optional_config_no_config_field => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.uses = Some(vec![
+                    fdecl::Use::Config(fdecl::UseConfiguration {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        source_name: Some("abc".to_string()),
+                        target_name: Some("foo".to_string()),
+                        availability: Some(fdecl::Availability::Optional),
+                        type_: Some(fdecl::ConfigType {
+                            layout: fdecl::ConfigTypeLayout::Bool,
+                            parameters: None,
+                            constraints: Vec::new(),
+                        }),
+                        ..Default::default()
+                    }),
+                ]);
+                decl.config = Some(fdecl::ConfigSchema {
+                    fields: Some(vec![]),
+                    checksum: Some(fdecl::ConfigChecksum::Sha256([0;32])),
+                    value_source: Some(fdecl::ConfigValueSource::PackagePath("path".into())),
+                    ..Default::default()
+                     });
+                decl
+            },
+            results = vec![
+                Err(ErrorList::new(vec![
+                    Error::missing_field(DeclType::ConfigField, "foo"),
+                ])),
+            ],
+        },
+        test_validate_use_optional_config_bad_type => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.uses = Some(vec![
+                    fdecl::Use::Config(fdecl::UseConfiguration {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        source_name: Some("abc".to_string()),
+                        target_name: Some("foo".to_string()),
+                        availability: Some(fdecl::Availability::Optional),
+                        type_: Some(fdecl::ConfigType {
+                            layout: fdecl::ConfigTypeLayout::Bool,
+                            parameters: None,
+                            constraints: Vec::new(),
+                        }),
+                        ..Default::default()
+                    }),
+                ]);
+                decl.config = Some(fdecl::ConfigSchema {
+                    fields: Some(vec![fdecl::ConfigField {
+                        key: Some("foo".into()),
+                        type_: Some(fdecl::ConfigType {
+                            layout: fdecl::ConfigTypeLayout::Int16,
+                            parameters: Some(Vec::new()),
+                            constraints: Vec::new(),
+                        }),
+                        mutability: None,
+                        ..Default::default()}]),
+                    checksum: Some(fdecl::ConfigChecksum::Sha256([0;32])),
+                    value_source: Some(fdecl::ConfigValueSource::PackagePath("path".into())),
+                    ..Default::default()
+                     });
+                decl
+            },
+            results = vec![
+                Err(ErrorList::new(vec![
+                    Error::invalid_field(DeclType::ConfigField, "foo"),
                 ])),
             ],
         },
