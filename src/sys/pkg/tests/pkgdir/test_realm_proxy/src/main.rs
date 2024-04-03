@@ -5,6 +5,7 @@
 use {
     anyhow::{Error, Result},
     blobfs_ramdisk::BlobfsRamdisk,
+    fidl::endpoints,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg_test::*,
     fidl_fuchsia_testing_harness::{OperationError, RealmProxy_RequestStream},
@@ -47,7 +48,7 @@ async fn main() -> Result<(), Error> {
     system_image_package.write_to_blobfs(&blobfs).await;
 
     let blobfs_client = blobfs.client();
-    let (client, server) = fidl::endpoints::create_proxy()?;
+    let (client, server) = endpoints::create_proxy()?;
 
     package_directory::serve(
         vfs::execution_scope::ExecutionScope::new(),
@@ -87,7 +88,7 @@ async fn serve_factory(
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             RealmFactoryRequest::CreateRealm { options: _, dictionary, responder } => {
-                let (client_end, server_end) = fidl::endpoints::create_endpoints();
+                let (client_end, server_end) = endpoints::create_endpoints();
                 if let Err(e) = directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end) {
                     error!("{:?}", e);
                     let _ = responder.send(Err(OperationError::Failed));
@@ -95,15 +96,13 @@ async fn serve_factory(
                 }
                 // TODO(https://fxbug.dev/329496030): We have to use this factory method instead
                 // of creating a Capability::Directory directly - see the bug for details.
-                let client_end = client_end.into_channel();
-                let value = factory.create_directory(client_end.into()).await.unwrap();
-                let output_dict_entries =
-                    vec![fsandbox::DictionaryItem { key: "pkg".into(), value }];
-                let () = factory
-                    .create_dictionary(output_dict_entries, dictionary)
-                    .await
-                    .unwrap()
-                    .unwrap();
+                let (my_dictionary_proxy, server) = endpoints::create_proxy().unwrap();
+                let () = factory.create_dictionary(server).await?;
+                let value =
+                    factory.create_directory(client_end.into_channel().into()).await.unwrap();
+                my_dictionary_proxy.insert("pkg", value).await?.unwrap();
+                my_dictionary_proxy.clone2(dictionary.into_channel().into())?;
+
                 responder.send(Ok(()))?;
             }
             RealmFactoryRequest::_UnknownMethod { .. } => unreachable!(),

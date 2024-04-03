@@ -16,7 +16,7 @@ use {
     fuchsia_zircon::AsHandleRef,
     futures::prelude::*,
     lazy_static::lazy_static,
-    sandbox::{Capability, Dict, Directory, Open, Receiver},
+    sandbox::{Dict, Directory, Open, Receiver},
     std::sync::Arc,
     tracing::warn,
 };
@@ -79,12 +79,13 @@ impl FactoryCapabilityHost {
 
     async fn handle_request(&self, request: fsandbox::FactoryRequest) -> Result<(), fidl::Error> {
         match request {
-            fsandbox::FactoryRequest::CreateSender { receiver, sender, control_handle: _ } => {
+            fsandbox::FactoryRequest::CreateSender { receiver, sender, responder } => {
                 self.create_sender(receiver, sender);
+                responder.send()?;
             }
-            fsandbox::FactoryRequest::CreateDictionary { items, server_end, responder } => {
-                let res = self.create_dictionary(items, server_end);
-                responder.send(res)?;
+            fsandbox::FactoryRequest::CreateDictionary { server_end, responder } => {
+                self.create_dictionary(server_end);
+                responder.send()?;
             }
             fsandbox::FactoryRequest::CreateOpen { client_end, server_end, responder } => {
                 self.create_open(client_end, server_end);
@@ -134,25 +135,10 @@ impl FactoryCapabilityHost {
         fsandbox::Capability::Directory(client_end)
     }
 
-    fn create_dictionary(
-        &self,
-        items: Vec<fsandbox::DictionaryItem>,
-        server_end: ServerEnd<fsandbox::DictionaryMarker>,
-    ) -> Result<(), fsandbox::DictionaryError> {
+    fn create_dictionary(&self, server_end: ServerEnd<fsandbox::DictionaryMarker>) {
         let dict = Dict::new();
-        let mut entries = dict.lock_entries();
-        for item in items {
-            let key = item.key.parse().map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
-            let cap = Capability::try_from(item.value)
-                .map_err(|_| fsandbox::DictionaryError::BadCapability)?;
-            if entries.insert(key, cap).is_some() {
-                return Err(fsandbox::DictionaryError::AlreadyExists);
-            }
-        }
-        drop(entries);
         let client_end_koid = server_end.basic_info().unwrap().related_koid;
         dict.serve_and_register(server_end.into_stream().unwrap(), client_end_koid);
-        Ok(())
     }
 }
 
@@ -186,21 +172,8 @@ mod tests {
     use {
         fidl::endpoints,
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_zircon::{self as zx, HandleBased},
-        sandbox::OneShotHandle,
+        fuchsia_zircon::{self as zx},
     };
-
-    async fn get_handle_from_fidl_capability(capability: fsandbox::Capability) -> zx::Handle {
-        let fsandbox::Capability::Handle(handle_capability) = capability else {
-            panic!("unexpected FIDL Capability variant");
-        };
-        let handle_capability = handle_capability.into_proxy().unwrap();
-        handle_capability
-            .get_handle()
-            .await
-            .expect("failed to call GetHandle")
-            .expect("GetHandle returned an error")
-    }
 
     #[fuchsia::test]
     async fn create_sender() {
@@ -217,7 +190,7 @@ mod tests {
             endpoints::create_proxy::<fsandbox::SenderMarker>().unwrap();
         let (receiver_client_end, mut receiver_stream) =
             endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
-        factory_proxy.create_sender(receiver_client_end, sender_server_end).unwrap();
+        let () = factory_proxy.create_sender(receiver_client_end, sender_server_end).await.unwrap();
 
         let (ch1, _ch2) = zx::Channel::create();
         let expected_koid = ch1.get_koid().unwrap();
@@ -262,58 +235,12 @@ mod tests {
             host.serve(stream).await.unwrap();
         });
 
-        // Create a dict with items that contain `OneShotHandle`s, and get the handle koids.
-        let (items, expected_koids): (Vec<_>, Vec<_>) = (0..2)
-            .into_iter()
-            .map(|i| {
-                let event = zx::Event::create();
-                let key = format!("key{}", i);
-                let koid = event.get_koid().unwrap();
-                let value: fsandbox::Capability = OneShotHandle::from(event.into_handle()).into();
-                (fsandbox::DictionaryItem { key, value }, koid)
-            })
-            .unzip();
         let (dict_proxy, server_end) =
             endpoints::create_proxy::<fsandbox::DictionaryMarker>().unwrap();
-        factory_proxy.create_dictionary(items, server_end).await.unwrap().unwrap();
+        let () = factory_proxy.create_dictionary(server_end).await.unwrap();
 
-        // Read the items back from the dict.
+        // The dictionary is empty.
         let items = dict_proxy.read().await.unwrap();
-
-        assert_eq!(items.len(), 2);
-
-        // Each item's key koid should match the item passed to CreateDict.
-        for (i, item) in items.into_iter().enumerate() {
-            assert_eq!(item.key, format!("key{}", i));
-            let handle = get_handle_from_fidl_capability(item.value).await;
-            assert!(handle.get_koid().unwrap() == expected_koids[i]);
-        }
-    }
-
-    #[fuchsia::test]
-    async fn create_dict_err() {
-        let mut tasks = fasync::TaskGroup::new();
-
-        let host = FactoryCapabilityHost::new();
-        let (factory_proxy, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::FactoryMarker>().unwrap();
-        tasks.spawn(async move {
-            host.serve(stream).await.unwrap();
-        });
-
-        let items: Vec<_> = (0..2)
-            .into_iter()
-            .map(|_| {
-                let event = zx::Event::create();
-                let key = "dup_key".into();
-                let value: fsandbox::Capability = OneShotHandle::from(event.into_handle()).into();
-                fsandbox::DictionaryItem { key, value }
-            })
-            .collect();
-        let (_, server_end) = endpoints::create_proxy::<fsandbox::DictionaryMarker>().unwrap();
-        assert_eq!(
-            factory_proxy.create_dictionary(items, server_end).await.unwrap().unwrap_err(),
-            fsandbox::DictionaryError::AlreadyExists,
-        );
+        assert_eq!(items.len(), 0);
     }
 }

@@ -341,7 +341,8 @@ pub async fn start_with_dict() {
         .expect("failed to connect to fuchsia.component.sandbox.Factory");
 
     // Create a Dictionary that will be passed to StartChild, containing an Open capability for the Echo protocol.
-    let (dictionary_client, dictionary_server) = create_endpoints::<fsandbox::DictionaryMarker>();
+    let (dictionary_client, dictionary_server) =
+        create_proxy::<fsandbox::DictionaryMarker>().unwrap();
 
     // StartChild dictionary entries must be Open capabilities.
     // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once it exists
@@ -391,16 +392,12 @@ pub async fn start_with_dict() {
         .await
         .expect("failed to call CreateOpen");
 
-    let items = vec![fsandbox::DictionaryItem {
-        key: "fidl.examples.routing.echo.Echo".to_string(),
-        value: fsandbox::Capability::Open(echo_open_cap_client),
-    }];
-
-    let () = factory
-        .create_dictionary(items, dictionary_server)
+    let () = factory.create_dictionary(dictionary_server).await.unwrap();
+    dictionary_client
+        .insert("fidl.examples.routing.echo.Echo", fsandbox::Capability::Open(echo_open_cap_client))
         .await
-        .expect("failed to call CreateDictionary")
-        .expect("failed to create Dictionary");
+        .unwrap()
+        .unwrap();
 
     let (_execution_controller_proxy, execution_controller_server_end) =
         create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
@@ -408,7 +405,7 @@ pub async fn start_with_dict() {
         .controller_proxy
         .start(
             fcomponent::StartChildArgs {
-                dictionary: Some(dictionary_client),
+                dictionary: Some(dictionary_client.into_client_end().unwrap()),
                 ..Default::default()
             },
             execution_controller_server_end,

@@ -4,7 +4,7 @@
 
 use {
     anyhow::{Error, Result},
-    fidl::endpoints::{self},
+    fidl::endpoints,
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_test_echoserver::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOptions},
     fuchsia_async as fasync,
@@ -33,8 +33,9 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
 
                     // Get a dict containing the capabilities exposed by the realm.
                     let (expose_dict, server_end) = endpoints::create_proxy().unwrap();
+                    let (my_dictionary_proxy, server) = endpoints::create_proxy().unwrap();
                     realm.root.controller().get_exposed_dictionary(server_end).await?.unwrap();
-                    let mut output_dict_entries = expose_dict.read().await?;
+                    let () = expose_dict.copy(server)?;
 
                     // Mix in additional capabilities to the dict.
                     //
@@ -56,16 +57,15 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                     let (echo_receiver_client, echo_receiver_stream) =
                         endpoints::create_request_stream::<fsandbox::ReceiverMarker>()?;
                     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>()?;
-                    let () = factory.create_sender(echo_receiver_client, echo_sender_server)?;
-
-                    output_dict_entries.push(fsandbox::DictionaryItem {
-                        key: format!("reverse-echo"),
-                        value: fsandbox::Capability::Sender(echo_sender_client),
-                    });
-
-                    // Create the dict containing the capabilities to pass to the test.
                     let () =
-                        factory.create_dictionary(output_dict_entries, dictionary).await?.unwrap();
+                        factory.create_sender(echo_receiver_client, echo_sender_server).await?;
+                    my_dictionary_proxy
+                        .insert("reverse-echo", fsandbox::Capability::Sender(echo_sender_client))
+                        .await?
+                        .unwrap();
+
+                    // Bind the dict.
+                    my_dictionary_proxy.clone2(dictionary.into_channel().into())?;
 
                     // Serve the mixed-in capability.
                     task_group.spawn(async move {

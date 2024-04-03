@@ -175,14 +175,12 @@ open protocol Factory {
     flexible CreateSender(resource struct {
         receiver client_end:Receiver;
         sender server_end:Sender;
-    });
+    }) -> ();
 
-    /// Creates a [`Dictionary`] initialized with `items`.
+    /// Creates a new empty [`Dictionary`].
     flexible CreateDictionary(resource struct {
-        // TODO(https://fxbug.dev/306043410): Accept a DictionaryIterator
-        items vector<DictionaryItem>:MAX;
         server_end server_end:Dictionary;
-    }) -> () error DictionaryError;
+    }) -> ();
 
     /// Creates an [`Open`] capability that issues Open calls on
     /// an another [`Openable`].
