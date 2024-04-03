@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -350,9 +349,9 @@ void SimpleDisplay::DisplayControllerImplApplyConfiguration(
 }
 
 zx_status_t SimpleDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  // DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV2> can't be used
+  // DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1> can't be used
   // here becuase it wants to create the endpoints, but in this case we have the server_end only.
-  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV2;
+  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
   auto status = device_connect_fragment_fidl_protocol(parent_, "sysmem", ServiceMember::ServiceName,
                                                       ServiceMember::Name, connection.release());
   if (status != ZX_OK) {

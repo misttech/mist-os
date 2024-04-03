@@ -23,8 +23,8 @@ fuchsia_driver("acpi-arm64-driver") {
   deps = [
     ":acpi-arm64-bind",
     "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
-    "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/board/lib/acpi",
     "//src/devices/board/lib/smbios",

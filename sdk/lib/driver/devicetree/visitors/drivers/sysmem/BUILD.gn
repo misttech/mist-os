@@ -10,7 +10,7 @@ devicetree_visitor("sysmem-visitor") {
     "sysmem-visitor.h",
   ]
   deps = [
-    "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/lib/driver/devicetree/manager",
     "//sdk/lib/driver/devicetree/visitors:driver-visitor",
     "//sdk/lib/driver/devicetree/visitors:registration",

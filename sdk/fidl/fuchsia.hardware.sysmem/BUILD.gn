@@ -9,6 +9,7 @@ fidl("fuchsia.hardware.sysmem") {
   sources = [
     "driver_connector.fidl",
     "heap.fidl",
+    "metadata.fidl",
     "sysmem.fidl",
   ]
   public_deps = [

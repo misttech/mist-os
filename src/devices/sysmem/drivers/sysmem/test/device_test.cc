@@ -184,7 +184,7 @@ class FakeDdkSysmem : public zxtest::Test {
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(endpoints.is_ok());
 
-    runSyncOnLoop(pdev_loop_, [this, server = std::move(endpoints->server)]() mutable {
+    RunSyncOnLoop(pdev_loop_, [this, server = std::move(endpoints->server)]() mutable {
       outgoing_.emplace(pdev_loop_.dispatcher());
       auto device_handler =
           [this](fidl::ServerEnd<fuchsia_hardware_platform_device::Device> request) {
@@ -210,7 +210,7 @@ class FakeDdkSysmem : public zxtest::Test {
     EXPECT_OK(sysmem_->zxdev()->WaitUntilUnbindReplyCalled());
     std::ignore = sysmem_.release();
     loop_.Shutdown();
-    runSyncOnLoop(pdev_loop_, [this] { outgoing_.reset(); });
+    RunSyncOnLoop(pdev_loop_, [this] { outgoing_.reset(); });
   }
 
   fidl::ClientEnd<fuchsia_sysmem::Allocator> Connect() {
@@ -243,7 +243,7 @@ class FakeDdkSysmem : public zxtest::Test {
     return std::move(collection_client_end);
   }
 
-  void runSyncOnLoop(async::Loop& loop, fit::closure to_run) {
+  void RunSyncOnLoop(async::Loop& loop, fit::closure to_run) {
     sync_completion_t done;
     ZX_ASSERT(ZX_OK ==
               async::PostTask(loop.dispatcher(), [&done, to_run = std::move(to_run)]() mutable {

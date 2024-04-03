@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 library fuchsia.sysmem;
 
-// Describes how a client will access the contents of a buffer.
+/// Describes how a client will access the contents of a buffer.
 // TODO(https://fxbug.dev/42107169): change struct to table
+@available(added=7, deprecated=19)
 type BufferUsage = struct {
     none uint32;
     cpu uint32;

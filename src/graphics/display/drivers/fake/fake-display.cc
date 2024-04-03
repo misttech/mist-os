@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -130,14 +131,17 @@ zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
            sysmem_client_result.status_string());
     return sysmem_client_result.error_value();
   }
-  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(sysmem_client_result).value());
+  sysmem_ = fidl::SyncClient(std::move(sysmem_client_result.value()));
 
   std::string debug_name = fxl::StringPrintf("fake-display[%lu]", fsl::GetCurrentProcessKoid());
-  auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
-      fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
-  if (!set_debug_status.ok()) {
-    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
-    return set_debug_status.status();
+  fuchsia_sysmem::AllocatorSetDebugClientInfoRequest request;
+  request.name() = std::move(debug_name);
+  request.id() = fsl::GetCurrentProcessKoid();
+  auto set_debug_status = sysmem_->SetDebugClientInfo(std::move(request));
+  if (!set_debug_status.is_ok()) {
+    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s",
+           set_debug_status.error_value().status_string());
+    return set_debug_status.error_value().status();
   }
 
   return ZX_OK;
@@ -201,8 +205,6 @@ zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(
     return ZX_ERR_ALREADY_EXISTS;
   }
 
-  ZX_DEBUG_ASSERT_MSG(sysmem_allocator_client_.is_valid(), "sysmem allocator is not initialized");
-
   auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   if (!endpoints.is_ok()) {
     zxlogf(ERROR, "Cannot create sysmem BufferCollection endpoints: %s", endpoints.status_string());
@@ -210,12 +212,14 @@ zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(
   }
   auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
 
-  auto bind_result = sysmem_allocator_client_->BindSharedCollection(
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),
-      std::move(collection_server_endpoint));
-  if (!bind_result.ok()) {
+  fuchsia_sysmem::AllocatorBindSharedCollectionRequest bind_request;
+  bind_request.token() =
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token));
+  bind_request.buffer_collection_request() = std::move(collection_server_endpoint);
+  auto bind_result = sysmem_->BindSharedCollection(std::move(bind_request));
+  if (bind_result.is_error()) {
     zxlogf(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
-           bind_result.status_string());
+           bind_result.error_value().status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -413,11 +417,11 @@ void FakeDisplay::DisplayControllerImplSetEld(uint64_t display_id, const uint8_t
                                               size_t raw_eld_count) {}
 
 zx_status_t FakeDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  // We can't use DdkConnectFragmentFidlProtocol here because it wants to create the endpoints but
-  // we only have the server_end here.
+  // DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1> can't be used
+  // here becuase it wants to create the endpoints, but in this case we have the server_end only.
   using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
   zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent_, "sysmem", ServiceMember::ServiceName, ServiceMember::Name, connection.release());
+      parent(), "sysmem", ServiceMember::ServiceName, ServiceMember::Name, connection.release());
   if (status != ZX_OK) {
     return status;
   }
@@ -473,8 +477,6 @@ fuchsia_sysmem::BufferCollectionConstraints FakeDisplay::CreateBufferCollectionC
       }
     }
   }
-  // format_constraints_count <= kPixelFormats.size(), so this should always
-  // hold true.
   ZX_DEBUG_ASSERT(format_constraints_count <= std::numeric_limits<uint32_t>::max());
   constraints.image_format_constraints_count() = static_cast<uint32_t>(format_constraints_count);
   return constraints;

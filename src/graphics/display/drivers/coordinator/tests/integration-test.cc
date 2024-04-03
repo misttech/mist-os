@@ -103,15 +103,14 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
   // |TestBase|
   void SetUp() override {
     TestBase::SetUp();
-    zx::result<fidl::Endpoints<sysmem::Allocator>> endpoints =
-        fidl::CreateEndpoints<sysmem::Allocator>();
-    ASSERT_OK(endpoints.status_value());
-    auto& [client, server] = endpoints.value();
-    EXPECT_TRUE(sysmem_fidl()->ConnectV1(std::move(server)).ok());
-    sysmem_ = fidl::WireSyncClient(std::move(client));
-    const fidl::OneWayStatus status = sysmem_->SetDebugClientInfo(
-        fidl::StringView::FromExternal(fsl::GetCurrentProcessName()), fsl::GetCurrentProcessKoid());
-    EXPECT_OK(status.status());
+    auto sysmem = fidl::SyncClient(ConnectToSysmemAllocatorV1());
+    EXPECT_TRUE(sysmem.is_valid());
+    fuchsia_sysmem::AllocatorSetDebugClientInfoRequest request;
+    request.name() = fsl::GetCurrentProcessName();
+    request.id() = fsl::GetCurrentProcessKoid();
+    auto set_debug_result = sysmem->SetDebugClientInfo(std::move(request));
+    EXPECT_TRUE(set_debug_result.is_ok());
+    sysmem_ = fidl::WireSyncClient<fuchsia_sysmem::Allocator>(sysmem.TakeClientEnd());
   }
 
   // |TestBase|

@@ -40,42 +40,11 @@ zx_status_t sysmem_bind(void* driver_ctx, zx_device_t* parent_device) {
 
   auto device = std::make_unique<Device>(parent_device, driver);
 
-  zx_status_t status = device->Bind();
+  zx_status_t status = Device::Bind(std::move(device));
   if (status != ZX_OK) {
     DRIVER_ERROR("Bind() failed: %s\n", zx_status_get_string(status));
     return status;
   }
-
-  // The device has bound successfully so it is owned by the DDK now.
-  auto device_ptr = device.release();
-
-  // Create a second device to serve the Banjo protocol. This is necessary
-  // so the banjo and FIDL devices can both be children of one device.
-  // This will be removed when all sysmem clients are migrated to FIDL.
-  auto banjo_device = std::make_unique<BanjoDevice>(device_ptr->zxdev(), device_ptr);
-  status = banjo_device->Bind();
-  if (status != ZX_OK) {
-    DRIVER_ERROR("Bind() failed for Banjo device: %s\n", zx_status_get_string(status));
-    return status;
-  }
-  [[maybe_unused]] auto ptr2 = banjo_device.release();
-
-  // Create a second device to serve the FIDL protocols.  This is temporary while we migrate sysmem
-  // clients from Banjo to FIDL.  It is a child of the sysmem device so that the parent is
-  // guaranteed to outlive it.
-  //
-  // We use device_ptr->dispatcher() to keep Allocator and other protocols on the same thread, in
-  // contrast to using fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher())
-  // which woudldn't, unless/until we move all protocols to that dispatcher.  We may have some
-  // redundant (but mostly harmless) posting back to this same dispatcher for historical reasons.
-  auto fidl_device =
-      std::make_unique<FidlDevice>(device_ptr->zxdev(), device_ptr, device_ptr->dispatcher());
-  status = fidl_device->Bind();
-  if (status != ZX_OK) {
-    DRIVER_ERROR("Bind() failed for FIDL device: %s\n", zx_status_get_string(status));
-    return status;
-  }
-  [[maybe_unused]] auto ptr3 = fidl_device.release();
 
   return ZX_OK;
 }

@@ -75,8 +75,8 @@ class FakeDisplayTest : public testing::Test {
 
   fake_display::FakeDisplay* display() { return tree_->display(); }
 
-  const fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector>& sysmem_fidl() {
-    return tree_->sysmem_client();
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> ConnectToSysmemAllocatorV1() {
+    return fidl::WireSyncClient(tree_->ConnectToSysmemAllocatorV1());
   }
 
   MockDevice* mock_root() const { return mock_root_.get(); }
@@ -208,13 +208,8 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
 
   void SetUp() override {
     FakeDisplayTest::SetUp();
-
-    zx::result<fidl::Endpoints<fuchsia_sysmem::Allocator>> sysmem_endpoints =
-        fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-    ASSERT_OK(sysmem_endpoints.status_value());
-    auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
-    EXPECT_TRUE(sysmem_fidl()->ConnectV1(std::move(sysmem_server)).ok());
-    sysmem_ = fidl::WireSyncClient(std::move(sysmem_client));
+    sysmem_ = ConnectToSysmemAllocatorV1();
+    EXPECT_TRUE(sysmem_.is_valid());
   }
 
   void TearDown() override {

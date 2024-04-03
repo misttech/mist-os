@@ -4,7 +4,7 @@
 
 #include "sysmem-visitor.h"
 
-#include <fuchsia/sysmem/c/banjo.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <lib/driver/devicetree/visitors/registration.h>
 #include <lib/driver/logging/cpp/logger.h>
 
@@ -30,7 +30,7 @@ zx::result<> SysmemVisitor::DriverVisit(fdf_devicetree::Node& node,
     return zx::ok();
   }
 
-  sysmem_metadata_t sysmem_metadata = {};
+  fuchsia_hardware_sysmem::wire::Metadata sysmem_metadata = {};
   sysmem_metadata.vid = vid->second.AsUint32().value_or(0);
   sysmem_metadata.pid = pid->second.AsUint32().value_or(0);
 
@@ -44,7 +44,7 @@ zx::result<> SysmemVisitor::DriverVisit(fdf_devicetree::Node& node,
       reinterpret_cast<const uint8_t*>(&sysmem_metadata) + sizeof(sysmem_metadata));
 
   fuchsia_hardware_platform_bus::Metadata metadata = {{
-      .type = SYSMEM_METADATA_TYPE,
+      .type = fuchsia_hardware_sysmem::wire::kMetadataType,
       .data = std::move(serialized),
   }};
 

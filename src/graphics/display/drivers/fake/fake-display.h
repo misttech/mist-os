@@ -198,7 +198,7 @@ class FakeDisplay : public DeviceType,
   mutable fbl::Mutex capture_mutex_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
+  fidl::SyncClient<fuchsia_sysmem::Allocator> sysmem_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,

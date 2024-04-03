@@ -27,12 +27,12 @@
 // Temporary solution for logging in driver and non-driver contexts by logging to stderr.
 // TODO(b/299990391): Replace with syslog logging interface that accommodates both driver and
 // non-driver contexts, when available.
-#define LOG(severity, format, ...)                             \
-  do {                                                         \
-    static_assert(true || DDK_LOG_##severity);                 \
-    if (DDK_LOG_##severity >= DDK_LOG_INFO) {                  \
-      fprintf(stderr, "metrics_buffer" format, ##__VA_ARGS__); \
-    }                                                          \
+#define LOG(severity, format, ...)                                  \
+  do {                                                              \
+    static_assert(true || DDK_LOG_##severity);                      \
+    if (DDK_LOG_##severity >= DDK_LOG_INFO) {                       \
+      fprintf(stderr, "metrics_buffer" format "\n", ##__VA_ARGS__); \
+    }                                                               \
   } while (0)
 
 #endif  // SRC_LIB_METRICS_BUFFER_LOG_H_

@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
 
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
@@ -31,7 +32,8 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
   pdev_fidl_.SetConfig({
       .use_fake_bti = true,
   });
-  mock_root_->SetMetadata(SYSMEM_METADATA_TYPE, &sysmem_metadata_, sizeof(sysmem_metadata_));
+  mock_root_->SetMetadata(fuchsia_hardware_sysmem::wire::kMetadataType, &sysmem_metadata_,
+                          sizeof(sysmem_metadata_));
 
   // Protocols for sysmem
   pdev_loop_.StartThread("pdev-server-thread");
@@ -54,19 +56,23 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
              zx_status_get_string(result));
   }
 
+  // Sysmem device was created as a child under mock_root by the caller.
   sysmem_device_ = mock_root_->GetLatestChild();
-  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::DriverConnector>();
-  fidl::BindServer(sysmem_loop_.dispatcher(), std::move(sysmem_endpoints->server),
-                   sysmem_->DriverConnectorServer());
-  sysmem_loop_.StartThread("sysmem-server-thread");
-  sysmem_client_ = fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector>(
-      std::move(sysmem_endpoints->client));
-
-  // Fragment for fake-display
+  // In mock-ddk, in order for a driver (fake-display) to access a fragment FIDL service
+  // (fuchsia.hardware.sysmem/Service), the service outgoing directory must be added to the the
+  // parent MockDevice (mock_root_) directly. There's no capability routing between MockDevices.
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> sysmem_service_dir_client_result =
+      sysmem_->CloneServiceDirClient();
+  if (sysmem_service_dir_client_result.is_error()) {
+    ZX_PANIC("CloneServiceDirClient failed: %s", sysmem_service_dir_client_result.status_string());
+  }
+  fidl::ClientEnd<fuchsia_io::Directory> sysmem_service_dir_client_end =
+      std::move(sysmem_service_dir_client_result.value());
+  // Fragments for fake-display
+  mock_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name,
+                             /*ns=*/std::move(sysmem_service_dir_client_end), "sysmem");
   mock_root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
                              /*ns=*/ConnectToOutgoingServiceDirectory(), "pdev");
-  mock_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name,
-                             /*ns=*/ConnectToOutgoingServiceDirectory(), "sysmem");
 
   display_ = new fake_display::FakeDisplay(mock_root_.get(), device_config, inspect::Inspector{});
   if (auto status = display_->Bind(); status != ZX_OK) {
@@ -107,30 +113,12 @@ void FakeDisplayStack::SetUpOutgoingServices() {
         fidl::BindServer(pdev_loop_.dispatcher(), std::move(request), &pdev_fidl_);
       }});
 
-  fuchsia_hardware_sysmem::Service::InstanceHandler sysmem_service_handler({
-      .sysmem = [](fidl::ServerEnd<fuchsia_hardware_sysmem::Sysmem> server) {},
-      .allocator_v1 =
-          [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> server) {
-            fidl::OneWayStatus result = sysmem_client_->ConnectV1(std::move(server));
-            ZX_ASSERT(result.ok());
-          },
-      .allocator_v2 =
-          [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> server) {
-            fidl::OneWayStatus result = sysmem_client_->ConnectV2(std::move(server));
-            ZX_ASSERT(result.ok());
-          },
-  });
-
   libsync::Completion add_services_complete;
   async::TaskClosure add_services_task([&] {
     zx::result<> add_platform_device_service_result =
         outgoing_->AddService<fuchsia_hardware_platform_device::Service>(
             std::move(platform_device_service_handler));
     ZX_ASSERT(add_platform_device_service_result.is_ok());
-
-    zx::result<> add_sysmem_service_result =
-        outgoing_->AddService<fuchsia_hardware_sysmem::Service>(std::move(sysmem_service_handler));
-    ZX_ASSERT(add_sysmem_service_result.is_ok());
     add_services_complete.Signal();
   });
   ZX_ASSERT(add_services_task.Post(service_loop_.dispatcher()) == ZX_OK);
@@ -156,9 +144,20 @@ const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& FakeDisplayStack
   return display_provider_client_;
 }
 
-const fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector>&
-FakeDisplayStack::sysmem_client() {
-  return sysmem_client_;
+fidl::ClientEnd<fuchsia_sysmem::Allocator> FakeDisplayStack::ConnectToSysmemAllocatorV1() {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
+  if (endpoints.is_error()) {
+    ZX_PANIC("CreateEndpoints failed - status: %s", endpoints.status_string());
+  }
+  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
+  zx_status_t status = device_connect_fragment_fidl_protocol(
+      mock_root_.get(), "sysmem", ServiceMember::ServiceName, ServiceMember::Name,
+      endpoints->server.TakeChannel().release());
+  if (status != ZX_OK) {
+    ZX_PANIC("device_connect_fragment_fidl_protocol failed - status: %s",
+             zx_status_get_string(status));
+  }
+  return std::move(endpoints->client);
 }
 
 void FakeDisplayStack::SyncShutdown() {
@@ -168,12 +167,9 @@ void FakeDisplayStack::SyncShutdown() {
   }
   shutdown_ = true;
 
-  // Stop serving display and sysmem async loops so that the devices can be
-  // safely torn down.
+  // Stop serving display loop so that the device can be safely torn down.
   display_loop_.Shutdown();
-  sysmem_loop_.Shutdown();
   display_loop_.JoinThreads();
-  sysmem_loop_.JoinThreads();
 
   coordinator_controller_->DdkAsyncRemove();
   display_->DdkAsyncRemove();

@@ -10,8 +10,10 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/fit/thread_checker.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/channel.h>
 #include <threads.h>
@@ -58,11 +60,17 @@ class SysmemProxyDevice final : public DdkDeviceType2 {
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease() { delete this; }
 
+  // fuchsia_hardware_sysmem::DriverConnector impl
+  //
+  // Drivers (and fake drivers) shouldn't be using DriverConnector, but continue serving it for now
+  // until we've removed all usages from drivers (DriverConnector is for sysmem-connector not for
+  // drivers, which should use fuchsia_hardware_sysmem::Service::AllocatorV1 or AllocatorV2).
   void ConnectV1(ConnectV1RequestView request, ConnectV1Completer::Sync& completer) override;
   void ConnectV2(ConnectV2RequestView request, ConnectV2Completer::Sync& completer) override;
   void SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView request,
                               SetAuxServiceDirectoryCompleter::Sync& completer) override;
 
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> CloneServiceDirClientForTests();
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
 
  private:
@@ -70,6 +78,10 @@ class SysmemProxyDevice final : public DdkDeviceType2 {
   inspect::Inspector inspector_;
   async::Loop loop_;
   thrd_t loop_thrd_;
+
+  // std::optional<> so we can init on the loop_ thread
+  std::optional<component::OutgoingDirectory> service_outgoing_;
+  fidl::ClientEnd<fuchsia_io::Directory> service_client_for_tests_;
 };
 
 }  // namespace display

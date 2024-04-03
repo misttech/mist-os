@@ -14,6 +14,7 @@ using zx;
 /// Constraints on BufferCollection parameters.  These constraints can be
 /// specified per-participant.  The sysmem service implements aggregation of
 /// constraints from multiple participants.
+@available(added=7, deprecated=19)
 type BufferCollectionConstraints = struct {
     /// The usage is only meant as a hint to help sysmem choose a more optimal
     /// PixelFormat or similar when multiple compatible options exist.
@@ -110,7 +111,7 @@ type BufferCollectionConstraints = struct {
     image_format_constraints array<ImageFormatConstraints, 32>;
 };
 
-@available(added=7, deprecated=9, removed=HEAD)
+@available(added=7, deprecated=9, removed=19)
 type BufferCollectionConstraintsAuxBuffers = struct {
     /// If true, a secure heap may only be selected if all participants with
     /// BufferMemoryConstraints specify allow_clear_aux_buffers_for_secure.  If
@@ -178,6 +179,7 @@ type BufferCollectionInfo_2 = resource struct {
     buffers array<VmoBuffer, 64>;
 };
 
+@available(added=7, deprecated=19)
 type SingleBufferInfo = resource struct {
     settings SingleBufferSettings;
     buffer VmoBuffer;
@@ -220,6 +222,7 @@ type HeapType = strict enum : uint64 {
     GOLDFISH_HOST_VISIBLE = 0x1000000000020001;
 };
 
+@available(added=7, deprecated=19)
 type BufferMemoryConstraints = struct {
     @allow_deprecated_struct_defaults
     min_size_bytes uint32 = 0;

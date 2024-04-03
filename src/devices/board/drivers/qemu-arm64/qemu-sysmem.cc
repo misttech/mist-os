@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fuchsia/sysmem/c/banjo.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
@@ -23,7 +23,7 @@ zx_status_t QemuArm64::SysmemInit() {
       }},
   };
 
-  constexpr sysmem_metadata_t kSysmemMetadata = {
+  constexpr fuchsia_hardware_sysmem::wire::Metadata kSysmemMetadata = {
       .vid = PDEV_VID_QEMU,
       .pid = PDEV_PID_QEMU,
       // no protected pool
@@ -34,7 +34,7 @@ zx_status_t QemuArm64::SysmemInit() {
 
   std::vector<fpbus::Metadata> kSysmemMetadataList{
       {{
-          .type = SYSMEM_METADATA_TYPE,
+          .type = fuchsia_hardware_sysmem::wire::kMetadataType,
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&kSysmemMetadata),
               reinterpret_cast<const uint8_t*>(&kSysmemMetadata) + sizeof(kSysmemMetadata)),

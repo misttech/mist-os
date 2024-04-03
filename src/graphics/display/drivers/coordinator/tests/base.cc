@@ -85,8 +85,8 @@ bool TestBase::RunLoopWithTimeoutOrUntil(fit::function<bool()>&& condition, zx::
   return result->load();
 }
 
-const fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector>& TestBase::sysmem_fidl() {
-  return tree_->sysmem_client();
+fidl::ClientEnd<fuchsia_sysmem::Allocator> TestBase::ConnectToSysmemAllocatorV1() {
+  return tree_->ConnectToSysmemAllocatorV1();
 }
 const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& TestBase::display_fidl() {
   return tree_->display_client();

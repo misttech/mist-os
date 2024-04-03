@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fuchsia/sysmem/c/banjo.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
@@ -21,7 +21,7 @@ static const std::vector<fpbus::Bti> sysmem_btis{
     }},
 };
 
-static const sysmem_metadata_t sysmem_metadata = {
+static const fuchsia_hardware_sysmem::wire::Metadata sysmem_metadata = {
     .vid = PDEV_VID_AMLOGIC,
     .pid = PDEV_PID_AMLOGIC_S905D2,
     // On astro there are two protected memory ranges.  The protected_memory_size field configures
@@ -39,7 +39,7 @@ static const sysmem_metadata_t sysmem_metadata = {
 
 static const std::vector<fpbus::Metadata> sysmem_metadata_list{
     {{
-        .type = SYSMEM_METADATA_TYPE,
+        .type = fuchsia_hardware_sysmem::wire::kMetadataType,
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&sysmem_metadata),
             reinterpret_cast<const uint8_t*>(&sysmem_metadata) + sizeof(sysmem_metadata)),

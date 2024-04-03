@@ -6,9 +6,9 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_STACK_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/sysmem/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -42,7 +42,7 @@ class FakeDisplayStack {
   fake_display::FakeDisplay* display() { return display_; }
 
   const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_client();
-  const fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector>& sysmem_client();
+  fidl::ClientEnd<fuchsia_sysmem::Allocator> ConnectToSysmemAllocatorV1();
 
   // Join all threads providing display and sysmem protocols, and remove all
   // the devices bound to the mock root device.
@@ -67,7 +67,7 @@ class FakeDisplayStack {
 
   bool shutdown_ = false;
 
-  const sysmem_metadata_t sysmem_metadata_ = {
+  const fuchsia_hardware_sysmem::wire::Metadata sysmem_metadata_ = {
       .vid = PDEV_VID_QEMU,
       .pid = PDEV_PID_QEMU,
       .protected_memory_size = 0,
@@ -78,9 +78,6 @@ class FakeDisplayStack {
   // Must be torn down before `display_` and `coordinator_controller_` is
   // removed.
   async::Loop display_loop_{&kAsyncLoopConfigNeverAttachToThread};
-  // Runs services provided by the sysmem driver. Must be torn down before
-  // `sysmem_device_` is removed.
-  async::Loop sysmem_loop_{&kAsyncLoopConfigNeverAttachToThread};
   // Runs services provided by the fake platform device (pdev). Must be torn
   // down before `pdev_fidl_`.
   async::Loop pdev_loop_{&kAsyncLoopConfigNeverAttachToThread};
@@ -89,7 +86,6 @@ class FakeDisplayStack {
   std::optional<component::OutgoingDirectory> outgoing_;
 
   fidl::WireSyncClient<fuchsia_hardware_display::Provider> display_provider_client_;
-  fidl::WireSyncClient<fuchsia_hardware_sysmem::DriverConnector> sysmem_client_;
 };
 
 }  // namespace display

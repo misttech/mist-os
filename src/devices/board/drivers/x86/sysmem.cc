@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fuchsia/sysmem/c/banjo.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 
@@ -25,7 +25,7 @@ static const std::vector<fpbus::Bti> sysmem_btis = {
 };
 
 // On x86 not much is known about the display adapter or other hardware.
-static const sysmem_metadata_t sysmem_metadata = {
+static const fuchsia_hardware_sysmem::wire::Metadata sysmem_metadata = {
     .vid = PDEV_VID_GENERIC,
     .pid = PDEV_PID_GENERIC,
     // no protected pool
@@ -38,7 +38,7 @@ static const sysmem_metadata_t sysmem_metadata = {
 
 static const std::vector<fpbus::Metadata> GetSysmemMetadataList() {
   return std::vector<fpbus::Metadata>{{{
-      .type = SYSMEM_METADATA_TYPE,
+      .type = fuchsia_hardware_sysmem::wire::kMetadataType,
       .data = std::vector<uint8_t>(
           reinterpret_cast<const uint8_t *>(&sysmem_metadata),
           reinterpret_cast<const uint8_t *>(&sysmem_metadata) + sizeof(sysmem_metadata)),

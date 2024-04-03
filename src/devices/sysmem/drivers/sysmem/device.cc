@@ -10,13 +10,12 @@
 // isn't here.
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
-#include <fuchsia/sysmem/c/banjo.h>
 #include <inttypes.h>
 #include <lib/async/dispatcher.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fidl/cpp/wire/arena.h>
-#include <lib/sync/completion.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
@@ -44,9 +43,6 @@
 #include "src/devices/sysmem/metrics/metrics.cb.h"
 #include "utils.h"
 
-// undef this macro defined above by <fuchsia/sysmem/c/banjo.h>
-#undef HEAP_TYPE_SYSTEM_RAM
-
 using sysmem_driver::MemoryAllocator;
 
 namespace sysmem_driver {
@@ -55,9 +51,9 @@ namespace {
 constexpr bool kLogAllCollectionsPeriodically = false;
 constexpr zx::duration kLogAllCollectionsInterval = zx::sec(20);
 
-// These defaults only take effect if there is no SYSMEM_METADATA_TYPE, and also
-// neither of these kernel cmdline parameters set:
-// driver.sysmem.contiguous_memory_size
+// These defaults only take effect if there is no
+// fuchsia.hardware.sysmem/SYSMEM_METADATA_TYPE, and also neither of these
+// kernel cmdline parameters set: driver.sysmem.contiguous_memory_size
 // driver.sysmem.protected_memory_size
 //
 // Typically these defaults are overriden.
@@ -213,13 +209,30 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
   inspect::ValueList properties_;
 };
 
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> CloneDirectoryClient(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> dir_client) {
+  auto clone_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (clone_endpoints.is_error()) {
+    LOG(ERROR, "CreateEndpoints failed: %s", clone_endpoints.status_string());
+    return zx::error(clone_endpoints.status_value());
+  }
+  fuchsia_io::Node1CloneRequest clone_request;
+  clone_request.flags() = fuchsia_io::OpenFlags::kCloneSameRights;
+  clone_request.object() = fidl::ServerEnd<fuchsia_io::Node>(clone_endpoints->server.TakeChannel());
+  auto clone_result = fidl::Call(dir_client)->Clone(std::move(clone_request));
+  if (clone_result.is_error()) {
+    LOG(ERROR, "Clone failed: %s", clone_result.error_value().status_string());
+    return zx::error(clone_result.error_value().status());
+  }
+  return zx::ok(std::move(clone_endpoints->client));
+}
+
 }  // namespace
 
 Device::Device(zx_device_t* parent_device, Driver* parent_driver)
     : DdkDeviceType(parent_device),
       parent_driver_(parent_driver),
-      loop_(&kAsyncLoopConfigNeverAttachToThread),
-      in_proc_sysmem_protocol_{.ops = &sysmem_protocol_ops_, .ctx = this} {
+      loop_(&kAsyncLoopConfigNeverAttachToThread) {
   ZX_DEBUG_ASSERT(parent_);
   ZX_DEBUG_ASSERT(parent_driver_);
   zx_status_t status = loop_.StartThread("sysmem", &loop_thrd_);
@@ -236,6 +249,33 @@ Device::Device(zx_device_t* parent_device, Driver* parent_driver)
 
   // Up until DdkAdd, all access to member variables must happen on this thread.
   loop_checker_.emplace(fit::thread_checker());
+}
+
+Device::~Device() {
+  if (loop_.GetState() != ASYNC_LOOP_RUNNABLE) {
+    // This is the normal case.
+    return;
+  }
+
+  // In unit tests, Device::Bind() may not have been run, so ensure the loop_checker_ has been moved
+  // to the loop_ thread before DdkUnbindInternal() below which expects to use the loop_ thread.
+  libsync::Completion completion;
+  postTask([this, &completion] {
+    ZX_ASSERT(loop_checker_.has_value());
+    // After this point, all operations must happen on the loop thread.
+    loop_checker_.emplace(fit::thread_checker());
+    completion.Signal();
+  });
+  completion.Wait();
+
+  // This may happen from tests that may not call DdkUnbind() first.
+  //
+  // TODO(b/332631101): Consider changing the tests to call DdkUnbind, DdkRelease, instead of just
+  // ~Device.
+  //
+  // Shouldn't be seen outside of tests:
+  LOG(ERROR, "Device::~Device() called without DdkUnbind() first (MockDdk test?)");
+  DdkUnbindInternal();
 }
 
 zx_status_t Device::OverrideSizeFromCommandLine(const char* name, int64_t* memory_size) {
@@ -371,10 +411,12 @@ zx_status_t Device::GetContiguousGuardParameters(uint64_t* guard_bytes_out,
   return ZX_OK;
 }
 
-void Device::DdkUnbind(ddk::UnbindTxn txn) {
+void Device::DdkUnbindInternal() {
   // Try to ensure there are no outstanding VMOS before shutting down the loop.
   postTask([this]() mutable {
+    ZX_ASSERT(loop_checker_.has_value());
     std::lock_guard checker(*loop_checker_);
+    outgoing_.reset();
     waiting_for_unbind_ = true;
     CheckForUnbind();
   });
@@ -384,10 +426,16 @@ void Device::DdkUnbind(ddk::UnbindTxn txn) {
   // tests don't have a way to wait for the unbind to be complete before tearing down the device.
   loop_.JoinThreads();
   loop_.Shutdown();
+
   // After this point the FIDL servers should have been shutdown and all DDK and other protocol
   // methods will error out because posting tasks to the dispatcher fails.
+  LOG(DEBUG, "Finished DdkUnbindInternal.");
+}
+
+void Device::DdkUnbind(ddk::UnbindTxn txn) {
+  DdkUnbindInternal();
   txn.Reply();
-  zxlogf(INFO, "Finished unbind.");
+  LOG(DEBUG, "Finished DdkUnbind.");
 }
 
 void Device::CheckForUnbind() {
@@ -400,7 +448,7 @@ void Device::CheckForUnbind() {
            logical_buffer_collections().size());
     return;
   }
-  if (!contiguous_system_ram_allocator_->is_empty()) {
+  if (!!contiguous_system_ram_allocator_ && !contiguous_system_ram_allocator_->is_empty()) {
     zxlogf(INFO, "Not unbinding because contiguous system ram allocator is not empty");
     return;
   }
@@ -532,6 +580,20 @@ void Device::SecureMemControl::ZeroProtectedSubRange(bool is_covering_range_expl
   ZX_ASSERT(!result->is_error());
 }
 
+zx_status_t Device::Bind(std::unique_ptr<Device> device) {
+  zx_status_t status = device->Bind();
+
+  if (status == ZX_OK) {
+    // The device has bound successfully so it is owned by the DDK now. The delete later may occur
+    // in DdkRelease.
+    [[maybe_unused]] auto unused_device_ptr = device.release();
+  } else {
+    // ~device
+  }
+
+  return status;
+}
+
 zx_status_t Device::Bind() {
   std::lock_guard checker(*loop_checker_);
 
@@ -554,11 +616,11 @@ zx_status_t Device::Bind() {
   int64_t protected_memory_size = kDefaultProtectedMemorySize;
   int64_t contiguous_memory_size = kDefaultContiguousMemorySize;
 
-  sysmem_metadata_t metadata;
+  fuchsia_hardware_sysmem::wire::Metadata metadata;
 
   size_t metadata_actual;
-  zx_status_t status =
-      DdkGetMetadata(SYSMEM_METADATA_TYPE, &metadata, sizeof(metadata), &metadata_actual);
+  zx_status_t status = DdkGetMetadata(fuchsia_hardware_sysmem::wire::kMetadataType, &metadata,
+                                      sizeof(metadata), &metadata_actual);
   if (status == ZX_OK && metadata_actual == sizeof(metadata)) {
     pdev_device_info_vid_ = metadata.vid;
     pdev_device_info_pid_ = metadata.pid;
@@ -685,17 +747,31 @@ zx_status_t Device::Bind() {
     allocators_[std::move(heap)] = std::move(amlogic_allocator);
   }
 
-  sync_completion_t completion;
+  // outgoing_ can only be created and used on loop_ thread, so go ahead and switch loop_checker_
+  // to the loop_ thread
+  libsync::Completion completion;
   postTask([this, &completion] {
     // After this point, all operations must happen on the loop thread.
     loop_checker_.emplace(fit::thread_checker());
-    sync_completion_signal(&completion);
+    completion.Signal();
   });
-  sync_completion_wait_deadline(&completion, ZX_TIME_INFINITE);
+  completion.Wait();
 
+  auto service_dir_result = SetupOutgoingServiceDir();
+  if (service_dir_result.is_error()) {
+    DRIVER_ERROR("SetupOutgoingServiceDir failed: %s", service_dir_result.status_string());
+    return service_dir_result.status_value();
+  }
+  auto outgoing_dir_client = std::move(service_dir_result.value());
+
+  std::array offers = {
+      fuchsia_hardware_sysmem::Service::Name,
+  };
   status = DdkAdd(ddk::DeviceAddArgs("sysmem")
-                      .set_flags(DEVICE_ADD_NON_BINDABLE)
-                      .set_inspect_vmo(inspector_.DuplicateVmo()));
+                      .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
+                      .set_inspect_vmo(inspector_.DuplicateVmo())
+                      .set_fidl_service_offers(offers)
+                      .set_outgoing_dir(outgoing_dir_client.TakeChannel()));
   if (status != ZX_OK) {
     DRIVER_ERROR("Failed to bind device");
     return status;
@@ -709,6 +785,78 @@ zx_status_t Device::Bind() {
   zxlogf(INFO, "sysmem finished initialization");
 
   return ZX_OK;
+}
+
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Device::SetupOutgoingServiceDir() {
+  auto service_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (service_dir_endpoints.is_error()) {
+    DRIVER_ERROR("fidl::CreateEndpoints failed: %s", service_dir_endpoints.status_string());
+    return zx::error(service_dir_endpoints.status_value());
+  }
+
+  // We currently wait on this part to plumb the status from potential failure of AddService or
+  // Serve. If in future the comments on those two are explicitly clarified to promise that they can
+  // only fail if inputs are bad (including promsing that into the future), then we could let this
+  // part be async and not plumb status back from the loop_ thread, instead just ZX_ASSERT'ing
+  // ZX_OK on the loop_ thread.
+  std::optional<zx_status_t> service_dir_status;
+  RunSyncOnLoop(
+      [this, server = std::move(service_dir_endpoints->server), &service_dir_status]() mutable {
+        std::lock_guard<fit::thread_checker> thread_checker(*loop_checker_);
+
+        outgoing_.emplace(dispatcher());
+        auto outgoing_result = outgoing_->AddService<fuchsia_hardware_sysmem::Service>(
+            fuchsia_hardware_sysmem::Service::InstanceHandler({
+                .sysmem = bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
+                .allocator_v1 =
+                    [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {
+                      zx_status_t status = CommonSysmemConnectV1(request.TakeChannel());
+                      if (status != ZX_OK) {
+                        LOG(INFO, "Direct connect to fuchsia_sysmem::Allocator() failed");
+                      }
+                    },
+                .allocator_v2 =
+                    [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
+                      zx_status_t status = CommonSysmemConnectV2(request.TakeChannel());
+                      if (status != ZX_OK) {
+                        LOG(INFO, "Direct connect to fuchsia_sysmem2::Allocator() failed");
+                      }
+                    },
+            }));
+
+        if (outgoing_result.is_error()) {
+          zxlogf(ERROR, "failed to add FIDL protocol to the outgoing directory (sysmem): %s",
+                 outgoing_result.status_string());
+          service_dir_status = outgoing_result.status_value();
+          return;
+        }
+
+        outgoing_result = outgoing_->Serve(std::move(server));
+        if (outgoing_result.is_error()) {
+          zxlogf(ERROR, "failed to serve outgoing directory (sysmem): %s",
+                 outgoing_result.status_string());
+          service_dir_status = outgoing_result.status_value();
+          return;
+        }
+        service_dir_status = ZX_OK;
+      });
+  ZX_ASSERT(service_dir_status.has_value());
+  if (service_dir_status.value() != ZX_OK) {
+    return zx::error(service_dir_status.value());
+  }
+
+  // We stash a client_end to the outgoing directory (in outgoing_dir_client_for_tests_) for later
+  // use by fake-display-stack, at least until MockDdk supports the outgoing dir (as of this
+  // comment, doesn't appear to so far).
+  auto outgoing_dir_client = std::move(service_dir_endpoints->client);
+  auto clone_result = CloneDirectoryClient(outgoing_dir_client);
+  if (clone_result.is_error()) {
+    DRIVER_ERROR("CloneDirectoryClient failed: %s", clone_result.status_string());
+    return zx::error(clone_result.status_value());
+  }
+  outgoing_dir_client_for_tests_ = std::move(clone_result.value());
+
+  return zx::ok(std::move(outgoing_dir_client));
 }
 
 void Device::ConnectV1(ConnectV1RequestView request, ConnectV1Completer::Sync& completer) {
@@ -1039,62 +1187,6 @@ zx_status_t Device::CommonSysmemUnregisterSecureMem() {
   return ZX_OK;
 }
 
-// "Direct" sysmem banjo is sysmem banjo directly on the sysmem device instead of on the
-// "sysmem-banjo" child.  We want clients to at least request "sysmem-banjo" to essentially tag
-// places that need to move to sysmem FIDL.  Or ideally, move directly to sysmem FIDL instead of
-// sysmem banjo.
-//
-// By default this only complains up to ~once for direct false, and up to ~once for direct true.
-//
-// Once all deprecated sysmem banjo is at least dead/unused code (or preferably removed entirely),
-// we'll see this warning zero times, at which point we'll put a ZX_PANIC() at the start of this
-// function in case we missed any, and then remove banjo handling once we're sure we have zero
-// banjo-using clients.
-static void WarnOfDeprecatedSysmemBanjo(bool direct) {
-  // This might occasionally output ~one extra time, if more than one thread gets involved, but not
-  // worth using std::atomic<> since a low number of additional log lines isn't a significant
-  // downside.
-  static bool warning_logged[2] = {};
-  if (warning_logged[direct]) {
-    return;
-  }
-  LOG(WARNING, "Deprecated sysmem banjo detected.  Please switch to sysmem FIDL.  direct: %u",
-      direct);
-  warning_logged[direct] = true;
-}
-
-zx_status_t Device::SysmemConnect(zx::channel allocator_request) {
-  WarnOfDeprecatedSysmemBanjo(true);
-  return CommonSysmemConnectV1(std::move(allocator_request));
-}
-
-zx_status_t Device::SysmemRegisterHeap(uint64_t heap_param, zx::channel heap_connection) {
-  WarnOfDeprecatedSysmemBanjo(true);
-  // TODO(b/316646315): Registering a heap should use fuchsia_sysmem2::Heap instead (and also not be
-  // supported via banjo), but for now we can treat the "heap" param as a v1 HeapType.
-  auto v1_heap_type = static_cast<fuchsia_sysmem::HeapType>(heap_param);
-  auto v2_heap_type_result = sysmem::V2CopyFromV1HeapType(v1_heap_type);
-  if (!v2_heap_type_result.is_ok()) {
-    LOG(WARNING, "V2CopyFromV1HeapType failed");
-    return ZX_ERR_INVALID_ARGS;
-  }
-  auto& v2_heap_type = v2_heap_type_result.value();
-  auto heap = sysmem::MakeHeap(std::move(v2_heap_type), 0);
-  return CommonSysmemRegisterHeap(
-      std::move(heap), fidl::ClientEnd<fuchsia_hardware_sysmem::Heap>{std::move(heap_connection)});
-}
-
-zx_status_t Device::SysmemRegisterSecureMem(zx::channel tee_connection) {
-  WarnOfDeprecatedSysmemBanjo(true);
-  return CommonSysmemRegisterSecureMem(
-      fidl::ClientEnd<fuchsia_sysmem::SecureMem>{std::move(tee_connection)});
-}
-
-zx_status_t Device::SysmemUnregisterSecureMem() {
-  WarnOfDeprecatedSysmemBanjo(true);
-  return CommonSysmemUnregisterSecureMem();
-}
-
 const zx::bti& Device::bti() { return bti_; }
 
 // Only use this in cases where we really can't use zx::vmo::create_contiguous() because we must
@@ -1237,6 +1329,10 @@ void Device::LogAllBufferCollections() {
   };
 }
 
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Device::CloneServiceDirClientForTests() {
+  return CloneDirectoryClient(outgoing_dir_client_for_tests_);
+}
+
 Device::SecureMemConnection::SecureMemConnection(fidl::ClientEnd<fuchsia_sysmem::SecureMem> channel,
                                                  std::unique_ptr<async::Wait> wait_for_close)
     : connection_(std::move(channel)), wait_for_close_(std::move(wait_for_close)) {
@@ -1258,84 +1354,7 @@ void Device::LogCollectionsTimer(async_dispatcher_t* dispatcher, async::TaskBase
             log_all_collections_.PostDelayed(loop_.dispatcher(), kLogAllCollectionsInterval));
 }
 
-FidlDevice::FidlDevice(zx_device_t* parent, sysmem_driver::Device* sysmem_device,
-                       async_dispatcher_t* dispatcher)
-    : DdkFidlDeviceBase(parent), sysmem_device_(sysmem_device), dispatcher_(dispatcher) {
-  ZX_DEBUG_ASSERT(parent_);
-  ZX_DEBUG_ASSERT(sysmem_device_);
-}
-
-zx_status_t FidlDevice::Bind() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
-  }
-
-  // outgoing_ can only be created and used on loop_ thread
-  std::optional<zx_status_t> status;
-  sysmem_device_->runSyncOnLoop([this, server = std::move(endpoints->server), &status]() mutable {
-    dispatcher_checker_.emplace();
-    std::lock_guard<fit::thread_checker> thread_checker(*dispatcher_checker_);
-
-    outgoing_.emplace(dispatcher_);
-    auto outgoing_result = outgoing_->AddService<fuchsia_hardware_sysmem::Service>(
-        fuchsia_hardware_sysmem::Service::InstanceHandler({
-            .sysmem = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
-            .allocator_v1 =
-                [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {
-                  zx_status_t status = sysmem_device_->CommonSysmemConnectV1(request.TakeChannel());
-                  if (status != ZX_OK) {
-                    LOG(INFO, "Direct connect to fuchsia_sysmem::Allocator() failed");
-                  }
-                },
-            .allocator_v2 =
-                [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
-                  zx_status_t status = sysmem_device_->CommonSysmemConnectV2(request.TakeChannel());
-                  if (status != ZX_OK) {
-                    LOG(INFO, "Direct connect to fuchsia_sysmem2::Allocator() failed");
-                  }
-                },
-        }));
-
-    if (outgoing_result.is_error()) {
-      zxlogf(ERROR, "failed to add FIDL protocol to the outgoing directory (sysmem): %s",
-             outgoing_result.status_string());
-      status = outgoing_result.status_value();
-      return;
-    }
-
-    outgoing_result = outgoing_->Serve(std::move(server));
-    if (outgoing_result.is_error()) {
-      zxlogf(ERROR, "failed to serve outgoing directory (sysmem): %s",
-             outgoing_result.status_string());
-      status = outgoing_result.status_value();
-      return;
-    }
-    status = ZX_OK;
-  });
-  ZX_DEBUG_ASSERT(status.has_value());
-  if (status.value() != ZX_OK) {
-    return status.value();
-  }
-
-  std::array offers = {
-      fuchsia_hardware_sysmem::Service::Name,
-  };
-  zx_status_t add_status =
-      DdkAdd(ddk::DeviceAddArgs("sysmem-fidl")
-                 .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE | DEVICE_ADD_MUST_ISOLATE)
-                 .set_fidl_service_offers(offers)
-                 .set_outgoing_dir(endpoints->client.TakeChannel()));
-  if (add_status != ZX_OK) {
-    DRIVER_ERROR("Failed to bind FIDL device");
-    return add_status;
-  }
-
-  return ZX_OK;
-}
-
-void FidlDevice::RegisterHeap(RegisterHeapRequest& request,
-                              RegisterHeapCompleter::Sync& completer) {
+void Device::RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::Sync& completer) {
   // TODO(b/316646315): Change RegisterHeap to specify fuchsia_sysmem2::Heap, and remove the
   // conversion here.
   auto v2_heap_type_result =
@@ -1347,8 +1366,8 @@ void FidlDevice::RegisterHeap(RegisterHeapRequest& request,
   }
   auto& v2_heap_type = v2_heap_type_result.value();
   auto heap = sysmem::MakeHeap(std::move(v2_heap_type), 0);
-  zx_status_t status = sysmem_device_->CommonSysmemRegisterHeap(
-      std::move(heap), std::move(request.heap_connection()));
+  zx_status_t status =
+      CommonSysmemRegisterHeap(std::move(heap), std::move(request.heap_connection()));
   if (status != ZX_OK) {
     LOG(WARNING, "CommonSysmemRegisterHeap failed");
     completer.Close(status);
@@ -1356,63 +1375,22 @@ void FidlDevice::RegisterHeap(RegisterHeapRequest& request,
   }
 }
 
-void FidlDevice::RegisterSecureMem(RegisterSecureMemRequest& request,
-                                   RegisterSecureMemCompleter::Sync& completer) {
-  zx_status_t status =
-      sysmem_device_->CommonSysmemRegisterSecureMem(std::move(request.secure_mem_connection()));
+void Device::RegisterSecureMem(RegisterSecureMemRequest& request,
+                               RegisterSecureMemCompleter::Sync& completer) {
+  zx_status_t status = CommonSysmemRegisterSecureMem(std::move(request.secure_mem_connection()));
   if (status != ZX_OK) {
     completer.Close(status);
     return;
   }
 }
 
-void FidlDevice::UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) {
-  zx_status_t status = sysmem_device_->CommonSysmemUnregisterSecureMem();
+void Device::UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) {
+  zx_status_t status = CommonSysmemUnregisterSecureMem();
   if (status == ZX_OK) {
     completer.Reply(fit::ok());
   } else {
     completer.Reply(fit::error(status));
   }
-}
-
-BanjoDevice::BanjoDevice(zx_device_t* parent, sysmem_driver::Device* sysmem_device)
-    : DdkBanjoDeviceType(parent), sysmem_device_(sysmem_device) {
-  ZX_DEBUG_ASSERT(parent_);
-  ZX_DEBUG_ASSERT(sysmem_device_);
-}
-
-zx_status_t BanjoDevice::Bind() {
-  return DdkAdd(ddk::DeviceAddArgs("sysmem-banjo").set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE));
-}
-
-zx_status_t BanjoDevice::SysmemConnect(zx::channel allocator_request) {
-  WarnOfDeprecatedSysmemBanjo(false);
-  return sysmem_device_->CommonSysmemConnectV1(std::move(allocator_request));
-}
-
-zx_status_t BanjoDevice::SysmemRegisterHeap(uint64_t heap_param, zx::channel heap_connection) {
-  WarnOfDeprecatedSysmemBanjo(false);
-  auto v2_heap_type_result =
-      sysmem::V2CopyFromV1HeapType(static_cast<fuchsia_sysmem::HeapType>(heap_param));
-  if (!v2_heap_type_result.is_ok()) {
-    LOG(WARNING, "V2CopyFromV1HeapType failed");
-    return ZX_ERR_INVALID_ARGS;
-  }
-  auto& v2_heap_type = v2_heap_type_result.value();
-  auto heap = sysmem::MakeHeap(std::move(v2_heap_type), 0);
-  return sysmem_device_->CommonSysmemRegisterHeap(
-      std::move(heap), fidl::ClientEnd<fuchsia_hardware_sysmem::Heap>{std::move(heap_connection)});
-}
-
-zx_status_t BanjoDevice::SysmemRegisterSecureMem(zx::channel tee_connection) {
-  WarnOfDeprecatedSysmemBanjo(false);
-  return sysmem_device_->CommonSysmemRegisterSecureMem(
-      fidl::ClientEnd<fuchsia_sysmem::SecureMem>{std::move(tee_connection)});
-}
-
-zx_status_t BanjoDevice::SysmemUnregisterSecureMem() {
-  WarnOfDeprecatedSysmemBanjo(false);
-  return sysmem_device_->CommonSysmemUnregisterSecureMem();
 }
 
 }  // namespace sysmem_driver

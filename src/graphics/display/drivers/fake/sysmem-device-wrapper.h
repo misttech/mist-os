@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_DEVICE_WRAPPER_H_
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/ddk/device.h>
 #include <zircon/errors.h>
@@ -25,35 +26,32 @@ namespace display {
 //   - system integration tests may want to use the "global" sysmem so that multiple components
 //     can use it to coordinate memory allocation, for example tests which involve Scenic, Magma,
 //     and the display driver.
-//
-// The wrapped sysmem device must provide a wire server of FIDL fuchsia.sysmem2.
-// DriverConnector protocol for clients to connect to the sysmem device.
 class SysmemDeviceWrapper {
  public:
   virtual ~SysmemDeviceWrapper() = default;
 
+  // The returned directory is guaranteed to have the
+  // [`fuchsia.hardware.sysmem/Service`] service on success.
+  virtual zx::result<fidl::ClientEnd<fuchsia_io::Directory>> CloneServiceDirClient() = 0;
   virtual zx_status_t Bind() = 0;
-  virtual fidl::WireServer<fuchsia_hardware_sysmem::DriverConnector>* DriverConnectorServer() = 0;
 };
 
 // Convenient implementation of SysmemDeviceWrapper which can be used to wrap both
 // sysmem_device::Driver and display::SysmemProxyDevice (the initial two usages of
 // SysmemDeviceWrapper).
-//
-// The wrapped sysmem device type must be a `fidl::WireServer` of
-// fuchsia.sysmem2.DriverConnector FIDL protocol.
 template <typename T>
 class GenericSysmemDeviceWrapper : public SysmemDeviceWrapper {
  public:
-  static_assert(std::is_base_of_v<fidl::WireServer<fuchsia_hardware_sysmem::DriverConnector>, T>);
   explicit GenericSysmemDeviceWrapper(zx_device_t* parent)
       : sysmem_ctx_(std::make_unique<sysmem_driver::Driver>()),
         owned_sysmem_(std::make_unique<T>(parent, sysmem_ctx_.get())) {
     sysmem_ = owned_sysmem_.get();
   }
 
-  fidl::WireServer<fuchsia_hardware_sysmem::DriverConnector>* DriverConnectorServer() override {
-    return sysmem_;
+  // The returned directory is guaranteed to have the
+  // [`fuchsia.hardware.sysmem/Service`] service on success.
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> CloneServiceDirClient() override {
+    return sysmem_->CloneServiceDirClientForTests();
   }
   zx_status_t Bind() override {
     zx_status_t status = sysmem_->Bind();
