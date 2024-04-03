@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
@@ -19,34 +19,39 @@ static const std::vector<fpbus::Bti> sysmem_btis{
         .bti_id = BTI_SYSMEM,
     }},
 };
-static const fuchsia_hardware_sysmem::wire::Metadata sysmem_metadata = {
-    .vid = PDEV_VID_AMLOGIC,
-    .pid = PDEV_PID_AMLOGIC_A311D,
-    .protected_memory_size = 0,
+static const std::vector<uint8_t> sysmem_metadata = [] {
+  fuchsia_hardware_sysmem::Metadata metadata;
+  metadata.vid() = PDEV_VID_AMLOGIC;
+  metadata.pid() = PDEV_PID_AMLOGIC_A311D;
+  metadata.protected_memory_size() = 0;
 
-    // The AMlogic display engine needs contiguous physical memory for each
-    // frame buffer, because it does not have a page table walker.
-    //
-    // The maximum supported resolution is documented below.
-    // * "A311D Quick Reference Manual" revision 01, pages 2-3
-    // * "A311D Datasheet" revision 08, section 2.2 "Features", pages 4-5
-    //
-    // These pages can be loaned back to zircon for use in pager-backed VMOs,
-    // but these pages won't be used in "anonymous" VMOs (at least for now).
-    // Whether the loaned-back pages can be absorbed by pager-backed VMOs is
-    // workload dependent. The "k ppb stats_on" command can be used to determine
-    // whether all loaned pages are being used by pager-backed VMOs.
-    //
-    // TODO(https://fxbug.dev/42072489): This should be configured elsewhere.
-    .contiguous_memory_size = int64_t{200} * 1024 * 1024,
-};
+  // The AMlogic display engine needs contiguous physical memory for each
+  // frame buffer, because it does not have a page table walker.
+  //
+  // The maximum supported resolution is documented below.
+  // * "A311D Quick Reference Manual" revision 01, pages 2-3
+  // * "A311D Datasheet" revision 08, section 2.2 "Features", pages 4-5
+  //
+  // These pages can be loaned back to zircon for use in pager-backed VMOs,
+  // but these pages won't be used in "anonymous" VMOs (at least for now).
+  // Whether the loaned-back pages can be absorbed by pager-backed VMOs is
+  // workload dependent. The "k ppb stats_on" command can be used to determine
+  // whether all loaned pages are being used by pager-backed VMOs.
+  //
+  // TODO(https://fxbug.dev/42072489): This should be configured elsewhere.
+  metadata.contiguous_memory_size() = int64_t{200} * 1024 * 1024;
+
+  auto persisted_result = fidl::Persist(metadata);
+  // Given permitted values above, a failure won't be seen here. An OOM would
+  // fail before getting here.
+  ZX_ASSERT(persisted_result.is_ok());
+  return std::move(persisted_result.value());
+}();
 
 static const std::vector<fpbus::Metadata> sysmem_metadata_list{
     {{
-        .type = fuchsia_hardware_sysmem::wire::kMetadataType,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&sysmem_metadata),
-            reinterpret_cast<const uint8_t*>(&sysmem_metadata) + sizeof(sysmem_metadata)),
+        .type = fuchsia_hardware_sysmem::kMetadataType,
+        .data = sysmem_metadata,
     }},
 };
 

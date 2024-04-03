@@ -6,7 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_STACK_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -67,12 +67,14 @@ class FakeDisplayStack {
 
   bool shutdown_ = false;
 
-  const fuchsia_hardware_sysmem::wire::Metadata sysmem_metadata_ = {
-      .vid = PDEV_VID_QEMU,
-      .pid = PDEV_PID_QEMU,
-      .protected_memory_size = 0,
-      .contiguous_memory_size = 0,
-  };
+  const fuchsia_hardware_sysmem::Metadata sysmem_metadata_ = [] {
+    fuchsia_hardware_sysmem::Metadata metadata;
+    metadata.vid() = PDEV_VID_QEMU;
+    metadata.pid() = PDEV_PID_QEMU;
+    metadata.protected_memory_size() = 0;
+    metadata.contiguous_memory_size() = 0;
+    return metadata;
+  }();
 
   // Runs services provided by the fake display and display coordinator driver.
   // Must be torn down before `display_` and `coordinator_controller_` is

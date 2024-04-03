@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 
@@ -25,23 +25,26 @@ static const std::vector<fpbus::Bti> sysmem_btis = {
 };
 
 // On x86 not much is known about the display adapter or other hardware.
-static const fuchsia_hardware_sysmem::wire::Metadata sysmem_metadata = {
-    .vid = PDEV_VID_GENERIC,
-    .pid = PDEV_PID_GENERIC,
-    // no protected pool
-    .protected_memory_size = 0,
-    // -5 means 5% of physical RAM
-    // we allocate a small amount of contiguous RAM to keep the sysmem tests from flaking,
-    // see https://fxbug.dev/42146647.
-    .contiguous_memory_size = -5,
-};
+static const std::vector<uint8_t> sysmem_metadata = [] {
+  fuchsia_hardware_sysmem::Metadata metadata;
+  metadata.vid() = PDEV_VID_GENERIC;
+  metadata.pid() = PDEV_PID_GENERIC;
+  // no protected pool
+  metadata.protected_memory_size() = 0;
+  // -5 means 5% of physical RAM
+  // we allocate a small amount of contiguous RAM to keep the sysmem tests from flaking,
+  // see https://fxbug.dev/42146647.
+  metadata.contiguous_memory_size() = -5;
+
+  auto persist_result = fidl::Persist(metadata);
+  ZX_ASSERT(persist_result.is_ok());
+  return std::move(persist_result.value());
+}();
 
 static const std::vector<fpbus::Metadata> GetSysmemMetadataList() {
   return std::vector<fpbus::Metadata>{{{
       .type = fuchsia_hardware_sysmem::wire::kMetadataType,
-      .data = std::vector<uint8_t>(
-          reinterpret_cast<const uint8_t *>(&sysmem_metadata),
-          reinterpret_cast<const uint8_t *>(&sysmem_metadata) + sizeof(sysmem_metadata)),
+      .data = sysmem_metadata,
   }}};
 }
 
@@ -72,4 +75,5 @@ zx_status_t X86::SysmemInit() {
 
   return ZX_OK;
 }
+
 }  // namespace x86

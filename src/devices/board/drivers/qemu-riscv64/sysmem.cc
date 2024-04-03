@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
@@ -23,20 +23,23 @@ zx::result<> QemuRiscv64::SysmemInit() {
       }},
   };
 
-  constexpr fuchsia_hardware_sysmem::wire::Metadata kSysmemMetadata = {
-      .vid = PDEV_VID_QEMU,
-      .pid = PDEV_PID_QEMU,
-      .protected_memory_size = 0,    // no protected pool
-      .contiguous_memory_size = -5,  // 5% of physical ram
+  const fuchsia_hardware_sysmem::Metadata kSysmemMetadata = [] {
+    fuchsia_hardware_sysmem::Metadata metadata;
+    metadata.vid() = PDEV_VID_QEMU;
+    metadata.pid() = PDEV_PID_QEMU;
+    metadata.protected_memory_size() = 0;    // no protected pool
+    metadata.contiguous_memory_size() = -5;  // 5% of physical ram
+    return metadata;
+  }();
 
-  };
+  auto metadata_result = fidl::Persist(kSysmemMetadata);
+  ZX_ASSERT(metadata_result.is_ok());
+  auto& metadata = metadata_result.value();
 
   std::vector<fpbus::Metadata> kSysmemMetadataList{
       {{
           .type = fuchsia_hardware_sysmem::wire::kMetadataType,
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&kSysmemMetadata),
-              reinterpret_cast<const uint8_t*>(&kSysmemMetadata) + sizeof(kSysmemMetadata)),
+          .data = std::move(metadata),
       }},
   };
 

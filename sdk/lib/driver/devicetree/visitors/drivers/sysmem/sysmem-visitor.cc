@@ -4,7 +4,7 @@
 
 #include "sysmem-visitor.h"
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/driver/devicetree/visitors/registration.h>
 #include <lib/driver/logging/cpp/logger.h>
 
@@ -30,18 +30,18 @@ zx::result<> SysmemVisitor::DriverVisit(fdf_devicetree::Node& node,
     return zx::ok();
   }
 
-  fuchsia_hardware_sysmem::wire::Metadata sysmem_metadata = {};
-  sysmem_metadata.vid = vid->second.AsUint32().value_or(0);
-  sysmem_metadata.pid = pid->second.AsUint32().value_or(0);
+  fuchsia_hardware_sysmem::Metadata sysmem_metadata;
+  sysmem_metadata.vid() = vid->second.AsUint32().value_or(0);
+  sysmem_metadata.pid() = pid->second.AsUint32().value_or(0);
 
   if (node.name() == "fuchsia,contiguous") {
-    sysmem_metadata.contiguous_memory_size =
+    sysmem_metadata.contiguous_memory_size() =
         static_cast<int64_t>(size->second.AsUint64().value_or(0));
   }
 
-  auto serialized = std::vector<uint8_t>(
-      reinterpret_cast<const uint8_t*>(&sysmem_metadata),
-      reinterpret_cast<const uint8_t*>(&sysmem_metadata) + sizeof(sysmem_metadata));
+  auto serialized_result = fidl::Persist(sysmem_metadata);
+  ZX_ASSERT(serialized_result.is_ok());
+  auto serialized = std::move(serialized_result.value());
 
   fuchsia_hardware_platform_bus::Metadata metadata = {{
       .type = fuchsia_hardware_sysmem::wire::kMetadataType,

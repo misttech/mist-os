@@ -8,9 +8,18 @@ library fuchsia.hardware.sysmem;
 const METADATA_TYPE uint32 = 0x53794d64; // 0x53794d00 | DEVICE_METADATA_PRIVATE
 
 /// Driver metadata for the sysmem driver.
-type Metadata = struct {
-    vid uint32;
-    pid uint32;
+type Metadata = table {
+    1: vid uint32;
+    2: pid uint32;
+
+    // protected_memory_size
+    // contiguous_memory_size
+    //
+    // Positive values are interpreted as bytes, and are aligned up to next
+    // ZX_PAGE_SIZE.
+    //
+    // Negative values are interpreted as a percentage of physical memory (after
+    // negation), and resulting size in bytes is aligned up to next ZX_PAGE_SIZE.
 
     /// protected_memory_size
     ///
@@ -23,8 +32,8 @@ type Metadata = struct {
     /// (after negation), and resulting size in bytes is aligned up to next
     /// ZX_PAGE_SIZE.
     ///
-    /// 0 means there is no protected memory pool.
-    protected_memory_size int64;
+    /// un-set or 0 means there is no protected memory pool.
+    3: protected_memory_size int64;
 
     /// contiguous_memory_size
     ///
@@ -37,12 +46,12 @@ type Metadata = struct {
     /// (after negation), and resulting size in bytes is aligned up to next
     /// ZX_PAGE_SIZE.
     ///
-    /// Zero means no space is reserved up front, which will end up using
-    /// zx::vmo::create_contiguous() for each allocation instead of allocating
-    /// up front, which can be prone to failure when physical memory becomes
-    /// fragmented.
+    /// Un-set or zero means no space is reserved up front, which will end up
+    /// using zx::vmo::create_contiguous() for each allocation instead of
+    /// allocating up front, which can be prone to failure when physical memory
+    /// becomes fragmented.
     ///
     /// There is no fallback from pre-reserved to zx::vmo::create_contiguous().
     /// If we're pre-reserving memory, we should reserve enough.
-    contiguous_memory_size int64;
+    4: contiguous_memory_size int64;
 };

@@ -616,16 +616,32 @@ zx_status_t Device::Bind() {
   int64_t protected_memory_size = kDefaultProtectedMemorySize;
   int64_t contiguous_memory_size = kDefaultContiguousMemorySize;
 
-  fuchsia_hardware_sysmem::wire::Metadata metadata;
+  size_t metadata_size = 0;
+  zx_status_t status = DdkGetMetadataSize(fuchsia_hardware_sysmem::kMetadataType, &metadata_size);
+  if (status == ZX_OK) {
+    std::vector<uint8_t> raw_metadata(metadata_size);
+    size_t metadata_actual = 0;
+    status = DdkGetMetadata(fuchsia_hardware_sysmem::kMetadataType, raw_metadata.data(),
+                            raw_metadata.size(), &metadata_actual);
+    if (status == ZX_OK) {
+      ZX_ASSERT(metadata_actual == metadata_size);
+      auto unpersist_result =
+          fidl::Unpersist<fuchsia_hardware_sysmem::Metadata>(cpp20::span(raw_metadata));
+      if (unpersist_result.is_error()) {
+        DRIVER_ERROR("Failed fidl::Unpersist - status: %s",
+                     zx_status_get_string(unpersist_result.error_value().status()));
+        return unpersist_result.error_value().status();
+      }
+      auto& metadata = unpersist_result.value();
 
-  size_t metadata_actual;
-  zx_status_t status = DdkGetMetadata(fuchsia_hardware_sysmem::wire::kMetadataType, &metadata,
-                                      sizeof(metadata), &metadata_actual);
-  if (status == ZX_OK && metadata_actual == sizeof(metadata)) {
-    pdev_device_info_vid_ = metadata.vid;
-    pdev_device_info_pid_ = metadata.pid;
-    protected_memory_size = metadata.protected_memory_size;
-    contiguous_memory_size = metadata.contiguous_memory_size;
+      // Default is zero when field un-set.
+      pdev_device_info_vid_ = metadata.vid().has_value() ? *metadata.vid() : 0;
+      pdev_device_info_pid_ = metadata.pid().has_value() ? *metadata.pid() : 0;
+      protected_memory_size =
+          metadata.protected_memory_size().has_value() ? *metadata.protected_memory_size() : 0;
+      contiguous_memory_size =
+          metadata.contiguous_memory_size().has_value() ? *metadata.contiguous_memory_size() : 0;
+    }
   }
 
   const char* kDisableDynamicRanges = "driver.sysmem.protected_ranges.disable_dynamic";

@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
@@ -21,18 +21,23 @@ static const std::vector<fpbus::Bti> sysmem_btis{
     }},
 };
 
-static const fuchsia_hardware_sysmem::wire::Metadata sysmem_metadata = {
-    .vid = PDEV_VID_GOOGLE,
-    .pid = PDEV_PID_MACHINA,
-    .protected_memory_size = 0,
-};
+static const std::vector<uint8_t> sysmem_metadata = [] {
+  fuchsia_hardware_sysmem::Metadata metadata;
+  metadata.vid() = PDEV_VID_GOOGLE;
+  metadata.pid() = PDEV_PID_MACHINA;
+  metadata.protected_memory_size() = 0;
+
+  auto persist_result = fidl::Persist(metadata);
+  // Given permitted values set above, we won't see failure here. An OOM would fail before getting
+  // here.
+  ZX_ASSERT(persist_result.is_ok());
+  return std::move(persist_result.value());
+}();
 
 static const std::vector<fpbus::Metadata> sysmem_metadata_list{
     {{
         .type = fuchsia_hardware_sysmem::wire::kMetadataType,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&sysmem_metadata),
-            reinterpret_cast<const uint8_t*>(&sysmem_metadata) + sizeof(sysmem_metadata)),
+        .data = sysmem_metadata,
     }},
 };
 

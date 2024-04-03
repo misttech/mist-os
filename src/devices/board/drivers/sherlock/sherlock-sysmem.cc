@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
@@ -24,28 +24,34 @@ static const std::vector<fpbus::Bti> sysmem_btis{
     }},
 };
 
-static const fuchsia_hardware_sysmem::wire::Metadata sysmem_metadata = {
-    .vid = PDEV_VID_AMLOGIC,
-    .pid = PDEV_PID_AMLOGIC_T931,
-    // On sherlock there are two protected memory ranges.  The protected_memory_size field
-    // configures the size of the non-VDEC range.  In contrast, the VDEC range is configured and
-    // allocated via the TEE, and is currently 7.5 MiB (on astro; to be verified on sherlock).  The
-    // VDEC range is a fixed location within the overall optee reserved range passed to Zircon
-    // during boot - the specific location is obtained by sysmem calling the secmem TA via
-    // fuchsia::sysmem::Tee protocol between sysmem and TEE Controller.
+static const std::vector<uint8_t> sysmem_metadata = [] {
+  fuchsia_hardware_sysmem::Metadata metadata;
+  metadata.vid() = PDEV_VID_AMLOGIC;
+  metadata.pid() = PDEV_PID_AMLOGIC_T931;
 
-    // The values below aren't used and are overridden by the kernel command-line set in the board
-    // file.
-    .protected_memory_size = 0,
-    .contiguous_memory_size = 0,
-};
+  // On sherlock there are two protected memory ranges.  The protected_memory_size field
+  // configures the size of the non-VDEC range.  In contrast, the VDEC range is configured and
+  // allocated via the TEE, and is currently 7.5 MiB (on astro; to be verified on sherlock).  The
+  // VDEC range is a fixed location within the overall optee reserved range passed to Zircon
+  // during boot - the specific location is obtained by sysmem calling the secmem TA via
+  // fuchsia::sysmem::Tee protocol between sysmem and TEE Controller.
+  //
+  // The values below aren't used and are overridden by the kernel command-line set in the board
+  // file.
+  metadata.protected_memory_size() = 0;
+  metadata.contiguous_memory_size() = 0;
+
+  auto persist_result = fidl::Persist(metadata);
+  // Given permitted values set above, we won't see failure here. An OOM would fail before getting
+  // here.
+  ZX_ASSERT(persist_result.is_ok());
+  return std::move(persist_result.value());
+}();
 
 static const std::vector<fpbus::Metadata> sysmem_metadata_list{
     {{
         .type = fuchsia_hardware_sysmem::wire::kMetadataType,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&sysmem_metadata),
-            reinterpret_cast<const uint8_t*>(&sysmem_metadata) + sizeof(sysmem_metadata)),
+        .data = sysmem_metadata,
     }},
 };
 
