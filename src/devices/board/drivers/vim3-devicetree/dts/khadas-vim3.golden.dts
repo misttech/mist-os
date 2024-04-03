@@ -85,6 +85,12 @@
 				pinctrl-0 = <0x09>;
 				reg = <0x00 0x5000 0x00 0x20>;
 
+				fusb302@22 {
+					gpio-names = "USB_POWER_DELIVERY";
+					gpios = <0x04 0x5d 0x00>;
+					reg = <0x22>;
+				};
+
 				khadas-mcu@18 {
 					compatible = "khadas,vim3-mcu";
 					reg = <0x18>;

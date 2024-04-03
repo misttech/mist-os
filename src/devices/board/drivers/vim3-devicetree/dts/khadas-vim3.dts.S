@@ -70,6 +70,12 @@
 		compatible = "khadas,vim3-mcu";
 		reg = <0x18>;
 	};
+
+	fusb302@22 {
+		reg = <0x22>;
+		gpios = <&gpio A311D_GPIOAO(8) 0>;
+		gpio-names = "USB_POWER_DELIVERY";
+	};
 };
 
 &i2c3 {
