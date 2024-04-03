@@ -18,7 +18,6 @@ use wav_socket::WavSocket;
 use anyhow::{anyhow, Context, Error};
 use error::ControllerError;
 use fidl_fuchsia_audio_controller as fac;
-use fidl_fuchsia_audio_device as fadevice;
 use fuchsia_async as fasync;
 use fuchsia_audio::{device::Selector, Format};
 use fuchsia_component::server::ServiceFs;
@@ -27,13 +26,6 @@ use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use std::time::Duration;
 use tracing::error;
-
-/// Paths to device driver devfs nodes and their corresponding types.
-const DEVFS_DEVICES: &[(&str, fadevice::DeviceType)] = &[
-    ("/dev/class/audio-input", fadevice::DeviceType::Input),
-    ("/dev/class/audio-output", fadevice::DeviceType::Output),
-    ("/dev/class/composite", fadevice::DeviceType::Composite),
-];
 
 /// Wraps all hosted protocols into a single type that can be matched against and dispatched.
 enum IncomingRequest {
@@ -187,26 +179,6 @@ async fn serve_device_control(mut stream: fac::DeviceControlRequestStream) -> Re
     while let Ok(Some(request)) = stream.try_next().await {
         let request_name = request.method_name();
         let request_result = match request {
-            fac::DeviceControlRequest::ListDevices { responder } => {
-                let mut fidl_selectors: Vec<fac::DeviceSelector> = Vec::new();
-
-                for (path, device_type) in DEVFS_DEVICES {
-                    match device::get_devfs_selectors(path, *device_type).await {
-                        Ok(selectors) => {
-                            fidl_selectors.extend(selectors.into_iter().map(Into::into))
-                        }
-                        Err(err) => {
-                            error!(%err, "Failed to get {device_type:?} entries")
-                        }
-                    }
-                }
-
-                let response = fac::DeviceControlListDevicesResponse {
-                    devices: Some(fidl_selectors),
-                    ..Default::default()
-                };
-                responder.send(Ok(response)).map_err(|e| anyhow!("Error sending response: {e}"))
-            }
             fac::DeviceControlRequest::GetDeviceInfo { payload, responder } => {
                 let selector: Selector = payload
                     .device

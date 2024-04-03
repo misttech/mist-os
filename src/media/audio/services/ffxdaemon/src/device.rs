@@ -13,7 +13,6 @@ use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
-use fidl_fuchsia_io as fio;
 use fuchsia_audio::{
     device::{DevfsSelector, Selector},
     stop_listener, Format,
@@ -559,59 +558,5 @@ impl Device {
             packet_fut.await
         };
         result.map_err(|e| ControllerError::new(fac::Error::UnknownCanRetry, format!("{e}")))
-    }
-}
-
-/// Returns device selectors for each entry in a devfs directory at `path`.
-///
-/// Each selector will be assigned the type from `device_type`.
-/// The type is not inferred from `path`.
-pub async fn get_devfs_selectors(
-    path: &str,
-    device_type: fadevice::DeviceType,
-) -> Result<Vec<DevfsSelector>, Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace(path, fio::OpenFlags::RIGHT_READABLE)
-        .context("failed to open directory")?;
-
-    let entries =
-        fuchsia_fs::directory::readdir(&dir).await.context("failed to read directory entries")?;
-
-    Ok(entries.into_iter().map(|entry| fac::Devfs { id: entry.name, device_type }.into()).collect())
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[fuchsia::test]
-    async fn test_get_devfs_selectors() {
-        let tempdir = TempDir::new().unwrap();
-        let tempdir_path = tempdir.path().to_str().unwrap();
-        let dir = fuchsia_fs::directory::open_in_namespace(
-            tempdir_path,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        )
-        .unwrap();
-
-        let names = vec!["a", "b", "c"];
-        let device_type = fadevice::DeviceType::Input;
-
-        for name in names {
-            fuchsia_fs::directory::create_directory(&dir, name, fio::OpenFlags::RIGHT_READABLE)
-                .await
-                .unwrap();
-        }
-
-        let selectors = get_devfs_selectors(tempdir_path, device_type).await.unwrap();
-
-        assert_eq!(
-            vec![
-                DevfsSelector::from(fac::Devfs { id: "a".to_string(), device_type }),
-                DevfsSelector::from(fac::Devfs { id: "b".to_string(), device_type }),
-                DevfsSelector::from(fac::Devfs { id: "c".to_string(), device_type }),
-            ],
-            selectors
-        );
     }
 }

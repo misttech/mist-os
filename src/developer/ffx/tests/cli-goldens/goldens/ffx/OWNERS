@@ -1,3 +1,4 @@
+per-file audio.golden = file: /src/developer/ffx/plugins/audio/OWNERS
 per-file inspect.golden = file: /src/developer/ffx/plugins/inspect/OWNERS
 per-file log.golden = file: /src/developer/ffx/plugins/log/OWNERS
 per-file trace.golden = file: /src/developer/ffx/plugins/trace/OWNERS

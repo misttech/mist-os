@@ -76,14 +76,6 @@ type DeviceSelector = flexible union {
 /// Enumerate, query, and control audio devices from clients.
 @discoverable
 open protocol DeviceControl {
-    /// Lists all available audio devices on target.
-    flexible ListDevices() -> (resource table {
-        /// List of available devices.
-        ///
-        /// Required.
-        1: devices vector<DeviceSelector>:MAX_COUNT_DEVICES;
-    }) error zx.Status;
-
     /// Returns details about a specific audio device.
     flexible GetDeviceInfo(resource table {
         /// Id of device to retrieve information about, and

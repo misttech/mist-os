@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod device_info;
-
 use {
     anyhow::Error,
     blocking::Unblock,
@@ -17,6 +15,9 @@ use {
     std::io::{BufRead, ErrorKind},
 };
 
+pub mod device_info;
+pub mod ffxtool;
+
 #[derive(Debug, Serialize, PartialEq, Deserialize)]
 pub struct PlayResult {
     pub bytes_processed: Option<u64>,
@@ -27,13 +28,6 @@ pub struct RecordResult {
     pub bytes_processed: Option<u64>,
     pub packets_processed: Option<u64>,
     pub late_wakeups: Option<u64>,
-}
-
-#[derive(Debug, PartialEq, Serialize)]
-pub enum DeviceResult {
-    Play(PlayResult),
-    Record(RecordResult),
-    Info(device_info::DeviceInfoResult),
 }
 
 pub async fn play(

@@ -3,7 +3,15 @@
 // found in the LICENSE file.
 
 use ffx_audio_device_args::DeviceCommand;
-use fuchsia_audio::device::{DevfsSelector, Selector, Type as DeviceType};
+use ffx_command::FfxContext;
+use fidl_fuchsia_audio_device as fadevice;
+use fidl_fuchsia_hardware_audio as fhaudio;
+use fidl_fuchsia_io as fio;
+use fuchsia_audio::device::{
+    DevfsSelector, HardwareType as HardwareDeviceType, Selector, Type as DeviceType,
+};
+use serde::{Serialize, Serializer};
+use std::fmt::Display;
 
 /// A query that matches device properties against a [DeviceSelector].
 pub struct DeviceQuery {
@@ -43,6 +51,98 @@ impl TryFrom<&DeviceCommand> for DeviceQuery {
             .transpose()?;
         Ok(Self { id, device_type })
     }
+}
+
+/// Output of the `ffx audio device list` command.
+#[derive(Debug, Clone, Serialize)]
+pub struct ListResult {
+    pub devices: Vec<ListResultDevice>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ListResultDevice {
+    device_id: String,
+    is_input: Option<bool>,
+    #[serde(serialize_with = "serialize_hw_device_type")]
+    device_type: HardwareDeviceType,
+    path: Option<String>,
+}
+
+pub fn serialize_hw_device_type<S>(
+    hw_device_type: &HardwareDeviceType,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&hw_device_type.to_string().to_uppercase())
+}
+
+impl From<Vec<Selector>> for ListResult {
+    fn from(value: Vec<Selector>) -> Self {
+        Self { devices: value.into_iter().map(Into::into).collect() }
+    }
+}
+
+impl From<Selector> for ListResultDevice {
+    fn from(value: Selector) -> Self {
+        let Selector::Devfs(devfs) = value;
+
+        Self {
+            device_id: devfs.0.id.clone(),
+            // TODO(https://fxbug.dev/327490666): Fix incorrect STREAMCONFIG device_type
+            device_type: HardwareDeviceType(fhaudio::DeviceType::StreamConfig),
+            is_input: match devfs.0.device_type {
+                fadevice::DeviceType::Input => Some(true),
+                fadevice::DeviceType::Output => Some(false),
+                _ => None,
+            },
+            path: Some(devfs.path().to_string()),
+        }
+    }
+}
+
+impl Display for ListResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.devices.is_empty() {
+            return write!(f, "No devices found.");
+        }
+        let mut first = true;
+        for device in &self.devices {
+            if first {
+                first = false;
+            } else {
+                writeln!(f)?;
+            }
+            let in_out = match device.is_input {
+                Some(is_input) => {
+                    if is_input {
+                        "Input"
+                    } else {
+                        "Output"
+                    }
+                }
+                None => "Input/Output not specified",
+            };
+            write!(
+                f,
+                "{:?} Device id: {:?}, Device type: {}, {in_out}",
+                device.path.as_ref().unwrap(),
+                device.device_id,
+                device.device_type
+            )?;
+        }
+        Ok(())
+    }
+}
+
+pub async fn get_devices(dev_class: &fio::DirectoryProxy) -> fho::Result<Vec<Selector>> {
+    Ok(fuchsia_audio::device::list_devfs(dev_class)
+        .await
+        .bug_context("Failed to list devices in devfs")?
+        .into_iter()
+        .map(Selector::Devfs)
+        .collect::<Vec<_>>())
 }
 
 #[cfg(test)]

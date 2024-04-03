@@ -73,6 +73,7 @@ pub struct DeviceCommand {
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum SubCommand {
+    List(ListCommand),
     Info(InfoCommand),
     Play(DevicePlayCommand),
     Record(DeviceRecordCommand),
@@ -81,6 +82,15 @@ pub enum SubCommand {
     Unmute(DeviceUnmuteCommand),
     Agc(DeviceAgcCommand),
 }
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "list",
+    description = "Lists audio devices.",
+    example = "ffx audio device --type StreamConfig list"
+)]
+pub struct ListCommand {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(

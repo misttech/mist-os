@@ -9,22 +9,34 @@ rustc_library("fuchsia-audio") {
   name = "fuchsia_audio"
   source_root = "src/lib.rs"
   edition = "2021"
-  with_unit_tests = true
+
+  # Don't build unit tests on host to avoid depending
+  # on //src/storage/lib/vfs/rust:vfs.
+  with_unit_tests = !is_host
 
   deps = [
     "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_rust",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hound",
     "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:thiserror",
   ]
 
-  test_deps = [ "//third_party/rust_crates:test-case" ]
+  if (!is_host) {
+    test_deps = [
+      "//src/lib/fuchsia",
+      "//src/storage/lib/vfs/rust:vfs",
+      "//third_party/rust_crates:test-case",
+    ]
+  }
 
   sources = [
     "src/device.rs",

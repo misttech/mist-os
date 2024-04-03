@@ -3,6 +3,7 @@ ffx/audio/device.golden
 ffx/audio/device/agc.golden
 ffx/audio/device/gain.golden
 ffx/audio/device/info.golden
+ffx/audio/device/list.golden
 ffx/audio/device/mute.golden
 ffx/audio/device/play.golden
 ffx/audio/device/record.golden

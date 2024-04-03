@@ -6,8 +6,10 @@ use camino::Utf8PathBuf;
 use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
+use fidl_fuchsia_io as fio;
 use std::fmt::Display;
 use std::str::FromStr;
+use thiserror::Error;
 
 /// The type of an audio device.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -235,10 +237,64 @@ impl From<DevfsSelector> for fac::DeviceSelector {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum ListDevfsError {
+    #[error("Failed to open directory {}: {:?}", name, err)]
+    Open {
+        name: String,
+        #[source]
+        err: fuchsia_fs::node::OpenError,
+    },
+
+    #[error("Failed to read directory {} entries: {:?}", name, err)]
+    Readdir {
+        name: String,
+        #[source]
+        err: fuchsia_fs::directory::EnumerateError,
+    },
+}
+
+/// Returns selectors for all audio devices in devfs.
+///
+/// `dev_class` should be a proxy to the `/dev/class` directory.
+pub async fn list_devfs(
+    dev_class: &fio::DirectoryProxy,
+) -> Result<Vec<DevfsSelector>, ListDevfsError> {
+    const TYPES: &[Type] = &[
+        Type(fadevice::DeviceType::Input),
+        Type(fadevice::DeviceType::Output),
+        Type(fadevice::DeviceType::Dai),
+        Type(fadevice::DeviceType::Codec),
+        Type(fadevice::DeviceType::Composite),
+    ];
+
+    let mut selectors = vec![];
+
+    for device_type in TYPES {
+        let subdir_name = device_type.devfs_class();
+        let subdir =
+            fuchsia_fs::directory::open_directory(dev_class, subdir_name, fio::OpenFlags::empty())
+                .await
+                .map_err(|err| ListDevfsError::Open { name: subdir_name.to_string(), err })?;
+        let entries = fuchsia_fs::directory::readdir(&subdir)
+            .await
+            .map_err(|err| ListDevfsError::Readdir { name: subdir_name.to_string(), err })?;
+        selectors.extend(
+            entries.into_iter().map(|entry| {
+                DevfsSelector(fac::Devfs { id: entry.name, device_type: device_type.0 })
+            }),
+        );
+    }
+
+    Ok(selectors)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::sync::Arc;
     use test_case::test_case;
+    use vfs::pseudo_directory;
 
     #[test_case("input", fadevice::DeviceType::Input; "input")]
     #[test_case("output", fadevice::DeviceType::Output; "output")]
@@ -318,5 +374,70 @@ mod test {
     )]
     fn test_devfs_selector_path(devfs: fac::Devfs, expected_path: &str) {
         assert_eq!(expected_path, DevfsSelector(devfs).path());
+    }
+
+    fn placeholder_node() -> Arc<vfs::service::Service> {
+        vfs::service::endpoint(move |_scope, _channel| {
+            // Just drop the channel.
+        })
+    }
+
+    #[fuchsia::test]
+    async fn test_list_devfs() {
+        // Placeholder for serving the device protocol.
+        // list_devfs doesn't connect to it, so we don't serve it.
+        let placeholder = placeholder_node();
+
+        let dev_class_vfs = pseudo_directory! {
+            "audio-input" => pseudo_directory! {
+                "input-0" => placeholder.clone(),
+                "input-1" => placeholder.clone(),
+            },
+            "audio-output" => pseudo_directory! {
+                "output-0" => placeholder.clone(),
+            },
+            "dai" => pseudo_directory! {
+                "dai-0" => placeholder.clone(),
+            },
+            "codec" => pseudo_directory! {
+                "codec-0" => placeholder.clone(),
+            },
+            "audio-composite" => pseudo_directory! {
+                "composite-0" => placeholder.clone(),
+            },
+        };
+
+        let dev_class = vfs::directory::spawn_directory(dev_class_vfs);
+        let selectors = list_devfs(&dev_class).await.unwrap();
+
+        assert_eq!(
+            vec![
+                DevfsSelector(fac::Devfs {
+                    id: "input-0".to_string(),
+                    device_type: fadevice::DeviceType::Input,
+                }),
+                DevfsSelector(fac::Devfs {
+                    id: "input-1".to_string(),
+                    device_type: fadevice::DeviceType::Input,
+                }),
+                DevfsSelector(fac::Devfs {
+                    id: "output-0".to_string(),
+                    device_type: fadevice::DeviceType::Output,
+                }),
+                DevfsSelector(fac::Devfs {
+                    id: "dai-0".to_string(),
+                    device_type: fadevice::DeviceType::Dai,
+                }),
+                DevfsSelector(fac::Devfs {
+                    id: "codec-0".to_string(),
+                    device_type: fadevice::DeviceType::Codec,
+                }),
+                DevfsSelector(fac::Devfs {
+                    id: "composite-0".to_string(),
+                    device_type: fadevice::DeviceType::Composite,
+                }),
+            ],
+            selectors
+        );
     }
 }
