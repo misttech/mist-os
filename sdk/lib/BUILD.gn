@@ -11,6 +11,7 @@ group("tests") {
     "component:tests",
     "device-watcher:tests",
     "diagnostics:tests",
+    "dl:tests",
     "driver:tests",
     "driver_test_realm:tests",
     "fdio:tests",
