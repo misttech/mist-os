@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/lib/escher/util/trace_macros.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
@@ -1024,6 +1025,32 @@ std::vector<allocation::ImageMetadata> DisplayCompositor::AllocateDisplayRenderT
     FX_DCHECK(dup_tokens.size() == 2);
     renderer_token = dup_tokens.at(0).BindSync();
     display_token = dup_tokens.at(1).BindSync();
+
+    constexpr size_t kMaxSysmem1DebugNameLength = 64;
+
+    auto set_token_debug_name = [](fuchsia::sysmem::BufferCollectionTokenSyncPtr& token,
+                                   const char* token_name) {
+      std::stringstream name_stream;
+      name_stream << "AllocateDisplayRenderTargets " << token_name << " "
+                  << fsl::GetCurrentProcessName();
+      std::string token_client_name = name_stream.str();
+      if (token_client_name.size() > kMaxSysmem1DebugNameLength) {
+        token_client_name.resize(kMaxSysmem1DebugNameLength);
+      }
+      // set debug info for renderer_token in case it fails unexpectedly or similar
+      auto set_info_status =
+          token->SetDebugClientInfo(std::move(token_client_name), fsl::GetCurrentProcessKoid());
+      FX_DCHECK(set_info_status == ZX_OK)
+          << "set_info_status: " << zx_status_get_string(set_info_status);
+    };
+
+    set_token_debug_name(renderer_token, "renderer_token");
+    set_token_debug_name(display_token, "display_token");
+
+    // The compositor_token inherited it's debug info from sysmem_allocator_, so is still set to
+    // "scenic flatland::DisplayCompositor" at this point, which is fine; just need to be able to
+    // tell which token is potentially failing below - at this point each token (compositor_token,
+    // renderer_token, display_token) has distinguishable debug info.
   }
 
   // Set renderer constraints.
