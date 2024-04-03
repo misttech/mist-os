@@ -33,12 +33,12 @@ where
     R: Default,
 {
     if let Some(security_server) = &current_task.kernel().security_server {
-        if !security_server.has_policy() || security_server.is_fake() {
+        if !security_server.has_policy() {
             return Ok(R::default());
         }
         let result = hook(security_server);
         // TODO(b/331375792): Relocate "enforcing" check into the AVC.
-        if !security_server.is_enforcing() {
+        if !security_server.is_enforcing() || security_server.is_fake() {
             return Ok(R::default());
         }
         result
@@ -65,7 +65,7 @@ where
     D: Fn() -> R,
 {
     current_task.kernel().security_server.as_ref().map_or_else(&default, |ss| {
-        if ss.has_policy() && !ss.is_fake() {
+        if ss.has_policy() {
             hook(ss)
         } else {
             default()
@@ -522,7 +522,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn no_state_update_for_fake_mode() {
+    async fn state_update_for_fake_mode() {
         let security_server = security_server_with_policy(Mode::Fake);
         let initial_state = SeLinuxThreadGroupState::for_kernel();
         let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
@@ -539,8 +539,13 @@ mod tests {
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut task, &Some(elf_state));
         assert_eq!(
-            task.thread_group.read().selinux_state.as_ref().expect("missing SELinux state"),
-            &initial_state
+            task.thread_group
+                .read()
+                .selinux_state
+                .as_ref()
+                .expect("missing SELinux state")
+                .current_sid,
+            elf_sid
         );
     }
 
@@ -734,7 +739,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn post_setxattr_noop_selinux_fake() {
+    async fn post_setxattr_selinux_fake() {
         let security_server = security_server_with_policy(Mode::Fake);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
@@ -748,7 +753,7 @@ mod tests {
             VALID_SECURITY_CONTEXT.into(),
         );
 
-        assert_eq!(None, node.cached_sid());
+        assert!(node.cached_sid().is_some());
     }
 
     #[fuchsia::test]
