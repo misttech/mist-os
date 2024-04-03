@@ -79,7 +79,7 @@ EOF
 # into an array (expecting one item per line, preserving spaces).
 # $1: variable name
 # $2+: command arguments.
-if [[ "${BASH_VERSION}" =~ /^3/ ]]; then
+if [[ "${BASH_VERSION}" =~ ^3 ]]; then
   # MacOS comes with Bash 3.x which doesn't have readarray at all
   # so read one line at a time.
   function command-stdout-to-array {
@@ -345,7 +345,7 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
       # then ignores the --host option. This results in confusing build error messages
       # (see https://fxbug.dev/328421720), so detect this here and make trailing toolchain
       # options an error with an explicit message.
-      local last_index=$(("${#fuchsia_targets[@]}" - 1))
+      local last_index=$((${#fuchsia_targets[@]} - 1))
       local last_fuchsia_target="${fuchsia_targets[${last_index}]}"
       if [[ "${last_fuchsia_target}" =~ --.* ]]; then
         fx-error "Toolchain option ${last_fuchsia_target} must be followed by at least one GN label"
