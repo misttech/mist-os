@@ -665,6 +665,10 @@ async fn acquire_then_renew_with_dhcpd_bound_device<
     .await;
 }
 
+// TODO(https://fxbug.dev/42077260): Enable this test for Netstack3. Note that
+// the test will need to be updated to make DAD more robust to CQ timing
+// variability. This could be done by configuring the number of IPV4
+// `dad_transmits` to some large value.
 #[netstack_test]
 async fn acquire_with_dhcpd_bound_device_dup_addr<
     SERVER: Netstack,

@@ -10,6 +10,15 @@
             ],
         },
         {
+            type: "skip",
+            matchers: [
+                // This test relies on using ARP probes to perform duplicate
+                // address detection, making it prone to flaking in CQ, where
+                // timing is less stable. See https://fxbug.dev/332181505.
+                "acquire_with_dhcpd_bound_device_dup_addr_ns[23]_ns2_with_dhcp_in_stack",
+            ],
+        },
+        {
             type: "expect_pass_with_err_logs",
             matchers: [
                 "acquire_then_renew_with_dhcpd_bound_device_ns3_ns2_with_dhcp_in_stack",
