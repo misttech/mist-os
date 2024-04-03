@@ -71,12 +71,26 @@ class InputDevice
   virtio_input_config_t config_;
 
   static const size_t kEventCount = 64;
-  io_buffer_t buffers_[kEventCount];
+  io_buffer_t eventq_buffers_[kEventCount];
+
+  // We don't currently send status events to the device, so we use the
+  // smallest value that is a power of 2, as required by virtio::Ring::Init();
+  static const size_t kStatusCount = 2;
+  io_buffer_t statusq_buffers_[kStatusCount];
 
   fbl::Mutex lock_;
 
   std::unique_ptr<HidDeviceBase> hid_device_;
-  Ring vring_ = {this};
+
+  // The input device's event virtqueue, or `eventq`.
+  //
+  // Defined in the VIRTIO spec Section 5.8.2 "Input Device" > "Virtqueues".
+  Ring eventq_vring_ = {this};
+
+  // The input device's status virtqueue, or `statusq`.
+  //
+  // Defined in the VIRTIO spec Section 5.8.2 "Input Device" > "Virtqueues".
+  Ring statusq_vring_ = {this};
 
   inspect::Inspector inspector_;
   inspect::Node metrics_root_;

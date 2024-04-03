@@ -112,40 +112,73 @@ zx_status_t InputDevice::Init() {
   // Plan to clean up unless everything succeeds.
   auto cleanup = fit::defer([this]() { Release(); });
 
-  // Allocate the main vring
-  zx_status_t status = vring_.Init(0, kEventCount);
+  // Allocate the main eventq vring
+  zx_status_t status = eventq_vring_.Init(0, kEventCount);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate vring: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to allocate eventq vring: %s", zx_status_get_string(status));
     return status;
   }
 
-  // Allocate event buffers for the ring.
+  // Allocate eventq buffers for the ring.
   // TODO: Avoid multiple allocations, allocate enough for all buffers once.
   for (uint16_t id = 0; id < kEventCount; ++id) {
     assert(sizeof(virtio_input_event_t) <= zx_system_get_page_size());
-    status = io_buffer_init(&buffers_[id], bti_.get(), sizeof(virtio_input_event_t),
+    status = io_buffer_init(&eventq_buffers_[id], bti_.get(), sizeof(virtio_input_event_t),
                             IO_BUFFER_RO | IO_BUFFER_CONTIG);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to allocate I/O buffers: %s", zx_status_get_string(status));
+      zxlogf(ERROR, "Failed to allocate eventq I/O buffers: %s", zx_status_get_string(status));
       return status;
     }
   }
 
-  // Expose event buffers to the host
+  // Expose eventq buffers to the host
   vring_desc* desc = nullptr;
   uint16_t id;
   for (uint16_t i = 0; i < kEventCount; ++i) {
-    desc = vring_.AllocDescChain(1, &id);
+    desc = eventq_vring_.AllocDescChain(1, &id);
     if (desc == nullptr) {
-      zxlogf(ERROR, "Failed to allocate descriptor chain");
+      zxlogf(ERROR, "Failed to allocate eventq descriptor chain");
       return ZX_ERR_NO_RESOURCES;
     }
     ZX_ASSERT(id < kEventCount);
-    desc->addr = io_buffer_phys(&buffers_[id]);
+    desc->addr = io_buffer_phys(&eventq_buffers_[id]);
     desc->len = sizeof(virtio_input_event_t);
     desc->flags |= VRING_DESC_F_WRITE;
     LTRACE_DO(virtio_dump_desc(desc));
-    vring_.SubmitChain(id);
+    eventq_vring_.SubmitChain(id);
+  }
+
+  // Allocate the statusq vring
+  status = statusq_vring_.Init(1, kStatusCount);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to allocate statusq vring: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  // Allocate statusq buffers for the ring.
+  for (uint16_t id = 0; id < kStatusCount; ++id) {
+    assert(sizeof(virtio_input_event_t) <= zx_system_get_page_size());
+    status = io_buffer_init(&statusq_buffers_[id], bti_.get(), sizeof(virtio_input_event_t),
+                            IO_BUFFER_RW | IO_BUFFER_CONTIG);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to allocate statusq I/O buffers: %s", zx_status_get_string(status));
+      return status;
+    }
+  }
+
+  // Expose statusq buffers to the host
+  for (uint16_t i = 0; i < kStatusCount; ++i) {
+    desc = statusq_vring_.AllocDescChain(1, &id);
+    if (desc == nullptr) {
+      zxlogf(ERROR, "Failed to allocate statusq descriptor chain");
+      return ZX_ERR_NO_RESOURCES;
+    }
+    ZX_ASSERT(id < kStatusCount);
+    desc->addr = io_buffer_phys(&statusq_buffers_[id]);
+    desc->len = sizeof(virtio_input_event_t);
+    desc->flags |= VRING_DESC_F_WRITE;
+    LTRACE_DO(virtio_dump_desc(desc));
+    statusq_vring_.SubmitChain(id);
   }
 
   StartIrqThread();
@@ -157,7 +190,7 @@ zx_status_t InputDevice::Init() {
     return status;
   }
 
-  vring_.Kick();
+  eventq_vring_.Kick();
   cleanup.cancel();
   return ZX_OK;
 }
@@ -165,8 +198,13 @@ zx_status_t InputDevice::Init() {
 void InputDevice::DdkRelease() {
   fbl::AutoLock lock(&lock_);
   for (size_t i = 0; i < kEventCount; ++i) {
-    if (io_buffer_is_valid(&buffers_[i])) {
-      io_buffer_release(&buffers_[i]);
+    if (io_buffer_is_valid(&eventq_buffers_[i])) {
+      io_buffer_release(&eventq_buffers_[i]);
+    }
+  }
+  for (size_t i = 0; i < kStatusCount; ++i) {
+    if (io_buffer_is_valid(&statusq_buffers_[i])) {
+      io_buffer_release(&statusq_buffers_[i]);
     }
   }
 }
@@ -186,30 +224,30 @@ void InputDevice::ReceiveEvent(virtio_input_event_t* event) {
 void InputDevice::IrqRingUpdate() {
   auto free_chain = [this](vring_used_elem* used_elem) {
     uint16_t id = static_cast<uint16_t>(used_elem->id & 0xffff);
-    vring_desc* desc = vring_.DescFromIndex(id);
+    vring_desc* desc = eventq_vring_.DescFromIndex(id);
     ZX_ASSERT(id < kEventCount);
     ZX_ASSERT(desc->len == sizeof(virtio_input_event_t));
 
-    auto evt = static_cast<virtio_input_event_t*>(io_buffer_virt(&buffers_[id]));
+    auto evt = static_cast<virtio_input_event_t*>(io_buffer_virt(&eventq_buffers_[id]));
     ReceiveEvent(evt);
 
     ZX_ASSERT((desc->flags & VRING_DESC_F_NEXT) == 0);
-    vring_.FreeDesc(id);
+    eventq_vring_.FreeDesc(id);
   };
 
-  vring_.IrqRingUpdate(free_chain);
+  eventq_vring_.IrqRingUpdate(free_chain);
 
   vring_desc* desc = nullptr;
   uint16_t id;
   bool need_kick = false;
-  while ((desc = vring_.AllocDescChain(1, &id))) {
+  while ((desc = eventq_vring_.AllocDescChain(1, &id))) {
     desc->len = sizeof(virtio_input_event_t);
-    vring_.SubmitChain(id);
+    eventq_vring_.SubmitChain(id);
     need_kick = true;
   }
 
   if (need_kick) {
-    vring_.Kick();
+    eventq_vring_.Kick();
   }
 }
 
