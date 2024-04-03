@@ -74,11 +74,6 @@ func NewFfxInstance(
 		ffx = path
 	}
 
-	sshKey, err := util.DutSshKeyPath()
-	if err != nil {
-		return nil, fmt.Errorf("util.DutSshKeyPath() = %w", err)
-	}
-
 	fmt.Printf("os.Environ() = %s\n", os.Environ())
 
 	wrapperFfxInstance := FfxInstance{outputDir: options.TestOutputDir}
@@ -94,6 +89,10 @@ func NewFfxInstance(
 		wrapperFfxInstance.outputDir = dir
 		wrapperFfxInstance.iOwnOutputDir = true
 	}
+
+	// Configure the ssh keys to be created in the ffx instance dir
+	sshKey := filepath.Join(wrapperFfxInstance.outputDir, "ssh_keys", "ssh_private_key")
+	sshAuthKey := filepath.Join(wrapperFfxInstance.outputDir, "ssh_keys", "ssh_auth_keys")
 
 	sdkRoot := filepath.Join(wrapperFfxInstance.outputDir, "sdk")
 
@@ -188,6 +187,7 @@ func NewFfxInstance(
 	cfgs := map[string]string{
 		"sdk.root": sdkRoot,
 		"sdk.type": "in-tree",
+		"ssh.pub":  sshAuthKey,
 	}
 
 	for key, value := range cfgs {

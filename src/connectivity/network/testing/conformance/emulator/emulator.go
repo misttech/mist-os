@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/util"
 	"go.fuchsia.dev/fuchsia/tools/emulator"
 	fvdpb "go.fuchsia.dev/fuchsia/tools/virtual_device/proto"
 )
@@ -46,6 +45,7 @@ const HostPathTestDataDirForQemuDistro = "test_data"
 // terminated on ctx.Done.
 func NewQemuInstance(
 	ctx context.Context,
+	authorizedKeysPath string,
 	args QemuInstanceArgs,
 ) (q *QemuInstance, err error) {
 	distro, err := emulator.UnpackFrom(
@@ -78,11 +78,6 @@ func NewQemuInstance(
 		args.HostX64Path,
 		SourceRootRelativeDir,
 	)
-
-	authorizedKeysPath, err := util.DutAuthorizedKeysPath()
-	if err != nil {
-		return nil, fmt.Errorf("util.DutAuthorizedKeysPath() = %w", err)
-	}
 
 	i, err := distro.CreateContextWithAuthorizedKeys(
 		ctx,

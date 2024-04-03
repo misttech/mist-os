@@ -90,4 +90,13 @@ func TestFFXInstance(t *testing.T) {
 	assertRunsExpectedCmd(ffx.RunWithTarget(ctx, "random", "cmd", "with", "args"), stdout, "--target target random cmd with args")
 
 	assertRunsExpectedCmd(ffx.Stop(), stdout, "daemon stop -t 4000")
+
+	if _, err := ffx.GetSshPrivateKey(ctx); err != nil {
+		t.Errorf("failed to get ssh private key: %s", err)
+	}
+
+	if _, err := ffx.GetSshAuthorizedKeys(ctx); err != nil {
+		t.Errorf("failed to get ssh private key: %s", err)
+	}
+
 }

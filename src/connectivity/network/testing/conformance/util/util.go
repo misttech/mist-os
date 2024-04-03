@@ -5,11 +5,8 @@
 package util
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-
-	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
 )
 
 func GetHostOutDirectory() (string, error) {
@@ -37,36 +34,4 @@ func GetHostToolsDirectory() (string, error) {
 
 	parent, _ := filepath.Split(hostOut)
 	return filepath.Join(parent, "host-tools"), nil
-}
-
-func DutSshKeyPath() (string, error) {
-	hostOutDir, err := GetHostOutDirectory()
-	if err != nil {
-		return "", err
-	}
-	keyFilepath := filepath.Join(hostOutDir, "ssh_keys", "dut_ssh_key")
-	fileExists, err := osmisc.FileExists(keyFilepath)
-	if err != nil {
-		return "", fmt.Errorf("osmisc.FileExists(%q) = %w", keyFilepath, err)
-	}
-	if !fileExists {
-		return "", fmt.Errorf("No SSH key file found at %s", keyFilepath)
-	}
-	return keyFilepath, nil
-}
-
-func DutAuthorizedKeysPath() (string, error) {
-	hostOutDir, err := GetHostOutDirectory()
-	if err != nil {
-		return "", err
-	}
-	authorizedKeysFilepath := filepath.Join(hostOutDir, "ssh_keys", "dut_authorized_keys")
-	fileExists, err := osmisc.FileExists(authorizedKeysFilepath)
-	if err != nil {
-		return "", fmt.Errorf("osmisc.FileExists(%q) = %w", authorizedKeysFilepath, err)
-	}
-	if !fileExists {
-		return "", fmt.Errorf("No authorized_keys file found at %s", authorizedKeysFilepath)
-	}
-	return authorizedKeysFilepath, nil
 }

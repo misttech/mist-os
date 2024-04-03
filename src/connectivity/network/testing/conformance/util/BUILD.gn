@@ -3,28 +3,11 @@
 # found in the LICENSE file.
 
 import("//build/go/go_library.gni")
-import("//build/testing/host_test_data.gni")
 
 if (is_host) {
   go_library("util") {
     sources = [ "util.go" ]
-    deps = [ "//tools/lib/osmisc" ]
-    non_go_deps = [
-      ":dut_authorized_keys",
-      ":dut_ssh_key",
-    ]
+    deps = []
     testonly = true
-  }
-
-  host_test_data("dut_ssh_key") {
-    sources = [ "//.ssh/pkey" ]
-
-    outputs = [ "${root_out_dir}/ssh_keys/dut_ssh_key" ]
-  }
-
-  host_test_data("dut_authorized_keys") {
-    sources = [ "//.ssh/authorized_keys" ]
-
-    outputs = [ "${root_out_dir}/ssh_keys/dut_authorized_keys" ]
   }
 }

@@ -9,7 +9,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
@@ -19,10 +18,6 @@ import (
 	ffxlib "go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/ffx"
 	fvdpb "go.fuchsia.dev/fuchsia/tools/virtual_device/proto"
 )
-
-const RSA_KEY_NUM_BITS int = 2048
-const PRIVATE_KEY_PERMISSIONS fs.FileMode = 0600
-const PUBLIC_KEY_PERMISSIONS fs.FileMode = 0666
 
 const NETWORK_TEST_REALM_COMPONENT_NAME = "net-test-realm-controller"
 
@@ -37,6 +32,9 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	executablePath, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -46,8 +44,42 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	sourceRootRelativeDir := filepath.Join(
+		hostOutDir,
+		"..",
+		"host-tools",
+	)
+
 	initrd := "network-conformance-base"
 	nodename := "TestEmulatorWorksWithFfx-Nodename"
+
+	tempDir := t.TempDir()
+	ffxPath := filepath.Join(sourceRootRelativeDir, "ffx")
+	ffx, err := ffxlib.NewFfxInstance(
+		ctx,
+		ffxlib.FfxInstanceOptions{
+			Target:        nodename,
+			TestOutputDir: tempDir,
+			FfxBinPath:    ffxPath,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ssh_auth_keys, err := ffx.GetSshAuthorizedKeys(ctx)
+	if err != nil {
+		t.Fatalf("Could not get authorized keys: %s", err)
+	}
+
+	defer func() {
+		// Just log errors since ffx.Stop() is expected to return a DeadlineExceeded
+		// when the daemon takes longer than usual to shut down (which is not
+		// actionable for us).
+		if err := ffx.Stop(); err != nil {
+			t.Logf("ffx.Stop() = %s", err)
+		}
+	}()
 
 	// Note: To run this test locally on linux, you must create the TAP interface:
 	// $ sudo ip tuntap add mode tap qemu; sudo ip link set dev qemu up
@@ -64,15 +96,14 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 		},
 	}}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	i, err := NewQemuInstance(ctx, QemuInstanceArgs{
-		Nodename:       nodename,
-		Initrd:         initrd,
-		HostX64Path:    hostOutDir,
-		NetworkDevices: netdevs,
-	})
+	i, err := NewQemuInstance(ctx,
+		ssh_auth_keys,
+		QemuInstanceArgs{
+			Nodename:       nodename,
+			Initrd:         initrd,
+			HostX64Path:    hostOutDir,
+			NetworkDevices: netdevs,
+		})
 
 	if err != nil {
 		t.Fatal(err)
@@ -95,34 +126,6 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 		_, err := i.Wait()
 		emulatorDone <- err
 		close(emulatorDone)
-	}()
-
-	sourceRootRelativeDir := filepath.Join(
-		hostOutDir,
-		"..",
-		"host-tools",
-	)
-
-	tempDir := t.TempDir()
-	ffxPath := filepath.Join(sourceRootRelativeDir, "ffx")
-	ffx, err := ffxlib.NewFfxInstance(
-		ctx,
-		ffxlib.FfxInstanceOptions{
-			Target:        nodename,
-			TestOutputDir: tempDir,
-			FfxBinPath:    ffxPath,
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		// Just log errors since ffx.Stop() is expected to return a DeadlineExceeded
-		// when the daemon takes longer than usual to shut down (which is not
-		// actionable for us).
-		if err := ffx.Stop(); err != nil {
-			t.Logf("ffx.Stop() = %s", err)
-		}
 	}()
 
 	netTestRealmExperimentalFlagPointer := "net.test.realm"

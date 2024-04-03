@@ -344,6 +344,38 @@ func (f *FFXInstance) GetConfig(ctx context.Context) error {
 	return f.Run(ctx, "config", "get")
 }
 
+// GetSshPrivateKey returns the file path for the ssh private key.
+func (f *FFXInstance) GetSshPrivateKey(ctx context.Context) (string, error) {
+	// Check that the keys exist and are valid
+	if err := f.Run(ctx, "config", "check-ssh-keys"); err != nil {
+		return "", err
+	}
+	key, err := f.RunAndGetOutput(ctx, "config", "get", "ssh.priv")
+	if err != nil {
+		return "", err
+	}
+
+	// strip quotes if present.
+	key = strings.Replace(key, "\"", "", -1)
+	return key, nil
+}
+
+// GetSshAuthorizedKeys returns the file path for the ssh auth keys.
+func (f *FFXInstance) GetSshAuthorizedKeys(ctx context.Context) (string, error) {
+	// Check that the keys exist and are valid
+	if err := f.Run(ctx, "config", "check-ssh-keys"); err != nil {
+		return "", err
+	}
+	key, err := f.RunAndGetOutput(ctx, "config", "get", "ssh.pub")
+	if err != nil {
+		return "", err
+	}
+
+	// strip quotes if present.
+	key = strings.Replace(key, "\"", "", -1)
+	return key, nil
+}
+
 // GetPBArtifacts returns a list of the artifacts required for the specified artifactsGroup (flash or emu).
 // The returned list are relative paths to the pbPath.
 func (f *FFXInstance) GetPBArtifacts(ctx context.Context, pbPath string, artifactsGroup string) ([]string, error) {
