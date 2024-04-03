@@ -751,7 +751,7 @@ async fn get_realm(
         name: CUSTOM_ARTIFACTS_CAPABILITY_NAME.parse().unwrap(),
         source: cm_rust::StorageDirectorySource::Child(MEMFS_REALM_NAME.to_string()),
         backing_dir: "memfs".parse().unwrap(),
-        subdir: Some("custom_artifacts".into()),
+        subdir: "custom_artifacts".parse().unwrap(),
         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
     }));
 

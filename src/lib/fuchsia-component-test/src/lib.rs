@@ -1112,13 +1112,8 @@ impl RealmBuilder {
                     let cap = Capability::directory(name)
                         .path(source_path.expect("missing capability source path"))
                         .rights(rights);
-                    let cap = if let Some(subdir) = expose.subdir {
-                        cap.subdir(
-                            subdir
-                                .into_os_string()
-                                .into_string()
-                                .expect("subdir path is invalid string"),
-                        )
+                    let cap = if !expose.subdir.is_dot() {
+                        cap.subdir(expose.subdir.to_string())
                     } else {
                         cap
                     };

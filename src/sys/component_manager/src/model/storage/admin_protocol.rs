@@ -260,7 +260,7 @@ impl StorageAdmin {
                 capability: ComponentCapability::Storage(storage_decl.clone()),
                 component: component.clone(),
             },
-            relative_path: PathBuf::new(),
+            relative_path: Default::default(),
         };
         let backing_dir_source_info = storage::route_backing_directory(storage_source.source)
             .await

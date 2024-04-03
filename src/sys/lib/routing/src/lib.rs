@@ -31,7 +31,6 @@ use {
             ErrorNotFoundInChild, ExposeVisitor, NoopVisitor, OfferVisitor, RouteBundle,
         },
         mapper::DebugRouteMapper,
-        path::PathBufExt,
         rights::Rights,
         walk_state::WalkState,
     },
@@ -47,11 +46,11 @@ use {
         UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource,
         UseStorageDecl,
     },
-    cm_types::Name,
+    cm_types::{Name, RelativePath},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     from_enum::FromEnum,
     moniker::{ChildName, Moniker},
-    std::{path::PathBuf, sync::Arc},
+    std::sync::Arc,
     tracing::warn,
 };
 
@@ -275,15 +274,18 @@ impl std::fmt::Display for RouteRequest {
 #[derive(Debug)]
 pub struct RouteSource<C: ComponentInstanceInterface> {
     pub source: CapabilitySource<C>,
-    pub relative_path: PathBuf,
+    pub relative_path: RelativePath,
 }
 
 impl<C: ComponentInstanceInterface> RouteSource<C> {
     pub fn new(source: CapabilitySource<C>) -> Self {
-        Self { source, relative_path: "".into() }
+        Self { source, relative_path: Default::default() }
     }
 
-    pub fn new_with_relative_path(source: CapabilitySource<C>, relative_path: PathBuf) -> Self {
+    pub fn new_with_relative_path(
+        source: CapabilitySource<C>,
+        relative_path: RelativePath,
+    ) -> Self {
         Self { source, relative_path }
     }
 }
@@ -424,7 +426,7 @@ where
 {
     let mut state = DirectoryState {
         rights: WalkState::new(),
-        subdir: PathBuf::new(),
+        subdir: Default::default(),
         availability_state: offer_decl.availability.into(),
     };
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Directory)
@@ -846,19 +848,15 @@ where
 #[derive(Clone, Debug)]
 pub struct DirectoryState {
     rights: WalkState<Rights>,
-    pub subdir: PathBuf,
+    pub subdir: RelativePath,
     availability_state: Availability,
 }
 
 impl DirectoryState {
-    fn new(
-        operations: fio::Operations,
-        subdir: Option<PathBuf>,
-        availability: &Availability,
-    ) -> Self {
+    fn new(operations: fio::Operations, subdir: RelativePath, availability: &Availability) -> Self {
         DirectoryState {
             rights: WalkState::at(operations.into()),
-            subdir: subdir.unwrap_or_else(PathBuf::new),
+            subdir,
             availability_state: availability.clone(),
         }
     }
@@ -877,22 +875,22 @@ impl DirectoryState {
     fn advance(
         &mut self,
         rights: Option<fio::Operations>,
-        subdir: Option<PathBuf>,
+        mut subdir: RelativePath,
     ) -> Result<(), RoutingError> {
         self.rights = self.rights.advance(rights.map(Rights::from))?;
-        let subdir = subdir.clone().unwrap_or_else(PathBuf::new);
-        self.subdir = subdir.attach(&self.subdir);
+        subdir.extend(self.subdir.clone());
+        self.subdir = subdir;
         Ok(())
     }
 
     fn finalize(
         &mut self,
         rights: fio::Operations,
-        subdir: Option<PathBuf>,
+        mut subdir: RelativePath,
     ) -> Result<(), RoutingError> {
         self.rights = self.rights.finalize(Some(rights.into()))?;
-        let subdir = subdir.clone().unwrap_or_else(PathBuf::new);
-        self.subdir = subdir.attach(&self.subdir);
+        subdir.extend(self.subdir.clone());
+        self.subdir = subdir;
         Ok(())
     }
 }
@@ -924,7 +922,9 @@ impl ExposeVisitor for DirectoryState {
 impl CapabilityVisitor for DirectoryState {
     fn visit(&mut self, capability: &cm_rust::CapabilityDecl) -> Result<(), RoutingError> {
         match capability {
-            cm_rust::CapabilityDecl::Directory(dir) => self.finalize(dir.rights.clone(), None),
+            cm_rust::CapabilityDecl::Directory(dir) => {
+                self.finalize(dir.rights.clone(), Default::default())
+            }
             _ => Ok(()),
         }
     }
@@ -963,7 +963,7 @@ where
                 &use_decl.availability,
             );
             if let UseSource::Framework = &use_decl.source {
-                state.finalize(fio::RW_STAR_DIR, None)?;
+                state.finalize(fio::RW_STAR_DIR, Default::default())?;
             }
             let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Directory)
                 .framework(InternalCapability::Directory)
@@ -997,7 +997,7 @@ where
 {
     let mut state = DirectoryState {
         rights: WalkState::new(),
-        subdir: PathBuf::new(),
+        subdir: Default::default(),
         availability_state: expose_decl.availability.into(),
     };
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Directory)
@@ -1097,7 +1097,8 @@ where
     C: ComponentInstanceInterface + 'static,
 {
     // Storage rights are always READ+WRITE.
-    let mut state = DirectoryState::new(fio::RW_STAR_DIR, None, &Availability::Required);
+    let mut state =
+        DirectoryState::new(fio::RW_STAR_DIR, Default::default(), &Availability::Required);
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Directory).component().namespace();
     let source = legacy_router::route_from_registration(

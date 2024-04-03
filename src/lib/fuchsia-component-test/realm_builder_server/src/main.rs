@@ -5,6 +5,7 @@
 use {
     anyhow::Context,
     cm_rust::{FidlIntoNative, NativeIntoFidl, OfferDeclCommon},
+    cm_types::RelativePath,
     fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcdecl,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_test as ftest,
@@ -20,7 +21,6 @@ use {
     std::{
         collections::HashMap,
         ops::{Deref, DerefMut},
-        path::PathBuf,
         str::FromStr,
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -1393,6 +1393,19 @@ fn try_into_target_name(
     })?)
 }
 
+fn try_into_subdir(input: &Option<String>) -> Result<RelativePath, RealmBuilderError> {
+    input
+        .as_ref()
+        .map(|p| {
+            RelativePath::new(p).map_err(|_| {
+                RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
+                    "Field `subdir` is not a valid relative path."
+                ))
+            })
+        })
+        .unwrap_or_else(|| Ok(Default::default()))
+}
+
 /// Attempts to produce a valid path from the "path" field from a capability
 fn try_into_capability_path(input: &Option<String>) -> Result<cm_types::Path, RealmBuilderError> {
     input
@@ -1517,7 +1530,7 @@ fn create_offer_decl(
                 target,
                 target_name,
                 rights: directory.rights,
-                subdir: directory.subdir.map(PathBuf::from),
+                subdir: try_into_subdir(&directory.subdir)?,
                 dependency_type,
                 availability,
             })
@@ -1627,8 +1640,8 @@ fn create_expose_decl(
             // exposing_in field to ensure that we apply the subdir field in the parent, and not in
             // a local child's manifest.
             let subdir = match exposing_in {
-                ExposingIn::Child => None,
-                ExposingIn::Realm => directory.subdir.map(PathBuf::from),
+                ExposingIn::Child => Default::default(),
+                ExposingIn::Realm => try_into_subdir(&directory.subdir)?,
             };
             cm_rust::ExposeDecl::Directory(cm_rust::ExposeDirectoryDecl {
                 source,
@@ -1733,7 +1746,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
                 // We only want to set the sub-directory field once, and if we're generating a use
                 // declaration then we've already generated an offer declaration in the parent and
                 // we'll set the sub-directory field there.
-                subdir: None,
+                subdir: Default::default(),
                 dependency_type,
                 availability: check_and_unwrap_use_availability(directory.availability)?,
             })
@@ -3411,7 +3424,7 @@ mod tests {
                         target_name: "config-data".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         rights: Some(fio::RW_STAR_DIR),
-                        subdir: Some(PathBuf::from("component")),
+                        subdir: "component".parse().unwrap(),
                         availability: cm_rust::Availability::Required,
                     }),
                     cm_rust::OfferDecl::Storage(cm_rust::OfferStorageDecl {
@@ -3552,7 +3565,7 @@ mod tests {
                     source_dictionary: Default::default(),
                     target_path: "/config-data".parse().unwrap(),
                     rights: fio::RW_STAR_DIR,
-                    subdir: None,
+                    subdir: Default::default(),
                     dependency_type: cm_rust::DependencyType::Strong,
                     availability: cm_rust::Availability::Optional,
                 }),
@@ -3609,7 +3622,7 @@ mod tests {
                         target_name: "config-data".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         rights: Some(fio::RW_STAR_DIR),
-                        subdir: Some(PathBuf::from("component")),
+                        subdir: "component".parse().unwrap(),
                         availability: cm_rust::Availability::Optional,
                     }),
                     cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
@@ -3620,7 +3633,7 @@ mod tests {
                         target_name: "config-data".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         rights: Some(fio::RW_STAR_DIR),
-                        subdir: Some(PathBuf::from("component")),
+                        subdir: "component".parse().unwrap(),
                         availability: cm_rust::Availability::Optional,
                     }),
                     cm_rust::OfferDecl::Storage(cm_rust::OfferStorageDecl {
@@ -3744,7 +3757,7 @@ mod tests {
                         target_name: "config-data".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         rights: Some(fio::RW_STAR_DIR),
-                        subdir: Some(PathBuf::from("component")),
+                        subdir: "component".parse().unwrap(),
                         availability: cm_rust::Availability::SameAsTarget,
                     }),
                     cm_rust::OfferDecl::Storage(cm_rust::OfferStorageDecl {
@@ -4660,7 +4673,7 @@ mod tests {
                 target: cm_rust::ExposeTarget::Parent,
                 target_name: "data".parse().unwrap(),
                 rights: Some(fio::R_STAR_DIR),
-                subdir: None,
+                subdir: Default::default(),
                 availability: cm_rust::Availability::Required,
             })],
             ..cm_rust::ComponentDecl::default()
@@ -4689,7 +4702,7 @@ mod tests {
                     target_name: "data".parse().unwrap(),
                     dependency_type: cm_rust::DependencyType::Strong,
                     rights: Some(fio::R_STAR_DIR),
-                    subdir: None,
+                    subdir: Default::default(),
                     availability: cm_rust::Availability::Required,
                 })],
                 ..cm_rust::ComponentDecl::default()

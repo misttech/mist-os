@@ -381,7 +381,7 @@ impl AnonymizedAggregateServiceDir {
         let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
         CapabilityOpenRequest::new_from_route_source(
-            RouteSource { source: source.clone(), relative_path: "".into() },
+            RouteSource { source: source.clone(), relative_path: Default::default() },
             &target,
             OpenOptions {
                 flags: fio::OpenFlags::DIRECTORY,

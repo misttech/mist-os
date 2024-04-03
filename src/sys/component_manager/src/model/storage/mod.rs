@@ -20,15 +20,13 @@ use {
     anyhow::Error,
     clonable_error::ClonableError,
     cm_moniker::InstancedMoniker,
+    cm_types::RelativePath,
     component_id_index::InstanceId,
     derivative::Derivative,
     fidl::endpoints,
     fidl_fuchsia_io as fio,
     moniker::MonikerBase,
-    std::{
-        path::{Path, PathBuf},
-        sync::Arc,
-    },
+    std::{path::PathBuf, sync::Arc},
     thiserror::Error,
 };
 
@@ -52,13 +50,13 @@ pub struct BackingDirectoryInfo {
     pub backing_directory_path: cm_types::Path,
 
     /// The subdirectory inside of the backing directory capability to use, if any
-    pub backing_directory_subdir: Option<PathBuf>,
+    pub backing_directory_subdir: RelativePath,
 
     /// The subdirectory inside of the backing directory's sub-directory to use, if any. The
     /// difference between this and backing_directory_subdir is that backing_directory_subdir is
     /// appended to backing_directory_path first, and component_manager will create this subdir if
     /// it doesn't exist but won't create backing_directory_subdir.
-    pub storage_subdir: Option<PathBuf>,
+    pub storage_subdir: RelativePath,
 
     /// The moniker of the component that defines the storage capability, with instance ids. This
     /// is used for generating moniker-based storage paths.
@@ -199,30 +197,24 @@ async fn open_storage_root(
 ) -> Result<fio::DirectoryProxy, ModelError> {
     let (mut dir_proxy, local_server_end) =
         endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
-    let full_backing_directory_path = match storage_source_info.backing_directory_subdir.as_ref() {
-        Some(subdir) => storage_source_info.backing_directory_path.to_path_buf().join(subdir),
-        None => storage_source_info.backing_directory_path.to_path_buf(),
-    };
+    let mut full_backing_directory_path = storage_source_info.backing_directory_path.clone();
+    full_backing_directory_path.extend(storage_source_info.backing_directory_subdir.clone());
     if let Some(dir_source_component) = storage_source_info.storage_provider.as_ref() {
         // TODO(https://fxbug.dev/42127827): This should be StartReason::AccessCapability, but we haven't
         // plumbed in all the details needed to use it.
         dir_source_component.ensure_started(&StartReason::StorageAdmin).await?;
-        let path = full_backing_directory_path
-            .to_str()
-            .ok_or_else(|| ModelError::path_is_not_utf8(full_backing_directory_path.clone()))?;
+        let path = full_backing_directory_path.to_string();
         dir_source_component
             .open_outgoing(
                 FLAGS | fio::OpenFlags::DIRECTORY,
-                path,
+                &path,
                 &mut local_server_end.into_channel(),
             )
             .await?;
     } else {
         // If storage_source_info.storage_provider is None, the directory comes from component_manager's namespace
-        let path = full_backing_directory_path
-            .to_str()
-            .ok_or_else(|| ModelError::path_is_not_utf8(full_backing_directory_path.clone()))?;
-        fuchsia_fs::directory::open_channel_in_namespace(path, FLAGS, local_server_end).map_err(
+        let path = full_backing_directory_path.to_string();
+        fuchsia_fs::directory::open_channel_in_namespace(&path, FLAGS, local_server_end).map_err(
             |e| {
                 ModelError::from(StorageError::open_root(
                     None,
@@ -232,10 +224,10 @@ async fn open_storage_root(
             },
         )?;
     }
-    if let Some(subdir) = storage_source_info.storage_subdir.as_ref() {
+    if !storage_source_info.storage_subdir.is_dot() {
         dir_proxy = fuchsia_fs::directory::create_directory_recursive(
             &dir_proxy,
-            subdir.to_str().ok_or(ModelError::path_is_not_utf8(subdir.clone()))?,
+            &storage_source_info.storage_subdir.to_string(),
             FLAGS,
         )
         .await
@@ -275,7 +267,7 @@ pub async fn route_backing_directory(
         .route(&storage_component)
         .await?;
 
-    let (dir_source_path, dir_source_instance, relative_path) = match source {
+    let (dir_source_path, dir_source_instance, dir_subdir) = match source {
         RouteSource {
             source: CapabilitySource::Component { capability, component },
             relative_path,
@@ -291,8 +283,6 @@ pub async fn route_backing_directory(
         ),
         _ => unreachable!("not valid sources"),
     };
-    let dir_subdir =
-        if relative_path == Path::new("") { None } else { Some(relative_path.clone()) };
 
     Ok(BackingDirectoryInfo {
         storage_provider: dir_source_instance,
@@ -328,7 +318,7 @@ pub async fn open_isolated_storage(
 
     fuchsia_fs::directory::create_directory_recursive(
         &root_dir,
-        storage_path.to_str().ok_or(ModelError::path_is_not_utf8(storage_path.clone()))?,
+        storage_path.to_str().expect("must be utf-8"),
         FLAGS,
     )
     .await
@@ -354,7 +344,7 @@ pub async fn open_isolated_storage_by_id(
 
     fuchsia_fs::directory::create_directory_recursive(
         &root_dir,
-        storage_path.to_str().ok_or(ModelError::path_is_not_utf8(storage_path.clone()))?,
+        storage_path.to_str().expect("must be utf-8"),
         FLAGS,
     )
     .await
@@ -388,15 +378,13 @@ pub async fn delete_isolated_storage(
                 StorageError::invalid_storage_path(moniker.clone(), Some(instance_id.clone()))
             })?
             .to_str()
-            .ok_or_else(|| ModelError::path_is_not_utf8(storage_path.clone()))?
+            .expect("must be utf-8")
             .to_string();
 
         let parent_path = storage_path.parent().ok_or_else(|| {
             StorageError::invalid_storage_path(moniker.clone(), Some(instance_id.clone()))
         })?;
-        let parent_path_str = parent_path
-            .to_str()
-            .ok_or_else(|| ModelError::path_is_not_utf8(storage_path.clone()))?;
+        let parent_path_str = parent_path.to_str().expect("must be utf-8");
         let dir = if parent_path_str.is_empty() {
             root_dir
         } else {
@@ -432,8 +420,7 @@ pub async fn delete_isolated_storage(
         let name = storage_path_parent
             .file_name()
             .ok_or_else(|| StorageError::invalid_storage_path(moniker.clone(), None))?;
-        let name =
-            name.to_str().ok_or_else(|| ModelError::path_is_not_utf8(storage_path.clone()))?;
+        let name = name.to_str().expect("must be utf-8");
         let dir = if dir_path.parent().is_none() {
             root_dir
         } else {
@@ -584,8 +571,8 @@ mod tests {
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: InstancedMoniker::root(),
             },
             false,
@@ -603,8 +590,8 @@ mod tests {
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: InstancedMoniker::root(),
             },
             false,
@@ -621,8 +608,8 @@ mod tests {
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: InstancedMoniker::root(),
             },
             false,
@@ -674,8 +661,8 @@ mod tests {
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: InstancedMoniker::root(),
             },
             false,
@@ -710,8 +697,8 @@ mod tests {
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: InstancedMoniker::root(),
             },
             false,
@@ -744,8 +731,8 @@ mod tests {
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&test.model.root())),
                 backing_directory_path: "/data".parse().unwrap(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: InstancedMoniker::root(),
             },
             false,
@@ -795,8 +782,8 @@ mod tests {
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: storage_moniker.clone(),
             },
             false,
@@ -814,8 +801,8 @@ mod tests {
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: storage_moniker.clone(),
             },
             false,
@@ -833,8 +820,8 @@ mod tests {
             BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: storage_moniker.clone(),
             },
             false,
@@ -849,8 +836,8 @@ mod tests {
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: storage_moniker.clone(),
             },
             false,
@@ -872,8 +859,8 @@ mod tests {
             BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path,
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: storage_moniker.clone(),
             },
             false,
@@ -928,8 +915,8 @@ mod tests {
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: parent_moniker.clone(),
             },
             false,
@@ -956,8 +943,8 @@ mod tests {
             BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: parent_moniker.clone(),
             },
             false,
@@ -977,8 +964,8 @@ mod tests {
             BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path,
-                backing_directory_subdir: None,
-                storage_subdir: None,
+                backing_directory_subdir: Default::default(),
+                storage_subdir: Default::default(),
                 storage_source_moniker: parent_moniker.clone(),
             },
             false,

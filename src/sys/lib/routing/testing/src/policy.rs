@@ -250,7 +250,7 @@ where
                 backing_dir: "cache".parse().unwrap(),
                 name: "cache".parse().unwrap(),
                 source: StorageDirectorySource::Parent,
-                subdir: None,
+                subdir: Default::default(),
                 storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
             }),
             component: component.as_weak(),

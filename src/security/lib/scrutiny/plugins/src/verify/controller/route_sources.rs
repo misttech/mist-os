@@ -13,7 +13,7 @@ use {
         route::VerifyRouteResult,
     },
     cm_rust::{CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, OfferDecl, UseDecl},
-    cm_types::{Name, Path},
+    cm_types::{Name, Path, RelativePath},
     moniker::Moniker,
     routing::{component_instance::ComponentInstanceInterface, mapper::RouteSegment},
     scrutiny::model::{controller::DataController, model::DataModel},
@@ -179,7 +179,7 @@ impl Matches<Vec<RouteSegment>> for SourceDeclSpec {
                     let subdirs = get_subdirs(other);
                     let source_path_str = subdirs.iter().fold(source_path.to_path_buf(), |path_buf, next| {
                             let mut next_buf = path_buf.clone();
-                            next_buf.push(next);
+                            next_buf.push(next.to_path_buf());
                             next_buf
                         }).to_str().ok_or_else(|| anyhow!("Failed to format PathBuf as string; components; {:?} appended with {:?}", decl.source_path, subdirs))?.to_string();
                     let source_path = Path::from_str(&source_path_str).with_context(|| {
@@ -195,38 +195,38 @@ impl Matches<Vec<RouteSegment>> for SourceDeclSpec {
     }
 }
 
-fn get_subdirs(route: &Vec<RouteSegment>) -> Vec<PathBuf> {
+fn get_subdirs(route: &Vec<RouteSegment>) -> Vec<RelativePath> {
     let mut subdir = vec![];
     for segment in route.iter() {
         match segment {
             RouteSegment::UseBy { capability, .. } => match capability {
                 UseDecl::Directory(decl) => {
-                    if let Some(decl_subdir) = &decl.subdir {
-                        subdir.push(decl_subdir.clone());
+                    if !decl.subdir.is_dot() {
+                        subdir.push(decl.subdir.clone());
                     }
                 }
                 _ => {}
             },
             RouteSegment::OfferBy { capability, .. } => match capability {
                 OfferDecl::Directory(decl) => {
-                    if let Some(decl_subdir) = &decl.subdir {
-                        subdir.push(decl_subdir.clone());
+                    if !decl.subdir.is_dot() {
+                        subdir.push(decl.subdir.clone());
                     }
                 }
                 _ => {}
             },
             RouteSegment::ExposeBy { capability, .. } => match capability {
                 ExposeDecl::Directory(decl) => {
-                    if let Some(decl_subdir) = &decl.subdir {
-                        subdir.push(decl_subdir.clone());
+                    if !decl.subdir.is_dot() {
+                        subdir.push(decl.subdir.clone());
                     }
                 }
                 _ => {}
             },
             RouteSegment::DeclareBy { capability, .. } => match capability {
                 CapabilityDecl::Storage(decl) => {
-                    if let Some(decl_subdir) = &decl.subdir {
-                        subdir.push(decl_subdir.clone());
+                    if !decl.subdir.is_dot() {
+                        subdir.push(decl.subdir.clone());
                     }
                 }
                 _ => {}
@@ -638,7 +638,7 @@ mod tests {
         scrutiny::prelude::{DataController, DataModel},
         scrutiny_testing::fake::fake_data_model,
         serde_json::json,
-        std::{path::PathBuf, str::FromStr, sync::Arc},
+        std::{str::FromStr, sync::Arc},
         url::Url,
     };
 
@@ -806,7 +806,7 @@ mod tests {
                         target_name: "routed_from_provider".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         rights: Some(fio::Operations::CONNECT),
-                        subdir: Some(PathBuf::from_str("root_subdir").unwrap()),
+                        subdir: "root_subdir".parse().unwrap(),
                         availability: Availability::Required,
                     }.into(),
                     OfferDirectoryDecl{
@@ -817,7 +817,7 @@ mod tests {
                         target_name: "routed_from_root".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         rights: Some(fio::Operations::CONNECT),
-                        subdir: Some(PathBuf::from_str("root_subdir").unwrap()),
+                        subdir: "root_subdir".parse().unwrap(),
                         availability: Availability::Required,
                     }.into(),
                 ],
@@ -849,7 +849,7 @@ mod tests {
                         source_dictionary: Default::default(),
                         target_path: Path::from_str("/data/from/provider").unwrap(),
                         rights: fio::Operations::CONNECT,
-                        subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
+                        subdir: "user_subdir".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }.into(),
@@ -859,7 +859,7 @@ mod tests {
                         source_dictionary: Default::default(),
                         target_path: Path::from_str("/data/from/root").unwrap(),
                         rights: fio::Operations::CONNECT,
-                        subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
+                        subdir: "user_subdir".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }.into(),
@@ -883,7 +883,7 @@ mod tests {
                         target: ExposeTarget::Parent,
                         target_name: "exposed_by_provider".parse().unwrap(),
                         rights: Some(fio::Operations::CONNECT),
-                        subdir: Some(PathBuf::from_str("provider_subdir").unwrap()),
+                        subdir: "provider_subdir".parse().unwrap(),
                         availability: cm_rust::Availability::Required,
                     }.into(),
                 ],
@@ -2166,7 +2166,7 @@ mod tests {
                                     source_dictionary: Default::default(),
                                     target_path: Path::from_str("/data/from/root").unwrap(),
                                     rights: fio::Operations::CONNECT,
-                                    subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
+                                    subdir: "user_subdir".parse().unwrap(),
                                     dependency_type: DependencyType::Strong,
                                     availability: Availability::Required,
                                 }.into(),
@@ -2182,7 +2182,7 @@ mod tests {
                                     source_dictionary: Default::default(),
                                     target_path: Path::from_str("/data/from/provider").unwrap(),
                                     rights: fio::Operations::CONNECT,
-                                    subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
+                                    subdir: "user_subdir".parse().unwrap(),
                                     dependency_type: DependencyType::Strong,
                                     availability: Availability::Required,
                                 }.into(),

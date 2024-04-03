@@ -9,7 +9,7 @@ use {
     cm_types::{Name, Path, RelativePath},
     derivative::Derivative,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    std::{collections::BTreeMap, path::PathBuf},
+    std::collections::BTreeMap,
 };
 
 /// Name of the test runner.
@@ -371,7 +371,7 @@ pub struct CapabilityBuilder {
     dictionary_source: Option<cm_rust::DictionarySource>,
     source_dictionary: Option<RelativePath>,
     rights: fio::Operations,
-    subdir: Option<PathBuf>,
+    subdir: RelativePath,
     backing_dir: Option<Name>,
     storage_source: Option<cm_rust::StorageDirectorySource>,
     storage_id: fdecl::StorageId,
@@ -447,7 +447,7 @@ impl CapabilityBuilder {
             dictionary_source: None,
             source_dictionary: None,
             rights: fio::R_STAR_DIR,
-            subdir: None,
+            subdir: Default::default(),
             backing_dir: None,
             storage_source: None,
             storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -506,7 +506,7 @@ impl CapabilityBuilder {
 
     pub fn subdir(mut self, subdir: &str) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::Storage);
-        self.subdir = Some(subdir.parse().unwrap());
+        self.subdir = subdir.parse().unwrap();
         self
     }
 
@@ -599,7 +599,7 @@ pub struct UseBuilder {
     dependency_type: cm_rust::DependencyType,
     availability: cm_rust::Availability,
     rights: fio::Operations,
-    subdir: Option<PathBuf>,
+    subdir: RelativePath,
     scope: Option<Vec<cm_rust::EventScope>>,
     filter: Option<BTreeMap<String, cm_rust::DictionaryValue>>,
     config_type: Option<cm_rust::ConfigValueType>,
@@ -643,7 +643,7 @@ impl UseBuilder {
             target_path: None,
             source_dictionary: Default::default(),
             rights: fio::R_STAR_DIR,
-            subdir: None,
+            subdir: Default::default(),
             dependency_type: cm_rust::DependencyType::Strong,
             availability: cm_rust::Availability::Required,
             scope: None,
@@ -748,7 +748,7 @@ impl UseBuilder {
 
     pub fn subdir(mut self, subdir: &str) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::Directory);
-        self.subdir = Some(subdir.parse().unwrap());
+        self.subdir = subdir.parse().unwrap();
         self
     }
 
@@ -847,7 +847,7 @@ pub struct ExposeBuilder {
     target_name: Option<Name>,
     availability: cm_rust::Availability,
     rights: Option<fio::Operations>,
-    subdir: Option<PathBuf>,
+    subdir: RelativePath,
 }
 
 impl ExposeBuilder {
@@ -888,7 +888,7 @@ impl ExposeBuilder {
             target_name: None,
             source_dictionary: Default::default(),
             rights: None,
-            subdir: None,
+            subdir: Default::default(),
             availability: cm_rust::Availability::Required,
         }
     }
@@ -952,7 +952,7 @@ impl ExposeBuilder {
 
     pub fn subdir(mut self, subdir: &str) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::Directory);
-        self.subdir = Some(subdir.parse().unwrap());
+        self.subdir = subdir.parse().unwrap();
         self
     }
 
@@ -1052,7 +1052,7 @@ pub struct OfferBuilder {
     source_instance_filter: Option<Vec<String>>,
     renamed_instances: Option<Vec<cm_rust::NameMapping>>,
     rights: Option<fio::Operations>,
-    subdir: Option<PathBuf>,
+    subdir: RelativePath,
     scope: Option<Vec<cm_rust::EventScope>>,
     dependency_type: cm_rust::DependencyType,
     availability: cm_rust::Availability,
@@ -1106,7 +1106,7 @@ impl OfferBuilder {
             source_instance_filter: None,
             renamed_instances: None,
             rights: None,
-            subdir: None,
+            subdir: Default::default(),
             scope: None,
             dependency_type: cm_rust::DependencyType::Strong,
             availability: cm_rust::Availability::Required,
@@ -1197,7 +1197,7 @@ impl OfferBuilder {
 
     pub fn subdir(mut self, subdir: &str) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::Directory);
-        self.subdir = Some(subdir.parse().unwrap());
+        self.subdir = subdir.parse().unwrap();
         self
     }
 

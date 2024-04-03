@@ -145,7 +145,7 @@ async fn expose_pkg_from_framework() {
                     target: cm_rust::ExposeTarget::Parent,
                     target_name: "config".parse().unwrap(),
                     rights: Some(fio::R_STAR_DIR),
-                    subdir: Some("data".into()),
+                    subdir: "data".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
                 })],
                 ..cm_rust::ComponentDecl::default()
@@ -195,7 +195,7 @@ async fn use_pkg_from_framework() {
         source_dictionary: Default::default(),
         target_path: "/config".parse().unwrap(),
         rights: fio::R_STAR_DIR,
-        subdir: Some("data".into()),
+        subdir: "data".parse().unwrap(),
         dependency_type: cm_rust::DependencyType::Strong,
         availability: cm_rust::Availability::Required,
     }));

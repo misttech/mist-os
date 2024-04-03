@@ -1543,7 +1543,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            }) if capability_decl == expected_protocol_decl && component.moniker == expected_source_moniker && relative_path == PathBuf::new()
+            }) if capability_decl == expected_protocol_decl && component.moniker == expected_source_moniker && relative_path.is_dot()
         );
     }
 
@@ -1768,7 +1768,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         ..
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
             }
             _ => panic!("bad capability source"),
@@ -1865,7 +1865,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         ..
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
                 assert_eq!(members.len(), 3);
                 for c in [AggregateMember::Child("c".try_into().unwrap()), AggregateMember::Parent,
@@ -3147,7 +3147,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -3200,7 +3200,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -3269,7 +3269,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -3341,7 +3341,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         capability_provider,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
                 assert_eq!(component.moniker, "c".parse().unwrap());
                 let mut data = capability_provider.route_instances();
@@ -3437,7 +3437,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         capability_provider,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
                 assert_eq!(component.moniker, "c".parse().unwrap());
                 let mut data = capability_provider.route_instances();
@@ -3520,7 +3520,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -3599,7 +3599,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -3675,7 +3675,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -3748,7 +3748,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -3867,7 +3867,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         ..
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
             }
             _ => panic!("bad capability source"),
@@ -3912,7 +3912,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         ..
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
             }
             _ => panic!("bad capability source"),
@@ -4070,7 +4070,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -4134,7 +4134,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -4202,7 +4202,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            } if relative_path == PathBuf::new() => {
+            } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),

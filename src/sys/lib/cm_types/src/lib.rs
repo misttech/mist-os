@@ -468,6 +468,10 @@ impl Path {
     pub fn basename(&self) -> &Name {
         self.0.basename().expect("can't be root")
     }
+
+    pub fn extend(&mut self, other: RelativePath) {
+        self.0.segments.extend(other.segments);
+    }
 }
 
 impl IterablePath for Path {
@@ -616,7 +620,15 @@ impl RelativePath {
     }
 
     pub fn to_path_buf(&self) -> PathBuf {
-        PathBuf::from(self.to_string())
+        if self.is_dot() {
+            PathBuf::new()
+        } else {
+            PathBuf::from(self.to_string())
+        }
+    }
+
+    pub fn extend(&mut self, other: Self) {
+        self.segments.extend(other.segments);
     }
 }
 

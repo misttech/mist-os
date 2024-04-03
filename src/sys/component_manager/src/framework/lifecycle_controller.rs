@@ -121,8 +121,7 @@ impl LifecycleController {
             .map_err(|_| fsys::CreateError::BadMoniker)?;
         let parent_component =
             model.root().find_and_maybe_resolve(&parent_moniker).await.map_err(|e| match e {
-                ModelError::PathIsNotUtf8 { path: _ }
-                | ModelError::UnexpectedComponentManagerMoniker
+                ModelError::UnexpectedComponentManagerMoniker
                 | ModelError::ComponentInstanceError { err: _ } => {
                     fsys::CreateError::InstanceNotFound
                 }

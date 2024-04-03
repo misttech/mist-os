@@ -724,7 +724,7 @@ mod tests {
             name: "foo".parse().unwrap(),
             source: StorageDirectorySource::Parent,
             backing_dir: "bar".parse().unwrap(),
-            subdir: None,
+            subdir: Default::default(),
             storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
         });
         assert_eq!(storage_capability.type_name(), CapabilityTypeName::Storage);

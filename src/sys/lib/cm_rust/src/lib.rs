@@ -15,7 +15,6 @@ use {
     std::collections::{BTreeMap, HashMap},
     std::fmt,
     std::hash::Hash,
-    std::path::PathBuf,
     thiserror::Error,
 };
 
@@ -358,7 +357,8 @@ pub struct UseDirectoryDecl {
     )]
     pub rights: fio::Operations,
 
-    pub subdir: Option<PathBuf>,
+    #[fidl_decl(default_preserve_none)]
+    pub subdir: RelativePath,
     pub dependency_type: DependencyType,
     #[fidl_decl(default)]
     pub availability: Availability,
@@ -579,7 +579,8 @@ pub struct OfferDirectoryDecl {
     )]
     pub rights: Option<fio::Operations>,
 
-    pub subdir: Option<PathBuf>,
+    #[fidl_decl(default_preserve_none)]
+    pub subdir: RelativePath,
     #[fidl_decl(default)]
     pub availability: Availability,
 }
@@ -968,7 +969,8 @@ pub struct ExposeDirectoryDecl {
     )]
     pub rights: Option<fio::Operations>,
 
-    pub subdir: Option<PathBuf>,
+    #[fidl_decl(default_preserve_none)]
+    pub subdir: RelativePath,
 
     #[fidl_decl(default)]
     pub availability: Availability,
@@ -1092,7 +1094,8 @@ pub struct StorageDecl {
     pub name: Name,
     pub source: StorageDirectorySource,
     pub backing_dir: Name,
-    pub subdir: Option<PathBuf>,
+    #[fidl_decl(default_preserve_none)]
+    pub subdir: RelativePath,
     #[cfg_attr(feature = "serde", serde(with = "serde_ext::StorageId"))]
     pub storage_id: fdecl::StorageId,
 }
@@ -2167,18 +2170,6 @@ impl FidlIntoNative<BTreeMap<String, DictionaryValue>> for fdata::Dictionary {
 impl NativeIntoFidl<fdata::Dictionary> for BTreeMap<String, DictionaryValue> {
     fn native_into_fidl(self) -> fdata::Dictionary {
         to_fidl_dict_btree(self)
-    }
-}
-
-impl FidlIntoNative<PathBuf> for String {
-    fn fidl_into_native(self) -> PathBuf {
-        PathBuf::from(self)
-    }
-}
-
-impl NativeIntoFidl<String> for PathBuf {
-    fn native_into_fidl(self) -> String {
-        self.into_os_string().into_string().expect("invalid utf8")
     }
 }
 
@@ -3364,7 +3355,7 @@ mod tests {
                             source_dictionary: "in/dict".parse().unwrap(),
                             target_path: "/data".parse().unwrap(),
                             rights: fio::Operations::CONNECT,
-                            subdir: Some("foo/bar".into()),
+                            subdir: "foo/bar".parse().unwrap(),
                             availability: Availability::Required,
                         }),
                         UseDecl::Storage(UseStorageDecl {
@@ -3414,7 +3405,7 @@ mod tests {
                             target_name: "data".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             rights: Some(fio::Operations::CONNECT),
-                            subdir: Some("foo/bar".into()),
+                            subdir: "foo/bar".parse().unwrap(),
                             availability: Availability::Optional,
                         }),
                         ExposeDecl::Runner(ExposeRunnerDecl {
@@ -3473,7 +3464,7 @@ mod tests {
                             target: OfferTarget::Collection("modular".parse().unwrap()),
                             target_name: "data".parse().unwrap(),
                             rights: Some(fio::Operations::CONNECT),
-                            subdir: None,
+                            subdir: ".".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
                             availability: Availability::Optional,
                         }),
@@ -3567,7 +3558,7 @@ mod tests {
                             name: "cache".parse().unwrap(),
                             backing_dir: "data".parse().unwrap(),
                             source: StorageDirectorySource::Parent,
-                            subdir: Some("cache".parse().unwrap()),
+                            subdir: "cache".parse().unwrap(),
                             storage_id: fdecl::StorageId::StaticInstanceId,
                         }),
                         CapabilityDecl::Runner(RunnerDecl {
@@ -3818,7 +3809,7 @@ mod tests {
                     name: "minfs".parse().unwrap(),
                     backing_dir: "minfs".parse().unwrap(),
                     source: StorageDirectorySource::Child("foo".to_string()),
-                    subdir: None,
+                    subdir: ".".parse().unwrap(),
                     storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                 },
             ],
@@ -3844,7 +3835,7 @@ mod tests {
                     name: "minfs".parse().unwrap(),
                     backing_dir: "minfs".parse().unwrap(),
                     source: StorageDirectorySource::Child("foo".to_string()),
-                    subdir: None,
+                    subdir: ".".parse().unwrap(),
                     storage_id: fdecl::StorageId::StaticInstanceId,
                 },
             ],

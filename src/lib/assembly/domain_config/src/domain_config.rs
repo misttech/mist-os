@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use assembly_platform_configuration::{DomainConfig, FileOrContents};
 use assembly_util::FileEntry;
 use camino::{Utf8Path, Utf8PathBuf};
+use cml::RelativePath;
 use fidl::persist;
 use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo};
 use std::io::Write;
@@ -42,9 +43,8 @@ impl DomainConfigPackage {
         // Find all the directory routes to expose.
         let mut exposes = vec![];
         for (directory, directory_config) in self.config.directories {
-            let subdir =
-                cml::RelativePath::new(&format!("meta/fuchsia.domain_config/{}", directory))
-                    .with_context(|| format!("Calculating relative path for {directory}"))?;
+            let subdir = RelativePath::new(&format!("meta/fuchsia.domain_config/{}", directory))
+                .with_context(|| format!("Calculating relative path for {directory}"))?;
             let name = cml::Name::new(&directory)
                 .with_context(|| format!("Calculating name for {directory}"))?;
             exposes.push(cml::Expose {
@@ -124,7 +124,6 @@ mod tests {
     use fuchsia_pkg::PackageName;
     use pretty_assertions::assert_eq;
     use std::fs::File;
-    use std::path::PathBuf;
     use std::str::FromStr;
     use tempfile::tempdir;
 
@@ -181,13 +180,13 @@ mod tests {
             target: ExposeTarget::Parent,
             target_name,
             rights: _,
-            subdir: Some(subdir),
+            subdir,
             availability: _,
         }) => {
             assert_eq!(source_name, &cml::Name::new("pkg").unwrap());
             assert!(source_dictionary.is_dot());
             assert_eq!(target_name, &cml::Name::new("config-dir").unwrap());
-            assert_eq!(subdir, &PathBuf::from("meta/fuchsia.domain_config/config-dir"));
+            assert_eq!(subdir, &RelativePath::new("meta/fuchsia.domain_config/config-dir").unwrap());
         });
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
@@ -340,13 +339,13 @@ mod tests {
             target: ExposeTarget::Parent,
             target_name,
             rights: _,
-            subdir: Some(subdir),
+            subdir,
             availability: _,
         }) => {
             assert_eq!(source_name, &cml::Name::new("pkg").unwrap());
             assert!(source_dictionary.is_dot());
             assert_eq!(target_name, &cml::Name::new("config-dir").unwrap());
-            assert_eq!(subdir, &PathBuf::from("meta/fuchsia.domain_config/config-dir"));
+            assert_eq!(subdir, &RelativePath::new("meta/fuchsia.domain_config/config-dir").unwrap());
         });
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();

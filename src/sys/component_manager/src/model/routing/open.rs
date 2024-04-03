@@ -66,6 +66,7 @@ impl<'a> CapabilityOpenRequest<'a> {
         mut open_options: OpenOptions<'a>,
     ) -> Self {
         let RouteSource { source, relative_path } = route_source;
+        let relative_path = relative_path.to_path_buf();
         open_options.relative_path =
             relative_path.attach(open_options.relative_path).to_string_lossy().into();
         Self::OutgoingDirectory { open_options, source, target }

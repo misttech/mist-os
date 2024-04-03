@@ -21,16 +21,13 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{ChildName, Moniker, MonikerError},
     sandbox::ConversionError,
-    std::{path::PathBuf, sync::Arc},
+    std::sync::Arc,
     thiserror::Error,
 };
 
 /// Errors produced by `Model`.
 #[derive(Debug, Error, Clone)]
 pub enum ModelError {
-    // TODO(https://fxbug.dev/42068250): Remove this error by using the `camino` library
-    #[error("path is not utf-8: {:?}", path)]
-    PathIsNotUtf8 { path: PathBuf },
     #[error("Moniker error: {}", err)]
     MonikerError {
         #[from]
@@ -131,10 +128,6 @@ pub enum ModelError {
 impl ModelError {
     pub fn instance_not_found(moniker: Moniker) -> ModelError {
         ModelError::from(ComponentInstanceError::instance_not_found(moniker))
-    }
-
-    pub fn path_is_not_utf8(path: PathBuf) -> ModelError {
-        ModelError::PathIsNotUtf8 { path }
     }
 
     pub fn open_directory_error(moniker: Moniker, relative_path: impl Into<String>) -> ModelError {
