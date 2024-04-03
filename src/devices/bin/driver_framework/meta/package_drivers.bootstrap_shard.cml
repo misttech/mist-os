@@ -1,0 +1,119 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    collections: [
+        {
+            name: "pkg-drivers",
+            environment: "#pkg-driver-env",
+            durability: "single_run",
+            allowed_offers: "static_and_dynamic",
+            allow_long_names: true,
+        },
+    ],
+    offer: [
+        {
+            from: "parent",
+            to: "#pkg-drivers",
+            config: [ "fuchsia.power.SuspendEnabled" ],
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: "#pkg-drivers",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.kernel.InfoResource",
+            from: "parent",
+            to: "#pkg-drivers",
+        },
+        {
+            protocol: "fuchsia.boot.Arguments",
+            from: "parent",
+            to: "#pkg-drivers",
+        },
+        {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            from: "#role_manager",
+            to: "#pkg-drivers",
+        },
+        {
+            protocol: [ "fuchsia.driver.framework.CompositeNodeManager" ],
+            from: "#driver_manager",
+            to: "#pkg-drivers",
+        },
+        {
+            protocol: [ "fuchsia.sysmem.Allocator" ],
+            from: "#miscsvc",
+            to: "#pkg-drivers",
+
+            // This must be weak because miscsvc needs sysmem from devfs, which creates
+            // a cycle. sysmem can be made into a non-driver to fix this.
+            dependency: "weak",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
+            from: "#shutdown_shim",
+            to: "#pkg-drivers",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#pkg-drivers",
+        },
+        {
+            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            from: "#system-activity-governor",
+            to: "#pkg-drivers",
+
+            // system-activity-governor depends on the suspend HAL but not all
+            // drivers depend on system-activity-governor.
+            // Weak to resolve dependency cycles.
+            dependency: "weak",
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+            to: "#pkg-drivers",
+        },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.rtc.Service",
+            from: "#pkg-drivers",
+        },
+    ],
+    environments: [
+        {
+            name: "pkg-driver-env",
+            extends: "none",
+            runners: [
+                {
+                    runner: "driver",
+                    from: "#driver_manager",
+                },
+            ],
+            resolvers: [
+                {
+                    resolver: "boot_resolver",
+                    from: "parent",
+                    scheme: "fuchsia-boot",
+                },
+                {
+                    resolver: "base_resolver",
+                    from: "#pkg-cache",
+                    scheme: "fuchsia-pkg",
+                },
+            ],
+
+            // 1 second
+            __stop_timeout_ms: 1000,
+        },
+    ],
+}

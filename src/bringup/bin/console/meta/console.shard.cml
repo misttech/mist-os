@@ -175,12 +175,14 @@
             ],
             from: "#pkg-cache",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             directory: "shell-commands-bin",
             from: "#pkg-cache",
             as: "bin",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             directory: [

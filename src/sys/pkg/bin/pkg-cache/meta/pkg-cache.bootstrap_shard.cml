@@ -1,0 +1,122 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            // pkg-cache is present on all product configurations except
+            // bringup builds, as its dependency blobfs is not available on
+            // bringup builds either.
+            name: "pkg-cache",
+            url: "fuchsia-boot:///pkg-cache#meta/pkg-cache.cm",
+            on_terminate: "reboot",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: "#pkg-cache",
+            availability: "optional",
+        },
+        {
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.kernel.VmexResource",
+            ],
+            from: "parent",
+            to: "#pkg-cache",
+        },
+        {
+            protocol: [
+                "fuchsia.metrics.MetricEventLoggerFactory",
+                "fuchsia.update.CommitStatusProvider",
+            ],
+            from: "parent",
+            to: "#pkg-cache",
+            dependency: "weak",
+        },
+        {
+            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            from: "#shutdown_shim",
+            to: "#pkg-cache",
+        },
+        {
+            directory: "blob-exec",
+            from: "#fshost",
+            to: [ "#pkg-cache" ],
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobCreator",
+            from: "#fshost",
+            to: "#pkg-cache",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            from: "#fshost",
+            to: "#pkg-cache",
+            availability: "optional",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#pkg-cache",
+        },
+    ],
+    expose: [
+        {
+            resolver: "base_resolver",
+            from: "#pkg-cache",
+        },
+        {
+            directory: [
+                "build-info",
+                "config-data",
+                "pkgfs",
+                "root-ssl-certificates",
+                "system",
+            ],
+            from: "#pkg-cache",
+        },
+        {
+            directory: "shell-commands-bin",
+            from: "#pkg-cache",
+            as: "bin",
+        },
+        {
+            protocol: "fuchsia.pkg.PackageResolver",
+            from: "#pkg-cache",
+            as: "fuchsia.pkg.PackageResolver-base",
+        },
+        {
+            protocol: "fuchsia.component.resolution.Resolver",
+            from: "#pkg-cache",
+            as: "fuchsia.component.resolution.Resolver-base",
+        },
+        {
+            protocol: [
+                "fuchsia.pkg.PackageCache",
+                "fuchsia.pkg.RetainedPackages",
+                "fuchsia.space.Manager",
+            ],
+            from: "#pkg-cache",
+        },
+    ],
+    environments: [
+        {
+            name: "base-resolver-env",
+            extends: "realm",
+            resolvers: [
+                {
+                    resolver: "base_resolver",
+                    from: "#pkg-cache",
+                    scheme: "fuchsia-pkg",
+                },
+            ],
+        },
+    ],
+}

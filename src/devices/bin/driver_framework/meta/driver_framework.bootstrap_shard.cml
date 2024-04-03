@@ -43,13 +43,6 @@
             allowed_offers: "static_and_dynamic",
             allow_long_names: true,
         },
-        {
-            name: "pkg-drivers",
-            environment: "#pkg-driver-env",
-            durability: "single_run",
-            allowed_offers: "static_and_dynamic",
-            allow_long_names: true,
-        },
     ],
     offer: [
         {
@@ -78,10 +71,7 @@
         },
         {
             from: "parent",
-            to: [
-                "#boot-drivers",
-                "#pkg-drivers",
-            ],
+            to: "#boot-drivers",
             config: [ "fuchsia.power.SuspendEnabled" ],
         },
         {
@@ -91,7 +81,6 @@
                 "#boot-drivers",
                 "#driver-hosts",
                 "#driver_manager",
-                "#pkg-drivers",
             ],
             availability: "optional",
         },
@@ -209,18 +198,12 @@
         {
             protocol: "fuchsia.kernel.InfoResource",
             from: "parent",
-            to: [
-                "#boot-drivers",
-                "#pkg-drivers",
-            ],
+            to: "#boot-drivers",
         },
         {
             protocol: "fuchsia.boot.Arguments",
             from: "parent",
-            to: [
-                "#boot-drivers",
-                "#pkg-drivers",
-            ],
+            to: "#boot-drivers",
         },
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
@@ -228,16 +211,12 @@
             to: [
                 "#boot-drivers",
                 "#driver-hosts",
-                "#pkg-drivers",
             ],
         },
         {
             protocol: [ "fuchsia.driver.framework.CompositeNodeManager" ],
             from: "#driver_manager",
-            to: [
-                "#boot-drivers",
-                "#pkg-drivers",
-            ],
+            to: "#boot-drivers",
         },
         {
             protocol: [ "fuchsia.device.fs.lifecycle.Lifecycle" ],
@@ -282,6 +261,7 @@
             service: [ "bootstrap.pkg-drivers" ],
             from: "#pkg-drivers",
             to: [ "#devfs-with-pkg" ],
+            source_availability: "unknown",
         },
         {
             service: [ "bootstrap.full-pkg-drivers" ],
@@ -298,10 +278,7 @@
         {
             protocol: [ "fuchsia.sysmem.Allocator" ],
             from: "#miscsvc",
-            to: [
-                "#boot-drivers",
-                "#pkg-drivers",
-            ],
+            to: "#boot-drivers",
 
             // This must be weak because miscsvc needs sysmem from devfs, which creates
             // a cycle. sysmem can be made into a non-driver to fix this.
@@ -332,7 +309,6 @@
                 "#boot-drivers",
                 "#driver-hosts",
                 "#driver_manager",
-                "#pkg-drivers",
             ],
             source_availability: "unknown",
         },
@@ -349,16 +325,12 @@
                 "#driver-hosts",
                 "#driver_index",
                 "#driver_manager",
-                "#pkg-drivers",
             ],
         },
         {
             protocol: [ "fuchsia.power.system.ActivityGovernor" ],
             from: "#system-activity-governor",
-            to: [
-                "#boot-drivers",
-                "#pkg-drivers",
-            ],
+            to: "#boot-drivers",
 
             // system-activity-governor depends on the suspend HAL but not all
             // drivers depend on system-activity-governor.
@@ -368,10 +340,7 @@
         {
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
-            to: [
-                "#boot-drivers",
-                "#pkg-drivers",
-            ],
+            to: "#boot-drivers",
         },
     ],
     expose: [
@@ -385,10 +354,7 @@
         },
         {
             service: "fuchsia.hardware.rtc.Service",
-            from: [
-                "#boot-drivers",
-                "#pkg-drivers",
-            ],
+            from: "#boot-drivers",
         },
         {
             directory: [
@@ -435,31 +401,6 @@
                     resolver: "boot_resolver",
                     from: "parent",
                     scheme: "fuchsia-boot",
-                },
-            ],
-
-            // 1 second
-            __stop_timeout_ms: 1000,
-        },
-        {
-            name: "pkg-driver-env",
-            extends: "none",
-            runners: [
-                {
-                    runner: "driver",
-                    from: "#driver_manager",
-                },
-            ],
-            resolvers: [
-                {
-                    resolver: "boot_resolver",
-                    from: "parent",
-                    scheme: "fuchsia-boot",
-                },
-                {
-                    resolver: "base_resolver",
-                    from: "#pkg-cache",
-                    scheme: "fuchsia-pkg",
                 },
             ],
 
