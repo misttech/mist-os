@@ -1,3 +1,4 @@
+
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -218,9 +219,9 @@ Screenshot PortableUITest::TakeScreenshot(ScreenshotFormat format) {
     QuitLoop();
   });
 
-  FX_LOGS(INFO) << "Screenshot captured.";
-
   EXPECT_FALSE(RunLoopWithTimeout(kScreenshotTimeout)) << "Timed out waiting for screenshot.";
+
+  FX_LOGS(INFO) << "Screenshot captured.";
 
   if (format == ScreenshotFormat::PNG) {
     return Screenshot(response->vmo());
