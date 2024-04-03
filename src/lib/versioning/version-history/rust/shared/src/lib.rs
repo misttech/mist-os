@@ -337,9 +337,6 @@ impl VersionHistory {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AbiRevisionError {
-    /// A component tried to run, but it presented no ABI revision.
-    Absent,
-
     /// A component tried to run, but its ABI revision was not recognized.
     Unknown { abi_revision: AbiRevision, supported_versions: Vec<Version> },
 
@@ -363,7 +360,6 @@ impl std::fmt::Display for AbiRevisionError {
             };
 
         match self {
-            AbiRevisionError::Absent => write!(f, "Missing target ABI revision."),
             AbiRevisionError::Unknown { abi_revision, supported_versions } => {
                 write!(
                     f,
