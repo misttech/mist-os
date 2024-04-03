@@ -284,10 +284,37 @@ elif is_feature_enabled "incremental_legacy"; then
   exit 1
 fi
 
-if is_feature_enabled "foreground_repo_server" && [[ "$(ffx-repository-server-state)" != "disabled" ]]; then
+if is_feature_enabled "foreground_repo_server" && [[ "$(ffx-repository-server-enabled)" == "true" ]]; then
+  fx-error "Both the foreground and background server are enabled. This is mutually incompatible."
+  fx-error "To fix this, please pick between the following two options:"
+  fx-error ""
+  fx-error "1. Disable the background server and restart ffx:"
+  fx-error ""
+  fx-error "   $ ffx config remove repository.server.enabled"
+  fx-error "   $ ffx doctor --restart-daemon"
+  fx-error ""
+  fx-error "2. (discouraged, background serving is going away at the end of 2024Q2) Opt out of"
+  fx-error "   using the foreground server: Set the following variable in (sh-type) shells"
+  fx-error "   where you use fx/ffx:"
+  fx-error ""
+  fx-error "   $ export FUCHSIA_DISABLED_foreground_repo_server=1"
+  fx-error ""
+  fx-error "   Please note that an already dunning foreground server may not always"
+  fx-error "   be detected correctly. Consider running the following commands in case"
+  fx-error "   of problems:"
+  fx-error ""
+  fx-error "   $ ffx config remove repository.server.listen"
+  fx-error "   $ ffx doctor --restart-daemon"
+  fx-error ""
+  fx-error "   Then restart \"fx serve\""
+  fx-error ""
+  exit 1
+elif is_feature_enabled "foreground_repo_server"; then
   fx-info "The 'foreground_repo_server' feature is now enabled by default."
-  fx-info "If you prefer the previous behavior for now, you can set this"
-  fx-info "environment variable in (sh-type) shells where you use fx / ffx:"
+  fx-info "Background serving with both ffx and pm is going away soon."
+  fx-info "Until the end of 2024Q2, you can opt out of foreground serving by"
+  fx-info "setting the following environment variable in (sh-type) shells"
+  fx-info "where you use fx / ffx:"
   fx-info ""
   fx-info "$ export FUCHSIA_DISABLED_foreground_repo_server=1"
   fx-info ""
@@ -299,6 +326,7 @@ if is_feature_enabled "foreground_repo_server" && [[ "$(ffx-repository-server-st
   fx-info "$ ffx doctor --restart-daemon"
   fx-info ""
   fx-info "Then restart \"fx serve\""
+  fx-info ""
 fi
 
 # Error out if we can't start a package server.

@@ -44,6 +44,7 @@ use {
 
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 const SERVE_KNOCK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
 const REPO_FOREGROUND_FEATURE_FLAG: &str = "repository.foreground.enabled";
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
 const ENGINE_MONIKER: &str = "/core/pkg-resolver";
@@ -197,6 +198,22 @@ impl FfxMain for ServeTool {
     type Writer = SimpleWriter;
 
     async fn main(self, mut writer: SimpleWriter) -> Result<()> {
+        let bg: bool = self
+            .context
+            .get(REPO_BACKGROUND_FEATURE_FLAG)
+            .await
+            .context("checking for background server flag")?;
+        if bg {
+            ffx_bail!(
+                r#"The ffx setting '{}' and the foreground server '{}' are mutually incompatible.
+Please disable background serving by running the following commands:
+$ ffx config remove repository.server.enabled
+$ ffx doctor --restart-daemon"#,
+                REPO_BACKGROUND_FEATURE_FLAG,
+                REPO_FOREGROUND_FEATURE_FLAG,
+            );
+        }
+
         let repo_manager: Arc<RepositoryManager> = RepositoryManager::new();
 
         let repo_path = match (self.cmd.repo_path, self.cmd.product_bundle) {
@@ -340,7 +357,7 @@ impl FfxMain for ServeTool {
                             // If we end up here, it is unlikely a reconnect will be successful without
                             // ffx being restarted.
                             tracing::error!("Cannot serve repository to target, exiting. Error: {}", e);
-                            let _ = server_stop_tx.send(());
+                            let _: Result<(), _> = server_stop_tx.send(()).await;
                             break;
                         }
                     };
