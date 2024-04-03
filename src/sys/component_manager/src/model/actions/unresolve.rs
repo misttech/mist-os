@@ -10,6 +10,7 @@ use {
         hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
+    futures::future::join_all,
     std::{ops::DerefMut, sync::Arc},
 };
 
@@ -41,55 +42,60 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionEr
     // Shut down the component, preventing new starts or resolves during the UnresolveAction.
     ActionSet::register(component.clone(), ShutdownAction::new(ShutdownType::Instance)).await?;
 
-    if component.lock_execution().runtime.is_some() {
+    if !component.lock_state().await.is_shut_down() {
         return Err(
             UnresolveActionError::InstanceRunning { moniker: component.moniker.clone() }.into()
         );
     }
 
-    let children: Vec<Arc<ComponentInstance>> = {
-        match *component.lock_state().await {
-            InstanceState::Resolved(ref s) => s.children().map(|(_, c)| c.clone()).collect(),
+    // Unresolve all children
+    let children = {
+        let state = component.lock_state().await;
+        match *state {
+            InstanceState::Shutdown(ref state, _) => state.children.clone(),
             InstanceState::Destroyed => {
                 return Err(UnresolveActionError::InstanceDestroyed {
                     moniker: component.moniker.clone(),
                 }
                 .into())
             }
-            InstanceState::Unresolved(_) | InstanceState::New => return Ok(()),
+            _ => {
+                panic!("component {} was moved to unexpected state {:?}", component.moniker, state)
+            }
         }
     };
-
-    // Unresolve the children before unresolving the component because removing the resolved
-    // state removes the ChildInstanceState that contains the list of children.
-    for child in children {
-        ActionSet::register(child, UnresolveAction::new()).await?;
+    let mut futures = vec![];
+    for (_name, child) in children {
+        futures
+            .push(async move { ActionSet::register(child.clone(), UnresolveAction::new()).await });
     }
+    // Run all the futures, and then return the first error if there were any.
+    join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))?;
 
-    // Move the component back to the Discovered state. We can't use a DiscoverAction for this
-    // change because the system allows and does call DiscoverAction on resolved components with
-    // the expectation that they will return without changing the instance state to Discovered.
-    // The state may have changed during the time taken for the recursions, so recheck here.
+    // Move this component back to the Unresolved state. The state may have changed during the time
+    // taken for the children to unresolve, so recheck here.
     {
         let mut state = component.lock_state().await;
-        match state.deref_mut() {
-            InstanceState::Resolved(resolved_state) => {
-                let next = InstanceState::Unresolved(resolved_state.to_unresolved());
-                state.set(next);
-                true
-            }
+        let unresolved_state = match state.deref_mut() {
+            InstanceState::Shutdown(_, unresolved_state) => unresolved_state.take(),
             InstanceState::Destroyed => {
                 return Err(UnresolveActionError::InstanceDestroyed {
                     moniker: component.moniker.clone(),
                 }
                 .into())
             }
-            InstanceState::Unresolved(_) | InstanceState::New => return Ok(()),
-        }
+            InstanceState::Resolved(_) | InstanceState::New => {
+                panic!(
+                    "component {} was shutdown, but then moved to unexpected state {:?}",
+                    component.moniker, state
+                );
+            }
+            InstanceState::Unresolved(_) => {
+                panic!("component {} moved to unresolved state before we set it to unresolved, this should be impossible", component.moniker);
+            }
+        };
+        state.set(InstanceState::Unresolved(unresolved_state));
     };
-
-    // The component was shut down, so won't start. Re-enable it.
-    component.lock_execution().reset_shut_down();
 
     let event = Event::new(&component, EventPayload::Unresolved);
     component.hooks.dispatch(&event).await;

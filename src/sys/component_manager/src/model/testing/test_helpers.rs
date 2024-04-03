@@ -81,9 +81,8 @@ impl ComponentInfo {
             .expect("request map didn't have channel id, perhaps the controller wasn't started?");
         assert_eq!(*request_vec, vec![ControlMessage::Stop]);
 
-        let execution = self.component.lock_execution();
-        assert!(execution.runtime.is_none());
-        assert!(execution.is_shut_down());
+        assert!(self.component.lock_execution().runtime.is_none());
+        assert!(self.component.lock_state().await.is_shut_down());
     }
 
     /// Checks that the component has not been shut down, panics if it has.
@@ -96,15 +95,14 @@ impl ComponentInfo {
             assert_eq!(*request_vec, vec![]);
         }
 
-        let execution = self.component.lock_execution();
-        assert!(execution.runtime.is_some());
-        assert!(!execution.is_shut_down());
+        assert!(self.component.lock_execution().runtime.is_some());
     }
 }
 
 pub async fn execution_is_shut_down(component: &ComponentInstance) -> bool {
+    let state = component.lock_state().await;
     let execution = component.lock_execution();
-    execution.runtime.is_none() && execution.is_shut_down()
+    execution.runtime.is_none() && state.is_shut_down()
 }
 
 /// Returns true if the given child (live or deleting) exists.
@@ -112,6 +110,9 @@ pub async fn has_child<'a>(component: &'a ComponentInstance, moniker: &'a str) -
     match *component.lock_state().await {
         InstanceState::Resolved(ref s) => {
             s.children().map(|(k, _)| k.clone()).any(|m| m == moniker.try_into().unwrap())
+        }
+        InstanceState::Shutdown(ref state, _) => {
+            state.children.iter().map(|(k, _)| k.clone()).any(|m| m == moniker.try_into().unwrap())
         }
         InstanceState::Destroyed => false,
         _ => panic!("not resolved"),
@@ -132,6 +133,7 @@ pub async fn get_incarnation_id<'a>(component: &'a ComponentInstance, moniker: &
 pub async fn get_live_children(component: &ComponentInstance) -> HashSet<ChildName> {
     match *component.lock_state().await {
         InstanceState::Resolved(ref s) => s.children().map(|(m, _)| m.clone()).collect(),
+        InstanceState::Shutdown(ref s, _) => s.children.iter().map(|(m, _)| m.clone()).collect(),
         InstanceState::Destroyed => HashSet::new(),
         _ => panic!("not resolved"),
     }

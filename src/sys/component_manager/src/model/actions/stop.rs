@@ -26,6 +26,12 @@ impl StopAction {
 #[async_trait]
 impl Action for StopAction {
     async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
+        // Ensure `Stop` is dispatched after `Discovered`.
+        {
+            let discover_completed =
+                component.lock_actions().await.wait_for_action(ActionKey::Discover);
+            discover_completed.await.unwrap();
+        }
         component.stop_instance_internal(self.shut_down).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {

@@ -503,7 +503,6 @@ pub(crate) mod test_utils {
         found_child.is_none()
             && matches!(*child_state, InstanceState::Destroyed)
             && child_execution.runtime.is_none()
-            && child_execution.is_shut_down()
     }
 
     pub async fn is_stopped(component: &ComponentInstance, moniker: &ChildName) -> bool {
@@ -512,6 +511,7 @@ pub(crate) mod test_utils {
                 Some(child) => !child.is_started(),
                 None => false,
             },
+            InstanceState::Shutdown(_, _) => true,
             InstanceState::Destroyed => false,
             InstanceState::New | InstanceState::Unresolved(_) => {
                 panic!("not resolved")
@@ -522,9 +522,7 @@ pub(crate) mod test_utils {
     pub async fn is_destroyed(component: &ComponentInstance) -> bool {
         let state = component.lock_state().await;
         let execution = component.lock_execution();
-        matches!(*state, InstanceState::Destroyed)
-            && execution.runtime.is_none()
-            && execution.is_shut_down()
+        matches!(*state, InstanceState::Destroyed) && execution.runtime.is_none()
     }
 
     pub async fn is_resolved(component: &ComponentInstance) -> bool {
@@ -535,12 +533,5 @@ pub(crate) mod test_utils {
     pub async fn is_discovered(component: &ComponentInstance) -> bool {
         let state = component.lock_state().await;
         matches!(*state, InstanceState::Unresolved(_))
-    }
-
-    pub async fn is_unresolved(component: &ComponentInstance) -> bool {
-        let state = component.lock_state().await;
-        let execution = component.lock_execution();
-        execution.runtime.is_none()
-            && matches!(*state, InstanceState::New | InstanceState::Unresolved(_))
     }
 }

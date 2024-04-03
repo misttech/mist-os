@@ -393,17 +393,14 @@ pub fn should_return_early(
     moniker: &Moniker,
 ) -> Option<Result<(), StartActionError>> {
     match component {
-        InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Resolved(_) => {}
-        InstanceState::Destroyed => {
-            return Some(Err(StartActionError::InstanceDestroyed { moniker: moniker.clone() }));
+        InstanceState::Resolved(_) if execution.runtime.is_some() => Some(Ok(())),
+        InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Resolved(_) => None,
+        InstanceState::Shutdown(_, _) => {
+            Some(Err(StartActionError::InstanceShutDown { moniker: moniker.clone() }))
         }
-    }
-    if execution.is_shut_down() {
-        Some(Err(StartActionError::InstanceShutDown { moniker: moniker.clone() }))
-    } else if execution.runtime.is_some() {
-        Some(Ok(()))
-    } else {
-        None
+        InstanceState::Destroyed => {
+            Some(Err(StartActionError::InstanceDestroyed { moniker: moniker.clone() }))
+        }
     }
 }
 
@@ -1011,7 +1008,7 @@ mod tests {
         };
         let ris = ResolvedInstanceState::new(
             &child,
-            resolved_component,
+            resolved_component.clone(),
             ComponentAddress::from_absolute_url(&child.component_url).unwrap(),
             Default::default(),
             ComponentInput::default(),
@@ -1022,18 +1019,30 @@ mod tests {
 
         // Check for already_started:
         {
+            let ris = ResolvedInstanceState::new(
+                &child,
+                resolved_component,
+                ComponentAddress::from_absolute_url(&child.component_url).unwrap(),
+                Default::default(),
+                ComponentInput::default(),
+            )
+            .await
+            .unwrap();
             let mut es = ExecutionState::new();
             es.runtime = Some(ComponentRuntime::new(StartReason::Debug, None, None));
-            assert!(!es.is_shut_down());
-            assert_matches!(should_return_early(&InstanceState::New, &es, &m), Some(Ok(())));
+            assert_matches!(
+                should_return_early(&InstanceState::Resolved(ris), &es, &m),
+                Some(Ok(()))
+            );
         }
 
         // Check for shut_down:
         let _ = child.stop_instance_internal(true).await;
+        assert!(child.lock_state().await.is_shut_down());
+        let state = child.lock_state().await;
         let execution = child.lock_execution();
-        assert!(execution.is_shut_down());
         assert_matches!(
-            should_return_early(&InstanceState::New, &execution, &m),
+            should_return_early(&*state, &execution, &m),
             Some(Err(StartActionError::InstanceShutDown { moniker: _ }))
         );
     }
@@ -1051,6 +1060,9 @@ mod tests {
 
         let m = Moniker::try_from(vec!["TEST_CHILD_NAME"]).unwrap();
         let execution = child.lock_execution();
-        assert_matches!(should_return_early(&InstanceState::New, &execution, &m), Some(Ok(())));
+        assert_matches!(
+            should_return_early(&*child.lock_state().await, &execution, &m),
+            Some(Ok(()))
+        );
     }
 }

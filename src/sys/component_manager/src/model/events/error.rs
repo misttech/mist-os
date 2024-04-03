@@ -12,6 +12,9 @@ pub enum EventsError {
     #[error("Model not available")]
     ModelNotAvailable,
 
+    #[error("Instance shut down")]
+    InstanceShutdown,
+
     #[error("Instance destroyed")]
     InstanceDestroyed,
 

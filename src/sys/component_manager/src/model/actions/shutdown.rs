@@ -263,6 +263,12 @@ async fn do_shutdown(
     component: &Arc<ComponentInstance>,
     shutdown_type: ShutdownType,
 ) -> Result<(), ActionError> {
+    // Ensure `Shutdown` is dispatched after `Discovered`.
+    {
+        let discover_completed =
+            component.lock_actions().await.wait_for_action(ActionKey::Discover);
+        discover_completed.await.unwrap();
+    }
     // Keep logs short to preserve as much as possible in the crash report
     // NS: Shutdown of {moniker} was no-op
     // RS: Beginning shutdown of resolved component {moniker}
@@ -271,15 +277,6 @@ async fn do_shutdown(
     // ES: Errored shutdown of {moniker}
     {
         let state = component.lock_state().await;
-        {
-            let exec_state = component.lock_execution();
-            if exec_state.is_shut_down() {
-                if matches!(shutdown_type, ShutdownType::System) {
-                    info!("=NS {}", component.moniker);
-                }
-                return Ok(());
-            }
-        }
         match *state {
             InstanceState::Resolved(ref s) => {
                 if matches!(shutdown_type, ShutdownType::System) {
@@ -293,6 +290,12 @@ async fn do_shutdown(
                 })?;
                 if matches!(shutdown_type, ShutdownType::System) {
                     info!("=FS {}", component.moniker);
+                }
+                return Ok(());
+            }
+            InstanceState::Shutdown(_, _) => {
+                if matches!(shutdown_type, ShutdownType::System) {
+                    info!("=NS {}", component.moniker);
                 }
                 return Ok(());
             }
@@ -929,7 +932,7 @@ mod tests {
     use {
         super::*,
         crate::model::{
-            actions::{test_utils::is_unresolved, StopAction},
+            actions::StopAction,
             component::StartReason,
             error::StopActionError,
             testing::{
@@ -3416,14 +3419,13 @@ mod tests {
         let component_b = {
             let state = component_a.lock_state().await;
             match *state {
-                InstanceState::Resolved(ref s) => {
-                    s.get_child(&"b".try_into().unwrap()).expect("child b not found").clone()
+                InstanceState::Shutdown(ref state, _) => {
+                    state.children.get(&"b".try_into().unwrap()).expect("child b not found").clone()
                 }
-                _ => panic!("not resolved"),
+                _ => panic!("not shutdown"),
             }
         };
         assert!(execution_is_shut_down(&component_b).await);
-        assert!(is_unresolved(&component_b).await);
 
         // Now "a" is shut down. There should be no event for "b" because it was never started
         // (or resolved).

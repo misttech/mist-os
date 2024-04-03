@@ -117,7 +117,7 @@ impl Model {
                 // if we never got everything started that we wanted to.
                 let action_set = self.root.lock_actions().await;
                 if !action_set.contains(&ActionKey::Shutdown) {
-                    if !self.root.lock_execution().is_shut_down() {
+                    if !self.root.lock_state().await.is_shut_down() {
                         panic!(
                             "failed to start root component {}: {:?}",
                             self.root.component_url, e

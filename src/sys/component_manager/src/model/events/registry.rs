@@ -307,6 +307,9 @@ impl EventRegistry {
                     unreachable!("route_events: not resolved");
                 }
                 InstanceState::Resolved(ref s) => s.decl().clone(),
+                InstanceState::Shutdown(_, _) => {
+                    return Err(ModelError::EventsError { err: EventsError::InstanceShutdown });
+                }
                 InstanceState::Destroyed => {
                     return Err(ModelError::EventsError { err: EventsError::InstanceDestroyed });
                 }

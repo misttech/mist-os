@@ -263,7 +263,10 @@ impl EventSynthesisProvider for DirectoryReadyNotifier {
         };
         let decl = match *component.lock_state().await {
             InstanceState::Resolved(ref s) => s.decl().clone(),
-            InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Destroyed => {
+            InstanceState::New
+            | InstanceState::Unresolved(_)
+            | InstanceState::Shutdown(_, _)
+            | InstanceState::Destroyed => {
                 return vec![];
             }
         };

@@ -20,6 +20,7 @@ use vfs::{
 use zx::AsHandleRef;
 
 use crate::model::{
+    actions::{ActionSet, DestroyAction},
     component::StartReason,
     start::Start,
     testing::{out_dir::OutDir, routing_test_helpers::RoutingTest},
@@ -172,7 +173,7 @@ async fn open_requests_go_to_the_same_directory_connection() {
     }
     // Drain routing and open requests.
     b.stop().await.unwrap();
-    b.destroy_instance().await.unwrap();
+    ActionSet::register(b.clone(), DestroyAction::new()).await.unwrap();
 
     // `c` should only get one open call after we drain any requests.
     test.mock_runner.wait_for_url("test:///c_resolved").await;

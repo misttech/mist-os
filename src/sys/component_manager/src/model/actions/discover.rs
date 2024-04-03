@@ -46,6 +46,7 @@ async fn do_discover(
             InstanceState::New => false,
             InstanceState::Unresolved(_) => true,
             InstanceState::Resolved(_) => true,
+            InstanceState::Shutdown(_, _) => true,
             InstanceState::Destroyed => {
                 return Err(DiscoverActionError::InstanceDestroyed {
                     moniker: component.moniker.clone(),
@@ -65,7 +66,7 @@ async fn do_discover(
             "Component in unexpected state after discover"
         );
         match *state {
-            InstanceState::Destroyed => {
+            InstanceState::Shutdown(_, _) | InstanceState::Destroyed => {
                 // Nothing to do.
             }
             InstanceState::Unresolved(_) | InstanceState::Resolved(_) => {

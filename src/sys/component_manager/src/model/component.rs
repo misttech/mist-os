@@ -63,7 +63,7 @@ use {
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
-        FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
+        FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl, UseStorageDecl,
     },
     cm_types::Name,
     cm_util::{channel, TaskGroup},
@@ -86,6 +86,7 @@ use {
         clone::Clone,
         collections::{HashMap, HashSet},
         fmt,
+        ops::DerefMut,
         sync::{Arc, Weak},
         time::Duration,
     },
@@ -521,36 +522,53 @@ impl ComponentInstance {
     pub async fn lock_resolved_state<'a>(
         self: &'a Arc<Self>,
     ) -> Result<MappedMutexGuard<'a, InstanceState, ResolvedInstanceState>, ActionError> {
-        fn get_resolved(s: &mut InstanceState) -> &mut ResolvedInstanceState {
-            match s {
-                InstanceState::Resolved(s) => s,
-                _ => panic!("not resolved"),
-            }
-        }
-        {
-            let state = self.state.lock().await;
-            match *state {
-                InstanceState::Resolved(_) => {
-                    return Ok(MutexGuard::map(state, get_resolved));
+        loop {
+            fn get_resolved(s: &mut InstanceState) -> &mut ResolvedInstanceState {
+                match s {
+                    InstanceState::Resolved(s) => s,
+                    _ => panic!("not resolved"),
                 }
-                InstanceState::Destroyed => {
+            }
+            /// Returns Ok(Some(_)) when the component is in a resolved state, Ok(None) when the
+            /// component is in a state from which it can be resolved, and Err(_) when the
+            /// component is in a state from which it cannot be resolved.
+            async fn get_mapped_mutex_or_error<'a>(
+                self_: &'a Arc<ComponentInstance>,
+            ) -> Result<
+                Option<MappedMutexGuard<'a, InstanceState, ResolvedInstanceState>>,
+                ActionError,
+            > {
+                let state = self_.state.lock().await;
+                if let InstanceState::Resolved(_) = *state {
+                    return Ok(Some(MutexGuard::map(state, get_resolved)));
+                }
+                if let InstanceState::Destroyed = *state {
                     return Err(ResolveActionError::InstanceDestroyed {
-                        moniker: self.moniker.clone(),
+                        moniker: self_.moniker.clone(),
                     }
                     .into());
                 }
-                InstanceState::New | InstanceState::Unresolved(_) => {}
+                if state.is_shut_down() {
+                    return Err(ResolveActionError::InstanceShutDown {
+                        moniker: self_.moniker.clone(),
+                    }
+                    .into());
+                }
+                Ok(None)
             }
-            // Drop the lock before doing the work to resolve the state.
+
+            if let Some(mapped_guard) = get_mapped_mutex_or_error(&self).await? {
+                return Ok(mapped_guard);
+            }
+            self.resolve().await?;
+            if let Some(mapped_guard) = get_mapped_mutex_or_error(&self).await? {
+                return Ok(mapped_guard);
+            }
+            // If we've reached here, then the component must have been unresolved in-between our
+            // calls to resolved and get_mapped_mutex_or_error. Our mission here remains to resolve
+            // the component if necessary and then return the resolved state, so let's loop and try
+            // to resolve it again.
         }
-        self.resolve().await?;
-        let state = self.state.lock().await;
-        if let InstanceState::Destroyed = *state {
-            return Err(
-                ResolveActionError::InstanceDestroyed { moniker: self.moniker.clone() }.into()
-            );
-        }
-        Ok(MutexGuard::map(state, get_resolved))
     }
 
     /// Resolves the component declaration, populating `ResolvedInstanceState` as necessary. A
@@ -776,8 +794,6 @@ impl ComponentInstance {
     ) -> Result<(), StopActionError> {
         let mut runtime = {
             let mut execution = self.lock_execution();
-            let shut_down = execution.shut_down | shut_down;
-            execution.shut_down = shut_down;
             execution.runtime.take()
         };
 
@@ -860,6 +876,10 @@ impl ComponentInstance {
             self.hooks.dispatch(&event).await;
         }
 
+        if shut_down {
+            self.move_state_to_shutdown().await;
+        }
+
         if let ExtendedInstance::Component(parent) =
             self.try_get_parent().map_err(|_| StopActionError::GetParentFailed)?
         {
@@ -871,6 +891,68 @@ impl ComponentInstance {
                 .await;
         }
         Ok(())
+    }
+
+    async fn move_state_to_shutdown(self: &Arc<Self>) {
+        loop {
+            fn get_storage_uses(resolved_state: &ResolvedInstanceState) -> Vec<UseStorageDecl> {
+                resolved_state
+                    .resolved_component
+                    .decl
+                    .uses
+                    .iter()
+                    .filter_map(|use_| match use_ {
+                        UseDecl::Storage(ref storage_use) => Some(storage_use.clone()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+            }
+
+            // If the component is in a resolved state, then we have to route its storage
+            // capabilities. We shouldn't do this while holding the state lock, so let's do this in
+            // advance before grabbing the state lock below.
+            let mut routed_storage = vec![];
+            let storage_uses = {
+                let state = self.lock_state().await;
+                match &*state {
+                    InstanceState::Resolved(resolved_state) => get_storage_uses(&resolved_state),
+                    _ => vec![],
+                }
+            };
+            for storage_use in &storage_uses {
+                if let Ok(info) = routing::route_storage(storage_use.clone(), &self).await {
+                    routed_storage.push(info);
+                }
+            }
+
+            // Now that any necessary routing operations are out of the way, grab the state lock
+            // and let's calculate our new state.
+            let mut state = self.lock_state().await;
+            let new_state = match state.deref_mut() {
+                InstanceState::New => {
+                    panic!("component should be discovered before shutting down");
+                }
+                InstanceState::Unresolved(unresolved_state) => Some(InstanceState::Shutdown(
+                    ShutdownInstanceState { children: HashMap::new(), routed_storage: vec![] },
+                    unresolved_state.take(),
+                )),
+                InstanceState::Resolved(resolved_state) => {
+                    let children = resolved_state.children.clone();
+                    if storage_uses != get_storage_uses(&resolved_state) {
+                        continue;
+                    }
+                    Some(InstanceState::Shutdown(
+                        ShutdownInstanceState { children, routed_storage },
+                        resolved_state.to_unresolved(),
+                    ))
+                }
+                InstanceState::Shutdown(_, _) | InstanceState::Destroyed => None,
+            };
+            if let Some(new_state) = new_state {
+                state.set(new_state);
+            }
+            return;
+        }
     }
 
     async fn destroy_child_if_single_run(
@@ -926,35 +1008,25 @@ impl ComponentInstance {
             return Ok(());
         }
         // Clean up isolated storage.
-        let uses = {
-            let state = self.lock_state().await;
+        let routed_storage = {
+            let mut state = self.lock_state().await;
             match *state {
-                InstanceState::Resolved(ref s) => s.resolved_component.decl.uses.clone(),
-                _ => {
-                    // The instance was never resolved and therefore never ran, it can't possibly
-                    // have storage to clean up.
-                    return Ok(());
-                }
+                InstanceState::Shutdown(ref mut s, _) => s.routed_storage.drain(..).collect::<Vec<_>>(),
+                _ => panic!("cannot destroy component instance {} because it is not shutdown, it is in state {:?}", self.moniker, *state),
             }
         };
-        for use_ in uses {
-            if let UseDecl::Storage(use_storage) = use_ {
-                match routing::route_and_delete_storage(use_storage.clone(), &self).await {
-                    Ok(()) => (),
-                    Err(ModelError::RoutingError { .. }) => {
-                        // If the routing for this storage capability is invalid then there's no
-                        // storage for us to delete. Ignore this error, and proceed.
-                    }
-                    Err(error) => {
-                        // We received an error we weren't expecting, but we still want to destroy
-                        // this instance. It's bad to leave storage state undeleted, but it would
-                        // be worse to not continue with destroying this instance. Log the error,
-                        // and proceed.
-                        warn!(
-                            component=%self.moniker, %error,
-                            "failed to delete storage during instance destruction, proceeding with destruction anyway",
-                        );
-                    }
+        for storage in routed_storage {
+            match routing::delete_storage(storage).await {
+                Ok(()) => (),
+                Err(error) => {
+                    // We received an error we weren't expecting, but we still want to destroy
+                    // this instance. It's bad to leave storage state undeleted, but it would
+                    // be worse to not continue with destroying this instance. Log the error,
+                    // and proceed.
+                    warn!(
+                        component=%self.moniker, %error,
+                        "failed to delete storage during instance destruction, proceeding with destruction anyway",
+                    );
                 }
             }
         }
@@ -964,15 +1036,18 @@ impl ComponentInstance {
     /// Registers actions to destroy all dynamic children of collections belonging to this instance.
     async fn destroy_dynamic_children(self: &Arc<Self>) -> Result<(), ActionError> {
         let moniker_incarnations: Vec<_> = {
-            let state = self.lock_state().await;
-            let state = match *state {
-                InstanceState::Resolved(ref s) => s,
+            match *self.lock_state().await {
+                InstanceState::Resolved(ref state) => {
+                    state.children().map(|(k, c)| (k.clone(), c.incarnation_id())).collect()
+                }
+                InstanceState::Shutdown(ref state, _) => {
+                    state.children.iter().map(|(k, c)| (k.clone(), c.incarnation_id())).collect()
+                }
                 _ => {
                     // Component instance was not resolved, so no dynamic children.
                     return Ok(());
                 }
-            };
-            state.children().map(|(k, c)| (k.clone(), c.incarnation_id())).collect()
+            }
         };
         let mut futures = vec![];
         // Destroy all children that belong to a collection.
@@ -997,6 +1072,9 @@ impl ComponentInstance {
                 InstanceState::Resolved(ref s) => {
                     let child = s.get_child(&moniker).map(|r| r.clone());
                     child
+                }
+                InstanceState::Shutdown(ref state, _) => {
+                    state.children.get(&moniker).map(|r| r.clone())
                 }
                 InstanceState::Destroyed => None,
                 InstanceState::New | InstanceState::Unresolved(_) => {
@@ -1137,6 +1215,12 @@ impl ComponentInstance {
                         fdecl::StartupMode::Lazy => None,
                     })
                     .collect(),
+                InstanceState::Shutdown(_, _) => {
+                    return Err(StartActionError::InstanceShutDown {
+                        moniker: self.moniker.clone(),
+                    }
+                    .into());
+                }
                 InstanceState::Destroyed => {
                     return Err(StartActionError::InstanceDestroyed {
                         moniker: self.moniker.clone(),
@@ -1438,10 +1522,6 @@ impl std::fmt::Debug for ComponentInstance {
 
 /// The execution state of a component.
 pub struct ExecutionState {
-    /// True if the component instance has shut down. This means that the component is stopped
-    /// and cannot be restarted.
-    shut_down: bool,
-
     /// Runtime support for the component. From component manager's point of view, the component
     /// instance is running iff this field is set.
     pub runtime: Option<ComponentRuntime>,
@@ -1450,23 +1530,12 @@ pub struct ExecutionState {
 impl ExecutionState {
     /// Creates a new ExecutionState.
     pub fn new() -> Self {
-        Self { shut_down: false, runtime: None }
+        Self { runtime: None }
     }
 
     /// Returns whether the component is started, i.e. if it has a runtime.
     pub fn is_started(&self) -> bool {
         self.runtime.is_some()
-    }
-
-    /// Returns whether the instance has shut down.
-    pub fn is_shut_down(&self) -> bool {
-        self.shut_down
-    }
-
-    /// Enables the component to restart after being shut down. Used by the UnresolveAction.
-    /// Use of this function is strongly discouraged.
-    pub fn reset_shut_down(&mut self) {
-        self.shut_down = false;
     }
 
     /// Scope server_end to `runtime` of this state. This ensures that the channel
@@ -1488,6 +1557,8 @@ pub enum InstanceState {
     Unresolved(UnresolvedInstanceState),
     /// The instance has been resolved.
     Resolved(ResolvedInstanceState),
+    /// The instance has been shutdown, and may not run anymore.
+    Shutdown(ShutdownInstanceState, UnresolvedInstanceState),
     /// The instance has been destroyed. It has no content and no further actions may be registered
     /// on it.
     Destroyed,
@@ -1518,6 +1589,13 @@ impl InstanceState {
         }
     }
 
+    pub fn is_shut_down(&self) -> bool {
+        match &self {
+            InstanceState::Shutdown(_, _) | InstanceState::Destroyed => true,
+            _ => false,
+        }
+    }
+
     /// Requests a token that represents this component instance, minting it if needed.
     ///
     /// If the component instance is destroyed or not discovered, returns `None`.
@@ -1528,8 +1606,9 @@ impl InstanceState {
     ) -> Option<InstanceToken> {
         match self {
             InstanceState::New => None,
-            InstanceState::Unresolved(unresolved) => {
-                Some(unresolved.instance_token(moniker, context))
+            InstanceState::Unresolved(unresolved_state)
+            | InstanceState::Shutdown(_, unresolved_state) => {
+                Some(unresolved_state.instance_token(moniker, context))
             }
             InstanceState::Resolved(resolved) => Some(resolved.instance_token(moniker, context)),
             InstanceState::Destroyed => None,
@@ -1543,6 +1622,7 @@ impl InstanceState {
             InstanceState::New => None,
             InstanceState::Unresolved(_) => None,
             InstanceState::Resolved(resolved) => resolved.program_escrow()?.will_start().await,
+            InstanceState::Shutdown(_, _) => None,
             InstanceState::Destroyed => None,
         }
     }
@@ -1554,10 +1634,21 @@ impl fmt::Debug for InstanceState {
             Self::New => "New",
             Self::Unresolved(_) => "Discovered",
             Self::Resolved(_) => "Resolved",
+            Self::Shutdown(_, _) => "Shutdown",
             Self::Destroyed => "Destroyed",
         };
         f.write_str(s)
     }
+}
+
+pub struct ShutdownInstanceState {
+    /// The children of this component, which is retained in case a destroy action is performed, as
+    /// in that case the children will need to be destroyed as well.
+    pub children: HashMap<ChildName, Arc<ComponentInstance>>,
+
+    /// Information about used storage capabilities the component had in its manifest. This is
+    /// retained because the storage contents will be deleted if this component is destroyed.
+    pub routed_storage: Vec<routing::RoutedStorage>,
 }
 
 pub struct UnresolvedInstanceState {
@@ -1579,10 +1670,17 @@ impl UnresolvedInstanceState {
 
     /// Returns relevant information and prepares to enter the resolved state.
     pub fn to_resolved(&mut self) -> (InstanceTokenState, ComponentInput) {
-        (
-            std::mem::replace(&mut self.instance_token_state, Default::default()),
-            self.component_input.clone(),
-        )
+        (std::mem::take(&mut self.instance_token_state), self.component_input.clone())
+    }
+
+    /// Creates a new UnresolvedInstanceState by either cloning values from this struct or moving
+    /// values from it (and replacing the values with their default values). This struct should be
+    /// dropped after this function is called.
+    pub fn take(&mut self) -> Self {
+        Self {
+            instance_token_state: std::mem::take(&mut self.instance_token_state),
+            component_input: self.component_input.clone(),
+        }
     }
 }
 

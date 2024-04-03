@@ -12,7 +12,11 @@ pub use open::*;
 use {
     crate::{
         capability::CapabilitySource,
-        model::{component::ComponentInstance, error::ModelError, storage},
+        model::{
+            component::{ComponentInstance, WeakComponentInstance},
+            error::ModelError,
+            storage,
+        },
     },
     ::routing::{component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper},
     async_trait::async_trait,
@@ -126,21 +130,31 @@ pub fn request_for_namespace_capability_expose(exposes: Vec<&ExposeDecl>) -> Opt
     }
 }
 
-/// Routes a storage capability from `target` to its source and deletes its isolated storage.
-pub(super) async fn route_and_delete_storage(
+pub struct RoutedStorage {
+    backing_dir_info: storage::BackingDirectoryInfo,
+    target: WeakComponentInstance,
+}
+
+pub(super) async fn route_storage(
     use_storage_decl: UseStorageDecl,
     target: &Arc<ComponentInstance>,
-) -> Result<(), ModelError> {
+) -> Result<RoutedStorage, ModelError> {
     let storage_source = RouteRequest::UseStorage(use_storage_decl.clone()).route(target).await?;
-
     let backing_dir_info = storage::route_backing_directory(storage_source.source).await?;
+    Ok(RoutedStorage { backing_dir_info, target: WeakComponentInstance::new(target) })
+}
+
+pub(super) async fn delete_storage(routed_storage: RoutedStorage) -> Result<(), ModelError> {
+    let target = routed_storage.target.upgrade()?;
 
     // As of today, the storage component instance must contain the target. This is because
     // it is impossible to expose storage declarations up.
-    let moniker =
-        target.instanced_moniker().strip_prefix(&backing_dir_info.storage_source_moniker).unwrap();
+    let moniker = target
+        .instanced_moniker()
+        .strip_prefix(&routed_storage.backing_dir_info.storage_source_moniker)
+        .unwrap();
     storage::delete_isolated_storage(
-        backing_dir_info,
+        routed_storage.backing_dir_info,
         target.persistent_storage,
         moniker,
         target.instance_id(),

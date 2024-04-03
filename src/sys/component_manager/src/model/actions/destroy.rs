@@ -42,92 +42,110 @@ impl Action for DestroyAction {
 }
 
 async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
-    // Do nothing if already destroyed.
-    {
-        if let InstanceState::Destroyed = *component.lock_state().await {
-            return Ok(());
+    loop {
+        // Do nothing if already destroyed.
+        {
+            if let InstanceState::Destroyed = *component.lock_state().await {
+                return Ok(());
+            }
         }
-    }
 
-    // Require the component to be discovered before deleting it so a Destroyed event is
-    // always preceded by a Discovered.
-    // TODO: wait for a discover, don't register a new one
-    ActionSet::register(component.clone(), DiscoverAction::new(ComponentInput::default())).await?;
+        // Require the component to be discovered before deleting it so a Destroyed event is
+        // always preceded by a Discovered.
+        // TODO: wait for a discover, don't register a new one
+        ActionSet::register(component.clone(), DiscoverAction::new(ComponentInput::default()))
+            .await?;
 
-    // For destruction to behave correctly, the component has to be shut down first.
-    // NOTE: This will recursively shut down the whole subtree. If this component has children,
-    // we'll call DestroyChild on them which in turn will call Shutdown on the child. Because
-    // the parent's subtree was shutdown, this shutdown is a no-op.
-    ActionSet::register(component.clone(), ShutdownAction::new(ShutdownType::Instance))
-        .await
-        .map_err(|e| DestroyActionError::ShutdownFailed { err: Box::new(e) })?;
+        // For destruction to behave correctly, the component has to be shut down first.
+        // NOTE: This will recursively shut down the whole subtree. If this component has children,
+        // we'll call DestroyChild on them which in turn will call Shutdown on the child. Because
+        // the parent's subtree was shutdown, this shutdown is a no-op.
+        ActionSet::register(component.clone(), ShutdownAction::new(ShutdownType::Instance))
+            .await
+            .map_err(|e| DestroyActionError::ShutdownFailed { err: Box::new(e) })?;
 
-    let nfs = {
-        match *component.lock_state().await {
-            InstanceState::Resolved(ref s) => {
-                let mut nfs = vec![];
-                for (m, c) in s.children() {
-                    let component = component.clone();
-                    let m = m.clone();
-                    let incarnation = c.incarnation_id();
-                    let nf = async move { component.destroy_child(m, incarnation).await };
-                    nfs.push(nf);
+        let nfs = {
+            match *component.lock_state().await {
+                InstanceState::Shutdown(ref state, _) => {
+                    let mut nfs = vec![];
+                    for (m, c) in state.children.iter() {
+                        let component = component.clone();
+                        let m = m.clone();
+                        let incarnation = c.incarnation_id();
+                        let nf = async move { component.destroy_child(m, incarnation).await };
+                        nfs.push(nf);
+                    }
+                    nfs
                 }
-                nfs
+                InstanceState::Unresolved(_) | InstanceState::Resolved(_) => {
+                    // The instance is not shut down, we must have raced with an unresolve action
+                    // (potentially followed by a resolve action). Let's try again.
+                    continue;
+                }
+                InstanceState::New => {
+                    panic!("discover action returned above but the component is undiscovered, this should be impossible");
+                }
+                InstanceState::Destroyed => {
+                    panic!(
+                        "component was destroyed earlier but is not now, this should be impossible"
+                    );
+                }
             }
-            InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Destroyed => {
-                // Component was never resolved. No explicit cleanup is required for children.
-                vec![]
+        };
+        let results = join_all(nfs).await;
+        ok_or_first_error(results)?;
+
+        // Now that all children have been destroyed, destroy the parent.
+        component.destroy_instance().await?;
+
+        // Wait for any remaining blocking tasks and actions finish up.
+        fn wait(nf: Option<impl Future + Send + 'static>) -> BoxFuture<'static, ()> {
+            Box::pin(async {
+                if let Some(nf) = nf {
+                    nf.await;
+                }
+            })
+        }
+        let task_shutdown = Box::pin(component.blocking_task_group().join());
+        let nfs = {
+            let actions = component.lock_actions().await;
+            vec![
+                wait(actions.wait(ResolveAction::new())),
+                wait(actions.wait(StartAction::new(
+                    StartReason::Debug,
+                    None,
+                    IncomingCapabilities::default(),
+                ))),
+                task_shutdown,
+            ]
+        };
+        join_all(nfs.into_iter()).await;
+
+        // Only consider the component fully destroyed once it's no longer executing any lifecycle
+        // transitions.
+        component.lock_state().await.set(InstanceState::Destroyed);
+
+        // Send the Destroyed event for the component
+        let event = Event::new(&component, EventPayload::Destroyed);
+        component.hooks.dispatch(&event).await;
+
+        // Remove this component from the parent's list of children
+        if let Some(child_name) = component.moniker.leaf() {
+            if let Ok(ExtendedInstanceInterface::Component(parent)) = component.parent.upgrade() {
+                match *parent.lock_state().await {
+                    InstanceState::Resolved(ref mut resolved_state) => {
+                        resolved_state.remove_child(child_name);
+                    }
+                    InstanceState::Shutdown(ref mut state, _) => {
+                        state.children.remove(child_name);
+                    }
+                    _ => (),
+                }
             }
         }
-    };
-    let results = join_all(nfs).await;
-    ok_or_first_error(results)?;
 
-    // Now that all children have been destroyed, destroy the parent.
-    component.destroy_instance().await?;
-
-    // Wait for any remaining blocking tasks and actions finish up.
-    fn wait(nf: Option<impl Future + Send + 'static>) -> BoxFuture<'static, ()> {
-        Box::pin(async {
-            if let Some(nf) = nf {
-                nf.await;
-            }
-        })
+        return Ok(());
     }
-    let task_shutdown = Box::pin(component.blocking_task_group().join());
-    let nfs = {
-        let actions = component.lock_actions().await;
-        vec![
-            wait(actions.wait(ResolveAction::new())),
-            wait(actions.wait(StartAction::new(
-                StartReason::Debug,
-                None,
-                IncomingCapabilities::default(),
-            ))),
-            task_shutdown,
-        ]
-    };
-    join_all(nfs.into_iter()).await;
-
-    // Only consider the component fully destroyed once it's no longer executing any lifecycle
-    // transitions.
-    component.lock_state().await.set(InstanceState::Destroyed);
-
-    // Send the Destroyed event for the component
-    let event = Event::new(&component, EventPayload::Destroyed);
-    component.hooks.dispatch(&event).await;
-
-    // Remove this component from the parent's list of children
-    if let Ok(ExtendedInstanceInterface::Component(parent)) = component.parent.upgrade() {
-        if let Ok(mut resolved_state) = parent.lock_resolved_state().await {
-            if let Some(child_name) = component.moniker.leaf() {
-                resolved_state.remove_child(child_name)
-            }
-        }
-    }
-
-    Ok(())
 }
 
 fn ok_or_first_error(results: Vec<Result<(), ActionError>>) -> Result<(), ActionError> {
@@ -140,8 +158,6 @@ pub mod tests {
         super::*,
         crate::model::{
             actions::test_utils::{is_child_deleted, is_destroyed},
-            events::{registry::EventSubscription, stream::EventStream},
-            hooks::EventType,
             testing::{
                 test_helpers::{
                     component_decl_with_test_runner, execution_is_shut_down, get_incarnation_id,
@@ -150,10 +166,8 @@ pub mod tests {
                 test_hook::Lifecycle,
             },
         },
-        assert_matches::assert_matches,
-        cm_rust::{Availability, UseEventStreamDecl, UseSource},
         cm_rust_testing::*,
-        fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc, StreamExt},
         moniker::{ChildName, Moniker},
         std::sync::atomic::Ordering,
@@ -333,34 +347,6 @@ pub mod tests {
         }
     }
 
-    async fn setup_destroy_waits_test_event_stream(
-        test: &ActionsTest,
-        event_types: Vec<EventType>,
-    ) -> EventStream {
-        let events: Vec<_> = event_types
-            .into_iter()
-            .map(|e| UseEventStreamDecl {
-                source_name: e.into(),
-                source: UseSource::Parent,
-                scope: None,
-                target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
-                filter: None,
-                availability: Availability::Required,
-            })
-            .collect();
-        let mut event_source =
-            test.builtin_environment.lock().await.event_source_factory.create_for_above_root();
-        let event_stream = event_source
-            .subscribe(
-                events.into_iter().map(|event| EventSubscription { event_name: event }).collect(),
-            )
-            .await
-            .expect("subscribe to event stream");
-        let model = test.model.clone();
-        fasync::Task::spawn(async move { model.start(ComponentInput::default()).await }).detach();
-        event_stream
-    }
-
     async fn run_destroy_waits_test(
         mock_action_key: ActionKey,
         mock_action_result: Result<(), ActionError>,
@@ -535,67 +521,6 @@ pub mod tests {
         mock_action_unblocker.try_send(()).unwrap();
 
         destroy_child_fut.await.unwrap();
-        assert!(is_child_deleted(&component_root, &component_a).await);
-    }
-
-    #[fuchsia::test]
-    async fn destroy_registers_discover() {
-        let components = vec![("root", ComponentDeclBuilder::new().build())];
-        let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.model.root();
-        // This setup circumvents the registration of the Discover action on component_a.
-        {
-            let mut resolved_state = component_root.lock_resolved_state().await.unwrap();
-            let child = cm_rust::ChildDecl {
-                name: format!("a"),
-                url: format!("test:///a"),
-                startup: fdecl::StartupMode::Lazy,
-                environment: None,
-                on_terminate: None,
-                config_overrides: None,
-            };
-            assert!(resolved_state
-                .add_child_no_discover(&component_root, &child, None)
-                .await
-                .is_ok());
-        }
-        let mut event_stream = setup_destroy_waits_test_event_stream(
-            &test,
-            vec![EventType::Discovered, EventType::Destroyed],
-        )
-        .await;
-
-        // Shut down component so we can destroy it.
-        let component_a = match *component_root.lock_state().await {
-            InstanceState::Resolved(ref s) => {
-                s.get_child(&ChildName::try_from("a").unwrap()).expect("child a not found").clone()
-            }
-            _ => panic!("not resolved"),
-        };
-        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
-            .await
-            .expect("shutdown failed");
-
-        // Confirm component is still in New state.
-        {
-            let state = &*component_a.lock_state().await;
-            assert_matches!(state, InstanceState::New);
-        };
-
-        // Register DestroyChild.
-        let component_root_clone = component_root.clone();
-        let nf = fasync::Task::spawn(async move {
-            component_root_clone.destroy_child("a".try_into().unwrap(), 0).await
-        });
-
-        // Wait for Discover action, which should be registered by Destroy, followed by
-        // Destroyed.
-        event_stream
-            .wait_until(EventType::Discovered, vec!["a"].try_into().unwrap())
-            .await
-            .unwrap();
-        event_stream.wait_until(EventType::Destroyed, vec!["a"].try_into().unwrap()).await.unwrap();
-        nf.await.unwrap();
         assert!(is_child_deleted(&component_root, &component_a).await);
     }
 

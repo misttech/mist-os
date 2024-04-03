@@ -240,6 +240,7 @@ fn get_subcomponents(
                     match *state_guard {
                         InstanceState::New
                         | InstanceState::Unresolved(_)
+                        | InstanceState::Shutdown(_, _)
                         | InstanceState::Destroyed => {}
                         InstanceState::Resolved(ref s) => {
                             for (_, child) in s.children() {

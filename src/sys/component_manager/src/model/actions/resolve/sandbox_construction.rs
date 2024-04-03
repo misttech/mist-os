@@ -6,7 +6,9 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            component::{ComponentInstance, ResolvedInstanceState, WeakComponentInstance},
+            component::{
+                ComponentInstance, InstanceState, ResolvedInstanceState, WeakComponentInstance,
+            },
             routing::router::{Request, Router},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive},
@@ -650,36 +652,32 @@ fn use_from_parent_router(
         };
         async move {
             let router = {
-                let state = match component.lock_resolved_state().await {
-                    Ok(state) => state,
-                    Err(err) => {
-                        return Err(RoutingError::from(ComponentInstanceError::resolve_failed(
-                            component.moniker.clone(),
-                            err,
-                        ))
-                        .into());
+                match *component.lock_state().await {
+                    InstanceState::Resolved(ref state)
+                        if state.program_input_dict_additions.is_some() =>
+                    {
+                        let additions = state.program_input_dict_additions.as_ref().unwrap();
+                        match additions.get_capability(&source_path) {
+                            // There's an addition to the program input dictionary for this
+                            // capability, let's use it.
+                            Some(Capability::Open(o)) => Router::new_ok(o),
+                            // There's no addition to the program input dictionary for this
+                            // capability, let's use the component input dictionary.
+                            _ => component_input_capability,
+                        }
                     }
-                };
-                // Try to get the capability from the incoming dict, which was passed when the child was
-                // started.
-                //
-                // Unlike the program input dict below that contains Routers created by
-                // component manager, the incoming dict may contain capabilities created externally.
-                // Currently there is no way to create a Router externally, so assume these
-                // are Open capabilities and convert them to Router here.
-                //
-                // TODO(https://fxbug.dev/319542502): Convert from the external Router type, once it
-                // exists.
-                state
-                    .program_input_dict_additions
-                    .as_ref()
-                    .and_then(|dict| match dict.get_capability(&source_path) {
-                        Some(Capability::Open(o)) => Some(Router::new_ok(o)),
-                        _ => None,
-                    })
-                    // Try to get the capability from the component input dict, created from static
-                    // routes when the component was resolved.
-                    .unwrap_or(component_input_capability)
+                    _ => {
+                        // If the component is not resolved and/or does not have additions to the
+                        // program input dictionary, then route this capability without any
+                        // additions.
+                        //
+                        // NOTE: there's a chance that the component is in the shutdown stage here.
+                        // The stop action clears the program_input_dict_additions, so even if
+                        // additions were set the last time the component was run they won't apply
+                        // after the component has stopped.
+                        component_input_capability
+                    }
+                }
             };
             router.route(request).await
         }

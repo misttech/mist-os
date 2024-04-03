@@ -42,8 +42,8 @@ impl Action for ResolveAction {
 
 async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<(), ResolveActionError> {
     {
-        let execution = component.lock_execution();
-        if execution.is_shut_down() {
+        let state = component.lock_state().await;
+        if state.is_shut_down() {
             return Err(ResolveActionError::InstanceShutDown {
                 moniker: component.moniker.clone(),
             });
@@ -55,8 +55,6 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<(), ResolveAct
             component.lock_actions().await.wait_for_action(ActionKey::Discover);
         discover_completed.await.unwrap();
     }
-    // Let's comment it out and see what happens. Fingers crossed this was superfluous. There's a
-    // panic right below this that should catch if we're undiscovered.
     let result = async move {
         let first_resolve = {
             let state = component.lock_state().await;
@@ -66,6 +64,11 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<(), ResolveAct
                 }
                 InstanceState::Unresolved(_) => true,
                 InstanceState::Resolved(_) => false,
+                InstanceState::Shutdown(_, _) => {
+                    return Err(ResolveActionError::InstanceShutDown {
+                        moniker: component.moniker.clone(),
+                    });
+                }
                 InstanceState::Destroyed => {
                     return Err(ResolveActionError::InstanceDestroyed {
                         moniker: component.moniker.clone(),
@@ -105,6 +108,11 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<(), ResolveAct
                 let (instance_token_state, component_input_dict) = match state.deref_mut() {
                     InstanceState::Resolved(_) => {
                         panic!("Component was marked Resolved during Resolve action?");
+                    }
+                    InstanceState::Shutdown(_, _) => {
+                        return Err(ResolveActionError::InstanceShutDown {
+                            moniker: component.moniker.clone(),
+                        });
                     }
                     InstanceState::New => {
                         panic!("Component was not marked Discovered before Resolve action?");
@@ -215,7 +223,7 @@ pub mod tests {
             ActionSet::register(component_a.clone(), ResolveAction::new()).await,
             Err(ActionError::ResolveError { err: ResolveActionError::InstanceShutDown { .. } })
         );
-        assert!(is_resolved(&component_a).await);
+        assert!(!is_resolved(&component_a).await);
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
     }
 }
