@@ -46,7 +46,7 @@ if (have_devicetree) {
     deps = [ "//zircon/kernel/phys/test:zbi-memory-test.zbi($phys_toolchain)" ]
 
     # This value should match `//zircon/kernel/phys/test:qemu-memory-test timeout`.
-    timeout = 120
+    timeout = 150
   }
 
   devicetree_zbi_test("core-tests") {

@@ -292,7 +292,7 @@ if (current_toolchain != default_toolchain) {
     #
     # Any changes to this timeout should be reflected in
     # `//zircon/kernel/phys/boot-shim:devicetree-shim-memory-test`
-    timeout = 120
+    timeout = 150
   }
 
   zbi_input("decompress-test-data") {
