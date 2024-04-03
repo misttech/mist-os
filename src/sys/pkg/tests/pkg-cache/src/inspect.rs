@@ -243,12 +243,7 @@ async fn package_cache_get() {
 
     let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
-    let content_blob = needed_blobs
-        .open_blob(&blob.blob_id, fpkg::BlobType::Delivery)
-        .await
-        .unwrap()
-        .unwrap()
-        .unwrap();
+    let content_blob = needed_blobs.open_blob(&blob.blob_id).await.unwrap().unwrap().unwrap();
 
     // Content blob open for writing.
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
@@ -264,12 +259,7 @@ async fn package_cache_get() {
 
     let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
-    let content_blob = needed_blobs
-        .open_blob(&blob.blob_id, fpkg::BlobType::Delivery)
-        .await
-        .unwrap()
-        .unwrap()
-        .unwrap();
+    let content_blob = needed_blobs.open_blob(&blob.blob_id).await.unwrap().unwrap().unwrap();
 
     // Last content blob open for writing.
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;

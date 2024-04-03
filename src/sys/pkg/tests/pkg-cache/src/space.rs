@@ -180,8 +180,7 @@ async fn gc_frees_space_so_write_can_succeed(blob_implementation: blobfs_ramdisk
 
     // Writing the meta.far should fail with NO_SPACE.
     let (meta_far, _contents) = pkg.contents();
-    let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let meta_blob = needed_blobs.open_meta_blob().await.unwrap().unwrap().unwrap();
     let () = compress_and_write_blob(&meta_far.contents, *meta_blob)
         .await
         .unwrap_err()
@@ -190,8 +189,7 @@ async fn gc_frees_space_so_write_can_succeed(blob_implementation: blobfs_ramdisk
     // GC should free space, allowing the meta.far write and therefore get to succeed.
     let () = env.proxies.space_manager.gc().await.unwrap().unwrap();
     assert!(!env.blobfs.list_blobs().unwrap().contains(&orphan_hash));
-    let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let meta_blob = needed_blobs.open_meta_blob().await.unwrap().unwrap().unwrap();
     let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
     let (_, blob_iterator_server_end) =
@@ -287,8 +285,7 @@ async fn blobs_protected_from_gc_during_get(gc_protection: fpkg::GcProtection) {
     };
 
     // Write the superpackage meta.far.
-    let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let meta_blob = needed_blobs.open_meta_blob().await.unwrap().unwrap().unwrap();
     let () = compress_and_write_blob(&to_be_fetched[0].1, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, to_be_fetched[0].0).await;
     let () = blob_is_present_and_protected(0).await;
@@ -310,7 +307,7 @@ async fn blobs_protected_from_gc_during_get(gc_protection: fpkg::GcProtection) {
         let (i, needed_blobs, to_be_fetched) = (i, &needed_blobs, &to_be_fetched);
         async move {
             let blob = needed_blobs
-                .open_blob(&BlobId::from(to_be_fetched[i].0).into(), fpkg::BlobType::Delivery)
+                .open_blob(&BlobId::from(to_be_fetched[i].0).into())
                 .await
                 .unwrap()
                 .unwrap()
@@ -448,8 +445,7 @@ async fn writing_index_clears_on_get_error() {
         )
         .map_ok(|res| res.map_err(Status::from_raw));
     let (meta_far, content_blobs) = pkg.contents();
-    let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let meta_blob = needed_blobs.open_meta_blob().await.unwrap().unwrap().unwrap();
     let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));

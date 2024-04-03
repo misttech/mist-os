@@ -80,9 +80,6 @@ pub enum CreateError {
 
     #[error("while calling fuchsia.fxfs/BlobCreator.Create: {0:?}")]
     BlobCreator(ffxfs::CreateBlobError),
-
-    #[error("unsupported blob type {0:?}")]
-    UnsupportedBlobType(fpkg::BlobType),
 }
 
 impl From<ffxfs::CreateBlobError> for CreateError {
@@ -343,20 +340,12 @@ impl Client {
     }
 
     /// Open a new blob for write.
-    pub async fn open_blob_for_write(
-        &self,
-        blob: &Hash,
-        blob_type: fpkg::BlobType,
-    ) -> Result<fpkg::BlobWriter, CreateError> {
+    pub async fn open_blob_for_write(&self, blob: &Hash) -> Result<fpkg::BlobWriter, CreateError> {
         Ok(if let Some(blob_creator) = &self.creator {
-            // FxBlob only supports Delivery blobs.
-            if blob_type != fpkg::BlobType::Delivery {
-                return Err(CreateError::UnsupportedBlobType(blob_type));
-            }
             fpkg::BlobWriter::Writer(blob_creator.create(blob, false).await??)
         } else {
             fpkg::BlobWriter::File(
-                self.open_blob_proxy_from_dir_for_write(blob, blob_type)
+                self.open_blob_proxy_from_dir_for_write(blob)
                     .await?
                     .into_channel()
                     .map_err(|_: fio::FileProxy| CreateError::ConvertToClientEnd)?
@@ -370,16 +359,12 @@ impl Client {
     async fn open_blob_proxy_from_dir_for_write(
         &self,
         blob: &Hash,
-        blob_type: fpkg::BlobType,
     ) -> Result<fio::FileProxy, CreateError> {
         let flags = fio::OpenFlags::CREATE
             | fio::OpenFlags::RIGHT_WRITABLE
             | fio::OpenFlags::RIGHT_READABLE;
 
-        let path = match blob_type {
-            fpkg::BlobType::Uncompressed => blob.to_string(),
-            fpkg::BlobType::Delivery => delivery_blob::delivery_blob_path(blob),
-        };
+        let path = delivery_blob::delivery_blob_path(blob);
         fuchsia_fs::directory::open_file(&self.dir, &path, flags).await.map_err(|e| match e {
             fuchsia_fs::node::OpenError::OpenError(Status::ACCESS_DENIED) => {
                 CreateError::AlreadyExists
@@ -711,27 +696,6 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn write_uncompressed_blob() {
-        let blobfs = BlobfsRamdisk::start().await.unwrap();
-        let client = Client::for_ramdisk(&blobfs);
-
-        let content = [3; 1024];
-        let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
-
-        let proxy = client
-            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Uncompressed)
-            .await
-            .unwrap();
-
-        let () = resize(&proxy, content.len()).await;
-        let () = write(&proxy, &content).await;
-
-        assert!(client.has_blob(&hash).await);
-
-        blobfs.stop().await.unwrap();
-    }
-
-    #[fasync::run_singlethreaded(test)]
     async fn write_delivery_blob() {
         let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
@@ -741,10 +705,7 @@ mod tests {
         let delivery_content =
             delivery_blob::Type1Blob::generate(&content, delivery_blob::CompressionMode::Always);
 
-        let proxy = client
-            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Delivery)
-            .await
-            .unwrap();
+        let proxy = client.open_blob_proxy_from_dir_for_write(&hash).await.unwrap();
 
         let () = resize(&proxy, delivery_content.len()).await;
         let () = write(&proxy, &delivery_content).await;
@@ -762,44 +723,34 @@ mod tests {
         hash: Hash,
     }
 
-    async fn open_blob_only(client: &Client, blob: &[u8; 1024]) -> TestBlob {
-        let hash = MerkleTree::from_reader(&blob[..]).unwrap().root();
-        let _blob = client
-            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Uncompressed)
-            .await
-            .unwrap();
+    async fn open_blob_only(client: &Client, content: &[u8]) -> TestBlob {
+        let hash = MerkleTree::from_reader(content).unwrap().root();
+        let _blob = client.open_blob_proxy_from_dir_for_write(&hash).await.unwrap();
         TestBlob { _blob, hash }
     }
 
-    async fn open_and_truncate_blob(client: &Client, content: &[u8; 1024]) -> TestBlob {
-        let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
-        let _blob = client
-            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Uncompressed)
-            .await
-            .unwrap();
+    async fn open_and_truncate_blob(client: &Client, content: &[u8]) -> TestBlob {
+        let hash = MerkleTree::from_reader(content).unwrap().root();
+        let _blob = client.open_blob_proxy_from_dir_for_write(&hash).await.unwrap();
         let () = resize(&_blob, content.len()).await;
         TestBlob { _blob, hash }
     }
 
-    async fn partially_write_blob(client: &Client, content: &[u8; 1024]) -> TestBlob {
-        let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
-        let _blob = client
-            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Uncompressed)
-            .await
-            .unwrap();
+    async fn partially_write_blob(client: &Client, content: &[u8]) -> TestBlob {
+        let hash = MerkleTree::from_reader(content).unwrap().root();
+        let _blob = client.open_blob_proxy_from_dir_for_write(&hash).await.unwrap();
+        let content = delivery_blob::generate(delivery_blob::DeliveryBlobType::Type1, content);
         let () = resize(&_blob, content.len()).await;
-        let () = write(&_blob, &content[..512]).await;
+        let () = write(&_blob, &content[..content.len() / 2]).await;
         TestBlob { _blob, hash }
     }
 
     async fn fully_write_blob(client: &Client, content: &[u8]) -> TestBlob {
         let hash = MerkleTree::from_reader(content).unwrap().root();
-        let _blob = client
-            .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Uncompressed)
-            .await
-            .unwrap();
+        let _blob = client.open_blob_proxy_from_dir_for_write(&hash).await.unwrap();
+        let content = delivery_blob::generate(delivery_blob::DeliveryBlobType::Type1, content);
         let () = resize(&_blob, content.len()).await;
-        let () = write(&_blob, content).await;
+        let () = write(&_blob, &content).await;
         TestBlob { _blob, hash }
     }
 
@@ -1026,7 +977,7 @@ mod tests {
         .detach();
 
         assert_matches!(
-            client.open_blob_for_write(&[0; 32].into(), fpkg::BlobType::Delivery).await,
+            client.open_blob_for_write(&[0; 32].into()).await,
             Ok(fpkg::BlobWriter::Writer(_))
         );
     }
@@ -1057,7 +1008,7 @@ mod tests {
         .detach();
 
         assert_matches!(
-            client.open_blob_for_write(&[0; 32].into(), fpkg::BlobType::Delivery).await,
+            client.open_blob_for_write(&[0; 32].into()).await,
             Err(CreateError::AlreadyExists)
         );
     }

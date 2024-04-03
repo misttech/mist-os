@@ -174,8 +174,7 @@ async fn get_and_verify_package(
 }
 
 pub async fn write_meta_far(needed_blobs: &fpkg::NeededBlobsProxy, meta_far: BlobContents) {
-    let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let meta_blob = needed_blobs.open_meta_blob().await.unwrap().unwrap().unwrap();
     let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(needed_blobs, meta_far.merkle).await;
 }
@@ -199,12 +198,8 @@ pub async fn write_needed_blobs(
             break;
         }
         for blob_info in chunk {
-            let blob_proxy = needed_blobs
-                .open_blob(&blob_info.blob_id, fpkg::BlobType::Delivery)
-                .await
-                .unwrap()
-                .unwrap()
-                .unwrap();
+            let blob_proxy =
+                needed_blobs.open_blob(&blob_info.blob_id).await.unwrap().unwrap().unwrap();
             let () = compress_and_write_blob(
                 available_blobs
                     .remove(&fpkg_ext::BlobId::from(blob_info.blob_id).into())
@@ -265,7 +260,7 @@ async fn verify_package_cached(
     // server will reply with `Ok(None)`, meaning that the metadata blob is cached and
     // GetMissingBlobs needs to be performed (but the iterator obtained with GetMissingBlobs should
     // be empty).
-    let epitaph_received = match needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await {
+    let epitaph_received = match needed_blobs.open_meta_blob().await {
         Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. }) => true,
         Ok(Ok(None)) => false,
         Ok(r) => {
@@ -943,14 +938,9 @@ impl<B: Blobfs> TestEnv<B> {
             None,
         )
         .unwrap();
-        // c++blobfs supports uncompressed and delivery blobs and FxBlob only supports delivery
-        // blobs, so we always write delivery blobs.
-        let () = compress_and_write_blob(
-            contents,
-            blobfs.open_blob_for_write(hash, fpkg::BlobType::Delivery).await.unwrap(),
-        )
-        .await
-        .unwrap();
+        let () = compress_and_write_blob(contents, blobfs.open_blob_for_write(hash).await.unwrap())
+            .await
+            .unwrap();
     }
 
     fn take_reboot_reasons(&self) -> Vec<RebootReason> {

@@ -62,7 +62,7 @@ impl Mock {
                 control_handle: _,
             })) => {
                 FlagSet::OPEN_FOR_WRITE.verify(flags);
-                assert_eq!(path, merkle.to_string());
+                assert_eq!(path, delivery_blob::delivery_blob_path(merkle));
 
                 let stream = object.into_stream().unwrap().cast_stream();
                 Blob { stream }

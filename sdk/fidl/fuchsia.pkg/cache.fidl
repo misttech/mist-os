@@ -162,16 +162,12 @@ closed protocol NeededBlobs {
     /// If the package was already cached, server will close the channel with a
     /// `ZX_OK` epitaph.
     ///
-    /// + request `blob_type` the type of the blob to be written. Will be
-    ///   removed once the transition to offline compression is complete.
     /// - response `writer` is used to write the blob. If `writer` is absent,
     ///   the blob is already cached and so does not need to be written.
     /// * error an OpenBlobError indicating failure. Clients may retry this
     ///   request, though the server end may abort this cache operation on
     ///   errors it considers to be fatal.
-    strict OpenMetaBlob(struct {
-        blob_type BlobType;
-    }) -> (resource struct {
+    strict OpenMetaBlob() -> (resource struct {
         writer BlobWriter:optional;
     }) error OpenBlobError;
 
@@ -199,8 +195,6 @@ closed protocol NeededBlobs {
     /// Opens a blob for writing.
     ///
     /// + request `blob_id` the blob id describing this blob.
-    /// + request `blob_type` the type of the blob to be written. Will be
-    ///   removed once the transition to offline compression is complete.
     /// - response `writer` is used to write the blob. If `writer` is absent,
     ///   the blob is already cached and so does not need to be written.
     /// * error an OpenBlobError indicating failure. Clients may retry this
@@ -208,7 +202,6 @@ closed protocol NeededBlobs {
     ///   errors it considers to be fatal.
     strict OpenBlob(struct {
         blob_id BlobId;
-        blob_type BlobType;
     }) -> (resource struct {
         writer BlobWriter:optional;
     }) error OpenBlobError;
@@ -237,16 +230,6 @@ closed protocol NeededBlobs {
     /// will also abort the package cache operation. However, this API provides
     /// the ability to wait for the operation to be torn down.
     strict Abort() -> ();
-};
-
-/// The type of the blob. Will be removed once the transition to offline
-/// compression is complete.
-type BlobType = strict enum {
-    /// Raw uncompressed blob.
-    UNCOMPRESSED = 1;
-
-    /// Delivery blob.
-    DELIVERY = 2;
 };
 
 /// Used to write a blob to the underlying storage.

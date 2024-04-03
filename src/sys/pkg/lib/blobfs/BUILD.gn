@@ -20,7 +20,6 @@ rustc_library("blobfs") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/delivery_blob",
-    "//src/storage/lib/delivery_blob",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/storage/lib/vmo-blob",
     "//src/sys/pkg/lib/fuchsia-hash",

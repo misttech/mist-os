@@ -510,10 +510,10 @@ async fn handle_open_meta_blob(
 
     loop {
         let () = match stream.try_next().await.map_err(ServeNeededBlobsError::ReceiveRequest)? {
-            Some(NeededBlobsRequest::OpenMetaBlob { blob_type, responder }) => {
+            Some(NeededBlobsRequest::OpenMetaBlob { responder }) => {
                 // Do not fail if already opened to allow retries.
                 opened = true;
-                match open_blob(responder, blobfs, hash, blob_type).await? {
+                match open_blob(responder, blobfs, hash).await? {
                     OpenBlobSuccess::AlreadyCached => break,
                     OpenBlobSuccess::Needed => Ok(()),
                 }
@@ -608,12 +608,12 @@ async fn handle_open_blobs(
 
     while missing_blobs.count_not_cached() != 0 {
         match stream.try_next().await.map_err(ServeNeededBlobsError::ReceiveRequest)? {
-            Some(NeededBlobsRequest::OpenBlob { blob_id, blob_type, responder }) => {
+            Some(NeededBlobsRequest::OpenBlob { blob_id, responder }) => {
                 let blob_id = Hash::from(BlobId::from(blob_id));
                 if !missing_blobs.should_cache(&blob_id) {
                     return Err(ServeNeededBlobsError::BlobNotNeeded(blob_id));
                 }
-                match open_blob(responder, blobfs, blob_id, blob_type).await {
+                match open_blob(responder, blobfs, blob_id).await {
                     Ok(OpenBlobSuccess::AlreadyCached) => {
                         // A prior call to OpenBlob may have added the blob to the set.
                         open_blobs.remove(&blob_id);
@@ -702,9 +702,8 @@ async fn open_blob(
     responder: impl OpenBlobResponder,
     blobfs: &blobfs::Client,
     blob_id: Hash,
-    blob_type: fpkg::BlobType,
 ) -> Result<OpenBlobSuccess, ServeNeededBlobsError> {
-    let create_res = blobfs.open_blob_for_write(&blob_id, blob_type).await;
+    let create_res = blobfs.open_blob_for_write(&blob_id).await;
     let is_readable = match &create_res {
         Err(blobfs::CreateError::AlreadyExists) => {
             // The blob may exist and be readable, or it may be in the process of being written.
@@ -721,23 +720,19 @@ async fn open_blob(
         Err(AlreadyExists) if is_readable => (Ok(None), Ok(AlreadyCached)),
         Err(AlreadyExists) => (Err(fErr::ConcurrentWrite), Ok(Needed)),
         Err(Io(e)) => {
-            warn!(%blob_id, ?blob_type, "io error opening blob {:#}", anyhow!(e));
+            warn!(%blob_id, "io error opening blob {:#}", anyhow!(e));
             (Err(fErr::UnspecifiedIo), Ok(Needed))
         }
         Err(ConvertToClientEnd) => {
-            warn!(%blob_id, ?blob_type, "converting blob handle");
+            warn!(%blob_id, "converting blob handle");
             (Err(fErr::UnspecifiedIo), Ok(Needed))
         }
         Err(Fidl(e)) => {
-            warn!(%blob_id, ?blob_type, "fidl error opening blob {:#}", anyhow!(e));
+            warn!(%blob_id, "fidl error opening blob {:#}", anyhow!(e));
             (Err(fErr::UnspecifiedIo), Ok(Needed))
         }
-        Err(UnsupportedBlobType(error_type)) => {
-            warn!(%blob_id, ?blob_type, ?error_type, "opening an unsupported blob type");
-            (Err(fErr::Internal), Ok(Needed))
-        }
         Err(BlobCreator(error)) => {
-            warn!(?error, %blob_id, ?blob_type, "error calling blob creator");
+            warn!(?error, %blob_id, "error calling blob creator");
             (Err(fErr::Internal), Ok(Needed))
         }
     };
@@ -968,9 +963,7 @@ mod serve_needed_blobs_tests {
         let (blobfs, _) = blobfs::Client::new_test();
 
         let mut response = FakeOpenBlobResponse::new();
-        let res =
-            open_blob(response.responder(), &blobfs, [0; 32].into(), fpkg::BlobType::Uncompressed)
-                .await;
+        let res = open_blob(response.responder(), &blobfs, [0; 32].into()).await;
 
         // The operation should succeed, to allow retries, but it should report the failure to the
         // fidl responder.
@@ -1047,7 +1040,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let blob = proxy
-                    .open_meta_blob(fpkg::BlobType::Uncompressed)
+                    .open_meta_blob()
                     .await
                     .expect("open_meta_blob failed")
                     .expect("open_meta_blob error")
@@ -1086,7 +1079,7 @@ mod serve_needed_blobs_tests {
         // Trying to open the meta FAR blob again after writing it successfully is a protocol
         // violation.
         assert_matches!(
-            proxy.open_meta_blob(fpkg::BlobType::Uncompressed).await,
+            proxy.open_meta_blob().await,
             Err(fidl::Error::ClientChannelClosed { status: Status::PEER_CLOSED, .. })
         );
 
@@ -1115,7 +1108,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let blob = proxy
-                    .open_meta_blob(fpkg::BlobType::Uncompressed)
+                    .open_meta_blob()
                     .await
                     .expect("open_meta_blob failed")
                     .expect("open_meta_blob error")
@@ -1185,7 +1178,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let _: Box<fpkg::BlobWriter> = proxy
-                    .open_meta_blob(fpkg::BlobType::Uncompressed)
+                    .open_meta_blob()
                     .await
                     .expect("open_meta_blob failed")
                     .expect("open_meta_blob error")
@@ -1205,7 +1198,7 @@ mod serve_needed_blobs_tests {
         // The invalid BlobWritten call should close the channel, so trying to open the meta far
         // again should fail.
         assert_matches!(
-            proxy.open_meta_blob(fpkg::BlobType::Uncompressed).await,
+            proxy.open_meta_blob().await,
             Err(fidl::Error::ClientChannelClosed { status: Status::BAD_STATE, .. })
         );
 
@@ -1243,7 +1236,7 @@ mod serve_needed_blobs_tests {
             async {
                 assert_eq!(
                     proxy
-                        .open_meta_blob(fpkg::BlobType::Uncompressed)
+                        .open_meta_blob()
                         .await
                         .expect("open_meta_blob failed")
                         .expect("open_meta_blob error"),
@@ -1256,7 +1249,7 @@ mod serve_needed_blobs_tests {
         // Trying to open the meta FAR blob again after being told it is not needed is a protocol
         // violation.
         assert_matches!(
-            proxy.open_meta_blob(fpkg::BlobType::Uncompressed).await,
+            proxy.open_meta_blob().await,
             Err(fidl::Error::ClientChannelClosed { status: Status::PEER_CLOSED, .. })
         );
 
@@ -1287,7 +1280,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 assert_matches!(
-                    proxy.open_meta_blob(fpkg::BlobType::Uncompressed).await,
+                    proxy.open_meta_blob().await,
                     Ok(Err(fidl_fuchsia_pkg::OpenBlobError::ConcurrentWrite))
                 );
             },
@@ -1301,7 +1294,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let blob = proxy
-                    .open_meta_blob(fpkg::BlobType::Uncompressed)
+                    .open_meta_blob()
                     .await
                     .expect("open_meta_blob failed")
                     .expect("open_meta_blob error")
@@ -1332,7 +1325,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let blob = proxy
-                    .open_meta_blob(fpkg::BlobType::Uncompressed)
+                    .open_meta_blob()
                     .await
                     .expect("open_meta_blob failed")
                     .expect("open_meta_blob error")
@@ -1362,13 +1355,7 @@ mod serve_needed_blobs_tests {
                 serve_minimal_far(&mut blobfs, [0; 32].into()).await
             },
             async {
-                let blob = proxy
-                    .open_meta_blob(fpkg::BlobType::Uncompressed)
-                    .await
-                    .unwrap()
-                    .unwrap()
-                    .unwrap()
-                    .unwrap_file();
+                let blob = proxy.open_meta_blob().await.unwrap().unwrap().unwrap().unwrap_file();
 
                 let () = blob
                     .resize(1)
@@ -1401,7 +1388,7 @@ mod serve_needed_blobs_tests {
 
         // Task moves to next state after retried write operation succeeds.
         assert_matches!(
-            proxy.open_meta_blob(fpkg::BlobType::Uncompressed).await,
+            proxy.open_meta_blob().await,
             Err(fidl::Error::ClientChannelClosed { status: Status::PEER_CLOSED, .. })
         );
         assert_matches!(
@@ -1457,10 +1444,7 @@ mod serve_needed_blobs_tests {
                 Task::spawn(async move { blob.serve_contents(&far_data[..]).await })
             },
             async {
-                assert_matches!(
-                    proxy.open_meta_blob(fpkg::BlobType::Uncompressed).await,
-                    Ok(Ok(None))
-                );
+                assert_matches!(proxy.open_meta_blob().await, Ok(Ok(None)));
             },
         )
         .await;
@@ -1586,10 +1570,7 @@ mod serve_needed_blobs_tests {
                     .await;
             },
             async {
-                assert_matches!(
-                    proxy.open_meta_blob(fpkg::BlobType::Uncompressed).await,
-                    Ok(Ok(None))
-                );
+                assert_matches!(proxy.open_meta_blob().await, Ok(Ok(None)));
             },
         )
         .await;
@@ -1753,7 +1734,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let blob = proxy
-                    .open_blob(&BlobId::from([2; 32]).into(), fpkg::BlobType::Uncompressed)
+                    .open_blob(&BlobId::from([2; 32]).into())
                     .await
                     .expect("open_blob failed")
                     .expect("open_blob error")
@@ -1829,7 +1810,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let _: Box<fpkg::BlobWriter> = proxy
-                    .open_blob(&BlobId::from([2; 32]).into(), fpkg::BlobType::Uncompressed)
+                    .open_blob(&BlobId::from([2; 32]).into())
                     .await
                     .expect("open_blob failed")
                     .expect("open_blob error")
@@ -1837,7 +1818,7 @@ mod serve_needed_blobs_tests {
 
                 assert_eq!(
                     proxy
-                        .open_blob(&BlobId::from([2; 32]).into(), fpkg::BlobType::Uncompressed)
+                        .open_blob(&BlobId::from([2; 32]).into(),)
                         .await
                         .expect("open_blob failed")
                         .expect("open_blob error"),
@@ -1894,8 +1875,7 @@ mod serve_needed_blobs_tests {
             async {
                 let () = stream::iter(content_blobs())
                     .for_each_concurrent(None, |hash| {
-                        let open_fut = proxy
-                            .open_blob(&BlobId::from(hash).into(), fpkg::BlobType::Uncompressed);
+                        let open_fut = proxy.open_blob(&BlobId::from(hash).into());
                         let proxy = &proxy;
 
                         async move {
@@ -1970,8 +1950,7 @@ mod serve_needed_blobs_tests {
             async {
                 let () = stream::iter(content_blobs())
                     .for_each(|hash| {
-                        let open_fut = proxy
-                            .open_blob(&BlobId::from(hash).into(), fpkg::BlobType::Uncompressed);
+                        let open_fut = proxy.open_blob(&BlobId::from(hash).into());
 
                         async move {
                             assert_eq!(open_fut.await.unwrap().unwrap(), None);
@@ -2016,7 +1995,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let _: Box<fpkg::BlobWriter> = proxy
-                    .open_blob(&BlobId::from([2; 32]).into(), fpkg::BlobType::Uncompressed)
+                    .open_blob(&BlobId::from([2; 32]).into())
                     .await
                     .expect("open_blob failed")
                     .expect("open_blob error")
@@ -2108,9 +2087,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 assert_matches!(
-                    proxy
-                        .open_blob(&BlobId::from(content_blob).into(), fpkg::BlobType::Uncompressed)
-                        .await,
+                    proxy.open_blob(&BlobId::from(content_blob).into(),).await,
                     Ok(Err(fpkg::OpenBlobError::ConcurrentWrite))
                 );
             },
@@ -2124,7 +2101,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let blob = proxy
-                    .open_blob(&BlobId::from(content_blob).into(), fpkg::BlobType::Uncompressed)
+                    .open_blob(&BlobId::from(content_blob).into())
                     .await
                     .expect("open_blob failed")
                     .expect("open_blob error")
@@ -2155,7 +2132,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let blob = proxy
-                    .open_blob(&BlobId::from(content_blob).into(), fpkg::BlobType::Uncompressed)
+                    .open_blob(&BlobId::from(content_blob).into())
                     .await
                     .unwrap()
                     .unwrap()
@@ -2180,7 +2157,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let blob = proxy
-                    .open_blob(&BlobId::from(content_blob).into(), fpkg::BlobType::Uncompressed)
+                    .open_blob(&BlobId::from(content_blob).into())
                     .await
                     .unwrap()
                     .unwrap()

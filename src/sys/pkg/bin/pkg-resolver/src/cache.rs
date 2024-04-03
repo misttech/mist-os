@@ -88,7 +88,7 @@ pub async fn cache_package<'a>(
         // Only add the meta.far fetch to the queue if the meta.far is not already cached to avoid
         // blocking resolves of fully cached packages behind in-progress resolves.
         let meta_opener = get.make_open_meta_blob();
-        if let Some(needed_meta) = meta_opener.open(fpkg::BlobType::Delivery).await? {
+        if let Some(needed_meta) = meta_opener.open().await? {
             let () = meta_opener.register_opened_blob(needed_meta);
             let () = blob_fetcher
                 .push(
@@ -627,7 +627,7 @@ async fn fetch_blob_http(
                 let inspect = inspect.attempt();
                 inspect.state(inspect::Http::CreateBlob);
                 if let Some(pkg::cache::NeededBlob { blob, closer: blob_closer }) =
-                    opener.open(fpkg::BlobType::Delivery).await.map_err(FetchError::CreateBlob)?
+                    opener.open().await.map_err(FetchError::CreateBlob)?
                 {
                     inspect.state(inspect::Http::DownloadBlob);
                     let guard = ftrace::async_enter!(
