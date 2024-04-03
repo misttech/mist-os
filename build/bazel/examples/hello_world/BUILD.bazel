@@ -5,4 +5,5 @@
 cc_binary(
     name = "hello_world",
     srcs = ["main.cc"],
+    visibility = ["//visibility:public"],
 )

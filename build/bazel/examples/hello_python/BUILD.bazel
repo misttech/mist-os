@@ -27,3 +27,14 @@ filegroup(
     name = "srcs",
     srcs = ["BUILD.bazel"] + glob(["**/*.py"]),
 )
+
+filegroup(
+    name = "hello_python",
+    testonly = True,
+    srcs = [
+        ":bin",
+        ":lib",
+        ":test",
+    ],
+    visibility = ["//visibility:public"],
+)

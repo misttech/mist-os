@@ -26,7 +26,7 @@ rust_binary(
 )
 
 fuchsia_wrap_rust_binary(
-    name = "hello_rust",
+    name = "hello_rust_bin",
     native_binary = ":hello_rust_native",
 )
 
@@ -38,7 +38,7 @@ fuchsia_component_manifest(
 fuchsia_component(
     name = "component",
     manifest = ":manifest",
-    deps = [":hello_rust"],
+    deps = [":hello_rust_bin"],
 )
 
 fuchsia_package(
@@ -89,3 +89,13 @@ fuchsia_test_package(
 #    name = "hello_rust_doc",
 #    crate = ":hello_rust_native",
 #)
+
+filegroup(
+    name = "hello_rust",
+    testonly = True,
+    srcs = [
+        ":pkg",
+        ":test_pkg",
+    ],
+    visibility = ["//visibility:public"],
+)

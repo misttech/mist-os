@@ -2,13 +2,19 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("examples") {
+import("//build/bazel/bazel_action.gni")
+
+# Build all examples with Bazel all at once.
+# This invokes a stamp_group() Bazel targets that depends on all
+# other example targets directly in the Bazel graph.
+bazel_action("examples") {
+  command = "build"
   testonly = true
-  deps = [
-    "hello_cpp",
-    "hello_fuchsia",
-    "hello_python",
-    "hello_rust",
-    "hello_world",
+  bazel_targets = [ ":examples" ]
+  copy_outputs = [
+    {
+      bazel = "{{BAZEL_TARGET_OUT_DIR}}/examples.bazel_stamp"
+      ninja = "examples.bazel_stamp"
+    },
   ]
 }

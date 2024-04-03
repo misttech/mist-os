@@ -38,3 +38,8 @@ fuchsia_package(
     components = [":hello_fuchsia_component"],
     fuchsia_api_level = "HEAD",
 )
+
+filegroup(
+    name = "hello_fuchsia",
+    srcs = [":hello_fuchsia_package"],
+)

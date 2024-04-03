@@ -90,3 +90,13 @@ fuchsia_unittest_package(
     ],
     visibility = ["//visibility:public"],
 )
+
+filegroup(
+    name = "hello_cpp",
+    testonly = True,
+    srcs = [
+        ":pkg",
+        ":test_pkg",
+    ],
+    visibility = ["//visibility:public"],
+)
