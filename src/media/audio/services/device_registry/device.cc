@@ -346,7 +346,7 @@ bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
   // For this new control, "catch it up" on the current state.
   if (auto notify = GetControlNotify(); notify) {
     // DaiFormat(s)
-    if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
+    if (is_codec()) {
       if (codec_format_) {
         notify->DaiFormatChanged(codec_format_->dai_format, codec_format_->codec_format_info);
       } else {
@@ -408,8 +408,7 @@ bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add)
   // ElementState for each signalprocessing element.
 
   // GainState -- if StreamConfig.
-  if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
-      device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
+  if (is_stream_config()) {
     observer_to_add->GainStateChanged({{
         .gain_db = *gain_state_->gain_db(),
         .muted = gain_state_->muted().value_or(false),
@@ -418,9 +417,7 @@ bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add)
   }
 
   // PlugState -- if Codec or StreamConfig.
-  if (device_type_ == fuchsia_audio_device::DeviceType::kCodec ||
-      device_type_ == fuchsia_audio_device::DeviceType::kInput ||
-      device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
+  if (is_codec() || is_stream_config()) {
     observer_to_add->PlugStateChanged(*plug_state_->plugged()
                                           ? fuchsia_audio_device::PlugState::kPlugged
                                           : fuchsia_audio_device::PlugState::kUnplugged,
@@ -504,14 +501,13 @@ void Device::SetState(State state) {
 void Device::Initialize() {
   ADR_LOG_METHOD(kLogDeviceMethods);
 
-  if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
+  if (is_codec()) {
     RetrieveCodecProperties();
     RetrieveCodecHealthState();
     RetrieveSignalProcessingState();
     RetrieveCodecDaiFormatSets();
     RetrieveCodecPlugState();
-  } else if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
-             device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
+  } else if (is_stream_config()) {
     RetrieveStreamProperties();
     RetrieveStreamHealthState();
     RetrieveSignalProcessingState();
@@ -770,7 +766,7 @@ void Device::RetrieveSignalProcessingState() {
 
   // TODO(https://fxbug.dev/113429): handle command timeouts
 
-  if (device_type() == fuchsia_audio_device::DeviceType::kCodec) {
+  if (is_codec()) {
     ADR_LOG_METHOD(kLogCodecFidlCalls) << "calling SignalProcessingConnect";
     if (!codec_client_->is_valid()) {
       return;
@@ -790,8 +786,7 @@ void Device::RetrieveSignalProcessingState() {
       OnError(status.error_value().status());
       return;
     }
-  } else if (device_type() == fuchsia_audio_device::DeviceType::kInput ||
-             device_type() == fuchsia_audio_device::DeviceType::kOutput) {
+  } else if (is_stream_config()) {
     ADR_LOG_METHOD(kLogStreamConfigFidlCalls) << "calling SignalProcessingConnect";
     if (!stream_config_client_->is_valid()) {
       return;
@@ -1006,7 +1001,7 @@ void Device::RetrieveDaiFormatSets(
   }
   // TODO(https://fxbug.dev/113429): handle command timeouts
 
-  if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
+  if (is_codec()) {
     if (element_id != fuchsia_audio_device::kDefaultDaiInterconnectElementId) {
       OnError(ZX_ERR_INVALID_ARGS);
       return;
@@ -1266,7 +1261,7 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
     info.signal_processing_elements(sig_proc_elements_);
     info.signal_processing_topologies(sig_proc_topologies_);
   }
-  if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
+  if (is_codec()) {
     // Optional for all device types.
     info.manufacturer(codec_properties_->manufacturer())
         .product(codec_properties_->product())
@@ -1286,14 +1281,12 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
              fuchsia_audio_device::kUniqueInstanceIdSize);
       info.unique_instance_id(uid);
     }
-  }
-  if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
-      device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
+  } else if (is_stream_config()) {
     // Optional for all device types:
     info.manufacturer(stream_config_properties_->manufacturer())
         .product(stream_config_properties_->product())
         .unique_instance_id(stream_config_properties_->unique_id())
-        // Required for Dai and StreamConfig; optional for Codec:
+        // Required for Dai and StreamConfig; optional for Codec; absent for Composite:
         .is_input(stream_config_properties_->is_input())
         // Required for Dai and StreamConfig; optional for Composite; absent for Codec:
         .ring_buffer_format_sets(ring_buffer_format_sets())
@@ -1326,12 +1319,20 @@ void Device::SetDeviceInfo() {
 
 void Device::CreateDeviceClock() {
   ADR_LOG_METHOD(kLogDeviceMethods);
-  FX_CHECK(stream_config_properties_->clock_domain()) << "Clock domain is required";
 
-  device_clock_ = RealClock::CreateFromMonotonic("'" + name_ + "' device clock",
-                                                 *stream_config_properties_->clock_domain(),
-                                                 (*stream_config_properties_->clock_domain() !=
-                                                  fuchsia_hardware_audio::kClockDomainMonotonic));
+  ClockDomain clock_domain;
+  if (is_stream_config()) {
+    FX_CHECK(stream_config_properties_->clock_domain()) << "Clock domain is required";
+    clock_domain = stream_config_properties_->clock_domain().value_or(
+        fuchsia_hardware_audio::kClockDomainMonotonic);
+  } else {
+    ADR_WARN_METHOD() << "Cannot create a device clock for device_type " << device_type();
+    return;
+  }
+
+  device_clock_ = RealClock::CreateFromMonotonic(
+      "'" + name_ + "' device clock", clock_domain,
+      (clock_domain != fuchsia_hardware_audio::kClockDomainMonotonic));
 }
 
 // Create a duplicate handle to our clock with limited rights. We can transfer it to a client who
@@ -1500,7 +1501,7 @@ std::shared_ptr<ControlNotify> Device::GetControlNotify() {
 }
 
 bool Device::CodecSetDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format) {
-  if (device_type_ != fuchsia_audio_device::DeviceType::kCodec) {
+  if (!is_codec()) {
     ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot SetDaiFormat";
     return false;
   }
@@ -1591,7 +1592,7 @@ bool Device::CodecSetDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_form
 }
 
 bool Device::CodecReset() {
-  if (device_type_ != fuchsia_audio_device::DeviceType::kCodec) {
+  if (!is_codec()) {
     ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Reset";
     return false;
   }
@@ -1642,7 +1643,7 @@ bool Device::CodecReset() {
 }
 
 bool Device::CodecStart() {
-  if (device_type_ != fuchsia_audio_device::DeviceType::kCodec) {
+  if (!is_codec()) {
     ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Start";
     return false;
   }
@@ -1696,7 +1697,7 @@ bool Device::CodecStart() {
 }
 
 bool Device::CodecStop() {
-  if (device_type_ != fuchsia_audio_device::DeviceType::kCodec) {
+  if (!is_codec()) {
     ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Stop";
     return false;
   }

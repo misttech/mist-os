@@ -15,6 +15,7 @@
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 
+#include <cstdint>
 #include <optional>
 
 #include "src/media/audio/services/device_registry/device.h"
@@ -115,8 +116,7 @@ void ControlServer::SetGain(SetGainRequest& request, SetGainCompleter::Sync& com
     return;
   }
 
-  if (device_->device_type() != fuchsia_audio_device::DeviceType::kInput &&
-      device_->device_type() != fuchsia_audio_device::DeviceType::kOutput) {
+  if (!device_->is_stream_config()) {
     ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kWrongDeviceType));
     return;
@@ -178,8 +178,7 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
     return;
   }
 
-  if (device_->device_type() != fuchsia_audio_device::DeviceType::kInput &&
-      device_->device_type() != fuchsia_audio_device::DeviceType::kOutput) {
+  if (!device_->is_stream_config()) {
     ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kWrongDeviceType));
@@ -308,7 +307,7 @@ void ControlServer::SetDaiFormat(SetDaiFormatRequest& request,
     return;
   }
 
-  if (device_->device_type() != fuchsia_audio_device::DeviceType::kCodec) {
+  if (!device_->is_codec()) {
     ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kWrongDeviceType));
     return;
@@ -402,7 +401,7 @@ void ControlServer::CodecStart(CodecStartCompleter::Sync& completer) {
     return;
   }
 
-  if (device_->device_type() != fuchsia_audio_device::DeviceType::kCodec) {
+  if (!device_->is_codec()) {
     ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
     completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStartError::kWrongDeviceType));
     return;
@@ -476,7 +475,7 @@ void ControlServer::CodecStop(CodecStopCompleter::Sync& completer) {
     return;
   }
 
-  if (device_->device_type() != fuchsia_audio_device::DeviceType::kCodec) {
+  if (!device_->is_codec()) {
     ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
     completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStopError::kWrongDeviceType));
     return;
@@ -551,7 +550,7 @@ void ControlServer::CodecReset(CodecResetCompleter::Sync& completer) {
     return;
   }
 
-  if (device_->device_type() != fuchsia_audio_device::DeviceType::kCodec) {
+  if (!device_->is_codec()) {
     ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
     completer.Reply(fit::error(fuchsia_audio_device::ControlCodecResetError::kWrongDeviceType));
     return;

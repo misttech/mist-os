@@ -98,6 +98,11 @@ class Device : public std::enable_shared_from_this<Device> {
   // This is the const subset available to device observers.
   //
   fuchsia_audio_device::DeviceType device_type() const { return device_type_; }
+  bool is_codec() const { return (device_type_ == fuchsia_audio_device::DeviceType::kCodec); }
+  bool is_stream_config() const {
+    return (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
+            device_type_ == fuchsia_audio_device::DeviceType::kOutput);
+  }
   // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
   TokenId token_id() const { return token_id_; }
   // `info` is only populated once the device is initialized.

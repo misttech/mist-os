@@ -40,7 +40,7 @@ TEST_F(CodecTest, Initialization) {
   EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
   EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
-  EXPECT_EQ(device->device_type(), fuchsia_audio_device::DeviceType::kCodec);
+  EXPECT_TRUE(device->is_codec());
 
   EXPECT_TRUE(device->has_codec_properties());
   EXPECT_TRUE(device->checked_for_signalprocessing());
