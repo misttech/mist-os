@@ -5,8 +5,10 @@
 use {
     argh::{ArgsInfo, FromArgs},
     ffx_core::ffx_command,
-    fuchsia_audio::Format,
-    std::str::FromStr,
+    fuchsia_audio::{
+        device::{Direction, HardwareType},
+        Format,
+    },
 };
 
 #[ffx_command()]
@@ -46,9 +48,9 @@ pub struct DeviceCommand {
 
     #[argh(
         option,
-        description = "device ID. stream device node ID from /dev/class/audio-input/, \
-        /dev/class/audio-output/, or /dev/class/audio-composite/. \
-        If not specified, command will default to first device alphabetically listed."
+        description = "device ID. Specify a devfs node name, \
+        e.g. 3d99d780 for /dev/class/audio-input/3d99d780.
+        If not specified, defaults to the first device alphabetically listed."
     )]
     pub id: Option<String>,
 
@@ -58,17 +60,14 @@ pub struct DeviceCommand {
         description = "device direction. Accepted values: input, output. \
         Play and record will use output and input respectively by default."
     )]
-    pub device_direction: Option<DeviceDirection>,
+    pub device_direction: Option<Direction>,
 
     #[argh(
         option,
         long = "type",
-        description = "device type. Accepted values: StreamConfig, Composite. \
-        If not specified, defaults to StreamConfig.",
-        from_str_fn(parse_device_type),
-        default = "fidl_fuchsia_hardware_audio::DeviceType::StreamConfig"
+        description = "device type. Accepted values: StreamConfig, Composite."
     )]
-    pub device_type: fidl_fuchsia_hardware_audio::DeviceType,
+    pub device_type: Option<HardwareType>,
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -159,34 +158,6 @@ fn string_to_enable(value: &str) -> Result<bool, String> {
         Ok(false)
     } else {
         Err(format!("Expected one of: on, off"))
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum DeviceDirection {
-    Input,
-    Output,
-}
-
-impl FromStr for DeviceDirection {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "input" => Ok(DeviceDirection::Input),
-            "output" => Ok(DeviceDirection::Output),
-            _ => Err(format!("invalid device direction, {}. Expected one of: input, output", s)),
-        }
-    }
-}
-
-fn parse_device_type(value: &str) -> Result<fidl_fuchsia_hardware_audio::DeviceType, String> {
-    match value.to_lowercase().as_str() {
-        "composite" => Ok(fidl_fuchsia_hardware_audio::DeviceType::Composite),
-        "streamconfig" => Ok(fidl_fuchsia_hardware_audio::DeviceType::StreamConfig),
-        _ => {
-            Err(format!("invalid device type, {}. Expected one of: Composite, StreamConfig", value))
-        }
     }
 }
 

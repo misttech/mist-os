@@ -159,11 +159,10 @@ pub async fn cancel_on_keypress(
 pub mod tests {
     use fidl_fuchsia_audio_controller::{
         CompositeDeviceInfo, DeviceControlGetDeviceInfoResponse, DeviceControlProxy,
-        DeviceControlRequest, DeviceInfo, RecorderRequest, StreamConfigDeviceInfo,
+        DeviceControlRequest, DeviceInfo, DeviceSelector, RecorderRequest, StreamConfigDeviceInfo,
     };
-    use fidl_fuchsia_hardware_audio::{
-        CompositeProperties, DeviceType, StreamProperties, SupportedFormats,
-    };
+    use fidl_fuchsia_audio_device as fadevice;
+    use fidl_fuchsia_hardware_audio::{CompositeProperties, StreamProperties, SupportedFormats};
     use fuchsia_audio::stop_listener;
     use futures::AsyncWriteExt;
     use timeout::timeout;
@@ -198,8 +197,12 @@ pub mod tests {
         let callback = |req| match req {
             DeviceControlRequest::GetDeviceInfo { payload, responder } => match payload.device {
                 Some(device_selector) => {
-                    let result = match device_selector.device_type.unwrap() {
-                        DeviceType::StreamConfig => {
+                    let DeviceSelector::Devfs(devfs) = device_selector else {
+                        panic!("unknown selector type");
+                    };
+
+                    let result = match devfs.device_type {
+                        fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
                             let stream_device_info = StreamConfigDeviceInfo {
                                 stream_properties: Some(StreamProperties {
                                     unique_id: Some([
@@ -227,7 +230,7 @@ pub mod tests {
                             };
                             DeviceInfo::StreamConfig(stream_device_info)
                         }
-                        DeviceType::Composite => {
+                        fadevice::DeviceType::Composite => {
                             let composite_device_info = CompositeDeviceInfo {
                                 composite_properties: Some(CompositeProperties {
                                     clock_domain: Some(0),

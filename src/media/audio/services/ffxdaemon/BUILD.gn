@@ -21,6 +21,7 @@ rustc_binary("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
+    "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_rust",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
@@ -28,7 +29,6 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.ultrasound:fuchsia.ultrasound_rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
-    "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
@@ -41,14 +41,16 @@ rustc_binary("bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:byteorder",
-    "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hound",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//third_party/rust_crates:assert_matches" ]
+  test_deps = [
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:tempfile",
+  ]
 
   sources = [
     "src/capturer.rs",
@@ -73,6 +75,12 @@ fuchsia_package("audio_ffx_daemon") {
   deps = [ ":component" ]
 }
 
-fuchsia_unittest_package("audio_ffx_daemon_unittests") {
+fuchsia_test_component("unittests_component") {
+  component_name = "audio_ffx_daemon_unittests"
+  manifest = "meta/audio_ffx_daemon_unittests.cml"
   deps = [ ":bin_test" ]
+}
+
+fuchsia_test_package("audio_ffx_daemon_unittests") {
+  test_components = [ ":unittests_component" ]
 }

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error, Result};
-use camino::Utf8PathBuf;
 use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fidl_fuchsia_media as fmedia;
@@ -297,33 +296,6 @@ pub fn parse_duration(value: &str) -> Result<Duration, String> {
             value, DURATION_REGEX
         )),
     }
-}
-
-/// Returns the devfs path for the device that matches the `DeviceSelector`.
-///
-/// The selector must have Some values for the `id`, `device_type`,
-/// and, for StreamConfig devices, `is_input`.
-pub fn path_for_selector(device_selector: &fac::DeviceSelector) -> Result<Utf8PathBuf, Error> {
-    let id = device_selector.id.as_ref().ok_or(anyhow!("Device ID missing"))?;
-    let device_type =
-        device_selector.device_type.ok_or_else(|| anyhow!("Device type not specified."))?;
-
-    let class = match device_type {
-        fhaudio::DeviceType::StreamConfig => device_selector
-            .is_input
-            .map(|is_input| if is_input { "audio-input" } else { "audio-output" })
-            .ok_or_else(|| anyhow!("Device direction not specified for StreamConfig device.")),
-        fhaudio::DeviceType::Composite => Ok("audio-composite"),
-        _ => Err(anyhow!("Unexpected device type.")),
-    }?;
-
-    Ok(Utf8PathBuf::from("/dev/class").join(class).join(id))
-}
-
-pub fn device_id_for_path(path: &std::path::Path) -> Result<String> {
-    let device_id = path.file_name().ok_or(anyhow!("Can't get filename from path"))?;
-    let id_str = device_id.to_str().ok_or(anyhow!("Could not convert device id to string"))?;
-    Ok(id_str.to_string())
 }
 
 pub fn str_to_clock(src: &str) -> Result<fac::ClockType, String> {

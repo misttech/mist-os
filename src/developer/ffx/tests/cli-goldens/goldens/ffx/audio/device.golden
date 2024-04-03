@@ -22,7 +22,7 @@
       "optionality": "optional",
       "long": "--id",
       "short": null,
-      "description": "device ID. stream device node ID from /dev/class/audio-input/, /dev/class/audio-output/, or /dev/class/audio-composite/. If not specified, command will default to first device alphabetically listed.",
+      "description": "device ID. Specify a devfs node name, e.g. 3d99d780 for /dev/class/audio-input/3d99d780.\n        If not specified, defaults to the first device alphabetically listed.",
       "hidden": false
     },
     {
@@ -46,7 +46,7 @@
       "optionality": "optional",
       "long": "--type",
       "short": null,
-      "description": "device type. Accepted values: StreamConfig, Composite. If not specified, defaults to StreamConfig.",
+      "description": "device type. Accepted values: StreamConfig, Composite.",
       "hidden": false
     }
   ],

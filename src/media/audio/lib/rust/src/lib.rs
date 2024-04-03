@@ -8,9 +8,10 @@ use fidl_fuchsia_audio_controller as fac;
 use futures::TryStreamExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-mod format;
+pub mod device;
+pub mod format;
 
-pub use format::{device_id_for_path, parse_duration, path_for_selector, str_to_clock, Format};
+pub use format::{parse_duration, str_to_clock, Format};
 
 pub async fn stop_listener(
     canceler: ServerEnd<fac::RecordCancelerMarker>,

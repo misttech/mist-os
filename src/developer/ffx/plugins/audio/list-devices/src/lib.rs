@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context, Result},
+    anyhow::{anyhow, Context, Result},
     async_trait::async_trait,
     ffx_audio_listdevices_args::ListDevicesCommand,
     fho::{moniker, FfxMain, FfxTool, MachineWriter},
     fidl_fuchsia_audio_controller::DeviceControlProxy,
-    fuchsia_audio::path_for_selector,
+    fidl_fuchsia_audio_device as fadevice,
+    fuchsia_audio::device::{HardwareType as HardwareDeviceType, Selector, Type as DeviceType},
     fuchsia_zircon_status::Status,
     itertools::Itertools,
     serde::{Deserialize, Serialize},
@@ -34,6 +35,7 @@ pub enum DeviceTypeWrapper {
     CODEC,
     STREAMCONFIG,
 }
+
 #[derive(FfxTool)]
 pub struct ListDevicesTool {
     #[command]
@@ -62,42 +64,57 @@ async fn list_devices_impl(
         .context("List devices failed")?
         .map_err(Status::from_raw)
         .context("Error from daemon for list devices request")?;
-    if let Some(devices) = response.devices {
+
+    if let Some(fidl_selectors) = response.devices {
+        let selectors = fidl_selectors
+            .into_iter()
+            .map(|selector| {
+                Selector::try_from(selector).map_err(|msg| anyhow!("invalid selector: {}", msg))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
         writer
             .machine_or_else(
                 &ListDeviceResult {
-                    devices: devices
+                    devices: selectors
                         .clone()
                         .into_iter()
-                        .map(|device| DeviceSelectorWrapper {
-                            device_id: device.id.clone(),
-                            // TODO(https://fxbug.dev/327490666): Fix incorrect STREAMCONFIG device_type
-                            device_type: DeviceTypeWrapper::STREAMCONFIG,
-                            is_input: device.is_input,
-                            path: path_for_selector(&device).map(String::from).ok(),
+                        .map(|selector| {
+                            let Selector::Devfs(devfs) = selector;
+
+                            DeviceSelectorWrapper {
+                                device_id: Some(devfs.0.id.clone()),
+                                // TODO(https://fxbug.dev/327490666): Fix incorrect STREAMCONFIG device_type
+                                device_type: DeviceTypeWrapper::STREAMCONFIG,
+                                is_input: match devfs.0.device_type {
+                                    fadevice::DeviceType::Input => Some(true),
+                                    fadevice::DeviceType::Output => Some(false),
+                                    _ => None,
+                                },
+                                path: Some(devfs.path().to_string()),
+                            }
                         })
                         .collect(),
                 },
                 || {
-                    devices
-                        .iter()
-                        .map(|device| {
-                            let in_out = match device.is_input {
-                                Some(is_input) => {
-                                    if is_input {
-                                        format!("Input")
-                                    } else {
-                                        format!("Output")
-                                    }
-                                }
-                                None => format!("Input/Output not specified"),
+                    selectors
+                        .into_iter()
+                        .map(|selector| {
+                            let Selector::Devfs(devfs) = selector;
+
+                            let in_out = match devfs.0.device_type {
+                                fadevice::DeviceType::Input => "Input",
+                                fadevice::DeviceType::Output => "Output",
+                                _ => "Input/Output not specified",
                             };
+                            let device_type =
+                                HardwareDeviceType::from(DeviceType(devfs.0.device_type));
 
                             format!(
-                                "{:?} Device id: {:?}, Device type: {:?}, {in_out}",
-                                path_for_selector(&device),
-                                device.id,
-                                device.device_type
+                                "{:?} Device id: {:?}, Device type: {}, {in_out}",
+                                devfs.path(),
+                                devfs.0.id,
+                                device_type
                             )
                         })
                         .join("\n")
@@ -113,25 +130,19 @@ async fn list_devices_impl(
 mod tests {
     use super::*;
     use ffx_writer::{Format, TestBuffers};
-    use fidl_fuchsia_audio_controller::{
-        DeviceControlListDevicesResponse, DeviceControlRequest, DeviceSelector,
-    };
-    use fidl_fuchsia_hardware_audio::DeviceType;
+    use fidl_fuchsia_audio_controller as fac;
+    use fidl_fuchsia_audio_controller::{DeviceControlListDevicesResponse, DeviceControlRequest};
 
     fn fake_audio_daemon() -> DeviceControlProxy {
         let devices = vec![
-            DeviceSelector {
-                is_input: Some(true),
-                id: Some("abc123".to_string()),
-                device_type: Some(DeviceType::StreamConfig),
-                ..Default::default()
-            },
-            DeviceSelector {
-                is_input: Some(false),
-                id: Some("abc123".to_string()),
-                device_type: Some(DeviceType::StreamConfig),
-                ..Default::default()
-            },
+            fac::DeviceSelector::Devfs(fac::Devfs {
+                id: "abc123".to_string(),
+                device_type: fadevice::DeviceType::Input,
+            }),
+            fac::DeviceSelector::Devfs(fac::Devfs {
+                id: "abc123".to_string(),
+                device_type: fadevice::DeviceType::Output,
+            }),
         ];
         let callback = move |req| match req {
             DeviceControlRequest::ListDevices { responder, .. } => {
@@ -156,8 +167,9 @@ mod tests {
 
         let stdout = test_buffers.into_stdout_str();
         let stdout_expected = format!(
-            "Ok(\"/dev/class/audio-input/abc123\") Device id: Some(\"abc123\"), Device type: Some(StreamConfig), Input\n\
-            Ok(\"/dev/class/audio-output/abc123\") Device id: Some(\"abc123\"), Device type: Some(StreamConfig), Output\n");
+            "\"/dev/class/audio-input/abc123\" Device id: \"abc123\", Device type: StreamConfig, Input\n\
+            \"/dev/class/audio-output/abc123\" Device id: \"abc123\", Device type: StreamConfig, Output\n"
+        );
 
         assert_eq!(stdout, stdout_expected);
         Ok(())

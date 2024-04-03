@@ -9,13 +9,15 @@ use crate::{
 };
 use anyhow::{anyhow, Context, Error};
 use async_trait::async_trait;
-use camino::Utf8PathBuf;
-use fidl::endpoints::{create_proxy, Proxy, ServerEnd};
+use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fuchsia_audio_controller as fac;
+use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
-use fuchsia_audio::{device_id_for_path, path_for_selector, stop_listener, Format};
+use fuchsia_audio::{
+    device::{DevfsSelector, Selector},
+    stop_listener, Format,
+};
 use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_zircon::{self as zx};
 use futures::{AsyncWriteExt, StreamExt};
@@ -170,15 +172,12 @@ fn validate_format(
     }
 }
 
-/// Connects to the device protocol for the device of the provided type at the namespace `path`.
-pub fn connect_to_device_controller(
-    device_path: Utf8PathBuf,
-    device_type: fhaudio::DeviceType,
-) -> Result<Box<dyn DeviceControl>, Error> {
-    let protocol_path = device_path.join("device_protocol");
+/// Connects to the device protocol for a device in devfs.
+pub fn connect_to_device_controller(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl>, Error> {
+    let protocol_path = devfs.path().join("device_protocol");
 
-    match device_type {
-        fhaudio::DeviceType::StreamConfig => {
+    match devfs.0.device_type {
+        fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
             let connector_proxy =
                 connect_to_protocol_at_path::<fhaudio::StreamConfigConnectorMarker>(
                     protocol_path.as_str(),
@@ -189,7 +188,7 @@ pub fn connect_to_device_controller(
 
             Ok(Box::new(StreamConfigDevice { proxy }))
         }
-        fhaudio::DeviceType::Composite => {
+        fadevice::DeviceType::Composite => {
             // DFv2 Composite drivers do not use a connector/trampoline as StreamConfig above.
             // TODO(https://fxbug.dev/326339971): Fall back to CompositeConnector for DFv1 drivers
             let proxy =
@@ -207,11 +206,9 @@ pub struct Device {
 }
 
 impl Device {
-    pub fn new_from_selector(selector: &fac::DeviceSelector) -> Result<Self, Error> {
-        let device_controller = connect_to_device_controller(
-            path_for_selector(&selector)?,
-            selector.device_type.ok_or(anyhow!("Device type not specified"))?,
-        )?;
+    pub fn new_from_selector(selector: Selector) -> Result<Self, Error> {
+        let Selector::Devfs(devfs) = selector;
+        let device_controller = connect_to_device_controller(devfs)?;
         Ok(Self { device_controller })
     }
 
@@ -565,54 +562,56 @@ impl Device {
     }
 }
 
-// Helper function to enumerate on device directories to get information about available drivers.
-pub async fn get_entries(
+/// Returns device selectors for each entry in a devfs directory at `path`.
+///
+/// Each selector will be assigned the type from `device_type`.
+/// The type is not inferred from `path`.
+pub async fn get_devfs_selectors(
     path: &str,
-    device_type: fhaudio::DeviceType,
-    is_input: Option<bool>,
-) -> Result<Vec<fac::DeviceSelector>, Error> {
-    let (control_client, control_server) = zx::Channel::create();
+    device_type: fadevice::DeviceType,
+) -> Result<Vec<DevfsSelector>, Error> {
+    let dir = fuchsia_fs::directory::open_in_namespace(path, fio::OpenFlags::RIGHT_READABLE)
+        .context("failed to open directory")?;
 
-    // Creates a connection to a FIDL service at path.
-    fdio::service_connect(path, control_server)
-        .context(format!("failed to connect to {:?}", path))?;
+    let entries =
+        fuchsia_fs::directory::readdir(&dir).await.context("failed to read directory entries")?;
 
-    let directory_proxy =
-        fio::DirectoryProxy::from_channel(fasync::Channel::from_channel(control_client));
+    Ok(entries.into_iter().map(|entry| fac::Devfs { id: entry.name, device_type }.into()).collect())
+}
 
-    let (status, buf) = directory_proxy
-        .read_dirents(fio::MAX_BUF)
-        .await
-        .map_err(|e| anyhow!("Failure calling read dirents: {}", e))?;
+#[cfg(test)]
+mod test {
+    use super::*;
+    use tempfile::TempDir;
 
-    if status != 0 {
-        return Err(anyhow!("Unable to call read dirents, status returned: {}", status));
+    #[fuchsia::test]
+    async fn test_get_devfs_selectors() {
+        let tempdir = TempDir::new().unwrap();
+        let tempdir_path = tempdir.path().to_str().unwrap();
+        let dir = fuchsia_fs::directory::open_in_namespace(
+            tempdir_path,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        )
+        .unwrap();
+
+        let names = vec!["a", "b", "c"];
+        let device_type = fadevice::DeviceType::Input;
+
+        for name in names {
+            fuchsia_fs::directory::create_directory(&dir, name, fio::OpenFlags::RIGHT_READABLE)
+                .await
+                .unwrap();
+        }
+
+        let selectors = get_devfs_selectors(tempdir_path, device_type).await.unwrap();
+
+        assert_eq!(
+            vec![
+                DevfsSelector::from(fac::Devfs { id: "a".to_string(), device_type }),
+                DevfsSelector::from(fac::Devfs { id: "b".to_string(), device_type }),
+                DevfsSelector::from(fac::Devfs { id: "c".to_string(), device_type }),
+            ],
+            selectors
+        );
     }
-
-    let entry_names = fuchsia_fs::directory::parse_dir_entries(&buf);
-
-    let full_paths = entry_names.into_iter().filter_map(|s| match s {
-        Ok(entry) => match entry.kind {
-            fio::DirentType::Directory => {
-                if entry.name.len() > 1 {
-                    Some(path.to_owned() + entry.name.as_str())
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        },
-        Err(_) => None,
-    });
-
-    let device_selectors = full_paths
-        .map(|path| fac::DeviceSelector {
-            is_input,
-            id: device_id_for_path(std::path::Path::new(&path)).ok(),
-            device_type: Some(device_type),
-            ..Default::default()
-        })
-        .collect();
-
-    Ok(device_selectors)
 }

@@ -13,10 +13,10 @@ rustc_library("fuchsia-audio") {
 
   deps = [
     "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
+    "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_rust",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/lib/fidl/rust/fidl",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
@@ -24,7 +24,10 @@ rustc_library("fuchsia-audio") {
     "//third_party/rust_crates:regex",
   ]
 
+  test_deps = [ "//third_party/rust_crates:test-case" ]
+
   sources = [
+    "src/device.rs",
     "src/format.rs",
     "src/lib.rs",
   ]

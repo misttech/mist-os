@@ -4,9 +4,9 @@
 
 use {
     camino::Utf8PathBuf,
-    fidl_fuchsia_audio_controller::{DeviceInfo, DeviceSelector},
+    fidl_fuchsia_audio_controller as fac,
     fidl_fuchsia_hardware_audio::{ChannelSet, PlugDetectCapabilities, SampleFormat},
-    fuchsia_audio::path_for_selector,
+    fuchsia_audio::device::Selector,
     serde::{Deserialize, Serialize},
     std::fmt::Display,
 };
@@ -325,11 +325,16 @@ impl Display for DeviceInfoResult {
     }
 }
 
-impl From<(DeviceInfo, &DeviceSelector)> for DeviceInfoResult {
-    fn from(t: (DeviceInfo, &DeviceSelector)) -> Self {
-        let (device_info, device_selector) = t;
+impl From<(fac::DeviceInfo, Selector)> for DeviceInfoResult {
+    fn from(t: (fac::DeviceInfo, Selector)) -> Self {
+        let (device_info, selector) = t;
+
+        let device_path = match selector {
+            Selector::Devfs(devfs) => Some(devfs.path()),
+        };
+
         match device_info {
-            DeviceInfo::StreamConfig(stream_info) => {
+            fac::DeviceInfo::StreamConfig(stream_info) => {
                 let stream_properties = stream_info.stream_properties;
                 let gain_state = stream_info.gain_state;
                 let plug_state_info = stream_info.plug_state;
@@ -337,7 +342,7 @@ impl From<(DeviceInfo, &DeviceSelector)> for DeviceInfoResult {
 
                 match stream_properties {
                     Some(stream_properties) => Self {
-                        device_path: path_for_selector(device_selector).ok(),
+                        device_path,
                         manufacturer: stream_properties.manufacturer.clone(),
                         product_name: stream_properties.product.clone(),
                         current_gain_db: gain_state.clone().and_then(|g| g.gain_db),
@@ -404,26 +409,20 @@ impl From<(DeviceInfo, &DeviceSelector)> for DeviceInfoResult {
                         }),
                         clock_domain: None,
                     },
-                    None => Self {
-                        device_path: path_for_selector(device_selector).ok(),
-                        ..Default::default()
-                    },
+                    None => Self { device_path, ..Default::default() },
                 }
             }
-            DeviceInfo::Composite(composite_info) => {
+            fac::DeviceInfo::Composite(composite_info) => {
                 let composite_properties = composite_info.composite_properties;
                 match composite_properties {
                     Some(composite_properties) => Self {
-                        device_path: path_for_selector(device_selector).ok(),
+                        device_path,
                         manufacturer: composite_properties.manufacturer,
                         product_name: composite_properties.product,
                         clock_domain: composite_properties.clock_domain,
                         ..Default::default()
                     },
-                    None => Self {
-                        device_path: path_for_selector(device_selector).ok(),
-                        ..Default::default()
-                    },
+                    None => Self { device_path, ..Default::default() },
                 }
             }
             _ => panic!("Unsupported device type"),

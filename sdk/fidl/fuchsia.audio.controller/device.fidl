@@ -4,6 +4,7 @@
 
 library fuchsia.audio.controller;
 
+using fuchsia.audio.device;
 using fuchsia.hardware.audio;
 using fuchsia.io;
 using zx;
@@ -61,21 +62,15 @@ type CompositeDeviceInfo = table {
 };
 
 /// Identifies which device to retrieve information about.
-type DeviceSelector = table {
-    /// Whether device is input or output.
-    ///
-    /// Required. Future device types may not require this field.
-    1: is_input bool;
+type DeviceSelector = flexible union {
+    /// Driver node in devfs, e.g. `/dev/class/audio-input/3d99d780`.
+    1: devfs struct {
+        /// ID of device.
+        id fuchsia.io.Name;
 
-    /// ID of device.
-    ///
-    /// Required.
-    2: id fuchsia.io.Path;
-
-    /// Device type.
-    ///
-    /// Optional. If not specified, defaults to StreamConfig.
-    3: device_type fuchsia.hardware.audio.DeviceType;
+        /// Device type.
+        device_type fuchsia.audio.device.DeviceType;
+    };
 };
 
 /// Enumerate, query, and control audio devices from clients.
@@ -83,7 +78,7 @@ type DeviceSelector = table {
 open protocol DeviceControl {
     /// Lists all available audio devices on target.
     flexible ListDevices() -> (resource table {
-        /// List of available devices, sorted by name.
+        /// List of available devices.
         ///
         /// Required.
         1: devices vector<DeviceSelector>:MAX_COUNT_DEVICES;

@@ -18,15 +18,22 @@ use wav_socket::WavSocket;
 use anyhow::{anyhow, Context, Error};
 use error::ControllerError;
 use fidl_fuchsia_audio_controller as fac;
-use fidl_fuchsia_hardware_audio as fhaudio;
+use fidl_fuchsia_audio_device as fadevice;
 use fuchsia_async as fasync;
-use fuchsia_audio::Format;
+use fuchsia_audio::{device::Selector, Format};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter};
 use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use std::time::Duration;
 use tracing::error;
+
+/// Paths to device driver devfs nodes and their corresponding types.
+const DEVFS_DEVICES: &[(&str, fadevice::DeviceType)] = &[
+    ("/dev/class/audio-input", fadevice::DeviceType::Input),
+    ("/dev/class/audio-output", fadevice::DeviceType::Output),
+    ("/dev/class/composite", fadevice::DeviceType::Composite),
+];
 
 /// Wraps all hosted protocols into a single type that can be matched against and dispatched.
 enum IncomingRequest {
@@ -63,8 +70,15 @@ pub async fn handle_play_request(
 
             renderer.play(wav_socket).await
         }
-        fac::PlayDestination::DeviceRingBuffer(device_selector) => {
-            let mut device = Device::new_from_selector(&device_selector).map_err(|err| {
+        fac::PlayDestination::DeviceRingBuffer(fidl_selector) => {
+            let selector = Selector::try_from(fidl_selector).map_err(|msg| {
+                ControllerError::new(
+                    fac::Error::InvalidArguments,
+                    format!("invalid selector: {msg}"),
+                )
+            })?;
+
+            let mut device = Device::new_from_selector(selector).map_err(|err| {
                 ControllerError::new(
                     fac::Error::DeviceNotReachable,
                     format!("Failed to connect to device with error: {err}"),
@@ -126,9 +140,16 @@ pub async fn handle_record_request(
 
             capturer.record(wav_socket, duration, request.canceler, request.buffer_size).await
         }
-        fac::RecordSource::DeviceRingBuffer(selector) => {
+        fac::RecordSource::DeviceRingBuffer(fidl_selector) => {
+            let selector = Selector::try_from(fidl_selector).map_err(|msg| {
+                ControllerError::new(
+                    fac::Error::InvalidArguments,
+                    format!("invalid selector: {msg}"),
+                )
+            })?;
             let format = Format::from(&stream_type);
-            let mut device = Device::new_from_selector(&selector).map_err(|err| {
+
+            let mut device = Device::new_from_selector(selector).map_err(|err| {
                 ControllerError::new(
                     fac::Error::DeviceNotReachable,
                     format!("Failed to connect to device with error: {err}"),
@@ -167,32 +188,33 @@ async fn serve_device_control(mut stream: fac::DeviceControlRequestStream) -> Re
         let request_name = request.method_name();
         let request_result = match request {
             fac::DeviceControlRequest::ListDevices { responder } => {
-                let mut entries = Vec::<fac::DeviceSelector>::new();
-                let devfs_devices = [
-                    (fhaudio::DeviceType::StreamConfig, "/dev/class/audio-input/", Some(true)),
-                    (fhaudio::DeviceType::StreamConfig, "/dev/class/audio-output/", Some(false)),
-                    (fhaudio::DeviceType::Composite, "/dev/class/audio-composite/", None),
-                ];
+                let mut fidl_selectors: Vec<fac::DeviceSelector> = Vec::new();
 
-                for (device_type, path, is_input) in devfs_devices {
-                    match device::get_entries(path, device_type, is_input).await {
-                        Ok(mut device_entries) => entries.append(&mut device_entries),
-                        Err(e) => {
-                            println!("Failed to get {device_type:?} entries: {e}")
+                for (path, device_type) in DEVFS_DEVICES {
+                    match device::get_devfs_selectors(path, *device_type).await {
+                        Ok(selectors) => {
+                            fidl_selectors.extend(selectors.into_iter().map(Into::into))
+                        }
+                        Err(err) => {
+                            error!(%err, "Failed to get {device_type:?} entries")
                         }
                     }
                 }
 
                 let response = fac::DeviceControlListDevicesResponse {
-                    devices: Some(entries),
+                    devices: Some(fidl_selectors),
                     ..Default::default()
                 };
                 responder.send(Ok(response)).map_err(|e| anyhow!("Error sending response: {e}"))
             }
             fac::DeviceControlRequest::GetDeviceInfo { payload, responder } => {
-                let device_selector = payload.device.ok_or(anyhow!("No device specified"))?;
+                let selector: Selector = payload
+                    .device
+                    .ok_or(anyhow!("No device specified"))?
+                    .try_into()
+                    .map_err(|msg| anyhow!("invalid selector: {msg}"))?;
 
-                let mut device = device::Device::new_from_selector(&device_selector)?;
+                let mut device = device::Device::new_from_selector(selector)?;
 
                 let info = device.get_info().await;
                 match info {
@@ -214,12 +236,14 @@ async fn serve_device_control(mut stream: fac::DeviceControlRequestStream) -> Re
                 }
             }
             fac::DeviceControlRequest::DeviceSetGainState { payload, responder } => {
-                let (device_selector, gain_state) = (
-                    payload.device.ok_or(anyhow!("No device specified"))?,
-                    payload.gain_state.ok_or(anyhow!("No gain state specified"))?,
-                );
+                let selector = payload
+                    .device
+                    .ok_or(anyhow!("No device specified"))?
+                    .try_into()
+                    .map_err(|msg| anyhow!("invalid selector: {msg}"))?;
+                let gain_state = payload.gain_state.ok_or(anyhow!("No gain state specified"))?;
 
-                let mut device = device::Device::new_from_selector(&device_selector)?;
+                let mut device = device::Device::new_from_selector(selector)?;
 
                 device.set_gain(gain_state)?;
                 responder.send(Ok(())).map_err(|e| anyhow!("Error sending response: {e}"))
