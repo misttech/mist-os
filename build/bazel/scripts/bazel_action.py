@@ -1130,7 +1130,10 @@ def main():
             + os.path.abspath(args.bazel_build_events_log_json),
         ]
 
-    cmd += configured_args + args.bazel_targets
+    # Always use --verbose_failures to get relevant information when
+    # Bazel commands fail. This is necessary to make the log output of
+    # CQ/CI bots usable.
+    cmd += configured_args + args.bazel_targets + ["--verbose_failures"]
 
     ret = subprocess.run(cmd)
     if ret.returncode != 0:
