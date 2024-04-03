@@ -1866,6 +1866,7 @@ void Dispatcher::ThreadPool::ThreadWakeupPrologue() {
 }
 
 zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
   zx::result client_end = component::Connect<fuchsia_scheduler::RoleManager>();
   if (client_end.is_error()) {
     return client_end.status_value();
@@ -1894,6 +1895,8 @@ zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
     return result.value().error_value();
   }
   return ZX_OK;
+#endif
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t Dispatcher::ThreadPool::AddThread() {
