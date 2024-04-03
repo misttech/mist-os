@@ -167,16 +167,14 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     // Now the module's image is in memory!  Decode phdrs for everything else
     // but the PT_LOADs for load_info_, already filled by LoadFromFile.
     std::optional<elfldltl::ElfNote> build_id;
-    std::optional<Phdr> relro_phdr;
     auto result = DecodeModulePhdrs(
         diag, phdrs,
-        elfldltl::PhdrMemoryNoteObserver(Elf{}, memory(), elfldltl::ObserveBuildIdNote(build_id)),
-        elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr));
+        elfldltl::PhdrMemoryNoteObserver(Elf{}, memory(), elfldltl::ObserveBuildIdNote(build_id)));
     if (!result) [[unlikely]] {
       return {};
     }
 
-    auto [dyn_phdr, tls_phdr, stack_size] = *result;
+    auto [dyn_phdr, tls_phdr, relro_phdr, stack_size] = *result;
     set_relro(relro_phdr);
 
     // Start filling in module() with pointers into the loaded image.

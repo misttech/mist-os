@@ -132,12 +132,10 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
     auto& [ehdr_owner, phdrs_owner] = *headers;
     const Ehdr& ehdr = ehdr_owner;
     const cpp20::span<const Phdr> phdrs = phdrs_owner;
-    std::optional<Phdr> relro_phdr;
     std::optional<elfldltl::ElfNote> build_id;
     constexpr elfldltl::NoArrayFromFile<std::byte> kNoBuildIdAllocator;
     auto result = DecodeModulePhdrs(  //
         diag, phdrs, this->load_info().GetPhdrObserver(page_size),
-        elfldltl::PhdrRelroObserver<Elf>(relro_phdr),
         elfldltl::PhdrFileNoteObserver(Elf{}, mapped_vmo_, kNoBuildIdAllocator,
                                        elfldltl::ObserveBuildIdNote(build_id)));
     if (!result) [[unlikely]] {
@@ -145,7 +143,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
       return false;
     }
 
-    auto [dyn_phdr, tls_phdr, stack_size] = *result;
+    auto [dyn_phdr, tls_phdr, relro_phdr, stack_size] = *result;
 
     exec_info_ = {.relative_entry = ehdr.entry, .stack_size = stack_size};
 

@@ -98,15 +98,15 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   // normally be picked up from phdrs after loading a module.
   using PhdrPhdrObserver =
       elfldltl::PhdrSingletonObserver<elfldltl::Elf<>, elfldltl::ElfPhdrType::kPhdr>;
-  std::optional<Phdr> phdr_phdr, relro_phdr;
+  std::optional<Phdr> phdr_phdr;
   auto phdr_info = DecodeModulePhdrs(
       diag, phdrs, main_executable->decoded().load_info().GetPhdrObserver(startup.page_size),
-      PhdrPhdrObserver{phdr_phdr}, elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr));
+      PhdrPhdrObserver{phdr_phdr});
   if (!phdr_info) {
     return {};
   }
 
-  main_executable->set_relro(relro_phdr);
+  main_executable->set_relro(phdr_info->relro_phdr);
 
   // The PT_PHDR gives the link-time view of the p_vaddr of the phdrs.  Since
   // we never saw the Ehdr, we can't use Ehdr::phoff to locate it among the

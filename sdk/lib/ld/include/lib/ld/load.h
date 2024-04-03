@@ -65,24 +65,28 @@ template <class Elf = elfldltl::Elf<>>
 struct ModulePhdrInfo {
   std::optional<typename Elf::Phdr> dyn_phdr;
   std::optional<typename Elf::Phdr> tls_phdr;
+  std::optional<typename Elf::Phdr> relro_phdr;
   std::optional<typename Elf::size_type> stack_size;
 };
 
-// This uses elfldltl::DecodePhdrs for the things that can gleaned from phdrs
-// before the whole load image is accessible in memory.  These are not stored
-// directly in Module, so they are just returned in ModulePhdrInfo.  Additional
-// phdr observers can be passed to include in the same initial scan.  This will
-// include some elfldltl::LoadInfo<...>::GetPhdrObserver() observer, as well as
-// whatever else the caller can use immediately.  Since phdrs refer to contents
-// both via file offset and via vaddr, when the entire ELF file image is
-// already accessible in memory, other things like notes can be examined in the
-// same one pass using elfldltl::PhdrFileNoteObserver.
+// This uses elfldltl::DecodePhdrs for the things needed by all dynamic linking
+// cases, but that aren't stored directly in abi::Abi<>::Module, so they are
+// just returned in ModulePhdrInfo.  Additional phdr observers can be passed to
+// combine these into a single phdr scan.  This might be used in a single pass
+// with the elfldltl::LoadInfo<...>::GetPhdrObserver() observer, when the
+// entire ELF file image is already accessible in memory and things like notes
+// can be examined in the same one pass using elfldltl::PhdrFileNoteObserver or
+// similar things that find data via p_offset.  Or it might be used in a second
+// pass after the LoadInfo has been filled in a first pass and the segments
+// have been mapped; then elfldltl::PhdrMemoryNoteObserver can be used, or
+// similar things that find data via p_vaddr.
 template <class Elf = elfldltl::Elf<>, class Diagnostics, typename... PhdrObservers>
 constexpr std::optional<ModulePhdrInfo<Elf>> DecodeModulePhdrs(
     Diagnostics& diag, cpp20::span<const typename Elf::Phdr> phdrs,
     PhdrObservers&&... phdr_observers) {
   ModulePhdrInfo<Elf> result;
   if (!elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(result.dyn_phdr),
+                             elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(result.relro_phdr),
                              elfldltl::PhdrTlsObserver<Elf>(result.tls_phdr),
                              elfldltl::PhdrStackObserver<Elf>(result.stack_size),
                              std::forward<PhdrObservers>(phdr_observers)...)) [[unlikely]] {
