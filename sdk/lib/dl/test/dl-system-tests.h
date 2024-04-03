@@ -21,6 +21,8 @@ class DlSystemTests : public DlTestsBase {
 #endif
 
   fit::result<Error, void*> DlOpen(const char* name, int mode);
+
+  fit::result<Error, void*> DlSym(void* module, const char* ref);
 };
 
 }  // namespace dl::testing

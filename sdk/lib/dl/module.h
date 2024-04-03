@@ -16,7 +16,6 @@
 #include <fbl/intrusive_double_list.h>
 
 #include "diagnostics.h"
-#include "error.h"
 
 namespace dl {
 
@@ -64,12 +63,16 @@ class Module : public fbl::DoublyLinkedListable<std::unique_ptr<Module>> {
 
   void set_load_bias(Addr load_bias) { load_bias_ = load_bias; }
 
+  Addr load_bias() const { return load_bias_; }
+
   void set_vaddr_range(Addr vaddr_start, Addr vaddr_end) {
     vaddr_start_ = vaddr_start;
     vaddr_end_ = vaddr_end;
   }
 
   void set_symbol_info(SymbolInfo symbol_info) { symbol_info_ = symbol_info; }
+
+  const SymbolInfo& symbol_info() const { return symbol_info_; }
 
  private:
   Module() = default;
@@ -146,13 +149,12 @@ class LoadModule {
       return false;
     };
 
-    // TODO(https://fxbug.dev/331468188): We should not commit until we've set
-    // up unmap on dl::Module destruction, so for now the mapping is thrown
-    // away.
     // To finalize the loaded module's mapping, OSImpl::Commit(...) will commit
     // the loader and return the Relro object that is used to apply relro
     // protections later.
-    // loader_relro_ = std::move(loader).Commit(relro_bounds);
+    // TODO(https://fxbug.dev/323418587): For now, pass an empty relro_bounds.
+    // This will eventually take the decoded relro_phdr.
+    loader_relro_ = std::move(loader).Commit(LoadInfo::Region{});
 
     return true;
   }

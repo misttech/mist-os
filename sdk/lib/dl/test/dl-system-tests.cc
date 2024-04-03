@@ -44,4 +44,12 @@ fit::result<Error, void*> DlSystemTests::DlOpen(const char* file, int mode) {
   return fit::ok(result);
 }
 
+fit::result<Error, void*> DlSystemTests::DlSym(void* module, const char* ref) {
+  void* result = dlsym(module, ref);
+  if (!result) {
+    return TakeError();
+  }
+  return fit::ok(result);
+}
+
 }  // namespace dl::testing

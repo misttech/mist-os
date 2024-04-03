@@ -32,6 +32,8 @@ class DlTestsBase : public ::testing::Test {
 
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);
+
+  fit::result<Error, void*> DlSym(void* module, const char* ref);
 };
 
 }  // namespace dl::testing

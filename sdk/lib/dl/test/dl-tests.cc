@@ -141,12 +141,16 @@ TYPED_TEST(DlTests, InvalidMode) {
 }
 
 TYPED_TEST(DlTests, Basic) {
-  // TODO(https://fxbug.dev/323418587): For now, just check that we got a
-  // non-null pointer back from dlopen. A subsequent CL will check that the
-  // module was loaded correctly with dlsym().
   auto result = this->DlOpen("libld-dep-c.so", RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
+  // Look up the "c" function and call it, expecting its return value of 2.
+  auto sym_result = this->DlSym(result.value(), "c");
+  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
+  ASSERT_TRUE(sym_result.value());
+  int64_t (*func_ptr)();
+  func_ptr = reinterpret_cast<int64_t (*)()>(reinterpret_cast<uintptr_t>(sym_result.value()));
+  EXPECT_EQ(func_ptr(), 2);
 }
 
 }  // namespace

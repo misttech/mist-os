@@ -27,4 +27,19 @@ fit::result<Error, Module*> RuntimeDynamicLinker::CheckOpen(const char* file, in
   return fit::ok(FindModule(Soname{file}));
 }
 
+fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(Module* module, const char* ref) {
+  Diagnostics diag;
+  elfldltl::SymbolName name{ref};
+  if (const auto* sym = name.Lookup(module->symbol_info())) {
+    if (sym->type() == elfldltl::ElfSymType::kTls) {
+      diag.SystemError(
+          "TODO(https://fxbug.dev/331421403): TLS semantics for dlsym() are not supported yet.");
+      return diag.take_error();
+    }
+    return diag.ok(reinterpret_cast<void*>(sym->value + module->load_bias()));
+  }
+  diag.UndefinedSymbol(ref);
+  return diag.take_error();
+}
+
 }  // namespace dl

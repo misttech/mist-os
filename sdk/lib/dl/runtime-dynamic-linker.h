@@ -100,6 +100,8 @@ class RuntimeDynamicLinker {
     return diag.ok(module_ref);
   }
 
+  fit::result<Error, void*> LookupSymbol(Module* module, const char* ref);
+
  private:
   // Perform basic argument checking and check whether a module for `file` was
   // already loaded. An error is returned if bad input was given. Otherwise,
