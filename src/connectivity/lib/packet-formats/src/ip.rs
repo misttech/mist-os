@@ -11,6 +11,7 @@ use alloc::vec::Vec;
 use core::cmp::PartialEq;
 use core::convert::Infallible as Never;
 use core::fmt::{Debug, Display};
+use core::hash::Hash;
 
 use net_types::ip::{GenericOverIp, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use packet::{BufferViewMut, PacketBuilder, ParsablePacket, ParseMetadata};
@@ -35,9 +36,11 @@ pub trait IpProtoExt: Ip {
         + GenericOverIp<Ipv6, Type = Ipv6Proto>
         + Copy
         + Clone
+        + Hash
         + Debug
         + Display
-        + PartialEq;
+        + PartialEq
+        + Eq;
 }
 
 impl IpProtoExt for Ipv4 {

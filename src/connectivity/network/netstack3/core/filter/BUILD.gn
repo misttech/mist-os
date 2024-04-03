@@ -45,18 +45,36 @@ rustc_library_with_features("netstack3-filter") {
   feature_sets = [
     {
       features = []
+      deps +=
+          [ "//src/connectivity/network/netstack3/core/sync:netstack3-sync" ]
     },
+
+    {
+      target_name = "netstack3-filter-instrumented"
+      features = [ "instrumented" ]
+      with_unit_tests = true
+      deps += [ "//src/connectivity/network/netstack3/core/sync:netstack3-sync-instrumented" ]
+    },
+
     {
       target_name = "netstack3-filter-testutils"
-      features = [ "testutils" ]
+      features = [
+        "testutils",
+        "instrumented",
+      ]
+      deps += [ "//src/connectivity/network/netstack3/core/sync:netstack3-sync-instrumented" ]
     },
   ]
+
   if (is_host) {
     feature_sets += [
       {
         target_name = "netstack3-filter-loom"
         testonly = true
         features = []
+        deps += [
+          "//src/connectivity/network/netstack3/core/sync:netstack3-sync-loom",
+        ]
         configs += [ "//src/connectivity/network/netstack3/core:loom" ]
       },
     ]

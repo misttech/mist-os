@@ -2,14 +2,125 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::sync::Arc;
+use alloc::{collections::HashMap, sync::Arc};
+use core::hash::Hash;
 
 use packet_formats::ip::IpExt;
 
 use crate::{packets::TransportPacket, IpPacket, MaybeTransportPacket};
+use netstack3_sync::Mutex;
+
+/// Implements a connection tracking subsystem.
+///
+/// The `E` parameter is for external data that is stored in the [`Connection`]
+/// struct and can be extracted with the [`Connection::external_data()`]
+/// function.
+#[allow(dead_code)]
+pub struct Table<I: IpExt, E> {
+    /// A connection is inserted into the map twice: once for the original
+    /// tuple, and once for the reply tuple.
+    map: Mutex<HashMap<Tuple<I>, Arc<ConnectionShared<I, E>>>>,
+}
+
+#[allow(dead_code)]
+impl<I: IpExt, E> Table<I, E> {
+    pub(crate) fn new() -> Self {
+        Self { map: Mutex::new(HashMap::new()) }
+    }
+
+    /// Returns whether the table contains a connection for the specified tuple.
+    ///
+    /// This is for NAT to determine whether a generated tuple will clash with
+    /// one already in the map. While it might seem inefficient, to require
+    /// locking in a loop, taking an uncontested lock is going to be
+    /// significantly faster than the RNG used to allocate NAT parameters.
+    pub(crate) fn contains_tuple(&self, tuple: &Tuple<I>) -> bool {
+        self.map.lock().contains_key(tuple)
+    }
+
+    /// Attempts to insert the `Connection` into the table.
+    ///
+    /// To be called once a packet for the connection has passed all filtering.
+    /// The boolean return value represents whether the connection was newly
+    /// added to the connection tracking state.
+    ///
+    /// This is on [`Table`] instead of [`Connection`] because conntrack needs
+    /// to be able to manipulate its internal map.
+    pub(crate) fn finalize_connection(
+        &self,
+        connection: Connection<I, E>,
+    ) -> Result<bool, FinalizeConnectionError> {
+        let exclusive = match connection {
+            Connection::Exclusive(c) => c,
+            // Given that make_shared is private, the only way for us to receive
+            // a shared connection is if it was already present in the map. This
+            // is far and away the most common case under normal operation.
+            Connection::Shared(_) => return Ok(false),
+        };
+
+        let mut guard = self.map.lock();
+
+        // The expected case here is that there isn't a conflict.
+        //
+        // Normally, we'd want to use the entry API to reduce the number of map
+        // lookups, but this setup allows us to completely avoid any heap
+        // allocations until we're sure that the insertion will succeed. This
+        // wastes a little CPU in the common case to avoid pathological behavior
+        // in degenerate cases.
+        //
+        // NOTE: It's theoretically possible for the first two packets (or more)
+        // in the same flow to create ExclusiveConnections. In this case,
+        // subsequent packets will be reported as conflicts. However, it should
+        // be the case that packets for the same flow are handled sequentially,
+        // so each subsequent packet should see the connection created by the
+        // first one.
+        if guard.contains_key(&exclusive.inner.original_tuple)
+            || guard.contains_key(&exclusive.inner.reply_tuple)
+        {
+            Err(FinalizeConnectionError::Conflict)
+        } else {
+            let shared = exclusive.make_shared();
+
+            let res = guard.insert(shared.inner.original_tuple.clone(), shared.clone());
+            debug_assert!(res.is_none());
+
+            let res = guard.insert(shared.inner.reply_tuple.clone(), shared);
+            debug_assert!(res.is_none());
+
+            Ok(true)
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl<I: IpExt, E: Default> Table<I, E> {
+    /// Returns a [`Connection`] for the packet's flow. If a connection does not
+    /// currently exist, a new one is created.
+    ///
+    /// At the same time, process the packet for the connection, updating
+    /// internal connection state.
+    ///
+    /// After processing is complete, you must call
+    /// [`finalize_connection`](Table::finalize_connection) with this
+    /// connection.
+    pub(crate) fn get_connection_for_packet_and_update<P: IpPacket<I>>(
+        &self,
+        packet: &P,
+    ) -> Option<Connection<I, E>> {
+        let tuple = Tuple::from_packet(packet)?;
+
+        // TODO(https://fxbug.dev/328064022): Add call to Connection::update()
+        // once that's implemented.
+        if let Some(connection) = self.map.lock().get(&tuple) {
+            Some(Connection::Shared(connection.clone()))
+        } else {
+            Some(Connection::Exclusive(tuple.into()))
+        }
+    }
+}
 
 /// A tuple for a flow in a single direction.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Tuple<I: IpExt> {
     protocol: I::Proto,
     src_addr: I::Addr,
@@ -64,6 +175,14 @@ pub(crate) enum ConnectionDirection {
     /// The packet is traveling in the opposite direction from the first packet
     /// seen for the [`Connection`].
     Reply,
+}
+
+/// An error returned from [`Table::finalize_connection`].
+#[derive(Debug)]
+pub(crate) enum FinalizeConnectionError {
+    /// There is a conflicting connection already tracked by conntrack. The
+    /// to-be-finalized connection was not inserted into the table.
+    Conflict,
 }
 
 /// A `Connection` contains all of the information about a single connection
@@ -380,5 +499,105 @@ mod tests {
         assert_matches!(connection.direction(&original_tuple), Some(ConnectionDirection::Original));
         assert_matches!(connection.direction(&reply_tuple), Some(ConnectionDirection::Reply));
         assert_matches!(connection.direction(&other_tuple), None);
+    }
+
+    #[ip_test]
+    fn table_get_exclusive_connection_and_finalize_shared<I: Ip + IpExt + TestIpExt>() {
+        let table = Table::<I, ()>::new();
+
+        let packet = FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::DST_ADDR,
+            body: FakeTcpSegment { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
+        };
+
+        let reply_packet = FakeIpPacket::<I, _> {
+            src_ip: I::DST_ADDR,
+            dst_ip: I::SRC_ADDR,
+            body: FakeTcpSegment { src_port: I::DST_PORT, dst_port: I::SRC_PORT },
+        };
+
+        let original_tuple = Tuple::from_packet(&packet).expect("packet should be valid");
+        let reply_tuple = Tuple::from_packet(&reply_packet).expect("packet should be valid");
+
+        // TODO(https://fxbug.dev/328064022): Add check for state update.
+        let conn =
+            table.get_connection_for_packet_and_update(&packet).expect("packet should be valid");
+
+        // Since the connection isn't present in the map, we should get a
+        // freshly-allocated exclusive connection and the map should not have
+        // been touched.
+        assert_matches!(conn, Connection::Exclusive(_));
+        assert!(!table.contains_tuple(&original_tuple));
+        assert!(!table.contains_tuple(&reply_tuple));
+
+        // Once we finalize the connection, it should be present in the map.
+        assert_matches!(table.finalize_connection(conn), Ok(true));
+        assert!(table.contains_tuple(&original_tuple));
+        assert!(table.contains_tuple(&reply_tuple));
+
+        // We should now get a shared connection back for packets in either
+        // direction now that the connection is present in the table.
+        let conn = table.get_connection_for_packet_and_update(&packet);
+        let conn = assert_matches!(conn, Some(Connection::Shared(conn)) => conn);
+
+        let reply_conn = table.get_connection_for_packet_and_update(&reply_packet);
+        let reply_conn = assert_matches!(reply_conn, Some(Connection::Shared(conn)) => conn);
+
+        // We should be getting the same connection in both directions.
+        assert!(Arc::ptr_eq(&conn, &reply_conn));
+
+        // Inserting the connection a second time shouldn't change the map.
+        let conn = table.get_connection_for_packet_and_update(&packet).unwrap();
+        assert_matches!(table.finalize_connection(conn), Ok(false));
+        assert!(table.contains_tuple(&original_tuple));
+        assert!(table.contains_tuple(&reply_tuple));
+    }
+
+    #[ip_test]
+    fn table_conflict<I: Ip + IpExt + TestIpExt>() {
+        let table = Table::new();
+
+        let original_tuple = Tuple::<I> {
+            protocol: I::Proto::from(IpProto::Tcp),
+            src_addr: I::SRC_ADDR,
+            dst_addr: I::DST_ADDR,
+            src_port_or_id: I::SRC_PORT,
+            dst_port_or_id: I::DST_PORT,
+        };
+
+        let nated_original_tuple = Tuple::<I> {
+            protocol: I::Proto::from(IpProto::Tcp),
+            src_addr: I::SRC_ADDR,
+            dst_addr: I::DST_ADDR,
+            src_port_or_id: I::SRC_PORT + 1,
+            dst_port_or_id: I::DST_PORT + 1,
+        };
+
+        let nated_reply_tuple = Tuple::<I> {
+            protocol: I::Proto::from(IpProto::Tcp),
+            src_addr: I::DST_ADDR,
+            dst_addr: I::SRC_ADDR,
+            src_port_or_id: I::DST_PORT + 1,
+            dst_port_or_id: I::SRC_PORT + 1,
+        };
+
+        let conn1: Connection<I, ()> = Connection::Exclusive(original_tuple.clone().into());
+
+        // Fake NAT that ends up allocating the same reply tuple as an existing
+        // connection.
+        let mut conn2: ConnectionExclusive<I, ()> = original_tuple.clone().into();
+        conn2.inner.original_tuple = nated_original_tuple.clone();
+        let conn2 = Connection::Exclusive(conn2);
+
+        // Fake NAT that ends up allocating the same original tuple as an
+        // existing connection.
+        let mut conn3: ConnectionExclusive<I, ()> = original_tuple.clone().into();
+        conn3.inner.reply_tuple = nated_reply_tuple.clone();
+        let conn3 = Connection::Exclusive(conn3);
+
+        assert_matches!(table.finalize_connection(conn1), Ok(true));
+        assert_matches!(table.finalize_connection(conn2), Err(FinalizeConnectionError::Conflict));
+        assert_matches!(table.finalize_connection(conn3), Err(FinalizeConnectionError::Conflict));
     }
 }
