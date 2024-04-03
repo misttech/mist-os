@@ -57,6 +57,7 @@ AudioCompositeServer::AudioCompositeServer(
     element_completers_[ring_buffer].first_response_sent = false;
     element_completers_[ring_buffer].completer = {};
   }
+  topology_completer_.first_response_sent = false;
 
   for (size_t i = 0; i < kNumberOfPipelines; ++i) {
     // Default supported DAI formats.
