@@ -4,6 +4,7 @@
 
 //! Common time abstractions.
 
+pub(crate) mod local_timer_heap;
 pub(crate) mod testutil;
 
 use core::{fmt::Debug, time::Duration};

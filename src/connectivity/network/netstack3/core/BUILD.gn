@@ -310,6 +310,7 @@ group("tests") {
     ":netstack3-core-fuzzers",
     ":netstack3-core-instrumented_test($host_toolchain)",
     ":netstack3-core-test-package",
+    "base:tests",
     "filter:tests",
     "lock-order:tests",
     "macros:tests",

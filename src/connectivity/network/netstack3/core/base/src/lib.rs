@@ -21,8 +21,8 @@ pub use context::ContextPair;
 pub use counters::Counter;
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use time::{
-    CoreTimerContext, Instant, InstantBindingsTypes, InstantContext, TimerBindingsTypes,
-    TimerContext2,
+    local_timer_heap::LocalTimerHeap, CoreTimerContext, Instant, InstantBindingsTypes,
+    InstantContext, TimerBindingsTypes, TimerContext2,
 };
 
 /// Test utilities provided to all crates.
