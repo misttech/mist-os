@@ -12,6 +12,9 @@
 #include <limits>
 #include <optional>
 
+#include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
+#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
+
 #include "amlogic_codec_adapter.h"
 #include "device_ctx.h"
 #include "hevcdec.h"
@@ -255,11 +258,11 @@ void CodecAdapterVp9::CoreCodecSetSecureMemoryMode(
   }
 }
 
-fuchsia::sysmem::BufferCollectionConstraints
-CodecAdapterVp9::CoreCodecGetBufferCollectionConstraints(
+fuchsia_sysmem2::BufferCollectionConstraints
+CodecAdapterVp9::CoreCodecGetBufferCollectionConstraints2(
     CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
     const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
-  fuchsia::sysmem::BufferCollectionConstraints result;
+  fuchsia_sysmem2::BufferCollectionConstraints result;
 
   // The CodecImpl won't hand us the sysmem token, so we shouldn't expect to
   // have the token here.
@@ -275,15 +278,15 @@ CodecAdapterVp9::CoreCodecGetBufferCollectionConstraints(
   ZX_DEBUG_ASSERT(min_buffer_count_[port] != 0);
   ZX_DEBUG_ASSERT(max_buffer_count_[port] != 0);
 
-  result.min_buffer_count_for_camping = min_buffer_count_[port];
+  result.min_buffer_count_for_camping() = min_buffer_count_[port];
 
   // Some slack is nice overall, but avoid having each participant ask for
   // dedicated slack.  Using sysmem the client will ask for it's own buffers for
   // camping and any slack, so the codec doesn't need to ask for any extra on
   // behalf of the client.
-  ZX_DEBUG_ASSERT(result.min_buffer_count_for_dedicated_slack == 0);
-  ZX_DEBUG_ASSERT(result.min_buffer_count_for_shared_slack == 0);
-  result.max_buffer_count = max_buffer_count_[port];
+  ZX_DEBUG_ASSERT(!result.min_buffer_count_for_dedicated_slack().has_value());
+  ZX_DEBUG_ASSERT(!result.min_buffer_count_for_shared_slack().has_value());
+  result.max_buffer_count() = max_buffer_count_[port];
 
   uint32_t per_packet_buffer_bytes_min;
   uint32_t per_packet_buffer_bytes_max;
@@ -301,52 +304,46 @@ CodecAdapterVp9::CoreCodecGetBufferCollectionConstraints(
     per_packet_buffer_bytes_max = 0xFFFFFFFF;
   }
 
-  result.has_buffer_memory_constraints = true;
-  result.buffer_memory_constraints.min_size_bytes = per_packet_buffer_bytes_min;
-  result.buffer_memory_constraints.max_size_bytes = per_packet_buffer_bytes_max;
+  auto& bmc = result.buffer_memory_constraints().emplace();
+  bmc.min_size_bytes() = per_packet_buffer_bytes_min;
+  bmc.max_size_bytes() = per_packet_buffer_bytes_max;
   // Non-secure input buffers are never read directly by the hardware, so they don't need to be
   // physically contiguous.
-  result.buffer_memory_constraints.physically_contiguous_required =
-      (port == kOutputPort) || IsPortSecurePermitted(port);
-  result.buffer_memory_constraints.secure_required = IsPortSecureRequired(port);
-  result.buffer_memory_constraints.cpu_domain_supported = !IsPortSecureRequired(port);
-  result.buffer_memory_constraints.ram_domain_supported =
-      !IsPortSecureRequired(port) && (port == kOutputPort);
+  bmc.physically_contiguous_required() = (port == kOutputPort) || IsPortSecurePermitted(port);
+  bmc.secure_required() = IsPortSecureRequired(port);
+  bmc.cpu_domain_supported() = !IsPortSecureRequired(port);
+  bmc.ram_domain_supported() = !IsPortSecureRequired(port) && (port == kOutputPort);
 
   if (IsPortSecurePermitted(port)) {
-    result.buffer_memory_constraints.inaccessible_domain_supported = true;
-    fuchsia::sysmem::HeapType secure_heap = (port == kInputPort)
-                                                ? fuchsia::sysmem::HeapType::AMLOGIC_SECURE_VDEC
-                                                : fuchsia::sysmem::HeapType::AMLOGIC_SECURE;
-    result.buffer_memory_constraints
-        .heap_permitted[result.buffer_memory_constraints.heap_permitted_count++] = secure_heap;
+    bmc.inaccessible_domain_supported() = true;
+    std::string secure_heap = (port == kInputPort)
+                                  ? bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC
+                                  : bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE;
+    fuchsia_sysmem2::Heap heap;
+    heap.heap_type() = std::move(secure_heap);
+    bmc.permitted_heaps()->emplace_back(std::move(heap));
   }
 
   if (!IsPortSecureRequired(port)) {
-    result.buffer_memory_constraints
-        .heap_permitted[result.buffer_memory_constraints.heap_permitted_count++] =
-        fuchsia::sysmem::HeapType::SYSTEM_RAM;
+    fuchsia_sysmem2::Heap heap;
+    heap.heap_type() = bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM;
+    bmc.permitted_heaps()->emplace_back(std::move(heap));
   }
   if (port == kOutputPort) {
-    result.image_format_constraints_count = 1;
-    fuchsia::sysmem::ImageFormatConstraints& image_constraints = result.image_format_constraints[0];
-    image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::NV12;
-    image_constraints.pixel_format.has_format_modifier = true;
-    image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
+    auto& image_constraints = result.image_format_constraints().emplace().emplace_back();
+    image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
+    image_constraints.pixel_format_modifier() = fuchsia_images2::PixelFormatModifier::kLinear;
     // TODO(https://fxbug.dev/42084950): confirm that REC709 is always what we want here, or plumb
     // actual YUV color space if it can ever be REC601_*.  Since 2020 and 2100
     // are minimum 10 bits per Y sample and we're outputting NV12, 601 is the
     // only other potential possibility here.
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::REC709;
+    image_constraints.color_spaces() = {fuchsia_images2::ColorSpace::kRec709};
 
     // The non-"required_" fields indicate the decoder's ability to potentially
     // output frames at various dimensions as coded in the stream.  Aside from
     // the current stream being somewhere in these bounds, these have nothing to
     // do with the current stream in particular.
-    image_constraints.min_coded_width = 2;
-    image_constraints.max_coded_width = 4096;
-    image_constraints.min_coded_height = 2;
+    image_constraints.min_size() = {2, 2};
     // This intentionally isn't the _height_ of a 4k frame, it's intentionally
     // the _width_ of a 4k frame assigned to max_coded_height.
     //
@@ -355,26 +352,28 @@ CodecAdapterVp9::CoreCodecGetBufferCollectionConstraints(
     // HW might be able to go bigger than that as long as the other dimension is
     // smaller to compensate, we don't really need to enable any larger than
     // 4k's width in either dimension, so we don't.
-    image_constraints.max_coded_height = 4096;
-    image_constraints.min_bytes_per_row = 2;
+    image_constraints.max_size() = {4096, 4096};
+    // AFAICT so far, this decoder has no way to output a stride other than
+    // fbl::round_up(width_, 32u), so we'll fail later if that stride isn't
+    // permitted.
+    image_constraints.min_bytes_per_row() = 2;
     // no hard-coded max stride, at least for now
-    image_constraints.max_bytes_per_row = 0xFFFFFFFF;
-    image_constraints.max_coded_width_times_coded_height = 4096 * 2176;
-    image_constraints.layers = 1;
+    image_constraints.max_bytes_per_row() = 0xFFFFFFFF;
+    image_constraints.max_width_times_height() = 4096 * 2176;
     // VP9 decoder writes NV12 frames separately from reference frames, so the
     // coded_width and coded_height aren't constrained to be block aligned.
     //
     // The vp9_decoder code will round up the coded_width to use more of the
     // also-rounded-up stride, so that coded_width can be even even if the
     // HW reported an odd width.
-    image_constraints.coded_width_divisor = 2;
+    //
     // Unclear how we'd deal with odd coded_height, even if we wanted to.
-    image_constraints.coded_height_divisor = 2;
-    image_constraints.bytes_per_row_divisor = 32;
+    image_constraints.size_alignment() = {2, 2};
+    image_constraints.bytes_per_row_divisor() = 32;
     // Even though we only ever output at offset 0, sysmem defaults start_offset_divisor to the
     // image format alignment which is 2 for NV12. Since we are a producer, we should fully specify
     // here so late attach clients don't have to specify it explicitly.
-    image_constraints.start_offset_divisor = 2;
+    image_constraints.start_offset_divisor() = 2;
     // Odd display dimensions are permitted, but these don't necessarily imply
     // odd NV12 coded_width or coded_height dimensions - those are constrainted
     // above.
@@ -385,8 +384,7 @@ CodecAdapterVp9::CoreCodecGetBufferCollectionConstraints(
     // Profile_0_8bit/frm_resize/crowd_run_1280X768_fr30_bd8_frm_resize_l31.
     // FWIW, the HW VP9 decoder can decode and match the conformance MD5 for
     // that stream, despite it's odd width.
-    image_constraints.display_width_divisor = 1;
-    image_constraints.display_height_divisor = 1;
+    image_constraints.display_rect_alignment() = {1, 1};
 
     // The decoder is producing frames and the decoder has no choice but to
     // produce frames at their coded size.  The decoder wants to potentially be
@@ -399,41 +397,49 @@ CodecAdapterVp9::CoreCodecGetBufferCollectionConstraints(
     // larger range of dimensions that includes the required range indicated
     // here (via a-priori knowledge of the potential stream dimensions), an
     // initiator is free to do so.
+    image_constraints.required_min_size() = {coded_width_, coded_height_};
+    image_constraints.required_max_size() = {coded_width_, coded_height_};
+
+    // Sysmem2 doesn't have required_min_bytes_per_row or
+    // required_max_bytes_per_row (at least for now). If those later prove to be
+    // worth adding to sysmem2, we'd set those to stride_ here. The way we'd
+    // know is IsCurrentOutputBufferCollectionUsable would complain about the
+    // stride not being within [min_bytes_per_row..max_bytes_per_row].
     //
-    // AFAICT so far, this decoder has no way to output a stride other than
-    // fbl::round_up(width_, 32u), so we have to care about stride also.
-    image_constraints.required_min_coded_width = coded_width_;
-    image_constraints.required_max_coded_width = coded_width_;
-    image_constraints.required_min_coded_height = coded_height_;
-    image_constraints.required_max_coded_height = coded_height_;
-    image_constraints.required_min_bytes_per_row = stride_;
-    image_constraints.required_max_bytes_per_row = stride_;
+    // The vp9 decoder is the producer. We're implicitly relying on the
+    // consumer(s) to not overly constrain the bytes_per_row using
+    // min_bytes_per_row and max_bytes_per_row, in order for decode of the
+    // current stream dimensions to be possible.
   } else {
-    ZX_DEBUG_ASSERT(result.image_format_constraints_count == 0);
+    ZX_DEBUG_ASSERT(!result.image_format_constraints().has_value());
   }
 
   // We don't have to fill out usage - CodecImpl takes care of that.
-  ZX_DEBUG_ASSERT(!result.usage.cpu);
-  ZX_DEBUG_ASSERT(!result.usage.display);
-  ZX_DEBUG_ASSERT(!result.usage.vulkan);
-  ZX_DEBUG_ASSERT(!result.usage.video);
+  ZX_DEBUG_ASSERT(!result.usage().has_value());
 
   return result;
 }
 
 void CodecAdapterVp9::CoreCodecSetBufferCollectionInfo(
-    CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) {
+    CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
   if (port == kOutputPort) {
-    ZX_DEBUG_ASSERT(buffer_collection_info.settings.buffer_settings.is_physically_contiguous);
-    ZX_DEBUG_ASSERT(buffer_collection_info.settings.has_image_format_constraints);
-    ZX_DEBUG_ASSERT(buffer_collection_info.settings.image_format_constraints.pixel_format.type ==
-                    fuchsia::sysmem::PixelFormatType::NV12);
-    output_buffer_collection_info_ = fidl::Clone(buffer_collection_info);
+    ZX_DEBUG_ASSERT(
+        *buffer_collection_info.settings()->buffer_settings()->is_physically_contiguous());
+    ZX_DEBUG_ASSERT(buffer_collection_info.settings()->image_format_constraints().has_value());
+    ZX_DEBUG_ASSERT(
+        *buffer_collection_info.settings()->image_format_constraints()->pixel_format() ==
+        fuchsia_images2::PixelFormat::kNv12);
+    auto clone_info_result =
+        sysmem::V2CloneBufferCollectionInfo(buffer_collection_info, ZX_RIGHT_SAME_RIGHTS);
+    // failure to dup a handle is fatal to this process (analogous to OOM)
+    ZX_ASSERT(clone_info_result.is_ok());
+    output_buffer_collection_info_ = clone_info_result.take_value();
   }
   if (IsPortSecurePermitted(port)) {
-    ZX_DEBUG_ASSERT(buffer_collection_info.settings.buffer_settings.is_physically_contiguous);
+    ZX_DEBUG_ASSERT(
+        *buffer_collection_info.settings()->buffer_settings()->is_physically_contiguous());
   }
-  buffer_settings_[port].emplace(buffer_collection_info.settings);
+  buffer_settings_[port].emplace(*buffer_collection_info.settings());
 }
 
 void CodecAdapterVp9::OnFrameReady(std::shared_ptr<VideoFrame> frame) {
@@ -1398,82 +1404,86 @@ bool CodecAdapterVp9::IsCurrentOutputBufferCollectionUsable(
     LOG(DEBUG, "!output_buffer_collection_info_");
     return false;
   }
-  fuchsia::sysmem::BufferCollectionInfo_2& info = output_buffer_collection_info_.value();
-  ZX_DEBUG_ASSERT(info.settings.has_image_format_constraints);
-  if (min_frame_count > info.buffer_count) {
+  fuchsia_sysmem2::BufferCollectionInfo& info = output_buffer_collection_info_.value();
+  ZX_DEBUG_ASSERT(info.settings()->image_format_constraints().has_value());
+  if (min_frame_count > info.buffers()->size()) {
     LOG(DEBUG, "min_frame_count > info.buffer_count");
     return false;
   }
-  if (info.buffer_count > max_frame_count) {
+  if (info.buffers()->size() > max_frame_count) {
     // The vp9_decoder.cc won't exercise this path since the max is always the same, and we won't
     // have allocated a collection with more than max_buffer_count.
     LOG(DEBUG, "info.buffer_count > max_frame_count");
     return false;
   }
-  if (stride * coded_height * 3 / 2 > info.settings.buffer_settings.size_bytes) {
+  if (stride * coded_height * 3 / 2 > *info.settings()->buffer_settings()->size_bytes()) {
     LOG(DEBUG, "stride * coded_height * 3 / 2 > info.settings.buffer_settings.size_bytes");
     return false;
   }
-  if (display_width % info.settings.image_format_constraints.display_width_divisor != 0) {
+  if (display_width %
+          info.settings()->image_format_constraints()->display_rect_alignment()->width() !=
+      0) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG,
         "display_width %% info.settings.image_format_constraints.display_width_divisor != 0");
     return false;
   }
-  if (display_height % info.settings.image_format_constraints.display_height_divisor != 0) {
+  if (display_height %
+          info.settings()->image_format_constraints()->display_rect_alignment()->height() !=
+      0) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG,
         "display_height %% info.settings.image_format_constraints.display_height_divisor != 0");
     return false;
   }
   if (coded_width * coded_height >
-      info.settings.image_format_constraints.max_coded_width_times_coded_height) {
+      *info.settings()->image_format_constraints()->max_width_times_height()) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG, "coded_width * coded_height > max_coded_width_times_coded_height");
     return false;
   }
 
-  if (coded_width < info.settings.image_format_constraints.min_coded_width) {
+  if (coded_width < info.settings()->image_format_constraints()->min_size()->width()) {
     LOG(DEBUG,
         "coded_width < info.settings.image_format_constraints.min_coded_width -- "
         "coded_width: %d min_coded_width: %d",
-        coded_width, info.settings.image_format_constraints.min_coded_width);
+        coded_width, info.settings()->image_format_constraints()->min_size()->width());
     return false;
   }
-  if (coded_width > info.settings.image_format_constraints.max_coded_width) {
+  if (coded_width > info.settings()->image_format_constraints()->max_size()->width()) {
     LOG(DEBUG, "coded_width > info.settings.image_format_constraints.max_coded_width");
     return false;
   }
-  if (coded_width % info.settings.image_format_constraints.coded_width_divisor != 0) {
+  if (coded_width % info.settings()->image_format_constraints()->size_alignment()->width() != 0) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG, "coded_width %% info.settings.image_format_constraints.coded_width_divisor != 0");
     return false;
   }
-  if (coded_height < info.settings.image_format_constraints.min_coded_height) {
+  if (coded_height < info.settings()->image_format_constraints()->min_size()->height()) {
     LOG(DEBUG, "coded_height < info.settings.image_format_constraints.min_coded_height");
     return false;
   }
-  if (coded_height > info.settings.image_format_constraints.max_coded_height) {
+  if (coded_height > info.settings()->image_format_constraints()->max_size()->height()) {
     LOG(DEBUG, "coded_height > info.settings.image_format_constraints.max_coded_height");
     return false;
   }
-  if (coded_height % info.settings.image_format_constraints.coded_height_divisor != 0) {
+  if (coded_height % info.settings()->image_format_constraints()->size_alignment()->height() != 0) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG, "coded_height %% info.settings.image_format_constraints.coded_height_divisor != 0");
     return false;
   }
-  if (stride < info.settings.image_format_constraints.min_bytes_per_row) {
+  if (stride < *info.settings()->image_format_constraints()->min_bytes_per_row()) {
     LOG(DEBUG,
         "stride < info.settings.image_format_constraints.min_bytes_per_row -- stride: %d "
         "min_bytes_per_row: %d",
-        stride, info.settings.image_format_constraints.min_bytes_per_row);
+        stride, *info.settings()->image_format_constraints()->min_bytes_per_row());
     return false;
   }
-  if (stride > info.settings.image_format_constraints.max_bytes_per_row) {
+  if (stride > *info.settings()->image_format_constraints()->max_bytes_per_row()) {
     LOG(DEBUG, "stride > info.settings.image_format_constraints.max_bytes_per_row");
     return false;
   }
-  if (stride % info.settings.image_format_constraints.bytes_per_row_divisor != 0) {
+  if (stride % *info.settings()->image_format_constraints()->bytes_per_row_divisor() != 0) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG, "stride %% info.settings.image_format_constraints.bytes_per_row_divisor != 0");
     return false;
@@ -1632,7 +1642,7 @@ bool CodecAdapterVp9::IsPortSecurePermitted(CodecPort port) {
 bool CodecAdapterVp9::IsPortSecure(CodecPort port) {
   ZX_DEBUG_ASSERT(secure_memory_mode_set_[port]);
   ZX_DEBUG_ASSERT(buffer_settings_[port]);
-  return buffer_settings_[port]->buffer_settings.is_secure;
+  return *buffer_settings_[port]->buffer_settings()->is_secure();
 }
 
 bool CodecAdapterVp9::IsOutputSecure() {
