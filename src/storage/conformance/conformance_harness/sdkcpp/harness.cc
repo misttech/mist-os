@@ -111,7 +111,7 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
         status = vmo.write(file.contents()->data(), 0, file.contents()->size());
         ZX_ASSERT_MSG(status == ZX_OK, "Failed to write to VMO: %s", zx_status_get_string(status));
         auto file_entry = std::make_unique<vfs::VmoFile>(std::move(vmo), file.contents()->size(),
-                                                         vfs::VmoFile::WriteOption::WRITABLE);
+                                                         vfs::VmoFile::WriteMode::kWritable);
         ZX_ASSERT_MSG(dest.AddEntry(*file.name(), std::move(file_entry)) == ZX_OK,
                       "Failed to add File entry!");
         break;
