@@ -3,7 +3,8 @@
 # found in the LICENSE file.
 
 # This import must be here before "version.gni" below.
-import("//build/icu/config.gni")  # icu_root, icu_flavor_major_versions
+import("//build/icu/config.gni")  # icu_root, icu_flavor_major_versions,
+                                  # icu_flavor_major_version_placeholder
 
 import("//build/dist/resource.gni")
 import("//build/icu/icu_group.gni")
@@ -64,7 +65,7 @@ group("data") {
 }
 
 icu_group("icudtl") {
-  public_deps = [
+  icu_public_deps = [
     ":icudtl_orig",
     ":icudtl_versioned",
   ]
@@ -77,10 +78,9 @@ icu_resource("icudtl_orig") {
 
 icu_resource("icudtl_versioned") {
   sources = [ "${icu_root}/common/icudtl.dat" ]
-  outputs = [ "data/icudt${icu_major_version_number}l.dat" ]
+  outputs = [ "data/icudt${icu_major_version_number_placeholder}l.dat" ]
 }
 
-# TODO(fmil): Is there a way to unify with above?
 icu_group("icudtl_root") {
   public_deps = [
     ":icudtl_root_orig",
