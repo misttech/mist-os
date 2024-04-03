@@ -1041,9 +1041,28 @@ common --enable_bzlmod=false
             "Regenerating Bazel workspace%s."
             % (", --force used" if args.force else "")
         )
+
+        # Remove the old workspace's content, which is just a set
+        # of symlinks and some auto-generated files.
         create_clean_dir(workspace_dir)
-        create_clean_dir(output_base_dir)
+
+        # Do not clean the output_base because it is now massive,
+        # and doing this will very slow and will force a lot of
+        # unnecessary rebuilds after that,
+        #
+        # However, do remove $OUTPUT_BASE/external/ which holds
+        # the content of external repositories.
+        #
+        # This is a guard against repository rules that do not
+        # list their input dependencies properly, and would fail
+        # to re-run if one of them is updated. Sadly, this is
+        # pretty common with Bazel.
+        create_clean_dir(os.path.join(output_base_dir, "external"))
+
+        # Repopulate the workspace directory.
         generated.write(topdir)
+
+        # Update the cotent of generated-info.json file.
         with open(generated_info_file, "w") as f:
             f.write(generated_json)
     else:
