@@ -691,3 +691,28 @@
 	url = https://fuchsia.googlesource.com/fuchsia-infra-bazel-rules
 	name = third_party/fuchsia-infra-bazel-rules
 	ignore = all
+[submodule "third_party/shac-project/checks-cpp/src"]
+	path = third_party/shac-project/checks-cpp/src
+	url = https://fuchsia.googlesource.com/shac-project/checks-cpp
+	name = third_party/shac-project/checks-cpp
+	ignore = all
+[submodule "third_party/shac-project/checks-go/src"]
+	path = third_party/shac-project/checks-go/src
+	url = https://fuchsia.googlesource.com/shac-project/checks-go
+	name = third_party/shac-project/checks-go
+	ignore = all
+[submodule "third_party/shac-project/checks-starlark/src"]
+	path = third_party/shac-project/checks-starlark/src
+	url = https://fuchsia.googlesource.com/shac-project/checks-starlark
+	name = third_party/shac-project/checks-starlark
+	ignore = all
+[submodule "third_party/shac-project/fuchsia-checks/src"]
+	path = third_party/shac-project/fuchsia-checks/src
+	url = https://fuchsia.googlesource.com/shac-project/fuchsia-checks
+	name = third_party/shac-project/fuchsia-checks
+	ignore = all
+[submodule "third_party/shac-project/generic-checks/src"]
+	path = third_party/shac-project/generic-checks/src
+	url = https://fuchsia.googlesource.com/shac-project/generic-checks
+	name = third_party/shac-project/generic-checks
+	ignore = all
