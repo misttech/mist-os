@@ -18,17 +18,11 @@ group("tests") {
 test("dl-unittests") {
   visibility = [ ":*" ]
 
-  sources = [
-    "dl-system-tests.cc",
-    "dl-system-tests.h",
-    "dl-tests-base.h",
-    "dl-tests.cc",
-  ]
+  sources = [ "dl-tests.cc" ]
   deps = [
     "..:diagnostics",
     "..:error",
     "..:stateful-error",
-    "//src/lib/elfldltl/testing",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
   ]
@@ -36,12 +30,19 @@ test("dl-unittests") {
     sources += [
       "dl-impl-tests.cc",
       "dl-impl-tests.h",
+      "dl-load-tests.cc",
+      "dl-system-tests.cc",
+      "dl-system-tests.h",
+      "dl-tests-base.h",
     ]
-    deps += [ "..:runtime" ]
-  }
+    deps += [
+      "..:runtime",
+      "//src/lib/elfldltl/testing",
+    ]
 
-  # Plumb in the switch to set cflags, such as the libprefix for test files.
-  deps += [ "//sdk/lib/ld/test:load-test-modules-info" ]
+    # Plumb in the switch to set cflags, such as the libprefix for test files.
+    deps += [ "//sdk/lib/ld/test:load-test-modules-info" ]
+  }
 }
 
 fuchsia_unittest_package("dl-tests") {
