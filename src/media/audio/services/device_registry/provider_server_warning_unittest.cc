@@ -191,7 +191,141 @@ TEST_F(ProviderServerCodecWarningTest, WrongDriverClient) {
 // Composite tests
 //
 // Remove this test, once Provider/AddDevice supports the Composite driver type.
-TEST_F(ProviderServerCompositeWarningTest, Unsupported) {
+TEST_F(ProviderServerCompositeWarningTest, MissingDeviceName) {
+  auto provider = CreateTestProviderServer();
+  ASSERT_EQ(ProviderServer::count(), 1u);
+  auto fake_driver = CreateFakeComposite();
+  auto received_callback = false;
+
+  fuchsia_audio_device::ProviderAddDeviceRequest request;
+  // missing .device_name
+  request.device_type(fuchsia_audio_device::DeviceType::kComposite);
+  request.driver_client(fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()));
+
+  provider->client()
+      ->AddDevice(std::move(request))
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidName)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(adr_service_->devices().size(), 0u);
+  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+}
+
+TEST_F(ProviderServerCompositeWarningTest, EmptyDeviceName) {
+  auto provider = CreateTestProviderServer();
+  ASSERT_EQ(ProviderServer::count(), 1u);
+  auto fake_driver = CreateFakeComposite();
+  auto received_callback = false;
+
+  provider->client()
+      ->AddDevice({{
+          .device_name = "",  // empty .device_name
+          .device_type = fuchsia_audio_device::DeviceType::kComposite,
+          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()),
+      }})
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidName)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(adr_service_->devices().size(), 0u);
+  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+}
+
+TEST_F(ProviderServerCompositeWarningTest, MissingDeviceType) {
+  auto provider = CreateTestProviderServer();
+  ASSERT_EQ(ProviderServer::count(), 1u);
+  auto fake_driver = CreateFakeComposite();
+  auto received_callback = false;
+
+  provider->client()
+      ->AddDevice({{
+          .device_name = "Test device name",
+          // missing .device_type
+          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()),
+      }})
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidType)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(adr_service_->devices().size(), 0u);
+  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+}
+
+TEST_F(ProviderServerCompositeWarningTest, MissingDriverClient) {
+  auto provider = CreateTestProviderServer();
+  ASSERT_EQ(ProviderServer::count(), 1u);
+  auto received_callback = false;
+
+  provider->client()
+      ->AddDevice({{
+          .device_name = "Test device name",
+          .device_type = fuchsia_audio_device::DeviceType::kComposite,
+          // missing .driver_client
+      }})
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidDriverClient)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(adr_service_->devices().size(), 0u);
+  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+}
+
+TEST_F(ProviderServerCompositeWarningTest, InvalidDriverClient) {
+  auto provider = CreateTestProviderServer();
+  ASSERT_EQ(ProviderServer::count(), 1u);
+  auto received_callback = false;
+
+  provider->client()
+      ->AddDevice({{
+          .device_name = "Test device name",
+          .device_type = fuchsia_audio_device::DeviceType::kComposite,
+          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(
+              fidl::ClientEnd<fuchsia_hardware_audio::Composite>()),
+      }})
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(adr_service_->devices().size(), 0u);
+  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+}
+
+TEST_F(ProviderServerCompositeWarningTest, WrongDriverClient) {
   auto provider = CreateTestProviderServer();
   ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigOutput();
@@ -201,11 +335,9 @@ TEST_F(ProviderServerCompositeWarningTest, Unsupported) {
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kComposite,
-          // Set a Composite device_type and driver_client -- which ADR doesn't yet support.
-          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(
-              // (as elsewhere, the zx::channel is from FakeStreamConfig, but that's irrelevant)
-              fidl::ClientEnd<fuchsia_hardware_audio::Composite>(
-                  fake_driver->Enable().TakeChannel())),
+          // StreamConfig driver_client doesn't match kComposite.
+          .driver_client =
+              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;

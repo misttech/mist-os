@@ -76,8 +76,7 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
   }
 
   // Remove this, when ADR supports the other driver_client types
-  if (*request.device_type() == fuchsia_audio_device::DeviceType::kComposite ||
-      *request.device_type() == fuchsia_audio_device::DeviceType::kDai) {
+  if (*request.device_type() == fuchsia_audio_device::DeviceType::kDai) {
     ADR_WARN_METHOD() << "AudioDeviceRegistry does not yet support this client type";
     completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kWrongClientType));
     return;

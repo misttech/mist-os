@@ -19,6 +19,7 @@ using Registry = fuchsia_audio_device::Registry;
 
 class ProviderServerTest : public AudioDeviceRegistryServerTestBase {};
 class ProviderServerCodecTest : public ProviderServerTest {};
+class ProviderServerCompositeTest : public ProviderServerTest {};
 class ProviderServerStreamConfigTest : public ProviderServerTest {};
 
 /////////////////////
@@ -169,6 +170,146 @@ TEST_F(ProviderServerCodecTest, WatchThenAdd) {
           .device_name = "Test codec",
           .device_type = fuchsia_audio_device::DeviceType::kCodec,
           .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
+      }})
+      .Then([&received_callback2](fidl::Result<Provider::AddDevice>& result) {
+        received_callback2 = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback1);
+  EXPECT_TRUE(received_callback2);
+  EXPECT_EQ(adr_service_->devices().size(), 1u);
+  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+}
+
+/////////////////////
+// Composite tests
+//
+// An added Composite lives even after the used Provider connection is dropped.
+TEST_F(ProviderServerCompositeTest, AddedDeviceThatOutlivesProvider) {
+  auto provider = CreateTestProviderServer();
+  ASSERT_EQ(ProviderServer::count(), 1u);
+  auto fake_driver = CreateFakeComposite();
+  auto received_callback = false;
+
+  provider->client()
+      ->AddDevice({{
+          .device_name = "Test composite",
+          .device_type = fuchsia_audio_device::DeviceType::kComposite,
+          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()),
+      }})
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+
+  provider->client() = fidl::Client<Provider>();
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(provider->server().WaitForShutdown(zx::sec(1)));
+  EXPECT_EQ(adr_service_->devices().size(), 1u);
+  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+}
+
+// An added Composite can be dropped without affecting the used Provider.
+TEST_F(ProviderServerCompositeTest, ProviderCanOutliveAddedDevice) {
+  auto provider = CreateTestProviderServer();
+  ASSERT_EQ(ProviderServer::count(), 1u);
+  auto fake_driver = CreateFakeComposite();
+  auto received_callback = false;
+
+  provider->client()
+      ->AddDevice({{
+          .device_name = "Test composite",
+          .device_type = fuchsia_audio_device::DeviceType::kComposite,
+          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()),
+      }})
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+
+  fake_driver->DropComposite();
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(adr_service_->devices().size(), 0u);
+  EXPECT_EQ(ProviderServer::count(), 1u);
+  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+}
+
+// For Composites added by Provider, ensure that Add-then-Watch works as expected.
+TEST_F(ProviderServerCompositeTest, AddThenWatch) {
+  auto provider = CreateTestProviderServer();
+  ASSERT_EQ(ProviderServer::count(), 1u);
+  auto registry_wrapper = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  auto fake_driver = CreateFakeComposite();
+  auto received_callback = false;
+
+  provider->client()
+      ->AddDevice({{
+          .device_name = "Test composite",
+          .device_type = fuchsia_audio_device::DeviceType::kComposite,
+          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()),
+      }})
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(adr_service_->devices().size(), 1u);
+  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  received_callback = false;
+
+  registry_wrapper->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 1u);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+}
+
+// For Composites added by Provider, ensure that Watch-then-Add works as expected.
+TEST_F(ProviderServerCompositeTest, WatchThenAdd) {
+  auto registry_wrapper = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  auto received_callback1 = false, received_callback2 = false;
+  registry_wrapper->client()->WatchDevicesAdded().Then(
+      [&received_callback1](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback1 = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 1u);
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_FALSE(received_callback1);
+  auto provider = CreateTestProviderServer();
+  ASSERT_EQ(ProviderServer::count(), 1u);
+  auto fake_driver = CreateFakeComposite();
+
+  provider->client()
+      ->AddDevice({{
+          .device_name = "Test composite",
+          .device_type = fuchsia_audio_device::DeviceType::kComposite,
+          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()),
       }})
       .Then([&received_callback2](fidl::Result<Provider::AddDevice>& result) {
         received_callback2 = true;
