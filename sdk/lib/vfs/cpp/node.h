@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_VFS_CPP_INTERNAL_NODE_H_
-#define LIB_VFS_CPP_INTERNAL_NODE_H_
+#ifndef LIB_VFS_CPP_NODE_H_
+#define LIB_VFS_CPP_NODE_H_
 
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/async/default.h>
@@ -16,9 +16,6 @@ namespace vfs {
 class ComposedServiceDir;
 class LazyDir;
 class PseudoDir;
-}  // namespace vfs
-
-namespace vfs::internal {
 
 // Represents an object in a file system that communicates via the `fuchsia.io.Node` protocol, and
 // potentially supports the composed protocols `fuchsia.io.Directory` and `fuchsia.io.File`.
@@ -65,12 +62,16 @@ class Node {
   vfs_internal_node_t* const handle_;
 };
 
-// TODO(https://fxbug.dev/311176363): Deprecate/remove the following type aliases which are used OOT
-// and move `Node` to the `vfs` namespace.
+namespace internal {
 
-using Directory = Node;
-using File = Node;
+// TODO(https://fxbug.dev/311176363): Remove the following type aliases when possible.
+using Node ZX_REMOVED_SINCE(1, 19, 20, "Use vfs::Node or a concrete type instead.") = vfs::Node;
+using Directory ZX_REMOVED_SINCE(1, 19, 20,
+                                 "Use vfs::Node or a concrete type instead.") = vfs::Node;
+using File ZX_REMOVED_SINCE(1, 19, 20, "Use vfs::Node or a concrete type instead.") = vfs::Node;
 
-}  // namespace vfs::internal
+}  // namespace internal
 
-#endif  // LIB_VFS_CPP_INTERNAL_NODE_H_
+}  // namespace vfs
+
+#endif  // LIB_VFS_CPP_NODE_H_

@@ -6,7 +6,7 @@
 #define LIB_VFS_CPP_COMPOSED_SERVICE_DIR_H_
 
 #include <fuchsia/io/cpp/fidl.h>
-#include <lib/vfs/cpp/internal/node.h>
+#include <lib/vfs/cpp/node.h>
 #include <lib/vfs/cpp/service.h>
 #include <zircon/assert.h>
 
@@ -21,11 +21,11 @@ namespace vfs {
 // This class is thread-safe.
 //
 // TODO(https://fxbug.dev/309685624): Remove when all callers have migrated.
-class ComposedServiceDir final : public internal::Node {
+class ComposedServiceDir final : public Node {
  public:
   ComposedServiceDir() : Node(MakeComposedServiceDir()) {}
 
-  using internal::Node::Serve;
+  using Node::Serve;
 
   // Sets the fallback directory for services. Services in this directory can be connected to, but
   // will not be enumerated. This method may only be called once.

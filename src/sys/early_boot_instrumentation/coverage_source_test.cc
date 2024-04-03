@@ -87,7 +87,7 @@ class FakeBootItemsFixture : public testing::Test {
     std::string dir_name(path.substr(0, curr));
     path = path.substr(curr + 1, path.length());
     // see if dir exists.
-    vfs::internal::Node* existing_entry = nullptr;
+    vfs::Node* existing_entry = nullptr;
     if (root.Lookup(dir_name, &existing_entry) == ZX_ERR_NOT_FOUND) {
       std::unique_ptr<vfs::PseudoDir> new_dir = std::make_unique<vfs::PseudoDir>();
       existing_entry = new_dir.get();
@@ -117,13 +117,12 @@ TEST_F(ExposeDebugdataTest, SingleSinkStatic) {
 
   ASSERT_TRUE(ExposeBootDebugdata(debugdata_dir, sink_map).is_ok());
   vfs::PseudoDir* lookup = nullptr;
-  ASSERT_EQ(
-      sink_map["random-sink"]->Lookup("static", reinterpret_cast<vfs::internal::Node**>(&lookup)),
-      ZX_OK);
+  ASSERT_EQ(sink_map["random-sink"]->Lookup("static", reinterpret_cast<vfs::Node**>(&lookup)),
+            ZX_OK);
   vfs::PseudoDir& out_dir = *lookup;
   ASSERT_FALSE(out_dir.IsEmpty());
 
-  vfs::internal::Node* node = nullptr;
+  vfs::Node* node = nullptr;
   ASSERT_EQ(out_dir.Lookup("my-sink-data.my-data", &node), ZX_OK);
   ASSERT_NE(node, nullptr);
 }
@@ -139,13 +138,12 @@ TEST_F(ExposeDebugdataTest, SingleSinkDynamic) {
 
   ASSERT_TRUE(ExposeBootDebugdata(debugdata_dir, sink_map).is_ok());
   vfs::PseudoDir* lookup = nullptr;
-  ASSERT_EQ(
-      sink_map["random-sink"]->Lookup("dynamic", reinterpret_cast<vfs::internal::Node**>(&lookup)),
-      ZX_OK);
+  ASSERT_EQ(sink_map["random-sink"]->Lookup("dynamic", reinterpret_cast<vfs::Node**>(&lookup)),
+            ZX_OK);
   vfs::PseudoDir& out_dir = *lookup;
   ASSERT_FALSE(out_dir.IsEmpty());
 
-  vfs::internal::Node* node = nullptr;
+  vfs::Node* node = nullptr;
   ASSERT_EQ(out_dir.Lookup("my-sink-data.my-data", &node), ZX_OK);
   ASSERT_NE(node, nullptr);
 }
@@ -173,12 +171,11 @@ TEST_F(ExposeDebugdataTest, MultipleSinks) {
 
   for (const auto& [sink, data_dir, file_name] : lookup_entries) {
     vfs::PseudoDir* lookup = nullptr;
-    ASSERT_EQ(sink_map[sink]->Lookup(data_dir, reinterpret_cast<vfs::internal::Node**>(&lookup)),
-              ZX_OK);
+    ASSERT_EQ(sink_map[sink]->Lookup(data_dir, reinterpret_cast<vfs::Node**>(&lookup)), ZX_OK);
     vfs::PseudoDir& out_dir = *lookup;
     ASSERT_FALSE(out_dir.IsEmpty());
 
-    vfs::internal::Node* node = nullptr;
+    vfs::Node* node = nullptr;
     ASSERT_EQ(out_dir.Lookup(file_name, &node), ZX_OK);
     ASSERT_NE(node, nullptr);
   }
@@ -217,7 +214,7 @@ void ValidatePublishedRequests(uint32_t svc_index, cpp20::span<PublishRequest> r
     ASSERT_NE(it, sink_map.end());
     auto& sink_root = *it->second;
 
-    vfs::internal::Node* lookup_node = nullptr;
+    vfs::Node* lookup_node = nullptr;
     ASSERT_EQ(sink_root.Lookup(path, &lookup_node), ZX_OK);
 
     auto* typed_dir = reinterpret_cast<vfs::PseudoDir*>(lookup_node);

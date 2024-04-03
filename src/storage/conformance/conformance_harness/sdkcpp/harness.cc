@@ -69,7 +69,7 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
       }
     }
 
-    // TODO(https://fxbug.dev/29393642): Support the new C++ bindings in the SDK VFS so that we can
+    // TODO(https://fxbug.dev/311176363): Support the new C++ bindings in the SDK VFS so that we can
     // use `fuchsia_io::OpenFlags` instead of the deprecated HLCPP `fuchsia::io::OpenFlags` type.
     fuchsia::io::OpenFlags flags = fuchsia::io::OpenFlags{static_cast<uint32_t>(request.flags())};
     ZX_ASSERT_MSG(dir->Serve(flags, request.directory_request().TakeChannel()) == ZX_OK,
@@ -96,7 +96,7 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
       case fio_test::DirectoryEntry::Tag::kRemoteDirectory: {
         fio_test::RemoteDirectory remote_directory = std::move(entry.remote_directory().value());
 
-        // TODO(https://fxbug.dev/29393642): Support the new C++ bindings in the SDK VFS so we can
+        // TODO(https://fxbug.dev/311176363): Support the new C++ bindings in the SDK VFS so we can
         // construct a `vfs::RemoteDir` using a `fidl::ClientEnd` directly.
         auto remote_dir_entry =
             std::make_unique<vfs::RemoteDir>(remote_directory.remote_client()->TakeChannel());
@@ -124,7 +124,7 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
         ZX_ASSERT_MSG(status == ZX_OK, "Failed to get VMO content size: %s",
                       zx_status_get_string(status));
         auto vmo_file_entry = std::make_unique<vfs::VmoFile>(std::move(vmo), size,
-                                                             vfs::VmoFile::WriteOption::WRITABLE);
+                                                             vfs::VmoFile::WriteMode::kWritable);
         ZX_ASSERT_MSG(dest.AddEntry(*vmo_file.name(), std::move(vmo_file_entry)) == ZX_OK,
                       "Failed to add VmoFile entry!");
         break;

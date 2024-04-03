@@ -14,8 +14,8 @@ sdk_source_set("cpp") {
 
   sources = [
     "composed_service_dir.h",
-    "internal/node.h",
     "lazy_dir.h",
+    "node.h",
     "pseudo_dir.h",
     "pseudo_file.h",
     "remote_dir.h",

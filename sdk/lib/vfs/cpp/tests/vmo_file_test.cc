@@ -44,13 +44,13 @@ class VmoFileTest : public ::gtest::RealLoopFixture {
     ASSERT_EQ(zx::vmo::create(kFileContents.size(), 0, &vmo), ZX_OK);
     ASSERT_EQ(vmo.write(kFileContents.data(), 0, kFileContents.size()), ZX_OK);
     auto writable_file = std::make_unique<vfs::VmoFile>(std::move(vmo), kFileContents.size(),
-                                                        vfs::VmoFile::WriteMode::WRITABLE);
+                                                        vfs::VmoFile::WriteMode::kWritable);
     ASSERT_EQ(root_->AddEntry("writable_file", std::move(writable_file)), ZX_OK);
 
     ASSERT_EQ(zx::vmo::create(kFileContents.size(), 0, &vmo), ZX_OK);
     ASSERT_EQ(vmo.write(kFileContents.data(), 0, kFileContents.size()), ZX_OK);
     auto read_only_file = std::make_unique<vfs::VmoFile>(std::move(vmo), kFileContents.size(),
-                                                         vfs::VmoFile::WriteMode::READ_ONLY);
+                                                         vfs::VmoFile::WriteMode::kReadOnly);
     ASSERT_EQ(root_->AddEntry("read_only_file", std::move(read_only_file)), ZX_OK);
 
     zx::channel root_server;

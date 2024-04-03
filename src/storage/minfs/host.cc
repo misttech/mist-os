@@ -491,7 +491,7 @@ DIR* emu_opendir(const char* name) {
 dirent* emu_readdir(DIR* dirp) {
   MinDir* dir = reinterpret_cast<MinDir*>(dirp);
   for (;;) {
-// TODO(b/293936429): Remove use of deprecated `vdirent_t` when transitioning ReadDir to Enumerate
+// TODO(b/293947862): Remove use of deprecated `vdirent_t` when transitioning ReadDir to Enumerate
 // as part of io2 migration.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"

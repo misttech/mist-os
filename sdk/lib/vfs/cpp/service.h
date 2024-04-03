@@ -8,18 +8,18 @@
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/fit/function.h>
-#include <lib/vfs/cpp/internal/node.h>
+#include <lib/vfs/cpp/node.h>
 
 namespace vfs {
 
 // A node which binds a channel to a service implementation when opened.
 //
 // This class is thread-safe.
-class Service final : public internal::Node {
+class Service final : public Node {
  public:
   // Handler callback which binds `channel` to a service instance.
   using Connector = fit::function<void(zx::channel channel, async_dispatcher_t* dispatcher)>;
-  explicit Service(Connector connector) : internal::Node(MakeService(std::move(connector))) {}
+  explicit Service(Connector connector) : Node(MakeService(std::move(connector))) {}
 
   template <typename Interface>
   explicit Service(fidl::InterfaceRequestHandler<Interface> handler)
@@ -28,7 +28,7 @@ class Service final : public internal::Node {
               handler(fidl::InterfaceRequest<Interface>(std::move(channel)));
             }) {}
 
-  using internal::Node::Serve;
+  using Node::Serve;
 
  private:
   static vfs_internal_node_t* MakeService(Connector connector) {

@@ -255,9 +255,6 @@ __EXPORT zx_status_t vfs_internal_remote_directory_create(zx_handle_t remote,
   if (!out_vnode) {
     return ZX_ERR_INVALID_ARGS;
   }
-  // TODO(https://fxbug.dev/293936429): We might have to relax this check, as RemoteDir should
-  // gracefully handle this case. The existing SDK VFS node constructors are infallible even when
-  // `remote` is invalid.
   if (remote == ZX_HANDLE_INVALID) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -292,9 +289,6 @@ __EXPORT zx_status_t vfs_internal_vmo_file_create(zx_handle_t vmo_handle, uint64
   if (!out_vnode) {
     return ZX_ERR_INVALID_ARGS;
   }
-  // TODO(https://fxbug.dev/293936429): We might have to relax this check, as VmoFile should
-  // gracefully handle this case. The existing SDK VFS node constructors are infallible even when
-  // `vmo` is invalid.
   if (vmo == ZX_HANDLE_INVALID) {
     return ZX_ERR_BAD_HANDLE;
   }

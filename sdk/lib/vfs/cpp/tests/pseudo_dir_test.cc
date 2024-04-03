@@ -62,19 +62,19 @@ TEST_F(PseudoDirTest, Lookup) {
   ASSERT_EQ(root()->Lookup("does_not_exist", nullptr), ZX_ERR_NOT_FOUND);
 
   // Both subdir_a and subdir_b should point to the same node.
-  vfs::internal::Node* subdir_a;
+  vfs::Node* subdir_a;
   ASSERT_EQ(root()->Lookup("subdir_a", &subdir_a), ZX_OK);
   ASSERT_EQ(subdir_a, subdir());
 
-  vfs::internal::Node* subdir_b;
+  vfs::Node* subdir_b;
   ASSERT_EQ(root()->Lookup("subdir_b", &subdir_b), ZX_OK);
   ASSERT_EQ(subdir_b, subdir());
 
-  vfs::internal::Node* unique_file;
+  vfs::Node* unique_file;
   ASSERT_EQ(subdir()->Lookup("unique_file", &unique_file), ZX_OK);
-  vfs::internal::Node* unique_file_a;
+  vfs::Node* unique_file_a;
   ASSERT_EQ(static_cast<vfs::PseudoDir*>(subdir_a)->Lookup("unique_file", &unique_file_a), ZX_OK);
-  vfs::internal::Node* unique_file_b;
+  vfs::Node* unique_file_b;
   ASSERT_EQ(static_cast<vfs::PseudoDir*>(subdir_b)->Lookup("unique_file", &unique_file_b), ZX_OK);
 
   // The entry for `unique_file` should be the same node in both sub directories.

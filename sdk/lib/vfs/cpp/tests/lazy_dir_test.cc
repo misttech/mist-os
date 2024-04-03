@@ -37,7 +37,7 @@ class TestLazyDir : public vfs::LazyDir {
   struct Entry {
     uint64_t id;
     uint32_t mode_type;
-    std::unique_ptr<vfs::internal::Node> node;
+    std::unique_ptr<vfs::Node> node;
   };
 
   using EntryMap = std::map<std::string_view, Entry, std::less<>>;

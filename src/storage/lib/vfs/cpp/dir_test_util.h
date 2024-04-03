@@ -31,7 +31,7 @@ class DirentChecker {
 
   void ExpectEntry(const char* name, uint32_t vtype) {
     ASSERT_NE(0u, remaining_);
-// TODO(b/293936429): Remove use of deprecated `vdirent_t` when transitioning ReadDir to Enumerate
+// TODO(b/293947862): Remove use of deprecated `vdirent_t` when transitioning ReadDir to Enumerate
 // as part of io2 migration.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"

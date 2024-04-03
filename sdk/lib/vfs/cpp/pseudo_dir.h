@@ -6,7 +6,7 @@
 #define LIB_VFS_CPP_PSEUDO_DIR_H_
 
 #include <fuchsia/io/cpp/fidl.h>
-#include <lib/vfs/cpp/internal/node.h>
+#include <lib/vfs/cpp/node.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
@@ -22,9 +22,9 @@ namespace vfs {
 // create, remove, or rename them.
 //
 // This class is thread-safe.
-class PseudoDir final : public internal::Node {
+class PseudoDir final : public Node {
  public:
-  PseudoDir() : internal::Node(CreateDirectory()) {}
+  PseudoDir() : Node(CreateDirectory()) {}
 
   ~PseudoDir() override {
     // We must close all connections to the nodes this directory owns before destroying them, since
@@ -32,7 +32,7 @@ class PseudoDir final : public internal::Node {
     vfs_internal_node_shutdown(handle_);
   }
 
-  using internal::Node::Serve;
+  using Node::Serve;
 
   // Adds a directory entry associating the given `name` with `vn`. The same node may be added
   // multiple times with different names. Returns `ZX_ERR_ALREADY_EXISTS` if there is already a node
@@ -113,8 +113,7 @@ class PseudoDir final : public internal::Node {
   // nodes added to this directory. `Lookup()` returns a `vfs::Node*` which callers downcast to the
   // concrete node type. The underlying `vfs_internal_node_t` type has no concept of the `vfs::Node`
   // type, so we must store them here to allow safe downcasting.
-  std::map<std::string, std::shared_ptr<internal::Node>, std::less<>> node_map_
-      __TA_GUARDED(mutex_);
+  std::map<std::string, std::shared_ptr<Node>, std::less<>> node_map_ __TA_GUARDED(mutex_);
 };
 }  // namespace vfs
 

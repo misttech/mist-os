@@ -51,7 +51,7 @@ bool FuchsiaDataSource::InitializeWithRealFiles(const std::vector<HackFilePath>&
     auto dir = root_dir_.get();
     for (size_t i = 0; i + 1 < segs.size(); ++i) {
       const auto& seg = segs[i];
-      vfs::internal::Node* subdir;
+      vfs::Node* subdir;
       if (ZX_OK != dir->Lookup(seg, &subdir)) {
         auto node = std::make_unique<vfs::PseudoDir>();
         subdir = node.get();

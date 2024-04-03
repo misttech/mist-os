@@ -22,7 +22,7 @@ vfs::PseudoDir* AddNewEmptyDirectory(vfs::PseudoDir* dir, std::string name) {
 }
 
 vfs::PseudoDir* GetOrCreateDirectory(vfs::PseudoDir* dir, std::string name) {
-  vfs::internal::Node* node;
+  vfs::Node* node;
   zx_status_t status = dir->Lookup(name, &node);
   if (status != ZX_OK) {
     return AddNewEmptyDirectory(dir, std::move(name));
@@ -101,7 +101,7 @@ zx_status_t OutgoingDirectory::AddNamedService(ServiceHandler handler, std::stri
 
 zx_status_t OutgoingDirectory::RemoveNamedService(const std::string& service,
                                                   const std::string& instance) const {
-  vfs::internal::Node* node;
+  vfs::Node* node;
   zx_status_t status = svc_->Lookup(instance, &node);
   if (status != ZX_OK) {
     return ZX_OK;

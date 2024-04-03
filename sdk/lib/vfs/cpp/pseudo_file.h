@@ -6,7 +6,7 @@
 #define LIB_VFS_CPP_PSEUDO_FILE_H_
 
 #include <lib/fit/function.h>
-#include <lib/vfs/cpp/internal/node.h>
+#include <lib/vfs/cpp/node.h>
 
 #include <vector>
 
@@ -30,7 +30,7 @@ namespace vfs {
 // the file.
 //
 // This class is thread-safe.
-class PseudoFile final : public internal::Node {
+class PseudoFile final : public Node {
  public:
   // Handler called to read from the pseudo-file.
   using ReadHandler = fit::function<zx_status_t(std::vector<uint8_t>* output, size_t max_bytes)>;
@@ -47,7 +47,7 @@ class PseudoFile final : public internal::Node {
                       WriteHandler write_handler = nullptr)
       : Node(MakePseudoFile(max_file_size, std::move(read_handler), std::move(write_handler))) {}
 
-  using internal::Node::Serve;
+  using Node::Serve;
 
  private:
   struct PseudoFileState {

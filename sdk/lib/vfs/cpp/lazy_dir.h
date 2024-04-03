@@ -5,7 +5,7 @@
 #ifndef LIB_VFS_CPP_LAZY_DIR_H_
 #define LIB_VFS_CPP_LAZY_DIR_H_
 
-#include <lib/vfs/cpp/internal/node.h>
+#include <lib/vfs/cpp/node.h>
 #include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -26,7 +26,7 @@ namespace vfs {
 // requirements.
 //
 // TODO(https://fxbug.dev/309685624): Remove LazyDir once all out-of-tree users have been migrated.
-class LazyDir : public vfs::internal::Node {
+class LazyDir : public vfs::Node {
  public:
   LazyDir() : Node(MakeLazyDir(this)) {}
 
