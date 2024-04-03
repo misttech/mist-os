@@ -102,6 +102,14 @@ config("semantic-interposition") {
   }
 }
 
+# On POSIX systems, a dlopen'd test module's DT_NEEDED dependencies will be
+# looked for in a search path.  Embedding DT_RUNPATH of $ORIGIN tells it to
+# look first in the directory containing the original dlopen'd module.
+config("runpath-origin") {
+  visibility = [ ":*" ]
+  ldflags = [ "-Wl,--enable-new-dtags,-rpath,\$ORIGIN" ]
+}
+
 template("_test_non_executable") {
   shlib_target_name = target_name
 
@@ -175,7 +183,12 @@ template("test_shared_library") {
 template("test_loadable_module") {
   _test_non_executable(target_name) {
     target_type = "loadable_module"
+    configs = []
     forward_variables_from(invoker, "*", [ "target_type" ])
+
+    # Make sure a system dlopen loading the module will look for its
+    # dependencies adjacent to it.
+    configs += [ ":runpath-origin" ]
   }
 }
 
@@ -199,6 +212,10 @@ template("test_executable") {
     target(target_type, executable_target + suffix) {
       visibility = [ ":*" ]
       testonly = true
+
+      if (is_linux) {
+        configs -= [ "//build/config/linux:implicit-host-libs" ]
+      }
 
       deps = []
       data_deps = []
@@ -316,6 +333,10 @@ foreach(in_process,
       # test_executable() is built, after variant selection.  So it gets the
       # right version of ld-startup installed where the test needs to find it.
       data_deps = [ "..:ld-startup.test-data($shlib_toolchain)" ]
+    } else if (!is_fuchsia) {
+      # Make sure a system dlopen loading the module will look for its
+      # dependencies adjacent to it.
+      public_configs += [ ":runpath-origin" ]
     }
   }
 }
