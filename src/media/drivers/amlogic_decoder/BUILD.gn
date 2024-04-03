@@ -195,6 +195,8 @@ if (target_cpu == "arm64") {
       "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",
       "//sdk/lib/fit",
       "//sdk/lib/fit-promise",
+      "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
+      "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
       "//src/devices/bus/lib/device-protocol-pdev",
       "//src/devices/lib/driver",
       "//src/devices/lib/mmio",

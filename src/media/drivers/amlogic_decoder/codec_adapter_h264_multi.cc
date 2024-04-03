@@ -17,6 +17,8 @@
 #include <mutex>
 #include <optional>
 
+#include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
+#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <src/lib/memory_barriers/memory_barriers.h>
 
@@ -167,7 +169,8 @@ bool CodecAdapterH264Multi::IsCoreCodecMappedBufferUseful(CodecPort port) {
     // they're possible.  However if is_secure true, we won't get a mapping and we don't really need
     // a mapping, other than for avcC.  If avcC shows up on input, we'll fail then.
     //
-    // TODO(https://fxbug.dev/42110593): Add the failure when avcC shows up when is_secure, as described above.
+    // TODO(https://fxbug.dev/42110593): Add the failure when avcC shows up when is_secure, as
+    // described above.
     return true;
   } else {
     ZX_DEBUG_ASSERT(port == kOutputPort);
@@ -190,11 +193,11 @@ void CodecAdapterH264Multi::CoreCodecInit(
 
 void CodecAdapterH264Multi::CoreCodecSetSecureMemoryMode(
     CodecPort port, fuchsia::mediacodec::SecureMemoryMode secure_memory_mode) {
-  // TODO(https://fxbug.dev/42116143): Ideally a codec list from the main CodecFactory would avoid reporting
-  // support for secure output or input when !is_tee_available(), which likely will mean reporting
-  // that in list from driver's local codec factory up to main factory.  The main CodecFactory could
-  // also avoid handing out a codec that can't do secure output / input when the TEE isn't
-  // available, so we wouldn't end up here.
+  // TODO(https://fxbug.dev/42116143): Ideally a codec list from the main CodecFactory would avoid
+  // reporting support for secure output or input when !is_tee_available(), which likely will mean
+  // reporting that in list from driver's local codec factory up to main factory.  The main
+  // CodecFactory could also avoid handing out a codec that can't do secure output / input when the
+  // TEE isn't available, so we wouldn't end up here.
   if (secure_memory_mode != fuchsia::mediacodec::SecureMemoryMode::OFF &&
       !video_->is_tee_available()) {
     events_->onCoreCodecFailCodec(
@@ -552,11 +555,11 @@ CodecAdapterH264Multi::CoreCodecBuildNewOutputConstraints(
   return config;
 }
 
-fuchsia::sysmem::BufferCollectionConstraints
-CodecAdapterH264Multi::CoreCodecGetBufferCollectionConstraints(
+fuchsia_sysmem2::BufferCollectionConstraints
+CodecAdapterH264Multi::CoreCodecGetBufferCollectionConstraints2(
     CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
     const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
-  fuchsia::sysmem::BufferCollectionConstraints result;
+  fuchsia_sysmem2::BufferCollectionConstraints result;
 
   // The CodecImpl won't hand us the sysmem token, so we shouldn't expect to
   // have the token here.
@@ -572,15 +575,15 @@ CodecAdapterH264Multi::CoreCodecGetBufferCollectionConstraints(
   ZX_DEBUG_ASSERT(min_buffer_count_[port] != 0);
   ZX_DEBUG_ASSERT(max_buffer_count_[port] != 0);
 
-  result.min_buffer_count_for_camping = min_buffer_count_[port];
+  result.min_buffer_count_for_camping() = min_buffer_count_[port];
 
   // Some slack is nice overall, but avoid having each participant ask for
   // dedicated slack.  Using sysmem the client will ask for it's own buffers for
   // camping and any slack, so the codec doesn't need to ask for any extra on
   // behalf of the client.
-  ZX_DEBUG_ASSERT(result.min_buffer_count_for_dedicated_slack == 0);
-  ZX_DEBUG_ASSERT(result.min_buffer_count_for_shared_slack == 0);
-  result.max_buffer_count = max_buffer_count_[port];
+  ZX_DEBUG_ASSERT(!result.min_buffer_count_for_dedicated_slack().has_value());
+  ZX_DEBUG_ASSERT(!result.min_buffer_count_for_shared_slack().has_value());
+  result.max_buffer_count() = max_buffer_count_[port];
 
   uint32_t per_packet_buffer_bytes_min;
   uint32_t per_packet_buffer_bytes_max;
@@ -598,51 +601,49 @@ CodecAdapterH264Multi::CoreCodecGetBufferCollectionConstraints(
     per_packet_buffer_bytes_max = 0xFFFFFFFF;
   }
 
-  result.has_buffer_memory_constraints = true;
-  result.buffer_memory_constraints.min_size_bytes = per_packet_buffer_bytes_min;
-  result.buffer_memory_constraints.max_size_bytes = per_packet_buffer_bytes_max;
+  auto& bmc = result.buffer_memory_constraints().emplace();
+  bmc.min_size_bytes() = per_packet_buffer_bytes_min;
+  bmc.max_size_bytes() = per_packet_buffer_bytes_max;
   // amlogic requires physically contiguous on both input and output
-  result.buffer_memory_constraints.physically_contiguous_required = true;
-  result.buffer_memory_constraints.secure_required = IsPortSecureRequired(port);
-  result.buffer_memory_constraints.cpu_domain_supported = !IsPortSecureRequired(port);
-  result.buffer_memory_constraints.ram_domain_supported =
-      !IsPortSecureRequired(port) && (port == kOutputPort);
+  bmc.physically_contiguous_required() = true;
+  bmc.secure_required() = IsPortSecureRequired(port);
+  bmc.cpu_domain_supported() = !IsPortSecureRequired(port);
+  bmc.ram_domain_supported() = !IsPortSecureRequired(port) && (port == kOutputPort);
+
+  bmc.permitted_heaps().emplace();
 
   if (IsPortSecurePermitted(port)) {
-    result.buffer_memory_constraints.inaccessible_domain_supported = true;
-    fuchsia::sysmem::HeapType secure_heap = (port == kInputPort)
-                                                ? fuchsia::sysmem::HeapType::AMLOGIC_SECURE_VDEC
-                                                : fuchsia::sysmem::HeapType::AMLOGIC_SECURE;
-    result.buffer_memory_constraints
-        .heap_permitted[result.buffer_memory_constraints.heap_permitted_count++] = secure_heap;
+    bmc.inaccessible_domain_supported() = true;
+    std::string secure_heap = (port == kInputPort)
+                                  ? bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC
+                                  : bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE;
+
+    fuchsia_sysmem2::Heap heap;
+    heap.heap_type() = std::move(secure_heap);
+    bmc.permitted_heaps()->emplace_back(std::move(heap));
   }
 
   if (!IsPortSecureRequired(port)) {
-    result.buffer_memory_constraints
-        .heap_permitted[result.buffer_memory_constraints.heap_permitted_count++] =
-        fuchsia::sysmem::HeapType::SYSTEM_RAM;
+    fuchsia_sysmem2::Heap heap;
+    heap.heap_type() = bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM;
+    bmc.permitted_heaps()->emplace_back(std::move(heap));
   }
 
   if (port == kOutputPort) {
-    result.image_format_constraints_count = 1;
-    fuchsia::sysmem::ImageFormatConstraints& image_constraints = result.image_format_constraints[0];
-    image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::NV12;
-    image_constraints.pixel_format.has_format_modifier = true;
-    image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
+    auto& image_constraints = result.image_format_constraints().emplace().emplace_back();
+    image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
+    image_constraints.pixel_format_modifier() = fuchsia_images2::PixelFormatModifier::kLinear;
     // TODO(https://fxbug.dev/42084950): confirm that REC709 is always what we want here, or plumb
     // actual YUV color space if it can ever be REC601_*.  Since 2020 and 2100
     // are minimum 10 bits per Y sample and we're outputting NV12, 601 is the
     // only other potential possibility here.
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::REC709;
+    image_constraints.color_spaces() = {fuchsia_images2::ColorSpace::kRec709};
 
     // The non-"required_" fields indicate the decoder's ability to potentially
     // output frames at various dimensions as coded in the stream.  Aside from
     // the current stream being somewhere in these bounds, these have nothing to
     // do with the current stream in particular.
-    image_constraints.min_coded_width = 16;
-    image_constraints.max_coded_width = 4096;
-    image_constraints.min_coded_height = 16;
+    image_constraints.min_size() = {16, 16};
     // This intentionally isn't the _height_ of a 4096x2176 frame, it's
     // intentionally the _width_ of a 4096x2176 frame assigned to
     // max_coded_height.
@@ -652,24 +653,21 @@ CodecAdapterH264Multi::CoreCodecGetBufferCollectionConstraints(
     // While the HW might be able to go bigger than that as long as the other
     // dimension is smaller to compensate, we don't really need to enable any
     // larger than 4096x2176's width in either dimension, so we don't.
-    image_constraints.max_coded_height = 4096;
-    image_constraints.min_bytes_per_row = 16;
+    image_constraints.max_size() = {4096, 4096};
+    image_constraints.min_bytes_per_row() = 16;
     // no hard-coded max stride, at least for now
-    image_constraints.max_bytes_per_row = 0xFFFFFFFF;
-    image_constraints.max_coded_width_times_coded_height = 4096 * 2176;
-    image_constraints.layers = 1;
-    image_constraints.coded_width_divisor = 16;
-    image_constraints.coded_height_divisor = 16;
-    image_constraints.bytes_per_row_divisor = H264MultiDecoder::kStrideAlignment;
+    image_constraints.max_bytes_per_row() = 0xFFFFFFFF;
+    image_constraints.max_width_times_height() = 4096 * 2176;
+    image_constraints.size_alignment() = {16, 16};
+    image_constraints.bytes_per_row_divisor() = H264MultiDecoder::kStrideAlignment;
     // Even though we only ever output at offset 0, sysmem defaults start_offset_divisor to the
     // image format alignment which is 2 for NV12. Since we are a producer, we should fully specify
     // here so late attach clients don't have to specify it explicitly.
-    image_constraints.start_offset_divisor = 2;
+    image_constraints.start_offset_divisor() = 2;
     // Odd display dimensions are permitted, but these don't imply odd NV12
     // dimensions - those are constrainted by coded_width_divisor and
     // coded_height_divisor which are both 16.
-    image_constraints.display_width_divisor = 1;
-    image_constraints.display_height_divisor = 1;
+    image_constraints.display_rect_alignment() = {1, 1};
 
     // The decoder is producing frames and the decoder has no choice but to
     // produce frames at their coded size.  The decoder wants to potentially be
@@ -682,33 +680,35 @@ CodecAdapterH264Multi::CoreCodecGetBufferCollectionConstraints(
     // larger range of dimensions that includes the required range indicated
     // here (via a-priori knowledge of the potential stream dimensions), an
     // initiator is free to do so.
-    image_constraints.required_min_coded_width = width_;
-    image_constraints.required_max_coded_width = width_;
-    image_constraints.required_min_coded_height = height_;
-    image_constraints.required_max_coded_height = height_;
+    image_constraints.required_min_size() = {width_, height_};
+    image_constraints.required_max_size() = {width_, height_};
   } else {
-    ZX_DEBUG_ASSERT(result.image_format_constraints_count == 0);
+    ZX_DEBUG_ASSERT(!result.image_format_constraints().has_value());
   }
 
   // We don't have to fill out usage - CodecImpl takes care of that.
-  ZX_DEBUG_ASSERT(!result.usage.cpu);
-  ZX_DEBUG_ASSERT(!result.usage.display);
-  ZX_DEBUG_ASSERT(!result.usage.vulkan);
-  ZX_DEBUG_ASSERT(!result.usage.video);
+  ZX_DEBUG_ASSERT(!result.usage().has_value());
 
   return result;
 }
 
 void CodecAdapterH264Multi::CoreCodecSetBufferCollectionInfo(
-    CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) {
-  ZX_DEBUG_ASSERT(buffer_collection_info.settings.buffer_settings.is_physically_contiguous);
+    CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
+  ZX_DEBUG_ASSERT(
+      *buffer_collection_info.settings()->buffer_settings()->is_physically_contiguous());
   if (port == kOutputPort) {
-    ZX_DEBUG_ASSERT(buffer_collection_info.settings.has_image_format_constraints);
-    ZX_DEBUG_ASSERT(buffer_collection_info.settings.image_format_constraints.pixel_format.type ==
-                    fuchsia::sysmem::PixelFormatType::NV12);
-    output_buffer_collection_info_ = fidl::Clone(buffer_collection_info);
+    ZX_DEBUG_ASSERT(buffer_collection_info.settings()->image_format_constraints().has_value());
+    ZX_DEBUG_ASSERT(
+        *buffer_collection_info.settings()->image_format_constraints()->pixel_format() ==
+        fuchsia_images2::PixelFormat::kNv12);
+    auto info_clone_result =
+        sysmem::V2CloneBufferCollectionInfo(buffer_collection_info, ZX_RIGHT_SAME_RIGHTS);
+    // failure to duplicate handles is treated similarly to OOM; fatal to this process
+    ZX_ASSERT(info_clone_result.is_ok());
+    output_buffer_collection_info_ = info_clone_result.take_value();
   }
-  buffer_settings_[port].emplace(buffer_collection_info.settings);
+  // clone / copy
+  buffer_settings_[port] = *buffer_collection_info.settings();
   ZX_DEBUG_ASSERT(IsPortSecure(port) || !IsPortSecureRequired(port));
   ZX_DEBUG_ASSERT(!IsPortSecure(port) || IsPortSecurePermitted(port));
   // TODO(dustingreen): Remove after secure video decode works e2e.
@@ -828,9 +828,9 @@ void CodecAdapterH264Multi::MidStreamOutputBufferConfigInternal(bool did_realloc
     }
     width = width_;
     height = height_;
-    stride = fbl::round_up(
-        width,
-        output_buffer_collection_info_->settings.image_format_constraints.bytes_per_row_divisor);
+    stride = fbl::round_up(width, *output_buffer_collection_info_->settings()
+                                       ->image_format_constraints()
+                                       ->bytes_per_row_divisor());
   }  // ~lock
 
   auto resource_init_function =
@@ -1346,86 +1346,90 @@ bool CodecAdapterH264Multi::IsCurrentOutputBufferCollectionUsable(
     LOG(DEBUG, "!output_buffer_collection_info_");
     return false;
   }
-  fuchsia::sysmem::BufferCollectionInfo_2& info = output_buffer_collection_info_.value();
-  ZX_DEBUG_ASSERT(info.settings.has_image_format_constraints);
-  if (min_frame_count > info.buffer_count) {
-    LOG(DEBUG, "min_frame_count > info.buffer_count");
+  fuchsia_sysmem2::BufferCollectionInfo& info = output_buffer_collection_info_.value();
+  ZX_DEBUG_ASSERT(info.settings()->image_format_constraints().has_value());
+  if (min_frame_count > info.buffers()->size()) {
+    LOG(DEBUG, "min_frame_count > info.buffers().size()");
     return false;
   }
   if (min_frame_count > min_buffer_count_[kOutputPort]) {
     LOG(DEBUG, "min_frame_count > min_buffer_count_[kOutputPort]");
     return false;
   }
-  if (info.buffer_count > max_frame_count) {
+  if (info.buffers()->size() > max_frame_count) {
     // The h264_multi_decoder.cc won't exercise this path since the max is always the same, and we
     // won't have allocated a collection with more than max_buffer_count.
     LOG(DEBUG, "info.buffer_count > max_frame_count");
     return false;
   }
-  if (stride * coded_height * 3 / 2 > info.settings.buffer_settings.size_bytes) {
+  if (stride * coded_height * 3 / 2 > *info.settings()->buffer_settings()->size_bytes()) {
     LOG(DEBUG, "stride * coded_height * 3 / 2 > info.settings.buffer_settings.size_bytes");
     return false;
   }
-  if (display_width % info.settings.image_format_constraints.display_width_divisor != 0) {
+  if (display_width %
+          info.settings()->image_format_constraints()->display_rect_alignment()->width() !=
+      0) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG,
         "display_width %% info.settings.image_format_constraints.display_width_divisor != 0");
     return false;
   }
-  if (display_height % info.settings.image_format_constraints.display_height_divisor != 0) {
+  if (display_height %
+          info.settings()->image_format_constraints()->display_rect_alignment()->height() !=
+      0) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG,
         "display_height %% info.settings.image_format_constraints.display_height_divisor != 0");
     return false;
   }
   if (coded_width * coded_height >
-      info.settings.image_format_constraints.max_coded_width_times_coded_height) {
+      *info.settings()->image_format_constraints()->max_width_times_height()) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG, "coded_width * coded_height > max_coded_width_times_coded_height");
     return false;
   }
 
-  if (coded_width < info.settings.image_format_constraints.min_coded_width) {
+  if (coded_width < info.settings()->image_format_constraints()->min_size()->width()) {
     LOG(DEBUG,
         "coded_width < info.settings.image_format_constraints.min_coded_width -- "
         "coded_width: %d min_coded_width: %d",
-        coded_width, info.settings.image_format_constraints.min_coded_width);
+        coded_width, info.settings()->image_format_constraints()->min_size()->width());
     return false;
   }
-  if (coded_width > info.settings.image_format_constraints.max_coded_width) {
+  if (coded_width > info.settings()->image_format_constraints()->max_size()->width()) {
     LOG(DEBUG, "coded_width > info.settings.image_format_constraints.max_coded_width");
     return false;
   }
-  if (coded_width % info.settings.image_format_constraints.coded_width_divisor != 0) {
+  if (coded_width % info.settings()->image_format_constraints()->size_alignment()->width() != 0) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG, "coded_width %% info.settings.image_format_constraints.coded_width_divisor != 0");
     return false;
   }
-  if (coded_height < info.settings.image_format_constraints.min_coded_height) {
+  if (coded_height < info.settings()->image_format_constraints()->min_size()->height()) {
     LOG(DEBUG, "coded_height < info.settings.image_format_constraints.min_coded_height");
     return false;
   }
-  if (coded_height > info.settings.image_format_constraints.max_coded_height) {
+  if (coded_height > info.settings()->image_format_constraints()->max_size()->height()) {
     LOG(DEBUG, "coded_height > info.settings.image_format_constraints.max_coded_height");
     return false;
   }
-  if (coded_height % info.settings.image_format_constraints.coded_height_divisor != 0) {
+  if (coded_height % info.settings()->image_format_constraints()->size_alignment()->height() != 0) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG, "coded_height %% info.settings.image_format_constraints.coded_height_divisor != 0");
     return false;
   }
-  if (stride < info.settings.image_format_constraints.min_bytes_per_row) {
+  if (stride < *info.settings()->image_format_constraints()->min_bytes_per_row()) {
     LOG(DEBUG,
         "stride < info.settings.image_format_constraints.min_bytes_per_row -- stride: %d "
         "min_bytes_per_row: %d",
-        stride, info.settings.image_format_constraints.min_bytes_per_row);
+        stride, *info.settings()->image_format_constraints()->min_bytes_per_row());
     return false;
   }
-  if (stride > info.settings.image_format_constraints.max_bytes_per_row) {
+  if (stride > *info.settings()->image_format_constraints()->max_bytes_per_row()) {
     LOG(DEBUG, "stride > info.settings.image_format_constraints.max_bytes_per_row");
     return false;
   }
-  if (stride % info.settings.image_format_constraints.bytes_per_row_divisor != 0) {
+  if (stride % *info.settings()->image_format_constraints()->bytes_per_row_divisor() != 0) {
     // Let it probably fail later when trying to re-negotiate buffers.
     LOG(DEBUG, "stride %% info.settings.image_format_constraints.bytes_per_row_divisor != 0");
     return false;
@@ -1544,7 +1548,7 @@ bool CodecAdapterH264Multi::IsPortSecurePermitted(CodecPort port) {
 
 bool CodecAdapterH264Multi::IsPortSecure(CodecPort port) {
   ZX_DEBUG_ASSERT(buffer_settings_[port]);
-  return buffer_settings_[port]->buffer_settings.is_secure;
+  return *buffer_settings_[port]->buffer_settings()->is_secure();
 }
 
 bool CodecAdapterH264Multi::IsOutputSecure() {

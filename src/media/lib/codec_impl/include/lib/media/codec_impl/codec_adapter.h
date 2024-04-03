@@ -206,7 +206,12 @@ class CodecAdapter {
   // the other overload below instead.
   virtual fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
-      const fuchsia::media::StreamBufferPartialSettings& partial_settings) = 0;
+      const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
+    // CoreCodecGetBufferCollectionConstraints is deprecated, so we don't want to require any
+    // subclass to override this method. This method won't get called unless the subclass doesn't
+    // override CoreCodecGetBufferCollectionConstraints2 or CoreCodecGetBufferCollectionConstraints.
+    ZX_PANIC("sub-class should override CoreCodecGetBufferCollectionConstraints2");
+  }
   // This default implementation will go away once all client code is overriding this overload and
   // the above overload can also go away.
   virtual fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
@@ -239,7 +244,13 @@ class CodecAdapter {
   // override of the other method (that doesn't call this method, unlike the
   // default implementation of the other method).
   virtual void CoreCodecSetBufferCollectionInfo(
-      CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) = 0;
+      CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) {
+    // CoreCodecSetBufferCollectionInfo(sysmem1) is deprecated, so we don't want to require any
+    // subclass to override this method. This method won't get called unless the subclass doesn't
+    // override CoreCodecSetBufferCollectionInfo(sysmem2) or
+    // CoreCodecSetBufferCollectionInfo(sysmem1).
+    ZX_PANIC("sub-class should override CoreCodecSetBufferCollectionInfo(fuchsia_sysmem2)");
+  }
   // This implementation will go away after clients have all overridden this
   // virtual method.
   virtual void CoreCodecSetBufferCollectionInfo(
