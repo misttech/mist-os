@@ -46,6 +46,7 @@ rustc_library("ebpf") {
 
   inputs = [
     "src/test_grammar.pest",
+    "src/tests/err-write-r10.data",
     "//third_party/ubpf/src/tests/add64.data",
     "//third_party/ubpf/src/tests/add.data",
     "//third_party/ubpf/src/tests/alu64-arith.data",
