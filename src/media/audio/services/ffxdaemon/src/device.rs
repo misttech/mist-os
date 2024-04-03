@@ -6,7 +6,6 @@ use crate::{
     error::ControllerError,
     ring_buffer::{HardwareRingBuffer, RingBuffer},
     wav_socket::WavSocket,
-    SECONDS_PER_NANOSECOND,
 };
 use anyhow::{anyhow, Context, Error};
 use async_trait::async_trait;
@@ -20,8 +19,13 @@ use fuchsia_audio::{device_id_for_path, path_for_selector, stop_listener, Format
 use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_zircon::{self as zx};
 use futures::{AsyncWriteExt, StreamExt};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
-// TODO(b/317991807) Remove #[async_trait] when supported by compiler.
+// TODO(https://fxbug.dev/332322792): Replace with an integer conversion.
+const SECONDS_PER_NANOSECOND: f64 = 1.0 / 10_u64.pow(9) as f64;
+
+// TODO(https://fxbug.dev/317991807): Remove #[async_trait] when supported by compiler.
 #[async_trait]
 pub trait DeviceControl: Send + Sync {
     async fn get_properties(&mut self) -> Result<Properties, Error>;
@@ -149,10 +153,10 @@ fn validate_format(
     match supported_formats {
         Formats::Composite { stream: _stream, dai: _dai } => {
             // TODO(b/310275209) Implement record for composite device type.
-            return Err(ControllerError::new(
+            Err(ControllerError::new(
                 fac::Error::NotSupported,
                 format!("Playing to composite drivers not yet supported."),
-            ));
+            ))
         }
         Formats::StreamConfig(stream_config_formats) => {
             if !requested_format.is_supported_by(&stream_config_formats) {
@@ -257,9 +261,8 @@ impl Device {
 
     pub async fn play(
         &mut self,
-        data_socket: fasync::Socket,
-    ) -> Result<fac::PlayerPlayResponse, Error> {
-        let mut socket = WavSocket(data_socket);
+        mut socket: WavSocket,
+    ) -> Result<fac::PlayerPlayResponse, ControllerError> {
         let spec = socket.read_header().await?;
         let format = Format::from(&spec);
 
@@ -289,7 +292,8 @@ impl Device {
             consumer + producer bytes: {}",
                 bytes_in_rb,
                 consumer_bytes + bytes_per_wakeup_interval
-            ));
+            )
+            .into());
         }
 
         let t_zero = ring_buffer.start().await?;
@@ -394,7 +398,10 @@ impl Device {
                 silenced_frames += partial_silence_bytes / format.bytes_per_frame() as u64;
             }
 
-            ring_buffer.vmo_buffer().write_to_frame(last_frame_written, &buf)?;
+            ring_buffer
+                .vmo_buffer()
+                .write_to_frame(last_frame_written, &buf)
+                .context("Failed to write to buffer")?;
             last_frame_written += new_frames_available_to_write;
 
             // We want entire ring buffer to be silenced.
@@ -416,12 +423,10 @@ impl Device {
     pub async fn record(
         &mut self,
         format: Format,
-        data_socket: fasync::Socket,
-        duration: Option<std::time::Duration>,
+        mut socket: WavSocket,
+        duration: Option<Duration>,
         cancel_server: Option<ServerEnd<fac::RecordCancelerMarker>>,
     ) -> Result<fac::RecorderRecordResponse, ControllerError> {
-        let mut socket = WavSocket(data_socket);
-
         let supported_formats = self.device_controller.get_supported_formats().await?;
         validate_format(&format, supported_formats)?;
 
@@ -464,7 +469,7 @@ impl Device {
 
         let mut timer = fuchsia_async::Interval::new(wakeup_interval);
         let mut buf = vec![format.silence_value(); bytes_per_wakeup_interval as usize];
-        let stop_signal = std::sync::atomic::AtomicBool::new(false);
+        let stop_signal = AtomicBool::new(false);
 
         socket.write_header(duration, &format).await?;
         let packet_fut = async {
@@ -475,7 +480,7 @@ impl Device {
                 // Ring buffer pointer should be ahead of last byte read.
                 let now = zx::Time::get_monotonic();
 
-                if stop_signal.load(std::sync::atomic::Ordering::SeqCst) {
+                if stop_signal.load(Ordering::SeqCst) {
                     break;
                 }
 
