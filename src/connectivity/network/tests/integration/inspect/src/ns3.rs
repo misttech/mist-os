@@ -660,6 +660,7 @@ async fn inspect_counters(name: &str) {
             "TCP": {
                 "V4": {
                     PassiveConnectionOpenings: 0u64,
+                    ActiveConnectionOpenings: 0u64,
                     "Rx": {
                         ValidSegmentsReceived: 0u64,
                         ReceivedSegmentsDispatched: 0u64,
@@ -676,11 +677,17 @@ async fn inspect_counters(name: &str) {
                         SegmentsSent: 0u64,
                         "Errors": {
                             SegmentSendErrors: 0u64,
+                            ActiveOpenNoRouteErrors: 0u64,
                         }
                     },
+                    "Errors": {
+                        FailedConnectionOpenings: 0u64,
+                        FailedPortReservations: 0u64,
+                    }
                 },
                 "V6": {
                     PassiveConnectionOpenings: 0u64,
+                    ActiveConnectionOpenings: 0u64,
                     "Rx": {
                         ValidSegmentsReceived: 0u64,
                         ReceivedSegmentsDispatched: 0u64,
@@ -697,8 +704,13 @@ async fn inspect_counters(name: &str) {
                         SegmentsSent: 0u64,
                         "Errors": {
                             SegmentSendErrors: 0u64,
+                            ActiveOpenNoRouteErrors: 0u64,
                         }
                     },
+                    "Errors": {
+                        FailedConnectionOpenings: 0u64,
+                        FailedPortReservations: 0u64,
+                    }
                 },
             },
         }

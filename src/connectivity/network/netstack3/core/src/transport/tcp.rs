@@ -365,6 +365,8 @@ pub type TcpCounters<I> = IpMarked<I, TcpCountersInner>;
 
 /// The IP agnostic version of [`TcpCounters`].
 #[derive(Default)]
+// TODO(https://fxbug.dev/42052878): Add counters for SYN cookies.
+// TODO(https://fxbug.dev/42078221): Add counters for SACK.
 pub struct TcpCountersInner {
     /// Count of received IP packets that were dropped because they had
     /// unexpected IP addresses (either src or dst).
@@ -395,6 +397,16 @@ pub struct TcpCountersInner {
     pub passive_open_no_route_errors: Counter,
     /// Count of passive connections that have been opened.
     pub passive_connection_openings: Counter,
+    /// Count of active open attempts that have failed because the stack doesn't
+    /// have a route to the peer.
+    pub active_open_no_route_errors: Counter,
+    /// Count of active connections that have been opened.
+    pub active_connection_openings: Counter,
+    /// Count of all failed connection attempts, including both passive and
+    /// active opens.
+    pub failed_connection_attempts: Counter,
+    /// Count of port reservation attempts that failed.
+    pub failed_port_reservations: Counter,
     // TODO(https://fxbug.dev/42052879): Add additional counters to achieve
     // parity with Netstack2.
 }

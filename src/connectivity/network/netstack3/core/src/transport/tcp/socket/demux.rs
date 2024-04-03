@@ -861,6 +861,7 @@ where
     // reused connection in the accept queue so we have to respect its limit.
     if accept_queue.len() == backlog.get() {
         core_ctx.increment(|counters| &counters.listener_queue_overflow);
+        core_ctx.increment(|counters| &counters.failed_connection_attempts);
         debug!("incoming SYN dropped because of the full backlog of the listener");
         return ListenerIncomingSegmentDisposition::FoundSocket;
     }
@@ -886,6 +887,7 @@ where
         Ok(ip_sock) => ip_sock,
         err @ Err((IpSockCreationError::Route(_), DefaultSendOptions)) => {
             core_ctx.increment(|counters| &counters.passive_open_no_route_errors);
+            core_ctx.increment(|counters| &counters.failed_connection_attempts);
             debug!("cannot construct an ip socket to the SYN originator: {:?}, ignoring", err);
             return ListenerIncomingSegmentDisposition::NoMatchingSocket;
         }
@@ -903,6 +905,7 @@ where
             // there isn't much we can do here since sending a RST back is
             // impossible, we just need to silent drop the segment.
             error!("Cannot find a device with large enough MTU for the connection");
+            core_ctx.increment(|counters| &counters.failed_connection_attempts);
             match err {
                 MmsError::NoDevice(_) | MmsError::MTUTooSmall(_) => {
                     return ListenerIncomingSegmentDisposition::FoundSocket;
@@ -1026,6 +1029,7 @@ where
             None => {
                 // We didn't create a new connection, short circuit early and
                 // don't send out the pending segment.
+                core_ctx.increment(|counters| &counters.failed_connection_attempts);
                 return ListenerIncomingSegmentDisposition::ConflictingConnection;
             }
         }
