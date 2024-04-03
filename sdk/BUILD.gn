@@ -798,6 +798,7 @@ if (is_host) {
 copy("idk_build_tools") {
   visibility += [
     "//build/*",
+    "//sdk/firmware:*",
     "//vendor/*",
   ]
 
@@ -843,55 +844,6 @@ copy("idk_build_tools") {
     "//tools/fidl/fidlgen_rust($host_toolchain)",
     "//tools/fidl/measure-tape/src:measure-tape($host_toolchain)",
     "//zircon/tools/zither($host_toolchain)",
-  ]
-}
-
-# Firmware IDK. See //src/firmware/README.md
-group("firmware") {
-  visibility += [ "//build/input:build_only" ]
-  deps = [
-    ":firmware.archive",
-    ":firmware.exported",
-    ":firmware_manifest_golden",
-  ]
-}
-
-idk("firmware.exported") {
-  output_name = "firmware"
-  sdk_collection_label = ":firmware_collection"
-  target_cpus = idk_target_cpus
-
-  # TODO(https://fxbug.dev/331991540): Define how the Firmware SDK is versioned.
-  api_levels = []
-}
-
-idk_archive("firmware.archive") {
-  idk = ":firmware.exported"
-  idk_output_name = "firmware"
-}
-
-sdk_final_manifest_golden("firmware_manifest_golden") {
-  golden = "manifests/firmware.manifest"
-  idk_name = "firmware"
-  idk_exported_label = ":firmware.exported"
-}
-
-sdk_collection("firmware_collection") {
-  visibility += [ "*" ]
-
-  # The "Firmware SDK" is unrelated to the Fuchsia SDK but uses the same GN templates and thus must
-  # set a category. See https://fxbug.dev/331962496.
-  category = "excluded"
-
-  deps = [
-    "//sdk/docs:firmware",
-    "//sdk/lib/zbi-format:zbi-format_sdk",
-    "//src/firmware/lib/abr:abr_sdk",
-    "//src/firmware/lib/storage:storage_sdk",
-    "//src/firmware/lib/zbi:zbi_sdk",
-    "//src/firmware/lib/zircon_boot:zircon_boot_sdk",
-    "//third_party/android/platform/external/avb:avb_sdk",
-    "//zircon/public/sysroot/sdk:sysroot_sdk",
   ]
 }
 

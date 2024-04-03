@@ -65,7 +65,10 @@ group("non_hermetic_deps") {
   visibility += [ "//sdk:cts_generate" ]
 
   # See: https://fxbug.dev/42121352
-  visibility += [ "//sdk:*" ]
+  visibility += [
+    "//sdk:*",
+    "//sdk/firmware:*",
+  ]
 
   # TODO(https://fxbug.dev/42174306): Remove entries when
   # assembly and board input bundle creation no longer triggers false-positives
