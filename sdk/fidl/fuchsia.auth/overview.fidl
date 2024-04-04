@@ -5,6 +5,5 @@
         added=7,
         deprecated=10,
         removed=11,
-        legacy=true,
         note="Fuchsia platform no longer supports service provider authentication")
 library fuchsia.auth;

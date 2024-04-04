@@ -14,7 +14,7 @@ type Expose = flexible union {
     3: directory ExposeDirectory;
     4: runner ExposeRunner;
     5: resolver ExposeResolver;
-    @available(removed=13, legacy=true)
+    @available(removed=13)
     6: event_stream ExposeEventStream;
     @available(added=HEAD)
     7: dictionary ExposeDictionary;
@@ -214,7 +214,7 @@ type ExposeResolver = table {
 
 /// Declares an event stream exposed to a component's containing realm, such as
 /// an event stream exposed by the component or one of its children at runtime.
-@available(removed=13, legacy=true)
+@available(removed=13)
 type ExposeEventStream = table {
     /// (Required) The provider of the capability relative to the component
     /// itself. Must be `child`, or `framework`.

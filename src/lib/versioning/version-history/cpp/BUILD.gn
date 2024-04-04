@@ -45,9 +45,5 @@
 #    `config` argument.
 # 6. Mark the bug from step (1) as fixed.
 config("level_retirement_macros") {
-  defines = [
-    # TODO(https://fxbug.dev/331643735): Remove this once 12 and 14 are retired.
-    "FUCHSIA_API_LEVEL_12_STILL_SUPPORTED",
-    "FUCHSIA_API_LEVEL_14_STILL_SUPPORTED",
-  ]
+  defines = []
 }

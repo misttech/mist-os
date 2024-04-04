@@ -69,8 +69,6 @@ class FakeAudio : public fuchsia::media::Audio {
                            bool loopback) override {
     FX_NOTIMPLEMENTED();
   }
-  void SetSystemMute(bool muted) override { FX_NOTIMPLEMENTED(); }
-  void SetSystemGain(float gain_db) override { FX_NOTIMPLEMENTED(); }
 
   // Prevents warmup from completing until |ChangeMinLeadTime| is called with a non-zero
   // duration.

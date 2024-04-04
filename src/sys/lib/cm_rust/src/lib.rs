@@ -1905,16 +1905,9 @@ fidl_translations_from_into!(cm_types::AllowedOffers, fdecl::AllowedOffers);
 pub enum DependencyType {
     Strong,
     Weak,
-    WeakForMigration,
 }
 
-fidl_translations_symmetrical_enums!(
-    fdecl::DependencyType,
-    DependencyType,
-    Strong,
-    Weak,
-    WeakForMigration
-);
+fidl_translations_symmetrical_enums!(fdecl::DependencyType, DependencyType, Strong, Weak);
 
 impl UseDecl {
     pub fn path(&self) -> Option<&Path> {

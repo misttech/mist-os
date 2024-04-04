@@ -4,7 +4,7 @@
 library fuchsia.ui.policy;
 
 /// Describes the intended usage ofthe display.
-@available(deprecated=13, removed=14, legacy=true)
+@available(deprecated=13, removed=14)
 type DisplayUsage = strict enum {
     kUnknown = 0;
     /// Display is held in one or both hands.

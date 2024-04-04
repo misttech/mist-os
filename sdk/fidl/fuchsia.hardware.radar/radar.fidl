@@ -69,7 +69,7 @@ closed protocol RadarBurstReader {
     /// should use this size to create VMOs to be registered by the driver.
     ///
     /// - response `burst_size` the size of each radar burst in bytes.
-    @available(removed=14, legacy=true)
+    @available(removed=14)
     strict GetBurstSize() -> (struct {
         burst_size uint32;
     });

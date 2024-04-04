@@ -272,8 +272,6 @@ class FakeAudio : public fuchsia::media::Audio, public component_testing::LocalC
     capturers_.push_back(
         std::make_unique<FakeAudioCapturer>(std::move(request), loop_.dispatcher()));
   }
-  void SetSystemMute(bool muted) final { UNEXPECTED_METHOD_CALL; }
-  void SetSystemGain(float gain_db) final { UNEXPECTED_METHOD_CALL; }
 
   void OnStart() override {
     ASSERT_EQ(outgoing()->AddPublicService(binding_set_.GetHandler(this, loop_.dispatcher())),

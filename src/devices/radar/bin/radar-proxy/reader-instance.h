@@ -57,7 +57,6 @@ class ReaderInstance : public fidl::Server<fuchsia_hardware_radar::RadarBurstRea
 
  private:
   // fidl::Server<fuchsia_hardware_radar::RadarBurstReader>
-  void GetBurstSize(GetBurstSizeCompleter::Sync& completer) override;
   void GetBurstProperties(GetBurstPropertiesCompleter::Sync& completer) override;
   void RegisterVmos(RegisterVmosRequest& request, RegisterVmosCompleter::Sync& completer) override;
   void UnregisterVmos(UnregisterVmosRequest& request,

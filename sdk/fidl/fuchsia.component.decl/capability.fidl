@@ -13,7 +13,7 @@ type Capability = flexible union {
     4: storage Storage;
     5: runner Runner;
     6: resolver Resolver;
-    @available(removed=14, legacy=true)
+    @available(removed=14)
     7: event Event;
     @available(added=8)
     8: event_stream EventStream;
@@ -150,7 +150,7 @@ type Resolver = table {
 /// This type cannot be used in `fuchsia.component.decl.Component`. It is only
 /// used for the framework's built-in capabilities declared in
 /// `internal.Config`.
-@available(removed=14, legacy=true)
+@available(removed=14)
 type Event = table {
     /// (Required) The name of this event.
     ///

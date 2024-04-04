@@ -16,7 +16,7 @@ type Offer = flexible union {
     4: storage OfferStorage;
     5: runner OfferRunner;
     6: resolver OfferResolver;
-    @available(removed=14, legacy=true)
+    @available(removed=14)
     7: event OfferEvent;
     8: event_stream OfferEventStream;
     @available(added=HEAD)
@@ -34,7 +34,7 @@ type DependencyType = strict enum {
     /// arbitrary times.
     WEAK = 2;
 
-    @available(deprecated=14, removed=15, legacy=true)
+    @available(deprecated=14, removed=15)
     WEAK_FOR_MIGRATION = 3;
 };
 
@@ -324,7 +324,7 @@ type OfferResolver = table {
 };
 
 /// Declares an event offered by a component.
-@available(removed=14, legacy=true)
+@available(removed=14)
 type OfferEvent = table {
     /// (Required) The provider of the capability relative to the component
     /// itself. Must be `parent` or `void`. If set to `void`, then the target
@@ -380,7 +380,7 @@ type OfferEventStream = table {
 
     /// (Optional) Filter for the event stream. Only present for DirectoryReady
     /// events and CapabilityRequested events
-    @available(removed=14, legacy=true)
+    @available(removed=14)
     6: filter fuchsia.data.Dictionary;
 
     /// (Optional, defaults to `REQUIRED`) The availability of this capability.

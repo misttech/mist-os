@@ -9,7 +9,7 @@
 /// https://fxrev.dev/874960.
 ///
 /// Use Component Framework v2 and its APIs in fuchsia.component.* instead.
-@available(added=7, removed=14, legacy=true)
+@available(added=7, removed=14)
 library fuchsia.sys.test;
 
 /// An interface for interacting with the isolated system cache. Typically only
