@@ -119,7 +119,6 @@ class AmlSdmmc : public fdf::DriverBase,
   void Request(RequestRequestView request, fdf::Arena& arena,
                RequestCompleter::Sync& completer) override;
 
-  // TODO(b/309152899): Consider not reporting an error upon client calls while power_suspended_.
   zx_status_t SuspendPower() TA_REQ(lock_);
   zx_status_t ResumePower() TA_REQ(lock_);
 
@@ -210,9 +209,12 @@ class AmlSdmmc : public fdf::DriverBase,
     RequestCompleter::Async completer;
   };
 
-  struct SdmmcHwResetInfo {
+  struct SdmmcTaskInfo {
+    fit::function<zx_status_t()> task;
     fdf::Arena arena;
-    HwResetCompleter::Async completer;
+    std::variant<SetBusWidthCompleter::Async, SetBusFreqCompleter::Async, SetTimingCompleter::Async,
+                 HwResetCompleter::Async, PerformTuningCompleter::Async>
+        completer;
   };
 
   using SdmmcVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
@@ -239,13 +241,17 @@ class AmlSdmmc : public fdf::DriverBase,
     return static_cast<aml_sdmmc_desc_t*>(descs_buffer_->virt());
   }
 
+  zx_status_t SdmmcSetBusWidthLocked(sdmmc_bus_width_t bus_width) TA_REQ(lock_);
+  zx_status_t SdmmcSetBusFreqLocked(uint32_t freq) TA_REQ(lock_);
+  zx_status_t SdmmcSetTimingLocked(sdmmc_timing_t timing) TA_REQ(lock_);
   zx_status_t SdmmcHwResetLocked() TA_REQ(lock_);
+  zx_status_t SdmmcPerformTuningLocked(uint32_t tuning_cmd_idx) TA_REQ(tuning_lock_);
   zx_status_t SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_response[4]) TA_REQ(lock_);
 
   template <typename T>
-  void HwResetAndComplete(fdf::Arena& arena, T& completer) TA_REQ(lock_);
+  void DoTaskAndComplete(fit::function<zx_status_t()>, fdf::Arena& arena, T& completer);
   template <typename T>
-  void RequestAndComplete(RequestRequestView request, fdf::Arena& arena, T& completer)
+  void DoRequestAndComplete(RequestRequestView request, fdf::Arena& arena, T& completer)
       TA_REQ(lock_);
 
   uint32_t DistanceToFailingPoint(TuneSettings point,
@@ -296,6 +302,11 @@ class AmlSdmmc : public fdf::DriverBase,
       const fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>& current_level_client,
       fuchsia_power_broker::PowerLevel power_level);
 
+  // Acquire lease on wake-on-request power element. This indirectly raises SAG's Execution State,
+  // satisfying the hardware power element's lease status (which is passively dependent on SAG's
+  // Execution State), and thus resuming power.
+  zx_status_t ActivateWakeOnRequest() TA_REQ(lock_);
+
   void AdjustHardwarePowerLevel();
 
   std::optional<fdf::MmioBuffer> mmio_ TA_GUARDED(lock_);
@@ -309,7 +320,7 @@ class AmlSdmmc : public fdf::DriverBase,
   sdmmc_host_info_t dev_info_;
   std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer_ TA_GUARDED(lock_);
   bool power_suspended_ TA_GUARDED(lock_) = false;
-  std::vector<std::variant<SdmmcRequestInfo, SdmmcHwResetInfo>> delayed_requests_;
+  std::vector<std::variant<SdmmcRequestInfo, SdmmcTaskInfo>> delayed_requests_;
   uint32_t clk_div_saved_ = 0;
 
   // TODO(b/309152899): Export these to children drivers via the PowerTokenProvider protocol.

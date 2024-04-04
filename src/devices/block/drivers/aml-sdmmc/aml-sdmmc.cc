@@ -489,6 +489,7 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
           case fuchsia_power_broker::LeaseStatus::kSatisfied: {
             const zx::time start = zx::clock::get_monotonic();
 
+            fbl::AutoLock tuning_lock(&tuning_lock_);  // If tuning was delayed, will do it now.
             fbl::AutoLock lock(&lock_);
             // Actually raise the hardware's power level.
             zx_status_t status = ResumePower();
@@ -509,14 +510,49 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
               for (auto& request : delayed_requests_) {
                 SdmmcRequestInfo* request_info = std::get_if<SdmmcRequestInfo>(&request);
                 if (request_info != nullptr) {
-                  RequestAndComplete(request_info->request, request_info->arena,
-                                     request_info->completer);
+                  DoRequestAndComplete(request_info->request, request_info->arena,
+                                       request_info->completer);
                   continue;
                 }
-                SdmmcHwResetInfo* reset_info = std::get_if<SdmmcHwResetInfo>(&request);
-                if (reset_info != nullptr) {
-                  HwResetAndComplete(reset_info->arena, reset_info->completer);
-                  continue;
+                SdmmcTaskInfo* task_info = std::get_if<SdmmcTaskInfo>(&request);
+                if (task_info != nullptr) {
+                  auto* set_bus_width_completer =
+                      std::get_if<SetBusWidthCompleter::Async>(&task_info->completer);
+                  if (set_bus_width_completer != nullptr) {
+                    DoTaskAndComplete(std::move(task_info->task), task_info->arena,
+                                      *set_bus_width_completer);
+                    continue;
+                  }
+                  auto* set_bus_freq_completer =
+                      std::get_if<SetBusFreqCompleter::Async>(&task_info->completer);
+                  if (set_bus_freq_completer != nullptr) {
+                    DoTaskAndComplete(std::move(task_info->task), task_info->arena,
+                                      *set_bus_freq_completer);
+                    continue;
+                  }
+                  auto* set_timing_completer =
+                      std::get_if<SetTimingCompleter::Async>(&task_info->completer);
+                  if (set_timing_completer != nullptr) {
+                    DoTaskAndComplete(std::move(task_info->task), task_info->arena,
+                                      *set_timing_completer);
+                    continue;
+                  }
+                  auto* hw_reset_completer =
+                      std::get_if<HwResetCompleter::Async>(&task_info->completer);
+                  if (hw_reset_completer != nullptr) {
+                    DoTaskAndComplete(std::move(task_info->task), task_info->arena,
+                                      *hw_reset_completer);
+                    continue;
+                  }
+                  auto* perform_tuning_completer =
+                      std::get_if<PerformTuningCompleter::Async>(&task_info->completer);
+                  if (perform_tuning_completer != nullptr) {
+                    lock_.Release();  // Tuning acquires lock_.
+                    DoTaskAndComplete(std::move(task_info->task), task_info->arena,
+                                      *perform_tuning_completer);
+                    lock_.Acquire();
+                    continue;
+                  }
                 }
               }
               delayed_requests_.clear();
@@ -535,6 +571,7 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
             break;
           }
           case fuchsia_power_broker::LeaseStatus::kPending: {
+            fbl::AutoLock tuning_lock(&tuning_lock_);  // Complete any ongoing tuning first.
             fbl::AutoLock lock(&lock_);
             // Actually lower the hardware's power level.
             zx_status_t status = SuspendPower();
@@ -748,22 +785,41 @@ void AmlSdmmc::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
       break;
   }
 
-  zx_status_t status = SdmmcSetBusWidth(bus_width);
-  if (status != ZX_OK) {
-    completer.buffer(arena).ReplyError(status);
+  // This function is run after acquiring lock_, but the compiler doesn't recognize this.
+  fit::function<zx_status_t()> task = [this, bus_width]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+    return SdmmcSetBusWidthLocked(bus_width);
+  };
+
+  fbl::AutoLock lock(&lock_);
+
+  if (power_suspended_) {
+    zx_status_t status = ActivateWakeOnRequest();
+    if (status != ZX_OK) {
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+
+    // Delay this request until power has been resumed.
+    delayed_requests_.emplace_back(
+        SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
     return;
   }
-  completer.buffer(arena).ReplySuccess();
+
+  DoTaskAndComplete(std::move(task), arena, completer);
 }
 
 zx_status_t AmlSdmmc::SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) {
   fbl::AutoLock lock(&lock_);
 
   if (power_suspended_) {
-    FDF_LOGL(ERROR, logger(), "Rejecting SetBusWidth while power is suspended.");
+    FDF_LOGL(ERROR, logger(), "Rejecting SdmmcSetBusWidth (Banjo) while power is suspended.");
     return ZX_ERR_BAD_STATE;
   }
 
+  return SdmmcSetBusWidthLocked(bus_width);
+}
+
+zx_status_t AmlSdmmc::SdmmcSetBusWidthLocked(sdmmc_bus_width_t bus_width) {
   uint32_t bus_width_val;
   switch (bus_width) {
     case SDMMC_BUS_WIDTH_EIGHT:
@@ -800,22 +856,41 @@ zx_status_t AmlSdmmc::SdmmcRegisterInBandInterrupt(
 
 void AmlSdmmc::SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
                           SetBusFreqCompleter::Sync& completer) {
-  zx_status_t status = SdmmcSetBusFreq(request->bus_freq);
-  if (status != ZX_OK) {
-    completer.buffer(arena).ReplyError(status);
-    return;
-  }
-  completer.buffer(arena).ReplySuccess();
-}
+  // This function is run after acquiring lock_, but the compiler doesn't recognize this.
+  fit::function<zx_status_t()> task =
+      [this, bus_freq = request->bus_freq]()
+          __TA_NO_THREAD_SAFETY_ANALYSIS { return SdmmcSetBusFreqLocked(bus_freq); };
 
-zx_status_t AmlSdmmc::SdmmcSetBusFreq(uint32_t freq) {
   fbl::AutoLock lock(&lock_);
 
   if (power_suspended_) {
-    FDF_LOGL(ERROR, logger(), "Rejecting SetBusFreq while power is suspended.");
+    zx_status_t status = ActivateWakeOnRequest();
+    if (status != ZX_OK) {
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+
+    // Delay this request until power has been resumed.
+    delayed_requests_.emplace_back(
+        SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
+    return;
+  }
+
+  DoTaskAndComplete(std::move(task), arena, completer);
+}
+
+zx_status_t AmlSdmmc::SdmmcSetBusFreq(uint32_t bus_freq) {
+  fbl::AutoLock lock(&lock_);
+
+  if (power_suspended_) {
+    FDF_LOGL(ERROR, logger(), "Rejecting SdmmcSetBusFreq (Banjo) while power is suspended.");
     return ZX_ERR_BAD_STATE;
   }
 
+  return SdmmcSetBusFreqLocked(bus_freq);
+}
+
+zx_status_t AmlSdmmc::SdmmcSetBusFreqLocked(uint32_t freq) {
   uint32_t clk = 0, clk_src = 0, clk_div = 0;
   if (freq == 0) {
     AmlSdmmcClock::Get().ReadFrom(&*mmio_).set_cfg_div(0).WriteTo(&*mmio_);
@@ -936,39 +1011,52 @@ void AmlSdmmc::ConfigureDefaultRegs() {
 }
 
 void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
+  // This function is run after acquiring lock_, but the compiler doesn't recognize this.
+  fit::function<zx_status_t()> task = [this]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+    return SdmmcHwResetLocked();
+  };
+
   fbl::AutoLock lock(&lock_);
 
   if (power_suspended_) {
-    // Acquire lease on wake-on-request power element. This indirectly raises SAG's Execution State,
-    // satisfying the hardware power element's lease status (which is passively dependent on SAG's
-    // Execution State), and thus resuming power.
-    zx_status_t status =
-        AcquireLease(wake_on_request_lessor_client_, wake_on_request_lease_control_client_end_);
-    if (status != ZX_OK && status != ZX_ERR_ALREADY_BOUND) {
-      FDF_LOGL(ERROR, logger(), "Failed to acquire lease during wake-on-reset: %s",
-               zx_status_get_string(status));
+    zx_status_t status = ActivateWakeOnRequest();
+    if (status != ZX_OK) {
       completer.buffer(arena).ReplyError(status);
       return;
     }
 
-    if (status == ZX_OK) {
-      // TODO(b/330223394): Update power level when ordered to do so by Power Broker via
-      // RequiredLevel.
-      UpdatePowerLevel(wake_on_request_current_level_client_, kPowerLevelOn);
-      inspect_.wake_on_request_count.Add(1);
-    }
-
-    // Delay these requests until power has been resumed.
-    delayed_requests_.emplace_back(SdmmcHwResetInfo{std::move(arena), completer.ToAsync()});
+    // Delay this request until power has been resumed.
+    delayed_requests_.emplace_back(
+        SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
     return;
   }
 
-  HwResetAndComplete(arena, completer);
+  DoTaskAndComplete(std::move(task), arena, completer);
+}
+
+zx_status_t AmlSdmmc::ActivateWakeOnRequest() {
+  zx_status_t status =
+      AcquireLease(wake_on_request_lessor_client_, wake_on_request_lease_control_client_end_);
+  if (status != ZX_OK && status != ZX_ERR_ALREADY_BOUND) {
+    FDF_LOGL(ERROR, logger(), "Failed to acquire lease during wake-on-request: %s",
+             zx_status_get_string(status));
+    return status;
+  }
+
+  if (status == ZX_OK) {
+    // TODO(b/330223394): Update power level when ordered to do so by Power Broker via
+    // RequiredLevel.
+    UpdatePowerLevel(wake_on_request_current_level_client_, kPowerLevelOn);
+    inspect_.wake_on_request_count.Add(1);
+  }
+
+  return ZX_OK;
 }
 
 template <typename T>
-void AmlSdmmc::HwResetAndComplete(fdf::Arena& arena, T& completer) {
-  zx_status_t status = SdmmcHwResetLocked();
+void AmlSdmmc::DoTaskAndComplete(fit::function<zx_status_t()> task, fdf::Arena& arena,
+                                 T& completer) {
+  zx_status_t status = task();
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -1038,22 +1126,41 @@ void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
       break;
   }
 
-  zx_status_t status = SdmmcSetTiming(timing);
-  if (status != ZX_OK) {
-    completer.buffer(arena).ReplyError(status);
+  // This function is run after acquiring lock_, but the compiler doesn't recognize this.
+  fit::function<zx_status_t()> task = [this, timing]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+    return SdmmcSetTimingLocked(timing);
+  };
+
+  fbl::AutoLock lock(&lock_);
+
+  if (power_suspended_) {
+    zx_status_t status = ActivateWakeOnRequest();
+    if (status != ZX_OK) {
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+
+    // Delay this request until power has been resumed.
+    delayed_requests_.emplace_back(
+        SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
     return;
   }
-  completer.buffer(arena).ReplySuccess();
+
+  DoTaskAndComplete(std::move(task), arena, completer);
 }
 
 zx_status_t AmlSdmmc::SdmmcSetTiming(sdmmc_timing_t timing) {
   fbl::AutoLock lock(&lock_);
 
   if (power_suspended_) {
-    FDF_LOGL(ERROR, logger(), "Rejecting SetTiming while power is suspended.");
+    FDF_LOGL(ERROR, logger(), "Rejecting SdmmcSetTiming (Banjo) while power is suspended.");
     return ZX_ERR_BAD_STATE;
   }
 
+  return SdmmcSetTimingLocked(timing);
+}
+
+zx_status_t AmlSdmmc::SdmmcSetTimingLocked(sdmmc_timing_t timing) {
   auto config = AmlSdmmcCfg::Get().ReadFrom(&*mmio_);
   if (timing == SDMMC_TIMING_HS400 || timing == SDMMC_TIMING_HSDDR ||
       timing == SDMMC_TIMING_DDR50) {
@@ -1528,17 +1635,47 @@ uint32_t AmlSdmmc::DistanceToFailingPoint(TuneSettings point,
 
 void AmlSdmmc::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena,
                              PerformTuningCompleter::Sync& completer) {
-  zx_status_t status = SdmmcPerformTuning(request->cmd_idx);
-  if (status != ZX_OK) {
-    completer.buffer(arena).ReplyError(status);
-    return;
+  // This function is run after acquiring tuning_lock_, but the compiler doesn't recognize this.
+  fit::function<zx_status_t()> task =
+      [this, cmd_idx = request->cmd_idx]()
+          __TA_NO_THREAD_SAFETY_ANALYSIS { return SdmmcPerformTuningLocked(cmd_idx); };
+
+  fbl::AutoLock tuning_lock(&tuning_lock_);
+
+  {
+    fbl::AutoLock lock(&lock_);
+    if (power_suspended_) {
+      zx_status_t status = ActivateWakeOnRequest();
+      if (status != ZX_OK) {
+        completer.buffer(arena).ReplyError(status);
+        return;
+      }
+
+      // Delay this request until power has been resumed.
+      delayed_requests_.emplace_back(
+          SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
+      return;
+    }
   }
-  completer.buffer(arena).ReplySuccess();
+
+  DoTaskAndComplete(std::move(task), arena, completer);
 }
 
 zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
   fbl::AutoLock tuning_lock(&tuning_lock_);
 
+  {
+    fbl::AutoLock lock(&lock_);
+    if (power_suspended_) {
+      FDF_LOGL(ERROR, logger(), "Rejecting SdmmcPerformTuning (Banjo) while power is suspended.");
+      return ZX_ERR_BAD_STATE;
+    }
+  }
+
+  return SdmmcPerformTuningLocked(tuning_cmd_idx);
+}
+
+zx_status_t AmlSdmmc::SdmmcPerformTuningLocked(uint32_t tuning_cmd_idx) {
   // Using a lambda for the constness of the resulting variables.
   const auto result = [this]() -> zx::result<std::tuple<uint32_t, uint32_t, TuneSettings>> {
     fbl::AutoLock lock(&lock_);
@@ -1745,36 +1882,23 @@ void AmlSdmmc::Request(RequestRequestView request, fdf::Arena& arena,
   fbl::AutoLock lock(&lock_);
 
   if (power_suspended_) {
-    // Acquire lease on wake-on-request power element. This indirectly raises SAG's Execution State,
-    // satisfying the hardware power element's lease status (which is passively dependent on SAG's
-    // Execution State), and thus resuming power.
-    zx_status_t status =
-        AcquireLease(wake_on_request_lessor_client_, wake_on_request_lease_control_client_end_);
-    if (status != ZX_OK && status != ZX_ERR_ALREADY_BOUND) {
-      FDF_LOGL(ERROR, logger(), "Failed to acquire lease during wake-on-request: %s",
-               zx_status_get_string(status));
+    zx_status_t status = ActivateWakeOnRequest();
+    if (status != ZX_OK) {
       completer.buffer(arena).ReplyError(status);
       return;
     }
 
-    if (status == ZX_OK) {
-      // TODO(b/330223394): Update power level when ordered to do so by Power Broker via
-      // RequiredLevel.
-      UpdatePowerLevel(wake_on_request_current_level_client_, kPowerLevelOn);
-      inspect_.wake_on_request_count.Add(1);
-    }
-
-    // Delay these requests until power has been resumed.
+    // Delay this request until power has been resumed.
     delayed_requests_.emplace_back(
         SdmmcRequestInfo{request, std::move(arena), completer.ToAsync()});
     return;
   }
 
-  RequestAndComplete(request, arena, completer);
+  DoRequestAndComplete(request, arena, completer);
 }
 
 template <typename T>
-void AmlSdmmc::RequestAndComplete(RequestRequestView request, fdf::Arena& arena, T& completer) {
+void AmlSdmmc::DoRequestAndComplete(RequestRequestView request, fdf::Arena& arena, T& completer) {
   fidl::Array<uint32_t, 4> response;
   for (const auto& req : request->reqs) {
     std::vector<sdmmc_buffer_region_t> buffer_regions;

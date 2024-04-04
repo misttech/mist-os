@@ -2411,6 +2411,72 @@ TEST_F(AmlSdmmcTest, PowerSuspendResume) {
   EXPECT_FALSE(incoming_.SyncCall(
       [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
 
+  // Trigger power level change to kPowerLevelOn.
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    incoming->power_broker.hardware_power_lessor_->lease_control_->lease_status_ =
+        fuchsia_power_broker::LeaseStatus::kSatisfied;
+  });
+  runtime_.PerformBlockingWork([&] {
+    bool clock_enabled;
+    do {
+      clock_enabled = incoming_.SyncCall(
+          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
+    } while (!clock_enabled);
+  });
+
+  dut_->ExpectInspectBoolPropertyValue("power_suspended", false);
+  dut_->ExpectInspectPropertyValue("wake_on_request_count", 0);
+  EXPECT_NE(clock.ReadFrom(&*mmio_).cfg_div(), 0);
+  EXPECT_TRUE(incoming_.SyncCall(
+      [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
+
+  // Trigger power level change to kPowerLevelOff.
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    incoming->power_broker.hardware_power_lessor_->lease_control_->lease_status_ =
+        fuchsia_power_broker::LeaseStatus::kPending;
+  });
+  runtime_.PerformBlockingWork([&] {
+    bool clock_enabled;
+    do {
+      clock_enabled = incoming_.SyncCall(
+          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
+    } while (clock_enabled);
+  });
+
+  dut_->ExpectInspectBoolPropertyValue("power_suspended", true);
+  dut_->ExpectInspectPropertyValue("wake_on_request_count", 0);
+  EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 0);
+  EXPECT_FALSE(incoming_.SyncCall(
+      [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
+}
+
+TEST_F(AmlSdmmcTest, WakeOnRequest) {
+  StartDriver(/*create_fake_bti_with_paddrs=*/false, /*supply_power_framework=*/true);
+
+  auto clock = AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
+
+  ASSERT_OK(dut_->Init({}));
+  // Initial power level is kPowerLevelOff.
+  runtime_.PerformBlockingWork([&] {
+    bool clock_enabled;
+    do {
+      clock_enabled = incoming_.SyncCall(
+          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
+    } while (clock_enabled);
+  });
+
+  auto check_power_suspended = [&](int wake_on_request_count) {
+    dut_->ExpectInspectBoolPropertyValue("power_suspended", true);
+    dut_->ExpectInspectPropertyValue("wake_on_request_count", wake_on_request_count);
+    EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 0);
+    EXPECT_FALSE(incoming_.SyncCall(
+        [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
+  };
+
+  check_power_suspended(0);
+
+  fdf::WireSyncClient<fuchsia_hardware_sdmmc::Sdmmc> client = GetClient();
+
   // Issue request while power is suspended.
   zx::vmo vmo, dup;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
@@ -2435,7 +2501,6 @@ TEST_F(AmlSdmmcTest, PowerSuspendResume) {
       fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq>::FromExternal(&request, 1);
 
   runtime_.PerformBlockingWork([&] {
-    fdf::WireSyncClient<fuchsia_hardware_sdmmc::Sdmmc> client = GetClient();
     fdf::Arena arena('SDMM');
     const auto result = client.buffer(arena)->Request(requests);
     EXPECT_OK(result);
@@ -2447,37 +2512,15 @@ TEST_F(AmlSdmmcTest, PowerSuspendResume) {
     } while (clock_enabled);
   });
 
-  dut_->ExpectInspectBoolPropertyValue("power_suspended", true);
-  dut_->ExpectInspectPropertyValue("wake_on_request_count", 1);
-  EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 0);
-  EXPECT_FALSE(incoming_.SyncCall(
-      [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
+  check_power_suspended(1);
 
-  // Trigger power level change to kPowerLevelOn.
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_lessor_->lease_control_->lease_status_ =
-        fuchsia_power_broker::LeaseStatus::kSatisfied;
-  });
+  // Issue SetBusWidth while power is suspended.
   runtime_.PerformBlockingWork([&] {
-    bool clock_enabled;
-    do {
-      clock_enabled = incoming_.SyncCall(
-          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
-    } while (!clock_enabled);
-  });
+    fdf::Arena arena('SDMM');
+    const auto result =
+        client.buffer(arena)->SetBusWidth(fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kFour);
+    EXPECT_OK(result);
 
-  dut_->ExpectInspectBoolPropertyValue("power_suspended", false);
-  dut_->ExpectInspectPropertyValue("wake_on_request_count", 1);
-  EXPECT_NE(clock.ReadFrom(&*mmio_).cfg_div(), 0);
-  EXPECT_TRUE(incoming_.SyncCall(
-      [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
-
-  // Trigger power level change to kPowerLevelOff.
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_lessor_->lease_control_->lease_status_ =
-        fuchsia_power_broker::LeaseStatus::kPending;
-  });
-  runtime_.PerformBlockingWork([&] {
     bool clock_enabled;
     do {
       clock_enabled = incoming_.SyncCall(
@@ -2485,11 +2528,68 @@ TEST_F(AmlSdmmcTest, PowerSuspendResume) {
     } while (clock_enabled);
   });
 
-  dut_->ExpectInspectBoolPropertyValue("power_suspended", true);
-  dut_->ExpectInspectPropertyValue("wake_on_request_count", 1);
-  EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 0);
-  EXPECT_FALSE(incoming_.SyncCall(
-      [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
+  check_power_suspended(2);
+
+  // Issue SetBusFreq while power is suspended.
+  runtime_.PerformBlockingWork([&] {
+    fdf::Arena arena('SDMM');
+    const auto result = client.buffer(arena)->SetBusFreq(100'000'000);
+    EXPECT_OK(result);
+
+    bool clock_enabled;
+    do {
+      clock_enabled = incoming_.SyncCall(
+          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
+    } while (clock_enabled);
+  });
+
+  check_power_suspended(3);
+
+  // Issue SetTiming while power is suspended.
+  runtime_.PerformBlockingWork([&] {
+    fdf::Arena arena('SDMM');
+    const auto result =
+        client.buffer(arena)->SetTiming(fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400);
+    EXPECT_OK(result);
+
+    bool clock_enabled;
+    do {
+      clock_enabled = incoming_.SyncCall(
+          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
+    } while (clock_enabled);
+  });
+
+  check_power_suspended(4);
+
+  // Issue HwReset while power is suspended.
+  runtime_.PerformBlockingWork([&] {
+    fdf::Arena arena('SDMM');
+    const auto result = client.buffer(arena)->HwReset();
+    EXPECT_OK(result);
+
+    bool clock_enabled;
+    do {
+      clock_enabled = incoming_.SyncCall(
+          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
+    } while (clock_enabled);
+  });
+
+  check_power_suspended(5);
+
+  // Issue PerformTuning while power is suspended.
+  runtime_.PerformBlockingWork([&] {
+    fdf::Arena arena('SDMM');
+    const auto result = client.buffer(arena)->PerformTuning(SD_SEND_TUNING_BLOCK);
+    EXPECT_OK(result);
+
+    bool clock_enabled;
+    do {
+      clock_enabled = incoming_.SyncCall(
+          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
+    } while (clock_enabled);
+  });
+
+  check_power_suspended(6);
 }
 
 }  // namespace aml_sdmmc
