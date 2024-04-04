@@ -27,15 +27,6 @@
 
 namespace virtio {
 
-static bool IsQemuTouchscreen(const virtio_input_config_t& config) {
-  if (config.u.ids.bustype == 0x06 && config.u.ids.vendor == 0x00 && config.u.ids.product == 0x00) {
-    if (config.u.ids.version == 0x01 || config.u.ids.version == 0x00) {
-      return true;
-    }
-  }
-  return false;
-}
-
 InputDevice::InputDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend)
     : virtio::Device(std::move(bti), std::move(backend)),
       ddk::Device<InputDevice, ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin>(
@@ -76,23 +67,28 @@ zx_status_t InputDevice::Init() {
   SelectConfig(VIRTIO_INPUT_CFG_EV_BITS, VIRTIO_INPUT_EV_ABS);
   uint8_t cfg_abs_size = config_.size;
 
-  // At the moment we support keyboards and a specific touchscreen.
+  SelectConfig(VIRTIO_INPUT_CFG_ABS_INFO, VIRTIO_INPUT_EV_MT_POSITION_X);
+  virtio_input_absinfo_t x_info = config_.u.abs;
+  SelectConfig(VIRTIO_INPUT_CFG_ABS_INFO, VIRTIO_INPUT_EV_MT_POSITION_Y);
+  virtio_input_absinfo_t y_info = config_.u.abs;
+
+  // At the moment we support mice, keyboards, and touchscreens.
   // Support for more devices should be added here.
-  SelectConfig(VIRTIO_INPUT_CFG_ID_DEVIDS, 0);
-  if (IsQemuTouchscreen(config_)) {
-    // QEMU MultiTouch Touchscreen
-    SelectConfig(VIRTIO_INPUT_CFG_ABS_INFO, VIRTIO_INPUT_EV_MT_POSITION_X);
-    virtio_input_absinfo_t x_info = config_.u.abs;
-    SelectConfig(VIRTIO_INPUT_CFG_ABS_INFO, VIRTIO_INPUT_EV_MT_POSITION_Y);
-    virtio_input_absinfo_t y_info = config_.u.abs;
+  SelectConfig(VIRTIO_INPUT_CFG_ID_NAME, 0);
+  if ((x_info.max > 0) && (y_info.max > 0)) {
+    // Touchscreen
+    zxlogf(INFO, "Detected a touchscreen device: %s", config_.u.string);
     hid_device_ = std::make_unique<HidTouch>(x_info, y_info);
   } else if (cfg_rel_size > 0 || cfg_abs_size > 0) {
     // Mouse
+    zxlogf(INFO, "Detected a mouse device: %s", config_.u.string);
     hid_device_ = std::make_unique<HidMouse>();
   } else if (cfg_key_size > 0) {
     // Keyboard
+    zxlogf(INFO, "Detected a keyboard device: %s", config_.u.string);
     hid_device_ = std::make_unique<HidKeyboard>();
   } else {
+    zxlogf(WARNING, "Detected an unsupported device: %s", config_.u.string);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
