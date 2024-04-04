@@ -11,6 +11,7 @@
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/static-vector.h>
 #include <lib/fit/result.h>
+#include <lib/ld/decoded-module-in-memory.h>
 #include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
 #include <lib/ld/module.h>
@@ -101,9 +102,7 @@ class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHand
   AbiModule abi_module_;
 };
 
-using LoadModuleBase =
-    ld::LoadModule<ld::DecodedModule<Elf, elfldltl::StaticVector<kMaxSegments>::Container,
-                                     ld::AbiModuleInline::kNo>>;
+using LoadModuleBase = ld::LoadModule<ld::DecodedModuleInMemory<>>;
 
 // TODO(https://fxbug.dev/324136435): Replace the code and functions copied from
 // ld::LoadModule to use them directly; then continue to use methods directly
@@ -142,36 +141,16 @@ class LoadModule : public LoadModuleBase {
   // entirely defined in this header file for convenience for now. In a
   // forthcoming CL we may be able to share a lot of this code with libld.
   [[nodiscard]] bool Load(Diagnostics& diag, File file) {
-    // Read the file header and program headers into stack buffers.
-    auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
-        diag, file, elfldltl::FixedArrayFromFile<Phdr, kMaxPhdrs>{});
+    // Read the file header and program headers into stack buffers and map in
+    // the image.  This fills in load_info() as well as the module vaddr bounds
+    // and phdrs fields.  Note that module().phdrs might remain empty if the
+    // phdrs aren't in the load image, so keep using the stack copy read from
+    // the file instead.
+    Loader loader;
+    auto headers = decoded().LoadFromFile(diag, loader, std::forward<File>(file));
     if (!headers) [[unlikely]] {
       return false;
     }
-
-    Loader loader;
-    std::optional<Phdr> dyn_phdr;
-    auto& [ehdr_owner, phdrs_owner] = *headers;
-    const cpp20::span<const Phdr> phdrs = phdrs_owner;
-    // Decode phdrs to fill LoadInfo and other things.
-    if (!elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(dyn_phdr),
-                               load_info_.GetPhdrObserver(loader.page_size()))) {
-      return false;
-    }
-
-    if (!loader.Load(diag, load_info_, file.borrow())) [[unlikely]] {
-      return false;
-    }
-
-    ld::SetModuleVaddrBounds(decoded().module(), load_info_, loader.load_bias());
-
-    // TODO(https://fxbug.dev/331804983): After loading is done, split the rest
-    // of the logic that performs decoding into a separate function.
-
-    if (ld::DecodeModuleDynamic(decoded().module(), diag, loader.memory(), dyn_phdr).is_error())
-        [[unlikely]] {
-      return false;
-    };
 
     // To finalize the loaded module's mapping, OSImpl::Commit(...) will commit
     // the loader and return the Relro object that is used to apply relro
@@ -180,12 +159,23 @@ class LoadModule : public LoadModuleBase {
     // This will eventually take the decoded relro_phdr.
     loader_relro_ = std::move(loader).Commit(LoadInfo::Region{});
 
-    return true;
+    // TODO(https://fxbug.dev/331804983): Use decoded().DecodeFromMemory
+
+    auto& [ehdr_owner, phdrs_owner] = *headers;
+    const cpp20::span<const Phdr> phdrs = phdrs_owner;
+
+    // TODO(caslyn): comment.
+    std::optional<Phdr> dyn_phdr;
+    if (!elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(dyn_phdr))) {
+      return false;
+    }
+
+    auto memory = ld::ModuleMemory{decoded().module()};
+    return ld::DecodeModuleDynamic(decoded().module(), diag, memory, dyn_phdr).is_ok();
   }
 
  private:
   std::unique_ptr<ModuleHandle> module_;
-  LoadInfo load_info_;
   Relro loader_relro_;
 };
 
