@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use analytics::add_custom_event;
 use anyhow::{anyhow, Result};
 use argh::{ArgsInfo, FromArgs};
 use async_fs as afs;
@@ -26,6 +25,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use vfs::directory::helper::DirectlyMutable;
 
+mod analytics;
 mod cf_fs;
 mod presentation;
 mod repl;
@@ -152,24 +152,14 @@ pub async fn exec_playground(
             Err(anyhow!("Cannot specify a command and a file at the same time"))
         } else {
             let res = interpreter.run(cmd.as_str()).await;
-            let _ = add_custom_event(
-                Some("ffx_playground_inline_cmd"),
-                Some(cmd.as_str()),
-                None,
-                [("result", format!("{res:?}").into())].into_iter().collect(),
-            );
+            analytics::emit_playground_cmd_event(res.is_ok(), "argument");
             display_result(&mut AllowStdIo::new(&io::stdout()), res, &interpreter).await?;
             Ok(())
         }
     } else if let Some(file) = command.file {
         afs::File::open(&file).await?.read_to_string(&mut text).await?;
         let res = interpreter.run(text.as_str()).await;
-        let _ = add_custom_event(
-            Some("ffx_playground_script"),
-            Some(&file),
-            None,
-            [("result", format!("{res:?}").into())].into_iter().collect(),
-        );
+        analytics::emit_playground_cmd_event(res.is_ok(), "script");
         display_result(&mut AllowStdIo::new(&io::stdout()), res, &interpreter).await?;
         Ok(())
     } else {
@@ -202,12 +192,7 @@ pub async fn exec_playground(
             if let Some(line) = line? {
                 fasync::Task::local(async move {
                     let res = interpreter.run(line.as_str()).await;
-                    let _ = add_custom_event(
-                        Some("ffx_playground_cmd"),
-                        Some(line.as_str()),
-                        None,
-                        [("result", format!("{res:?}").into())].into_iter().collect(),
-                    );
+                    analytics::emit_playground_cmd_event(res.is_ok(), "interactive");
                     display_result(&mut repl::ReplWriter::new(&*repl), res, &interpreter)
                         .await
                         .unwrap();
