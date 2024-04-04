@@ -242,12 +242,12 @@ template("sdk_shared_library") {
       }
     }
 
-    # 'sdk_shared_library()' targets in the 'partner' or 'public' category that
-    # are not testonly must be tracked by
-    # //build/sdk:sdk_versioned_shared_libraries_allowlist for SDK consistency
-    # checks (see https://fxbug.dev/42057225).
+    # Ensure that 'sdk_shared_library()' targets in the 'partner' or 'public'
+    # category that are not testonly are included in the SDK shared_library
+    # allowlist. The allowlist target's `visibility` list ensures that the
+    # target using this template is in the allowlist.
     if (invoker.category == "partner" || invoker.category == "public") {
-      deps += [ "//build/sdk:sdk_versioned_shared_libraries_allowlist" ]
+      deps += [ "//build/sdk:sdk_shared_libraries_allowlist" ]
     }
   }
 

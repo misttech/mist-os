@@ -57,7 +57,7 @@ syslog_visibility_allowlist += [
 # Syslog code can depend on syslog.
 syslog_visibility_allowlist += [ "//zircon/system/ulib/syslog:*" ]
 
-syslog_visibility_allowlist += [ "//build/sdk:sdk_versioned_shared_libraries" ]
+syslog_visibility_allowlist += [ "//build/sdk:deprecated_sdk_shared_libraries_to_build_at_all_supported_api_levels" ]
 
 syslog_headers_visibility_allowlist = [
   "//src/devices/lib/iommu:*",

@@ -455,16 +455,15 @@ if (current_toolchain == dart_toolchain) {
       is_vendor_google_library =
           string_replace(target_out_dir, "/vendor/google", "") != target_out_dir
 
-      # 'dart_library()' targets in the 'partner' or 'public' category that are
-      # not testonly or private must be tracked by
-      # //build/sdk:sdk_versioned_source_sets_allowlist for SDK consistency
-      # checks (see https://fxbug.dev/42069989).
+      # Ensure that 'dart_library()' targets in the 'partner' or 'public' category that are not
+      # testonly are included in the SDK source_sets allowlist. The allowlist target's `visibility`
+      # list ensures that the target using this template is in the allowlist.
       if (!is_vendor_google_library &&
           (!defined(invoker.testonly) || !invoker.testonly) &&
           (defined(invoker.sdk_category) &&
            (invoker.sdk_category == "partner" ||
             invoker.sdk_category == "public"))) {
-        deps = [ "//build/sdk:sdk_versioned_source_sets_allowlist" ]
+        deps = [ "//build/sdk:sdk_source_sets_allowlist" ]
       }
     }
   }

@@ -15,9 +15,8 @@ group("tests") {
   ]
 }
 
-# Contains all the source sets redistributed with the partner or public SDK that
-# should be compatible with all the currently supported API levels.
-_sdk_versioned_source_sets_list = [
+# Contains all the source sets distributed with the partner or public SDK.
+_sdk_source_sets_list = [
   # sdk_source_set() targets:
   # keep-sorted: begin
   "//sdk/lib/async-loop-testing/cpp",
@@ -97,17 +96,19 @@ _sdk_versioned_source_sets_list = [
   "//sdk/testing/sl4f/client",
 ]
 
-group("sdk_versioned_source_sets") {
-  deps = _sdk_versioned_source_sets_list
+# TODO(https://fxbug.dev/330709069): Replace this with another mechanism that ensure these targets
+# are built at all supported API levels. See https://fxbug.dev/42083950.
+group("deprecated_sdk_source_sets_to_build_at_all_supported_api_levels") {
+  visibility = [ ":*" ]
+  deps = _sdk_source_sets_list
 }
 
-group("sdk_versioned_source_sets_allowlist") {
-  visibility =
-      _sdk_versioned_source_sets_list + [ ":sdk_versioned_source_sets" ]
+# All `sdk_shared_library()` targets depend on this target to ensure that they are in the allowlist.
+group("sdk_source_sets_allowlist") {
+  visibility = _sdk_source_sets_list
 }
 
-# Contains all the shared libraries redistributed with the partner or public
-# SDK that should be compatible with all the currently supported API levels.
+# Contains all the shared libraries distributed with the partner or public SDK.
 _sdk_versioned_shared_libraries_list = [
   # sdk_shared_library() targets:
   # keep-sorted: begin
@@ -126,13 +127,27 @@ _sdk_versioned_shared_libraries_list = [
   # keep-sorted: end
 ]
 
-group("sdk_versioned_shared_libraries") {
+# TODO(https://fxbug.dev/330709069): Replace this with another mechanism that ensure these targets
+# are built at all supported API levels. See https://fxbug.dev/42083950.
+group("deprecated_sdk_shared_libraries_to_build_at_all_supported_api_levels") {
+  visibility = [ ":*" ]
   deps = _sdk_versioned_shared_libraries_list
 }
 
-group("sdk_versioned_shared_libraries_allowlist") {
-  visibility = _sdk_versioned_shared_libraries_list +
-               [ ":sdk_versioned_shared_libraries" ]
+group("sdk_shared_libraries_allowlist") {
+  visibility = _sdk_versioned_shared_libraries_list
+}
+
+# TODO(https://fxbug.dev/330709069): Remove these once the bots no longer use them.
+group("sdk_versioned_source_sets") {
+  visibility = [ "//:root_targets" ]
+  deps = [ ":deprecated_sdk_source_sets_to_build_at_all_supported_api_levels" ]
+}
+group("sdk_versioned_shared_libraries") {
+  visibility = [ "//:root_targets" ]
+  deps = [
+    ":deprecated_sdk_shared_libraries_to_build_at_all_supported_api_levels",
+  ]
 }
 
 python_binary("create_atom_manifest") {

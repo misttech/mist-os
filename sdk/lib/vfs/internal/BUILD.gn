@@ -55,7 +55,7 @@ sdk_shared_library("vfs_internal") {
   # This target should *only* be used within //sdk/lib/vfs. Do not modify this visibility list.
   visibility = [
     ":*",
-    "//build/sdk:sdk_versioned_shared_libraries",
+    "//build/sdk:deprecated_sdk_shared_libraries_to_build_at_all_supported_api_levels",
     "//sdk:core_cc_prebuilt_libraries",
     "//sdk/lib/vfs/cpp:*",
   ]

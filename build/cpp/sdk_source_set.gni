@@ -142,13 +142,12 @@ template("sdk_source_set") {
       deps += invoker.non_sdk_local_deps
     }
 
-    # 'source_set()' targets in the 'partner' or 'public' category that are not
-    # testonly must be tracked by
-    # //build/sdk:sdk_versioned_source_sets_allowlist for SDK consistency
-    # checks (see https://fxbug.dev/42069989).
+    # Ensure that 'sdk_source_set()' targets in the 'partner' or 'public' category that are not
+    # testonly are included in the SDK source_sets allowlist. The allowlist target's `visibility`
+    # list ensures that the target using this template is in the allowlist.
     if ((!defined(invoker.testonly) || !invoker.testonly) &&
         (invoker.category == "partner" || invoker.category == "public")) {
-      deps += [ "//build/sdk:sdk_versioned_source_sets_allowlist" ]
+      deps += [ "//build/sdk:sdk_source_sets_allowlist" ]
     }
 
     # TODO(https://fxbug.dev/42079584): All SDK libraries should compile with `sdk_extra_warnings`.
