@@ -11,6 +11,7 @@
 #include <lib/elfldltl/soname.h>
 
 #include "abi.h"
+#include "load.h"
 
 namespace ld {
 
@@ -80,6 +81,7 @@ class DecodedModule : public DecodedModuleBase {
   using Soname = elfldltl::Soname<Elf>;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
+  using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
   static_assert(std::is_move_constructible_v<LoadInfo> || std::is_copy_constructible_v<LoadInfo>);
@@ -149,12 +151,31 @@ class DecodedModule : public DecodedModuleBase {
     return reloc_info_;
   }
 
+  // This fills out module() and (if present) reloc_info() from the PT_DYNAMIC
+  // data read via the Memory object.  Additional observers can be passed as
+  // for ld::DecodeModuleDynamic, and the return value is the same as that.
+  template <class Diagnostics, class Memory, class... Observers>
+  constexpr fit::result<bool, cpp20::span<const Dyn>> DecodeDynamic(
+      Diagnostics& diag, Memory&& memory, const std::optional<Phdr>& dyn_phdr,
+      Observers&&... observers) {
+    auto decode = [&](auto&&... more) {
+      return DecodeModuleDynamic<Elf>(module(), diag, memory, dyn_phdr,
+                                      std::forward<Observers>(observers)...,
+                                      std::forward<decltype(more)>(more)...);
+    };
+    if constexpr (kRelocInfo) {
+      return decode(elfldltl::DynamicRelocationInfoObserver(reloc_info()));
+    } else {
+      return decode();
+    }
+  }
+
   // Set up the Abi<>::TlsModule in tls_module() based on the PT_TLS segment.
   // The modid must be nonzero, but its only actual use is in the module() and
   // tls_module_id() values returned by this object.  In a derived object only
   // used as a pure cache of the ELF file's metadata, constant 1 is fine.
   template <class Diagnostics, class Memory>
-  bool SetTls(Diagnostics& diag, Memory& memory, const Phdr& tls_phdr, size_type modid) {
+  constexpr bool SetTls(Diagnostics& diag, Memory& memory, const Phdr& tls_phdr, size_type modid) {
     using PhdrError = elfldltl::internal::PhdrError<elfldltl::ElfPhdrType::kTls>;
 
     assert(modid != 0);

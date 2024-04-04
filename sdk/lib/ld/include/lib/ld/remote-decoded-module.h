@@ -175,13 +175,11 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
 
     // Decode everything else from the PT_DYNAMIC data.  Each DT_NEEDED has an
     // offset into the DT_STRTAB, but the single pass finds DT_STRTAB and sees
-    // each DT_NEEDED at the same time.  So the observer just collects their
-    // offsets and then those are reified into strings afterwards.
+    // each DT_NEEDED at the same time.  So the NeededObserver just collects
+    // their offsets and then those are reified into strings afterwards.
     elfldltl::StdContainer<std::vector>::Container<size_type> needed_offsets;
 
-    if (auto result = DecodeModuleDynamic<Elf>(
-            this->module(), diag, memory, dyn_phdr, NeededObserver(needed_offsets),
-            elfldltl::DynamicRelocationInfoObserver(this->reloc_info()));
+    if (auto result = this->DecodeDynamic(diag, memory, dyn_phdr, NeededObserver(needed_offsets));
         result.is_error()) [[unlikely]] {
       return result.error_value();
     }
