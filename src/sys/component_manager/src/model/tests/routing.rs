@@ -3400,7 +3400,7 @@ async fn source_component_stopping_when_routing() {
     );
 
     let root = test_topology.look_up(Moniker::default()).await;
-    assert!(!root.is_started());
+    assert!(!root.is_started().await);
 
     // Start the component.
     let root = root
@@ -3408,7 +3408,7 @@ async fn source_component_stopping_when_routing() {
         .await
         .expect("failed to start root");
     test_topology.runner.wait_for_urls(&["test:///root_resolved"]).await;
-    assert!(root.is_started());
+    assert!(root.is_started().await);
 
     // Start to stop the component. This will stall because the framework will be
     // waiting the controller to respond.
@@ -3451,7 +3451,7 @@ async fn source_component_stopping_when_routing() {
         client_end.basic_info().unwrap().related_koid,
         server_end.basic_info().unwrap().koid
     );
-    assert!(root.is_started());
+    assert!(root.is_started().await);
 }
 
 /// If the provider component of a capability is stopped before the open request is
@@ -3478,7 +3478,7 @@ async fn source_component_stopped_after_routing_before_open() {
     test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
 
     let root = test_topology.look_up(Moniker::default()).await;
-    assert!(!root.is_started());
+    assert!(!root.is_started().await);
 
     // Request a capability from the component.
     let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
@@ -3497,15 +3497,15 @@ async fn source_component_stopped_after_routing_before_open() {
     );
 
     // It should be started with the capability access start reason.
-    assert!(root.is_started());
+    assert!(root.is_started().await);
     assert_matches!(
-        root.lock_execution().runtime.as_ref().unwrap().start_reason,
+        root.lock_state().await.get_started_state().unwrap().start_reason,
         StartReason::AccessCapability { .. }
     );
 
     // Stop the component.
     root.stop().await.expect("failed to stop");
-    assert!(!root.is_started());
+    assert!(!root.is_started().await);
 
     // Connect to the capability. The component should be started again.
     let (client_end, server_end) = zx::Channel::create();
@@ -3517,9 +3517,9 @@ async fn source_component_stopped_after_routing_before_open() {
         server_end.basic_info().unwrap().koid
     );
 
-    assert!(root.is_started());
+    assert!(root.is_started().await);
     assert_matches!(
-        root.lock_execution().runtime.as_ref().unwrap().start_reason,
+        root.lock_state().await.get_started_state().unwrap().start_reason,
         StartReason::OutgoingDirectory
     );
 }
@@ -3547,7 +3547,7 @@ async fn source_component_shutdown_after_routing_before_open() {
     test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
 
     let root = test_topology.look_up(Moniker::default()).await;
-    assert!(!root.is_started());
+    assert!(!root.is_started().await);
 
     // Request a capability from the component.
     let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
@@ -3566,21 +3566,21 @@ async fn source_component_shutdown_after_routing_before_open() {
     );
 
     // It should be started with the capability access start reason.
-    assert!(root.is_started());
+    assert!(root.is_started().await);
     assert_matches!(
-        root.lock_execution().runtime.as_ref().unwrap().start_reason,
+        root.lock_state().await.get_started_state().unwrap().start_reason,
         StartReason::AccessCapability { .. }
     );
 
     // Shutdown the component.
     root.shutdown(ShutdownType::Instance).await.expect("failed to stop");
-    assert!(!root.is_started());
+    assert!(!root.is_started().await);
 
     // Connect to the capability. The request will fail and the component is not started.
     let (client_end, server_end) = zx::Channel::create();
     open.open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
     fasync::OnSignals::new(&client_end, zx::Signals::CHANNEL_PEER_CLOSED).await.unwrap();
-    assert!(!root.is_started());
+    assert!(!root.is_started().await);
 }
 
 /// A hook on the Resolved event that finishes when receives a value on an mpsc channel.
@@ -3828,7 +3828,7 @@ fn protocol_delivery_on_readable() {
         // `b` is stopped.
         let b = test.model.root().find_and_maybe_resolve(&"b".parse().unwrap()).await.unwrap();
         _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
-        assert!(!b.is_started());
+        assert!(!b.is_started().await);
 
         // Open the capability.
         let echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
@@ -3839,12 +3839,12 @@ fn protocol_delivery_on_readable() {
 
         // `b` is still stopped.
         _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
-        assert!(!b.is_started());
+        assert!(!b.is_started().await);
 
         // Make a request. `b` should only then start.
         capability_util::call_echo_and_validate_result(echo_proxy, ExpectedResult::Ok).await;
         _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
-        assert!(b.is_started());
+        assert!(b.is_started().await);
     });
     executor.run_until_stalled(&mut test_body).unwrap();
 }
@@ -3864,7 +3864,7 @@ fn protocol_delivery_on_readable_bail_when_unresolve() {
         // `b` is stopped.
         let b = test.model.root().find_and_maybe_resolve(&"b".parse().unwrap()).await.unwrap();
         _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
-        assert!(!b.is_started());
+        assert!(!b.is_started().await);
 
         // Open the capability.
         let echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
@@ -3875,7 +3875,7 @@ fn protocol_delivery_on_readable_bail_when_unresolve() {
 
         // `b` is still stopped.
         _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
-        assert!(!b.is_started());
+        assert!(!b.is_started().await);
 
         // Unresolve b. This should drop the request from `a`.
         b.unresolve().await.unwrap();
@@ -3885,7 +3885,7 @@ fn protocol_delivery_on_readable_bail_when_unresolve() {
         // Make a request which should fail.
         echo_proxy.echo_string(Some("hippos")).await.expect_err("FIDL call should fail");
         _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
-        assert!(!b.is_started());
+        assert!(!b.is_started().await);
     });
     executor.run_until_stalled(&mut test_body).unwrap();
 }
@@ -3913,7 +3913,7 @@ fn capability_requested_protocol_on_delivery_readable() {
 
         // Provider should remain stopped.
         _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
-        assert!(!provider.is_started());
+        assert!(!provider.is_started().await);
 
         // Make a request by writing to the channel. Provider should only then start.
         let echo_call = echo_proxy.echo_string(Some("hippos"));
@@ -3922,7 +3922,7 @@ fn capability_requested_protocol_on_delivery_readable() {
             .await
             .expect_pending("Request should be buffered in the channel in the event stream");
         _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
-        assert!(provider.is_started());
+        assert!(provider.is_started().await);
 
         // After starting, the provider should observe the request in its event stream.
         let event_stream = {

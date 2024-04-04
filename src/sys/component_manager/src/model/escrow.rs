@@ -139,6 +139,7 @@ struct ActorImpl {
     nonblocking_start_task: TaskGroup,
 }
 
+#[derive(Debug)]
 enum State {
     /// The component has stopped.
     Stopped { escrow: EscrowedState },

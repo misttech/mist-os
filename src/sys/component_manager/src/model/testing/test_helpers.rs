@@ -63,9 +63,13 @@ impl ComponentInfo {
         // being the Channel passed to the Runner to use for the
         // ComponentController protocol.
         let koid = {
-            let component = component.lock_execution();
-            let runtime = component.runtime.as_ref().expect("runtime is unexpectedly missing");
-            runtime.program_koid().expect("program is unexpectedly missing")
+            component
+                .lock_state()
+                .await
+                .get_started_state()
+                .expect("expected component to be running")
+                .program_koid()
+                .expect("program is unexpectedly missing")
         };
 
         ComponentInfo { component, channel_id: koid }
@@ -81,7 +85,6 @@ impl ComponentInfo {
             .expect("request map didn't have channel id, perhaps the controller wasn't started?");
         assert_eq!(*request_vec, vec![ControlMessage::Stop]);
 
-        assert!(self.component.lock_execution().runtime.is_none());
         assert!(self.component.lock_state().await.is_shut_down());
     }
 
@@ -95,20 +98,18 @@ impl ComponentInfo {
             assert_eq!(*request_vec, vec![]);
         }
 
-        assert!(self.component.lock_execution().runtime.is_some());
+        assert!(!self.component.lock_state().await.is_shut_down());
     }
 }
 
 pub async fn execution_is_shut_down(component: &ComponentInstance) -> bool {
-    let state = component.lock_state().await;
-    let execution = component.lock_execution();
-    execution.runtime.is_none() && state.is_shut_down()
+    component.lock_state().await.is_shut_down()
 }
 
 /// Returns true if the given child (live or deleting) exists.
 pub async fn has_child<'a>(component: &'a ComponentInstance, moniker: &'a str) -> bool {
     match *component.lock_state().await {
-        InstanceState::Resolved(ref s) => {
+        InstanceState::Resolved(ref s) | InstanceState::Started(ref s, _) => {
             s.children().map(|(k, _)| k.clone()).any(|m| m == moniker.try_into().unwrap())
         }
         InstanceState::Shutdown(ref state, _) => {
@@ -121,18 +122,22 @@ pub async fn has_child<'a>(component: &'a ComponentInstance, moniker: &'a str) -
 
 /// Return the incarnation id of the given child.
 pub async fn get_incarnation_id<'a>(component: &'a ComponentInstance, moniker: &'a str) -> u32 {
-    match *component.lock_state().await {
-        InstanceState::Resolved(ref s) => {
-            s.get_child(&moniker.try_into().unwrap()).unwrap().incarnation_id()
-        }
-        _ => panic!("not resolved"),
-    }
+    component
+        .lock_state()
+        .await
+        .get_resolved_state()
+        .expect("not resolved")
+        .get_child(&moniker.try_into().unwrap())
+        .unwrap()
+        .incarnation_id()
 }
 
 /// Return all monikers of the live children of the given `component`.
 pub async fn get_live_children(component: &ComponentInstance) -> HashSet<ChildName> {
     match *component.lock_state().await {
-        InstanceState::Resolved(ref s) => s.children().map(|(m, _)| m.clone()).collect(),
+        InstanceState::Resolved(ref s) | InstanceState::Started(ref s, _) => {
+            s.children().map(|(m, _)| m.clone()).collect()
+        }
         InstanceState::Shutdown(ref s, _) => s.children.iter().map(|(m, _)| m.clone()).collect(),
         InstanceState::Destroyed => HashSet::new(),
         _ => panic!("not resolved"),
@@ -144,10 +149,14 @@ pub async fn get_live_child<'a>(
     component: &'a ComponentInstance,
     child: &'a str,
 ) -> Arc<ComponentInstance> {
-    match *component.lock_state().await {
-        InstanceState::Resolved(ref s) => s.get_child(&child.try_into().unwrap()).unwrap().clone(),
-        _ => panic!("not resolved"),
-    }
+    component
+        .lock_state()
+        .await
+        .get_resolved_state()
+        .expect("not resolved")
+        .get_child(&child.try_into().unwrap())
+        .unwrap()
+        .clone()
 }
 
 pub async fn list_directory<'a>(root_proxy: &'a fio::DirectoryProxy) -> Vec<String> {

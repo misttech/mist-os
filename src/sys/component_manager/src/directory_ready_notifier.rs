@@ -262,7 +262,7 @@ impl EventSynthesisProvider for DirectoryReadyNotifier {
             }
         };
         let decl = match *component.lock_state().await {
-            InstanceState::Resolved(ref s) => s.decl().clone(),
+            InstanceState::Resolved(ref s) | InstanceState::Started(ref s, _) => s.decl().clone(),
             InstanceState::New
             | InstanceState::Unresolved(_)
             | InstanceState::Shutdown(_, _)
@@ -278,7 +278,7 @@ impl EventSynthesisProvider for DirectoryReadyNotifier {
         }
 
         let outgoing_dir = {
-            if !component.lock_execution().is_started() {
+            if !component.lock_state().await.is_started() {
                 return vec![];
             }
             Some(component.get_outgoing())

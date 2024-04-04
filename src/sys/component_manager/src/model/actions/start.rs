@@ -8,7 +8,7 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::{
-            ComponentInstance, ExecutionState, IncomingCapabilities, InstanceState, StartReason,
+            ComponentInstance, IncomingCapabilities, InstanceState, StartReason,
             StartedInstanceState,
         },
         error::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError},
@@ -271,11 +271,8 @@ async fn start_component(
     {
         let mut state = component.lock_state().await;
 
-        {
-            let execution = component.lock_execution();
-            if let Some(r) = should_return_early(&state, &execution, &component.moniker) {
-                return r;
-            }
+        if let Some(r) = should_return_early(&state, &component.moniker) {
+            return r;
         }
 
         let (diagnostics_sender, diagnostics_receiver) = oneshot::channel();
@@ -315,45 +312,36 @@ async fn start_component(
                 component_instance,
             };
 
-            // Create the `Program` and install it in the `Runtime`. Make sure that the
-            // `ExecutionState` lock is held while calling `Start` on the runner
-            // ([Program::start]). This guarantees that if the component exits and a `StopAction`
-            // is registered in response, the `StopAction` will find the `Runtime` and perform the
-            // appropriate actions.
-            let mut execution = component.lock_execution();
-            let program = Program::start(
-                &runner,
-                start_info,
-                escrowed_state,
-                diagnostics_sender,
-                namespace_scope,
-            )
-            .map_err(|err| StartActionError::StartProgramError { moniker: moniker.clone(), err })?;
-            pending_runtime.set_program(program, component.as_weak());
-            timestamp = pending_runtime.timestamp;
-            runtime_info = RuntimeInfo::new(timestamp, diagnostics_receiver);
-            runtime_dir = pending_runtime.runtime_dir().cloned();
-            execution.runtime = Some(pending_runtime);
-        } else {
-            // Set the runtime on this component even if there is no program associated with it.
-            // Formally, the component is still considered to be in the Started state. (This is
-            // still a meaningful state to represent, since a non-executable component can have
-            // executable eager children which are launched when this component is started.)
-            let mut execution = component.lock_execution();
-            timestamp = pending_runtime.timestamp;
-            runtime_info = RuntimeInfo::new(timestamp, diagnostics_receiver);
-            runtime_dir = None;
-            execution.runtime = Some(pending_runtime);
+            pending_runtime.set_program(
+                Program::start(
+                    &runner,
+                    start_info,
+                    escrowed_state,
+                    diagnostics_sender,
+                    namespace_scope,
+                )
+                .map_err(|err| StartActionError::StartProgramError {
+                    moniker: moniker.clone(),
+                    err,
+                })?,
+                component.as_weak(),
+            );
         }
 
-        // TODO(b/322564390): Move program_input_dict_additions into `ExecutionState`.
-        {
-            let resolved_state = match &mut *state {
-                InstanceState::Resolved(resolved_state) => resolved_state,
-                _ => panic!("expected component to be resolved"),
-            };
-            resolved_state.program_input_dict_additions = program_input_dict_additions;
-        }
+        timestamp = pending_runtime.timestamp;
+        runtime_info = RuntimeInfo::new(timestamp, diagnostics_receiver);
+        runtime_dir = pending_runtime.runtime_dir().cloned();
+
+        state.replace(|instance_state| match instance_state {
+            InstanceState::Resolved(resolved) => InstanceState::Started(resolved, pending_runtime),
+            other_state => panic!("starting an unresolved component: {:?}", other_state),
+        });
+
+        // TODO(b/322564390): Move program_input_dict_additions into `StartedInstanceState`.
+        state
+            .get_resolved_state_mut()
+            .expect("expected component to be resolved")
+            .program_input_dict_additions = program_input_dict_additions;
     }
 
     // Dispatch Started and DebugStarted events outside of the state lock, but under the
@@ -393,11 +381,10 @@ async fn start_component(
 /// due to `err` (for example, perhaps the component is destroyed or shut down).
 pub fn should_return_early(
     component: &InstanceState,
-    execution: &ExecutionState,
     moniker: &Moniker,
 ) -> Option<Result<(), StartActionError>> {
     match component {
-        InstanceState::Resolved(_) if execution.runtime.is_some() => Some(Ok(())),
+        InstanceState::Started(_, _) => Some(Ok(())),
         InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Resolved(_) => None,
         InstanceState::Shutdown(_, _) => {
             Some(Err(StartActionError::InstanceShutDown { moniker: moniker.clone() }))
@@ -872,8 +859,8 @@ mod tests {
             )
             .await
             .expect("failed to start child");
-            let execution = child.lock_execution();
-            let runtime = execution.runtime.as_ref().expect("child runtime is unexpectedly empty");
+            let state = child.lock_state().await;
+            let runtime = state.get_started_state().expect("child runtime is unexpectedly empty");
             assert!(runtime.timestamp > timestamp);
         }
 
@@ -881,8 +868,8 @@ mod tests {
             ActionSet::register(child.clone(), StopAction::new(false))
                 .await
                 .expect("failed to stop child");
-            let execution = child.lock_execution();
-            assert!(execution.runtime.is_none());
+            let state = child.lock_state().await;
+            assert!(state.get_started_state().is_none());
         }
 
         {
@@ -893,8 +880,8 @@ mod tests {
             )
             .await
             .expect("failed to start child");
-            let execution = child.lock_execution();
-            let runtime = execution.runtime.as_ref().expect("child runtime is unexpectedly empty");
+            let state = child.lock_state().await;
+            let runtime = state.get_started_state().expect("child runtime is unexpectedly empty");
             assert!(runtime.timestamp > timestamp);
         }
     }
@@ -911,8 +898,8 @@ mod tests {
             )
             .await
             .expect("failed to start child");
-            let execution = child.lock_execution();
-            let runtime = execution.runtime.as_ref().expect("child runtime is unexpectedly empty");
+            let state = child.lock_state().await;
+            let runtime = state.get_started_state().expect("child runtime is unexpectedly empty");
             assert!(runtime.timestamp > timestamp);
         }
 
@@ -920,8 +907,8 @@ mod tests {
             let () = ActionSet::register(child.clone(), StopAction::new(false))
                 .await
                 .expect("failed to stop child");
-            let execution = child.lock_execution();
-            assert!(execution.runtime.is_none());
+            let state = child.lock_state().await;
+            assert!(state.get_started_state().is_none());
         }
 
         let resolver = test_harness.resolver.as_mut();
@@ -960,29 +947,22 @@ mod tests {
 
     async fn get_resolved_decl(component: &Arc<ComponentInstance>) -> ComponentDecl {
         let state = component.lock_state().await;
-        let resolved_state = match &*state {
-            InstanceState::Resolved(resolve_state) => resolve_state,
-            _ => panic!("expected component to be resolved"),
-        };
-
-        resolved_state.decl().clone()
+        state.get_resolved_state().expect("expected component to be resolved").decl().clone()
     }
 
     #[fuchsia::test]
     async fn check_should_return_early() {
         let m = Moniker::try_from(vec!["foo"]).unwrap();
-        let es = ExecutionState::new();
 
         // Checks based on InstanceState:
-        assert!(should_return_early(&InstanceState::New, &es, &m).is_none());
+        assert!(should_return_early(&InstanceState::New, &m).is_none());
         assert!(should_return_early(
             &InstanceState::Unresolved(UnresolvedInstanceState::new(ComponentInput::default())),
-            &es,
             &m
         )
         .is_none());
         assert_matches!(
-            should_return_early(&InstanceState::Destroyed, &es, &m),
+            should_return_early(&InstanceState::Destroyed, &m),
             Some(Err(StartActionError::InstanceDestroyed { moniker: _ }))
         );
         let (_, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
@@ -1004,7 +984,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(should_return_early(&InstanceState::Resolved(ris), &es, &m).is_none());
+        assert!(should_return_early(&InstanceState::Resolved(ris), &m).is_none());
 
         // Check for already_started:
         {
@@ -1017,10 +997,9 @@ mod tests {
             )
             .await
             .unwrap();
-            let mut es = ExecutionState::new();
-            es.runtime = Some(StartedInstanceState::new(StartReason::Debug, None, None));
+            let started_state = StartedInstanceState::new(StartReason::Debug, None, None);
             assert_matches!(
-                should_return_early(&InstanceState::Resolved(ris), &es, &m),
+                should_return_early(&InstanceState::Started(ris, started_state), &m),
                 Some(Ok(()))
             );
         }
@@ -1029,9 +1008,8 @@ mod tests {
         let _ = child.stop_instance_internal(true).await;
         assert!(child.lock_state().await.is_shut_down());
         let state = child.lock_state().await;
-        let execution = child.lock_execution();
         assert_matches!(
-            should_return_early(&*state, &execution, &m),
+            should_return_early(&*state, &m),
             Some(Err(StartActionError::InstanceShutDown { moniker: _ }))
         );
     }
@@ -1048,10 +1026,6 @@ mod tests {
         .expect("failed to start child");
 
         let m = Moniker::try_from(vec!["TEST_CHILD_NAME"]).unwrap();
-        let execution = child.lock_execution();
-        assert_matches!(
-            should_return_early(&*child.lock_state().await, &execution, &m),
-            Some(Ok(()))
-        );
+        assert_matches!(should_return_early(&*child.lock_state().await, &m), Some(Ok(())));
     }
 }

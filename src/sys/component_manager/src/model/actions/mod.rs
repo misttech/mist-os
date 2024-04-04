@@ -491,43 +491,30 @@ pub(crate) mod test_utils {
         );
 
         let parent_state = parent.lock_state().await;
-        let parent_resolved_state = match *parent_state {
-            InstanceState::Resolved(ref s) => s,
-            _ => panic!("not resolved"),
-        };
+        let parent_resolved_state = parent_state.get_resolved_state().expect("not resolved");
 
         let child_state = child.lock_state().await;
-        let child_execution = child.lock_execution();
         let found_child = parent_resolved_state.get_child(child.child_moniker().unwrap());
 
-        found_child.is_none()
-            && matches!(*child_state, InstanceState::Destroyed)
-            && child_execution.runtime.is_none()
+        found_child.is_none() && matches!(*child_state, InstanceState::Destroyed)
     }
 
     pub async fn is_stopped(component: &ComponentInstance, moniker: &ChildName) -> bool {
-        match *component.lock_state().await {
-            InstanceState::Resolved(ref s) => match s.get_child(moniker) {
-                Some(child) => !child.is_started(),
-                None => false,
-            },
-            InstanceState::Shutdown(_, _) => true,
-            InstanceState::Destroyed => false,
-            InstanceState::New | InstanceState::Unresolved(_) => {
-                panic!("not resolved")
+        if let Some(resolved_state) = component.lock_state().await.get_resolved_state() {
+            if let Some(child) = resolved_state.get_child(moniker) {
+                return !child.is_started().await;
             }
         }
+        false
     }
 
     pub async fn is_destroyed(component: &ComponentInstance) -> bool {
         let state = component.lock_state().await;
-        let execution = component.lock_execution();
-        matches!(*state, InstanceState::Destroyed) && execution.runtime.is_none()
+        matches!(*state, InstanceState::Destroyed)
     }
 
     pub async fn is_resolved(component: &ComponentInstance) -> bool {
-        let state = component.lock_state().await;
-        matches!(*state, InstanceState::Resolved(_))
+        component.lock_state().await.get_resolved_state().is_some()
     }
 
     pub async fn is_discovered(component: &ComponentInstance) -> bool {

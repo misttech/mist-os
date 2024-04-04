@@ -3,11 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{
-        actions::ShutdownType,
-        component::{ComponentInstance, InstanceState},
-        model::Model,
-    },
+    crate::model::{actions::ShutdownType, component::ComponentInstance, model::Model},
     anyhow::{format_err, Context as _, Error},
     fidl_fuchsia_sys2::*,
     fuchsia_async::{self as fasync},
@@ -94,13 +90,12 @@ async fn get_all_remaining_monikers(root: &Arc<ComponentInstance>) -> Vec<String
     queue.push_back(root.clone());
 
     while let Some(next) = queue.pop_front() {
-        if let InstanceState::Resolved(resolved_state) = &*next.lock_state().await {
+        let state = next.lock_state().await;
+        if let Some(resolved_state) = state.get_resolved_state() {
             queue.extend(resolved_state.children().map(|(_, i)| i.clone()));
-
-            let execution_state = next.lock_execution();
-            if execution_state.is_started() {
-                monikers.push(next.moniker.to_string());
-            }
+        }
+        if state.is_started() {
+            monikers.push(next.moniker.to_string());
         }
     }
 

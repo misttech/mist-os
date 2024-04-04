@@ -4,7 +4,7 @@
 
 use {
     crate::model::{
-        component::{ComponentInstance, InstanceState},
+        component::ComponentInstance,
         error::ModelError,
         events::{dispatcher::EventDispatcherScope, event::Event, registry::ComponentEventRoute},
         hooks::{Event as HookEvent, EventType},
@@ -232,25 +232,17 @@ fn get_subcomponents(
         loop {
             match pending.pop() {
                 None => return None,
-                Some(curr_component) => {
-                    if visited.contains(&curr_component.moniker) {
+                Some(current) => {
+                    if visited.contains(&current.moniker) {
                         continue;
                     }
-                    let state_guard = curr_component.lock_state().await;
-                    match *state_guard {
-                        InstanceState::New
-                        | InstanceState::Unresolved(_)
-                        | InstanceState::Shutdown(_, _)
-                        | InstanceState::Destroyed => {}
-                        InstanceState::Resolved(ref s) => {
-                            for (_, child) in s.children() {
-                                pending.push(child.clone());
-                            }
+                    if let Some(resolved_state) = current.lock_state().await.get_resolved_state() {
+                        for (_, child) in resolved_state.children() {
+                            pending.push(child.clone());
                         }
                     }
-                    drop(state_guard);
-                    visited.insert(curr_component.moniker.clone());
-                    return Some((curr_component, (pending, visited)));
+                    visited.insert(current.moniker.clone());
+                    return Some((current, (pending, visited)));
                 }
             }
         }

@@ -6,7 +6,7 @@ use {
     crate::{
         capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
-            component::{ComponentInstance, InstanceState, WeakComponentInstance},
+            component::{ComponentInstance, WeakComponentInstance},
             error::OpenExposedDirError,
             model::Model,
             namespace::create_namespace,
@@ -231,32 +231,17 @@ pub async fn get_instance(
 
     let resolved_info = {
         let state = instance.lock_state().await;
-        let execution = instance.lock_execution();
 
-        match &*state {
-            InstanceState::Resolved(r) => {
-                let url = r.address().url().to_string();
-
-                let execution_info = if let Some(runtime) = &execution.runtime {
-                    let start_reason = runtime.start_reason.to_string();
-                    let execution_info = Some(fsys::ExecutionInfo {
-                        start_reason: Some(start_reason),
-                        ..Default::default()
-                    });
-                    execution_info
-                } else {
-                    None
-                };
-
-                let resolved_info = Some(fsys::ResolvedInfo {
-                    resolved_url: Some(url),
-                    execution_info,
+        if let Some(resolved_state) = state.get_resolved_state() {
+            let resolved_url = Some(resolved_state.address().url().to_string());
+            let execution_info =
+                state.get_started_state().map(|started_state| fsys::ExecutionInfo {
+                    start_reason: Some(started_state.start_reason.to_string()),
                     ..Default::default()
                 });
-
-                resolved_info
-            }
-            _ => None,
+            Some(fsys::ResolvedInfo { resolved_url, execution_info, ..Default::default() })
+        } else {
+            None
         }
     };
 
@@ -287,10 +272,12 @@ pub async fn get_resolved_declaration(
 
     let state = instance.lock_state().await;
 
-    let decl = match &*state {
-        InstanceState::Resolved(r) => r.decl().clone().native_into_fidl(),
-        _ => return Err(fsys::GetDeclarationError::InstanceNotResolved),
-    };
+    let decl = state
+        .get_resolved_state()
+        .ok_or(fsys::GetDeclarationError::InstanceNotResolved)?
+        .decl()
+        .clone()
+        .native_into_fidl();
 
     let bytes = fidl::persist(&decl).map_err(|error| {
         warn!(%moniker, %error, "RealmQuery failed to encode manifest");
@@ -344,25 +331,24 @@ async fn resolve_declaration(
     let (address, environment) = {
         // this lock needs to be dropped before we try to call resolve, since routing the resolver
         // may also need to take this lock
-        match &*instance.lock_state().await {
-            InstanceState::Resolved(r) => {
-                trace!("found parent, and it is resolved");
-                let address = if url.starts_with("#") {
-                    r.address_for_relative_url(url)
-                        .map_err(|_| fsys::GetDeclarationError::BadUrl)?
-                } else {
-                    ComponentAddress::from_absolute_url(&url)
-                        .map_err(|_| fsys::GetDeclarationError::BadUrl)?
-                };
-                let collections = r.collections();
-                let collection_decl = collections
-                    .iter()
-                    .find(|c| c.name == collection)
-                    .ok_or(fsys::GetDeclarationError::BadChildLocation)?;
-                (address, r.environment_for_collection(&instance, &collection_decl))
-            }
-            _ => return Err(fsys::GetDeclarationError::InstanceNotResolved),
-        }
+        let state = instance.lock_state().await;
+        let resolved_state =
+            state.get_resolved_state().ok_or(fsys::GetDeclarationError::InstanceNotResolved)?;
+        trace!("found parent, and it is resolved");
+        let address = if url.starts_with("#") {
+            resolved_state
+                .address_for_relative_url(url)
+                .map_err(|_| fsys::GetDeclarationError::BadUrl)?
+        } else {
+            ComponentAddress::from_absolute_url(&url)
+                .map_err(|_| fsys::GetDeclarationError::BadUrl)?
+        };
+        let collections = resolved_state.collections();
+        let collection_decl = collections
+            .iter()
+            .find(|c| c.name == collection)
+            .ok_or(fsys::GetDeclarationError::BadChildLocation)?;
+        (address, resolved_state.environment_for_collection(&instance, &collection_decl))
     };
 
     trace!(
@@ -418,13 +404,13 @@ pub async fn get_structured_config(
         .ok_or(fsys::GetStructuredConfigError::InstanceNotFound)?;
 
     let state = instance.lock_state().await;
-
-    let config = match &*state {
-        InstanceState::Resolved(r) => {
-            r.config().ok_or(fsys::GetStructuredConfigError::NoConfig)?.clone().into()
-        }
-        _ => return Err(fsys::GetStructuredConfigError::InstanceNotResolved),
-    };
+    let config = state
+        .get_resolved_state()
+        .ok_or(fsys::GetStructuredConfigError::InstanceNotResolved)?
+        .config()
+        .ok_or(fsys::GetStructuredConfigError::NoConfig)?
+        .clone()
+        .into();
 
     Ok(config)
 }
@@ -442,23 +428,20 @@ async fn construct_namespace(
     // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
     let instance =
         model.root().find(&moniker).await.ok_or(fsys::ConstructNamespaceError::InstanceNotFound)?;
-    let mut state = instance.lock_state().await;
-    match &mut *state {
-        InstanceState::Resolved(r) => {
-            let namespace = create_namespace(
-                r.package(),
-                &instance,
-                r.decl(),
-                &r.program_input_dict,
-                instance.execution_scope.clone(),
-            )
-            .await
-            .unwrap();
-            let ns = namespace.serve().unwrap();
-            Ok(ns.into())
-        }
-        _ => Err(fsys::ConstructNamespaceError::InstanceNotResolved),
-    }
+    let state = instance.lock_state().await;
+    let resolved_state =
+        state.get_resolved_state().ok_or(fsys::ConstructNamespaceError::InstanceNotResolved)?;
+    let namespace = create_namespace(
+        resolved_state.package(),
+        &instance,
+        resolved_state.decl(),
+        &resolved_state.program_input_dict,
+        instance.execution_scope.clone(),
+    )
+    .await
+    .unwrap();
+    let ns = namespace.serve().unwrap();
+    Ok(ns.into())
 }
 
 async fn open(
@@ -497,10 +480,9 @@ async fn open(
             }
         }
         fsys::OpenDirType::RuntimeDir => {
-            let execution = instance.lock_execution();
-            let dir = execution
-                .runtime
-                .as_ref()
+            let state = instance.lock_state().await;
+            let dir = state
+                .get_started_state()
                 .ok_or(fsys::OpenError::InstanceNotRunning)?
                 .runtime_dir()
                 .ok_or(fsys::OpenError::NoSuchDir)?;
@@ -508,14 +490,14 @@ async fn open(
         }
         fsys::OpenDirType::PackageDir => {
             let mut state = instance.lock_state().await;
-            match &mut *state {
-                InstanceState::Resolved(r) => {
+            match state.get_resolved_state_mut() {
+                Some(r) => {
                     let pkg = r.package().ok_or(fsys::OpenError::NoSuchDir)?;
                     pkg.package_dir
                         .open(flags, mode, path, object)
                         .map_err(|_| fsys::OpenError::FidlError)
                 }
-                _ => Err(fsys::OpenError::InstanceNotResolved),
+                None => Err(fsys::OpenError::InstanceNotResolved),
             }
         }
         fsys::OpenDirType::ExposedDir => {
@@ -544,11 +526,9 @@ async fn open(
             let path =
                 vfs::path::Path::validate_and_split(path).map_err(|_| fsys::OpenError::BadPath)?;
 
-            let mut state = instance.lock_state().await;
-            let resolved_state = match &mut *state {
-                InstanceState::Resolved(r) => Ok(r),
-                _ => Err(fsys::OpenError::InstanceNotResolved),
-            }?;
+            let state = instance.lock_state().await;
+            let resolved_state =
+                state.get_resolved_state().ok_or(fsys::OpenError::InstanceNotResolved)?;
 
             resolved_state.namespace_dir().await.map_err(|_| fsys::OpenError::NoSuchDir)?.open(
                 instance.execution_scope.clone(),
@@ -586,19 +566,18 @@ async fn connect_to_storage_admin(
     let task_group = instance.nonblocking_task_group();
 
     let storage_decl = {
-        let mut state = instance.lock_state().await;
-        match &mut *state {
-            InstanceState::Resolved(r) => r
-                .decl()
-                .find_storage_source(
-                    &storage_name
-                        .parse()
-                        .map_err(|_| fsys::ConnectToStorageAdminError::BadCapability)?,
-                )
-                .ok_or(fsys::ConnectToStorageAdminError::StorageNotFound)?
-                .clone(),
-            _ => return Err(fsys::ConnectToStorageAdminError::InstanceNotResolved),
-        }
+        let state = instance.lock_state().await;
+        state
+            .get_resolved_state()
+            .ok_or(fsys::ConnectToStorageAdminError::InstanceNotResolved)?
+            .decl()
+            .find_storage_source(
+                &storage_name
+                    .parse()
+                    .map_err(|_| fsys::ConnectToStorageAdminError::BadCapability)?,
+            )
+            .ok_or(fsys::ConnectToStorageAdminError::StorageNotFound)?
+            .clone()
     };
 
     task_group.spawn(async move {
@@ -665,31 +644,21 @@ async fn get_fidl_instance_and_children(
 
     let (resolved_info, children) = {
         let state = instance.lock_state().await;
-        let execution = instance.lock_execution();
-        match &*state {
-            InstanceState::Resolved(r) => {
-                let url = r.address().url().to_string();
-                let children = r.children().map(|(_, c)| c.clone()).collect();
 
-                let execution_info = if let Some(runtime) = &execution.runtime {
-                    let start_reason = runtime.start_reason.to_string();
-                    let execution_info = Some(fsys::ExecutionInfo {
-                        start_reason: Some(start_reason),
-                        ..Default::default()
-                    });
-                    execution_info
-                } else {
-                    None
-                };
-
-                let resolved_info = Some(fsys::ResolvedInfo {
-                    resolved_url: Some(url),
-                    execution_info,
+        if let Some(resolved_state) = state.get_resolved_state() {
+            let resolved_url = Some(resolved_state.address().url().to_string());
+            let children = resolved_state.children().map(|(_, c)| c.clone()).collect();
+            let execution_info =
+                state.get_started_state().map(|started_state| fsys::ExecutionInfo {
+                    start_reason: Some(started_state.start_reason.to_string()),
                     ..Default::default()
                 });
-                (resolved_info, children)
-            }
-            _ => (None, vec![]),
+            (
+                Some(fsys::ResolvedInfo { resolved_url, execution_info, ..Default::default() }),
+                children,
+            )
+        } else {
+            (None, vec![])
         }
     };
 

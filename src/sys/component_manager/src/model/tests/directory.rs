@@ -77,7 +77,7 @@ async fn starting_directory_using_target_component_does_not_start_source() {
     let b = test.model.root().find_and_maybe_resolve(&"b".parse().unwrap()).await.unwrap();
     let c = test.model.root().find_and_maybe_resolve(&"c".parse().unwrap()).await.unwrap();
 
-    assert!(!c.is_started());
+    assert!(!c.is_started().await);
 
     // Start `b` and get a hold of the directory connection.
     b.ensure_started(&StartReason::Debug).await.unwrap();
@@ -96,7 +96,7 @@ async fn starting_directory_using_target_component_does_not_start_source() {
     }
 
     // `c` should remain not started.
-    assert!(!c.is_started());
+    assert!(!c.is_started().await);
 
     // Make some round-trip calls on the directory.
     {
@@ -107,7 +107,7 @@ async fn starting_directory_using_target_component_does_not_start_source() {
     }
 
     // `c` should be started now.
-    assert!(c.is_started());
+    assert!(c.is_started().await);
 }
 
 /// If component `b` uses a directory from `c`, and `b` makes multiple `Open`

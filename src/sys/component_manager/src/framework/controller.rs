@@ -37,7 +37,7 @@ pub async fn serve_controller(
                     responder.send(Err(fcomponent::Error::InstanceNotFound))?;
                     continue;
                 };
-                if component.is_started() {
+                if component.is_started().await {
                     responder.send(Err(fcomponent::Error::InstanceAlreadyStarted))?;
                     continue;
                 }
@@ -104,7 +104,7 @@ pub async fn serve_controller(
                     continue;
                 }
                 let component = component.unwrap();
-                responder.send(Ok(component.is_started()))?;
+                responder.send(Ok(component.is_started().await))?;
             }
             fcomponent::ControllerRequest::GetExposedDictionary { dictionary, responder } => {
                 let res = async {

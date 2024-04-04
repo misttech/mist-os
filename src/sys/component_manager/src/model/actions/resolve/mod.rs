@@ -63,7 +63,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<(), ResolveAct
                     panic!("Component should be at least discovered")
                 }
                 InstanceState::Unresolved(_) => true,
-                InstanceState::Resolved(_) => false,
+                InstanceState::Resolved(_) | InstanceState::Started(_, _) => false,
                 InstanceState::Shutdown(_, _) => {
                     return Err(ResolveActionError::InstanceShutDown {
                         moniker: component.moniker.clone(),
@@ -108,6 +108,9 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<(), ResolveAct
                 let (instance_token_state, component_input_dict) = match state.deref_mut() {
                     InstanceState::Resolved(_) => {
                         panic!("Component was marked Resolved during Resolve action?");
+                    }
+                    InstanceState::Started(_, _) => {
+                        panic!("Component was marked Started during Resolve action?");
                     }
                     InstanceState::Shutdown(_, _) => {
                         return Err(ResolveActionError::InstanceShutDown {
@@ -194,7 +197,7 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
         let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.start(vec!["a"].try_into().unwrap()).await;
-        assert!(component_a.is_started());
+        assert!(component_a.is_started().await);
         assert!(is_resolved(&component_root).await);
         assert!(is_resolved(&component_a).await);
 

@@ -90,7 +90,7 @@ use {
         sync::{Arc, Weak},
         time::Duration,
     },
-    tracing::{debug, warn},
+    tracing::{debug, error, warn},
     version_history::AbiRevision,
     vfs::{
         directory::{
@@ -414,8 +414,6 @@ pub struct ComponentInstance {
     // These locks must be taken in the order declared if held simultaneously.
     /// The component's mutable state.
     state: Mutex<InstanceState>,
-    /// The component's execution state.
-    execution: std::sync::Mutex<ExecutionState>,
     /// Actions on the instance that must eventually be completed.
     actions: Mutex<ActionSet>,
     /// Tasks owned by this component instance that will be cancelled if the component is
@@ -478,7 +476,6 @@ impl ComponentInstance {
             context,
             parent,
             state: Mutex::new(InstanceState::New),
-            execution: std::sync::Mutex::new(ExecutionState::new()),
             actions: Mutex::new(ActionSet::new()),
             hooks,
             nonblocking_task_group: TaskGroup::new(),
@@ -492,12 +489,6 @@ impl ComponentInstance {
     // TODO(b/309656051): Remove this method from ComponentInstance's public API
     pub async fn lock_state(&self) -> MutexGuard<'_, InstanceState> {
         self.state.lock().await
-    }
-
-    /// Locks and returns the instance's execution state.
-    // TODO(b/309656051): Remove this method from ComponentInstance's public API
-    pub fn lock_execution(&self) -> std::sync::MutexGuard<'_, ExecutionState> {
-        self.execution.lock().unwrap()
     }
 
     /// Locks and returns the instance's action set.
@@ -519,8 +510,8 @@ impl ComponentInstance {
     }
 
     /// Returns true if the component is started, i.e. when it has a runtime.
-    pub fn is_started(&self) -> bool {
-        self.lock_execution().is_started()
+    pub async fn is_started(&self) -> bool {
+        self.lock_state().await.is_started()
     }
 
     /// Locks and returns a lazily resolved and populated `ResolvedInstanceState`. Does not
@@ -532,12 +523,6 @@ impl ComponentInstance {
         self: &'a Arc<Self>,
     ) -> Result<MappedMutexGuard<'a, InstanceState, ResolvedInstanceState>, ActionError> {
         loop {
-            fn get_resolved(s: &mut InstanceState) -> &mut ResolvedInstanceState {
-                match s {
-                    InstanceState::Resolved(s) => s,
-                    _ => panic!("not resolved"),
-                }
-            }
             /// Returns Ok(Some(_)) when the component is in a resolved state, Ok(None) when the
             /// component is in a state from which it can be resolved, and Err(_) when the
             /// component is in a state from which it cannot be resolved.
@@ -548,8 +533,10 @@ impl ComponentInstance {
                 ActionError,
             > {
                 let state = self_.state.lock().await;
-                if let InstanceState::Resolved(_) = *state {
-                    return Ok(Some(MutexGuard::map(state, get_resolved)));
+                if state.get_resolved_state().is_some() {
+                    return Ok(Some(MutexGuard::map(state, |s| {
+                        s.get_resolved_state_mut().expect("not resolved")
+                    })));
                 }
                 if let InstanceState::Destroyed = *state {
                     return Err(ResolveActionError::InstanceDestroyed {
@@ -754,16 +741,10 @@ impl ComponentInstance {
     ) -> Result<(), ActionError> {
         let incarnation = {
             let state = self.lock_state().await;
-            let state = match *state {
-                InstanceState::Resolved(ref s) => s,
-                _ => {
-                    return Err(DestroyActionError::InstanceNotResolved {
-                        moniker: self.moniker.clone(),
-                    }
-                    .into())
-                }
-            };
-            if let Some(c) = state.get_child(&child_moniker) {
+            let resolved_state = state
+                .get_resolved_state()
+                .ok_or(DestroyActionError::InstanceNotResolved { moniker: self.moniker.clone() })?;
+            if let Some(c) = resolved_state.get_child(&child_moniker) {
                 c.incarnation_id()
             } else {
                 let moniker = self.moniker.child(child_moniker.clone());
@@ -789,7 +770,7 @@ impl ComponentInstance {
     }
 
     /// Performs the stop protocol for this component instance. `shut_down` determines whether the
-    /// instance is to be put in the shutdown state; see documentation on [ExecutionState].
+    /// instance is to be put into `InstanceState::Resolved` or `InstanceState::Shutdown`.
     ///
     /// Clients should not call this function directly, except for `StopAction` and
     /// `ShutdownAction`.
@@ -801,10 +782,16 @@ impl ComponentInstance {
         self: &Arc<Self>,
         shut_down: bool,
     ) -> Result<(), StopActionError> {
-        let mut runtime = {
-            let mut execution = self.lock_execution();
-            execution.runtime.take()
-        };
+        // If the component is started, we first move it back to the resolved state. We will move
+        // it to the shutdown state after the stopping is complete.
+        let mut runtime = None;
+        self.lock_state().await.replace(|instance_state| match instance_state {
+            InstanceState::Started(resolved_state, started_state) => {
+                runtime = Some(started_state);
+                InstanceState::Resolved(resolved_state)
+            }
+            other_state => other_state,
+        });
 
         let stop_result = {
             if let Some(runtime) = &mut runtime {
@@ -856,10 +843,10 @@ impl ComponentInstance {
             }
         };
 
-        // TODO(b/322564390): Move program_input_dict_additions into `ExecutionState` to avoid locking InstanceState.
+        // TODO(b/322564390): Move program_input_dict_additions into `StartedInstanceState` to avoid locking InstanceState.
         {
             let mut state = self.lock_state().await;
-            if let InstanceState::Resolved(resolved_state) = &mut *state {
+            if let Some(resolved_state) = state.get_resolved_state_mut() {
                 resolved_state.program_input_dict_additions = None;
             };
         }
@@ -886,7 +873,7 @@ impl ComponentInstance {
         }
 
         if shut_down {
-            self.move_state_to_shutdown().await;
+            self.move_state_to_shutdown().await?;
         }
 
         if let ExtendedInstance::Component(parent) =
@@ -902,7 +889,9 @@ impl ComponentInstance {
         Ok(())
     }
 
-    async fn move_state_to_shutdown(self: &Arc<Self>) {
+    /// Moves the state of `self` to `InstanceState::Shutdown`, or panics. If the component was in
+    /// the `Started` state, the `StartedInstanceState` is returned.
+    async fn move_state_to_shutdown(self: &Arc<Self>) -> Result<(), StopActionError> {
         loop {
             fn get_storage_uses(resolved_state: &ResolvedInstanceState) -> Vec<UseStorageDecl> {
                 resolved_state
@@ -955,12 +944,16 @@ impl ComponentInstance {
                         resolved_state.to_unresolved(),
                     ))
                 }
+                InstanceState::Started(_, _) => {
+                    error!("component {} was started while it was stopping or shutting down, this should be impossible", &self.moniker);
+                    return Err(StopActionError::ComponentStartedDuringShutdown);
+                }
                 InstanceState::Shutdown(_, _) | InstanceState::Destroyed => None,
             };
             if let Some(new_state) = new_state {
                 state.set(new_state);
             }
-            return;
+            return Ok(());
         }
     }
 
@@ -971,14 +964,12 @@ impl ComponentInstance {
     ) {
         let single_run_colls = {
             let state = self.lock_state().await;
-            let state = match *state {
-                InstanceState::Resolved(ref s) => s,
-                _ => {
-                    // Component instance was not resolved, so no dynamic children.
-                    return;
-                }
-            };
-            let single_run_colls: HashSet<_> = state
+            if state.get_resolved_state().is_none() {
+                // Component instance was not resolved, so no dynamic children.
+                return;
+            }
+            let resolved_state = state.get_resolved_state().unwrap();
+            resolved_state
                 .decl()
                 .collections
                 .iter()
@@ -986,8 +977,7 @@ impl ComponentInstance {
                     fdecl::Durability::SingleRun => Some(c.name.clone()),
                     fdecl::Durability::Transient => None,
                 })
-                .collect();
-            single_run_colls
+                .collect::<HashSet<_>>()
         };
         if let Some(coll) = child_moniker.collection() {
             if single_run_colls.contains(coll) {
@@ -1046,7 +1036,7 @@ impl ComponentInstance {
     async fn destroy_dynamic_children(self: &Arc<Self>) -> Result<(), ActionError> {
         let moniker_incarnations: Vec<_> = {
             match *self.lock_state().await {
-                InstanceState::Resolved(ref state) => {
+                InstanceState::Resolved(ref state) | InstanceState::Started(ref state, _) => {
                     state.children().map(|(k, c)| (k.clone(), c.incarnation_id())).collect()
                 }
                 InstanceState::Shutdown(ref state, _) => {
@@ -1078,7 +1068,7 @@ impl ComponentInstance {
         let child = {
             let state = self.lock_state().await;
             match *state {
-                InstanceState::Resolved(ref s) => {
+                InstanceState::Resolved(ref s) | InstanceState::Started(ref s, _) => {
                     let child = s.get_child(&moniker).map(|r| r.clone());
                     child
                 }
@@ -1121,7 +1111,8 @@ impl ComponentInstance {
         open_request: OpenRequest<'_>,
     ) -> Result<(), OpenOutgoingDirError> {
         match *self.lock_state().await {
-            InstanceState::Resolved(ref mut resolved) => {
+            InstanceState::Resolved(ref mut resolved)
+            | InstanceState::Started(ref mut resolved, _) => {
                 let program_escrow =
                     resolved.program_escrow().ok_or(OpenOutgoingDirError::InstanceNonExecutable)?;
                 program_escrow.open_outgoing(open_request)?;
@@ -1168,7 +1159,8 @@ impl ComponentInstance {
             InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Shutdown(_, _) => {
                 Err(OpenExposedDirError::InstanceNotResolved)
             }
-            InstanceState::Resolved(resolved_instance_state) => {
+            InstanceState::Resolved(resolved_instance_state)
+            | InstanceState::Started(resolved_instance_state, _) => {
                 resolved_instance_state.get_exposed_dir().await.open_entry(open_request)?;
                 Ok(())
             }
@@ -1187,8 +1179,7 @@ impl ComponentInstance {
         // here so we don't waste time starting eager children more than once.
         {
             let state = self.lock_state().await;
-            let execution = self.lock_execution();
-            if let Some(res) = start::should_return_early(&state, &execution, &self.moniker) {
+            if let Some(res) = start::should_return_early(&state, &self.moniker) {
                 return res.map_err(Into::into);
             }
         }
@@ -1201,7 +1192,7 @@ impl ComponentInstance {
         let eager_children: Vec<_> = {
             let state = self.lock_state().await;
             match *state {
-                InstanceState::Resolved(ref s) => s
+                InstanceState::Resolved(ref s) | InstanceState::Started(ref s, _) => s
                     .children()
                     .filter_map(|(_, r)| match r.startup {
                         fdecl::StartupMode::Eager => Some(r.clone()),
@@ -1269,8 +1260,8 @@ impl ComponentInstance {
     /// If the component is not running or does not have a logger, the tracing subscriber
     /// is unchanged, so logs will be attributed to component_manager.
     pub async fn with_logger_as_default<T>(&self, op: impl FnOnce() -> T) -> T {
-        let execution = self.lock_execution();
-        match &execution.runtime {
+        let state = self.lock_state().await;
+        match state.get_started_state() {
             Some(StartedInstanceState { logger: Some(ref logger), .. }) => {
                 let logger = logger.clone() as Arc<dyn tracing::Subscriber + Send + Sync>;
                 tracing::subscriber::with_default(logger, op)
@@ -1283,8 +1274,8 @@ impl ComponentInstance {
     /// of the component's lifetime, when it's running, this channel will be
     /// kept alive.
     pub async fn scope_to_runtime(self: &Arc<Self>, server_end: zx::Channel) {
-        let mut execution = self.lock_execution();
-        execution.scope_server_end(server_end);
+        let mut state = self.lock_state().await;
+        state.scope_server_end(server_end);
     }
 
     /// Returns the top instance (component manager's instance) by traversing parent links.
@@ -1345,19 +1336,13 @@ impl ComponentInstance {
     ) -> Option<Arc<ComponentInstance>> {
         let mut cur = self.clone();
         for moniker in look_up_moniker.path().iter() {
-            cur = {
-                let state = cur.lock_state().await;
-                match &*state {
-                    InstanceState::Resolved(r) => {
-                        if let Some(c) = r.get_child(moniker) {
-                            c.clone()
-                        } else {
-                            return None;
-                        }
-                    }
-                    _ => return None,
-                }
-            };
+            let next = cur
+                .lock_state()
+                .await
+                .get_resolved_state()
+                .and_then(|r| r.get_child(moniker))
+                .cloned()?;
+            cur = next
         }
         Some(cur)
     }
@@ -1371,22 +1356,19 @@ impl ComponentInstance {
     ) -> Option<Arc<ComponentInstance>> {
         let mut cur = self.clone();
         for moniker in find_moniker.path().iter() {
-            cur = {
-                let state = cur.lock_state().await;
-                match &*state {
-                    InstanceState::Resolved(r) => match r.get_child(moniker) {
-                        Some(c) => c.clone(),
-                        _ => return None,
-                    },
-                    _ => return None,
-                }
-            };
+            let next = cur
+                .lock_state()
+                .await
+                .get_resolved_state()
+                .and_then(|r| r.get_child(moniker))
+                .cloned()?;
+            cur = next
         }
         // Found the moniker, the last child in the chain of resolved parents. Is it resolved?
-        let state = cur.lock_state().await;
-        match &*state {
-            InstanceState::Resolved(_) => Some(cur.clone()),
-            _ => None,
+        if cur.lock_state().await.get_resolved_state().is_some() {
+            Some(cur.clone())
+        } else {
+            None
         }
     }
 
@@ -1497,35 +1479,6 @@ impl std::fmt::Debug for ComponentInstance {
     }
 }
 
-/// The execution state of a component.
-pub struct ExecutionState {
-    /// Runtime support for the component. From component manager's point of view, the component
-    /// instance is running iff this field is set.
-    pub runtime: Option<StartedInstanceState>,
-}
-
-impl ExecutionState {
-    /// Creates a new ExecutionState.
-    pub fn new() -> Self {
-        Self { runtime: None }
-    }
-
-    /// Returns whether the component is started, i.e. if it has a runtime.
-    pub fn is_started(&self) -> bool {
-        self.runtime.is_some()
-    }
-
-    /// Scope server_end to `runtime` of this state. This ensures that the channel
-    /// will be kept alive as long as runtime is set to Some(...). If it is
-    /// None when this method is called, this operation is a no-op and the channel
-    /// will be dropped.
-    pub fn scope_server_end(&mut self, server_end: zx::Channel) {
-        if let Some(runtime) = self.runtime.as_mut() {
-            runtime.add_scoped_server_end(server_end);
-        }
-    }
-}
-
 /// The mutable state of a component instance.
 pub enum InstanceState {
     /// The instance was just created.
@@ -1534,6 +1487,8 @@ pub enum InstanceState {
     Unresolved(UnresolvedInstanceState),
     /// The instance has been resolved.
     Resolved(ResolvedInstanceState),
+    /// The instance has started running.
+    Started(ResolvedInstanceState, StartedInstanceState),
     /// The instance has been shutdown, and may not run anymore.
     Shutdown(ShutdownInstanceState, UnresolvedInstanceState),
     /// The instance has been destroyed. It has no content and no further actions may be registered
@@ -1542,6 +1497,15 @@ pub enum InstanceState {
 }
 
 impl InstanceState {
+    pub fn replace<F>(&mut self, f: F)
+    where
+        F: FnOnce(InstanceState) -> InstanceState,
+    {
+        // We place InstanceState::New into self temporarily, so that the function can take
+        // ownership of the current InstanceState and move values out of it.
+        *self = f(std::mem::replace(self, InstanceState::New));
+    }
+
     /// Changes the state, checking invariants.
     /// The allowed transitions:
     /// • New -> Discovered <-> Resolved -> Destroyed
@@ -1573,6 +1537,40 @@ impl InstanceState {
         }
     }
 
+    pub fn is_started(&self) -> bool {
+        self.get_started_state().is_some()
+    }
+
+    pub fn get_resolved_state(&self) -> Option<&ResolvedInstanceState> {
+        match &self {
+            InstanceState::Resolved(state) | InstanceState::Started(state, _) => Some(state),
+            _ => None,
+        }
+    }
+
+    pub fn get_resolved_state_mut(&mut self) -> Option<&mut ResolvedInstanceState> {
+        match self {
+            InstanceState::Resolved(ref mut state) | InstanceState::Started(ref mut state, _) => {
+                Some(state)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn get_started_state(&self) -> Option<&StartedInstanceState> {
+        match &self {
+            InstanceState::Started(_, state) => Some(state),
+            _ => None,
+        }
+    }
+
+    pub fn get_started_state_mut(&mut self) -> Option<&mut StartedInstanceState> {
+        match self {
+            InstanceState::Started(_, ref mut state) => Some(state),
+            _ => None,
+        }
+    }
+
     /// Requests a token that represents this component instance, minting it if needed.
     ///
     /// If the component instance is destroyed or not discovered, returns `None`.
@@ -1587,7 +1585,9 @@ impl InstanceState {
             | InstanceState::Shutdown(_, unresolved_state) => {
                 Some(unresolved_state.instance_token(moniker, context))
             }
-            InstanceState::Resolved(resolved) => Some(resolved.instance_token(moniker, context)),
+            InstanceState::Resolved(resolved) | InstanceState::Started(resolved, _) => {
+                Some(resolved.instance_token(moniker, context))
+            }
             InstanceState::Destroyed => None,
         }
     }
@@ -1595,12 +1595,16 @@ impl InstanceState {
     /// Removes any escrowed state such that they can be passed back to the component
     /// as it is started.
     pub async fn reap_escrowed_state_during_start(&mut self) -> Option<EscrowedState> {
-        match self {
-            InstanceState::New => None,
-            InstanceState::Unresolved(_) => None,
-            InstanceState::Resolved(resolved) => resolved.program_escrow()?.will_start().await,
-            InstanceState::Shutdown(_, _) => None,
-            InstanceState::Destroyed => None,
+        let escrow = self.get_resolved_state().and_then(|state| state.program_escrow())?;
+        escrow.will_start().await
+    }
+
+    /// Scope server_end to `StartedInstanceState`. This ensures that the channel will be kept
+    /// alive as long as the component is running. If the component is not started when this method
+    /// is called, this operation is a no-op and the channel will be dropped.
+    pub fn scope_server_end(&mut self, server_end: zx::Channel) {
+        if let Some(started_state) = self.get_started_state_mut() {
+            started_state.add_scoped_server_end(server_end);
         }
     }
 }
@@ -1611,6 +1615,7 @@ impl fmt::Debug for InstanceState {
             Self::New => "New",
             Self::Unresolved(_) => "Discovered",
             Self::Resolved(_) => "Resolved",
+            Self::Started(_, _) => "Started",
             Self::Shutdown(_, _) => "Shutdown",
             Self::Destroyed => "Destroyed",
         };
@@ -1768,7 +1773,7 @@ pub struct ResolvedInstanceState {
     program_output_dict: Dict,
 
     /// Dictionary of extra capabilities passed to the component when it is started.
-    // TODO(b/322564390): Move this into `ExecutionState` once stop action releases lock on it
+    // TODO(b/322564390): Move this into `StartedInstanceState` once stop action releases lock on it
     pub program_input_dict_additions: Option<Dict>,
 
     /// Dicts containing the capabilities we want to provide to each collection. Each new
@@ -2751,7 +2756,8 @@ pub mod tests {
         assert!(started_timestamp == debug_started_timestamp);
 
         let component = bind_handle.await;
-        let component_timestamp = component.lock_execution().runtime.as_ref().unwrap().timestamp;
+        let component_timestamp =
+            component.lock_state().await.get_started_state().unwrap().timestamp;
         assert_eq!(component_timestamp, started_timestamp);
     }
 
@@ -2807,7 +2813,7 @@ pub mod tests {
             .await;
 
         // Check that the eager 'b' has started.
-        assert!(component_b.is_started());
+        assert!(component_b.is_started().await);
 
         let b_info = ComponentInfo::new(component_b.clone()).await;
         b_info.check_not_shut_down(&test.runner).await;
@@ -3809,7 +3815,7 @@ pub mod tests {
         .await
         .expect("failed to start child");
 
-        assert!(child.is_started());
+        assert!(child.is_started().await);
 
         // Log a message using the child's scoped logger.
         child.with_logger_as_default(|| info!("hello world")).await;
@@ -3909,7 +3915,7 @@ pub mod tests {
         test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
 
         let root = test_topology.look_up(Moniker::default()).await;
-        assert!(!root.is_started());
+        assert!(!root.is_started().await);
 
         let (client_end, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
@@ -3923,7 +3929,7 @@ pub mod tests {
         .await
         .unwrap();
         let server_end = open_request_rx.next().await.unwrap();
-        assert!(root.is_started());
+        assert!(root.is_started().await);
         assert_eq!(
             client_end.basic_info().unwrap().related_koid,
             server_end.basic_info().unwrap().koid
@@ -3950,7 +3956,7 @@ pub mod tests {
         test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
 
         let root = test_topology.look_up(Moniker::default()).await;
-        assert!(!root.is_started());
+        assert!(!root.is_started().await);
 
         let (client_end, server_end) = zx::Channel::create();
 
@@ -3966,10 +3972,10 @@ pub mod tests {
             .await,
             Ok(())
         );
-        assert!(!root.is_started());
+        assert!(!root.is_started().await);
 
         fasync::OnSignals::new(&client_end, zx::Signals::CHANNEL_PEER_CLOSED).await.unwrap();
-        assert!(!root.is_started());
+        assert!(!root.is_started().await);
     }
 
     /// While the provider component is stopping, opening its outgoing directory should not block.
@@ -3998,7 +4004,7 @@ pub mod tests {
         );
 
         let root = test_topology.look_up(Moniker::default()).await;
-        assert!(!root.is_started());
+        assert!(!root.is_started().await);
 
         // Start the component.
         let root = root

@@ -6,9 +6,7 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            component::{
-                ComponentInstance, InstanceState, ResolvedInstanceState, WeakComponentInstance,
-            },
+            component::{ComponentInstance, ResolvedInstanceState, WeakComponentInstance},
             routing::router::{Request, Router},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive},
@@ -644,31 +642,26 @@ fn use_from_parent_router(
         };
         async move {
             let router = {
-                match *component.lock_state().await {
-                    InstanceState::Resolved(ref state)
-                        if state.program_input_dict_additions.is_some() =>
-                    {
-                        let additions = state.program_input_dict_additions.as_ref().unwrap();
-                        match additions.get_capability(&source_path) {
-                            // There's an addition to the program input dictionary for this
-                            // capability, let's use it.
-                            Some(Capability::Open(o)) => Router::new_ok(o),
-                            // There's no addition to the program input dictionary for this
-                            // capability, let's use the component input dictionary.
-                            _ => component_input_capability,
-                        }
+                if let Some(resolved_state) = component.lock_state().await.get_resolved_state() {
+                    let additions = resolved_state.program_input_dict_additions.as_ref();
+                    match additions.and_then(|a| a.get_capability(&source_path)) {
+                        // There's an addition to the program input dictionary for this
+                        // capability, let's use it.
+                        Some(Capability::Open(o)) => Router::new_ok(o),
+                        // There's no addition to the program input dictionary for this
+                        // capability, let's use the component input dictionary.
+                        _ => component_input_capability,
                     }
-                    _ => {
-                        // If the component is not resolved and/or does not have additions to the
-                        // program input dictionary, then route this capability without any
-                        // additions.
-                        //
-                        // NOTE: there's a chance that the component is in the shutdown stage here.
-                        // The stop action clears the program_input_dict_additions, so even if
-                        // additions were set the last time the component was run they won't apply
-                        // after the component has stopped.
-                        component_input_capability
-                    }
+                } else {
+                    // If the component is not resolved and/or does not have additions to the
+                    // program input dictionary, then route this capability without any
+                    // additions.
+                    //
+                    // NOTE: there's a chance that the component is in the shutdown stage here.
+                    // The stop action clears the program_input_dict_additions, so even if
+                    // additions were set the last time the component was run they won't apply
+                    // after the component has stopped.
+                    component_input_capability
                 }
             };
             router.route(request).await

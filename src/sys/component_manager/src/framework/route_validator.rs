@@ -8,9 +8,7 @@ use {
             CapabilityProvider, CapabilitySource, FrameworkCapability, InternalCapabilityProvider,
         },
         model::{
-            component::{
-                ComponentInstance, InstanceState, ResolvedInstanceState, WeakComponentInstance,
-            },
+            component::{ComponentInstance, ResolvedInstanceState, WeakComponentInstance},
             model::Model,
             routing::{self, service::AnonymizedServiceRoute, Route, RouteRequest, RoutingError},
         },
@@ -62,12 +60,10 @@ impl RouteValidator {
         let (uses, exposes) = {
             let state = instance.lock_state().await;
 
-            let resolved = match *state {
-                InstanceState::Resolved(ref r) => r,
-                // TODO(https://fxbug.dev/42052917): The error is that the instance is not currently
-                // resolved. Use a better error here, when one exists.
-                _ => return Err(fcomponent::Error::InstanceCannotResolve),
-            };
+            // TODO(https://fxbug.dev/42052917): The error is that the instance is not currently
+            // resolved. Use a better error here, when one exists.
+            let resolved =
+                state.get_resolved_state().ok_or(fcomponent::Error::InstanceCannotResolve)?;
 
             let uses = resolved.decl().uses.clone();
             let exposes = resolved.decl().exposes.clone();
@@ -100,12 +96,10 @@ impl RouteValidator {
             .await
             .map_err(|_| fsys::RouteValidatorError::InstanceNotFound)?;
         let state = instance.lock_state().await;
-        let resolved = match *state {
-            InstanceState::Resolved(ref r) => r,
-            // TODO(https://fxbug.dev/42052917): The error is that the instance is not currently
-            // resolved. Use a better error here, when one exists.
-            _ => return Err(fsys::RouteValidatorError::InstanceNotResolved),
-        };
+        // TODO(https://fxbug.dev/42052917): The error is that the instance is not currently
+        // resolved. Use a better error here, when one exists.
+        let resolved =
+            state.get_resolved_state().ok_or(fsys::RouteValidatorError::InstanceNotResolved)?;
 
         let route_requests = Self::generate_route_requests(&resolved, targets)?;
         drop(state);
@@ -282,10 +276,7 @@ impl RouteValidator {
                     service_name: capability.source_name().clone(),
                 };
                 let state = component.lock_state().await;
-                match &*state {
-                    InstanceState::Resolved(r) => r.anonymized_services.get(&route).cloned(),
-                    _ => None,
-                }
+                state.get_resolved_state().and_then(|r| r.anonymized_services.get(&route).cloned())
             }
             _ => None,
         };

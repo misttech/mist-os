@@ -881,6 +881,8 @@ pub enum StopActionError {
         #[source]
         err: Box<ActionError>,
     },
+    #[error("a component started while shutdown was ongoing")]
+    ComponentStartedDuringShutdown,
 }
 
 // This is implemented for fuchsia.sys2.LifecycleController protocol.

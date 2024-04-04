@@ -77,7 +77,9 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
                     }
                     nfs
                 }
-                InstanceState::Unresolved(_) | InstanceState::Resolved(_) => {
+                InstanceState::Unresolved(_)
+                | InstanceState::Resolved(_)
+                | InstanceState::Started(_, _) => {
                     // The instance is not shut down, we must have raced with an unresolve action
                     // (potentially followed by a resolve action). Let's try again.
                     continue;
@@ -137,7 +139,8 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
         if let Some(child_name) = component.moniker.leaf() {
             if let Ok(ExtendedInstanceInterface::Component(parent)) = component.parent.upgrade() {
                 match *parent.lock_state().await {
-                    InstanceState::Resolved(ref mut resolved_state) => {
+                    InstanceState::Resolved(ref mut resolved_state)
+                    | InstanceState::Started(ref mut resolved_state, _) => {
                         resolved_state.remove_child(child_name);
                     }
                     InstanceState::Shutdown(ref mut state, _) => {
@@ -191,7 +194,7 @@ pub mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(component_a.is_started());
+        assert!(component_a.is_started().await);
 
         // Register shutdown first because DestroyChild requires the component to be shut down.
         ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
@@ -262,9 +265,9 @@ pub mod tests {
             .start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
-        assert!(component_container.is_started());
-        assert!(component_a.is_started());
-        assert!(component_b.is_started());
+        assert!(component_container.is_started().await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
 
         // Destroy the child, and wait for it. Components should be destroyed.
         let component_container = test.look_up(vec!["container"].try_into().unwrap()).await;
@@ -363,12 +366,14 @@ pub mod tests {
         test.model.start(ComponentInput::default()).await;
 
         let component_root = test.model.root().clone();
-        let component_a = match *component_root.lock_state().await {
-            InstanceState::Resolved(ref s) => {
-                s.get_child(&ChildName::try_from("a").unwrap()).expect("child a not found").clone()
-            }
-            _ => panic!("not resolved"),
-        };
+        let component_a = component_root
+            .lock_state()
+            .await
+            .get_resolved_state()
+            .expect("not resolved")
+            .get_child(&ChildName::try_from("a").unwrap())
+            .expect("child a not found")
+            .clone();
 
         let (mock_action, mut mock_action_unblocker) =
             MockAction::new(mock_action_key.clone(), mock_action_result);
@@ -543,14 +548,16 @@ pub mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(component_a.is_started());
+        assert!(component_a.is_started().await);
         // Get component_b without resolving it.
-        let component_b = match *component_a.lock_state().await {
-            InstanceState::Resolved(ref s) => {
-                s.get_child(&ChildName::try_from("b").unwrap()).expect("child b not found").clone()
-            }
-            _ => panic!("not resolved"),
-        };
+        let component_b = component_a
+            .lock_state()
+            .await
+            .get_resolved_state()
+            .expect("not resolved")
+            .get_child(&ChildName::try_from("b").unwrap())
+            .expect("child b not found")
+            .clone();
 
         // Register destroy action on "a", and wait for it.
         ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
@@ -628,11 +635,11 @@ pub mod tests {
             .start_instance(&component_x.moniker, &StartReason::Eager)
             .await
             .expect("could not start x");
-        assert!(component_a.is_started());
-        assert!(component_b.is_started());
-        assert!(component_c.is_started());
-        assert!(component_d.is_started());
-        assert!(component_x.is_started());
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
+        assert!(component_d.is_started().await);
+        assert!(component_x.is_started().await);
 
         // Register destroy action on "a", and wait for it. This should cause all components
         // in "a"'s component to be shut down and destroyed, in bottom-up order, but "x" is still
@@ -649,16 +656,16 @@ pub mod tests {
         assert!(is_destroyed(&component_b).await);
         assert!(is_destroyed(&component_c).await);
         assert!(is_destroyed(&component_d).await);
-        assert!(component_x.is_started());
+        assert!(component_x.is_started().await);
         {
             // Expect only "x" as child of root.
             let state = component_root.lock_state().await;
-            let children: Vec<_> = match *state {
-                InstanceState::Resolved(ref s) => s.children().map(|(k, _)| k.clone()).collect(),
-                _ => {
-                    panic!("not resolved");
-                }
-            };
+            let children: Vec<_> = state
+                .get_resolved_state()
+                .expect("not_resolved")
+                .children()
+                .map(|(k, _)| k.clone())
+                .collect();
             assert_eq!(children, vec!["x".try_into().unwrap()]);
         }
         {
@@ -747,9 +754,9 @@ pub mod tests {
             .start_instance(&component_b2.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
-        assert!(component_a.is_started());
-        assert!(component_b.is_started());
-        assert!(component_b2.is_started());
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_b2.is_started().await);
 
         // Register destroy action on "a", and wait for it. This should cause all components
         // that were started to be destroyed, in bottom-up order.
@@ -766,10 +773,12 @@ pub mod tests {
         assert!(is_destroyed(&component_b2).await);
         {
             let state = component_root.lock_state().await;
-            let children: Vec<_> = match *state {
-                InstanceState::Resolved(ref s) => s.children().map(|(k, _)| k.clone()).collect(),
-                _ => panic!("not resolved"),
-            };
+            let children: Vec<_> = state
+                .get_resolved_state()
+                .expect("not_resolved")
+                .children()
+                .map(|(k, _)| k.clone())
+                .collect();
             assert_eq!(children, Vec::<ChildName>::new());
         }
         {
@@ -840,10 +849,10 @@ pub mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(component_a.is_started());
-        assert!(component_b.is_started());
-        assert!(component_c.is_started());
-        assert!(component_d.is_started());
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
+        assert!(component_d.is_started().await);
 
         // Mock a failure to delete "d".
         {

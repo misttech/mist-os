@@ -306,7 +306,9 @@ impl EventRegistry {
                     // and indicates a bug in component manager.
                     unreachable!("route_events: not resolved");
                 }
-                InstanceState::Resolved(ref s) => s.decl().clone(),
+                InstanceState::Resolved(ref s) | InstanceState::Started(ref s, _) => {
+                    s.decl().clone()
+                }
                 InstanceState::Shutdown(_, _) => {
                     return Err(ModelError::EventsError { err: EventsError::InstanceShutdown });
                 }

@@ -44,9 +44,10 @@ async fn do_discover(
         let state = component.lock_state().await;
         match *state {
             InstanceState::New => false,
-            InstanceState::Unresolved(_) => true,
-            InstanceState::Resolved(_) => true,
-            InstanceState::Shutdown(_, _) => true,
+            InstanceState::Unresolved(_)
+            | InstanceState::Resolved(_)
+            | InstanceState::Started(_, _)
+            | InstanceState::Shutdown(_, _) => true,
             InstanceState::Destroyed => {
                 return Err(DiscoverActionError::InstanceDestroyed {
                     moniker: component.moniker.clone(),
@@ -69,7 +70,9 @@ async fn do_discover(
             InstanceState::Shutdown(_, _) | InstanceState::Destroyed => {
                 // Nothing to do.
             }
-            InstanceState::Unresolved(_) | InstanceState::Resolved(_) => {
+            InstanceState::Unresolved(_)
+            | InstanceState::Resolved(_)
+            | InstanceState::Started(_, _) => {
                 panic!(
                     "Component was marked {:?} during Discover action, which shouldn't be possible",
                     *state

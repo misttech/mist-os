@@ -11,7 +11,7 @@ use {
     },
     async_trait::async_trait,
     futures::future::join_all,
-    std::{ops::DerefMut, sync::Arc},
+    std::sync::Arc,
 };
 
 /// Returns a resolved component to the discovered state. The result is that the component can be
@@ -76,25 +76,21 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionEr
     // taken for the children to unresolve, so recheck here.
     {
         let mut state = component.lock_state().await;
-        let unresolved_state = match state.deref_mut() {
-            InstanceState::Shutdown(_, unresolved_state) => unresolved_state.take(),
-            InstanceState::Destroyed => {
-                return Err(UnresolveActionError::InstanceDestroyed {
-                    moniker: component.moniker.clone(),
-                }
-                .into())
+        if let InstanceState::Destroyed = &*state {
+            return Err(UnresolveActionError::InstanceDestroyed {
+                moniker: component.moniker.clone(),
             }
-            InstanceState::Resolved(_) | InstanceState::New => {
-                panic!(
-                    "component {} was shutdown, but then moved to unexpected state {:?}",
-                    component.moniker, state
-                );
+            .into());
+        }
+        state.replace(|instance_state| match instance_state {
+            InstanceState::Shutdown(_, unresolved_state) => {
+                InstanceState::Unresolved(unresolved_state)
             }
-            InstanceState::Unresolved(_) => {
-                panic!("component {} moved to unresolved state before we set it to unresolved, this should be impossible", component.moniker);
-            }
-        };
-        state.set(InstanceState::Unresolved(unresolved_state));
+            instance_state => panic!(
+                "component {} was shutdown, but then moved to unexpected state {:?}",
+                component.moniker, instance_state
+            ),
+        });
     };
 
     // Drop any tasks that might be running in the component's execution scope.  We don't need to
@@ -340,11 +336,11 @@ pub mod tests {
         root.start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
-        assert!(component_container.is_started());
+        assert!(component_container.is_started().await);
         assert!(is_resolved(&component_a).await);
         assert!(is_resolved(&component_b).await);
-        assert!(component_a.is_started());
-        assert!(component_b.is_started());
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
         (test, component_container, component_a, component_b)
     }
 
