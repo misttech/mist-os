@@ -163,23 +163,13 @@ fx set {{"<var>"}}PRODUCT{{"</var>"}}.{{"<var>"}}BOARD{{"</var>"}} \
 
 #### Include adb {: #include-adb }
 
-To enable `adb` in your Fuchsia image, add the following options
-to your `fx set` command:
+To enable `adb` in your Fuchsia image, you will need to include the
+[adb function driver](/src/developer/adb/drivers/README.md) and a daemon.
+The daemon can be the [Fuchsia adb daemon](/src/developer/adb/bin/README.md)
+or any other daemon that speaks to the function driver.
 
-```posix-terminal
-fx set {{"<var>"}}PRODUCT{{"</var>"}}.{{"<var>"}}BOARD{{"</var>"}} \
-    --args 'dev_kernel_cmdline=["driver.usb.peripheral=adb"]' \
-    --args 'dev_bootfs_labels=["//src/developer/adb:drivers"]' \
-    --with-base '//src/developer/adb:adb' \
-    --args 'core_realm_shards+=["//src/developer/adb:core_shards"]'
-```
-
-Use `driver.usb.peripheral=cdc_adb` rather than `driver.usb.peripheral=adb`
-to enable networking and `adb` interfaces simultaneously.
-
-[`//src/developer/adb/README.md`]: /src/developer/adb/README.md
-
-See [`//src/developer/adb/README.md`] for more information.
+[/src/developer/adb/drivers/README.md]: /src/developer/adb/drivers/README.md
+[/src/developer/adb/bin/README.md]: /src/developer/adb/bin/README.md
 
 ## Running commands {: #transport }
 
@@ -254,7 +244,8 @@ adb shell 'gpioutil list'
 
 Fuchsia only has partial support for `adb` by design. See [RFC-0200] for
 details on what's supported and what's not. See
-[`//src/developer/adb/README.md`] for more guidance on using `adb` with Fuchsia.
+[`//src/developer/adb/bin/README.md`](/src/developer/adb/bin/README.md)
+for more guidance on using `adb` with Fuchsia.
 
 Tip: If you have access to an {{ widgets.glossary_simple ('in-tree', 'in-tree')}}
 Fuchsia checkout there's a copy of `adb` that you can use at
