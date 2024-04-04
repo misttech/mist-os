@@ -75,6 +75,19 @@ def _cc_toolchain_config_impl(ctx):
         ),
     ]
 
+    cc_features = [
+        features.default_compile_flags,
+        features.dbg,
+        features.opt,
+        features.target_system_name(target_system_name),
+        features.dependency_file,
+        features.supports_pic,
+        features.coverage,
+        features.ml_inliner,
+        features.static_cpp_standard_library,
+        features.no_runtime_library_search_directories,
+    ] + sanitizer_features
+
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
         toolchain_identifier = "crosstool-1.x.x-llvm-fuchsia-" + ctx.attr.cpu,
@@ -96,18 +109,7 @@ def _cc_toolchain_config_impl(ctx):
         ],
         builtin_sysroot = "%{SYSROOT_PATH_PREFIX}" + ctx.attr.cpu,
         cc_target_os = "fuchsia",
-        features = [
-            features.default_compile_flags,
-            features.dbg,
-            features.opt,
-            features.target_system_name(target_system_name),
-            features.dependency_file,
-            features.supports_pic,
-            features.coverage,
-            features.ml_inliner,
-            features.static_cpp_standard_library,
-            features.no_runtime_library_search_directories,
-        ] + sanitizer_features,
+        features = cc_features,
     )
 
 cc_toolchain_config = rule(

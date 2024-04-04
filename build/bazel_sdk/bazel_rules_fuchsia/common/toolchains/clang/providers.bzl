@@ -10,5 +10,7 @@ ClangInfo = provider(
         "short_version": "Clang short version, as a string.",
         "long_version": "Clang long version, as a string.",
         "builtin_include_paths": "Clang built-in include paths.",
+        "fuchsia_host_arch": "Host cpu name, using Fuchsia conventions.",
+        "fuchsia_host_os": "Host os name using Fuchsia conventions.",
     },
 )

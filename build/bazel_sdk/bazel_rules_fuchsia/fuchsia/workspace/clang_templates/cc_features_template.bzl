@@ -228,12 +228,13 @@ _dbg_feature = feature(
     name = "dbg",
 )
 
+# Clang ML Inliner is not supported on mac-arm64.
+_use_ml_inliner = "%{HOST_OS}-%{HOST_ARCH}" != "mac-arm64"
+
 _opt_feature = feature(
     name = "opt",
     # List any features that should be enabled in opt mode here
-    implies = [
-        "ml_inliner",
-    ],
+    implies = ["ml_inliner"] if _use_ml_inliner else [],
 )
 
 def _target_system_name_feature(target_system_name):
@@ -416,6 +417,7 @@ _coverage_feature = feature(
 
 _ml_inliner_feature = feature(
     name = "ml_inliner",
+    enabled = _use_ml_inliner,
     flag_sets = [
         flag_set(
             actions = [

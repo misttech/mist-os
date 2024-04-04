@@ -4,7 +4,7 @@
 
 """Defines a WORKSPACE rule for loading a version of clang."""
 
-load("//fuchsia/workspace:utils.bzl", "fetch_cipd_contents", "normalize_os", "workspace_path")
+load("//fuchsia/workspace:utils.bzl", "fetch_cipd_contents", "normalize_arch", "normalize_os", "workspace_path")
 
 # Base URL for Fuchsia clang archives.
 _CLANG_URL_TEMPLATE = "https://chrome-infra-packages.appspot.com/dl/fuchsia/third_party/clang/{os}-amd64/+/{tag}"
@@ -72,12 +72,12 @@ def _fuchsia_clang_repository_impl(ctx):
 
     crosstool_template = Label("//fuchsia/workspace/clang_templates:crosstool.BUILD.template")
     toolchain_config_template = Label("//fuchsia/workspace/clang_templates:cc_toolchain_config_template.bzl")
-    cc_features_file = Label("//fuchsia/workspace/clang_templates:cc_features.bzl")
+    cc_features_template_file = Label("//fuchsia/workspace/clang_templates:cc_features_template.bzl")
     defs_template_file = Label("//fuchsia/workspace/clang_templates:defs.bzl")
 
     ctx.path(crosstool_template)
     ctx.path(toolchain_config_template)
-    ctx.path(cc_features_file)
+    ctx.path(cc_features_template_file)
     ctx.path(defs_template_file)
 
     # Hack to get the path to the sysroot directory, see
@@ -91,9 +91,17 @@ def _fuchsia_clang_repository_impl(ctx):
         "defs.bzl",
     )
 
-    ctx.symlink(
-        cc_features_file,
+    normalized_os = normalize_os(ctx)
+    normalized_arch = normalize_arch(ctx)
+
+    ctx.template(
         "cc_features.bzl",
+        cc_features_template_file,
+        substitutions = {
+            "%{HOST_OS}": normalized_os,
+            "%{HOST_ARCH}": normalized_arch,
+        },
+        executable = False,
     )
 
     # Create symlinks to the @fuchsia_sdk sysroots, which allows defining
@@ -103,7 +111,6 @@ def _fuchsia_clang_repository_impl(ctx):
     ctx.symlink(str(fuchsia_sdk_path) + "/arch/x64/sysroot", "fuchsia_sysroot_x86_64")
     ctx.symlink(str(fuchsia_sdk_path) + "/arch/riscv64/sysroot", "fuchsia_sysroot_riscv64")
 
-    normalized_os = normalize_os(ctx)
     if ctx.attr.local_path:
         local_clang = workspace_path(ctx, ctx.attr.local_path)
         _instantiate_from_local_dir(ctx, local_clang)
@@ -211,6 +218,8 @@ def _fuchsia_clang_repository_impl(ctx):
             "%{CROSSTOOL_ROOT}": str(ctx.path(".")),
             "%{CLANG_VERSION}": clang_version,
             "%{SDK_ROOT}": ctx.attr.sdk_root_label.workspace_name,
+            "%{HOST_OS}": normalized_os,
+            "%{HOST_CPU}": ctx.os.arch,
         },
     )
 

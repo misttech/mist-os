@@ -7,6 +7,7 @@
 load(":toolchains/clang/clang_utils.bzl", "process_clang_builtins_output")
 load(":toolchains/clang/providers.bzl", "ClangInfo")
 load(":toolchains/clang/toolchain_utils.bzl", "define_clang_runtime_filegroups")
+load(":repository_utils.bzl", "get_fuchsia_host_arch", "get_fuchsia_host_os")
 
 def prepare_clang_repository(repo_ctx, clang_install_dir):
     """Prepare a repository directory for a clang toolchain creation.
@@ -102,12 +103,16 @@ constants = struct(
   builtin_include_paths = [
 {builtin_paths}
   ],
+  fuchsia_host_arch = "{fuchsia_host_arch}",
+  fuchsia_host_os = "{fuchsia_host_os}",
 )
 '''.format(
         long_version = long_version,
         short_version = short_version,
         lib_clang_internal_dir = lib_clang_internal_dir,
         builtin_paths = builtin_include_paths_str,
+        fuchsia_host_arch = get_fuchsia_host_arch(repo_ctx),
+        fuchsia_host_os = get_fuchsia_host_os(repo_ctx),
     ))
 
 def _clang_info_target_impl(ctx):
@@ -115,6 +120,8 @@ def _clang_info_target_impl(ctx):
         short_version = ctx.attr.short_version,
         long_version = ctx.attr.long_version,
         builtin_include_paths = ctx.attr.builtin_include_paths,
+        fuchsia_host_arch = ctx.attr.fuchsia_host_arch,
+        fuchsia_host_os = ctx.attr.fuchsia_host_os,
     )]
 
 _clang_info_target = rule(
@@ -132,6 +139,14 @@ _clang_info_target = rule(
             doc = "List of Clang builtin include paths, must be absolute.",
             mandatory = True,
             allow_empty = True,
+        ),
+        "fuchsia_host_arch": attr.string(
+            doc = "Host cpu name, using Fuchsia conventions.",
+            mandatory = True,
+        ),
+        "fuchsia_host_os": attr.string(
+            doc = "Host os name, using Fuchsia conventions.",
+            mandatory = True,
         ),
     },
 )
@@ -157,6 +172,8 @@ def setup_clang_repository(constants):
         short_version = constants.short_version,
         long_version = constants.long_version,
         builtin_include_paths = constants.builtin_include_paths,
+        fuchsia_host_arch = constants.fuchsia_host_arch,
+        fuchsia_host_os = constants.fuchsia_host_os,
     )
 
     define_clang_runtime_filegroups(constants)

@@ -20,9 +20,11 @@ load(
 load("//:toolchains/clang/providers.bzl", "ClangInfo")
 load("//:toolchains/clang/sanitizer.bzl", "sanitizer_features")
 
-def compute_clang_features():
+def compute_clang_features(clang_info):
     """Compute list of C++ toolchain features required by Clang.
 
+    Args:
+      clang_info: A ClangInfo provider value.
     Returns:
       A list of feature() objects.
     """
@@ -87,8 +89,18 @@ def compute_clang_features():
         ],
     )
 
+    # https://fxbug.dev/42082246: ML inliner is unsupported on mac-arm64
+    fuchsia_host_tag = "{}-{}".format(clang_info.fuchsia_host_os, clang_info.fuchsia_host_arch)
+    use_ml_inliner = fuchsia_host_tag != "mac-arm64"
+
+    opt_feature = feature(
+        name = "opt",
+        implies = ["ml_inliner"] if use_ml_inliner else [],
+    )
+
     ml_inliner_feature = feature(
         name = "ml_inliner",
+        enabled = use_ml_inliner,
         flag_sets = [
             flag_set(
                 actions = [
@@ -138,6 +150,7 @@ def compute_clang_features():
     )
 
     features = [
+        opt_feature,
         dependency_file_feature,
         ml_inliner_feature,
         coverage_feature,
@@ -261,11 +274,11 @@ def _prebuilt_clang_cc_toolchain_config_impl(ctx):
         tool_path(name = "llvm-profdata", path = "bin/llvm-profdata"),
     ]
 
+    clang_info = ctx.attr.clang_info[ClangInfo]
+
     # TODO(digit): Change features list based on target_os and build variants
     # For now, this is only enough for host toolchains.
-    features = compute_clang_features()
-
-    clang_info = ctx.attr.clang_info[ClangInfo]
+    features = compute_clang_features(clang_info)
 
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
@@ -292,6 +305,8 @@ def _prebuilt_clang_cc_toolchain_config_impl(ctx):
 _prebuilt_clang_cc_toolchain_config = rule(
     implementation = _prebuilt_clang_cc_toolchain_config_impl,
     attrs = {
+        "host_os": attr.string(mandatory = True),
+        "host_arch": attr.string(mandatory = True),
         "target_os": attr.string(mandatory = True),
         "target_arch": attr.string(mandatory = True),
         "sysroot": attr.string(default = ""),
@@ -336,6 +351,8 @@ def generate_clang_cc_toolchain(
     """
     _prebuilt_clang_cc_toolchain_config(
         name = name + "_cc_toolchain_config",
+        host_os = host_os,
+        host_arch = host_arch,
         target_os = target_os,
         target_arch = target_arch,
         sysroot = sysroot_path,

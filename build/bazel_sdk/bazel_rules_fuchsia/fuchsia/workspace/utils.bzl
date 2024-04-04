@@ -8,6 +8,14 @@ def normalize_os(ctx):
     # On osx os.name => "mac os x".
     return ctx.os.name.split(" ")[0]
 
+def normalize_arch(ctx):
+    _MAP = {
+        "adm64": "x86_64",
+        "k8": "x86_64",
+        "aarch64": "arm64",
+    }
+    return _MAP.get(ctx.os.arch, ctx.os.arch)
+
 def symlink_or_copy(ctx, copy_content_strategy, files_to_copy):
     """ Symlink, hardlink or copy files from one location to another, replicating the relative directory structure
 
