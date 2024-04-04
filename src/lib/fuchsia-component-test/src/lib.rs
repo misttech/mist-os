@@ -1856,9 +1856,8 @@ impl ScopedInstance {
             .connect_to_protocol_at_exposed_dir::<fcomponent::BinderMarker>()
             .context("failed to connect to fuchsia.component.Binder")?;
 
-        let moniker = format!("./{}:{}", self.collection, self.child_name);
         let _ = EventMatcher::ok()
-            .moniker(&moniker)
+            .moniker(self.moniker())
             .wait::<Started>(&mut event_stream)
             .await
             .context("failed to observe Started event")?;
@@ -1939,9 +1938,15 @@ impl ScopedInstance {
             },
         )
     }
+
     /// Return the name of this instance.
     pub fn child_name(&self) -> &str {
         self.child_name.as_str()
+    }
+
+    /// Returns the moniker of this instance relative to the calling component.
+    pub fn moniker(&self) -> String {
+        format!("./{}:{}", self.collection, self.child_name)
     }
 }
 
