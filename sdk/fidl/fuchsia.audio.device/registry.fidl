@@ -242,6 +242,9 @@ type RegistryCreateObserverError = flexible enum {
 closed protocol Observer {
     /// Query the device's available processing topologies and individual
     /// elements, and watch for changes to those elements.
+    ///
+    /// These methods must be supported by Composite devices,
+    /// but are optional for Codec and StreamConfig devices.
     compose fuchsia.hardware.audio.signalprocessing.Reader;
 
     /// Request notification of any change to the device's gain state.
@@ -262,6 +265,8 @@ closed protocol Observer {
 
     /// Request notification of any change to the device's plug state. When
     /// called for the first time, it will return immediately.
+    ///
+    /// Should only be called for Codec or StreamConfig devices.
     strict WatchPlugState() -> (table {
         /// The device's current plug state.
         1: state PlugState;
@@ -274,7 +279,7 @@ closed protocol Observer {
     ///
     /// This clock will be in the domain specified in the device's `Info` table.
     ///
-    /// Should only be called for StreamConfig devices.
+    /// Should only be called for Composite or StreamConfig devices.
     strict GetReferenceClock() -> (resource table {
         /// The device's reference clock.
         1: reference_clock zx.Handle:CLOCK;
@@ -299,8 +304,6 @@ type ObserverWatchPlugStateError = flexible enum {
     DEVICE_ERROR = 1;
 
     /// This device type does not support the method that was called.
-    //
-    // Although added prematurely, this will be used in subsequent CL when adding Composite or Dai.
     WRONG_DEVICE_TYPE = 2;
 
     /// The previous `WatchPlugState` call has not yet completed.

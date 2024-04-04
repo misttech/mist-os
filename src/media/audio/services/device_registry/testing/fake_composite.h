@@ -69,7 +69,7 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
   static const fuchsia_hardware_audio::DaiSupportedFormats kDefaultDaiFormatSet2;
   static const std::vector<fuchsia_hardware_audio::DaiSupportedFormats> kDefaultDaiFormatSets;
   static const std::vector<fuchsia_hardware_audio::DaiSupportedFormats> kDefaultDaiFormatSets2;
-  static const std::unordered_map<uint64_t,
+  static const std::unordered_map<ElementId,
                                   std::vector<fuchsia_hardware_audio::DaiSupportedFormats>>
       kDefaultDaiFormatsMap;
 
@@ -125,7 +125,7 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
   static const std::vector<fuchsia_hardware_audio::SupportedFormats> kDefaultRbFormatSets;
   static const std::vector<fuchsia_hardware_audio::SupportedFormats> kDefaultRbFormatSets2;
 
-  static const std::unordered_map<uint64_t, std::vector<fuchsia_hardware_audio::SupportedFormats>>
+  static const std::unordered_map<ElementId, std::vector<fuchsia_hardware_audio::SupportedFormats>>
       kDefaultRbFormatsMap;
 
   static const fuchsia_hardware_audio::PcmFormat kDefaultRbFormat;
@@ -134,18 +134,18 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
   // signalprocessing elements and topologies
   //
   // For min/max checks based on ranges, keep the DAI and RB element ID ranges contiguous.
-  static constexpr uint64_t kSourceDaiElementId = 0;
-  static constexpr uint64_t kDestDaiElementId = 1;
-  static constexpr uint64_t kMinDaiElementId = kSourceDaiElementId;
-  static constexpr uint64_t kMaxDaiElementId = kDestDaiElementId;
+  static constexpr ElementId kSourceDaiElementId = 0;
+  static constexpr ElementId kDestDaiElementId = 1;
+  static constexpr ElementId kMinDaiElementId = kSourceDaiElementId;
+  static constexpr ElementId kMaxDaiElementId = kDestDaiElementId;
 
-  static constexpr uint64_t kDestRbElementId = 2;
-  static constexpr uint64_t kSourceRbElementId = 3;
-  static constexpr uint64_t kMinRingBufferElementId = kDestRbElementId;
-  static constexpr uint64_t kMaxRingBufferElementId = kSourceRbElementId;
+  static constexpr ElementId kDestRbElementId = 2;
+  static constexpr ElementId kSourceRbElementId = 3;
+  static constexpr ElementId kMinRingBufferElementId = kDestRbElementId;
+  static constexpr ElementId kMaxRingBufferElementId = kSourceRbElementId;
 
-  static constexpr uint64_t kMinElementId = kSourceDaiElementId;
-  static constexpr uint64_t kMaxElementId = kSourceRbElementId;
+  static constexpr ElementId kMinElementId = kSourceDaiElementId;
+  static constexpr ElementId kMaxElementId = kSourceRbElementId;
 
   static const fuchsia_hardware_audio_signalprocessing::Element kSourceDaiElement;
   static const fuchsia_hardware_audio_signalprocessing::Element kDestRbElement;
@@ -162,11 +162,11 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
   static const std::vector<fuchsia_hardware_audio_signalprocessing::Element> kElements;
 
   // For min/max checks based on ranges, keep this range contiguous.
-  static constexpr uint64_t kInputOnlyTopologyId = 10;
-  static constexpr uint64_t kFullDuplexTopologyId = 11;
-  static constexpr uint64_t kOutputOnlyTopologyId = 12;
-  static constexpr uint64_t kMinTopologyId = kInputOnlyTopologyId;
-  static constexpr uint64_t kMaxTopologyId = kOutputOnlyTopologyId;
+  static constexpr TopologyId kInputOnlyTopologyId = 10;
+  static constexpr TopologyId kFullDuplexTopologyId = 11;
+  static constexpr TopologyId kOutputOnlyTopologyId = 12;
+  static constexpr TopologyId kMinTopologyId = kInputOnlyTopologyId;
+  static constexpr TopologyId kMaxTopologyId = kOutputOnlyTopologyId;
 
   static const fuchsia_hardware_audio_signalprocessing::EdgePair kTopologyInputEdgePair;
   static const fuchsia_hardware_audio_signalprocessing::EdgePair kTopologyOutputEdgePair;
@@ -207,15 +207,15 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
   }
   void set_clock_domain(std::optional<ClockDomain> clock_domain) { clock_domain_ = clock_domain; }
 
-  void InjectElementStateChange(uint64_t element_id,
+  void InjectElementStateChange(ElementId element_id,
                                 fuchsia_hardware_audio_signalprocessing::ElementState new_state);
-  void InjectTopologyChange(std::optional<uint64_t> topology_id);
+  void InjectTopologyChange(std::optional<TopologyId> topology_id);
 
   ////////////////////////////////////////////////////////////////
  private:
   static inline const std::string_view kClassName = "FakeComposite";
 
-  struct ElementRecord {
+  struct FakeElementRecord {
     fuchsia_hardware_audio_signalprocessing::Element element;
     fuchsia_hardware_audio_signalprocessing::ElementState state;
     bool state_has_changed = true;  // immediately complete the first WatchElementState request
@@ -252,7 +252,7 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) final;
 
   // Internal implementation methods/members
-  static void CheckForElementStateCompletion(ElementRecord& element_record);
+  static void CheckForElementStateCompletion(FakeElementRecord& element_record);
   void CheckForTopologyCompletion();
 
   async_dispatcher_t* dispatcher_;
@@ -272,10 +272,10 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
   bool supports_signalprocessing_ = true;
   std::optional<fidl::ServerBindingRef<SignalProcessing>> signal_processing_binding_;
 
-  std::unordered_map<uint64_t, ElementRecord> elements_;
+  std::unordered_map<ElementId, FakeElementRecord> elements_;
 
   std::optional<WatchTopologyCompleter::Async> watch_topology_completer_;
-  std::optional<uint64_t> topology_id_ = kFullDuplexTopologyId;
+  std::optional<TopologyId> topology_id_ = kFullDuplexTopologyId;
   bool topology_has_changed_ = true;
 };
 

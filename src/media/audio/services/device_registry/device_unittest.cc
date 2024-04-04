@@ -171,6 +171,18 @@ TEST_F(CodecTest, Control) {
   EXPECT_TRUE(DropControl(device));
 }
 
+// This tests whether a Codec driver notifies Observers of initial gain state. (It shouldn't.)
+TEST_F(CodecTest, InitialGainState) {
+  auto fake_driver = MakeFakeCodecInput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(AddObserver(device));
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(notify()->gain_state().has_value())
+      << "ObserverNotify was notified of initial GainState";
+}
+
 TEST_F(CodecTest, GetDaiFormats) {
   auto fake_driver = MakeFakeCodecInput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
@@ -183,7 +195,7 @@ TEST_F(CodecTest, GetDaiFormats) {
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       [&received_get_dai_formats_callback, &dai_formats](
-          uint64_t element_id,
+          ElementId element_id,
           const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
@@ -215,7 +227,7 @@ TEST_F(CodecTest, SetDaiFormat) {
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       [&received_get_dai_formats_callback, &dai_formats](
-          uint64_t element_id,
+          ElementId element_id,
           const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
@@ -249,7 +261,7 @@ TEST_F(CodecTest, InitialStop) {
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       [&received_get_dai_formats_callback, &dai_formats](
-          uint64_t element_id,
+          ElementId element_id,
           const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
@@ -282,7 +294,7 @@ TEST_F(CodecTest, Start) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](uint64_t element_id,
+      [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -310,7 +322,7 @@ TEST_F(CodecTest, SetDaiFormatChange) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](uint64_t element_id,
+      [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -347,7 +359,7 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](uint64_t element_id,
+      [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -384,7 +396,7 @@ TEST_F(CodecTest, StartStop) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](uint64_t element_id,
+      [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -416,7 +428,7 @@ TEST_F(CodecTest, StartStart) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](uint64_t element_id,
+      [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -449,7 +461,7 @@ TEST_F(CodecTest, StopStop) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](uint64_t element_id,
+      [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -489,7 +501,7 @@ TEST_F(CodecTest, Reset) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      [&dai_formats](uint64_t element_id,
+      [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -764,6 +776,72 @@ TEST_F(CompositeTest, Control) {
 
   EXPECT_TRUE(DropControl(device));
 }
+
+// This tests whether a Composite driver notifies Observers of initial gain state. (It shouldn't.)
+TEST_F(CompositeTest, InitialGainState) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(AddObserver(device));
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(notify()->gain_state().has_value())
+      << "ObserverNotify was notified of initial GainState";
+}
+
+// This tests whether a Composite driver notifies Observers of initial plug state. (It shouldn't.)
+TEST_F(CompositeTest, InitialPlugState) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(AddObserver(device));
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(notify()->plug_state().has_value())
+      << "ObserverNotify was notified of initial PlugState";
+}
+
+// This tests the driver's ability to inform its ObserverNotify of initial signalprocessing state.
+TEST_F(CompositeTest, InitialSignalProcessingForObserver) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(AddObserver(device));
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify()->topology_id().has_value())
+      << "ObserverNotify was not notified of initial TopologyId";
+  EXPECT_FALSE(notify()->element_states().empty());
+
+  ASSERT_TRUE(device->info().has_value());
+  ASSERT_TRUE(device->info()->signal_processing_elements().has_value());
+  EXPECT_FALSE(device->info()->signal_processing_elements()->empty());
+  EXPECT_EQ(notify()->element_states().size(),
+            device->info()->signal_processing_elements()->size());
+}
+
+// This tests the driver's ability to inform its ControlNotify of initial signalprocessing state.
+TEST_F(CompositeTest, InitialSignalProcessingForControl) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify()->topology_id().has_value())
+      << "ObserverNotify was not notified of initial TopologyId";
+  EXPECT_FALSE(notify()->element_states().empty());
+
+  ASSERT_TRUE(device->info().has_value());
+  ASSERT_TRUE(device->info()->signal_processing_elements().has_value());
+  EXPECT_FALSE(device->info()->signal_processing_elements()->empty());
+  EXPECT_EQ(notify()->element_states().size(),
+            device->info()->signal_processing_elements()->size());
+}
+
+// SetElementState(no-change) should not generate a notification.
+
+// SetTopology(no-change) should not generate a notification.
 
 /////////////////////
 // StreamConfig tests

@@ -16,8 +16,9 @@ namespace media_audio {
 
 // A ControlServer exposes this interface, to the Device that it controls. The Device uses it for
 // asynchronous notification. Note that ControlNotify includes the entirety of the ObserverNotify
-// interface, including methods such as DeviceIsRemoved and DeviceHasError. Also note that the
-// Device stores this interface as a weak_ptr, since the ControlServer can be destroyed at any time.
+// interface, including methods such as DeviceIsRemoved, DeviceHasError, TopologyChanged, etc.
+// Also note that the Device stores this interface as a weak_ptr, since the ControlServer can be
+// destroyed at any time.
 class ControlNotify : public ObserverNotify {
  public:
   virtual void DeviceDroppedRingBuffer() = 0;

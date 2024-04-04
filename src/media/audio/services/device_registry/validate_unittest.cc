@@ -629,18 +629,18 @@ TEST(ValidateTest, MapElements) {
   auto map = MapElements(kElements);
   EXPECT_EQ(map.size(), kElements.size());
 
-  EXPECT_EQ(*map.at(*kElement1.id()).type(), *kElement1.type());
-  EXPECT_EQ(*map.at(*kElement1.id()).type_specific()->endpoint()->type(),
+  EXPECT_EQ(*map.at(*kElement1.id()).element.type(), *kElement1.type());
+  EXPECT_EQ(*map.at(*kElement1.id()).element.type_specific()->endpoint()->type(),
             fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
 
-  EXPECT_EQ(*map.at(*kElement2.id()).type(), *kElement2.type());
+  EXPECT_EQ(*map.at(*kElement2.id()).element.type(), *kElement2.type());
 
-  EXPECT_EQ(*map.at(*kElement3.id()).type(), *kElement3.type());
-  EXPECT_TRUE(map.at(*kElement3.id()).can_disable().value_or(false));
-  EXPECT_EQ(map.at(*kElement3.id()).description()->at(255), 'X');
+  EXPECT_EQ(*map.at(*kElement3.id()).element.type(), *kElement3.type());
+  EXPECT_TRUE(map.at(*kElement3.id()).element.can_disable().value_or(false));
+  EXPECT_EQ(map.at(*kElement3.id()).element.description()->at(255), 'X');
 
-  EXPECT_EQ(*map.at(*kElement4.id()).type(), *kElement4.type());
-  EXPECT_EQ(*map.at(*kElement4.id()).type_specific()->endpoint()->type(),
+  EXPECT_EQ(*map.at(*kElement4.id()).element.type(), *kElement4.type());
+  EXPECT_EQ(*map.at(*kElement4.id()).element.type_specific()->endpoint()->type(),
             fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
 }
 

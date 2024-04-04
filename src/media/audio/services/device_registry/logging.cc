@@ -512,78 +512,89 @@ void LogCompositeProperties(const fuchsia_hardware_audio::CompositeProperties& c
   }
 }
 
-void LogElementState(const fuchsia_hardware_audio_signalprocessing::ElementState& element_state) {
+void LogElementStateInternal(
+    const std::optional<fuchsia_hardware_audio_signalprocessing::ElementState>& element_state,
+    std::string indent) {
+  if (!element_state.has_value()) {
+    FX_LOGS(INFO) << indent << "                      <none>  (during device initialization)";
+    return;
+  }
+
+  if (element_state->type_specific().has_value()) {
+    switch (element_state->type_specific()->Which()) {
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kVendorSpecific:
+        FX_LOGS(INFO) << indent << "type_specific         VendorSpecific";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kGain:
+        FX_LOGS(INFO) << indent << "type_specific         Gain";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEqualizer:
+        FX_LOGS(INFO) << indent << "type_specific         Equalizer";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kDynamics:
+        FX_LOGS(INFO) << indent << "type_specific         Dynamics";
+        break;
+      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint:
+        FX_LOGS(INFO) << indent << "type_specific         Endpoint";
+        break;
+      default:
+        FX_LOGS(INFO) << indent << "type_specific         <unknown union>  (non-compliant)";
+        break;
+    }
+  } else {
+    FX_LOGS(INFO) << indent << "type_specific         <none>";
+  }
+
+  FX_LOGS(INFO) << indent << "enabled               "
+                << (element_state->enabled().has_value()
+                        ? (*element_state->enabled() ? "TRUE" : "FALSE")
+                        : "<none>");
+
+  if (element_state->latency().has_value()) {
+    switch (element_state->latency()->Which()) {
+      case fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime:
+        FX_LOGS(INFO) << indent << "latency (time)";
+        if (element_state->latency()->latency_time().has_value()) {
+          FX_LOGS(INFO) << indent << "                      "
+                        << element_state->latency()->latency_time().value() << " ns";
+        } else {
+          FX_LOGS(INFO) << indent << "                      <none> ns (non-compliant)";
+        }
+        break;
+      case fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyFrames:
+        FX_LOGS(INFO) << indent << "latency (frames)";
+        if (element_state->latency()->latency_frames().has_value()) {
+          FX_LOGS(INFO) << indent << "                      "
+                        << element_state->latency()->latency_frames().value() << " frames";
+        } else {
+          FX_LOGS(INFO) << indent << "                      <none> frames (non-compliant)";
+        }
+        break;
+      default:
+        FX_LOGS(INFO) << indent << "latency <unknown union>  ( non-compliant)";
+        break;
+    }
+  } else {
+    FX_LOGS(INFO) << indent << "latency               <none>";
+  }
+
+  if (element_state->vendor_specific_data().has_value()) {
+    FX_LOGS(INFO) << indent << "vendor_specific_data  ["
+                  << element_state->vendor_specific_data()->size() << "]  (not shown here)"
+                  << (element_state->vendor_specific_data()->empty() ? " (non-compliant)" : "");
+  } else {
+    FX_LOGS(INFO) << indent << "vendor_specific_data  <none>";
+  }
+}
+
+void LogElementState(
+    const std::optional<fuchsia_hardware_audio_signalprocessing::ElementState>& element_state) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/ElementState";
-
-  if (element_state.type_specific().has_value()) {
-    switch (element_state.type_specific()->Which()) {
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kVendorSpecific:
-        FX_LOGS(INFO) << "    type_specific         VendorSpecific";
-        break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kGain:
-        FX_LOGS(INFO) << "    type_specific         Gain";
-        break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEqualizer:
-        FX_LOGS(INFO) << "    type_specific         Equalizer";
-        break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kDynamics:
-        FX_LOGS(INFO) << "    type_specific         Dynamics";
-        break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint:
-        FX_LOGS(INFO) << "    type_specific         Endpoint";
-        break;
-      default:
-        FX_LOGS(INFO) << "    type_specific         <unknown union>  (non-compliant)";
-        break;
-    }
-  } else {
-    FX_LOGS(INFO) << "    type_specific         <none>";
-  }
-
-  FX_LOGS(INFO) << "    enabled               "
-                << (element_state.enabled().has_value()
-                        ? (*element_state.enabled() ? "TRUE" : "FALSE")
-                        : "<none>");
-
-  if (element_state.latency().has_value()) {
-    switch (element_state.latency()->Which()) {
-      case fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime:
-        FX_LOGS(INFO) << "    latency (time)";
-        if (element_state.latency()->latency_time().has_value()) {
-          FX_LOGS(INFO) << "                          "
-                        << element_state.latency()->latency_time().value() << " ns";
-        } else {
-          FX_LOGS(INFO) << "                          <none> ns (non-compliant)";
-        }
-        break;
-      case fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyFrames:
-        FX_LOGS(INFO) << "    latency (frames)";
-        if (element_state.latency()->latency_frames().has_value()) {
-          FX_LOGS(INFO) << "                          "
-                        << element_state.latency()->latency_frames().value() << " frames";
-        } else {
-          FX_LOGS(INFO) << "                          <none> frames (non-compliant)";
-        }
-        break;
-      default:
-        FX_LOGS(INFO) << "    latency <unknown union>  ( non-compliant)";
-        break;
-    }
-  } else {
-    FX_LOGS(INFO) << "    latency               <none>";
-  }
-
-  if (element_state.vendor_specific_data().has_value()) {
-    FX_LOGS(INFO) << "    vendor_specific_data  [" << element_state.vendor_specific_data()->size()
-                  << "]  (not shown here)"
-                  << (element_state.vendor_specific_data()->empty() ? " (non-compliant)" : "");
-  } else {
-    FX_LOGS(INFO) << "    vendor_specific_data  <none>";
-  }
+  LogElementStateInternal(element_state, "    ");
 }
 
 void LogElementInternal(const fuchsia_hardware_audio_signalprocessing::Element& element,
@@ -657,6 +668,24 @@ void LogElements(const std::vector<fuchsia_hardware_audio_signalprocessing::Elem
 
   for (auto i = 0u; i < elements.size(); ++i) {
     LogElementInternal(elements[i], "   ", i, "    ");
+  }
+}
+
+void LogElementMap(const std::unordered_map<ElementId, ElementRecord>& element_map) {
+  if constexpr (!kLogSignalProcessingFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "ElementMap <ElementId, ElementRecord>";
+  for (auto& [element_id, element_record] : element_map) {
+    FX_LOGS(INFO) << "ElementId     " << element_id;
+    FX_LOGS(INFO) << "ElementRecord";
+
+    FX_LOGS(INFO) << "    element";
+    LogElementInternal(element_record.element, "        ");
+
+    FX_LOGS(INFO) << "    state";
+    LogElementStateInternal(element_record.state, "        ");
   }
 }
 
@@ -975,7 +1004,7 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                           "    ");
     }
   } else {
-    FX_LOGS(INFO) << "   signal_processing_topologies <none>"
+    FX_LOGS(INFO) << "  signal_processing_topologies <none>"
                   << (device_info.device_type() == fuchsia_audio_device::DeviceType::kComposite
                           ? " (non-compliant)"
                           : "");

@@ -14,6 +14,7 @@
 #include <optional>
 #include <ostream>
 
+#include "fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h"
 #include "src/media/audio/services/device_registry/basic_types.h"
 
 namespace media_audio {
@@ -38,7 +39,7 @@ namespace media_audio {
 inline constexpr bool kLogMain = true;
 
 inline constexpr bool kLogDeviceDetection = false;
-inline constexpr bool kLogDeviceInitializationProgress = true;
+inline constexpr bool kLogDeviceInitializationProgress = false;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
 inline constexpr bool kLogSummaryFinalDeviceInfo = true;
 inline constexpr bool kLogDetailedFinalDeviceInfo = false;
@@ -47,7 +48,7 @@ inline constexpr bool kLogDeviceMethods = false;
 
 inline constexpr bool kLogObjectLifetimes = false;
 inline constexpr bool kLogDeviceState = false;
-inline constexpr bool kLogObjectCounts = true;
+inline constexpr bool kLogObjectCounts = false;
 inline constexpr bool kLogNotifyMethods = false;
 
 // Driver FIDL methods
@@ -55,17 +56,17 @@ inline constexpr bool kLogCodecFidlCalls = false;
 inline constexpr bool kLogCodecFidlResponses = false;
 inline constexpr bool kLogCodecFidlResponseValues = false;
 
-inline constexpr bool kLogCompositeFidlCalls = true;
-inline constexpr bool kLogCompositeFidlResponses = true;
-inline constexpr bool kLogCompositeFidlResponseValues = true;
+inline constexpr bool kLogCompositeFidlCalls = false;
+inline constexpr bool kLogCompositeFidlResponses = false;
+inline constexpr bool kLogCompositeFidlResponseValues = false;
 
 inline constexpr bool kLogStreamConfigFidlCalls = false;
 inline constexpr bool kLogStreamConfigFidlResponses = false;
 inline constexpr bool kLogStreamConfigFidlResponseValues = false;
 
-inline constexpr bool kLogSignalProcessingFidlCalls = true;
-inline constexpr bool kLogSignalProcessingFidlResponses = true;
-inline constexpr bool kLogSignalProcessingFidlResponseValues = true;
+inline constexpr bool kLogSignalProcessingFidlCalls = false;
+inline constexpr bool kLogSignalProcessingFidlResponses = false;
+inline constexpr bool kLogSignalProcessingFidlResponseValues = false;
 
 inline constexpr bool kLogRingBufferMethods = false;
 inline constexpr bool kLogRingBufferFidlCalls = false;
@@ -104,12 +105,14 @@ void LogCompositeProperties(const fuchsia_hardware_audio::CompositeProperties& c
 
 void LogDeviceInfo(const fuchsia_audio_device::Info& device_info);
 
+void LogElementMap(const std::unordered_map<ElementId, ElementRecord>& element_map);
 void LogElements(const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements);
 void LogTopologies(
     const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies);
 void LogElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
 void LogTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology);
-void LogElementState(const fuchsia_hardware_audio_signalprocessing::ElementState& element_state);
+void LogElementState(
+    const std::optional<fuchsia_hardware_audio_signalprocessing::ElementState>& element_state);
 
 void LogElementRingBufferFormatSets(
     const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>&

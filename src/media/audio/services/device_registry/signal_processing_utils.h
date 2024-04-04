@@ -14,14 +14,12 @@
 
 namespace media_audio {
 
-std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element> MapElements(
+std::unordered_map<ElementId, ElementRecord> MapElements(
     const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements);
 std::unordered_set<ElementId> dai_endpoints(
-    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
-        element_map);
+    const std::unordered_map<ElementId, ElementRecord>& element_map);
 std::unordered_set<ElementId> ring_buffer_endpoints(
-    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
-        element_map);
+    const std::unordered_map<ElementId, ElementRecord>& element_map);
 
 std::unordered_map<TopologyId, std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>
 MapTopologies(const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies);

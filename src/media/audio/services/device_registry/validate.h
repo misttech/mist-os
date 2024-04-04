@@ -63,12 +63,9 @@ zx_status_t ValidateElementState(
 
 zx_status_t ValidateTopologies(
     const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies,
-    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
-        element_map);
-zx_status_t ValidateTopology(
-    const fuchsia_hardware_audio_signalprocessing::Topology& topology,
-    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
-        element_map);
+    const std::unordered_map<ElementId, ElementRecord>& element_map);
+zx_status_t ValidateTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology,
+                             const std::unordered_map<ElementId, ElementRecord>& element_map);
 
 zx_status_t ValidateRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);

@@ -8,6 +8,8 @@
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 
+#include "src/media/audio/services/device_registry/basic_types.h"
+
 namespace media_audio {
 
 // An ObserverServer exposes this interface, to the Device that it is observing. The Device uses it
@@ -21,6 +23,11 @@ class ObserverNotify {
   virtual void GainStateChanged(const fuchsia_audio_device::GainState&) = 0;
   virtual void PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
                                 zx::time plug_change_time) = 0;
+
+  virtual void TopologyChanged(TopologyId topology_id) = 0;
+  virtual void ElementStateChanged(
+      ElementId element_id,
+      fuchsia_hardware_audio_signalprocessing::ElementState element_state) = 0;
 };
 
 }  // namespace media_audio

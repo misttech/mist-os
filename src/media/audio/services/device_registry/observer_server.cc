@@ -61,6 +61,7 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogObserverServerMethods);
 
   if (has_error_) {
+    ADR_WARN_METHOD() << "Device encountered an error and will be removed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
         fuchsia_audio_device::ObserverWatchGainStateError::kDeviceError));
     return;
@@ -68,6 +69,7 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
 
   FX_CHECK(device_);
   if (!device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "This method is not supported for this device type";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
         fuchsia_audio_device::ObserverWatchGainStateError::kWrongDeviceType));
     return;
@@ -113,8 +115,17 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogObserverServerMethods);
 
   if (has_error_) {
+    ADR_WARN_METHOD() << "Device encountered an error and will be removed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchPlugStateError>(
         fuchsia_audio_device::ObserverWatchPlugStateError::kDeviceError));
+    return;
+  }
+
+  FX_CHECK(device_);
+  if (!device_->is_codec() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "This method is not supported for this device type";
+    completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchPlugStateError>(
+        fuchsia_audio_device::ObserverWatchPlugStateError::kWrongDeviceType));
     return;
   }
 
@@ -159,13 +170,15 @@ void ObserverServer::GetReferenceClock(GetReferenceClockCompleter::Sync& complet
   ADR_LOG_METHOD(kLogObserverServerMethods);
 
   if (has_error_) {
+    ADR_WARN_METHOD() << "Device encountered an error and will be removed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverGetReferenceClockError>(
         fuchsia_audio_device::ObserverGetReferenceClockError::kDeviceError));
     return;
   }
 
   FX_CHECK(device_);
-  if (!device_->is_stream_config()) {
+  if (!device_->is_composite() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "This method is not supported for this device type";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverGetReferenceClockError>(
         fuchsia_audio_device::ObserverGetReferenceClockError::kWrongDeviceType));
     return;
@@ -173,6 +186,7 @@ void ObserverServer::GetReferenceClock(GetReferenceClockCompleter::Sync& complet
 
   auto clock_result = device_->GetReadOnlyClock();
   if (clock_result.is_error()) {
+    ADR_WARN_METHOD() << "Device clock could not be created";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverGetReferenceClockError>(
         fuchsia_audio_device::ObserverGetReferenceClockError::kDeviceClockUnavailable));
     return;
@@ -181,6 +195,19 @@ void ObserverServer::GetReferenceClock(GetReferenceClockCompleter::Sync& complet
       .reference_clock = std::move(clock_result.value()),
   }};
   completer.Reply(fit::success(std::move(response)));
+}
+
+// For now, don't do anything with this.
+void ObserverServer::TopologyChanged(TopologyId topology_id) {
+  ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
+      << "(topology_id " << topology_id << ")";
+}
+
+// For now, don't do anything with this.
+void ObserverServer::ElementStateChanged(
+    ElementId element_id, fuchsia_hardware_audio_signalprocessing::ElementState element_state) {
+  ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
+      << "(element_id " << element_id << ")";
 }
 
 }  // namespace media_audio

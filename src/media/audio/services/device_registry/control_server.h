@@ -43,6 +43,10 @@ class ControlServer
   void GainStateChanged(const fuchsia_audio_device::GainState&) final;
   void PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
                         zx::time plug_change_time) final;
+  void TopologyChanged(TopologyId topology_id) final;
+  void ElementStateChanged(
+      ElementId element_id,
+      fuchsia_hardware_audio_signalprocessing::ElementState element_state) final;
 
   // ControlNotify
   //

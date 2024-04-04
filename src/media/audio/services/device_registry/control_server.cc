@@ -579,4 +579,17 @@ void ControlServer::GetElements(GetElementsCompleter::Sync& completer) {
   completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
 }
 
+// For now, don't do anything with this.
+void ControlServer::TopologyChanged(TopologyId topology_id) {
+  ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
+      << "(topology_id " << topology_id << ")";
+}
+
+// For now, don't do anything with this.
+void ControlServer::ElementStateChanged(
+    ElementId element_id, fuchsia_hardware_audio_signalprocessing::ElementState element_state) {
+  ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
+      << "(element_id " << element_id << ")";
+}
+
 }  // namespace media_audio

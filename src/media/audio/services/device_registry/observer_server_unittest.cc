@@ -15,6 +15,7 @@
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
+#include "src/media/audio/services/device_registry/testing/fake_composite.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
@@ -95,6 +96,21 @@ class ObserverServerCodecTest : public ObserverServerTest {
         adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
         fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable())));
 
+    RunLoopUntilIdle();
+    return fake_driver;
+  }
+};
+
+class ObserverServerCompositeTest : public ObserverServerTest {
+ protected:
+  std::unique_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
+    auto fake_driver = CreateFakeComposite();
+
+    adr_service_->AddDevice(Device::Create(
+        adr_service_, dispatcher(), "Test composite name",
+        fuchsia_audio_device::DeviceType::kComposite,
+        DriverClient::WithComposite(
+            fidl::ClientEnd<fuchsia_hardware_audio::Composite>(fake_driver->Enable()))));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -348,6 +364,136 @@ TEST_F(ObserverServerCodecTest, ObserverDoesNotDropIfClientControlDrops) {
   EXPECT_TRUE(observer->client().is_valid());
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
+
+// Add test cases for WatchTopology and WatchElementState (once implemented)
+//
+// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
+
+/////////////////////
+// Composite tests
+//
+// Validate that an Observer client can drop cleanly (without generating a WARNING or ERROR).
+TEST_F(ObserverServerCompositeTest, CleanClientDrop) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
+  ASSERT_EQ(ObserverServer::count(), 1u);
+
+  (void)observer->client().UnbindMaybeGetEndpoint();
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+
+  // No WARNING logging should occur during test case shutdown.
+}
+
+// Validate that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
+TEST_F(ObserverServerCompositeTest, CleanServerShutdown) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
+  ASSERT_EQ(ObserverServer::count(), 1u);
+
+  observer->server().Shutdown(ZX_ERR_PEER_CLOSED);
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(observer_fidl_error_status_.has_value());
+  EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
+
+  // No WARNING logging should occur during test case shutdown.
+}
+
+// Validate creation of an Observer via the Registry/CreateObserver method. Most other test cases
+// directly create an Observer server and client synthetically via CreateTestObserverServer.
+TEST_F(ObserverServerCompositeTest, Creation) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [observer_client_end, observer_server_end] =
+      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
+  auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
+  bool received_callback = false;
+
+  registry->client()
+      ->CreateObserver({{
+          .token_id = *added_device_id,
+          .observer_server =
+              fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
+      }})
+      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer_client.is_valid());
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
+
+// Validate that when an observed device is removed, the Observer is dropped.
+TEST_F(ObserverServerCompositeTest, ObservedDeviceRemoved) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
+
+  fake_driver->DropComposite();
+
+  auto removed_device_id = WaitForRemovedDeviceTokenId(registry->client());
+  ASSERT_TRUE(removed_device_id.has_value());
+  EXPECT_EQ(*added_device_id, *removed_device_id);
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(observer_fidl_error_status_.has_value());
+  EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
+}
+
+// Validate that the Observer receives the observed device's reference clock, and that it is valid.
+TEST_F(ObserverServerCompositeTest, GetReferenceClock) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
+  bool received_callback = false;
+
+  observer->client()->GetReferenceClock().Then(
+      [&received_callback](fidl::Result<Observer::GetReferenceClock>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->reference_clock());
+        zx::clock clock = std::move(*result->reference_clock());
+        EXPECT_TRUE(clock.is_valid());
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
+
+// Validate that an Observer does not drop, if an observed device's driver RingBuffer is dropped.
+
+// Validate that an Observer does not drop, if an observed device's RingBuffer client is dropped.
+
+// Validate that an Observer does not drop, if the observed device's Control client is dropped.
 
 // Add test cases for WatchTopology and WatchElementState (once implemented)
 //

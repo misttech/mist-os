@@ -1114,10 +1114,8 @@ zx_status_t ValidateElements(
   return (MapElements(elements).empty() ? ZX_ERR_INVALID_ARGS : ZX_OK);
 }
 
-zx_status_t ValidateTopology(
-    const fuchsia_hardware_audio_signalprocessing::Topology& topology,
-    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
-        element_map) {
+zx_status_t ValidateTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology,
+                             const std::unordered_map<ElementId, ElementRecord>& element_map) {
   LogTopology(topology);
   if (!topology.id().has_value()) {
     FX_LOGS(WARNING) << "Reported SignalProcessing.topology.id is missing";
@@ -1159,20 +1157,22 @@ zx_status_t ValidateTopology(
   }
 
   // Check that only ENDPOINTs are terminal
-  for (auto& [id, element] : element_map) {
+  for (auto& [id, element_record] : element_map) {
     if (source_elements.find(id) != source_elements.end() &&
         destination_elements.find(id) == destination_elements.end()) {
-      if (*element.type() != fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+      if (*element_record.element.type() !=
+          fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
         FX_LOGS(WARNING) << "Element " << id << " has no incoming edges but is not an Endpoint! Is "
-                         << *element.type();
+                         << *element_record.element.type();
         return ZX_ERR_INVALID_ARGS;
       }
     }
     if (source_elements.find(id) == source_elements.end() &&
         destination_elements.find(id) != destination_elements.end()) {
-      if (*element.type() != fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+      if (*element_record.element.type() !=
+          fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
         FX_LOGS(WARNING) << "Element " << id << " has no outgoing edges but is not an Endpoint! Is "
-                         << *element.type();
+                         << *element_record.element.type();
         return ZX_ERR_INVALID_ARGS;
       }
     }
@@ -1183,8 +1183,7 @@ zx_status_t ValidateTopology(
 
 zx_status_t ValidateTopologies(
     const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies,
-    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
-        element_map) {
+    const std::unordered_map<ElementId, ElementRecord>& element_map) {
   LogTopologies(topologies);
 
   if (topologies.empty()) {
@@ -1201,8 +1200,11 @@ zx_status_t ValidateTopologies(
     return ZX_ERR_INVALID_ARGS;
   }
 
-  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>
-      elements_remaining = element_map;
+  std::unordered_set<ElementId> elements_remaining;
+  for (const auto& element_entry_pair : element_map) {
+    elements_remaining.insert(element_entry_pair.first);
+  }
+
   for (auto& topology : topologies) {
     if (const auto& status = ValidateTopology(topology, element_map); status != ZX_OK) {
       return status;
@@ -1214,7 +1216,7 @@ zx_status_t ValidateTopologies(
   }
   if (!elements_remaining.empty()) {
     FX_LOGS(WARNING) << "topologies did not cover all elements. Example: element_id "
-                     << elements_remaining.begin()->first;
+                     << *elements_remaining.begin();
     return ZX_ERR_INVALID_ARGS;
   }
 

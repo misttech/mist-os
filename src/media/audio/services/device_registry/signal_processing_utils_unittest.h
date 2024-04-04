@@ -189,8 +189,7 @@ const std::vector<fuchsia_hardware_audio_signalprocessing::Topology> kTopologies
 const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>
     kTopologiesWithTerminalNotEndpoint{kTopology1234, kTopologyTerminalNotEndpoint};
 
-const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>
-    kEmptyElementMap{};
+const std::unordered_map<ElementId, ElementRecord> kEmptyElementMap{};
 
 }  // namespace media_audio
 

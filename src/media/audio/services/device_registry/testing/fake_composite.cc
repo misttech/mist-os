@@ -53,9 +53,9 @@ void FakeComposite::DropComposite() {
 
   health_completer_.reset();
   watch_topology_completer_.reset();
-  for (auto& element_record : elements_) {
-    if (element_record.second.watch_completer.has_value()) {
-      element_record.second.watch_completer.reset();
+  for (auto& element_entry_pair : elements_) {
+    if (element_entry_pair.second.watch_completer.has_value()) {
+      element_entry_pair.second.watch_completer.reset();
     }
   }
 
@@ -64,14 +64,14 @@ void FakeComposite::DropComposite() {
 }
 
 void FakeComposite::SetupElementsMap() {
-  elements_.insert({kSourceDaiElementId, ElementRecord{.element = kSourceDaiElement,
-                                                       .state = kSourceDaiElementInitState}});
-  elements_.insert({kDestDaiElementId,
-                    ElementRecord{.element = kDestDaiElement, .state = kDestDaiElementInitState}});
-  elements_.insert({kDestRbElementId,
-                    ElementRecord{.element = kDestRbElement, .state = kDestRbElementInitState}});
-  elements_.insert({kSourceRbElementId, ElementRecord{.element = kSourceRbElement,
-                                                      .state = kSourceRbElementInitState}});
+  elements_.insert({kSourceDaiElementId, FakeElementRecord{.element = kSourceDaiElement,
+                                                           .state = kSourceDaiElementInitState}});
+  elements_.insert({kDestDaiElementId, FakeElementRecord{.element = kDestDaiElement,
+                                                         .state = kDestDaiElementInitState}});
+  elements_.insert({kDestRbElementId, FakeElementRecord{.element = kDestRbElement,
+                                                        .state = kDestRbElementInitState}});
+  elements_.insert({kSourceRbElementId, FakeElementRecord{.element = kSourceRbElement,
+                                                          .state = kSourceRbElementInitState}});
 
   ASSERT_TRUE(elements_.at(kSourceDaiElementId).state_has_changed);
   ASSERT_TRUE(elements_.at(kDestDaiElementId).state_has_changed);
@@ -226,7 +226,7 @@ void FakeComposite::WatchElementState(WatchElementStateRequest& request,
     completer.Close(ZX_ERR_INVALID_ARGS);
     return;
   }
-  ElementRecord& element = match->second;
+  FakeElementRecord& element = match->second;
 
   if (element.watch_completer.has_value()) {
     ADR_WARN_METHOD() << "previous completer was still pending";
@@ -251,7 +251,7 @@ void FakeComposite::SetElementState(SetElementStateRequest& request,
     completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
     return;
   }
-  ElementRecord& element_record = match->second;
+  FakeElementRecord& element_record = match->second;
 
   if (element_record.state == request.state()) {
     ADR_LOG_METHOD(kLogFakeComposite)
@@ -267,7 +267,7 @@ void FakeComposite::SetElementState(SetElementStateRequest& request,
 }
 
 void FakeComposite::InjectElementStateChange(
-    uint64_t element_id, fuchsia_hardware_audio_signalprocessing::ElementState new_state) {
+    ElementId element_id, fuchsia_hardware_audio_signalprocessing::ElementState new_state) {
   auto match = elements_.find(element_id);
   ASSERT_NE(match, elements_.end());
   auto& element = match->second;
@@ -279,7 +279,7 @@ void FakeComposite::InjectElementStateChange(
 }
 
 // static
-void FakeComposite::CheckForElementStateCompletion(ElementRecord& element_record) {
+void FakeComposite::CheckForElementStateCompletion(FakeElementRecord& element_record) {
   if (element_record.state_has_changed && element_record.watch_completer.has_value()) {
     auto completer = std::move(*element_record.watch_completer);
     element_record.watch_completer.reset();
@@ -334,7 +334,7 @@ void FakeComposite::SetTopology(SetTopologyRequest& request,
 }
 
 // Inject std::nullopt to simulate "no topology", such as at power-up or after Reset().
-void FakeComposite::InjectTopologyChange(std::optional<uint64_t> topology_id) {
+void FakeComposite::InjectTopologyChange(std::optional<TopologyId> topology_id) {
   if (topology_id.has_value()) {
     topology_id_ = *topology_id;
     topology_has_changed_ = true;

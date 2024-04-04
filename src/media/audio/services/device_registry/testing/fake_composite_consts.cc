@@ -66,7 +66,7 @@ const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>
     FakeComposite::kDefaultDaiFormatSets2{kDefaultDaiFormatSet2};
 
 // Map of Dai format sets, by element. Used within the driver.
-const std::unordered_map<uint64_t, std::vector<fuchsia_hardware_audio::DaiSupportedFormats>>
+const std::unordered_map<ElementId, std::vector<fuchsia_hardware_audio::DaiSupportedFormats>>
     FakeComposite::kDefaultDaiFormatsMap = {{
         {kSourceDaiElementId, kDefaultDaiFormatSets},
         {kDestDaiElementId, kDefaultDaiFormatSets2},
@@ -163,7 +163,7 @@ const std::vector<fuchsia_hardware_audio::SupportedFormats> FakeComposite::kDefa
     kDefaultRbFormatSet2};
 
 // Map of RingBuffer format sets, by element. Used internally by the driver.
-const std::unordered_map<uint64_t, std::vector<fuchsia_hardware_audio::SupportedFormats>>
+const std::unordered_map<ElementId, std::vector<fuchsia_hardware_audio::SupportedFormats>>
     FakeComposite::kDefaultRbFormatsMap = {{
         {kDestRbElementId, kDefaultRbFormatSets},
         {kSourceRbElementId, kDefaultRbFormatSets2},

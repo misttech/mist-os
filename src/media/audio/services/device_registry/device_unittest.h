@@ -17,11 +17,13 @@
 
 #include <memory>
 #include <sstream>
+#include <unordered_map>
 
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/media/audio/lib/clock/clock.h"
+#include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
@@ -79,6 +81,16 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     void PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
                           zx::time plug_change_time) final {
       plug_state_ = std::make_pair(new_plug_state, plug_change_time);
+    }
+    void TopologyChanged(TopologyId topology_id) final {
+      FX_LOGS(INFO) << __func__ << "(topology_id " << topology_id << ")";
+      topology_id_ = topology_id;
+    }
+    void ElementStateChanged(
+        ElementId element_id,
+        fuchsia_hardware_audio_signalprocessing::ElementState element_state) final {
+      FX_LOGS(INFO) << __func__ << "(element_id " << element_id << ")";
+      element_states_.insert({element_id, element_state});
     }
 
     // ControlNotify
@@ -171,6 +183,12 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     std::optional<zx::time>& codec_stop_time() { return codec_stop_time_; }
     bool codec_stop_failed() const { return codec_stop_failed_; }
 
+    std::optional<TopologyId> topology_id() const { return topology_id_; }
+    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>&
+    element_states() const {
+      return element_states_;
+    }
+
    private:
     [[maybe_unused]] DeviceTestBase& parent_;
     std::optional<fuchsia_audio_device::GainState> gain_state_;
@@ -181,6 +199,10 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     std::optional<fuchsia_hardware_audio::CodecFormatInfo> codec_format_info_;
     std::optional<zx::time> codec_start_time_;
     std::optional<zx::time> codec_stop_time_{zx::time::infinite_past()};
+
+    std::optional<TopologyId> topology_id_;
+    std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
+        element_states_;
 
     std::optional<zx_status_t> dai_format_error_;
     bool codec_start_failed_ = false;

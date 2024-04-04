@@ -10,44 +10,45 @@
 namespace media_audio {
 
 std::unordered_set<ElementId> dai_endpoints(
-    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
-        element_map) {
+    const std::unordered_map<ElementId, ElementRecord>& element_map) {
   std::unordered_set<ElementId> dai_endpoints;
-  for (const auto& element : element_map) {
-    if (element.second.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint &&
-        element.second.type_specific()->endpoint()->type() ==
+  for (const auto& element_entry_pair : element_map) {
+    if (element_entry_pair.second.element.type() ==
+            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint &&
+        element_entry_pair.second.element.type_specific()->endpoint()->type() ==
             fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect) {
-      dai_endpoints.insert(element.first);
+      dai_endpoints.insert(element_entry_pair.first);
     }
   }
   return dai_endpoints;
 }
 
 std::unordered_set<ElementId> ring_buffer_endpoints(
-    const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>&
-        element_map) {
+    const std::unordered_map<ElementId, ElementRecord>& element_map) {
   std::unordered_set<ElementId> ring_buffer_endpoints;
-  for (const auto& element : element_map) {
-    if (element.second.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint &&
-        element.second.type_specific()->endpoint()->type() ==
+  for (const auto& element_entry_pair : element_map) {
+    if (element_entry_pair.second.element.type() ==
+            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint &&
+        element_entry_pair.second.element.type_specific()->endpoint()->type() ==
             fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer) {
-      ring_buffer_endpoints.insert(element.first);
+      ring_buffer_endpoints.insert(element_entry_pair.first);
     }
   }
   return ring_buffer_endpoints;
 }
 
-std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element> MapElements(
+// This maps ElementId->ElementRecord but populates only the Element portion of the ElementRecord.
+std::unordered_map<ElementId, ElementRecord> MapElements(
     const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements) {
-  auto element_map =
-      std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>{};
+  auto element_map = std::unordered_map<ElementId, ElementRecord>{};
 
   for (const auto& element : elements) {
     if (!element.id().has_value()) {
       FX_LOGS(WARNING) << "invalid element_id";
       return {};
     }
-    if (!element_map.insert({*element.id(), element}).second) {
+    auto element_insertion = element_map.insert({*element.id(), ElementRecord{.element = element}});
+    if (!element_insertion.second) {
       FX_LOGS(WARNING) << "duplicate element_id " << *element.id();
       return {};
     }

@@ -165,7 +165,12 @@ void Device::FidlErrorHandler<fuchsia_hardware_audio_signalprocessing::SignalPro
   device_->sig_proc_client_.reset();
 }
 
+// Called during initialization, when we know definitively whether the driver supports the protocol.
+// It might also be called later, if there is an error related to the signalprocessing protocol.
+// If this is the first time this is called, then call `OnInitializationResponse` to unblock the
+// signalprocessing-related aspect of the "wait for multiple responses" state machine.
 void Device::SetSignalProcessingSupported(bool is_supported) {
+  ADR_LOG_METHOD(kLogSignalProcessingFidlResponses);
   auto first_set_of_signalprocessing_support = !supports_signalprocessing_.has_value();
 
   supports_signalprocessing_ = is_supported;
@@ -409,13 +414,22 @@ bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add)
   }
   observers_.push_back(observer_to_add);
 
-  // For this new observer, "catch it up" on the current state.
+  // For this new observer, "catch it up" on any current state that we already know.
+  // This may include:
   //
-  // Current signalprocessing topology.
+  // (1) current signalprocessing topology.
+  if (current_topology_id_.has_value()) {
+    observer_to_add->TopologyChanged(*current_topology_id_);
+  }
 
-  // ElementState for each signalprocessing element.
+  // (2) ElementState, for each signalprocessing element where this has already been retrieved.
+  for (const auto& element_record : sig_proc_element_map_) {
+    if (element_record.second.state.has_value()) {
+      observer_to_add->ElementStateChanged(element_record.first, *element_record.second.state);
+    }
+  }
 
-  // GainState -- if StreamConfig.
+  // (3) GainState (if StreamConfig).
   if (is_stream_config()) {
     observer_to_add->GainStateChanged({{
         .gain_db = *gain_state_->gain_db(),
@@ -424,7 +438,7 @@ bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add)
     }});
   }
 
-  // PlugState -- if Codec or StreamConfig.
+  // (4) PlugState (if Codec or StreamConfig).
   if (is_codec() || is_stream_config()) {
     observer_to_add->PlugStateChanged(*plug_state_->plugged()
                                           ? fuchsia_audio_device::PlugState::kPlugged
@@ -934,6 +948,7 @@ void Device::RetrieveSignalProcessingElements() {
             sig_proc_elements_ = result->processing_elements();
             sig_proc_element_map_ = MapElements(sig_proc_elements_);
             if (sig_proc_element_map_.empty()) {
+              ADR_WARN_OBJECT() << "Empty element map";
               OnError(ZX_ERR_INVALID_ARGS);
               return;
             }
@@ -979,6 +994,7 @@ void Device::RetrieveSignalProcessingTopologies() {
         sig_proc_topologies_ = result->topologies();
         sig_proc_topology_map_ = MapTopologies(sig_proc_topologies_);
         if (sig_proc_topology_map_.empty()) {
+          ADR_WARN_OBJECT() << "Empty topology map";
           OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
@@ -1009,16 +1025,18 @@ void Device::RetrieveCurrentTopology() {
           return;
         }
 
-        TopologyId topology_id = result->topology_id();
-        auto match = sig_proc_topology_map_.find(topology_id);
+        TopologyId new_topology_id = result->topology_id();
+        auto match = sig_proc_topology_map_.find(new_topology_id);
         if (match == sig_proc_topology_map_.end()) {
-          ADR_WARN_OBJECT() << context << ": topology_id " << topology_id << " not found";
+          ADR_WARN_OBJECT() << context << ": topology_id " << new_topology_id << " not found";
           OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
-        if (!current_topology_id_.has_value() || *current_topology_id_ != topology_id) {
-          current_topology_id_ = topology_id;
+        // Save the topology and notify Observers, but only if this is a change in topology.
+        if (!current_topology_id_.has_value() || *current_topology_id_ != new_topology_id) {
+          current_topology_id_ = new_topology_id;
+          ForEachObserver([new_topology_id](auto obs) { obs->TopologyChanged(new_topology_id); });
         }
       });
 }
@@ -1032,7 +1050,7 @@ void Device::RetrieveCurrentElementStates() {
   FX_DCHECK(sig_proc_client_->is_valid());
 
   for (auto& element_pair : sig_proc_element_map_) {
-    const auto& element = element_pair.second;
+    const auto& element = element_pair.second.element;
     (*sig_proc_client_)
         ->WatchElementState({{.processing_element_id = element_pair.first}})
         .Then([this, element](
@@ -1049,8 +1067,18 @@ void Device::RetrieveCurrentElementStates() {
             OnError(status);
             return;
           }
+          ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
 
-          // Save the initial element state, for Observers
+          // Save the state and notify Observers, but only if this is a change in element state.
+          auto element_record = sig_proc_element_map_.find(*element.id());
+          if (!element_record->second.state.has_value() ||
+              *element_record->second.state != element_state) {
+            element_record->second.state = element_state;
+            // Notify any Observers of this change in element state.
+            ForEachObserver([element_id = *element.id(), element_state](auto obs) {
+              obs->ElementStateChanged(element_id, element_state);
+            });
+          }
         });
   }
 }
@@ -1085,7 +1113,7 @@ void Device::RetrieveCompositeDaiFormatSets() {
   element_dai_format_sets_.clear();
   for (auto element_id : temp_dai_endpoint_ids_) {
     RetrieveDaiFormatSets(
-        [this](uint64_t element_id,
+        [this](ElementId element_id,
                const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_formats) {
           element_dai_format_sets_.push_back({{element_id, dai_formats}});
           temp_dai_endpoint_ids_.extract(element_id);
@@ -1541,6 +1569,11 @@ void Device::SetDeviceInfo() {
   ADR_LOG_METHOD(kLogDeviceMethods);
 
   device_info_ = CreateDeviceInfo();
+
+  if (!sig_proc_element_map_.empty()) {
+    LogElementMap(sig_proc_element_map_);
+  }
+
   ValidateDeviceInfo(*device_info_);
 }
 
@@ -1622,9 +1655,9 @@ std::optional<fuchsia_hardware_audio::Format> Device::SupportedDriverFormatForCl
   }
 
   std::vector<fuchsia_hardware_audio::SupportedFormats> driver_ring_buffer_format_sets;
-  for (const auto& element_entry : element_driver_ring_buffer_format_sets_) {
-    if (element_entry.first == element_id) {
-      driver_ring_buffer_format_sets = element_entry.second;
+  for (const auto& element_entry_pair : element_driver_ring_buffer_format_sets_) {
+    if (element_entry_pair.first == element_id) {
+      driver_ring_buffer_format_sets = element_entry_pair.second;
     }
   }
   if (driver_ring_buffer_format_sets.empty()) {

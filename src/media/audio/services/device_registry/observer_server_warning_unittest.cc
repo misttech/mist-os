@@ -15,6 +15,7 @@
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/observer_server.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
+#include "src/media/audio/services/device_registry/testing/fake_composite.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
@@ -49,6 +50,19 @@ class ObserverServerCodecWarningTest : public ObserverServerWarningTest {
     adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
                                            fuchsia_audio_device::DeviceType::kCodec,
                                            DriverClient::WithCodec(fake_driver->Enable())));
+    RunLoopUntilIdle();
+    return fake_driver;
+  }
+};
+
+class ObserverServerCompositeWarningTest : public ObserverServerWarningTest {
+ protected:
+  std::unique_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
+    auto fake_driver = CreateFakeComposite();
+
+    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test composite name",
+                                           fuchsia_audio_device::DeviceType::kComposite,
+                                           DriverClient::WithComposite(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -199,6 +213,79 @@ TEST_F(ObserverServerCodecWarningTest, GetReferenceClockFails) {
 // Add negative test cases for WatchTopology and WatchElementState (once implemented)
 //
 // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
+
+/////////////////////
+// Composite tests
+//
+// Validate that the Observer cannot handle a WatchGainState request from this type of device.
+TEST_F(ObserverServerCompositeWarningTest, WatchGainStateFails) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
+  ASSERT_EQ(ObserverServer::count(), 1u);
+  bool received_callback = false;
+
+  observer->client()->WatchGainState().Then(
+      [&received_callback](
+          fidl::Result<fuchsia_audio_device::Observer::WatchGainState>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().framework_error();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ObserverWatchGainStateError::kWrongDeviceType)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ObserverServer::count(), 1u);
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
+
+// Validate that the Observer cannot handle a WatchPlugState request from this type of device.
+TEST_F(ObserverServerCompositeWarningTest, WatchPlugStateFails) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
+  ASSERT_EQ(ObserverServer::count(), 1u);
+  bool received_callback = false;
+
+  observer->client()->WatchPlugState().Then(
+      [&received_callback](
+          fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().framework_error();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ObserverWatchPlugStateError::kWrongDeviceType)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ObserverServer::count(), 1u);
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
+
+// Add negative test cases for WatchTopology and WatchElementState (once implemented)
 
 /////////////////////
 // StreamConfig tests

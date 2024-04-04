@@ -22,7 +22,8 @@ closed protocol Provider {
 
         /// The client_end of the protocol channel (Codec, Composite, Dai or StreamConfig)
         /// that this service will use to configure/observe the device.
-        /// For now, `AddDevice` only accepts a `stream_config_client` or `codec_client` here.
+        /// For now, `AddDevice` only accepts a `codec_client`, `composite_client` or
+        /// `stream_config_client` here.
         ///
         /// Required.
         3: driver_client DriverClient;

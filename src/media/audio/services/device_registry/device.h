@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.audio/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fit/function.h>
@@ -332,8 +332,7 @@ class Device : public std::enable_shared_from_this<Device> {
   std::optional<bool> supports_signalprocessing_;
   std::vector<fuchsia_hardware_audio_signalprocessing::Element> sig_proc_elements_;
   std::vector<fuchsia_hardware_audio_signalprocessing::Topology> sig_proc_topologies_;
-  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::Element>
-      sig_proc_element_map_;
+  std::unordered_map<ElementId, ElementRecord> sig_proc_element_map_;
 
   std::unordered_set<ElementId> dai_endpoint_ids_;
   std::unordered_set<ElementId> temp_dai_endpoint_ids_;
