@@ -124,7 +124,6 @@ source_set("common_srcs") {
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sysmem-version",
-    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
 

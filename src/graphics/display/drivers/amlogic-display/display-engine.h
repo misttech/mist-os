@@ -11,7 +11,6 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/interrupt.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -66,7 +65,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
   zx_status_t Initialize();
 
   // Tears down display submodules and turns off the hardware.
-  //
+  // TA_REQ
   // Must be called exactly once before the DisplayEngine instance is
   // destroyed in production code.
   //
@@ -203,7 +202,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
   // and `vout_` are initialized, but before any IRQ handler thread starts
   // running, as access to display resources (registers, IRQs) after powering
   // off the display engine will cause the system to crash.
-  zx::result<> ResetDisplayEngine() TA_REQ(display_mutex_);
+  zx::result<> ResetDisplayEngine() __TA_REQUIRES(display_mutex_);
 
   bool fully_initialized() const { return full_init_done_.load(std::memory_order_relaxed); }
   void set_fully_initialized() { full_init_done_.store(true, std::memory_order_release); }
@@ -216,7 +215,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
 
   // Whether `timing` is a new display timing different from the timing
   // currently applied to the display.
-  bool IsNewDisplayTiming(const display::DisplayTiming& timing) TA_REQ(display_mutex_);
+  bool IsNewDisplayTiming(const display::DisplayTiming& timing) __TA_REQUIRES(display_mutex_);
 
   zx_device_t* const bus_device_;
 
@@ -238,11 +237,11 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
   std::atomic<bool> full_init_done_ = false;
 
   // Display controller related data
-  ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(display_mutex_);
+  ddk::DisplayControllerInterfaceProtocolClient dc_intf_ __TA_GUARDED(display_mutex_);
 
   // Points to the next capture target image to capture displayed contents into.
   // Stores nullptr if capture is not going to be performed.
-  ImageInfo* current_capture_target_image_ TA_GUARDED(capture_mutex_) = nullptr;
+  ImageInfo* current_capture_target_image_ __TA_GUARDED(capture_mutex_) = nullptr;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,
@@ -250,8 +249,8 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
       buffer_collections_;
 
   // Imported Images
-  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_images_ TA_GUARDED(image_mutex_);
-  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_captures_ TA_GUARDED(capture_mutex_);
+  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_images_ __TA_GUARDED(image_mutex_);
+  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_captures_ __TA_GUARDED(capture_mutex_);
 
   // Objects: only valid if fully_initialized()
   std::unique_ptr<Vpu> vpu_;

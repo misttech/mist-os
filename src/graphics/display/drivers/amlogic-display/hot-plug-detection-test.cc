@@ -5,11 +5,11 @@
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
+#include <zircon/compiler.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
@@ -115,7 +115,7 @@ class HotPlugDetectionTest : public ::gtest::RealLoopFixture {
   zx::interrupt pin_gpio_interrupt_;
 
   mutable fbl::Mutex mutex_;
-  std::vector<HotPlugDetectionState> recorded_detection_states_ TA_GUARDED(&mutex_);
+  std::vector<HotPlugDetectionState> recorded_detection_states_ __TA_GUARDED(&mutex_);
 };
 
 TEST_F(HotPlugDetectionTest, NoHotplugEvents) {

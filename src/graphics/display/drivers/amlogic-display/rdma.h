@@ -11,13 +11,13 @@
 #include <lib/async/cpp/irq.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio-buffer.h>
-#include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/pmt.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
 #include <zircon/syscalls/port.h>
 #include <zircon/types.h>
 
@@ -239,12 +239,13 @@ class RdmaEngine {
 
   fbl::Mutex rdma_lock_;
 
-  uint64_t rdma_usage_table_[kNumberOfTables] TA_GUARDED(rdma_lock_);
-  size_t start_index_used_ TA_GUARDED(rdma_lock_) = 0;
-  size_t end_index_used_ TA_GUARDED(rdma_lock_) = 0;
+  uint64_t rdma_usage_table_[kNumberOfTables] __TA_GUARDED(rdma_lock_);
+  size_t start_index_used_ __TA_GUARDED(rdma_lock_) = 0;
+  size_t end_index_used_ __TA_GUARDED(rdma_lock_) = 0;
 
-  bool rdma_active_ TA_GUARDED(rdma_lock_) = false;
-  display::ConfigStamp latest_applied_config_ TA_GUARDED(rdma_lock_) = display::kInvalidConfigStamp;
+  bool rdma_active_ __TA_GUARDED(rdma_lock_) = false;
+  display::ConfigStamp latest_applied_config_ __TA_GUARDED(rdma_lock_) =
+      display::kInvalidConfigStamp;
 
   RdmaChannelContainer rdma_channels_[kNumberOfTables];
 

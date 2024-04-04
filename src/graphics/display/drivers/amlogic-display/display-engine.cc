@@ -17,12 +17,12 @@
 #include <lib/fit/function.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
-#include <lib/zircon-internal/align.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/limits.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
@@ -346,15 +346,15 @@ zx_status_t DisplayEngine::DisplayControllerImplImportImage(
       // AFBC does not use canvas.
       uint64_t offset = collection_info.buffers[index].vmo_usable_start;
       size_t size =
-          ZX_ROUNDUP(ImageFormatImageSize(
-                         ImageConstraintsToFormat(collection_info.settings.image_format_constraints,
-                                                  image_metadata->width, image_metadata->height)
-                             .value()),
-                     PAGE_SIZE);
+          fbl::round_up(ImageFormatImageSize(ImageConstraintsToFormat(
+                                                 collection_info.settings.image_format_constraints,
+                                                 image_metadata->width, image_metadata->height)
+                                                 .value()),
+                        ZX_PAGE_SIZE);
       zx_paddr_t paddr;
       zx_status_t status =
           bti_.pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, collection_info.buffers[index].vmo,
-                   offset & ~(PAGE_SIZE - 1), size, &paddr, 1, &import_info->pmt);
+                   offset & ~(ZX_PAGE_SIZE - 1), size, &paddr, 1, &import_info->pmt);
       if (status != ZX_OK) {
         zxlogf(ERROR, "Failed to pin BTI: %s", zx_status_get_string(status));
         return status;

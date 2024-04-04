@@ -7,9 +7,9 @@
 
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <lib/mmio/mmio-buffer.h>
-#include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
+#include <zircon/compiler.h>
 
 #include <cstdint>
 #include <memory>
@@ -76,7 +76,7 @@ class HdmiTransmitter {
 
   fbl::Mutex dw_lock_;
   std::unique_ptr<designware_hdmi::HdmiTransmitterController> designware_controller_
-      TA_GUARDED(dw_lock_);
+      __TA_GUARDED(dw_lock_);
 
   fdf::MmioBuffer hdmitx_top_level_mmio_;
 

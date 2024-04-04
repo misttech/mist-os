@@ -7,8 +7,8 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/mmio/mmio-buffer.h>
-#include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/result.h>
+#include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <cstdint>
@@ -112,7 +112,7 @@ class Vpu {
   uint32_t first_time_load_ = false;
 
   fbl::Mutex capture_mutex_;
-  CaptureState capture_state_ TA_GUARDED(capture_mutex_);
+  CaptureState capture_state_ __TA_GUARDED(capture_mutex_);
 };
 }  // namespace amlogic_display
 
