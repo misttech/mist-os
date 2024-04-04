@@ -34,7 +34,9 @@ type encodeSuccessCase struct {
 	Name, Context, HandleDefs, Handles, HandleDispositions, Value, Bytes string
 }
 
-type decodeSuccessCase struct{}
+type decodeSuccessCase struct {
+	Name, Context, HandleDefs, Handles, HandleDispositions, ValueType, Bytes, EqualityCheck string
+}
 
 type encodeFailureCase struct{}
 
@@ -46,9 +48,14 @@ func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.Gene
 	if err != nil {
 		return nil, err
 	}
+	decodeSuccessCases, err := decodeSuccessCases(gidl.DecodeSuccess, schema)
+	if err != nil {
+		return nil, err
+	}
 	var buf bytes.Buffer
 	err = conformanceTmpl.Execute(&buf, conformanceTmplInput{
 		EncodeSuccessCases: encodeSuccessCases,
+		DecodeSuccessCases: decodeSuccessCases,
 	})
 	return buf.Bytes(), err
 }
@@ -96,6 +103,32 @@ func encodeSuccessCases(gidlEncodeSuccesses []ir.EncodeSuccess, schema mixer.Sch
 	return encodeSuccessCases, nil
 }
 
+func decodeSuccessCases(gidlDecodeSuccesses []ir.DecodeSuccess, schema mixer.Schema) ([]decodeSuccessCase, error) {
+	var decodeSuccessCases []decodeSuccessCase
+	for _, decodeSuccess := range gidlDecodeSuccesses {
+		decl, err := schema.ExtractDeclaration(decodeSuccess.Value, decodeSuccess.HandleDefs)
+		if err != nil {
+			return nil, fmt.Errorf("decode success %s: %s", decodeSuccess.Name, err)
+		}
+		equalityCheck := buildEqualityCheck(decodeSuccess.Value, decl)
+		for _, encoding := range decodeSuccess.Encodings {
+			if !wireFormatSupported(encoding.WireFormat) {
+				continue
+			}
+			decodeSuccessCases = append(decodeSuccessCases, decodeSuccessCase{
+				Name:          testCaseName(decodeSuccess.Name, encoding.WireFormat),
+				Context:       encodingContext(encoding.WireFormat),
+				HandleDefs:    buildHandleDefs(decodeSuccess.HandleDefs),
+				Handles:       buildHandles(encoding.Handles),
+				ValueType:     decl.Name(),
+				Bytes:         buildBytes(encoding.Bytes),
+				EqualityCheck: equalityCheck,
+			})
+		}
+	}
+	return decodeSuccessCases, nil
+}
+
 func handleTypeName(subtype fidlgen.HandleSubtype) string {
 	switch subtype {
 	case fidlgen.HandleSubtypeNone:
@@ -116,7 +149,20 @@ func buildHandleDefs(defs []ir.HandleDef) string {
 	var builder strings.Builder
 	builder.WriteString("[\n")
 	for _, d := range defs {
-		builder.WriteString(fmt.Sprintf("create_handle(fuchsia_controller_py.%s).take(),\n", handleTypeName(d.Subtype)))
+		builder.WriteString(fmt.Sprintf("create_handle(fuchsia_controller_py.%s),\n", handleTypeName(d.Subtype)))
+	}
+	builder.WriteString("]")
+	return builder.String()
+}
+
+func buildHandles(handles []ir.Handle) string {
+	var builder strings.Builder
+	builder.WriteString("[\n")
+	for i, h := range handles {
+		builder.WriteString(fmt.Sprintf("%d,", h))
+		if i%8 == 7 {
+			builder.WriteString("\n")
+		}
 	}
 	builder.WriteString("]")
 	return builder.String()
@@ -130,7 +176,7 @@ func buildRawHandleDispositions(defs []ir.HandleDisposition) string {
 	builder.WriteString("[")
 	for _, d := range defs {
 		// MOVE operation at idx 0, result ZX_OK at last idx.
-		builder.WriteString(fmt.Sprintf("(0, handle_defs[%d], %d, %d, 0),", d.Handle, d.Type, d.Rights))
+		builder.WriteString(fmt.Sprintf("(0, handle_defs[%d].as_int(), %d, %d, 0),", d.Handle, d.Type, d.Rights))
 	}
 	builder.WriteString("]")
 	return builder.String()
@@ -142,8 +188,11 @@ func buildRawHandles(defs []ir.HandleDisposition) string {
 	}
 	var builder strings.Builder
 	builder.WriteString("[")
-	for _, d := range defs {
-		builder.WriteString(fmt.Sprintf("handle_defs[%d],", d.Handle))
+	for i, d := range defs {
+		builder.WriteString(fmt.Sprintf("%d,", d.Handle))
+		if i%8 == 7 {
+			builder.WriteString("\n")
+		}
 	}
 	builder.WriteString("]")
 	return builder.String()
@@ -310,7 +359,7 @@ func visit(value ir.Value, decl mixer.Declaration) string {
 		}
 		return "None"
 	case ir.Handle:
-		return fmt.Sprintf("handle_defs[%d]", int(value))
+		return fmt.Sprintf("handle_defs[%d].as_int()", int(value))
 	case ir.Record:
 		switch decl := decl.(type) {
 		case *mixer.StructDecl:

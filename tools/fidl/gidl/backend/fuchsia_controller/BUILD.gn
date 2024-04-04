@@ -16,5 +16,6 @@ go_library("fuchsia_controller") {
   sources = [
     "conformance.go",
     "conformance.tmpl",
+    "equality_builder.go",
   ]
 }

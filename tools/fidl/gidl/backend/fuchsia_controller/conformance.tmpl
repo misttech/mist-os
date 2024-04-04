@@ -9,6 +9,9 @@ import fidl.test_conformance as test_conformance
 import struct
 import unittest
 
+from fidl import construct_response_object
+from fidl_codec import decode_standalone
+
 def create_handle(cls):
     """Generalized handle-maker (for sockets, events, channel, etc."""
     res = cls.create()
@@ -16,7 +19,7 @@ def create_handle(cls):
         return res[0]
     return res
 
-class ConformanceTests(unittest.TestCase):
+class EncodeConformanceTests(unittest.TestCase):
 {{ range .EncodeSuccessCases }}
     def test_{{ .Name }}_encode(self):
         {{- if .HandleDefs }}
@@ -26,12 +29,32 @@ class ConformanceTests(unittest.TestCase):
         b, hdls = value.encode()
         self.assertEqual(b, {{ .Bytes }})
         {{- if .Handles }}
-        self.assertEqual([hdl[1] for hdl in hdls], {{ .Handles }})
+        handles = [handle_defs[i].as_int() for i in {{ .Handles }}]
+        self.assertEqual([hdl[1] for hdl in hdls], handles)
         {{- else if .HandleDispositions }}
         self.assertEqual(hdls, {{ .HandleDispositions }})
         {{- else }}
         self.assertEqual(hdls, [])
         {{- end }}
+{{ end }}
+
+class DecodeConformanceTests(unittest.TestCase):
+{{ range .DecodeSuccessCases }}
+    def test_{{ .Name }}_decode(self):
+        {{- if .HandleDefs }}
+        handle_defs = {{ .HandleDefs }}
+        handles = [handle_defs[i].as_int() for i in {{ .Handles }}]
+        handle_koids = [h.koid() for h in handle_defs]
+        {{- else }}
+        handle_defs = []
+        handles = []
+        handle_koids = []
+        {{- end }}
+        bytes = {{ .Bytes }}
+        type_name = "{{ .ValueType }}"
+        value = decode_standalone(type_name=type_name, bytes=bytes, handles=handles)
+        value = construct_response_object(type_name, value)
+{{ .EqualityCheck }}
 {{ end }}
 
 if __name__ == "__main__":

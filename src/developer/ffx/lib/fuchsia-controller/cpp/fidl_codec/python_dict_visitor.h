@@ -28,7 +28,8 @@ class PythonDictVisitor : public fidl_codec::Visitor {
 
   void VisitInvalidValue(const fidl_codec::InvalidValue* node,
                          const fidl_codec::Type* for_type) override {
-    PyErr_SetString(PyExc_TypeError, "invalid value");
+    PyErr_Format(PyExc_TypeError, "invalid value for type: %s",
+                 for_type ? for_type->Name().c_str() : "[unknown]");
   }
 
   void VisitNullValue(const fidl_codec::NullValue* node,
@@ -55,7 +56,8 @@ class PythonDictVisitor : public fidl_codec::Visitor {
     if (visitor.result() == nullptr) {
       return;
     }
-    PyDict_SetItemString(res.get(), node->member().name().c_str(), visitor.result());
+    PyDict_SetItemString(res.get(), NormalizeMemberName(node->member().name()).c_str(),
+                         visitor.result());
     result_ = res.take();
   }
 
@@ -144,8 +146,8 @@ class PythonDictVisitor : public fidl_codec::Visitor {
     bool negative;
     node->GetIntegerValue(&value, &negative);
     if (negative) {
-      // Max possible absolute value for a signed integer (2^63 - 1).
-      if (value > 0x7fffffffffffffff) {
+      // Max possible absolute value for a signed integer (2^63).
+      if (value > 1ul << 63) {
         PyErr_SetString(PyExc_OverflowError, "Integer overflow");
         return;
       }
@@ -159,7 +161,12 @@ class PythonDictVisitor : public fidl_codec::Visitor {
 
   void VisitHandleValue(const fidl_codec::HandleValue* handle,
                         const fidl_codec::Type* for_type) override {
-    result_ = PyLong_FromUnsignedLongLong(handle->handle().handle);
+    if (handle->handle().handle == 0) {
+      Py_INCREF(Py_None);
+      result_ = Py_None;
+    } else {
+      result_ = PyLong_FromUnsignedLongLong(handle->handle().handle);
+    }
   }
 
   PyObject* result_{nullptr};

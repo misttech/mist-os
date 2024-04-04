@@ -4,6 +4,7 @@
 
 from dataclasses import dataclass
 from enum import IntEnum
+import enum
 import inspect
 import re
 import sys
@@ -180,6 +181,14 @@ def get_type_from_import(i):
 
 def construct_from_name_and_type(constructed_obj, sub_parsed_obj, name, ty):
     unwrapped_ty = unwrap_type(ty)
+    handle_types = ["zx.handle", "zx.channel", "zx.socket", "zx.event"]
+    ty_str = str(unwrapped_ty)
+    if ty_str in handle_types or ty_str.endswith(".Server"):
+        setattr(constructed_obj, name, sub_parsed_obj)
+        return
+    if sub_parsed_obj is None:
+        setattr(constructed_obj, name, None)
+        return
     unwrapped_module = unwrapped_ty.__module__
     if unwrapped_module.startswith("fidl."):
         obj = get_type_from_import(
@@ -190,12 +199,27 @@ def construct_from_name_and_type(constructed_obj, sub_parsed_obj, name, ty):
             construct_result(sub_obj, sub_parsed_obj)
             setattr(constructed_obj, name, sub_obj)
         elif isinstance(sub_parsed_obj, list):
-            results = []
-            for item in sub_parsed_obj:
-                sub_obj = make_default_obj(obj)
-                construct_result(sub_obj, item)
-                results.append(sub_obj)
-            setattr(constructed_obj, name, results)
+            # It may be necessary here to handle a list of lists.
+            def handle_list(spo):
+                results = []
+                for item in spo:
+                    if isinstance(item, list):
+                        results.append(handle_list(item))
+                        continue
+                    sub_obj = make_default_obj(obj)
+                    if item is None:
+                        sub_obj = None
+                    elif isinstance(sub_obj, enum.Enum):
+                        # This is a bit of a special case that can't be set from behind a function,
+                        # so the variable has to be set directly. This is also the case for bits
+                        # (both types are represented as enums).
+                        sub_obj = item
+                    else:
+                        construct_result(sub_obj, item)
+                    results.append(sub_obj)
+                return results
+
+            setattr(constructed_obj, name, handle_list(sub_parsed_obj))
         else:
             setattr(constructed_obj, name, sub_parsed_obj)
     else:
@@ -204,7 +228,7 @@ def construct_from_name_and_type(constructed_obj, sub_parsed_obj, name, ty):
 
 def construct_result(constructed_obj, parsed_obj):
     if constructed_obj.__fidl_kind__ == "union":
-        key = next(iter(parsed_obj.keys()))
+        key = camel_case_to_snake_case(next(iter(parsed_obj.keys())))
         sub_obj_type = getattr(constructed_obj, f"{key}_type")
         sub_parsed_obj = parsed_obj[key]
         setattr(constructed_obj, key, None)
@@ -247,5 +271,8 @@ def make_default_obj(object_ty):
     try:
         return object_ty(**args)
     except TypeError:
-        # Object might accept *args/**kwargs, so use empty constructor.
+        if issubclass(object_ty, enum.Enum):
+            # If this is an Enum, we will just set 0, since it must be set to
+            # a specific numeric value.
+            return object_ty(value=0)
         return object_ty()

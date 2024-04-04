@@ -7,8 +7,6 @@
 #include <zircon/types.h>
 
 #include <cinttypes>
-#include <locale>
-#include <unordered_set>
 
 #include "object.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/convert.h"
@@ -16,43 +14,6 @@
 #include "src/lib/fidl_codec/wire_object.h"
 
 namespace converter {
-
-namespace {
-
-// Converts camel case to lower snake case. Does not handle acronyms.
-std::string ToLowerSnake(std::string_view s) {
-  std::stringstream ss;
-  auto iter = s.cbegin();
-  ss.put(std::tolower(*iter, std::locale()));
-  iter++;
-  for (; iter != s.cend(); ++iter) {
-    auto c = *iter;
-    if (std::isupper(c)) {
-      ss.put('_');
-    }
-    ss.put(std::tolower(c, std::locale()));
-  }
-  return ss.str();
-}
-
-// This is a recreation of the "normalize_member_name" function from Python.
-inline std::string NormalizeMemberName(std::string_view s) {
-  // These keywords are taken from the Python docs:
-  // https://docs.python.org/3/reference/lexical_analysis.html#keywords
-  // Uppercase keywords have been ommitted.
-  static std::unordered_set<std::string> python_keywords = {
-      "await",  "else",    "import", "pass",   "break",    "except",   "in",     "raise",
-      "class",  "finally", "is",     "return", "and",      "continue", "for",    "lambda",
-      "try",    "as",      "def",    "from",   "nonlocal", "while",    "assert", "del",
-      "global", "not",     "with",   "async",  "elif",     "if",       "or",     "yield"};
-  auto lower_snake = ToLowerSnake(s);
-  if (python_keywords.count(lower_snake) > 0) {
-    lower_snake.append("_");
-  }
-  return lower_snake;
-}
-
-}  // namespace
 
 // Helper func. This attempts to lookup an attribute on an object while not setting an error if the
 // attribute does not exist. Can still return an error generally, and is indicated by returning

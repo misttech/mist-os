@@ -62,7 +62,7 @@ class Handle:
 
     def koid(self) -> int:
         """Returns the underlying kernel object ID."""
-        return fuchsia_controller_internal.channel_koid(self._handle)
+        return fuchsia_controller_internal.handle_koid(self._handle)
 
     def take(self) -> int:
         """Takes the underlying fidl handle, setting it internally to zero.
@@ -137,7 +137,7 @@ class Socket:
 
     def koid(self) -> int:
         """Returns the underlying kernel object ID."""
-        return fuchsia_controller_internal.channel_koid(self._handle)
+        return fuchsia_controller_internal.socket_koid(self._handle)
 
     def close(self):
         """Releases the underlying handle."""
@@ -433,7 +433,7 @@ class Event:
 
     def koid(self) -> int:
         """Returns the underlying kernel object ID."""
-        return fuchsia_controller_internal.channel_koid(self._handle)
+        return fuchsia_controller_internal.event_koid(self._handle)
 
     def take(self) -> int:
         """Takes the underlying fidl handle, setting it internally to zero.

@@ -466,6 +466,10 @@ func (decl *EnumDecl) IsFlexible() bool {
 	return decl.enumDecl.IsFlexible()
 }
 
+func (decl *EnumDecl) MemberCount() int {
+	return len(decl.enumDecl.Members)
+}
+
 func (decl *EnumDecl) conforms(value ir.Value, ctx context) error {
 	err := decl.Underlying.conforms(value, ctx)
 	if err != nil {

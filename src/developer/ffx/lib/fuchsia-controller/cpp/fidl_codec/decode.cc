@@ -16,6 +16,31 @@ namespace decode {
 
 enum Direction : uint8_t { REQUEST, RESPONSE };
 
+std::unique_ptr<zx_handle_disposition_t[]> python_obj_to_handle_disps(PyObject *handles,
+                                                                      Py_ssize_t *c_handles_len) {
+  if (!PyList_Check(handles)) {
+    PyErr_SetString(PyExc_TypeError, "Expected handles to be a list");
+    return nullptr;
+  }
+  *c_handles_len = PyList_Size(handles);
+  std::unique_ptr<zx_handle_disposition_t[]> c_handles =
+      std::make_unique<zx_handle_disposition_t[]>(*c_handles_len);
+  for (Py_ssize_t i = 0; i < *c_handles_len; ++i) {
+    auto obj = PyList_GetItem(handles, i);
+    if (obj == nullptr) {
+      return nullptr;
+    }
+    zx_handle_t res = convert::PyLong_AsU32(obj);
+    if (res == convert::MINUS_ONE_U32 && PyErr_Occurred()) {
+      return nullptr;
+    }
+    // TODO(https://fxbug.dev/42075167): Properly fill the handle disposition. The code will likely
+    // not just be integers.
+    c_handles[i] = zx_handle_disposition_t{.handle = res};
+  }
+  return c_handles;
+}
+
 PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  // NOLINT
                               Direction direction) {
   PyObject *handles = nullptr;
@@ -29,28 +54,13 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
                                    &handles)) {
     return nullptr;
   }
-  py::Buffer bytes(bytes_raw);
-  if (!PyList_Check(handles)) {
-    PyErr_SetString(PyExc_TypeError, "Expected handles to be a list");
+  Py_ssize_t c_handles_len;
+  auto c_handles = python_obj_to_handle_disps(handles, &c_handles_len);
+  if (c_handles == nullptr) {
     return nullptr;
   }
-  Py_ssize_t c_handles_len = PyList_Size(handles);
-  std::unique_ptr<zx_handle_disposition_t[]> c_handles =
-      std::make_unique<zx_handle_disposition_t[]>(c_handles_len);
-  for (Py_ssize_t i = 0; i < c_handles_len; ++i) {
-    auto obj = PyList_GetItem(handles, i);
-    if (obj == nullptr) {
-      return nullptr;
-    }
-    zx_handle_t res = convert::PyLong_AsU32(obj);
-    if (res == convert::MINUS_ONE_U32 && PyErr_Occurred()) {
-      return nullptr;
-    }
-    // TODO(https://fxbug.dev/42075167): Properly fill the handle disposition. The code will likely
-    // not just be integers.
-    c_handles[i] = zx_handle_disposition_t{.handle = res};
-  }
-  auto header = reinterpret_cast<const fidl_message_header_t *>(bytes.buf());
+  py::Buffer bytes(bytes_raw);
+  auto header = static_cast<const fidl_message_header_t *>(bytes.buf());
   const std::vector<fidl_codec::ProtocolMethod *> *methods =
       mod::get_module_state()->loader->GetByOrdinal(header->ordinal);
   if (methods == nullptr || methods->empty()) {
@@ -65,13 +75,12 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
   bool successful;
   switch (direction) {
     case Direction::RESPONSE:
-      successful =
-          fidl_codec::DecodeResponse(method, reinterpret_cast<const uint8_t *>(bytes.buf()),
-                                     static_cast<uint64_t>(bytes.len()), c_handles.get(),
-                                     static_cast<uint64_t>(c_handles_len), &object, errors);
+      successful = fidl_codec::DecodeResponse(
+          method, static_cast<const uint8_t *>(bytes.buf()), static_cast<uint64_t>(bytes.len()),
+          c_handles.get(), static_cast<uint64_t>(c_handles_len), &object, errors);
       break;
     case Direction::REQUEST:
-      successful = fidl_codec::DecodeRequest(method, reinterpret_cast<const uint8_t *>(bytes.buf()),
+      successful = fidl_codec::DecodeRequest(method, static_cast<const uint8_t *>(bytes.buf()),
                                              static_cast<uint64_t>(bytes.len()), c_handles.get(),
                                              static_cast<uint64_t>(c_handles_len), &object, errors);
       break;
@@ -89,6 +98,64 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
   return visitor.result();
 }
 
+PyObject *decode_standalone(PyObject *self, PyObject *args, PyObject *kwds) {  // NOLINT
+  const char *c_type_name = nullptr;
+  PyObject *handles = nullptr;
+  Py_buffer bytes_raw;
+  static const char *kwlist[] = {
+      "type_name",
+      "bytes",
+      "handles",
+      nullptr,
+  };
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "sy*O", const_cast<char **>(kwlist), &c_type_name,
+                                   &bytes_raw, &handles)) {
+    return nullptr;
+  }
+  std::string type_name(c_type_name);
+  auto const idx = type_name.find('/');
+  if (idx == std::string::npos) {
+    PyErr_SetString(PyExc_ValueError,
+                    "Protocol not formatted properly, expected {library}/{protocol}");
+    return nullptr;
+  }
+  const std::string library_name(c_type_name, idx);
+  py::Buffer bytes(bytes_raw);
+  Py_ssize_t c_handles_len;
+  auto c_handles = python_obj_to_handle_disps(handles, &c_handles_len);
+  if (c_handles == nullptr) {
+    return nullptr;
+  }
+  auto lib = mod::get_ir_library(library_name);
+  if (lib == nullptr) {
+    return nullptr;
+  }
+  auto type = lib->TypeFromIdentifier(false, type_name);
+  if (type == nullptr) {
+    PyErr_Format(PyExc_RuntimeError, "Invalid value returned for %s in library %s",
+                 type_name.c_str(), library_name.c_str());
+    return nullptr;
+  }
+  fidl_codec::InvalidType invalid_type;
+  if (type->Name() == invalid_type.Name()) {
+    PyErr_Format(PyExc_TypeError, "Unable to find type %s in library %s", type_name.c_str(),
+                 library_name.c_str());
+    return nullptr;
+  }
+  std::ostringstream errors;
+  fidl_codec::MessageDecoder decoder(static_cast<uint8_t *>(bytes.buf()), bytes.len(),
+                                     c_handles.get(), c_handles_len, errors);
+  decoder.SkipObject(type->InlineSize(fidl_codec::WireVersion::kWireV2));
+  auto value = type->Decode(&decoder, 0);
+  if (value == nullptr || decoder.HasError()) {
+    PyErr_SetString(PyExc_RuntimeError, errors.str().c_str());
+    return nullptr;
+  }
+  python_dict_visitor::PythonDictVisitor visitor;
+  value->Visit(&visitor, nullptr);
+  return visitor.result();
+}
+
 PyObject *decode_fidl_response(PyObject *self, PyObject *args, PyObject *kwds) {  // NOLINT
   return decode_fidl_message(self, args, kwds, Direction::RESPONSE);
 }
@@ -96,6 +163,11 @@ PyObject *decode_fidl_response(PyObject *self, PyObject *args, PyObject *kwds) {
 PyObject *decode_fidl_request(PyObject *self, PyObject *args, PyObject *kwds) {  // NOLINT
   return decode_fidl_message(self, args, kwds, Direction::REQUEST);
 }
+
+PyMethodDef decode_standalone_py_def = {
+    "decode_standalone", reinterpret_cast<PyCFunction>(decode_standalone),
+    METH_VARARGS | METH_KEYWORDS,
+    "Decodes a standalone fidl response based on its type, bytes, and handles."};
 
 PyMethodDef decode_fidl_response_py_def = {
     "decode_fidl_response", reinterpret_cast<PyCFunction>(decode_fidl_response),

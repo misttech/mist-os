@@ -416,6 +416,10 @@ def bits_or_enum_root_type(ir, type_name: str) -> enum.EnumMeta:
         member["name"]: int(member["value"]["value"])
         for member in ir["members"]
     }
+    # If there are no members, there must be at least one so that it can be
+    # decoded without error.
+    if len(members) == 0:
+        members = {"__EMPTY__": 0}
     ty = enum.IntFlag(name, members)
     setattr(ty, "__fidl_kind__", type_name)
     setattr(ty, "__doc__", docstring(ir))
