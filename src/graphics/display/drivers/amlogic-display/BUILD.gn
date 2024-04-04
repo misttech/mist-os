@@ -55,6 +55,8 @@ source_set("common_srcs") {
     "hhi-regs.h",
     "hot-plug-detection.cc",
     "hot-plug-detection.h",
+    "image-info.cc",
+    "image-info.h",
     "initcodes-inl.h",
     "irq-handler-loop-util.cc",
     "irq-handler-loop-util.h",

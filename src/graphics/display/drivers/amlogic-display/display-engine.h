@@ -5,16 +5,13 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_ENGINE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_ENGINE_H_
 
-#include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/thread_annotations.h>
-#include <lib/zx/bti.h>
 #include <lib/zx/interrupt.h>
 #include <unistd.h>
 #include <zircon/compiler.h>
@@ -32,6 +29,7 @@
 #include "src/graphics/display/drivers/amlogic-display/capture.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
+#include "src/graphics/display/drivers/amlogic-display/image-info.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
@@ -40,33 +38,6 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
 namespace amlogic_display {
-
-struct ImageInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ImageInfo>> {
-  ~ImageInfo() {
-    zxlogf(INFO, "Destroying image on canvas %d", canvas_idx);
-    if (canvas.has_value()) {
-      fidl::WireResult result = fidl::WireCall(canvas.value())->Free(canvas_idx);
-      if (!result.ok()) {
-        zxlogf(WARNING, "Failed to call Canvas Free: %s",
-               result.error().FormatDescription().c_str());
-      } else if (result->is_error()) {
-        zxlogf(WARNING, "Canvas Free failed: %s", zx_status_get_string(result->error_value()));
-      }
-    }
-    if (pmt) {
-      pmt.unpin();
-    }
-  }
-  std::optional<fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device>> canvas;
-  uint8_t canvas_idx;
-  uint32_t image_height;
-  uint32_t image_width;
-
-  PixelFormatAndModifier pixel_format;
-  bool is_afbc;
-  zx::pmt pmt;
-  zx_paddr_t paddr;
-};
 
 class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, ddk::base_protocol> {
  public:
