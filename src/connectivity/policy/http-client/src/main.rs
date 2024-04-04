@@ -76,6 +76,7 @@ async fn to_success_response(
     current_url: &hyper::Uri,
     current_method: &hyper::Method,
     mut hyper_response: hyper::Response<hyper::Body>,
+    scope: vfs::execution_scope::ExecutionScope,
 ) -> net_http::Response {
     let redirect_info = redirect_info(current_url, current_method, &hyper_response);
     let headers = hyper_response
@@ -104,7 +105,7 @@ async fn to_success_response(
         ..Default::default()
     };
 
-    fasync::Task::spawn(async move {
+    scope.spawn(async move {
         let hyper_body = hyper_response.body_mut();
         while let Some(chunk) = hyper_body.next().await {
             if let Ok(chunk) = chunk {
@@ -142,7 +143,7 @@ async fn to_success_response(
                 }
             }
         }
-    }).detach();
+    });
 
     response
 }
@@ -191,10 +192,14 @@ struct Loader {
     headers: hyper::HeaderMap,
     body: Vec<u8>,
     deadline: fasync::Time,
+    scope: vfs::execution_scope::ExecutionScope,
 }
 
 impl Loader {
-    async fn new(req: net_http::Request) -> Result<Self, anyhow::Error> {
+    async fn new(
+        req: net_http::Request,
+        scope: vfs::execution_scope::ExecutionScope,
+    ) -> Result<Self, anyhow::Error> {
         let net_http::Request { method, url, headers, body, deadline, .. } = req;
         let method = method.as_ref().map(|method| hyper::Method::from_str(method)).transpose()?;
         let method = method.unwrap_or(hyper::Method::GET);
@@ -235,14 +240,14 @@ impl Loader {
 
             trace!("Starting request {} {}", method, url);
 
-            Ok(Loader { method, url, headers, body, deadline })
+            Ok(Loader { method, url, headers, body, deadline, scope })
         } else {
             Err(anyhow::Error::msg("Request missing URL"))
         }
     }
 
     fn build_request(&self) -> hyper::Request<hyper::Body> {
-        let Self { method, url, headers, body, deadline: _ } = self;
+        let Self { method, url, headers, body, deadline: _, scope: _ } = self;
         let mut request = hyper::Request::new(body.clone().into());
         *request.method_mut() = method.clone();
         *request.uri_mut() = url.clone();
@@ -265,8 +270,13 @@ impl Loader {
                                 self.method,
                                 self.url
                             );
-                            let response =
-                                to_success_response(&self.url, &self.method, hyper_response).await;
+                            let response = to_success_response(
+                                &self.url,
+                                &self.method,
+                                hyper_response,
+                                self.scope.clone(),
+                            )
+                            .await;
                             match loader_client.on_response(response).await {
                                 Ok(()) => {}
                                 Err(e) => {
@@ -278,8 +288,13 @@ impl Loader {
                             continue;
                         }
                     }
-                    let response =
-                        to_success_response(&self.url, &self.method, hyper_response).await;
+                    let response = to_success_response(
+                        &self.url,
+                        &self.method,
+                        hyper_response,
+                        self.scope.clone(),
+                    )
+                    .await;
                     // We don't care if on_response returns an error since this is the last
                     // callback.
                     let _: Result<_, _> = loader_client.on_response(response).await;
@@ -352,60 +367,75 @@ fn calculate_redirect(
     Some(hyper::Uri::from_parts(new_parts).ok()?)
 }
 
-fn spawn_server(stream: net_http::LoaderRequestStream) {
-    fasync::Task::spawn(
-        async move {
-            stream
-                .err_into()
-                .try_for_each_concurrent(None, |message| async move {
-                    match message {
-                        net_http::LoaderRequest::Fetch { request, responder } => {
-                            debug!(
-                                "Fetch request received (url: {}): {:?}",
-                                request
-                                    .url
-                                    .as_ref()
-                                    .and_then(|url| Some(url.as_str()))
-                                    .unwrap_or_default(),
-                                request
-                            );
-                            let result = Loader::new(request).await?.fetch().await;
-                            responder.send(match result {
-                                Ok((hyper_response, final_url, final_method)) => {
-                                    to_success_response(&final_url, &final_method, hyper_response)
-                                        .await
-                                }
-                                Err(error) => to_error_response(error),
-                            })?;
-                        }
-                        net_http::LoaderRequest::Start { request, client, control_handle } => {
-                            debug!(
-                                "Start request received (url: {}): {:?}",
-                                request
-                                    .url
-                                    .as_ref()
-                                    .and_then(|url| Some(url.as_str()))
-                                    .unwrap_or_default(),
-                                request
-                            );
-                            Loader::new(request).await?.start(client.into_proxy()?).await?;
-                            control_handle.shutdown();
-                        }
+async fn loader_server(stream: net_http::LoaderRequestStream) -> Result<(), anyhow::Error> {
+    let background_tasks = vfs::execution_scope::ExecutionScope::new();
+
+    stream
+        .err_into::<anyhow::Error>()
+        .try_for_each_concurrent(None, |message| {
+            let scope = background_tasks.clone();
+            async move {
+                match message {
+                    net_http::LoaderRequest::Fetch { request, responder } => {
+                        debug!(
+                            "Fetch request received (url: {}): {:?}",
+                            request
+                                .url
+                                .as_ref()
+                                .and_then(|url| Some(url.as_str()))
+                                .unwrap_or_default(),
+                            request
+                        );
+                        let result = Loader::new(request, scope.clone()).await?.fetch().await;
+                        responder.send(match result {
+                            Ok((hyper_response, final_url, final_method)) => {
+                                to_success_response(
+                                    &final_url,
+                                    &final_method,
+                                    hyper_response,
+                                    scope,
+                                )
+                                .await
+                            }
+                            Err(error) => to_error_response(error),
+                        })?;
                     }
-                    Ok(())
-                })
-                .await
-        }
-        .unwrap_or_else(|e: anyhow::Error| error!("{:?}", e)),
-    )
-    .detach();
+                    net_http::LoaderRequest::Start { request, client, control_handle } => {
+                        debug!(
+                            "Start request received (url: {}): {:?}",
+                            request
+                                .url
+                                .as_ref()
+                                .and_then(|url| Some(url.as_str()))
+                                .unwrap_or_default(),
+                            request
+                        );
+                        Loader::new(request, scope).await?.start(client.into_proxy()?).await?;
+                        control_handle.shutdown();
+                    }
+                }
+                Ok(())
+            }
+        })
+        .await?;
+
+    background_tasks.wait().await;
+    Ok(())
+}
+
+enum HttpServices {
+    Loader(net_http::LoaderRequestStream),
 }
 
 #[fuchsia::main]
 pub async fn main() -> Result<(), anyhow::Error> {
     let mut fs = ServiceFs::new();
-    let _: &mut ServiceFsDir<'_, _> = fs.dir("svc").add_fidl_service(spawn_server);
-    let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle()?;
-    let () = fs.collect().await;
+    let _: &mut ServiceFsDir<'_, _> =
+        fs.take_and_serve_directory_handle()?.dir("svc").add_fidl_service(HttpServices::Loader);
+    fs.for_each_concurrent(None, |services| async {
+        let HttpServices::Loader(stream) = services;
+        loader_server(stream).await.unwrap_or_else(|e: anyhow::Error| error!("{:?}", e))
+    })
+    .await;
     Ok(())
 }
