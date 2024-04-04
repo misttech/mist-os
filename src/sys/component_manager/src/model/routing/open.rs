@@ -23,36 +23,25 @@ use {
             storage::{self, BackingDirectoryInfo},
         },
     },
-    ::routing::{component_instance::ComponentInstanceInterface, path::PathBufExt},
+    ::routing::component_instance::ComponentInstanceInterface,
     cm_moniker::InstancedExtendedMoniker,
-    cm_util::channel,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio,
     moniker::MonikerBase,
-    std::{path::PathBuf, sync::Arc},
+    std::sync::Arc,
+    vfs::{directory::entry::OpenRequest, remote::remote_dir},
 };
-
-/// Contains the options to use when opening a capability.
-///
-/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `relative_path`,
-/// and `server_chan` parameters are used in the open call.
-pub struct OpenOptions<'a> {
-    pub flags: fio::OpenFlags,
-    pub relative_path: String,
-    pub server_chan: &'a mut zx::Channel,
-}
 
 /// A request to open a capability at its source.
 pub enum CapabilityOpenRequest<'a> {
     // Open a capability backed by a component's outgoing directory.
     OutgoingDirectory {
-        open_options: OpenOptions<'a>,
+        open_request: OpenRequest<'a>,
         source: CapabilitySource,
         target: &'a Arc<ComponentInstance>,
     },
     // Open a storage capability.
     Storage {
-        open_options: OpenOptions<'a>,
+        open_request: OpenRequest<'a>,
         source: storage::BackingDirectoryInfo,
         target: &'a Arc<ComponentInstance>,
     },
@@ -63,33 +52,35 @@ impl<'a> CapabilityOpenRequest<'a> {
     pub fn new_from_route_source(
         route_source: RouteSource,
         target: &'a Arc<ComponentInstance>,
-        mut open_options: OpenOptions<'a>,
-    ) -> Self {
+        mut open_request: OpenRequest<'a>,
+    ) -> Result<Self, ModelError> {
         let RouteSource { source, relative_path } = route_source;
-        let relative_path = relative_path.to_path_buf();
-        open_options.relative_path =
-            relative_path.attach(open_options.relative_path).to_string_lossy().into();
-        Self::OutgoingDirectory { open_options, source, target }
+        if !relative_path.is_dot() {
+            open_request.prepend_path(
+                &relative_path.to_string().try_into().map_err(|_| ModelError::BadPath)?,
+            );
+        }
+        Ok(Self::OutgoingDirectory { open_request, source, target })
     }
 
     /// Creates a request to open a storage capability with source `storage_source` for `target`.
     pub fn new_from_storage_source(
         source: BackingDirectoryInfo,
         target: &'a Arc<ComponentInstance>,
-        open_options: OpenOptions<'a>,
+        open_request: OpenRequest<'a>,
     ) -> Self {
-        Self::Storage { open_options, source, target }
+        Self::Storage { open_request, source, target }
     }
 
     /// Opens the capability in `self`, triggering a `CapabilityRouted` event and binding
     /// to the source component instance if necessary.
     pub async fn open(self) -> Result<(), OpenError> {
         match self {
-            Self::OutgoingDirectory { open_options, source, target } => {
-                Self::open_outgoing_directory(open_options, source, target).await
+            Self::OutgoingDirectory { open_request, source, target } => {
+                Self::open_outgoing_directory(open_request, source, target).await
             }
-            Self::Storage { open_options, source, target } => {
-                Self::open_storage(open_options, &source, target)
+            Self::Storage { open_request, source, target } => {
+                Self::open_storage(open_request, &source, target)
                     .await
                     .map_err(|e| OpenError::OpenStorageError { err: Box::new(e) })
             }
@@ -97,7 +88,7 @@ impl<'a> CapabilityOpenRequest<'a> {
     }
 
     async fn open_outgoing_directory(
-        open_options: OpenOptions<'a>,
+        mut open_request: OpenRequest<'a>,
         source: CapabilitySource,
         target: &Arc<ComponentInstance>,
     ) -> Result<(), OpenError> {
@@ -115,22 +106,21 @@ impl<'a> CapabilityOpenRequest<'a> {
                 .ok_or(OpenError::CapabilityProviderNotFound)?
         };
 
-        let OpenOptions { flags, relative_path, mut server_chan } = open_options;
-
         let source_instance =
             source.source_instance().upgrade().map_err(CapabilityProviderError::from)?;
         let task_group = match source_instance {
             ExtendedInstance::AboveRoot(top) => top.task_group(),
-            ExtendedInstance::Component(component) => component.nonblocking_task_group(),
+            ExtendedInstance::Component(component) => {
+                open_request.set_scope(component.execution_scope.clone());
+                component.nonblocking_task_group()
+            }
         };
-        capability_provider
-            .open(task_group, flags, PathBuf::from(relative_path), &mut server_chan)
-            .await?;
+        capability_provider.open(task_group, open_request).await?;
         Ok(())
     }
 
     async fn open_storage(
-        open_options: OpenOptions<'a>,
+        open_request: OpenRequest<'a>,
         source: &storage::BackingDirectoryInfo,
         target: &Arc<ComponentInstance>,
     ) -> Result<(), ModelError> {
@@ -149,32 +139,15 @@ impl<'a> CapabilityOpenRequest<'a> {
         .await
         .map_err(|e| ModelError::from(e))?;
 
-        let OpenOptions { flags, relative_path, server_chan } = open_options;
-
-        // Open the storage with the provided flags, mode, relative_path and server_chan.
-        // We don't clone the directory because we can't specify the mode or path that way.
-        let server_chan = channel::take_channel(server_chan);
-
-        // If there is no relative path, assume it is the current directory. We use "."
-        // because `fuchsia.io/Directory.Open` does not accept empty paths.
-        let relative_path = if relative_path.is_empty() { "." } else { &relative_path };
-
-        storage_dir_proxy
-            .open(flags, fio::ModeType::empty(), relative_path, ServerEnd::new(server_chan))
-            .map_err(|err| {
-                let source_moniker = match &dir_source {
-                    Some(r) => {
-                        InstancedExtendedMoniker::ComponentInstance(r.instanced_moniker().clone())
-                    }
-                    None => InstancedExtendedMoniker::ComponentManager,
-                };
-                ModelError::OpenStorageFailed {
-                    source_moniker,
-                    moniker,
-                    path: relative_path.to_string(),
-                    err,
+        open_request.open_remote(remote_dir(storage_dir_proxy)).map_err(|err| {
+            let source_moniker = match &dir_source {
+                Some(r) => {
+                    InstancedExtendedMoniker::ComponentInstance(r.instanced_moniker().clone())
                 }
-            })?;
+                None => InstancedExtendedMoniker::ComponentManager,
+            };
+            ModelError::OpenStorageFailed { source_moniker, moniker, path: String::new(), err }
+        })?;
         Ok(())
     }
 
@@ -200,9 +173,11 @@ impl<'a> CapabilityOpenRequest<'a> {
                 })
             }
             CapabilitySource::Namespace { capability, .. } => match capability.source_path() {
-                Some(path) => {
-                    Ok(Some(Box::new(NamespaceCapabilityProvider { path: path.clone() })))
-                }
+                Some(path) => Ok(Some(Box::new(NamespaceCapabilityProvider {
+                    path: path.clone(),
+                    is_directory_like: fio::DirentType::from(capability.type_name())
+                        == fio::DirentType::Directory,
+                }))),
                 _ => Ok(None),
             },
             CapabilitySource::FilteredAggregate { capability_provider, component, .. } => {
@@ -242,7 +217,6 @@ impl<'a> CapabilityOpenRequest<'a> {
                     let state = source_component_instance.lock_resolved_state().await?;
                     if let Some(service_dir) = state.anonymized_services.get(&route) {
                         let provider = DirectoryEntryCapabilityProvider {
-                            execution_scope: state.execution_scope().clone(),
                             entry: service_dir.dir_entry().await,
                         };
                         return Ok(Some(Box::new(provider)));
@@ -261,12 +235,11 @@ impl<'a> CapabilityOpenRequest<'a> {
 
                 let provider = {
                     let mut state = source_component_instance.lock_resolved_state().await?;
-                    let execution_scope = state.execution_scope().clone();
                     let entry = service_dir.dir_entry().await;
 
                     state.anonymized_services.insert(route, service_dir.clone());
 
-                    DirectoryEntryCapabilityProvider { execution_scope, entry }
+                    DirectoryEntryCapabilityProvider { entry }
                 };
 
                 // Populate the service dir with service entries from children that may have been started before the service

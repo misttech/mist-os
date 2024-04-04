@@ -11,7 +11,7 @@ use {
     cm_rust::{ChildRef, EventScope},
     cm_types::Name,
     cm_util::io::clone_dir,
-    fidl::endpoints::{Proxy, ServerEnd},
+    fidl::endpoints::Proxy,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
     flyweights::FlyStr,
     fuchsia_zircon::{
@@ -295,7 +295,7 @@ async fn handle_get_next_request(
 /// Serves the event_stream protocol implemented for EventStreamRequestStream
 /// This is needed because we get the request stream directly as a stream from FDIO
 /// but as a ServerEnd from the hooks system.
-pub async fn serve_event_stream_as_stream(
+pub async fn serve_event_stream(
     event_stream: EventStream,
     mut stream: fcomponent::EventStreamRequestStream,
 ) {
@@ -344,15 +344,6 @@ pub async fn serve_event_stream_as_stream(
             }
         }
     }
-}
-
-/// Serves EventStream FIDL requests received over the provided stream.
-pub async fn serve_event_stream(
-    event_stream: EventStream,
-    server_end: ServerEnd<fcomponent::EventStreamMarker>,
-) {
-    let stream = server_end.into_stream().unwrap();
-    serve_event_stream_as_stream(event_stream, stream).await;
 }
 
 type BoxStream<T> = Pin<Box<dyn Stream<Item = T> + Send + 'static>>;

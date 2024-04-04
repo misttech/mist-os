@@ -28,6 +28,7 @@ use {
     moniker::MonikerBase,
     std::{path::PathBuf, sync::Arc},
     thiserror::Error,
+    vfs::{directory::entry::OpenRequest, ToObjectRequest},
 };
 
 // TODO: The `use` declaration for storage implicitly carries these rights. While this is
@@ -199,21 +200,23 @@ async fn open_storage_root(
         endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
     let mut full_backing_directory_path = storage_source_info.backing_directory_path.clone();
     full_backing_directory_path.extend(storage_source_info.backing_directory_subdir.clone());
+    let path = full_backing_directory_path.to_string();
     if let Some(dir_source_component) = storage_source_info.storage_provider.as_ref() {
         // TODO(https://fxbug.dev/42127827): This should be StartReason::AccessCapability, but we haven't
         // plumbed in all the details needed to use it.
         dir_source_component.ensure_started(&StartReason::StorageAdmin).await?;
-        let path = full_backing_directory_path.to_string();
+        let path = path.try_into().map_err(|_| ModelError::BadPath)?;
+        let mut object_request = FLAGS.to_object_request(local_server_end.into_channel());
         dir_source_component
-            .open_outgoing(
+            .open_outgoing(OpenRequest::new(
+                dir_source_component.execution_scope.clone(),
                 FLAGS | fio::OpenFlags::DIRECTORY,
-                &path,
-                &mut local_server_end.into_channel(),
-            )
+                path,
+                &mut object_request,
+            ))
             .await?;
     } else {
         // If storage_source_info.storage_provider is None, the directory comes from component_manager's namespace
-        let path = full_backing_directory_path.to_string();
         fuchsia_fs::directory::open_channel_in_namespace(&path, FLAGS, local_server_end).map_err(
             |e| {
                 ModelError::from(StorageError::open_root(

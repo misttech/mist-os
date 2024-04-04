@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.cti
 
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use ::routing::RouteRequest;
 use anyhow::Context;
@@ -11,13 +11,13 @@ use cm_types::Name;
 use cm_util::TaskGroup;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use moniker::{ExtendedMoniker, Moniker, MonikerBase};
 use routing::{capability_source::InternalCapability, error::RoutingError, policy::PolicyError};
 use tracing::warn;
+use vfs::directory::entry::OpenRequest;
 
 use crate::{
     capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
@@ -152,25 +152,16 @@ impl CapabilityProvider for AccessDeniedCapabilityProvider {
     async fn open(
         self: Box<Self>,
         _task_group: TaskGroup,
-        _flags: fio::OpenFlags,
-        _relative_path: PathBuf,
-        server_end: &mut zx::Channel,
+        _open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
-        let server_end = cm_util::channel::take_channel(server_end);
-        let Ok(target) = self.target.upgrade() else {
-            return Ok(());
-        };
-        report_routing_failure(
-            &DEBUG_REQUEST,
-            &target,
-            RoutingError::from(PolicyError::CapabilityUseDisallowed {
-                cap: INTROSPECTOR_SERVICE.to_string(),
-                source_moniker: ExtendedMoniker::ComponentInstance(self.source_moniker),
-                target_moniker: self.target.moniker,
-            }),
-            server_end,
-        )
-        .await;
-        Ok(())
+        let err = RoutingError::from(PolicyError::CapabilityUseDisallowed {
+            cap: INTROSPECTOR_SERVICE.to_string(),
+            source_moniker: ExtendedMoniker::ComponentInstance(self.source_moniker),
+            target_moniker: self.target.moniker.clone(),
+        });
+        if let Ok(target) = self.target.upgrade() {
+            report_routing_failure(&DEBUG_REQUEST, &target, &err).await;
+        }
+        Err(err.into())
     }
 }

@@ -18,11 +18,11 @@ TEST(FuchsiaIoTest, Stat) {
   struct stat info = {};
   // Calling stat on an optional route to void breaks.
   EXPECT_EQ(-1, stat("/svc/fuchsia.test.Void", &info));
-  EXPECT_EQ(EPIPE, errno);
+  EXPECT_EQ(ENOENT, errno);
 
   // Calling stat on a broken route breaks.
   EXPECT_EQ(-1, stat("/svc/fuchsia.test.Broken", &info));
-  EXPECT_EQ(EPIPE, errno);
+  EXPECT_EQ(ENOENT, errno);
 
   // Calling stat on a path that doesn't exist breaks.
   EXPECT_EQ(-1, stat("/svc/nonexistant", &info));

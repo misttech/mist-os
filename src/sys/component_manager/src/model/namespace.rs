@@ -11,7 +11,6 @@ use {
             routing::{
                 self, route_and_open_capability,
                 router::{ErrorCapsule, Request, Router},
-                OpenOptions,
             },
         },
         sandbox_util::DictExt,
@@ -20,12 +19,10 @@ use {
         component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper, rights::Rights,
         route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
     },
-    cm_rust::{ComponentDecl, UseDecl, UseStorageDecl},
+    bedrock_error::{BedrockError, Explain},
+    cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl, UseStorageDecl},
     cm_util::TaskGroup,
-    fidl::{
-        endpoints::{ClientEnd, ServerEnd},
-        prelude::*,
-    },
+    fidl::{endpoints::ClientEnd, prelude::*},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
@@ -36,11 +33,10 @@ use {
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
     vfs::{
-        directory::entry::{serve_directory, DirectoryEntry, EntryInfo, OpenRequest},
+        directory::entry::{
+            serve_directory, DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest,
+        },
         execution_scope::ExecutionScope,
-        path::Path,
-        remote::RemoteLike,
-        service::endpoint,
         ToObjectRequest,
     },
 };
@@ -64,7 +60,7 @@ pub async fn create_namespace(
         add_pkg_directory(&mut namespace, pkg_dir)?;
     }
     let uses = deduplicate_event_stream(decl.uses.iter());
-    add_use_decls(&mut namespace, component, uses, program_input_dict, scope).await?;
+    add_use_decls(&mut namespace, component, uses, program_input_dict).await?;
     Ok(namespace)
 }
 
@@ -110,7 +106,6 @@ async fn add_use_decls(
     component: &Arc<ComponentInstance>,
     uses: impl Iterator<Item = &UseDecl>,
     program_input_dict: &Dict,
-    scope: ExecutionScope,
 ) -> Result<(), CreateNamespaceError> {
     for use_ in uses {
         if let cm_rust::UseDecl::Runner(_) = use_ {
@@ -125,29 +120,27 @@ async fn add_use_decls(
         let target_path =
             use_.path().ok_or_else(|| CreateNamespaceError::UseDeclWithoutPath(use_.clone()))?;
         let capability: Capability = match use_ {
-            cm_rust::UseDecl::Directory(_) => {
-                directory_use(&use_, component.as_weak(), scope.clone()).into()
-            }
+            cm_rust::UseDecl::Directory(_) => directory_use(&use_, component).into(),
             cm_rust::UseDecl::Storage(storage) => {
-                storage_use(storage, use_, component, scope.clone()).await?.into()
+                storage_use(storage, use_, component).await?.into()
             }
             cm_rust::UseDecl::Protocol(s) => service_or_protocol_use(
                 UseDecl::Protocol(s.clone()),
-                component.as_weak(),
+                component,
                 program_input_dict,
                 component.blocking_task_group(),
             )
             .into(),
             cm_rust::UseDecl::Service(s) => service_or_protocol_use(
                 UseDecl::Service(s.clone()),
-                component.as_weak(),
+                component,
                 program_input_dict,
                 component.blocking_task_group(),
             )
             .into(),
             cm_rust::UseDecl::EventStream(s) => service_or_protocol_use(
                 UseDecl::EventStream(s.clone()),
-                component.as_weak(),
+                component,
                 program_input_dict,
                 component.blocking_task_group(),
             )
@@ -185,7 +178,6 @@ async fn storage_use(
     use_storage_decl: &UseStorageDecl,
     use_decl: &UseDecl,
     component: &Arc<ComponentInstance>,
-    scope: ExecutionScope,
 ) -> Result<Directory, CreateNamespaceError> {
     // Prevent component from using storage capability if it is restricted to the component ID
     // index, and the component isn't in the index.
@@ -202,7 +194,7 @@ async fn storage_use(
             .map_err(CreateNamespaceError::InstanceNotInInstanceIdIndex)?;
     }
 
-    Ok(directory_use(use_decl, component.as_weak(), scope))
+    Ok(directory_use(use_decl, component))
 }
 
 /// Makes a capability representing the directory described by `use_`. Once the
@@ -212,11 +204,7 @@ async fn storage_use(
 /// `component` is a weak pointer, which is important because we don't want the task
 /// waiting for channel readability to hold a strong pointer to this component lest it
 /// create a reference cycle.
-fn directory_use(
-    use_: &UseDecl,
-    component: WeakComponentInstance,
-    scope: ExecutionScope,
-) -> Directory {
+fn directory_use(use_: &UseDecl, component: &Arc<ComponentInstance>) -> Directory {
     let flags = match use_ {
         UseDecl::Directory(dir) => Rights::from(dir.rights).into_legacy(),
         UseDecl::Storage(_) => fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -239,54 +227,50 @@ fn directory_use(
         }
 
         fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
-            request.open_remote(self)
+            request.spawn(self);
+            Ok(())
         }
     }
 
-    impl RemoteLike for RouteDirectory {
-        fn open(
+    impl DirectoryEntryAsync for RouteDirectory {
+        async fn open_entry_async(
             self: Arc<Self>,
-            _scope: ExecutionScope,
-            flags: fio::OpenFlags,
-            path: Path,
-            server_end: ServerEnd<fio::NodeMarker>,
-        ) {
-            flags.to_object_request(server_end).handle(|object_request| {
-                let target = match self.component.upgrade() {
-                    Ok(component) => component,
-                    Err(e) => {
-                        error!(
-                            "failed to upgrade WeakComponentInstance routing use \
-                             decl `{:?}`: {:?}",
-                            &self.use_decl, e
-                        );
-                        return Err(e.as_zx_status());
-                    }
-                };
-                // Spawn a separate task to perform routing in the blocking scope. This way it won't
-                // block namespace teardown, but it will block component destruction.
-                target.blocking_task_group().spawn(route_directory(
-                    target,
-                    self.use_decl.clone(),
-                    path.into_string(),
-                    flags,
-                    object_request.take().into_channel(),
-                ));
+            request: OpenRequest<'_>,
+        ) -> Result<(), zx::Status> {
+            if request.path().is_empty() {
+                if !request.wait_till_ready().await {
+                    return Ok(());
+                }
+            }
 
-                Ok(())
-            });
-        }
+            // Hold a guard to prevent this task from being dropped during component destruction.
+            let _guard = request.scope().active_guard();
 
-        fn lazy(&self, path: &Path) -> bool {
-            // Open the directory lazily if the path is empty.
-            path.is_empty()
+            let target = match self.component.upgrade() {
+                Ok(component) => component,
+                Err(e) => {
+                    error!(
+                        "failed to upgrade WeakComponentInstance routing use \
+                         decl `{:?}`: {:?}",
+                        &self.use_decl, e
+                    );
+                    return Err(e.as_zx_status());
+                }
+            };
+
+            route_directory(target, self.use_decl.clone(), request)
+                .await
+                .map_err(|e| e.as_zx_status())
         }
     }
 
+    // Serve this directory on the component's execution scope rather than the namespace execution
+    // scope so that requests don't block block namespace teardown, but they will block component
+    // destruction.
     sandbox::Directory::new(
         serve_directory(
-            Arc::new(RouteDirectory { component, use_decl: use_.clone() }),
-            &scope,
+            Arc::new(RouteDirectory { component: component.as_weak(), use_decl: use_.clone() }),
+            &component.execution_scope.clone(),
             flags,
         )
         .unwrap(),
@@ -296,31 +280,22 @@ fn directory_use(
 async fn route_directory(
     target: Arc<ComponentInstance>,
     use_: UseDecl,
-    relative_path: String,
-    flags: fio::OpenFlags,
-    mut server_end: zx::Channel,
-) {
-    let (route_request, open_options) = match &use_ {
-        UseDecl::Directory(use_dir_decl) => (
-            RouteRequest::UseDirectory(use_dir_decl.clone()),
-            OpenOptions {
-                flags: flags | fio::OpenFlags::DIRECTORY,
-                relative_path,
-                server_chan: &mut server_end,
-            },
-        ),
-        UseDecl::Storage(use_storage_decl) => (
-            RouteRequest::UseStorage(use_storage_decl.clone()),
-            OpenOptions {
-                flags: flags | fio::OpenFlags::DIRECTORY,
-                relative_path,
-                server_chan: &mut server_end,
-            },
-        ),
+    open_request: OpenRequest<'_>,
+) -> Result<(), BedrockError> {
+    let (route_request, open_request) = match &use_ {
+        UseDecl::Directory(use_dir_decl) => {
+            (RouteRequest::UseDirectory(use_dir_decl.clone()), open_request)
+        }
+        UseDecl::Storage(use_storage_decl) => {
+            (RouteRequest::UseStorage(use_storage_decl.clone()), open_request)
+        }
         _ => panic!("not a directory or storage capability"),
     };
-    if let Err(e) = route_and_open_capability(&route_request, &target, open_options).await {
-        routing::report_routing_failure(&route_request, &target, e, server_end).await;
+    if let Err(e) = route_and_open_capability(&route_request, &target, open_request).await {
+        routing::report_routing_failure(&route_request, &target, &e).await;
+        Err(e)
+    } else {
+        Ok(())
     }
 }
 
@@ -331,7 +306,7 @@ async fn route_directory(
 /// closure to hold a strong pointer to this component lest it create a reference cycle.
 fn service_or_protocol_use(
     use_: UseDecl,
-    component: WeakComponentInstance,
+    component: &Arc<ComponentInstance>,
     program_input_dict: &Dict,
     blocking_task_group: TaskGroup,
 ) -> Open {
@@ -340,7 +315,7 @@ fn service_or_protocol_use(
         UseDecl::Protocol(use_protocol_decl) => {
             let request = Request {
                 availability: use_protocol_decl.availability.clone(),
-                target: component.clone(),
+                target: component.as_weak(),
             };
             let Some(capability) =
                 program_input_dict.get_capability(&use_protocol_decl.target_path)
@@ -353,22 +328,20 @@ fn service_or_protocol_use(
             let router = Router::from_any(router.clone());
             let legacy_request = RouteRequest::UseProtocol(use_protocol_decl.clone());
 
-            // When there are router errors, they are sent to the error handler,
-            // which reports errors and may attempt routing again via legacy.
+            // When there are router errors, they are sent to the error handler, which reports
+            // errors and may attempt routing again via legacy.
+            let weak_component = component.as_weak();
             let errors_fn = move |err: ErrorCapsule| {
                 let legacy_request = legacy_request.clone();
-                let Ok(target) = component.upgrade() else {
+                let Ok(target) = weak_component.upgrade() else {
                     return;
                 };
                 target.blocking_task_group().spawn(async move {
                     let (error, open_request) = err.manually_handle();
-                    routing::report_routing_failure(
-                        &legacy_request,
-                        &target,
-                        error,
-                        open_request.server_end,
-                    )
-                    .await
+                    let object_request =
+                        open_request.flags.to_object_request(open_request.server_end);
+                    object_request.shutdown(error.as_zx_status());
+                    routing::report_routing_failure(&legacy_request, &target, &error).await
                 });
             };
 
@@ -384,6 +357,7 @@ fn service_or_protocol_use(
         UseDecl::Service(use_service_decl) => {
             struct Service {
                 component: WeakComponentInstance,
+                scope: ExecutionScope,
                 use_service_decl: cm_rust::UseServiceDecl,
             }
             impl DirectoryEntry for Service {
@@ -391,18 +365,28 @@ fn service_or_protocol_use(
                     EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
                 }
 
-                fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
-                    request.open_remote(self)
+                fn open_entry(
+                    self: Arc<Self>,
+                    mut request: OpenRequest<'_>,
+                ) -> Result<(), zx::Status> {
+                    // Move this request from the namespace scope to the component's scope so that
+                    // we don't block namespace teardown.
+                    request.set_scope(self.scope.clone());
+                    request.spawn(self);
+                    Ok(())
                 }
             }
-            impl RemoteLike for Service {
-                fn open(
+            impl DirectoryEntryAsync for Service {
+                async fn open_entry_async(
                     self: Arc<Self>,
-                    _scope: ExecutionScope,
-                    flags: fio::OpenFlags,
-                    relative_path: Path,
-                    server_end: ServerEnd<fio::NodeMarker>,
-                ) {
+                    request: OpenRequest<'_>,
+                ) -> Result<(), zx::Status> {
+                    if request.path().is_empty() {
+                        if !request.wait_till_ready().await {
+                            return Ok(());
+                        }
+                    }
+
                     let component = match self.component.upgrade() {
                         Ok(component) => component,
                         Err(e) => {
@@ -411,75 +395,81 @@ fn service_or_protocol_use(
                                  decl `{:?}`: {:?}",
                                 self.use_service_decl, e
                             );
-                            return;
+                            return Err(e.as_zx_status());
                         }
                     };
 
-                    let target = component.clone();
+                    // Hold a guard to prevent this task from being dropped during component
+                    // destruction.
+                    let _guard = request.scope().active_guard();
 
-                    component.blocking_task_group().spawn(async move {
-                        let mut server_end = server_end.into_channel();
-                        let route_request = RouteRequest::UseService(self.use_service_decl.clone());
-                        let open_options = OpenOptions {
-                            flags,
-                            relative_path: relative_path.into_string(),
-                            server_chan: &mut server_end,
-                        };
-                        let res = routing::route_and_open_capability(
-                            &route_request,
-                            &target,
-                            open_options,
-                        )
-                        .await;
-                        if let Err(e) = res {
-                            routing::report_routing_failure(&route_request, &target, e, server_end)
-                                .await;
-                        }
-                    });
-                }
-
-                fn lazy(&self, path: &Path) -> bool {
-                    // Open the directory lazily if the path is empty.
-                    path.is_empty()
+                    let route_request = RouteRequest::UseService(self.use_service_decl.clone());
+                    if let Err(e) =
+                        routing::route_and_open_capability(&route_request, &component, request)
+                            .await
+                    {
+                        routing::report_routing_failure(&route_request, &component, &e).await;
+                        Err(e.as_zx_status())
+                    } else {
+                        Ok(())
+                    }
                 }
             }
-            Open::new(Arc::new(Service { component, use_service_decl }))
+            Open::new(Arc::new(Service {
+                component: component.as_weak(),
+                scope: component.execution_scope.clone(),
+                use_service_decl,
+            }))
         }
 
         UseDecl::EventStream(stream) => {
-            Open::new(endpoint(move |_scope: ExecutionScope, server_end| {
-                let mut server_end = server_end.into_zx_channel();
-                let component = match component.upgrade() {
-                    Ok(component) => component,
-                    Err(e) => {
-                        error!(
-                            "failed to upgrade WeakComponentInstance routing use \
-                             decl `{:?}`: {:?}",
-                            stream, e
-                        );
-                        return;
+            struct UseEventStream {
+                component: WeakComponentInstance,
+                stream: UseEventStreamDecl,
+            }
+            impl DirectoryEntry for UseEventStream {
+                fn entry_info(&self) -> EntryInfo {
+                    EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Service)
+                }
+                fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+                    if !request.path().is_empty() {
+                        return Err(zx::Status::NOT_DIR);
                     }
-                };
-                let target = component.clone();
-                let stream = stream.clone();
-
-                component.blocking_task_group().spawn(async move {
-                    let relative_path = stream.target_path.to_string();
-                    let route_request = RouteRequest::UseEventStream(stream);
-                    let open_options = OpenOptions {
-                        flags: fio::OpenFlags::empty(),
-                        relative_path,
-                        server_chan: &mut server_end,
+                    request.spawn(self);
+                    Ok(())
+                }
+            }
+            impl DirectoryEntryAsync for UseEventStream {
+                async fn open_entry_async(
+                    self: Arc<Self>,
+                    mut request: OpenRequest<'_>,
+                ) -> Result<(), zx::Status> {
+                    let component = match self.component.upgrade() {
+                        Ok(component) => component,
+                        Err(e) => {
+                            error!(
+                                "failed to upgrade WeakComponentInstance routing use \
+                                 decl `{:?}`: {:?}",
+                                self.stream, e
+                            );
+                            return Err(e.as_zx_status());
+                        }
                     };
-                    let res =
-                        routing::route_and_open_capability(&route_request, &target, open_options)
-                            .await;
-                    if let Err(e) = res {
-                        routing::report_routing_failure(&route_request, &target, e, server_end)
-                            .await;
+
+                    request.prepend_path(&self.stream.target_path.to_string().try_into()?);
+                    let route_request = RouteRequest::UseEventStream(self.stream.clone());
+                    if let Err(e) =
+                        routing::route_and_open_capability(&route_request, &component, request)
+                            .await
+                    {
+                        routing::report_routing_failure(&route_request, &component, &e).await;
+                        Err(e.as_zx_status())
+                    } else {
+                        Ok(())
                     }
-                });
-            }))
+                }
+            }
+            Open::new(Arc::new(UseEventStream { component: component.as_weak(), stream }))
         }
 
         _ => panic!("add_service_or_protocol_use called with non-service or protocol capability"),

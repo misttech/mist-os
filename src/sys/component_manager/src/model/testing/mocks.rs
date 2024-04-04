@@ -15,7 +15,7 @@ use {
     async_trait::async_trait,
     cm_rust::{ComponentDecl, ConfigValuesData},
     fidl::{
-        endpoints::{create_endpoints, ClientEnd, ServerEnd},
+        endpoints::{create_endpoints, ClientEnd, RequestStream, ServerEnd},
         epitaph::ChannelEpitaphExt,
         prelude::*,
     },
@@ -38,8 +38,11 @@ use {
     },
     tracing::warn,
     vfs::{
-        directory::entry_container::Directory, execution_scope::ExecutionScope,
-        file::vmo::read_only, pseudo_directory,
+        directory::{entry::OpenRequest, entry_container::Directory},
+        execution_scope::ExecutionScope,
+        file::vmo::read_only,
+        pseudo_directory,
+        service::endpoint,
     },
 };
 
@@ -386,22 +389,23 @@ impl BuiltinRunnerFactory for MockRunner {
     fn get_scoped_runner(
         self: Arc<Self>,
         checker: ScopedPolicyChecker,
-        server_end: ServerEnd<fcrunner::ComponentRunnerMarker>,
-    ) {
+        open_request: OpenRequest<'_>,
+    ) -> Result<(), zx::Status> {
         {
             let mut state = self.inner.lock().unwrap();
             state.last_checker = Some(checker);
         }
-        let mut stream = server_end.into_stream().expect("should not fail to create stream");
-        let runner = self.clone();
-        fasync::Task::spawn(async move {
-            while let Ok(Some(request)) = stream.try_next().await {
-                let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
-                    request;
-                runner.start(start_info, controller).await;
-            }
-        })
-        .detach();
+        open_request.open_service(endpoint(move |scope, server_end| {
+            let mut stream = fcrunner::ComponentRunnerRequestStream::from_channel(server_end);
+            let runner = self.clone();
+            scope.spawn(async move {
+                while let Ok(Some(request)) = stream.try_next().await {
+                    let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
+                        request;
+                    runner.start(start_info, controller).await;
+                }
+            });
+        }))
     }
 }
 

@@ -438,11 +438,13 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
         fuchsia_async::Task,
         fuchsia_fs::directory::open_in_namespace,
-        std::path::PathBuf,
         std::sync::Weak,
         vfs::{
-            directory::entry_container::Directory, execution_scope::ExecutionScope,
-            file::vmo::read_only, pseudo_directory,
+            directory::{entry::OpenRequest, entry_container::Directory},
+            execution_scope::ExecutionScope,
+            file::vmo::read_only,
+            path::Path as VfsPath,
+            pseudo_directory, ToObjectRequest,
         },
     };
 
@@ -452,7 +454,7 @@ mod tests {
         root.open(
             fs_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            vfs::path::Path::dot(),
+            VfsPath::dot(),
             ServerEnd::new(server.into_channel()),
         );
 
@@ -555,12 +557,17 @@ mod tests {
             Box::new(ComponentResolverCapabilityProvider::new(resolver.clone()));
         let (client_channel, server_channel) = create_endpoints::<fresolution::ResolverMarker>();
         let task_group = TaskGroup::new();
+        let scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_channel);
         resolver_provider
             .open(
                 task_group.clone(),
-                fio::OpenFlags::empty(),
-                PathBuf::new(),
-                &mut server_channel.into_channel(),
+                OpenRequest::new(
+                    scope.clone(),
+                    fio::OpenFlags::empty(),
+                    VfsPath::dot(),
+                    &mut object_request,
+                ),
             )
             .await
             .expect("failed to open capability");

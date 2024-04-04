@@ -97,6 +97,14 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionEr
         state.set(InstanceState::Unresolved(unresolved_state));
     };
 
+    // Drop any tasks that might be running in the component's execution scope.  We don't need to
+    // wait for old tasks to complete naturally; we just force them to stop.  It's possible that
+    // waiting for them to complete would block forever anyway e.g. routing a storage capability can
+    // block if the backing directory isn't responding for some reason.
+    component.execution_scope.force_shutdown();
+    component.execution_scope.wait().await;
+    component.execution_scope.resurrect();
+
     let event = Event::new(&component, EventPayload::Unresolved);
     component.hooks.dispatch(&event).await;
     Ok(())

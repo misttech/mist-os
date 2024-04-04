@@ -113,6 +113,13 @@ pub const MAX_LONG_NAME_LENGTH: usize = 1024;
 pub const MAX_PATH_LENGTH: usize = fio::MAX_PATH_LENGTH as usize;
 pub const MAX_URL_LENGTH: usize = 4096;
 
+/// This asks for the maximum possible rights that the parent connection will allow; this will
+/// include the writable and executable rights if the parent connection has them, but won't fail if
+/// it doesn't.
+pub const OPEN_FLAGS_MAX_POSSIBLE_RIGHTS: fio::OpenFlags = fio::OpenFlags::RIGHT_READABLE
+    .union(fio::OpenFlags::POSIX_WRITABLE)
+    .union(fio::OpenFlags::POSIX_EXECUTABLE);
+
 /// A name that can refer to a component, collection, or other entity in the
 /// Component Manifest. Its length is bounded to `MAX_NAME_LENGTH`.
 pub type Name = BoundedName<MAX_NAME_LENGTH>;

@@ -69,7 +69,7 @@ use {
             event_logger::EventLogger,
             events::{
                 registry::EventRegistry,
-                serve::serve_event_stream_as_stream,
+                serve::serve_event_stream,
                 source_factory::{EventSourceFactory, EventSourceFactoryCapability},
                 stream_provider::EventStreamProvider,
             },
@@ -113,6 +113,7 @@ use {
     moniker::{Moniker, MonikerBase},
     std::sync::Arc,
     tracing::{info, warn},
+    vfs::{directory::entry::OpenRequest, path::Path, ToObjectRequest},
 };
 
 #[cfg(test)]
@@ -1228,23 +1229,22 @@ impl BuiltinEnvironment {
             service_fs.add_remote("root-exposed", proxy);
             let root = self.model.top_instance().root().await;
             let root = WeakComponentInstance::new(&root);
-            scope.spawn(async move {
-                let signals = fasync::OnSignals::new(&server_end, zx::Signals::CHANNEL_READABLE);
-                let _ = signals.await.expect("failed to await channel readable signal");
+            scope.clone().spawn(async move {
+                let flags = routing::rights::Rights::from(fio::RW_STAR_DIR).into_legacy();
+                let mut object_request = flags.to_object_request(server_end);
+                object_request.wait_till_ready().await;
                 if let Ok(root) = root.upgrade() {
-                    let resolved_state = root
-                        .lock_resolved_state()
+                    root.lock_resolved_state()
                         .await
                         .expect("failed to resolve root component state");
-                    let server_end = server_end.into_channel();
-                    let flags = routing::rights::Rights::from(fio::RW_STAR_DIR).into_legacy();
-                    resolved_state
-                        .open_exposed_dir(
-                            flags,
-                            vfs::path::Path::dot(),
-                            fidl::endpoints::ServerEnd::new(server_end),
-                        )
-                        .await;
+                    root.open_exposed(OpenRequest::new(
+                        root.execution_scope.clone(),
+                        flags,
+                        Path::dot(),
+                        &mut object_request,
+                    ))
+                    .await
+                    .expect("unable to open root exposed dir");
                 }
             });
         }
@@ -1259,7 +1259,7 @@ impl BuiltinEnvironment {
                 // Spawn a short-lived task that adds the EventSource serve to
                 // component manager's task scope.
                 fasync::Task::spawn(async move {
-                    serve_event_stream_as_stream(
+                    serve_event_stream(
                         event_source
                             .subscribe(vec![
                                 EventSubscription {

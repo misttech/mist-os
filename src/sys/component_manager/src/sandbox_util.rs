@@ -3,12 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        model::{
-            component::{ComponentInstance, WeakComponentInstance},
-            routing::router::{Request, Routable, Router},
-        },
-        PathBuf,
+    crate::model::{
+        component::{ComponentInstance, WeakComponentInstance},
+        routing::router::{Request, Routable, Router},
     },
     ::routing::{
         capability_source::CapabilitySource, component_instance::ComponentInstanceInterface,
@@ -23,12 +20,17 @@ use {
         epitaph::ChannelEpitaphExt,
         AsyncChannel,
     },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{future::BoxFuture, FutureExt},
     sandbox::{Capability, Dict, Message, Open, Sendable, Sender},
     std::sync::Arc,
     tracing::warn,
-    vfs::execution_scope::ExecutionScope,
+    vfs::{
+        directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest},
+        execution_scope::ExecutionScope,
+        path::Path,
+        ToObjectRequest,
+    },
 };
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
@@ -274,7 +276,7 @@ impl LaunchTaskOnReceive {
             component.nonblocking_task_group().as_weak(),
             "framework hook dispatcher",
             Some((component.context.policy().clone(), capability_source.clone())),
-            Arc::new(move |mut channel, target| {
+            Arc::new(move |channel, target| {
                 let weak_component = weak_component.clone();
                 let capability_source = capability_source.clone();
                 async move {
@@ -285,12 +287,17 @@ impl LaunchTaskOnReceive {
                                 .find_internal_provider(&capability_source, target.as_weak())
                                 .await
                             {
+                                let mut object_request =
+                                    fio::OpenFlags::empty().to_object_request(channel);
                                 provider
                                     .open(
                                         component.nonblocking_task_group(),
-                                        fio::OpenFlags::empty(),
-                                        PathBuf::from(""),
-                                        &mut channel,
+                                        OpenRequest::new(
+                                            component.execution_scope.clone(),
+                                            fio::OpenFlags::empty(),
+                                            Path::dot(),
+                                            &mut object_request,
+                                        ),
                                     )
                                     .await?;
                                 return Ok(());
@@ -311,46 +318,6 @@ impl LaunchTaskOnReceive {
 impl Routable for Arc<LaunchTaskOnReceive> {
     async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
         Ok(self.clone().into_sender(request.target).into())
-    }
-}
-
-/// Porcelain methods on [`Sendable`] objects.
-trait SendableExt: Sendable {
-    /// Returns a sender that waits until the channel is readable, then
-    /// sends the channel using the underlying sender. The wait is performed
-    /// in the provided `scope`.
-    fn on_readable(self, scope: ExecutionScope) -> Sender;
-}
-
-impl<T: Sendable + 'static> SendableExt for T {
-    fn on_readable(self, scope: ExecutionScope) -> Sender {
-        #[derive(Debug)]
-        struct OnReadableSender {
-            scope: ExecutionScope,
-            sender: Sender,
-        }
-
-        impl Sendable for OnReadableSender {
-            fn send(&self, message: Message) -> Result<(), ()> {
-                let sender = self.sender.clone();
-                self.scope.spawn(async move {
-                    let signals = fasync::OnSignals::new(
-                        &message.channel,
-                        zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,
-                    )
-                    .await;
-                    let Ok(signals) = signals else { return };
-                    // If readable, send the channel.
-                    // If peer-closed, there is no point sending the channel.
-                    if signals.contains(zx::Signals::CHANNEL_READABLE) {
-                        _ = sender.send(message);
-                    }
-                });
-                Ok(())
-            }
-        }
-
-        Sender::new_sendable(OnReadableSender { scope, sender: Sender::new_sendable(self) })
     }
 }
 
@@ -398,8 +365,47 @@ impl<T: Routable + 'static> RoutableExt for T {
                         });
                     },
                 );
-                let sender = sandbox::Sender::new_sendable(Open::new(entry));
-                Ok(sender.on_readable(self.scope.clone()).into())
+
+                // Wrap the entry in something that will wait until the channel is readable.
+                struct OnReadable(ExecutionScope, Arc<dyn DirectoryEntry>);
+
+                impl DirectoryEntry for OnReadable {
+                    fn entry_info(&self) -> EntryInfo {
+                        self.1.entry_info()
+                    }
+
+                    fn open_entry(
+                        self: Arc<Self>,
+                        mut request: OpenRequest<'_>,
+                    ) -> Result<(), zx::Status> {
+                        request.set_scope(self.0.clone());
+                        if request.path().is_empty() && !request.requires_event() {
+                            tracing::info!("Spawning on {:?}", self.0);
+                            request.spawn(self);
+                            Ok(())
+                        } else {
+                            self.1.clone().open_entry(request)
+                        }
+                    }
+                }
+
+                impl DirectoryEntryAsync for OnReadable {
+                    async fn open_entry_async(
+                        self: Arc<Self>,
+                        request: OpenRequest<'_>,
+                    ) -> Result<(), zx::Status> {
+                        if request.wait_till_ready().await {
+                            self.1.clone().open_entry(request)
+                        } else {
+                            // The channel was closed.
+                            Ok(())
+                        }
+                    }
+                }
+
+                Ok(Capability::Open(Open::new(
+                    Arc::new(OnReadable(self.scope.clone(), entry)) as Arc<dyn DirectoryEntry>
+                )))
             }
         }
 
@@ -417,7 +423,7 @@ pub mod tests {
     use bedrock_error::DowncastErrorForTest;
     use cm_rust::Availability;
     use cm_types::RelativePath;
-    use fasync::pin_mut;
+    use fuchsia_async::pin_mut;
     use fuchsia_async::TestExecutor;
     use sandbox::{Data, Receiver};
     use std::{sync::Weak, task::Poll};
@@ -564,48 +570,6 @@ pub mod tests {
         assert_matches!(cap, Ok(None));
     }
 
-    #[fuchsia::test(allow_stalls = false)]
-    async fn sender_on_readable_client_writes() {
-        let (receiver, sender) = Receiver::new();
-        let scope = ExecutionScope::new();
-        let sender = sender.on_readable(scope.clone());
-        let (client_end, server_end) = zx::Channel::create();
-        sender.send(sandbox::Message { channel: server_end }).unwrap();
-
-        let receive = receiver.receive();
-        pin_mut!(receive);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
-        assert_matches!(
-            TestExecutor::poll_until_stalled(Box::pin(scope.wait())).await,
-            Poll::Pending
-        );
-
-        client_end.write(&[0], &mut []).unwrap();
-        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Ready(Some(_)));
-        scope.wait().await;
-    }
-
-    #[fuchsia::test(allow_stalls = false)]
-    async fn sender_on_readable_client_closes() {
-        let (receiver, sender) = Receiver::new();
-        let scope = ExecutionScope::new();
-        let sender = sender.on_readable(scope.clone());
-        let (client_end, server_end) = zx::Channel::create();
-        sender.send(sandbox::Message { channel: server_end }).unwrap();
-
-        let receive = receiver.receive();
-        pin_mut!(receive);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
-        assert_matches!(
-            TestExecutor::poll_until_stalled(Box::pin(scope.clone().wait())).await,
-            Poll::Pending
-        );
-
-        drop(client_end);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
-        scope.wait().await;
-    }
-
     #[derive(Debug, Clone)]
     struct RouteCounter {
         capability: Capability,
@@ -653,13 +617,22 @@ pub mod tests {
             .route(Request { availability: Availability::Required, target: component.as_weak() })
             .await
             .unwrap();
-        let Capability::Sender(sender) = capability else {
-            panic!("Wrong type: {capability:?}");
-        };
+
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
         assert_eq!(route_counter.count(), 0);
 
-        sender.send(sandbox::Message { channel: server_end }).unwrap();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        capability
+            .try_into_directory_entry()
+            .unwrap()
+            .open_entry(OpenRequest::new(
+                scope.clone(),
+                fio::OpenFlags::empty(),
+                Path::dot(),
+                &mut object_request,
+            ))
+            .unwrap();
+
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
         assert_eq!(route_counter.count(), 0);
 
@@ -692,11 +665,19 @@ pub mod tests {
             .route(Request { availability: Availability::Required, target: component.as_weak() })
             .await
             .unwrap();
-        let Capability::Sender(sender) = capability else {
-            panic!("Wrong type: {capability:?}");
-        };
 
-        sender.send(sandbox::Message { channel: server_end }).unwrap();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        capability
+            .try_into_directory_entry()
+            .unwrap()
+            .open_entry(OpenRequest::new(
+                scope.clone(),
+                fio::OpenFlags::empty(),
+                Path::dot(),
+                &mut object_request,
+            ))
+            .unwrap();
+
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
         assert_matches!(
             TestExecutor::poll_until_stalled(Box::pin(scope.clone().wait())).await,

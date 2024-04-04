@@ -7,7 +7,7 @@ use {
         capability::CapabilityProvider,
         model::{
             component::{ExtendedInstance, WeakExtendedInstance},
-            error::{CapabilityProviderError, ModelError},
+            error::{CapabilityProviderError, EventSourceError, ModelError},
             events::{
                 error::EventsError,
                 registry::{EventRegistry, EventSubscription},
@@ -18,13 +18,12 @@ use {
         },
     },
     async_trait::async_trait,
-    cm_util::channel,
     cm_util::TaskGroup,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl::endpoints::RequestStream,
     futures::{SinkExt, StreamExt},
     moniker::ExtendedMoniker,
-    std::{path::PathBuf, sync::Weak},
+    std::sync::{Mutex, Weak},
+    vfs::{directory::entry::OpenRequest, path::Path as VfsPath, service::endpoint},
 };
 
 // Event source (supporting event streams)
@@ -125,32 +124,43 @@ impl CapabilityProvider for EventSource {
     async fn open(
         mut self: Box<Self>,
         _task_group: TaskGroup,
-        _flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
+        mut open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
         // Spawn the task in the component's task scope so that when the component is destroyed,
         // the task is cancelled and does not leak (similar to how framework capabilities are
         // scoped).
-        let task_group = match self
-            .subscriber
-            .upgrade()
-            .map_err(|err| CapabilityProviderError::EventSourceError { err })?
-        {
+        let task_group = match self.subscriber.upgrade()? {
             ExtendedInstance::Component(target) => target.nonblocking_task_group(),
             ExtendedInstance::AboveRoot(target) => target.task_group(),
         };
-        let server_end = channel::take_channel(server_end);
-        let stream = ServerEnd::<fcomponent::EventStreamMarker>::new(server_end);
-        task_group.spawn(async move {
-            let moniker = self.subscriber.extended_moniker();
-            if let Ok(Some(event_stream)) = self
-                .subscribe_all(moniker, relative_path.into_os_string().into_string().unwrap())
+
+        let moniker = self.subscriber.extended_moniker();
+
+        // NOTE: EventSource is a protocol capability for which you'd normally expect an empty path,
+        // but we are abusing the path in the open request to allow us to identify a specific
+        // subscription.  Earlier in routing, the path in the open request is replaced with the
+        // identifier (after checking that it is empty).
+
+        // VFS paths don't have a leading '/', but the identiifiers we use do, so we need to add it
+        // here.
+        let path = format!("/{}", open_request.path().as_ref());
+        let event_stream = Mutex::new(Some(
+            self.subscribe_all(moniker, path)
                 .await
-            {
-                serve_event_stream(event_stream, stream).await;
-            }
-        });
-        Ok(())
+                .map_err(|e| {
+                    CapabilityProviderError::EventSourceError(EventSourceError::Model(Box::new(e)))
+                })?
+                .ok_or(EventSourceError::AlreadyConsumed)?,
+        ));
+
+        open_request.set_path(VfsPath::dot());
+        open_request
+            .open_service(endpoint(move |_scope, channel| {
+                task_group.spawn(serve_event_stream(
+                    event_stream.lock().unwrap().take().unwrap(),
+                    RequestStream::from_channel(channel),
+                ))
+            }))
+            .map_err(|e| CapabilityProviderError::VfsOpenError(e))
     }
 }

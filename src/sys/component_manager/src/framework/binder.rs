@@ -48,7 +48,7 @@ impl BinderCapabilityProvider {
         let source = match self.source.upgrade().map_err(|e| ModelError::from(e)) {
             Ok(source) => source,
             Err(err) => {
-                report_routing_failure_to_target(self.target, err, server_end).await;
+                report_routing_failure_to_target(self.target, err).await;
                 return Err(());
             }
         };
@@ -62,7 +62,7 @@ impl BinderCapabilityProvider {
                 source.scope_to_runtime(server_end).await;
             }
             Err(err) => {
-                report_routing_failure_to_target(self.target, err.into(), server_end).await;
+                report_routing_failure_to_target(self.target, err.into()).await;
                 return Err(());
             }
         }
@@ -99,14 +99,10 @@ impl FrameworkCapability for BinderFrameworkCapability {
     }
 }
 
-async fn report_routing_failure_to_target(
-    target: WeakComponentInstance,
-    err: ModelError,
-    server_end: zx::Channel,
-) {
+async fn report_routing_failure_to_target(target: WeakComponentInstance, err: ModelError) {
     match target.upgrade().map_err(|e| ModelError::from(e)) {
         Ok(target) => {
-            report_routing_failure(&DEBUG_REQUEST, &target, err, server_end).await;
+            report_routing_failure(&DEBUG_REQUEST, &target, &err).await;
         }
         Err(err) => {
             warn!(moniker=%target.moniker, error=%err, "failed to upgrade reference");
@@ -134,8 +130,11 @@ mod tests {
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         futures::{lock::Mutex, StreamExt},
         moniker::{Moniker, MonikerBase},
-        std::path::PathBuf,
         std::sync::Arc,
+        vfs::{
+            directory::entry::OpenRequest, execution_scope::ExecutionScope, path::Path as VfsPath,
+            ToObjectRequest,
+        },
     };
 
     struct BinderCapabilityTestFixture {
@@ -194,14 +193,24 @@ mod tests {
         let (_event_source, mut event_stream) = fixture
             .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
             .await;
-        let (_client_end, mut server_end) = zx::Channel::create();
+        let (_client_end, server_end) = zx::Channel::create();
         let moniker: Moniker = vec!["source"].try_into().unwrap();
 
         let task_group = TaskGroup::new();
+        let scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         fixture
             .provider(moniker.clone(), vec!["target"].try_into().unwrap())
             .await
-            .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_end)
+            .open(
+                task_group.clone(),
+                OpenRequest::new(
+                    scope.clone(),
+                    fio::OpenFlags::empty(),
+                    VfsPath::dot(),
+                    &mut object_request,
+                ),
+            )
             .await
             .expect("failed to call open()");
         task_group.join().await;
@@ -222,14 +231,24 @@ mod tests {
                 .build(),
         )])
         .await;
-        let (client_end, mut server_end) = zx::Channel::create();
+        let (client_end, server_end) = zx::Channel::create();
         let moniker: Moniker = vec!["foo"].try_into().unwrap();
 
         let task_group = TaskGroup::new();
+        let scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         fixture
             .provider(moniker, Moniker::root())
             .await
-            .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_end)
+            .open(
+                task_group.clone(),
+                OpenRequest::new(
+                    scope.clone(),
+                    fio::OpenFlags::empty(),
+                    VfsPath::dot(),
+                    &mut object_request,
+                ),
+            )
             .await
             .expect("failed to call open()");
         task_group.join().await;

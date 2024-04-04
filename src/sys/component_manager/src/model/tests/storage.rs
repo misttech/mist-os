@@ -6,7 +6,7 @@ use {
     crate::model::{
         component::StartReason,
         error::{ActionError, CreateNamespaceError, ModelError, StartActionError},
-        routing::{route_and_open_capability, OpenOptions},
+        routing::route_and_open_capability,
         testing::routing_test_helpers::*,
     },
     ::routing_test_helpers::{
@@ -23,6 +23,10 @@ use {
     moniker::{Moniker, MonikerBase},
     routing::{error::RoutingError, RouteRequest},
     std::path::Path,
+    vfs::{
+        directory::entry::OpenRequest, execution_scope::ExecutionScope, path::Path as VfsPath,
+        ToObjectRequest,
+    },
 };
 
 #[fuchsia::test]
@@ -593,7 +597,11 @@ async fn use_restricted_storage_open_failure() {
         .expect("could not resolve state");
 
     // `parent_consumer` should be able to open its storage because its not restricted
-    let (_client_end, mut server_end) = zx::Channel::create();
+    let (_client_end, server_end) = zx::Channel::create();
+    let scope = ExecutionScope::new();
+    let flags =
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY;
+    let mut object_request = flags.to_object_request(server_end);
     route_and_open_capability(
         &RouteRequest::UseStorage(UseStorageDecl {
             source_name: "cache".parse().unwrap(),
@@ -601,13 +609,7 @@ async fn use_restricted_storage_open_failure() {
             availability: cm_rust::Availability::Required,
         }),
         &parent_consumer_instance,
-        OpenOptions {
-            flags: fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            relative_path: ".".parse().unwrap(),
-            server_chan: &mut server_end,
-        },
+        OpenRequest::new(scope.clone(), flags, VfsPath::dot(), &mut object_request),
     )
     .await
     .expect("Unable to route.  oh no!!");
@@ -630,7 +632,11 @@ async fn use_restricted_storage_open_failure() {
     }
 
     // `parent_consumer` should NOT be able to open its storage because its IS restricted
-    let (_client_end, mut server_end) = zx::Channel::create();
+    let (_client_end, server_end) = zx::Channel::create();
+    let scope = ExecutionScope::new();
+    let flags =
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY;
+    let mut object_request = flags.to_object_request(server_end);
     let result = route_and_open_capability(
         &RouteRequest::UseStorage(UseStorageDecl {
             source_name: "cache".parse().unwrap(),
@@ -638,13 +644,7 @@ async fn use_restricted_storage_open_failure() {
             availability: cm_rust::Availability::Required,
         }),
         &parent_consumer_instance,
-        OpenOptions {
-            flags: fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            relative_path: ".".parse().unwrap(),
-            server_chan: &mut server_end,
-        },
+        OpenRequest::new(scope.clone(), flags, VfsPath::dot(), &mut object_request),
     )
     .await;
     assert_matches!(
@@ -723,7 +723,11 @@ async fn open_storage_subdirectory() {
 
     // `consumer` should be able to open its storage at the root dir
     let (root_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    let mut server_end = server_end.into_channel();
+    let server_end = server_end.into_channel();
+    let scope = ExecutionScope::new();
+    let flags =
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY;
+    let mut object_request = flags.to_object_request(server_end);
     route_and_open_capability(
         &RouteRequest::UseStorage(UseStorageDecl {
             source_name: "cache".parse().unwrap(),
@@ -731,13 +735,7 @@ async fn open_storage_subdirectory() {
             availability: cm_rust::Availability::Required,
         }),
         &consumer_instance,
-        OpenOptions {
-            flags: fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            relative_path: ".".parse().unwrap(),
-            server_chan: &mut server_end,
-        },
+        OpenRequest::new(scope.clone(), flags, VfsPath::dot(), &mut object_request),
     )
     .await
     .expect("Unable to route.  oh no!!");
@@ -755,7 +753,10 @@ async fn open_storage_subdirectory() {
 
     // `consumer` should be able to open its storage at "foo/bar"
     let (bar_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    let mut server_end = server_end.into_channel();
+    let scope = ExecutionScope::new();
+    let flags =
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY;
+    let mut object_request = flags.to_object_request(server_end);
     route_and_open_capability(
         &RouteRequest::UseStorage(UseStorageDecl {
             source_name: "cache".parse().unwrap(),
@@ -763,13 +764,7 @@ async fn open_storage_subdirectory() {
             availability: cm_rust::Availability::Required,
         }),
         &consumer_instance,
-        OpenOptions {
-            flags: fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            relative_path: "foo/bar".parse().unwrap(),
-            server_chan: &mut server_end,
-        },
+        OpenRequest::new(scope.clone(), flags, "foo/bar".try_into().unwrap(), &mut object_request),
     )
     .await
     .expect("Unable to route.  oh no!!");

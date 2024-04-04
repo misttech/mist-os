@@ -17,6 +17,8 @@ use futures::{
     channel::{mpsc, oneshot},
     select, FutureExt, StreamExt,
 };
+use std::sync::Mutex;
+use vfs::{directory::entry::OpenRequest, remote::remote_dir};
 use zx::AsHandleRef;
 
 use super::{error::ActionError, start::Start};
@@ -69,6 +71,7 @@ impl Debug for EscrowedState {
 /// directory server endpoint, thus reducing the risks of deadlocks.
 pub struct Actor {
     sender: mpsc::UnboundedSender<Command>,
+    outgoing_dir: Arc<Mutex<fio::DirectoryProxy>>,
 }
 
 impl Actor {
@@ -81,14 +84,14 @@ impl Actor {
         let (sender, receiver) = mpsc::unbounded();
         let (client, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
         let escrow = EscrowedState { outgoing_dir: server, escrowed_dictionary: None };
+        let outgoing_dir = Arc::new(Mutex::new(client));
         let actor = ActorImpl {
             starter: Arc::new(starter),
-            outgoing_dir: client,
-            open_waiters: vec![],
+            outgoing_dir: outgoing_dir.clone(),
             nonblocking_start_task: TaskGroup::new(),
         };
         let task = fasync::Task::spawn(actor.run(escrow, receiver));
-        let handle = Actor { sender };
+        let handle = Actor { sender, outgoing_dir };
         (handle, task)
     }
 
@@ -111,39 +114,22 @@ impl Actor {
         receiver.await.ok()
     }
 
-    /// Opens an object referenced by `path` from the outgoing directory of the component.
-    /// If the component is not started, this will cause the escrowed state to become urgent
-    /// and the component to be started.
-    ///
-    /// Interested callers can wait on the returned receiver to get notified if the open
-    /// request was successfully passed to a started component, or any start errors.
-    pub fn open_outgoing(
-        &self,
-        flags: fio::OpenFlags,
-        path: String,
-        server_end: zx::Channel,
-    ) -> oneshot::Receiver<Result<(), ActionError>> {
-        let (waiter, receiver) = oneshot::channel();
-        _ = self.sender.unbounded_send(Command::OpenOutgoing { flags, path, server_end, waiter });
-        receiver
+    /// Forwards `open_request` to the outgoing directory of the component.  If the component is not
+    /// started, this will cause the escrowed state to become urgent and the component to be
+    /// started.
+    pub fn open_outgoing(&self, open_request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        open_request.open_remote(remote_dir(Clone::clone(&*self.outgoing_dir.lock().unwrap())))
     }
 }
 
 enum Command {
     DidStop(Option<EscrowRequest>),
     WillStart(oneshot::Sender<EscrowedState>),
-    OpenOutgoing {
-        flags: fio::OpenFlags,
-        path: String,
-        server_end: zx::Channel,
-        waiter: oneshot::Sender<Result<(), ActionError>>,
-    },
 }
 
 struct ActorImpl {
     starter: Arc<dyn Start + Send + Sync + 'static>,
-    outgoing_dir: fio::DirectoryProxy,
-    open_waiters: Vec<oneshot::Sender<Result<(), ActionError>>>,
+    outgoing_dir: Arc<Mutex<fio::DirectoryProxy>>,
 
     // The actor monitors a `start_task`, a task to start the component, until
     // the escrow state is reaped. But the rest of the component start process
@@ -184,39 +170,34 @@ impl ActorImpl {
         escrow: EscrowedState,
         receiver: &mut mpsc::UnboundedReceiver<Command>,
     ) -> State {
-        loop {
-            select! {
-                command = receiver.next() => {
-                    let Some(command) = command else { return State::Quit };
-                    match command {
-                        // TODO(https://fxbug.dev/319095979): These panics can be avoided by
-                        // centralizing more state transitions in a coordinator.
-                        //
-                        // The current overall component state machine never double stops or
-                        // double starts a component, but there's no good way to represent
-                        // that in the type system, yet. The need for panic could go away if
-                        // we had a larger state machine managing component starting and
-                        // stopping, which can simply ignore the next stop request if the
-                        // component is already stopped.
-                        Command::DidStop(_) => panic!("double stop"),
-                        Command::WillStart(sender) => {
-                            _ = sender.send(escrow);
-                            return State::Started;
-                        }
-                        Command::OpenOutgoing { flags, path, server_end, waiter } => {
-                            self.open_outgoing(flags, path, server_end, waiter);
-                        }
+        select! {
+            command = receiver.next() => {
+                let Some(command) = command else { return State::Quit };
+                match command {
+                    // TODO(https://fxbug.dev/319095979): These panics can be avoided by
+                    // centralizing more state transitions in a coordinator.
+                    //
+                    // The current overall component state machine never double stops or
+                    // double starts a component, but there's no good way to represent
+                    // that in the type system, yet. The need for panic could go away if
+                    // we had a larger state machine managing component starting and
+                    // stopping, which can simply ignore the next stop request if the
+                    // component is already stopped.
+                    Command::DidStop(_) => panic!("double stop"),
+                    Command::WillStart(sender) => {
+                        _ = sender.send(escrow);
+                        return State::Started;
                     }
-                },
-                _ = escrow.needs_attention().fuse() => {
-                    // If the escrow needs attention, schedule a start action.
-                    let starter = self.starter.clone();
-                    let start_task = fasync::Task::spawn(async move {
-                        starter.ensure_started(&StartReason::OutgoingDirectory).await
-                    });
-                    return State::Starting{escrow, start_task};
-                },
-            }
+                }
+            },
+            _ = escrow.needs_attention().fuse() => {
+                // If the escrow needs attention, schedule a start action.
+                let starter = self.starter.clone();
+                let start_task = fasync::Task::spawn(async move {
+                    starter.ensure_started(&StartReason::OutgoingDirectory).await
+                });
+                return State::Starting{escrow, start_task};
+            },
         }
     }
 
@@ -227,89 +208,59 @@ impl ActorImpl {
         receiver: &mut mpsc::UnboundedReceiver<Command>,
     ) -> State {
         let mut start_task = start_task.fuse();
-        loop {
-            select! {
-                command = receiver.next() => {
-                    let Some(command) = command else { return State::Quit };
-                    match command {
-                        Command::DidStop(_) => panic!("double stop"),
-                        Command::WillStart(sender) => {
-                            _ = sender.send(escrow);
-                            // When the program will imminently start, it reaps the escrow state. We
-                            // can assume the open requests will be handled. But the rest of the
-                            // component start process still runs for a while. We should not drop
-                            // the task lest it cancels the start process in an inconsistent state.
-                            self.notify_open_waiters(Ok(()));
-                            self.nonblocking_start_task.spawn(async move {
-                                match start_task.await {
-                                    Ok(()) => {}
-                                    Err(err) => {
-                                        tracing::warn!(
-                            "the program of the component started, but the rest of the \
-                        start procedure (e.g. starting eager children) failed: {err}"
-                        );
-                                    }
+        select! {
+            command = receiver.next() => {
+                let Some(command) = command else { return State::Quit };
+                match command {
+                    Command::DidStop(_) => panic!("double stop"),
+                    Command::WillStart(sender) => {
+                        _ = sender.send(escrow);
+                        // When the program will imminently start, it reaps the escrow state. We
+                        // can assume the open requests will be handled. But the rest of the
+                        // component start process still runs for a while. We should not drop
+                        // the task lest it cancels the start process in an inconsistent state.
+                        self.nonblocking_start_task.spawn(async move {
+                            match start_task.await {
+                                Ok(()) => {}
+                                Err(err) => {
+                                    tracing::warn!(
+                                        "the program of the component started, but the rest of the \
+                                         start procedure (e.g. starting eager children) failed: \
+                                         {err}"
+                                    );
                                 }
-                            });
-                            return State::Started;
-                        }
-                        Command::OpenOutgoing { flags, path, server_end, waiter } => {
-                            self.open_outgoing(flags, path, server_end, waiter);
-                        }
+                            }
+                        });
+                        return State::Started;
                     }
-                },
-                start_result = start_task => {
-                    match start_result {
-                        Ok(()) => panic!("start task must call will_start before finishing"),
-                        Err(ref err) => {
-                            // If the start action completes with an error, clear the escrow
-                            // that was used to trigger the start action. Otherwise, we'll
-                            // be continuously starting the component in a loop.
-                            tracing::warn!(
-                                "the escrowed state of the component is readable but the component \
-                            failed to start: {err}"
-                            );
-                            self.notify_open_waiters(start_result);
-                            return self.update_escrow(Default::default());
-                        }
+                }
+            },
+            start_result = start_task => {
+                match start_result {
+                    Ok(()) => panic!("start task must call will_start before finishing"),
+                    Err(ref err) => {
+                        // If the start action completes with an error, clear the escrow
+                        // that was used to trigger the start action. Otherwise, we'll
+                        // be continuously starting the component in a loop.
+                        tracing::warn!(
+                            "the escrowed state of the component is readable but the component \
+                             failed to start: {err}"
+                        );
+                        return self.update_escrow(Default::default());
                     }
-                },
-            }
+                }
+            },
         }
     }
 
     async fn run_started(&mut self, receiver: &mut mpsc::UnboundedReceiver<Command>) -> State {
-        loop {
-            let command = receiver.next().await;
-            let Some(command) = command else { return State::Quit };
-            match command {
-                Command::DidStop(request) => {
-                    return self.update_escrow(request.unwrap_or_default());
-                }
-                Command::WillStart(_) => panic!("double start"),
-                Command::OpenOutgoing { flags, path, server_end, waiter } => {
-                    self.open_outgoing(flags, path, server_end, waiter);
-                    self.notify_open_waiters(Ok(()));
-                }
+        let command = receiver.next().await;
+        let Some(command) = command else { return State::Quit };
+        match command {
+            Command::DidStop(request) => {
+                return self.update_escrow(request.unwrap_or_default());
             }
-        }
-    }
-
-    fn open_outgoing(
-        &mut self,
-        flags: fio::OpenFlags,
-        path: String,
-        server_end: zx::Channel,
-        waiter: oneshot::Sender<Result<(), ActionError>>,
-    ) {
-        let server_end = ServerEnd::new(server_end);
-        _ = self.outgoing_dir.open(flags, fio::ModeType::empty(), &path, server_end);
-        self.open_waiters.push(waiter);
-    }
-
-    fn notify_open_waiters(&mut self, result: Result<(), ActionError>) {
-        for sender in self.open_waiters.drain(..) {
-            _ = sender.send(result.clone());
+            Command::WillStart(_) => panic!("double start"),
         }
     }
 
@@ -320,7 +271,7 @@ impl ActorImpl {
             // No outgoing directory server endpoint was escrowed. Mint a new pair and
             // update our client counterpart.
             let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            self.outgoing_dir = client;
+            *self.outgoing_dir.lock().unwrap() = client;
             server
         };
         let escrow =
@@ -343,6 +294,7 @@ mod tests {
     use fuchsia_zircon as zx;
     use futures::{channel::mpsc, lock::Mutex, StreamExt};
     use moniker::Moniker;
+    use vfs::{directory::entry::OpenRequest, execution_scope::ExecutionScope, ToObjectRequest};
 
     use crate::{
         bedrock::program::EscrowRequest,
@@ -435,14 +387,24 @@ mod tests {
         task_group.add(task);
 
         let (_, server_end) = zx::Channel::create();
-        let open_rx = actor.open_outgoing(fio::OpenFlags::empty(), "foo".to_string(), server_end);
+
+        let execution_scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        assert_eq!(
+            actor.open_outgoing(OpenRequest::new(
+                execution_scope.clone(),
+                fio::OpenFlags::empty(),
+                "foo".try_into().unwrap(),
+                &mut object_request
+            )),
+            Ok(())
+        );
         let (reason, escrow) = start_rx.next().await.unwrap();
         assert_eq!(reason, StartReason::OutgoingDirectory);
 
         let mut outgoing = escrow.outgoing_dir.into_stream().unwrap();
         let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
         assert_eq!(open.2, "foo");
-        assert_matches!(open_rx.await, Ok(Ok(())));
 
         drop(actor);
         task_group.join().await;
@@ -460,7 +422,17 @@ mod tests {
         assert!(escrow.is_some());
 
         let (_, server_end) = zx::Channel::create();
-        let open_rx = actor.open_outgoing(fio::OpenFlags::empty(), "foo".to_string(), server_end);
+        let execution_scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        assert_eq!(
+            actor.open_outgoing(OpenRequest::new(
+                execution_scope.clone(),
+                fio::OpenFlags::empty(),
+                "foo".try_into().unwrap(),
+                &mut object_request
+            )),
+            Ok(())
+        );
 
         let mut next_start = start_rx.next();
         assert_matches!(TestExecutor::poll_until_stalled(&mut next_start).await, Poll::Pending);
@@ -468,7 +440,6 @@ mod tests {
         let mut outgoing = escrow.unwrap().outgoing_dir.into_stream().unwrap();
         let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
         assert_eq!(open.2, "foo");
-        assert_matches!(open_rx.await, Ok(Ok(())));
 
         drop(actor);
         task_group.join().await;
@@ -487,9 +458,18 @@ mod tests {
         assert_matches!(TestExecutor::poll_until_stalled(start_rx.next()).await, Poll::Pending);
 
         let (_, server_end) = zx::Channel::create();
-        let open_rx = actor.open_outgoing(fio::OpenFlags::empty(), "foo".to_string(), server_end);
+        let execution_scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        assert_eq!(
+            actor.open_outgoing(OpenRequest::new(
+                execution_scope.clone(),
+                fio::OpenFlags::empty(),
+                "foo".try_into().unwrap(),
+                &mut object_request
+            )),
+            Ok(())
+        );
         assert_matches!(TestExecutor::poll_until_stalled(start_rx.next()).await, Poll::Pending);
-        assert_matches!(open_rx.await, Ok(Ok(())));
 
         // Component stopped with an unread message. It should be started back up.
         actor.did_stop(Some(EscrowRequest {
@@ -519,7 +499,17 @@ mod tests {
             escrowed_dictionary: None,
         }));
         let (_, server_end) = zx::Channel::create();
-        _ = actor.open_outgoing(fio::OpenFlags::empty(), "foo".to_string(), server_end);
+        let execution_scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        assert_eq!(
+            actor.open_outgoing(OpenRequest::new(
+                execution_scope.clone(),
+                fio::OpenFlags::empty(),
+                "foo".try_into().unwrap(),
+                &mut object_request
+            )),
+            Ok(())
+        );
         assert_matches!(TestExecutor::poll_until_stalled(start_rx.next()).await, Poll::Ready(_));
 
         drop(actor);
@@ -534,8 +524,17 @@ mod tests {
 
         let escrow = actor.will_start().await;
         let (client_end, server_end) = zx::Channel::create();
-        let open_rx = actor.open_outgoing(fio::OpenFlags::empty(), "foo".to_string(), server_end);
-        assert_matches!(open_rx.await, Ok(Ok(())));
+        let execution_scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        assert_eq!(
+            actor.open_outgoing(OpenRequest::new(
+                execution_scope.clone(),
+                fio::OpenFlags::empty(),
+                "foo".try_into().unwrap(),
+                &mut object_request
+            )),
+            Ok(())
+        );
 
         // Component stopped without escrowing anything. The open request will be lost.
         drop(escrow);
@@ -545,11 +544,20 @@ mod tests {
         // If the component is started again, it can receive requests again.
         let escrow = actor.will_start().await;
         let (_, server_end) = zx::Channel::create();
-        let open_rx = actor.open_outgoing(fio::OpenFlags::empty(), "bar".to_string(), server_end);
+        let execution_scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        assert_eq!(
+            actor.open_outgoing(OpenRequest::new(
+                execution_scope.clone(),
+                fio::OpenFlags::empty(),
+                "bar".try_into().unwrap(),
+                &mut object_request
+            )),
+            Ok(())
+        );
         let mut outgoing = escrow.unwrap().outgoing_dir.into_stream().unwrap();
         let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
         assert_eq!(open.2, "bar");
-        assert_matches!(open_rx.await, Ok(Ok(())));
 
         drop(actor);
         task_group.join().await;
@@ -584,10 +592,18 @@ mod tests {
         task_group.add(task);
 
         let (client_end, server_end) = zx::Channel::create();
-        let mut open_rx =
-            actor.open_outgoing(fio::OpenFlags::empty(), "foo".to_string(), server_end);
+        let execution_scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        assert_eq!(
+            actor.open_outgoing(OpenRequest::new(
+                execution_scope.clone(),
+                fio::OpenFlags::empty(),
+                "foo".try_into().unwrap(),
+                &mut object_request
+            )),
+            Ok(())
+        );
         start_rx.next().await.unwrap();
-        assert_matches!(TestExecutor::poll_until_stalled(&mut open_rx).await, Poll::Pending);
 
         // Fail the start request.
         result_tx
@@ -595,10 +611,6 @@ mod tests {
                 err: StartActionError::Aborted { moniker: Moniker::default() },
             }))
             .unwrap();
-
-        // Open will fail.
-        let err = open_rx.await.unwrap().unwrap_err();
-        assert_matches!(err, ActionError::StartError { err: StartActionError::Aborted { .. } });
 
         // Connection got closed.
         fasync::OnSignals::new(&client_end, zx::Signals::CHANNEL_PEER_CLOSED).await.unwrap();
@@ -617,14 +629,21 @@ mod tests {
         task_group.add(task);
 
         let (_, server_end) = zx::Channel::create();
-        let mut open_rx =
-            actor.open_outgoing(fio::OpenFlags::empty(), "foo".to_string(), server_end);
+        let execution_scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        assert_eq!(
+            actor.open_outgoing(OpenRequest::new(
+                execution_scope.clone(),
+                fio::OpenFlags::empty(),
+                "foo".try_into().unwrap(),
+                &mut object_request
+            )),
+            Ok(())
+        );
         start_rx.next().await.unwrap();
-        assert_matches!(TestExecutor::poll_until_stalled(&mut open_rx).await, Poll::Pending);
 
         // Notify actor that the program is started. Open should already succeed.
         let escrow = actor.will_start().await;
-        assert_matches!(open_rx.await, Ok(Ok(())));
 
         // Fail the rest of the start process. This doesn't matter to open.
         result_tx

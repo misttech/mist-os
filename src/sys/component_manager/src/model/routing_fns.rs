@@ -5,19 +5,13 @@
 use {
     crate::model::{
         component::WeakComponentInstance,
-        routing::{self, OpenOptions, RouteRequest},
+        routing::{self, RouteRequest},
     },
-    fidl::endpoints::ServerEnd,
+    bedrock_error::Explain,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::sync::Arc,
     tracing::error,
-    vfs::{
-        directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
-        execution_scope::ExecutionScope,
-        path::Path,
-        remote::RemoteLike,
-        ObjectRequestRef, ToObjectRequest,
-    },
+    vfs::directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest},
 };
 
 pub struct RouteEntry {
@@ -42,63 +36,32 @@ impl DirectoryEntry for RouteEntry {
     }
 
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
-        request.open_remote(self)
+        request.spawn(self);
+        Ok(())
     }
 }
 
-impl RemoteLike for RouteEntry {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        let this = self.clone();
-        scope.clone().spawn(async move {
-            flags.to_object_request(server_end).handle(|object_request| {
-                let component = match this.component.upgrade() {
-                    Ok(component) => component,
-                    Err(e) => {
-                        // This can happen if the component instance tree topology changes such
-                        // that the captured `component` no longer exists.
-                        error!(
-                            "failed to upgrade WeakComponentInstance while routing {}: {:?}",
-                            this.request, e
-                        );
-                        return Err(e.as_zx_status());
-                    }
-                };
+impl DirectoryEntryAsync for RouteEntry {
+    async fn open_entry_async(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        let component = match self.component.upgrade() {
+            Ok(component) => component,
+            Err(e) => {
+                // This can happen if the component instance tree topology changes such
+                // that the captured `component` no longer exists.
+                error!(
+                    "failed to upgrade WeakComponentInstance while routing {}: {:?}",
+                    self.request, e
+                );
+                return Err(e.as_zx_status());
+            }
+        };
 
-                let mut server_end = object_request.take().into_channel();
-
-                scope.spawn(async move {
-                    let open_options = OpenOptions {
-                        flags,
-                        relative_path: path.into_string(),
-                        server_chan: &mut server_end,
-                    };
-                    let res =
-                        routing::route_and_open_capability(&this.request, &component, open_options)
-                            .await;
-                    if let Err(e) = res {
-                        routing::report_routing_failure(&this.request, &component, e, server_end)
-                            .await;
-                    }
-                });
-
-                Ok(())
-            });
-        });
-    }
-
-    fn open2(
-        self: Arc<Self>,
-        _scope: ExecutionScope,
-        _path: Path,
-        _protocols: fio::ConnectionProtocols,
-        _object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
+        if let Err(e) = routing::route_and_open_capability(&self.request, &component, request).await
+        {
+            routing::report_routing_failure(&self.request, &component, &e).await;
+            Err(e.as_zx_status())
+        } else {
+            Ok(())
+        }
     }
 }

@@ -16,10 +16,11 @@ use {
     ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
     anyhow::Error,
     async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
     fuchsia_component::client as fclient,
+    fuchsia_zircon as zx,
     std::sync::Arc,
+    vfs::{directory::entry::OpenRequest, remote::remote_dir},
 };
 
 pub static SCHEME: &str = "realm-builder";
@@ -120,11 +121,12 @@ impl BuiltinRunnerFactory for RealmBuilderRunnerFactory {
     fn get_scoped_runner(
         self: Arc<Self>,
         _checker: ScopedPolicyChecker,
-        server_end: ServerEnd<fcrunner::ComponentRunnerMarker>,
-    ) {
-        let _ = fclient::connect_channel_to_protocol_at_path(
-            server_end.into_channel(),
-            "/svc/fuchsia.component.runner.RealmBuilder",
-        );
+        mut open_request: OpenRequest<'_>,
+    ) -> Result<(), zx::Status> {
+        open_request.prepend_path(&"fuchsia.component.runner.RealmBuilder".try_into().unwrap());
+        open_request.open_remote(remote_dir(
+            fuchsia_fs::directory::open_in_namespace("/svc", fio::OpenFlags::RIGHT_READABLE)
+                .unwrap(),
+        ))
     }
 }

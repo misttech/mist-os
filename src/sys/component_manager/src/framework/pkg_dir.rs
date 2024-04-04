@@ -15,11 +15,8 @@ use {
     },
     ::routing::{capability_source::InternalCapability, error::ComponentInstanceError},
     async_trait::async_trait,
-    cm_util::channel,
     cm_util::TaskGroup,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::path::PathBuf,
+    vfs::{directory::entry::OpenRequest, remote::remote_dir},
 };
 
 struct PkgDirectoryProvider {
@@ -37,9 +34,7 @@ impl CapabilityProvider for PkgDirectoryProvider {
     async fn open(
         self: Box<Self>,
         _task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
+        open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
         let component = self.scope.upgrade().map_err(|_| {
             ComponentInstanceError::InstanceNotFound { moniker: self.scope.moniker.clone() }
@@ -51,27 +46,14 @@ impl CapabilityProvider for PkgDirectoryProvider {
                 err: err.into(),
             }
         })?;
-        let package = resolved_state.package().cloned();
 
-        let relative_path =
-            relative_path.to_str().ok_or(CapabilityProviderError::BadPath)?.to_string();
-        let server_end = ServerEnd::new(channel::take_channel(server_end));
-        if let Some(package) = package {
-            if relative_path.is_empty() {
-                package
-                    .package_dir
-                    .clone(flags, server_end)
-                    .map_err(|err| PkgDirError::OpenFailed { err })?;
-            } else {
-                package
-                    .package_dir
-                    .open(flags, fio::ModeType::empty(), &relative_path, server_end)
-                    .map_err(|err| PkgDirError::OpenFailed { err })?;
-            }
+        if let Some(package) = resolved_state.package().as_ref() {
+            open_request
+                .open_remote(remote_dir(Clone::clone(&package.package_dir)))
+                .map_err(|e| CapabilityProviderError::VfsOpenError(e))
         } else {
-            return Err(CapabilityProviderError::PkgDirError { err: PkgDirError::NoPkgDir });
+            Err(CapabilityProviderError::PkgDirError { err: PkgDirError::NoPkgDir })
         }
-        Ok(())
     }
 }
 

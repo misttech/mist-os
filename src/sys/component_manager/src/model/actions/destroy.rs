@@ -14,12 +14,12 @@ use {
     },
     ::routing::component_instance::ExtendedInstanceInterface,
     async_trait::async_trait,
-    futures::{
-        future::{join_all, BoxFuture},
-        Future,
-    },
+    futures::{future::join_all, Future},
     moniker::MonikerBase,
-    std::sync::Arc,
+    std::{
+        pin::{pin, Pin},
+        sync::Arc,
+    },
 };
 
 /// Destroy this component instance, including all instances nested in its component.
@@ -99,27 +99,31 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
         component.destroy_instance().await?;
 
         // Wait for any remaining blocking tasks and actions finish up.
-        fn wait(nf: Option<impl Future + Send + 'static>) -> BoxFuture<'static, ()> {
-            Box::pin(async {
-                if let Some(nf) = nf {
-                    nf.await;
-                }
-            })
+        async fn wait(nf: Option<impl Future>) {
+            if let Some(nf) = nf {
+                nf.await;
+            }
         }
-        let task_shutdown = Box::pin(component.blocking_task_group().join());
-        let nfs = {
+        let resolve_shutdown;
+        let start_shutdown;
+        {
             let actions = component.lock_actions().await;
-            vec![
-                wait(actions.wait(ResolveAction::new())),
-                wait(actions.wait(StartAction::new(
-                    StartReason::Debug,
-                    None,
-                    IncomingCapabilities::default(),
-                ))),
-                task_shutdown,
-            ]
-        };
-        join_all(nfs.into_iter()).await;
+            resolve_shutdown = wait(actions.wait(ResolveAction::new()));
+            start_shutdown = wait(actions.wait(StartAction::new(
+                StartReason::Debug,
+                None,
+                IncomingCapabilities::default(),
+            )));
+        }
+        let execution_scope = &component.execution_scope;
+        execution_scope.shutdown();
+        join_all([
+            pin!(resolve_shutdown) as Pin<&mut (dyn Future<Output = ()> + Send)>,
+            pin!(start_shutdown),
+            pin!(component.blocking_task_group().join()),
+            pin!(execution_scope.wait()),
+        ])
+        .await;
 
         // Only consider the component fully destroyed once it's no longer executing any lifecycle
         // transitions.

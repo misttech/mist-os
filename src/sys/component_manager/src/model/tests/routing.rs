@@ -3880,6 +3880,8 @@ fn protocol_delivery_on_readable_bail_when_unresolve() {
         // Unresolve b. This should drop the request from `a`.
         b.unresolve().await.unwrap();
 
+        _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+
         // Make a request which should fail.
         echo_proxy.echo_string(Some("hippos")).await.expect_err("FIDL call should fail");
         _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;

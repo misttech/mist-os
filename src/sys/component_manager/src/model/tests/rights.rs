@@ -15,11 +15,9 @@ use {
     async_trait::async_trait,
     cm_rust::*,
     cm_rust_testing::*,
-    cm_util::channel,
     cm_util::TaskGroup,
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::path::PathBuf,
+    vfs::{directory::entry::OpenRequest, remote::remote_dir},
 };
 
 #[fuchsia::test]
@@ -71,17 +69,11 @@ impl CapabilityProvider for MockFrameworkDirectoryProvider {
     async fn open(
         self: Box<Self>,
         _task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
+        open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
-        let relative_path = relative_path.to_str().unwrap();
-        let server_end = channel::take_channel(server_end);
-        let server_end = ServerEnd::<fio::NodeMarker>::new(server_end);
-        self.test_dir_proxy
-            .open(flags, fio::ModeType::empty(), relative_path, server_end)
-            .expect("failed to open test dir");
-        Ok(())
+        open_request
+            .open_remote(remote_dir(Clone::clone(&self.test_dir_proxy)))
+            .map_err(|e| CapabilityProviderError::VfsOpenError(e))
     }
 }
 

@@ -191,17 +191,19 @@ impl ObjectRequest {
     }
 
     /// Waits until the request has a request waiting in its channel.  Returns immediately if this
-    /// request requires sending an initial event such as OnOpen or OnRepresentation.
-    pub async fn wait_till_ready(&self) {
+    /// request requires sending an initial event such as OnOpen or OnRepresentation.  Returns
+    /// `true` if the channel is readable (rather than just closed).
+    pub async fn wait_till_ready(&self) -> bool {
         if !matches!(self.what_to_send, ObjectRequestSend::Nothing) {
-            return;
+            return true;
         }
-        fasync::OnSignalsRef::new(
+        let signals = fasync::OnSignalsRef::new(
             self.object_request.as_handle_ref(),
             fidl::Signals::OBJECT_READABLE | fidl::Signals::CHANNEL_PEER_CLOSED,
         )
         .await
         .unwrap();
+        signals.contains(fidl::Signals::OBJECT_READABLE)
     }
 
     /// Take the ObjectRequest.  The caller is responsible for sending errors.

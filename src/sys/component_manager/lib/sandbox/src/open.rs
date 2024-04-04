@@ -88,6 +88,11 @@ impl Open {
         });
     }
 
+    /// Forwards the open request.
+    pub fn open_entry(&self, open_request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        self.entry.clone().open_entry(open_request)
+    }
+
     /// Returns an [`Open`] capability which will open paths relative to
     /// `relative_path` if non-empty, from the base [`Open`] object.
     ///

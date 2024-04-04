@@ -7,6 +7,7 @@ use {
         capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
             component::{ComponentInstance, InstanceState, WeakComponentInstance},
+            error::OpenExposedDirError,
             model::Model,
             namespace::create_namespace,
             resolver::Resolver,
@@ -15,6 +16,7 @@ use {
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
+    bedrock_error::Explain,
     cm_rust::NativeIntoFidl,
     cm_types::Name,
     fidl::{
@@ -35,7 +37,10 @@ use {
     },
     std::sync::{Arc, Weak},
     tracing::{trace, warn},
-    vfs::directory::entry_container::Directory,
+    vfs::{
+        directory::{entry::OpenRequest, entry_container::Directory},
+        ToObjectRequest,
+    },
 };
 
 lazy_static! {
@@ -445,7 +450,7 @@ async fn construct_namespace(
                 &instance,
                 r.decl(),
                 &r.program_input_dict,
-                r.execution_scope().clone(),
+                instance.execution_scope.clone(),
             )
             .await
             .unwrap();
@@ -475,8 +480,21 @@ async fn open(
 
     match dir_type {
         fsys::OpenDirType::OutgoingDir => {
-            instance.open_outgoing(flags, path, &mut object.into_channel()).await?;
-            Ok(())
+            let mut object_request = flags.to_object_request(object);
+            if let Err(e) = instance
+                .open_outgoing(OpenRequest::new(
+                    instance.execution_scope.clone(),
+                    flags,
+                    path.try_into().map_err(|_| fsys::OpenError::BadPath)?,
+                    &mut object_request,
+                ))
+                .await
+            {
+                object_request.shutdown(e.as_zx_status());
+                Err(fsys::OpenError::FidlError)
+            } else {
+                Ok(())
+            }
         }
         fsys::OpenDirType::RuntimeDir => {
             let execution = instance.lock_execution();
@@ -501,15 +519,25 @@ async fn open(
             }
         }
         fsys::OpenDirType::ExposedDir => {
-            let mut state = instance.lock_state().await;
-            match &mut *state {
-                InstanceState::Resolved(r) => {
-                    let path = vfs::path::Path::validate_and_split(path)
-                        .map_err(|_| fsys::OpenError::BadPath)?;
-                    r.open_exposed_dir(flags, path, object).await;
-                    Ok(())
-                }
-                _ => Err(fsys::OpenError::InstanceNotResolved),
+            let mut object_request = flags.to_object_request(object);
+            if let Err(e) = instance
+                .open_exposed(OpenRequest::new(
+                    instance.execution_scope.clone(),
+                    flags,
+                    path.try_into().map_err(|_| fsys::OpenError::BadPath)?,
+                    &mut object_request,
+                ))
+                .await
+            {
+                object_request.shutdown(e.as_zx_status());
+                Err(match e {
+                    OpenExposedDirError::InstanceNotResolved => {
+                        fsys::OpenError::InstanceNotResolved
+                    }
+                    _ => fsys::OpenError::FidlError,
+                })
+            } else {
+                Ok(())
             }
         }
         fsys::OpenDirType::NamespaceDir => {
@@ -522,9 +550,8 @@ async fn open(
                 _ => Err(fsys::OpenError::InstanceNotResolved),
             }?;
 
-            let execution_scope = resolved_state.execution_scope().clone();
             resolved_state.namespace_dir().await.map_err(|_| fsys::OpenError::NoSuchDir)?.open(
-                execution_scope,
+                instance.execution_scope.clone(),
                 flags,
                 path,
                 object,

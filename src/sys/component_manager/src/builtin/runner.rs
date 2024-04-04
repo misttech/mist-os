@@ -10,11 +10,10 @@ use {
     async_trait::async_trait,
     cm_config::SecurityPolicy,
     cm_types::Name,
-    cm_util::channel,
     cm_util::TaskGroup,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::{path::PathBuf, sync::Arc},
+    fuchsia_zircon as zx,
+    std::sync::Arc,
+    vfs::directory::entry::OpenRequest,
 };
 
 /// Trait for built-in runner services. Wraps the generic Runner trait to provide a
@@ -26,8 +25,8 @@ pub trait BuiltinRunnerFactory: Send + Sync {
     fn get_scoped_runner(
         self: Arc<Self>,
         checker: ScopedPolicyChecker,
-        server_end: ServerEnd<fcrunner::ComponentRunnerMarker>,
-    );
+        open_request: OpenRequest<'_>,
+    ) -> Result<(), zx::Status>;
 }
 
 /// Provides a hook for routing built-in runners to realms.
@@ -79,13 +78,12 @@ impl CapabilityProvider for RunnerCapabilityProvider {
     async fn open(
         self: Box<Self>,
         _task_group: TaskGroup,
-        _flags: fio::OpenFlags,
-        _relative_path: PathBuf,
-        server_end: &mut zx::Channel,
+        open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
-        let server_end = channel::take_channel(server_end);
-        self.factory.get_scoped_runner(self.checker, server_end.into());
-        Ok(())
+        self.factory
+            .clone()
+            .get_scoped_runner(self.checker, open_request)
+            .map_err(|err| CapabilityProviderError::VfsOpenError(err))
     }
 }
 
@@ -98,8 +96,10 @@ mod tests {
         assert_matches::assert_matches,
         cm_rust::{CapabilityDecl, RunnerDecl},
         cm_rust_testing::*,
+        fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio,
         futures::prelude::*,
         moniker::{Moniker, MonikerBase},
+        vfs::{execution_scope::ExecutionScope, path::Path, ToObjectRequest},
     };
 
     fn sample_start_info(name: &str) -> fcrunner::ComponentStartInfo {
@@ -128,10 +128,20 @@ mod tests {
 
         // Open a connection to the provider.
         let (client, server) = fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>()?;
-        let mut server = server.into_channel();
+        let server = server.into_channel();
         let task_group = TaskGroup::new();
+        let scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server);
         provider
-            .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::from("."), &mut server)
+            .open(
+                task_group.clone(),
+                OpenRequest::new(
+                    scope.clone(),
+                    fio::OpenFlags::empty(),
+                    Path::dot(),
+                    &mut object_request,
+                ),
+            )
             .await?;
 
         // Ensure errors are propagated back to the caller.

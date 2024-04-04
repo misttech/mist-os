@@ -2039,7 +2039,7 @@ impl std::str::FromStr for CapabilityTypeName {
             "runner" => Ok(CapabilityTypeName::Runner),
             "service" => Ok(CapabilityTypeName::Service),
             "storage" => Ok(CapabilityTypeName::Storage),
-            "dictionary" => Ok(CapabilityTypeName::Directory),
+            "dictionary" => Ok(CapabilityTypeName::Dictionary),
             "configuration" => Ok(CapabilityTypeName::Config),
             _ => Err(Error::ParseCapabilityTypeName { raw: s.to_string() }),
         }
@@ -2139,7 +2139,7 @@ impl From<CapabilityTypeName> for fio::DirentType {
             CapabilityTypeName::Protocol => fio::DirentType::Service,
             CapabilityTypeName::Service => fio::DirentType::Directory,
             CapabilityTypeName::Storage => fio::DirentType::Directory,
-            CapabilityTypeName::Dictionary => fio::DirentType::Service,
+            CapabilityTypeName::Dictionary => fio::DirentType::Directory,
             // The below don't appear in exposed or used dir
             CapabilityTypeName::Resolver
             | CapabilityTypeName::Runner

@@ -28,6 +28,8 @@ use {
 /// Errors produced by `Model`.
 #[derive(Debug, Error, Clone)]
 pub enum ModelError {
+    #[error("bad path")]
+    BadPath,
     #[error("Moniker error: {}", err)]
     MonikerError {
         #[from]
@@ -52,7 +54,7 @@ pub enum ModelError {
         moniker: InstancedMoniker,
         path: String,
         #[source]
-        err: fidl::Error,
+        err: zx::Status,
     },
     #[error("storage error: {}", err)]
     StorageError {
@@ -187,8 +189,22 @@ pub enum RebootError {
 
 #[derive(Debug, Error)]
 pub enum OpenExposedDirError {
+    #[error("instance is not resolved")]
+    InstanceNotResolved,
     #[error("instance was destroyed")]
     InstanceDestroyed,
+    #[error("open error: {0}")]
+    Open(#[from] zx::Status),
+}
+
+impl Explain for OpenExposedDirError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::InstanceNotResolved => zx::Status::NOT_FOUND,
+            Self::InstanceDestroyed => zx::Status::NOT_FOUND,
+            Self::Open(status) => *status,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Error)]
@@ -197,8 +213,8 @@ pub enum OpenOutgoingDirError {
     InstanceNotResolved,
     #[error("instance is non-executable")]
     InstanceNonExecutable,
-    #[error("instance failed to start: {0}")]
-    InstanceFailedToStart(#[from] ActionError),
+    #[error("open error: {0}")]
+    Open(#[from] zx::Status),
 }
 
 impl Explain for OpenOutgoingDirError {
@@ -206,7 +222,7 @@ impl Explain for OpenOutgoingDirError {
         match self {
             Self::InstanceNotResolved => zx::Status::NOT_FOUND,
             Self::InstanceNonExecutable => zx::Status::NOT_FOUND,
-            Self::InstanceFailedToStart(err) => err.as_zx_status(),
+            Self::Open(err) => *err,
         }
     }
 }
@@ -216,9 +232,7 @@ impl From<OpenOutgoingDirError> for fsys::OpenError {
         match value {
             OpenOutgoingDirError::InstanceNotResolved => fsys::OpenError::InstanceNotResolved,
             OpenOutgoingDirError::InstanceNonExecutable => fsys::OpenError::NoSuchDir,
-            OpenOutgoingDirError::InstanceFailedToStart(_) => {
-                fsys::OpenError::InstanceFailedToStart
-            }
+            OpenOutgoingDirError::Open(_) => fsys::OpenError::FidlError,
         }
     }
 }
@@ -621,7 +635,7 @@ pub enum PkgDirError {
     #[error("error opening pkg dir: {err}")]
     OpenFailed {
         #[from]
-        err: fidl::Error,
+        err: zx::Status,
     },
 }
 
@@ -629,7 +643,7 @@ impl PkgDirError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
             Self::NoPkgDir => zx::Status::NOT_FOUND,
-            Self::OpenFailed { .. } => zx::Status::INTERNAL,
+            Self::OpenFailed { err } => *err,
         }
     }
 }
@@ -671,11 +685,8 @@ pub enum CapabilityProviderError {
         #[from]
         err: PkgDirError,
     },
-    #[error("error in event source capability provider: {err}")]
-    EventSourceError {
-        #[source]
-        err: ComponentInstanceError,
-    },
+    #[error("error in event source capability provider: {0}")]
+    EventSourceError(#[from] EventSourceError),
     #[error("error in component capability provider: {err}")]
     ComponentProviderError {
         #[from]
@@ -691,6 +702,10 @@ pub enum CapabilityProviderError {
         #[from]
         err: BedrockError,
     },
+    #[error("could not route: {0}")]
+    RoutingError(#[from] RoutingError),
+    #[error("vfs open error")]
+    VfsOpenError(#[source] zx::Status),
 }
 
 impl CapabilityProviderError {
@@ -700,9 +715,11 @@ impl CapabilityProviderError {
             Self::ComponentInstanceError { err } => err.as_zx_status(),
             Self::CmNamespaceError { .. } => zx::Status::INTERNAL,
             Self::PkgDirError { err } => err.as_zx_status(),
-            Self::EventSourceError { err } => err.as_zx_status(),
+            Self::EventSourceError(err) => err.as_zx_status(),
             Self::ComponentProviderError { err } => err.as_zx_status(),
             Self::BedrockError { err } => err.as_zx_status(),
+            Self::RoutingError(err) => err.as_zx_status(),
+            Self::VfsOpenError(err) => *err,
         }
     }
 }
@@ -992,6 +1009,27 @@ impl CreateNamespaceError {
             Self::BuildNamespaceError(_) => zx::Status::NOT_FOUND,
             Self::ConvertToDirectory(_) => zx::Status::INTERNAL,
             Self::ComponentInstanceError(err) => err.as_zx_status(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum EventSourceError {
+    #[error("component instance error: {0}")]
+    ComponentInstance(#[from] ComponentInstanceError),
+    #[error("model error: {0}")]
+    // TODO(https://fxbug.dev/42068065): This will get fixed when we untangle ModelError
+    Model(#[from] Box<ModelError>),
+    #[error("event stream already consumed")]
+    AlreadyConsumed,
+}
+
+impl EventSourceError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::ComponentInstance(err) => err.as_zx_status(),
+            Self::Model(err) => err.as_zx_status(),
+            Self::AlreadyConsumed => zx::Status::INTERNAL,
         }
     }
 }

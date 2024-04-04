@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use cm_config::SecurityPolicy;
 use cm_util::TaskGroup;
 use elf_runner::{crash_info::CrashRecords, process_launcher::NamespaceConnector};
-use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
+use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as fcrunner;
 use fidl_fuchsia_io as fio;
@@ -21,7 +21,7 @@ use sandbox::{Capability, CapabilityTrait, Dict, Open};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;
-use vfs::execution_scope::ExecutionScope;
+use vfs::{directory::entry::OpenRequest, execution_scope::ExecutionScope, service::endpoint};
 use zx::{AsHandleRef, HandleBased, Task};
 
 use crate::{
@@ -171,27 +171,29 @@ impl BuiltinRunnerFactory for BuiltinRunner {
     fn get_scoped_runner(
         self: Arc<Self>,
         _checker: ScopedPolicyChecker,
-        server_end: ServerEnd<fcrunner::ComponentRunnerMarker>,
-    ) {
-        let runner = self.clone();
-        let mut stream = server_end.into_stream().unwrap();
-        runner.clone().task_group.spawn(async move {
-            while let Ok(Some(request)) = stream.try_next().await {
-                let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
-                    request;
-                match runner.clone().start(start_info) {
-                    Ok((program, on_exit)) => {
-                        let controller =
-                            Controller::new(program, controller.into_stream().unwrap());
-                        runner.task_group.spawn(controller.serve(on_exit));
-                    }
-                    Err(err) => {
-                        warn!("Builtin runner failed to run component: {err}");
-                        let _ = controller.close_with_epitaph(err.into());
+        open_request: OpenRequest<'_>,
+    ) -> Result<(), zx::Status> {
+        open_request.open_service(endpoint(move |_scope, server_end| {
+            let runner = self.clone();
+            let mut stream = fcrunner::ComponentRunnerRequestStream::from_channel(server_end);
+            runner.clone().task_group.spawn(async move {
+                while let Ok(Some(request)) = stream.try_next().await {
+                    let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
+                        request;
+                    match runner.clone().start(start_info) {
+                        Ok((program, on_exit)) => {
+                            let controller =
+                                Controller::new(program, controller.into_stream().unwrap());
+                            runner.task_group.spawn(controller.serve(on_exit));
+                        }
+                        Err(err) => {
+                            warn!("Builtin runner failed to run component: {err}");
+                            let _ = controller.close_with_epitaph(err.into());
+                        }
                     }
                 }
-            }
-        });
+            });
+        }))
     }
 }
 
@@ -351,7 +353,7 @@ mod tests {
     use fcrunner::{ComponentNamespaceEntry, ComponentStartInfo};
     use fidl::endpoints::ClientEnd;
     use fidl_fuchsia_data::{Dictionary, DictionaryEntry, DictionaryValue};
-    use fidl_fuchsia_io::DirectoryProxy;
+    use fidl_fuchsia_io::{self as fio, DirectoryProxy};
     use fidl_fuchsia_process as fprocess;
     use fuchsia_fs::directory::open_channel_in_namespace;
     use fuchsia_runtime::{HandleInfo, HandleType};
@@ -359,6 +361,7 @@ mod tests {
     use moniker::{Moniker, MonikerBase};
     use sandbox::Directory;
     use serve_processargs::NamespaceBuilder;
+    use vfs::{path::Path as VfsPath, ToObjectRequest};
 
     use crate::{
         bedrock::program::{Program, StartInfo},
@@ -427,8 +430,22 @@ mod tests {
     #[fuchsia::test]
     async fn start_stop_elf_runner() {
         let builtin_runner = make_builtin_runner();
-        let (client, server_end) = fidl::endpoints::create_proxy().unwrap();
-        builtin_runner.clone().get_scoped_runner(make_scoped_policy_checker(), server_end);
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+        let scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        builtin_runner
+            .clone()
+            .get_scoped_runner(
+                make_scoped_policy_checker(),
+                OpenRequest::new(
+                    scope.clone(),
+                    fio::OpenFlags::empty(),
+                    VfsPath::dot(),
+                    &mut object_request,
+                ),
+            )
+            .unwrap();
         let (elf_runner_controller, server_end) = fidl::endpoints::create_proxy().unwrap();
 
         // Start the ELF runner.
@@ -531,8 +548,21 @@ mod tests {
     #[fuchsia::test]
     async fn start_error_unknown_type() {
         let builtin_runner = make_builtin_runner();
-        let (client, server_end) = fidl::endpoints::create_proxy().unwrap();
-        builtin_runner.get_scoped_runner(make_scoped_policy_checker(), server_end);
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+        let scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        builtin_runner
+            .get_scoped_runner(
+                make_scoped_policy_checker(),
+                OpenRequest::new(
+                    scope.clone(),
+                    fio::OpenFlags::empty(),
+                    VfsPath::dot(),
+                    &mut object_request,
+                ),
+            )
+            .unwrap();
         let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
         open_channel_in_namespace("/svc", fio::OpenFlags::RIGHT_READABLE, svc_server_end).unwrap();

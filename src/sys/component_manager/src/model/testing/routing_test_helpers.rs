@@ -7,7 +7,7 @@ use {
         builtin::runner::BuiltinRunnerFactory,
         builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder},
         model::{
-            component::{ComponentInstance, InstanceState, StartReason},
+            component::{ComponentInstance, StartReason},
             error::ModelError,
             hooks::HooksRegistration,
             model::Model,
@@ -51,7 +51,10 @@ use {
         sync::Arc,
     },
     tempfile::TempDir,
-    vfs::directory::entry::DirectoryEntry,
+    vfs::{
+        directory::entry::{DirectoryEntry, OpenRequest},
+        ToObjectRequest,
+    },
 };
 
 // TODO(https://fxbug.dev/42140194): remove type aliases once the routing_test_helpers lib has a stable
@@ -1197,7 +1200,9 @@ pub mod capability_util {
         let service_dir = service_dir
             // `open_directory` could fail if service capability routing fails.
             .map_err(|e| match e {
-                OpenError::OnOpenDecode(e) => e,
+                OpenError::OpenError(status) => {
+                    fidl::Error::ClientChannelClosed { status, protocol_name: "" }
+                }
                 _ => panic!("Unexpected open error {:?}", e),
             })?;
 
@@ -1205,7 +1210,9 @@ pub mod capability_util {
             fuchsia_fs::directory::open_directory(&service_dir, instance, fio::OpenFlags::empty())
                 .await
                 .map_err(|e| match e {
-                    OpenError::OnOpenDecode(e) => e,
+                    OpenError::OpenError(status) => {
+                        fidl::Error::ClientChannelClosed { status, protocol_name: "" }
+                    }
                     _ => panic!("Unexpected open error {:?}", e),
                 })?;
         Ok(connect_to_named_protocol_at_dir_root::<T>(&instance_dir, member)
@@ -1496,21 +1503,21 @@ pub mod capability_util {
             .await
             .unwrap_or_else(|e| panic!("component not found {}: {}", moniker, e));
         root.start_instance(moniker, &StartReason::Eager).await.expect("failed to start instance");
-        let state = component.lock_state().await;
-        match &*state {
-            InstanceState::Resolved(resolved_instance_state) => {
-                let flags = if directory {
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY
-                } else {
-                    fio::OpenFlags::NOT_DIRECTORY
-                };
-                let vns_path = to_fvfs_path(path);
-                resolved_instance_state.open_exposed_dir(flags, vns_path, server_end).await;
-            }
-            _ => {
-                panic!("Attempted to open exposed dir of unresolved component: {}", moniker);
-            }
-        }
+        let flags = if directory {
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY
+        } else {
+            fio::OpenFlags::NOT_DIRECTORY
+        };
+        let mut object_request = flags.to_object_request(server_end);
+        component
+            .open_exposed(OpenRequest::new(
+                component.execution_scope.clone(),
+                flags,
+                to_fvfs_path(path),
+                &mut object_request,
+            ))
+            .await
+            .unwrap();
     }
 
     /// Function to convert a [cm_types::Path] to a [vfs::path::Path]

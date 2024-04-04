@@ -12,6 +12,7 @@ use crate::{
     execution_scope::ExecutionScope,
     file::{self, FileLike},
     node::IsDirectory,
+    object_request::ObjectRequestSend,
     path::Path,
     service::{self, ServiceLike},
     symlink::{self, Symlink},
@@ -147,9 +148,19 @@ impl<'a> OpenRequest<'a> {
     }
 
     /// Waits until the request has a request waiting in its channel.  Returns immediately if this
-    /// request requires sending an initial event such as OnOpen or OnRepresentation.
-    pub async fn wait_till_ready(&self) {
-        self.object_request.wait_till_ready().await;
+    /// request requires sending an initial event such as OnOpen or OnRepresentation.  Returns
+    /// `true` if the channel is readable (rather than just clased).
+    pub async fn wait_till_ready(&self) -> bool {
+        self.object_request.wait_till_ready().await
+    }
+
+    /// Returns `true` if the request requires the server to send an event (e.g. either OnOpen or
+    /// OnRepresentation).  If `true`, `wait_till_ready` will return immediately.  If `false`, the
+    /// caller might choose to call `wait_till_ready` if other conditions are satisfied (checking
+    /// for an empty path is usually a good idea since it is hard to know where a non-empty path
+    /// might end up being terminated).
+    pub fn requires_event(&self) -> bool {
+        self.object_request.what_to_send() != ObjectRequestSend::Nothing
     }
 
     /// Opens a directory.
@@ -267,7 +278,6 @@ impl<'a> OpenRequest<'a> {
         self,
         remote: Arc<impl crate::remote::RemoteLike + Send + Sync + 'static>,
     ) -> Result<(), Status> {
-        use crate::object_request::ObjectRequestSend;
         match self {
             OpenRequest {
                 scope,
@@ -279,8 +289,9 @@ impl<'a> OpenRequest<'a> {
                 {
                     let object_request = object_request.take();
                     scope.clone().spawn(async move {
-                        object_request.wait_till_ready().await;
-                        remote.open(scope, flags, path, object_request.into_server_end());
+                        if object_request.wait_till_ready().await {
+                            remote.open(scope, flags, path, object_request.into_server_end());
+                        }
                     });
                 } else {
                     remote.open(scope, flags, path, object_request.take().into_server_end());
@@ -298,10 +309,11 @@ impl<'a> OpenRequest<'a> {
                 {
                     let object_request = object_request.take();
                     scope.clone().spawn(async move {
-                        object_request.wait_till_ready().await;
-                        object_request.handle(|object_request| {
-                            remote.open2(scope, path, protocols, object_request)
-                        });
+                        if object_request.wait_till_ready().await {
+                            object_request.handle(|object_request| {
+                                remote.open2(scope, path, protocols, object_request)
+                            });
+                        }
                     });
                     Ok(())
                 } else {

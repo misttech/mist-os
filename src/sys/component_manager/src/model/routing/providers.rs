@@ -11,21 +11,15 @@ use {
         },
         sandbox_util::DictExt,
     },
-    ::routing::{error::RoutingError, path::PathBufExt},
+    ::routing::error::RoutingError,
     async_trait::async_trait,
     bedrock_error::BedrockError,
     clonable_error::ClonableError,
     cm_rust::Availability,
-    cm_types::Name,
-    cm_util::{channel, TaskGroup},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::{path::PathBuf, sync::Arc},
-    vfs::{
-        directory::{entry::OpenRequest, entry_container::Directory},
-        execution_scope::ExecutionScope,
-        ToObjectRequest,
-    },
+    cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS},
+    cm_util::TaskGroup,
+    std::sync::Arc,
+    vfs::{directory::entry::OpenRequest, path::Path as VfsPath, remote::remote_dir},
 };
 
 /// The default provider for a ComponentCapability.
@@ -48,13 +42,9 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
     async fn open(
         self: Box<Self>,
         _task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
+        open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
         let source = self.source.upgrade()?;
-        let path = cm_util::io::path_buf_to_vfs_path(relative_path)
-            .ok_or(CapabilityProviderError::BadPath)?;
         let capability = source
             .get_program_output_dict()
             .await?
@@ -73,22 +63,14 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             .try_into_directory_entry()
             .map_err(OpenError::DoesNotSupportOpen)
             .map_err(BedrockError::from)?;
-        let server_end = cm_util::channel::take_channel(server_end);
-        flags.to_object_request(server_end).handle(|object_request| {
-            entry.clone().open_entry(OpenRequest::new(
-                ExecutionScope::new(),
-                flags,
-                path,
-                object_request,
-            ))
-        });
-        Ok(())
+        entry.open_entry(open_request).map_err(|err| CapabilityProviderError::VfsOpenError(err))
     }
 }
 
 /// The default provider for a Namespace Capability.
 pub struct NamespaceCapabilityProvider {
     pub path: cm_types::Path,
+    pub is_directory_like: bool,
 }
 
 #[async_trait]
@@ -96,30 +78,43 @@ impl CapabilityProvider for NamespaceCapabilityProvider {
     async fn open(
         self: Box<Self>,
         _task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
+        mut open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
-        let namespace_path = self.path.to_path_buf().attach(relative_path);
-        let namespace_path = namespace_path.to_str().ok_or(CapabilityProviderError::BadPath)?;
-        let server_end = channel::take_channel(server_end);
-        fuchsia_fs::node::open_channel_in_namespace(
-            namespace_path,
-            flags,
-            ServerEnd::new(server_end),
-        )
-        .map_err(|e| CapabilityProviderError::CmNamespaceError {
-            err: ClonableError::from(anyhow::Error::from(e)),
-        })
+        let path = self.path.to_path_buf();
+        let (dir, base) = if self.is_directory_like {
+            (path.to_str().ok_or(CapabilityProviderError::BadPath)?, VfsPath::dot())
+        } else {
+            (
+                match path.parent() {
+                    None => "/",
+                    Some(p) => p.to_str().ok_or(CapabilityProviderError::BadPath)?,
+                },
+                path.file_name()
+                    .and_then(|f| f.to_str())
+                    .ok_or(CapabilityProviderError::BadPath)?
+                    .try_into()
+                    .map_err(|_| CapabilityProviderError::BadPath)?,
+            )
+        };
+
+        open_request.prepend_path(&base);
+
+        open_request
+            .open_remote(remote_dir(
+                fuchsia_fs::directory::open_in_namespace(dir, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS)
+                    .map_err(|e| CapabilityProviderError::CmNamespaceError {
+                        err: ClonableError::from(anyhow::Error::from(e)),
+                    })?,
+            ))
+            .map_err(|e| CapabilityProviderError::CmNamespaceError {
+                err: ClonableError::from(anyhow::Error::from(e)),
+            })
     }
 }
 
 /// A `CapabilityProvider` that serves a pseudo directory entry.
 #[derive(Clone)]
 pub struct DirectoryEntryCapabilityProvider {
-    /// Execution scope for requests to `entry`.
-    pub execution_scope: ExecutionScope,
-
     /// The pseudo directory that backs this capability.
     pub entry: Arc<vfs::directory::immutable::simple::Simple>,
 }
@@ -129,25 +124,10 @@ impl CapabilityProvider for DirectoryEntryCapabilityProvider {
     async fn open(
         self: Box<Self>,
         _task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
+        open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
-        let relative_path_utf8 = relative_path.to_str().ok_or(CapabilityProviderError::BadPath)?;
-        let relative_path = if relative_path_utf8.is_empty() {
-            vfs::path::Path::dot()
-        } else {
-            vfs::path::Path::validate_and_split(relative_path_utf8)
-                .map_err(|_| CapabilityProviderError::BadPath)?
-        };
-
-        self.entry.open(
-            self.execution_scope.clone(),
-            flags,
-            relative_path,
-            ServerEnd::new(channel::take_channel(server_end)),
-        );
-
-        Ok(())
+        open_request
+            .open_dir(self.entry.clone())
+            .map_err(|e| CapabilityProviderError::VfsOpenError(e))
     }
 }

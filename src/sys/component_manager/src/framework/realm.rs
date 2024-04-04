@@ -16,7 +16,7 @@ use {
     async_trait::async_trait,
     cm_config::RuntimeConfig,
     cm_rust::FidlIntoNative,
-    cm_types::Name,
+    cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
@@ -28,6 +28,7 @@ use {
         sync::{Arc, Weak},
     },
     tracing::{debug, error, warn},
+    vfs::{directory::entry::OpenRequest, path::Path, ToObjectRequest},
 };
 
 lazy_static! {
@@ -198,10 +199,26 @@ impl RealmCapabilityHost {
                     );
                     return fcomponent::Error::InstanceCannotResolve;
                 })?;
-                let mut exposed_dir = exposed_dir.into_channel();
-                let () =
-                    child.open_exposed(&mut exposed_dir).await.map_err(|error| match error {
-                        OpenExposedDirError::InstanceDestroyed => fcomponent::Error::InstanceDied,
+                // TODO(https://fxbug.dev/42161419): open_exposed does not have a rights input
+                // parameter, so this makes use of the POSIX_[WRITABLE|EXECUTABLE] flags to open a
+                // connection with those rights if available from the parent directory connection
+                // but without failing if not available.
+                let flags = OPEN_FLAGS_MAX_POSSIBLE_RIGHTS | fio::OpenFlags::DIRECTORY;
+                let mut object_request = flags.to_object_request(exposed_dir);
+                child
+                    .open_exposed(OpenRequest::new(
+                        child.execution_scope.clone(),
+                        flags,
+                        Path::dot(),
+                        &mut object_request,
+                    ))
+                    .await
+                    .map_err(|error| match error {
+                        OpenExposedDirError::InstanceDestroyed
+                        | OpenExposedDirError::InstanceNotResolved => {
+                            fcomponent::Error::InstanceDied
+                        }
+                        OpenExposedDirError::Open(_) => fcomponent::Error::Internal,
                     })?;
             }
             None => {

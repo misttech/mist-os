@@ -14,7 +14,7 @@ use {
         error::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
         namespace::create_namespace,
-        routing::{route_and_open_capability, OpenOptions, RouteRequest},
+        routing::{open_capability, RouteRequest},
     },
     crate::runner::RemoteRunner,
     ::namespace::Entry as NamespaceEntry,
@@ -27,13 +27,10 @@ use {
     cm_rust::ComponentDecl,
     cm_util::{AbortError, AbortFutureExt, AbortHandle, AbortableScope},
     config_encoder::ConfigFields,
-    fidl::{
-        endpoints::{create_proxy, DiscoverableProtocolMarker},
-        Vmo,
-    },
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
-    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
+    fidl::{endpoints::DiscoverableProtocolMarker, Vmo},
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
+    fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
+    fuchsia_zircon as zx,
     futures::channel::oneshot,
     moniker::Moniker,
     sandbox::{Capability, Dict},
@@ -419,22 +416,14 @@ async fn open_runner(
     runner: cm_rust::UseRunnerDecl,
 ) -> Result<Option<RemoteRunner>, StartActionError> {
     // Open up a channel to the runner.
-    let (client, server) = create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
-    let mut server_channel = server.into_channel();
-    let options = OpenOptions {
-        flags: fio::OpenFlags::NOT_DIRECTORY,
-        relative_path: "".into(),
-        server_chan: &mut server_channel,
-    };
-    route_and_open_capability(&RouteRequest::UseRunner(runner.clone()), component, options)
+    let proxy = open_capability(&RouteRequest::UseRunner(runner.clone()), component)
         .await
         .map_err(|err| StartActionError::ResolveRunnerError {
-        moniker: component.moniker.clone(),
-        err: Box::new(err),
-        runner: runner.source_name,
-    })?;
-
-    return Ok(Some(RemoteRunner::new(client)));
+            moniker: component.moniker.clone(),
+            err: Box::new(err),
+            runner: runner.source_name,
+        })?;
+    Ok(Some(RemoteRunner::new(proxy)))
 }
 
 fn get_config_field<'a>(
@@ -631,14 +620,7 @@ async fn create_scoped_logger(
     component: &Arc<ComponentInstance>,
     logsink_decl: cm_rust::UseProtocolDecl,
 ) -> Result<ScopedLogger, anyhow::Error> {
-    let (logsink, logsink_server_end) = create_proxy::<flogger::LogSinkMarker>().unwrap();
-    let route_request = RouteRequest::UseProtocol(logsink_decl);
-    let open_options = OpenOptions {
-        flags: fio::OpenFlags::empty(),
-        relative_path: String::new(),
-        server_chan: &mut logsink_server_end.into_channel(),
-    };
-    route_and_open_capability(&route_request, component, open_options).await?;
+    let logsink = open_capability(&RouteRequest::UseProtocol(logsink_decl), component).await?;
     Ok(ScopedLogger::create(logsink)?)
 }
 

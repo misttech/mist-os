@@ -9,12 +9,10 @@ use {
     },
     ::routing::capability_source::{ComponentCapability, InternalCapability},
     async_trait::async_trait,
-    cm_util::channel,
     cm_util::TaskGroup,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::path::PathBuf,
+    fuchsia_zircon as zx,
     std::sync,
-    vfs::{execution_scope::ExecutionScope, ToObjectRequest},
+    vfs::{directory::entry::OpenRequest, execution_scope::ExecutionScope},
 };
 
 pub type CapabilitySource = ::routing::capability_source::CapabilitySource<ComponentInstance>;
@@ -34,9 +32,7 @@ pub trait CapabilityProvider: Send + Sync {
     async fn open(
         self: Box<Self>,
         task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
+        open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError>;
 }
 
@@ -55,9 +51,7 @@ impl<T: InternalCapabilityProvider + 'static> CapabilityProvider for T {
     async fn open(
         self: Box<Self>,
         task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
+        open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
         let this = sync::Mutex::new(Some(self));
         let service = vfs::service::endpoint(
@@ -67,17 +61,7 @@ impl<T: InternalCapabilityProvider + 'static> CapabilityProvider for T {
                 task_group.spawn(this.open_protocol(server_end.into_zx_channel()));
             },
         );
-        let relative_path = relative_path.to_string_lossy();
-        if !relative_path.is_empty()
-            && !vfs::path::Path::validate_and_split(relative_path).map_or(false, |p| p.is_dot())
-        {
-            return Err(CapabilityProviderError::BadPath);
-        }
-        let server_end = channel::take_channel(server_end);
-        flags.to_object_request(server_end).handle(|object_request| {
-            vfs::service::serve(service, ExecutionScope::new(), &flags, object_request)
-        });
-        Ok(())
+        open_request.open_service(service).map_err(|e| CapabilityProviderError::VfsOpenError(e))
     }
 }
 

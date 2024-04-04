@@ -10,15 +10,14 @@ use {
             error::{CapabilityProviderError, ModelError, OpenError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             mutable_directory::MutableDirectory,
-            routing::{CapabilityOpenRequest, CapabilitySource, OpenOptions, RouteSource},
+            routing::{CapabilityOpenRequest, CapabilitySource, RouteSource},
         },
     },
     async_trait::async_trait,
     bedrock_error::Explain,
     cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon},
     cm_types::Name,
-    cm_util::{channel, TaskGroup},
-    fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt},
+    cm_util::TaskGroup,
     fidl_fuchsia_io as fio,
     flyweights::FlyStr,
     fuchsia_async::{DurationExt, TimeoutExt},
@@ -37,18 +36,17 @@ use {
     std::{
         collections::HashMap,
         fmt,
-        path::PathBuf,
         sync::{Arc, Weak},
     },
     tracing::{error, warn},
     vfs::{
         directory::{
-            entry::{DirectoryEntry, EntryInfo, OpenRequest},
-            entry_container::Directory,
+            entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest},
             immutable::simple::{simple as simple_immutable_dir, Simple as SimpleImmutableDir},
         },
         execution_scope::ExecutionScope,
-        remote::RemoteLike,
+        path::Path,
+        ToObjectRequest,
     },
 };
 
@@ -59,10 +57,6 @@ const OPEN_SERVICE_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
 /// and to open instances.
 ///
 pub struct FilteredAggregateServiceProvider {
-    /// Execution scope for requests to `dir`. This is the same scope
-    /// as the one in `collection_component`'s resolved state.
-    execution_scope: ExecutionScope,
-
     /// The directory that contains entries for all service instances
     /// across all of the aggregated source services.
     dir: Arc<SimpleImmutableDir>,
@@ -74,10 +68,8 @@ impl FilteredAggregateServiceProvider {
         target: WeakComponentInstance,
         provider: Box<dyn FilteredAggregateCapabilityProvider<ComponentInstance>>,
     ) -> Result<FilteredAggregateServiceProvider, ModelError> {
-        let execution_scope =
-            parent.upgrade()?.lock_resolved_state().await?.execution_scope().clone();
         let dir = FilteredAggregateServiceDir::new(parent, target, provider).await?;
-        Ok(FilteredAggregateServiceProvider { execution_scope, dir })
+        Ok(FilteredAggregateServiceProvider { dir })
     }
 }
 
@@ -86,19 +78,11 @@ impl CapabilityProvider for FilteredAggregateServiceProvider {
     async fn open(
         self: Box<Self>,
         _task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
+        open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
-        let relative_path = cm_util::io::path_buf_to_vfs_path(relative_path)
-            .ok_or(CapabilityProviderError::BadPath)?;
-        self.dir.open(
-            self.execution_scope.clone(),
-            flags,
-            relative_path,
-            ServerEnd::new(channel::take_channel(server_end)),
-        );
-        Ok(())
+        open_request
+            .open_dir(self.dir.clone())
+            .map_err(|e| CapabilityProviderError::VfsOpenError(e))
     }
 }
 
@@ -476,12 +460,18 @@ impl AnonymizedAggregateServiceDir {
                     // open_outgoing function doesn't work on an empty path string.
                     // Inside, the "/" is turned into a "." through canonicalize_path.
                     let curr_path_joined = format!("/{}", curr_path.join("/"));
+                    let flags = fio::OpenFlags::DIRECTORY;
+                    let mut object_request = flags.to_object_request(server_end);
                     component
-                        .open_outgoing(
-                            fio::OpenFlags::DIRECTORY,
-                            curr_path_joined.as_str(),
-                            &mut server_end.into_channel(),
-                        )
+                        .open_outgoing(OpenRequest::new(
+                            component.execution_scope.clone(),
+                            flags,
+                            curr_path_joined
+                                .as_str()
+                                .try_into()
+                                .map_err(|_| ModelError::BadPath)?,
+                            &mut object_request,
+                        ))
                         .await?;
                     let watcher =
                         fuchsia_fs::directory::Watcher::new(&proxy).await.map_err(|err| {
@@ -510,8 +500,8 @@ impl AnonymizedAggregateServiceDir {
                         .try_for_each(|entry| async move {
                             let mut inner = self.inner.lock().await;
                             if !inner.watchers_spawned.contains_key(&instance) {
-                                // Our task entry doesn't exist, it is removed in |on_stopped_async|,
-                                // so we can exit early.
+                                // Our task entry doesn't exist, it is removed in
+                                // |on_stopped_async|, so we can exit early.
                                 return Err(StreamErrorType::Exit);
                             }
 
@@ -607,17 +597,19 @@ impl AnonymizedAggregateServiceDir {
         let target =
             self.parent.upgrade().map_err(|err| ModelError::ComponentInstanceError { err })?;
 
+        let scope = ExecutionScope::new();
         let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-
+        let mut object_request = fio::OpenFlags::DIRECTORY.to_object_request(server);
         CapabilityOpenRequest::new_from_route_source(
             RouteSource { source: source.clone(), relative_path: Default::default() },
             &target,
-            OpenOptions {
-                flags: fio::OpenFlags::DIRECTORY,
-                relative_path: "".into(),
-                server_chan: &mut server.into_channel(),
-            },
-        )
+            OpenRequest::new(
+                scope.clone(),
+                fio::OpenFlags::DIRECTORY,
+                Path::dot(),
+                &mut object_request,
+            ),
+        )?
         .open()
         .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || Err(OpenError::Timeout))
         .await?;
@@ -895,15 +887,22 @@ struct ServiceInstanceDirectoryKey<T: Send + Sync + 'static + fmt::Display> {
     pub service_instance: FlyStr,
 }
 
-impl<T: Send + Sync + 'static> RemoteLike for ServiceInstanceDirectoryEntry<T> {
-    fn open(
+impl<T: Send + Sync + 'static> DirectoryEntry for ServiceInstanceDirectoryEntry<T> {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        request.spawn(self);
+        Ok(())
+    }
+}
+
+impl<T: Send + Sync + 'static> DirectoryEntryAsync for ServiceInstanceDirectoryEntry<T> {
+    async fn open_entry_async(
         self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        mut path: vfs::path::Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        let mut server_end = server_end.into_channel();
+        mut request: OpenRequest<'_>,
+    ) -> Result<(), zx::Status> {
         let source_component = match self.capability_source.source_instance() {
             WeakExtendedInstance::Component(c) => c,
             WeakExtendedInstance::AboveRoot(_) => {
@@ -914,50 +913,32 @@ impl<T: Send + Sync + 'static> RemoteLike for ServiceInstanceDirectoryEntry<T> {
             }
         };
         let Ok(source_component) = source_component.upgrade() else {
-            warn!(moniker=%source_component.moniker, "source_component of aggregated service directory is gone");
-            return;
-        };
-        // VFS paths are canonicalized so this will do the right thing.
-        let mut relative_path = PathBuf::new();
-        relative_path.push(self.service_instance.as_str());
-        while let Some(p) = path.next() {
-            relative_path.push(p);
-        }
-        let relative_path = relative_path.to_string_lossy().to_string();
-        let route_source = RouteSource::new((*self.capability_source).clone());
-        scope.spawn(async move {
-            let open_options = OpenOptions { flags, relative_path, server_chan: &mut server_end };
-            let open_request = CapabilityOpenRequest::new_from_route_source(
-                route_source,
-                &source_component,
-                open_options,
+            warn!(
+                moniker=%source_component.moniker,
+                "source_component of aggregated service directory is gone"
             );
-            if let Err(err) = open_request.open().await {
-                server_end
-                    .close_with_epitaph(err.as_zx_status())
-                    .unwrap_or_else(|error| warn!(%error, "failed to close server end"));
-                source_component
-                    .with_logger_as_default(|| {
-                        error!(
-                            service_instance=%self.service_instance,
-                            source_instance=%source_component.moniker,
-                            error=%err,
-                            "Failed to open service instance from component",
-                        );
-                    })
-                    .await;
-            }
-        });
-    }
-}
-
-impl<T: Send + Sync + 'static> DirectoryEntry for ServiceInstanceDirectoryEntry<T> {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-    }
-
-    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
-        request.open_remote(self)
+            return Err(zx::Status::NOT_FOUND);
+        };
+        request.prepend_path(&self.service_instance.as_str().try_into().unwrap());
+        let route_source = RouteSource::new((*self.capability_source).clone());
+        let cap_open_request =
+            CapabilityOpenRequest::new_from_route_source(route_source, &source_component, request)
+                .map_err(|e| e.as_zx_status())?;
+        if let Err(err) = cap_open_request.open().await {
+            source_component
+                .with_logger_as_default(|| {
+                    error!(
+                        service_instance=%self.service_instance,
+                        source_instance=%source_component.moniker,
+                        error=%err,
+                        "Failed to open service instance from component",
+                    );
+                })
+                .await;
+            Err(err.as_zx_status())
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -978,12 +959,13 @@ mod tests {
         },
         cm_rust::*,
         cm_rust_testing::*,
+        fidl::endpoints::ServerEnd,
         fuchsia_async as fasync,
         maplit::hashmap,
         proptest::prelude::*,
         rand::SeedableRng,
         std::collections::HashSet,
-        vfs::pseudo_directory,
+        vfs::{directory::entry_container::Directory, pseudo_directory},
     };
 
     #[derive(Clone)]

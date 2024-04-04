@@ -23,12 +23,13 @@ use {
     bedrock_error::{BedrockError, Explain},
     cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl},
     cm_types::{Availability, Name},
-    fidl::epitaph::ChannelEpitaphExt,
-    fuchsia_zircon as zx,
+    fidl::endpoints::create_proxy,
+    fidl_fuchsia_io as fio,
     moniker::MonikerBase,
     sandbox::{Capability, Open},
     std::{collections::BTreeMap, sync::Arc},
-    tracing::{debug, info, warn},
+    tracing::{info, warn},
+    vfs::{directory::entry::OpenRequest, path::Path, ToObjectRequest},
 };
 
 pub type RouteRequest = ::routing::RouteRequest;
@@ -77,7 +78,7 @@ pub(super) fn capability_into_open(capability: Capability) -> Result<Open, Bedro
 pub(super) async fn route_and_open_capability(
     route_request: &RouteRequest,
     target: &Arc<ComponentInstance>,
-    open_options: OpenOptions<'_>,
+    open_request: OpenRequest<'_>,
 ) -> Result<(), BedrockError> {
     match route_request.clone() {
         r @ RouteRequest::UseStorage(_) | r @ RouteRequest::OfferStorage(_) => {
@@ -89,7 +90,7 @@ pub(super) async fn route_and_open_capability(
             Ok(CapabilityOpenRequest::new_from_storage_source(
                 backing_dir_info,
                 target,
-                open_options,
+                open_request,
             )
             .open()
             .await?)
@@ -100,11 +101,34 @@ pub(super) async fn route_and_open_capability(
 
             // clone the source as additional context in case of an error
 
-            Ok(CapabilityOpenRequest::new_from_route_source(route_source, target, open_options)
+            Ok(CapabilityOpenRequest::new_from_route_source(route_source, target, open_request)
+                .map_err(|e| BedrockError::RoutingError(Arc::new(e)))?
                 .open()
                 .await?)
         }
     }
+}
+
+/// Same as `route_and_open_capability` except this returns a new request.  This will only work for
+/// protocols.
+pub(super) async fn open_capability<Proxy: fidl::endpoints::Proxy>(
+    route_request: &RouteRequest,
+    target: &Arc<ComponentInstance>,
+) -> Result<Proxy, BedrockError> {
+    let (proxy, server) = create_proxy::<Proxy::Protocol>().unwrap();
+    let mut object_request = fio::OpenFlags::empty().to_object_request(server);
+    route_and_open_capability(
+        route_request,
+        target,
+        OpenRequest::new(
+            target.execution_scope.clone(),
+            fio::OpenFlags::empty(),
+            Path::dot(),
+            &mut object_request,
+        ),
+    )
+    .await?;
+    Ok(proxy)
 }
 
 /// Create a new `RouteRequest` from an `ExposeDecl`, checking that the capability type can
@@ -171,12 +195,8 @@ https://fuchsia.dev/go/components/connect-errors";
 pub async fn report_routing_failure(
     request: &RouteRequest,
     target: &Arc<ComponentInstance>,
-    err: impl Explain,
-    server_end: zx::Channel,
+    err: &impl Explain,
 ) {
-    server_end
-        .close_with_epitaph(err.as_zx_status())
-        .unwrap_or_else(|error| debug!(%error, "failed to send epitaph"));
     target
         .with_logger_as_default(|| {
             let availability = request.target_use_availability().unwrap_or(Availability::Required);

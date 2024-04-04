@@ -66,7 +66,7 @@ use {
         FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl, UseStorageDecl,
     },
     cm_types::Name,
-    cm_util::{channel, TaskGroup},
+    cm_util::TaskGroup,
     component_id_index::InstanceId,
     config_encoder::ConfigFields,
     fidl::endpoints::{self, ServerEnd},
@@ -94,15 +94,13 @@ use {
     version_history::AbiRevision,
     vfs::{
         directory::{
-            entry::{DirectoryEntry, EntryInfo, OpenRequest},
+            entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest},
             immutable::simple as pfs,
         },
         execution_scope::ExecutionScope,
         path::Path,
-        remote::RemoteLike,
         ToObjectRequest,
     },
-    zx::HandleBased,
 };
 
 pub type WeakComponentInstance = WeakComponentInstanceInterface<ComponentInstance>;
@@ -340,9 +338,15 @@ impl ComponentManagerInstance {
     ) -> Result<fstatecontrol::AdminProxy, RebootError> {
         let (exposed_dir, server) =
             endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
-        let mut server = server.into_channel();
         let root = self.root().await;
-        root.open_exposed(&mut server).await?;
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server);
+        root.open_exposed(OpenRequest::new(
+            root.execution_scope.clone(),
+            fio::OpenFlags::empty(),
+            Path::dot(),
+            &mut object_request,
+        ))
+        .await?;
         let statecontrol_proxy =
             client::connect_to_protocol_at_dir_root::<fstatecontrol::AdminMarker>(&exposed_dir)
                 .map_err(RebootError::ConnectToAdminFailed)?;
@@ -420,6 +424,10 @@ pub struct ComponentInstance {
     /// Tasks owned by this component instance that will block destruction if the component is
     /// destroyed.
     blocking_task_group: TaskGroup,
+    /// The ExecutionScope for this component. Pseudo directories should be hosted with this scope
+    /// to tie their life-time to that of the component. Tasks can block component destruction by
+    /// using `active_guard()` (as an alternative to `blocking_task_group`).
+    pub execution_scope: ExecutionScope,
 }
 
 impl ComponentInstance {
@@ -476,6 +484,7 @@ impl ComponentInstance {
             nonblocking_task_group: TaskGroup::new(),
             blocking_task_group: TaskGroup::new(),
             persistent_storage,
+            execution_scope: ExecutionScope::new(),
         })
     }
 
@@ -1101,29 +1110,25 @@ impl ComponentInstance {
         ActionSet::register(child.clone(), DestroyAction::new()).await
     }
 
-    /// Opens an object referenced by `path` from the outgoing directory of the component.
-    /// The component must have a program, or this method will fail.
-    /// Starts the component if necessary.
+    /// Opens an object referenced by `path` from the outgoing directory of the component.  The
+    /// component must have a program, or this method will fail.  Starts the component if necessary.
+    ///
+    /// TODO(https://fxbug.dev/332329856): If the component is to be started as a result of the open
+    /// call, and the starting failed, that error is not returned here. If you would like to observe
+    /// start errors, call `ensure_started` before this function.
     pub async fn open_outgoing(
         &self,
-        flags: fio::OpenFlags,
-        path: &str,
-        server_chan: &mut zx::Channel,
+        open_request: OpenRequest<'_>,
     ) -> Result<(), OpenOutgoingDirError> {
-        let open_rx = match *self.lock_state().await {
+        match *self.lock_state().await {
             InstanceState::Resolved(ref mut resolved) => {
                 let program_escrow =
                     resolved.program_escrow().ok_or(OpenOutgoingDirError::InstanceNonExecutable)?;
-                let path = fuchsia_fs::canonicalize_path(&path);
-                let server_end = channel::take_channel(server_chan);
-                program_escrow.open_outgoing(flags, path.to_string(), server_end)
+                program_escrow.open_outgoing(open_request)?;
+                Ok(())
             }
-            _ => return Err(OpenOutgoingDirError::InstanceNotResolved),
-        };
-        open_rx
-            .await
-            .map(|v| v.map_err(OpenOutgoingDirError::from))
-            .unwrap_or(Err(OpenOutgoingDirError::InstanceNotResolved))
+            _ => Err(OpenOutgoingDirError::InstanceNotResolved),
+        }
     }
 
     /// Returns an [`Open`] representation of the outgoing directory of the component. It performs
@@ -1140,12 +1145,12 @@ impl ComponentInstance {
 
             fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
                 let component = self.component.upgrade().map_err(|e| e.as_zx_status())?;
-                component.open_entry(request)
+                request.spawn(component);
+                Ok(())
             }
         }
 
-        let get_remote_dir = Arc::new(GetOutgoing { component: WeakComponentInstance::from(self) });
-        Open::new(get_remote_dir)
+        Open::new(Arc::new(GetOutgoing { component: WeakComponentInstance::from(self) }))
     }
 
     /// Obtains the program output dict.
@@ -1153,33 +1158,21 @@ impl ComponentInstance {
         Ok(self.lock_resolved_state().await?.program_output_dict.clone())
     }
 
-    /// Connects `server_chan` to this instance's exposed directory if it has
-    /// been resolved. Component must be resolved or destroyed before using
-    /// this function, otherwise it will panic.
+    /// Opens this instance's exposed directory if it has been resolved.
     pub async fn open_exposed(
         &self,
-        server_chan: &mut zx::Channel,
+        open_request: OpenRequest<'_>,
     ) -> Result<(), OpenExposedDirError> {
         let state = self.lock_state().await;
         match &*state {
+            InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Shutdown(_, _) => {
+                Err(OpenExposedDirError::InstanceNotResolved)
+            }
             InstanceState::Resolved(resolved_instance_state) => {
-                // TODO(https://fxbug.dev/42161419): open_exposed does not have a rights input parameter, so
-                // this makes use of the POSIX_[WRITABLE|EXECUTABLE] flags to open a connection
-                // with those rights if available from the parent directory connection but without
-                // failing if not available.
-                let flags = fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::POSIX_WRITABLE
-                    | fio::OpenFlags::POSIX_EXECUTABLE
-                    | fio::OpenFlags::DIRECTORY;
-                let server_chan = channel::take_channel(server_chan);
-                let server_end = ServerEnd::new(server_chan);
-                resolved_instance_state.open_exposed_dir(flags, Path::dot(), server_end).await;
+                resolved_instance_state.get_exposed_dir().await.open_entry(open_request)?;
                 Ok(())
             }
             InstanceState::Destroyed => Err(OpenExposedDirError::InstanceDestroyed),
-            _ => {
-                panic!("Component must be resolved or destroyed before using this function")
-            }
         }
     }
 
@@ -1411,36 +1404,20 @@ impl ComponentInstance {
     }
 }
 
-/// Represent the outgoing directory of the component as a fuchsia.io remote node.
-impl RemoteLike for ComponentInstance {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        scope.spawn(async move {
-            let mut channel = server_end.into_channel();
-            match self.open_outgoing(flags, path.as_ref(), &mut channel).await {
-                Ok(()) => {}
-                Err(err) => {
-                    if !channel.is_invalid_handle() {
-                        flags.to_object_request(channel).shutdown(err.as_zx_status());
-                    }
-                }
-            }
-        });
-    }
-}
-
 impl DirectoryEntry for ComponentInstance {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
 
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
-        request.open_remote(self)
+        request.spawn(self);
+        Ok(())
+    }
+}
+
+impl DirectoryEntryAsync for ComponentInstance {
+    async fn open_entry_async(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        self.open_outgoing(request).await.map_err(|e| e.as_zx_status())
     }
 }
 
@@ -1733,11 +1710,6 @@ pub struct ResolvedInstanceState {
     /// Caches an instance token.
     instance_token_state: InstanceTokenState,
 
-    /// The ExecutionScope for this component. Pseudo directories should be hosted with this
-    /// scope to tie their life-time to that of the component. The scope is shut down when
-    /// the component is unresolved.
-    execution_scope: ExecutionScope,
-
     /// Result of resolving the component.
     pub resolved_component: Component,
 
@@ -1822,7 +1794,6 @@ impl ResolvedInstanceState {
         component_input: ComponentInput,
     ) -> Result<Self, ResolveActionError> {
         let weak_component = WeakComponentInstance::new(component);
-        let execution_scope = ExecutionScope::new();
 
         let environments = Self::instantiate_environments(component, &resolved_component.decl);
         let decl = resolved_component.decl.clone();
@@ -1859,7 +1830,6 @@ impl ResolvedInstanceState {
         let mut state = Self {
             weak_component,
             instance_token_state,
-            execution_scope: execution_scope.clone(),
             resolved_component,
             children: HashMap::new(),
             next_dynamic_instance_id: 1,
@@ -1884,7 +1854,6 @@ impl ResolvedInstanceState {
         let mut child_inputs = HashMap::new();
         build_component_sandbox(
             component,
-            &execution_scope,
             &state.children,
             &decl,
             &state.component_input,
@@ -1906,7 +1875,6 @@ impl ResolvedInstanceState {
         component_decl: &ComponentDecl,
         capability_decl: &cm_rust::CapabilityDecl,
         path: &cm_types::Path,
-        execution_scope: &ExecutionScope,
     ) -> Router {
         if component_decl.program.is_none() {
             return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable);
@@ -1928,7 +1896,9 @@ impl ResolvedInstanceState {
         match capability_decl {
             CapabilityDecl::Protocol(p) => match p.delivery {
                 DeliveryType::Immediate => Router::new(hook),
-                DeliveryType::OnReadable => hook.on_readable(execution_scope.clone(), entry_type),
+                DeliveryType::OnReadable => {
+                    hook.on_readable(component.execution_scope.clone(), entry_type)
+                }
             },
             _ => Router::new(hook),
         }
@@ -1961,13 +1931,6 @@ impl ResolvedInstanceState {
 
     fn program_escrow(&self) -> Option<&escrow::Actor> {
         self.program_escrow.as_ref()
-    }
-
-    /// This component's `ExecutionScope`.
-    /// Pseudo-directories can be opened with this scope to tie their lifetime
-    /// to this component.
-    pub fn execution_scope(&self) -> &ExecutionScope {
-        &self.execution_scope
     }
 
     pub fn address_for_relative_url(
@@ -2017,7 +1980,7 @@ impl ResolvedInstanceState {
                 &component,
                 &self.resolved_component.decl,
                 &self.program_input_dict,
-                self.execution_scope.clone(),
+                component.execution_scope.clone(),
             )
             .await?;
             let namespace =
@@ -2080,21 +2043,6 @@ impl ResolvedInstanceState {
             let open = Open::new(RouteEntry::new(component.clone(), request, type_name.into()));
             target_dict.insert_capability(target_name, open.into());
         }
-    }
-
-    /// Opens the exposed directory bound to this instance.
-    pub async fn open_exposed_dir(
-        &self,
-        flags: fio::OpenFlags,
-        path: vfs::path::Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        self.get_exposed_dir().await.open(
-            self.execution_scope.clone(),
-            flags,
-            path,
-            server_end.into_channel(),
-        );
     }
 
     async fn get_exposed_dir(&self) -> &Open {
@@ -2469,12 +2417,6 @@ impl ResolvedInstanceState {
     }
 }
 
-impl Drop for ResolvedInstanceState {
-    fn drop(&mut self) {
-        self.execution_scope.shutdown();
-    }
-}
-
 impl ResolvedInstanceInterface for ResolvedInstanceState {
     type Component = ComponentInstance;
 
@@ -2755,7 +2697,7 @@ pub mod tests {
         routing_test_helpers::component_id_index::make_index_file,
         std::{panic, task::Poll},
         tracing::info,
-        vfs::service::host,
+        vfs::{path::Path as VfsPath, service::host},
     };
 
     #[fuchsia::test]
@@ -3969,8 +3911,17 @@ pub mod tests {
         let root = test_topology.look_up(Moniker::default()).await;
         assert!(!root.is_started());
 
-        let (client_end, mut server_end) = zx::Channel::create();
-        root.open_outgoing(fio::OpenFlags::empty(), "svc/foo", &mut server_end).await.unwrap();
+        let (client_end, server_end) = zx::Channel::create();
+        let execution_scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        root.open_outgoing(OpenRequest::new(
+            execution_scope.clone(),
+            fio::OpenFlags::empty(),
+            "svc/foo".try_into().unwrap(),
+            &mut object_request,
+        ))
+        .await
+        .unwrap();
         let server_end = open_request_rx.next().await.unwrap();
         assert!(root.is_started());
         assert_eq!(
@@ -3980,7 +3931,7 @@ pub mod tests {
     }
 
     /// If a component is not started and is configured incorrectly to not be able to start,
-    /// `open_outgoing` should fail and the channel is closed.
+    /// `open_outgoing` should succeed but the channel is closed.
     #[fuchsia::test]
     async fn open_outgoing_failed_to_start_component() {
         let components = vec![(
@@ -4001,11 +3952,22 @@ pub mod tests {
         let root = test_topology.look_up(Moniker::default()).await;
         assert!(!root.is_started());
 
-        let (client_end, mut server_end) = zx::Channel::create();
-        let open_rx = root.open_outgoing(fio::OpenFlags::empty(), "svc/foo", &mut server_end);
+        let (client_end, server_end) = zx::Channel::create();
+
+        let execution_scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        assert_matches!(
+            root.open_outgoing(OpenRequest::new(
+                execution_scope.clone(),
+                fio::OpenFlags::empty(),
+                "svc/foo".try_into().unwrap(),
+                &mut object_request,
+            ))
+            .await,
+            Ok(())
+        );
         assert!(!root.is_started());
 
-        assert_matches!(open_rx.await, Err(OpenOutgoingDirError::InstanceFailedToStart(_)));
         fasync::OnSignals::new(&client_end, zx::Signals::CHANNEL_PEER_CLOSED).await.unwrap();
         assert!(!root.is_started());
     }
@@ -4052,19 +4014,36 @@ pub mod tests {
         assert_matches!(TestExecutor::poll_until_stalled(&mut stop_fut).await, Poll::Pending);
 
         // Open the outgoing directory. This should not block.
-        let (_, mut server_end) = zx::Channel::create();
-        let open_fut = root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end);
-        futures::pin_mut!(open_fut);
-        assert_matches!(TestExecutor::poll_until_stalled(open_fut).await, Poll::Ready(Ok(())));
+        let (_, server_end) = zx::Channel::create();
+        let scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        assert_matches!(
+            root.open_outgoing(OpenRequest::new(
+                scope.clone(),
+                fio::OpenFlags::empty(),
+                VfsPath::dot(),
+                &mut object_request
+            ))
+            .await,
+            Ok(())
+        );
 
         // Let the timer advance. The component should be stopped now.
         TestExecutor::advance_to(initial + response_delay).await;
         assert_matches!(stop_fut.await, Ok(()));
 
         // Open the outgoing directory. This should still not block.
-        let (_, mut server_end) = zx::Channel::create();
+        let (_, server_end) = zx::Channel::create();
+        let scope = ExecutionScope::new();
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         assert_matches!(
-            root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end).await,
+            root.open_outgoing(OpenRequest::new(
+                scope.clone(),
+                fio::OpenFlags::empty(),
+                VfsPath::dot(),
+                &mut object_request
+            ))
+            .await,
             Ok(())
         );
     }

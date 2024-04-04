@@ -5,7 +5,7 @@
 use {
     crate::model::{
         component::{ComponentInstance, WeakComponentInstance},
-        routing::{route_and_open_capability, OpenOptions, RouteRequest},
+        routing::{open_capability, RouteRequest},
     },
     ::routing::{
         component_instance::ComponentInstanceInterface,
@@ -14,7 +14,7 @@ use {
     async_trait::async_trait,
     cm_rust::{ConfigValueSource, FidlIntoNative, RegistrationSource, ResolverRegistration},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
+    fidl_fuchsia_mem as fmem,
     std::{collections::HashMap, sync::Arc},
     tracing::error,
 };
@@ -104,21 +104,11 @@ impl Resolver for RemoteResolver {
         &self,
         component_address: &ComponentAddress,
     ) -> Result<ResolvedComponent, ResolverError> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fresolution::ResolverMarker>()
-            .map_err(ResolverError::internal)?;
         let component = self.component.upgrade().map_err(ResolverError::routing_error)?;
-        let open_options = OpenOptions {
-            flags: fio::OpenFlags::NOT_DIRECTORY,
-            relative_path: "".into(),
-            server_chan: &mut server_end.into_channel(),
-        };
-        route_and_open_capability(
-            &RouteRequest::Resolver(self.registration.clone()),
-            &component,
-            open_options,
-        )
-        .await
-        .map_err(ResolverError::routing_error)?;
+        let proxy: fresolution::ResolverProxy =
+            open_capability(&RouteRequest::Resolver(self.registration.clone()), &component)
+                .await
+                .map_err(ResolverError::routing_error)?;
         let (component_url, some_context) = component_address.to_url_and_context();
         let component = if component_address.is_relative_path() {
             let context = some_context.ok_or_else(|| {
