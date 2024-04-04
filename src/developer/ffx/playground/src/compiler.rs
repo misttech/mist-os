@@ -1110,7 +1110,11 @@ impl Visitor {
                     None
                 };
 
-                let a = if let Some(a) = a { a } else { unimplemented!() };
+                let a = if let Some(a) = a {
+                    a
+                } else {
+                    return Err(error!("Left-unbounded ranges are not yet supported"));
+                };
 
                 let range_cursor = RangeCursor { start: a, end: b, is_inclusive };
 
