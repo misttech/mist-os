@@ -221,6 +221,10 @@ class RemoteAbiHeap {
   static zx::result<RemoteAbiHeap> Create(Diagnostics& diagnostics, size_type stub_data_size,
                                           RemoteLoadModule<Elf>& stub_module,
                                           RemoteAbiHeapLayout layout) {
+    if (!stub_module.PrepareLoadInfo(diagnostics)) [[unlikely]] {
+      return zx::error{ZX_ERR_NO_MEMORY};
+    }
+
     // Now that everything else is allocated, allocate space for the strings.
     RemoteAbiSpan<char> strtab = layout.Allocate<char>(std::max<size_t>(layout.strtab_size_, 1));
 
@@ -231,11 +235,9 @@ class RemoteAbiHeap {
       std::ignore = stub_data_size;  // For NDEBUG, capture optimized out.
       return ReplaceSegment(diagnostics, std::move(old_segment), file_vmo, memsz);
     };
-    if (auto new_segment =
-            std::visit(replace, stub_module.decoded().load_info().RemoveLastSegment());
+    if (auto new_segment = std::visit(replace, stub_module.load_info().RemoveLastSegment());
         new_segment.is_ok()) {
-      if (!stub_module.decoded().load_info().AddSegment(diagnostics, *std::move(new_segment),
-                                                        false)) {
+      if (!stub_module.load_info().AddSegment(diagnostics, *std::move(new_segment), false)) {
         return zx::error{ZX_ERR_NO_MEMORY};
       }
     } else {
@@ -354,6 +356,7 @@ class RemoteAbiHeap {
     if (auto* copied = std::get_if<Copied>(&data_)) {
       // The data is in a local buffer, so it has to be written to the VMO.
       std::unique_ptr buffer = std::exchange(copied->buffer, {});
+      assert(*copied->vmo);
       zx_status_t status = copied->vmo->write(buffer.get(), 0, size_bytes_);
       if (status != ZX_OK) {
         return zx::error{status};
@@ -393,6 +396,8 @@ class RemoteAbiHeap {
                                                         Segment&& old_segment,
                                                         const zx::vmo& file_vmo,
                                                         size_t segment_size) {
+    assert(file_vmo);
+
     const size_type page_size = RemoteLoadModule<Elf>::Loader::page_size();
     const size_type filesz = old_segment.filesz();
     const size_type memsz = (segment_size + page_size - 1) & -page_size;

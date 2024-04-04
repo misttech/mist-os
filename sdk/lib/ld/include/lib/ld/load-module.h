@@ -88,6 +88,8 @@ class LoadModule {
   using RelocationInfo = typename Decoded::RelocationInfo;
   using Soname = typename Decoded::Soname;
 
+  static constexpr bool kMutableDecoded = !std::is_const_v<Decoded>;
+
   // This is returned by the name_ref() and soname_ref() methods.
   using Ref = LoadModuleRef<LoadModule>;
 
@@ -146,27 +148,29 @@ class LoadModule {
 
   // Use ths TlsLayout object to assign a static TLS offset for this module's
   // PT_TLS segment, if it has one.  SetTls() has already been called if it
-  // will be, so the module ID is known.  If the result is not std::nullopt,
-  // then the Abi array fields at the returned index should be filled using
-  // .tls_module() and .static_tls_bias().
+  // will be.  This returns false if there was no PT_TLS segment.  If it
+  // returns true, then the .tls_module() and .static_tls_bias() should go into
+  // the Abi array fields at the the index TLS module ID - 1.  If Decoded is
+  // const, then the module ID is not available directly in this class and a
+  // subclass tls_module_id() definition must be used to fetch it.
   template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, size_type RedZone = 0>
-  constexpr std::optional<size_type> AssignStaticTls(elfldltl::TlsLayout<Elf>& tls_layout) {
+  constexpr bool AssignStaticTls(elfldltl::TlsLayout<Elf>& tls_layout) {
     if (!HasModule()) [[unlikely]] {
-      return std::nullopt;
+      return false;
     }
 
-    if (this->tls_module_id() == 0) {
-      return std::nullopt;
+    if (module().tls_modid == 0) {
+      return false;
     }
 
     // These correspond to the p_memsz and p_align of the PT_TLS.
-    const size_type memsz = this->tls_module().tls_size();
-    const size_type align = this->tls_module().tls_alignment;
+    const size_type memsz = tls_module().tls_size();
+    const size_type align = tls_module().tls_alignment;
 
     // Save the offset for use in resolving IE relocations.
     static_tls_bias_ = tls_layout.template Assign<Machine, RedZone>(memsz, align);
 
-    return this->tls_module_id() - 1;
+    return true;
   }
 
   // This returns true if it's safe to call the decoded() method.  This is
@@ -192,7 +196,7 @@ class LoadModule {
 
   // When Decoded is mutable and uses AbiModuleInline::kYes, EmplaceModule(..)
   // just constructs Module{...}).
-  template <typename... Args, bool CanEmplace = Decoded::kModuleInline && !std::is_const_v<Decoded>,
+  template <typename... Args, bool CanEmplace = Decoded::kModuleInline && kMutableDecoded,
             typename = std::enable_if_t<CanEmplace>>
   constexpr void EmplaceModule(uint32_t modid, Args&&... args) {
     decoded().EmplaceModule(modid, std::forward<Args>(args)...);
@@ -202,7 +206,7 @@ class LoadModule {
   // When Decoded is mutable and uses AbiModuleInline::kNo, then calling
   // NewModule(a..., c...)  does new (a...) Module{c...}.  The last argument in
   // a... must be a fbl::AllocChecker that indicates whether `new` succeeded.
-  template <typename... Args, bool CanNew = !Decoded::kModuleInline && !std::is_const_v<Decoded>,
+  template <typename... Args, bool CanNew = !Decoded::kModuleInline && kMutableDecoded,
             typename = std::enable_if_t<CanNew>>
   constexpr void NewModule(uint32_t modid, Args&&... args) {
     decoded().NewModule(modid, std::forward<Args>(args)...);
@@ -228,8 +232,6 @@ class LoadModule {
     return decoded().reloc_info();
   }
 
-  constexpr size_type tls_module_id() const { return module().tls_modid; }
-
   constexpr const TlsModule& tls_module() const { return decoded().tls_module(); }
 
   // The following methods satisfy the Module template API for use with
@@ -241,7 +243,7 @@ class LoadModule {
   // decoding and choosing load address, module() will be updated via
   // ld::SetModuleVaddrBounds.  In other cases, a derived class must implement
   // load_bias() itself.
-  template <bool Mutable = !std::is_const_v<Decoded>, typename = std::enable_if_t<Mutable>>
+  template <bool M = kMutableDecoded, typename = std::enable_if_t<M>>
   constexpr size_type load_bias() const {
     return module().link_map.addr;
   }
@@ -251,9 +253,20 @@ class LoadModule {
            (module().symbols.flags1() & elfldltl::ElfDynFlags1::kPie);
   }
 
+  // This is only provided when Decoded is mutable.  In that case, SetTls
+  // installs the actual TLS module ID and this will return it.  When Decoded
+  // is const, then SetTls will be called with the placeholder TLS module ID 1
+  // just so that it's nonzero to indicate the module has a PT_TLS at all.  The
+  // derived class must define tls_module_id() itself to return the real TLS
+  // module ID it assigns and stores elsewhere.
+  template <bool M = kMutableDecoded, typename = std::enable_if_t<M>>
+  constexpr size_type tls_module_id() const {
+    return module().tls_modid;
+  }
+
  protected:
   constexpr void SetAbiName() {
-    if constexpr (!std::is_const_v<Decoded>) {
+    if constexpr (kMutableDecoded) {
       if (HasDecoded()) {
         decoded().SetAbiName(name_);
       }
