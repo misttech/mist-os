@@ -712,6 +712,7 @@ sdk_molecule("platform_libs") {
     "//sdk/lib/driver/promise/cpp:cpp_sdk",
     "//sdk/lib/driver/testing/cpp:gtest_fixture_sdk",
     "//sdk/lib/sys/component:realm_builder_shard",
+    "//src/devices/registers/testing/mock-registers:mock-registers_sdk",
     "//src/devices/testing/fake-bti:fake-bti_sdk",
     "//src/devices/testing/fake-mmio-reg:fake-mmio-reg_sdk",
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",

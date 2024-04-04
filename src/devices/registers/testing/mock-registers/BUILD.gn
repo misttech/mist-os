@@ -3,10 +3,12 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
-source_set("mock-registers") {
-  testonly = true
+sdk_source_set("mock-registers") {
+  category = "internal"
+  sdk_name = "mock-registers"
   sources = [ "mock-registers.h" ]
 
   public_deps =
