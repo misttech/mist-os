@@ -33,10 +33,24 @@ network_unified_binary("http_client") {
   sources = [ "src/main.rs" ]
 }
 
-network_unified_binary_regular_and_gub_components("component") {
+fuchsia_component_manifest("manifest") {
   component_name = "http-client"
   manifest = "meta/http_client.cml"
+  restricted_features = [ "config_capabilities" ]
+}
+
+fuchsia_structured_config_values("default_config_value") {
+  cm_label = ":manifest"
+  values = {
+    stop_on_idle_timeout_millis = -1
+  }
+}
+
+network_unified_binary_regular_and_gub_components("component") {
+  component_name = "http-client"
+  cm_label = ":manifest"
   gub_deps = [ ":http_client" ]
+  non_gub_deps = [ ":default_config_value" ]
 }
 
 network_unified_binary_regular_and_gub_packages("package") {

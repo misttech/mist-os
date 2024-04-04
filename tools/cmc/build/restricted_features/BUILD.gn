@@ -16,6 +16,7 @@ group("dictionaries") {
 group("config_capabilities") {
   visibility = [
     "//sdk/lib/driver_test_realm/*",
+    "//src/connectivity/policy/http-client/*",
     "//src/graphics/tests/vkext:*",
     "//src/sys/component_manager/tests/*",
   ]
