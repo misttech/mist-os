@@ -257,7 +257,7 @@ impl RfcommManager {
             spp_service,
             bredr::ChannelParameters::default(),
         )?;
-        let _ = client.add_search(bredr::ServiceClassProfileIdentifier::SerialPort, &[])?;
+        let _ = client.add_search(bredr::ServiceClassProfileIdentifier::SerialPort, None)?;
         let service_task = fasync::Task::spawn(async move {
             let result = Self::handle_profile_events(client, inner_clone).await;
             info!("Profile event handler ended: {:?}", result);
@@ -434,8 +434,8 @@ mod tests {
                     let connect_proxy = payload.receiver.unwrap().into_proxy().unwrap();
                     advertisement = Some((connect_proxy, responder));
                 }
-                Ok(bredr::ProfileRequest::Search { results, .. }) => {
-                    search_request = Some(results.into_proxy().unwrap())
+                Ok(bredr::ProfileRequest::Search { payload, .. }) => {
+                    search_request = Some(payload.results.unwrap().into_proxy().unwrap())
                 }
                 x => panic!("Expected one Advertise and Search but got: {:?}", x),
             }

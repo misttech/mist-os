@@ -477,7 +477,7 @@ fn setup_profiles(
 
     let mut profile = ProfileClient::advertise(proxy, service_defs, config.channel_parameters())?;
 
-    const ATTRS: [u16; 4] = [
+    let attr_ids = vec![
         bredr::ATTR_PROTOCOL_DESCRIPTOR_LIST,
         bredr::ATTR_SERVICE_CLASS_ID_LIST,
         bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
@@ -485,11 +485,12 @@ fn setup_profiles(
     ];
 
     if config.source.is_some() {
-        profile.add_search(bredr::ServiceClassProfileIdentifier::AudioSink, &ATTRS)?;
+        profile
+            .add_search(bredr::ServiceClassProfileIdentifier::AudioSink, Some(attr_ids.clone()))?;
     }
 
     if config.enable_sink {
-        profile.add_search(bredr::ServiceClassProfileIdentifier::AudioSource, &ATTRS)?;
+        profile.add_search(bredr::ServiceClassProfileIdentifier::AudioSource, Some(attr_ids))?;
     }
 
     Ok(profile)

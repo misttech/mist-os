@@ -21,7 +21,7 @@ pub fn register_with_proxy(
         bredr::ChannelParameters::default(),
     )?;
     // Register a search for remote peers that support the Audio Gateway role
-    profile.add_search(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway, &[])?;
+    profile.add_search(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway, None)?;
 
     Ok(profile)
 }

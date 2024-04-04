@@ -146,7 +146,17 @@ impl MockPiconetServer {
                     .map_err(|_| ErrorCode::Failed);
                 let _ = responder.send(channel);
             }
-            bredr::ProfileRequest::Search { service_uuid, attr_ids, results, .. } => {
+            bredr::ProfileRequest::Search { payload, .. } => {
+                let bredr::ProfileSearchRequest {
+                    service_uuid: Some(service_uuid),
+                    attr_ids,
+                    results: Some(results),
+                    ..
+                } = payload
+                else {
+                    panic!("invalid parameters");
+                };
+                let attr_ids = attr_ids.unwrap_or_default();
                 let proxy = results.into_proxy().expect("couldn't get connection receiver");
                 self.new_search(id, service_uuid, attr_ids, proxy);
             }

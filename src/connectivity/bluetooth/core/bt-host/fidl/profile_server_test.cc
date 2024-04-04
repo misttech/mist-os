@@ -247,7 +247,9 @@ class FakeConnectionReceiver : public fidlbredr::testing::ConnectionReceiver_Tes
 class FakeSearchResults : public fidlbredr::testing::SearchResults_TestBase {
  public:
   FakeSearchResults(fidl::InterfaceRequest<SearchResults> request, async_dispatcher_t* dispatcher)
-      : binding_(this, std::move(request), dispatcher), service_found_count_(0) {}
+      : binding_(this, std::move(request), dispatcher), service_found_count_(0) {
+    binding_.set_error_handler([this](zx_status_t) { closed_ = true; });
+  }
 
   void ServiceFound(fuchsia::bluetooth::PeerId peer_id,
                     fidl::VectorPtr<fidlbredr::ProtocolDescriptor> protocol,
@@ -260,11 +262,13 @@ class FakeSearchResults : public fidlbredr::testing::SearchResults_TestBase {
     service_found_count_++;
   }
 
+  bool closed() const { return closed_; }
   size_t service_found_count() const { return service_found_count_; }
   const std::optional<fuchsia::bluetooth::PeerId>& peer_id() const { return peer_id_; }
   const std::optional<std::vector<fidlbredr::Attribute>>& attributes() const { return attributes_; }
 
  private:
+  bool closed_ = false;
   fidl::Binding<SearchResults> binding_;
   std::optional<fuchsia::bluetooth::PeerId> peer_id_;
   std::optional<std::vector<fidlbredr::Attribute>> attributes_;
@@ -2139,13 +2143,16 @@ TEST_F(ProfileServerTestFakeAdapter, ServiceFoundRelayedToFidlClient) {
 
   fidlbredr::ServiceClassProfileIdentifier search_uuid =
       fidlbredr::ServiceClassProfileIdentifier::AUDIO_SINK;
-  std::vector<uint16_t> attr_ids = std::vector<uint16_t>();
 
   EXPECT_EQ(adapter()->fake_bredr()->registered_searches().size(), 0u);
   EXPECT_EQ(search_results.service_found_count(), 0u);
 
   // FIDL client registers a service search.
-  client()->Search(search_uuid, std::move(attr_ids), std::move(search_results_handle));
+  fidlbredr::ProfileSearchRequest request;
+  request.set_service_uuid(search_uuid);
+  request.set_attr_ids({});
+  request.set_results(std::move(search_results_handle));
+  client()->Search(std::move(request));
   RunLoopUntilIdle();
 
   EXPECT_EQ(adapter()->fake_bredr()->registered_searches().size(), 1u);
@@ -2170,6 +2177,40 @@ TEST_F(ProfileServerTestFakeAdapter, ServiceFoundRelayedToFidlClient) {
   EXPECT_EQ(search_results.attributes().value()[0].id, attr_id);
   EXPECT_EQ(search_results.attributes().value()[0].element.url(),
             std::string("https://foobar.dev"));
+}
+
+TEST_F(ProfileServerTestFakeAdapter, SearchWithMissingServiceUuidFails) {
+  fidlbredr::SearchResultsHandle search_results_handle;
+  FakeSearchResults search_results(search_results_handle.NewRequest(), dispatcher());
+
+  // service_uuid is not set
+  fidlbredr::ProfileSearchRequest request;
+  request.set_results(std::move(search_results_handle));
+  client()->Search(std::move(request));
+  RunLoopUntilIdle();
+  EXPECT_EQ(adapter()->fake_bredr()->registered_searches().size(), 0u);
+  EXPECT_TRUE(search_results.closed());
+}
+
+TEST_F(ProfileServerTestFakeAdapter, SearchWithMissingResultsClientFails) {
+  // results is not set
+  fidlbredr::ProfileSearchRequest request;
+  request.set_service_uuid(fidlbredr::ServiceClassProfileIdentifier::AUDIO_SINK);
+  client()->Search(std::move(request));
+  RunLoopUntilIdle();
+  EXPECT_EQ(adapter()->fake_bredr()->registered_searches().size(), 0u);
+}
+
+TEST_F(ProfileServerTestFakeAdapter, SearchWithMissingAttrIdsSucceeds) {
+  fidlbredr::SearchResultsHandle search_results_handle;
+  FakeSearchResults search_results(search_results_handle.NewRequest(), dispatcher());
+
+  fidlbredr::ProfileSearchRequest request;
+  request.set_service_uuid(fidlbredr::ServiceClassProfileIdentifier::AUDIO_SINK);
+  request.set_results(std::move(search_results_handle));
+  client()->Search(std::move(request));
+  RunLoopUntilIdle();
+  EXPECT_EQ(adapter()->fake_bredr()->registered_searches().size(), 1u);
 }
 
 TEST_F(ProfileServerTestScoConnected, ScoConnectionRead2Packets) {

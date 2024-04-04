@@ -163,14 +163,19 @@ impl ProfileClient {
     pub fn add_search(
         &mut self,
         service_uuid: bredr::ServiceClassProfileIdentifier,
-        attributes: &[u16],
+        attributes: Option<Vec<u16>>,
     ) -> Result<()> {
         if self.terminated {
             return Err(Error::AlreadyTerminated);
         }
 
         let (results_client, results_stream) = create_request_stream()?;
-        self.proxy.search(service_uuid, attributes, results_client)?;
+        self.proxy.search(bredr::ProfileSearchRequest {
+            service_uuid: Some(service_uuid),
+            attr_ids: attributes,
+            results: Some(results_client),
+            ..Default::default()
+        })?;
         self.searches.push(results_stream);
 
         if let Some(waker) = self.stream_waker.take() {
@@ -388,12 +393,17 @@ mod tests {
         search_attrs: &[u16],
     ) -> bredr::SearchResultsProxy {
         match exec.run_until_stalled(&mut profile_stream.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Search {
-                service_uuid,
-                attr_ids,
-                results,
-                ..
-            }))) => {
+            Poll::Ready(Some(Ok(bredr::ProfileRequest::Search { payload, .. }))) => {
+                let bredr::ProfileSearchRequest {
+                    service_uuid: Some(service_uuid),
+                    attr_ids,
+                    results: Some(results),
+                    ..
+                } = payload
+                else {
+                    panic!("invalid parameters");
+                };
+                let attr_ids = attr_ids.unwrap_or_default();
                 assert_eq!(&attr_ids[..], search_attrs);
                 assert_eq!(service_uuid, search_uuid);
                 results.into_proxy().expect("proxy from client end")
@@ -410,19 +420,29 @@ mod tests {
 
         let mut profile = ProfileClient::new(proxy);
 
-        let search_attrs = &[bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST];
+        let search_attrs = vec![bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST];
 
         let source_uuid = bredr::ServiceClassProfileIdentifier::AudioSource;
-        profile.add_search(source_uuid, search_attrs).expect("adding search succeeds");
+        profile
+            .add_search(source_uuid, Some(search_attrs.clone()))
+            .expect("adding search succeeds");
 
         let sink_uuid = bredr::ServiceClassProfileIdentifier::AudioSink;
-        profile.add_search(sink_uuid, search_attrs).expect("adding search succeeds");
+        profile.add_search(sink_uuid, Some(search_attrs.clone())).expect("adding search succeeds");
 
         // Get the search clients out
-        let source_results_proxy =
-            expect_search_registration(&mut exec, &mut profile_stream, source_uuid, search_attrs);
-        let sink_results_proxy =
-            expect_search_registration(&mut exec, &mut profile_stream, sink_uuid, search_attrs);
+        let source_results_proxy = expect_search_registration(
+            &mut exec,
+            &mut profile_stream,
+            source_uuid,
+            &search_attrs[..],
+        );
+        let sink_results_proxy = expect_search_registration(
+            &mut exec,
+            &mut profile_stream,
+            sink_uuid,
+            &search_attrs[..],
+        );
 
         // Send a search request, process the request (by polling event stream) and confirm it responds.
 
@@ -471,7 +491,7 @@ mod tests {
         assert!(profile.is_terminated());
 
         // Adding a search after termination should fail.
-        assert!(profile.add_search(sink_uuid, &[]).is_err());
+        assert!(profile.add_search(sink_uuid, None).is_err());
     }
 
     #[test]
@@ -499,7 +519,7 @@ mod tests {
         // Adding a search should be OK. We expect to get the search request and the
         // waker should be awoken.
         let source_uuid = bredr::ServiceClassProfileIdentifier::AudioSource;
-        profile.add_search(source_uuid, &[]).expect("adding search succeeds");
+        profile.add_search(source_uuid, None).expect("adding search succeeds");
         let search_proxy =
             expect_search_registration(&mut exec, &mut profile_stream, source_uuid, &[]);
 

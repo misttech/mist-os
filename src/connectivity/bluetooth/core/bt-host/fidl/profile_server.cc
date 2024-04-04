@@ -561,12 +561,16 @@ void ProfileServer::Advertise(fuchsia::bluetooth::bredr::ProfileAdvertiseRequest
   advertised_total_ = next;
 }
 
-void ProfileServer::Search(
-    fidlbredr::ServiceClassProfileIdentifier service_uuid, std::vector<uint16_t> attr_ids,
-    fidl::InterfaceHandle<fuchsia::bluetooth::bredr::SearchResults> results) {
-  bt::UUID search_uuid(static_cast<uint32_t>(service_uuid));
-  std::unordered_set<bt::sdp::AttributeId> attributes(attr_ids.begin(), attr_ids.end());
-  if (!attr_ids.empty()) {
+void ProfileServer::Search(::fuchsia::bluetooth::bredr::ProfileSearchRequest request) {
+  if (!request.has_results() || !request.has_service_uuid()) {
+    bt_log(WARN, "fidl", "%s: missing parameter", __FUNCTION__);
+    return;
+  }
+
+  bt::UUID search_uuid(static_cast<uint32_t>(request.service_uuid()));
+  std::unordered_set<bt::sdp::AttributeId> attributes;
+  if (request.has_attr_ids() && !request.attr_ids().empty()) {
+    attributes.insert(request.attr_ids().begin(), request.attr_ids().end());
     // Always request the ProfileDescriptor for the event
     attributes.insert(bt::sdp::kBluetoothProfileDescriptorList);
   }
@@ -583,7 +587,7 @@ void ProfileServer::Search(
     return;
   }
 
-  auto results_ptr = results.Bind();
+  auto results_ptr = request.mutable_results()->Bind();
   results_ptr.set_error_handler(
       [this, next](zx_status_t status) { OnSearchResultError(next, status); });
 

@@ -70,7 +70,7 @@ impl TestProfileServer {
         };
 
         if let Some(service_class_profile_id) = service_class_profile_id {
-            client.add_search(service_class_profile_id, &[]).expect("Failed to search for peers.");
+            client.add_search(service_class_profile_id, None).expect("Failed to search for peers.");
         }
 
         let test_server = TestProfileServer::from(stream);
@@ -81,8 +81,8 @@ impl TestProfileServer {
     pub async fn expect_search(&mut self) {
         let request = self.profile_request_stream.next().await;
         match request {
-            Some(Ok(bredr::ProfileRequest::Search { results, .. })) => {
-                self.search_results_proxy = Some(results.into_proxy().unwrap());
+            Some(Ok(bredr::ProfileRequest::Search { payload, .. })) => {
+                self.search_results_proxy = Some(payload.results.unwrap().into_proxy().unwrap());
             }
             _ => panic!(
                 "unexpected result on profile request stream while waiting for search: {:?}",

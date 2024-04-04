@@ -173,7 +173,12 @@ impl PiconetMember {
     ) -> Result<bredr::SearchResultsRequestStream, Error> {
         let (results_client, results_requests) =
             f_end::create_request_stream().expect("couldn't create endpoints");
-        self.profile_svc.search(svc_id, &attributes, results_client)?;
+        self.profile_svc.search(bredr::ProfileSearchRequest {
+            service_uuid: Some(svc_id),
+            attr_ids: Some(attributes),
+            results: Some(results_client),
+            ..Default::default()
+        })?;
         Ok(results_requests)
     }
 

@@ -9,8 +9,8 @@ use fidl_fuchsia_bluetooth_bredr::{
     Attribute, Channel, ChannelMode, ChannelParameters, ConnectParameters,
     ConnectionReceiverRequest, ConnectionReceiverRequestStream, DataElement, Information,
     L2capParameters, ProfileAdvertiseRequest, ProfileDescriptor, ProfileMarker, ProfileProxy,
-    ProtocolDescriptor, ProtocolIdentifier, SearchResultsRequest, SearchResultsRequestStream,
-    ServiceClassProfileIdentifier, ServiceDefinition,
+    ProfileSearchRequest, ProtocolDescriptor, ProtocolIdentifier, SearchResultsRequest,
+    SearchResultsRequestStream, ServiceClassProfileIdentifier, ServiceDefinition,
 };
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{PeerId, Uuid};
@@ -677,7 +677,12 @@ impl ProfileServerFacade {
             create_request_stream().context("SearchResults creation")?;
 
         match &self.inner.read().profile_server_proxy {
-            Some(server) => server.search(profile_id, &attribute_list, search_client)?,
+            Some(server) => server.search(ProfileSearchRequest {
+                service_uuid: Some(profile_id),
+                attr_ids: Some(attribute_list),
+                results: Some(search_client),
+                ..Default::default()
+            })?,
             None => fx_err_and_bail!(&with_line!(tag), "No Server Proxy created."),
         };
 

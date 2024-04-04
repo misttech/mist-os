@@ -19,7 +19,7 @@ fn register(
     )?;
 
     // Register a search for remote peers that support the Hands Free role.
-    profile.add_search(bredr::ServiceClassProfileIdentifier::Handsfree, &[])?;
+    profile.add_search(bredr::ServiceClassProfileIdentifier::Handsfree, None)?;
 
     Ok(profile)
 }
@@ -87,11 +87,11 @@ pub(crate) mod test_server {
                             break;
                         }
                     }
-                    Ok(bredr::ProfileRequest::Search { results, .. }) => {
+                    Ok(bredr::ProfileRequest::Search { payload, .. }) => {
                         if self.is_registration_complete() {
                             panic!("unexpected second search request");
                         }
-                        self.results = Some(results.into_proxy().unwrap());
+                        self.results = Some(payload.results.unwrap().into_proxy().unwrap());
                         if self.is_registration_complete() {
                             break;
                         }

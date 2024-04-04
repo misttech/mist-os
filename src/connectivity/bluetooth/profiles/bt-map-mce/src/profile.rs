@@ -210,7 +210,7 @@ fn build_mns_service_definition() -> ServiceDefinition {
 
 pub fn connect_and_advertise(profile_svc: bredr::ProfileProxy) -> Result<ProfileClient, Error> {
     // Attributes to search for in SDP record for the Message Access Service on a MSE device.
-    const SEARCH_ATTRIBUTES: [u16; 8] = [
+    let search_attributes = vec![
         bredr::ATTR_SERVICE_CLASS_ID_LIST,
         bredr::ATTR_PROTOCOL_DESCRIPTOR_LIST,
         ATTR_SERVICE_NAME,
@@ -233,7 +233,7 @@ pub fn connect_and_advertise(profile_svc: bredr::ProfileProxy) -> Result<Profile
 
     profile_client.add_search(
         bredr::ServiceClassProfileIdentifier::MessageAccessServer,
-        &SEARCH_ATTRIBUTES,
+        Some(search_attributes),
     )?;
 
     info!("Registered service search & advertisement");

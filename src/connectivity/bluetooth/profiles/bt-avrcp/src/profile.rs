@@ -284,7 +284,7 @@ pub fn connect_and_advertise() -> Result<(ProfileProxy, ProfileClient), Error> {
     let profile_svc = fuchsia_component::client::connect_to_protocol::<ProfileMarker>()
         .context("Failed to connect to Bluetooth profile service")?;
 
-    const SEARCH_ATTRIBUTES: [u16; 5] = [
+    let search_attributes = vec![
         ATTR_SERVICE_CLASS_ID_LIST,
         ATTR_PROTOCOL_DESCRIPTOR_LIST,
         ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
@@ -301,7 +301,7 @@ pub fn connect_and_advertise() -> Result<(ProfileProxy, ProfileClient), Error> {
         ProfileClient::advertise(profile_svc.clone(), service_defs, channel_parameters)?;
 
     profile_client
-        .add_search(ServiceClassProfileIdentifier::AvRemoteControl, &SEARCH_ATTRIBUTES)?;
+        .add_search(ServiceClassProfileIdentifier::AvRemoteControl, Some(search_attributes))?;
 
     info!("Registered service search & advertisement");
 

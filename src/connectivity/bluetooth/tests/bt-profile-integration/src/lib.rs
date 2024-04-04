@@ -12,9 +12,9 @@ use {
     fidl_fuchsia_bluetooth::{DeviceClass, ErrorCode, MAJOR_DEVICE_CLASS_MISCELLANEOUS},
     fidl_fuchsia_bluetooth_bredr::{
         ConnectParameters, ConnectionReceiverRequestStream, DataElement, L2capParameters,
-        ProfileAdvertiseRequest, ProfileDescriptor, ProtocolDescriptor, ProtocolIdentifier,
-        SearchResultsRequest, SearchResultsRequestStream, ServiceClassProfileIdentifier,
-        ServiceDefinition, PSM_AVDTP,
+        ProfileAdvertiseRequest, ProfileDescriptor, ProfileSearchRequest, ProtocolDescriptor,
+        ProtocolIdentifier, SearchResultsRequest, SearchResultsRequestStream,
+        ServiceClassProfileIdentifier, ServiceDefinition, PSM_AVDTP,
     },
     fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy,
     fidl_fuchsia_bluetooth_test::{BredrPeerParameters, HciEmulatorProxy, PeerProxy},
@@ -109,7 +109,11 @@ async fn add_search(
 ) -> Result<SearchResultsRequestStream, Error> {
     let (results_client, results_stream) =
         create_request_stream().context("SearchResults creation")?;
-    profile.aux().profile.search(profileid, &[], results_client)?;
+    profile.aux().profile.search(ProfileSearchRequest {
+        service_uuid: Some(profileid),
+        results: Some(results_client),
+        ..Default::default()
+    })?;
     Ok(results_stream)
 }
 

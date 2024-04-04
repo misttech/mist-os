@@ -447,9 +447,9 @@ impl ProfileRegistrar {
                     warn!(%peer_id, "Error making outgoing connection: {e:?}");
                 }
             }
-            bredr::ProfileRequest::Search { service_uuid, attr_ids, results, .. } => {
+            bredr::ProfileRequest::Search { payload, .. } => {
                 // Searches are handled directly by the upstream Profile Server.
-                let _ = self.profile_upstream.search(service_uuid, &attr_ids, results);
+                let _ = self.profile_upstream.search(payload);
             }
             bredr::ProfileRequest::ConnectSco { payload, .. } => {
                 let _ = self.profile_upstream.connect_sco(payload);
@@ -593,7 +593,12 @@ mod tests {
         let (c, mut s) = create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
         let (results, server) = create_request_stream::<bredr::SearchResultsMarker>().unwrap();
 
-        assert!(c.search(bredr::ServiceClassProfileIdentifier::AudioSink, &[], results).is_ok());
+        let search_result = c.search(bredr::ProfileSearchRequest {
+            service_uuid: Some(bredr::ServiceClassProfileIdentifier::AudioSink),
+            results: Some(results),
+            ..Default::default()
+        });
+        assert!(search_result.is_ok());
 
         match exec.run_until_stalled(&mut s.next()) {
             Poll::Ready(Some(Ok(x))) => (x, server),

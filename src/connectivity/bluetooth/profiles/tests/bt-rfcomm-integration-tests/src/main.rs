@@ -233,7 +233,11 @@ async fn rfcomm_component_connecting_to_another_rfcomm_component() {
         .expect("can connect to Profile");
     let (search_client, mut search_results) = fidl::endpoints::create_request_stream().unwrap();
     other_rfcomm_proxy
-        .search(bredr::ServiceClassProfileIdentifier::SerialPort, &[], search_client)
+        .search(bredr::ProfileSearchRequest {
+            service_uuid: Some(bredr::ServiceClassProfileIdentifier::SerialPort),
+            results: Some(search_client),
+            ..Default::default()
+        })
         .expect("can register search");
 
     // Client #1's advertisement should be discovered - should also be echoed on observer.
@@ -330,7 +334,7 @@ async fn passthrough_search_discovers_advertisement() {
         .expect("Profile should be available");
     let mut client = ProfileClient::new(profile.clone());
     let _ = client
-        .add_search(bredr::ServiceClassProfileIdentifier::AudioSink, &[])
+        .add_search(bredr::ServiceClassProfileIdentifier::AudioSink, None)
         .expect("can register search");
     // We expect it to discover `test_driven_peer`s service advertisement.
     match client.next().await.unwrap() {

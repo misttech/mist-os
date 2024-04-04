@@ -287,13 +287,16 @@ open protocol Profile {
     /// Register a search for services on newly connected peers.  The SearchResults protocol will be
     /// used to report results for this search.  Any service result with a service matching
     /// `service_uuid` will be returned with the additional attributes in `attr_ids`.  If `attr_ids`
-    /// is empty, all attributes will be requested.  The additional attribute
+    /// is empty or omitted, all attributes will be requested.  The additional attribute
     /// BLUETOOTH_PROTOCOL_DESCRIPTOR_LIST is always requested.  See the Bluetooth Spec v5.2, Vol 3,
     /// Part B, Section 5) and relevant profile specification documents.
-    flexible Search(resource struct {
-        service_uuid ServiceClassProfileIdentifier;
-        attr_ids vector<uint16>:MAX_ATTRIBUTES;
-        results client_end:SearchResults;
+    flexible Search(resource table {
+        /// Required.
+        1: service_uuid ServiceClassProfileIdentifier;
+        /// Optional.
+        2: attr_ids vector<uint16>:MAX_ATTRIBUTES;
+        /// Required.
+        3: results client_end:SearchResults;
     });
 
     /// Connect an L2CAP or RFCOMM channel to the connected peer identified by `peer_id` using the

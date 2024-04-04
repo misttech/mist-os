@@ -80,7 +80,7 @@ async fn main() -> Result<(), Error> {
     info!("Starting Object Push client");
     let profile = connect_to_protocol::<bredr::ProfileMarker>()?;
     let mut profile_client = ProfileClient::new(profile.clone());
-    profile_client.add_search(bredr::ServiceClassProfileIdentifier::ObexObjectPush, &[])?;
+    profile_client.add_search(bredr::ServiceClassProfileIdentifier::ObexObjectPush, None)?;
     let result = handle_profile_events(profile, profile_client).await;
     info!("OPP client finished: {result:?}");
     Ok(())
