@@ -13,10 +13,20 @@ source_set("runtime") {
     "//src/lib/elfldltl",
     "//zircon/system/ulib/fbl",
   ]
+  if (is_fuchsia) {
+    public_deps += [ "//zircon/system/ulib/zx" ]
+  }
+
   sources = [
+    "module.cc",
     "module.h",
     "runtime-dynamic-linker.cc",
   ]
+  if (is_fuchsia) {
+    sources += [ "unmap-zircon.cc" ]
+  } else {
+    sources += [ "unmap-posix.cc" ]
+  }
 }
 
 source_set("error") {

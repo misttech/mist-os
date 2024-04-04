@@ -46,6 +46,8 @@ class Module : public fbl::DoublyLinkedListable<std::unique_ptr<Module>> {
   Module(const Module&) = delete;
   Module(Module&&) = default;
 
+  ~Module();
+
   // TODO(https://fxbug.dev/324136435): This should also match against the
   // SONAME, like ld::LoadModule does.
   constexpr bool operator==(const Soname& other_name) const { return name() == other_name; }
@@ -77,12 +79,14 @@ class Module : public fbl::DoublyLinkedListable<std::unique_ptr<Module>> {
  private:
   Module() = default;
 
+  static void Unmap(uintptr_t vaddr, size_t len);
+
   // TODO(https://fxbug.dev/324136435): All these fields will be derived from
   // ld::abi::Abi<>::Module when that data structures is supported.
   Soname name_;
   Addr load_bias_;
-  Addr vaddr_start_;
-  Addr vaddr_end_;
+  Addr vaddr_start_ = 0;
+  Addr vaddr_end_ = 0;
   SymbolInfo symbol_info_;
 };
 
