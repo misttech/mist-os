@@ -264,6 +264,9 @@ impl Visitor {
             Node::VariableDecl { identifier, value, mutability } => {
                 Arc::new(self.visit_variable_decl(*identifier.fragment(), *value, mutability))
             }
+            Node::True => Arc::new(|_, _| async move { Ok(Value::Bool(true)) }.boxed()),
+            Node::False => Arc::new(|_, _| async move { Ok(Value::Bool(false)) }.boxed()),
+            Node::Null => Arc::new(|_, _| async move { Ok(Value::Null) }.boxed()),
 
             // We should never try to execute a parse tree with these in it.
             Node::Error => panic!("Invalid output from parser"),
@@ -537,32 +540,12 @@ impl Visitor {
         string: &str,
     ) -> impl for<'f> Fn(&Arc<InterpreterInner>, &'f Mutex<Frame>) -> BoxFuture<'f, Result<Value>>
     {
-        #[derive(Copy, Clone)]
-        enum IdentifierType {
-            True,
-            False,
-            Null,
-            Normal(usize),
-        }
-
-        let ty = match string {
-            "true" => IdentifierType::True,
-            "false" => IdentifierType::False,
-            "null" => IdentifierType::Null,
-            _ => IdentifierType::Normal(self.fetch_slot(string).0),
-        };
+        let id = self.fetch_slot(string).0;
 
         move |_, frame| {
             async move {
-                match ty {
-                    IdentifierType::True => Ok(Value::Bool(true)),
-                    IdentifierType::False => Ok(Value::Bool(false)),
-                    IdentifierType::Null => Ok(Value::Null),
-                    IdentifierType::Normal(id) => {
-                        let fut = frame.lock().unwrap().get(id);
-                        fut.await
-                    }
-                }
+                let fut = frame.lock().unwrap().get(id);
+                fut.await
             }
             .boxed()
         }

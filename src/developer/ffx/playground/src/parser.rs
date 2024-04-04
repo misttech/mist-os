@@ -142,6 +142,9 @@ pub enum Node<'a> {
     String(Span<'a>),
     Subtract(Box<Node<'a>>, Box<Node<'a>>),
     VariableDecl { identifier: Span<'a>, value: Box<Node<'a>>, mutability: Mutability },
+    True,
+    False,
+    Null,
     Error,
 }
 
@@ -987,6 +990,9 @@ fn value<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         map(preceded(ex_tag("$"), unescaped_identifier), |x| {
             Node::Identifier(x.strip_parse_state())
         }),
+        map(kw("true"), |_| Node::True),
+        map(kw("false"), |_| Node::False),
+        map(kw("null"), |_| Node::Null),
         string,
         real,
         integer,

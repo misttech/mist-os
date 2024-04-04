@@ -347,9 +347,9 @@ async fn gt_true() {
 async fn if_test() {
     Test::test(
         r#"
-    if $true {
+    if true {
         3
-    } else if $false {
+    } else if false {
         4
     } else {
         5
@@ -366,9 +366,9 @@ async fn if_test() {
 async fn if_test_elif() {
     Test::test(
         r#"
-    if $false {
+    if false {
         3
-    } else if $true {
+    } else if true {
         4
     } else {
         5
@@ -385,9 +385,9 @@ async fn if_test_elif() {
 async fn if_test_else() {
     Test::test(
         r#"
-    if $false {
+    if false {
         3
-    } else if $false {
+    } else if false {
         4
     } else {
         5
@@ -544,9 +544,9 @@ async fn and_short_circuit() {
     let x = 0;
     def y {
         $x = 1;
-        $true
+        true
     }
-    $false && {y};
+    false && {y};
     $x
     "#,
     )
@@ -563,9 +563,9 @@ async fn and_short_pass() {
     let x = 0;
     def y {
         $x = 1;
-        $true
+        true
     }
-    $true && {y};
+    true && {y};
     $x
     "#,
     )
@@ -582,9 +582,9 @@ async fn or_short_circuit() {
     let x = 0;
     def y {
         $x = 1;
-        $true
+        true
     }
-    $false || {y};
+    false || {y};
     $x
     "#,
     )
@@ -601,9 +601,9 @@ async fn or_short_pass() {
     let x = 0;
     def y {
         $x = 1;
-        $true
+        true
     }
-    $true || {y};
+    true || {y};
     $x
     "#,
     )
@@ -615,7 +615,7 @@ async fn or_short_pass() {
 
 #[fuchsia::test]
 async fn and_true_false() {
-    Test::test("$true && $false")
+    Test::test("true && false")
         .check(|value| {
             let Value::Bool(value) = value else {
                 panic!();
@@ -627,7 +627,7 @@ async fn and_true_false() {
 
 #[fuchsia::test]
 async fn and_false_true() {
-    Test::test("$false && $true")
+    Test::test("false && true")
         .check(|value| {
             let Value::Bool(value) = value else {
                 panic!();
@@ -639,7 +639,7 @@ async fn and_false_true() {
 
 #[fuchsia::test]
 async fn and_false_false() {
-    Test::test("$false && $false")
+    Test::test("false && false")
         .check(|value| {
             let Value::Bool(value) = value else {
                 panic!();
@@ -651,7 +651,7 @@ async fn and_false_false() {
 
 #[fuchsia::test]
 async fn and_true_true() {
-    Test::test("$true && $true")
+    Test::test("true && true")
         .check(|value| {
             let Value::Bool(value) = value else {
                 panic!();
@@ -663,7 +663,7 @@ async fn and_true_true() {
 
 #[fuchsia::test]
 async fn or_true_false() {
-    Test::test("$true || $false")
+    Test::test("true || false")
         .check(|value| {
             let Value::Bool(value) = value else {
                 panic!();
@@ -675,7 +675,7 @@ async fn or_true_false() {
 
 #[fuchsia::test]
 async fn or_false_true() {
-    Test::test("$false || $true")
+    Test::test("false || true")
         .check(|value| {
             let Value::Bool(value) = value else {
                 panic!();
@@ -687,7 +687,7 @@ async fn or_false_true() {
 
 #[fuchsia::test]
 async fn or_false_false() {
-    Test::test("$false || $false")
+    Test::test("false || false")
         .check(|value| {
             let Value::Bool(value) = value else {
                 panic!();
@@ -699,7 +699,7 @@ async fn or_false_false() {
 
 #[fuchsia::test]
 async fn or_true_true() {
-    Test::test("$true || $true")
+    Test::test("true || true")
         .check(|value| {
             let Value::Bool(value) = value else {
                 panic!();
@@ -711,7 +711,7 @@ async fn or_true_true() {
 
 #[fuchsia::test]
 async fn not_true() {
-    Test::test("!$true")
+    Test::test("!true")
         .check(|value| {
             let Value::Bool(value) = value else {
                 panic!();
@@ -723,7 +723,7 @@ async fn not_true() {
 
 #[fuchsia::test]
 async fn not_false() {
-    Test::test("!$false")
+    Test::test("!false")
         .check(|value| {
             let Value::Bool(value) = value else {
                 panic!();
