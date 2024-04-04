@@ -137,7 +137,7 @@ async fn launch_and_run_sample_test_include_disabled() {
     ]
     .into_iter()
     .group();
-    let expected_fail_events = hashset![
+    let mut expected_fail_events = hashset![
         RunEvent::case_found("SampleDisabled.DISABLED_TestFail"),
         RunEvent::case_started("SampleDisabled.DISABLED_TestFail"),
         RunEvent::case_stopped("SampleDisabled.DISABLED_TestFail", CaseStatus::Failed),
@@ -165,18 +165,14 @@ async fn launch_and_run_sample_test_include_disabled() {
     assert_eq!(actual_pass_events, &expected_pass_events);
 
     // Not going to check all of the exact log events.
-    let actual_fail_events = HashSet::from_iter(
-        events
-            .get(&Some("SampleDisabled.DISABLED_TestFail".to_string()))
-            .unwrap()
-            .non_artifact_events
-            .clone(),
-    );
-    assert!(
-        actual_fail_events.is_superset(&expected_fail_events),
-        "actual_fail_events: {:?}",
-        &actual_fail_events
-    );
+    for e in &events
+        .get(&Some("SampleDisabled.DISABLED_TestFail".to_string()))
+        .unwrap()
+        .non_artifact_events
+    {
+        assert!(expected_fail_events.remove(&e), "unexpected fail event {:?}", e);
+    }
+    assert!(expected_fail_events.len() == 0, "missing fail events {:?}", expected_fail_events);
 
     let actual_skip_events = events.get(&Some("SampleDisabled.DynamicSkip".to_string())).unwrap();
     assert_eq!(actual_skip_events, &expected_skip_events);
