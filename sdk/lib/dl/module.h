@@ -11,6 +11,8 @@
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/static-vector.h>
 #include <lib/fit/result.h>
+#include <lib/ld/load.h>
+#include <lib/ld/module.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_double_list.h>
@@ -30,17 +32,32 @@ inline constexpr size_t kMaxSegments = 8;
 inline constexpr size_t kMaxPhdrs = 32;
 static_assert(kMaxPhdrs > kMaxSegments);
 
-// TODO(https://fxbug.dev/324136831): comment on how Module relates to startup
-// modules when the latter is supported.
-// A Module is created for every unique file object loaded either directly or
-// indirectly as a dependency of another Module. While this is an internal API,
-// a Module* is the void* handle returned by the public <dlfcn.h> API.
+// TODO(https://fxbug.dev/324136831): comment on how Module relates to
+// startup modules when the latter is supported.
+// TODO(https://fxbug.dev/328135195): comment on the reference counting when
+// that gets implemented.
+
+// A Module is created for every unique ELF file object loaded either
+// directly or indirectly as a dependency of another module. It holds the
+// ld::abi::Abi<...>::Module data structure that describes the module in the
+// passive ABI (see //sdk/lib/ld/module.h).
+
+// A Module is created for the ELF file in `dlopen`, when the
+// LoadModule::Load function decodes and loads the file into memory. Whereas a
+// LoadModule is ephemeral and lives only as long as it takes to load a module
+// and its dependencies in `dlopen`, the Module is a "permanent" data
+// structure that is kept alive in the RuntimeDynamicLinker's `loaded_modules`
+// list until the module is unloaded.
+
+// While this is an internal API, a Module* is the void* handle returned
+// by the public <dlfcn.h> API.
 class Module : public fbl::DoublyLinkedListable<std::unique_ptr<Module>> {
  public:
   using Elf = elfldltl::Elf<>;
   using Addr = Elf::Addr;
   using Soname = elfldltl::Soname<>;
   using SymbolInfo = elfldltl::SymbolInfo<Elf>;
+  using AbiModule = ld::AbiModule<>;
 
   // Not copyable, but movable.
   Module(const Module&) = delete;
@@ -63,31 +80,20 @@ class Module : public fbl::DoublyLinkedListable<std::unique_ptr<Module>> {
     return std::move(module);
   }
 
-  void set_load_bias(Addr load_bias) { load_bias_ = load_bias; }
+  constexpr AbiModule& module() { return abi_module_; }
 
-  Addr load_bias() const { return load_bias_; }
+  constexpr const AbiModule& module() const { return abi_module_; }
 
-  void set_vaddr_range(Addr vaddr_start, Addr vaddr_end) {
-    vaddr_start_ = vaddr_start;
-    vaddr_end_ = vaddr_end;
-  }
+  constexpr Addr load_bias() const { return abi_module_.link_map.addr; }
 
-  void set_symbol_info(SymbolInfo symbol_info) { symbol_info_ = symbol_info; }
-
-  const SymbolInfo& symbol_info() const { return symbol_info_; }
+  const SymbolInfo& symbol_info() const { return abi_module_.symbols; }
 
  private:
   Module() = default;
 
   static void Unmap(uintptr_t vaddr, size_t len);
-
-  // TODO(https://fxbug.dev/324136435): All these fields will be derived from
-  // ld::abi::Abi<>::Module when that data structures is supported.
   Soname name_;
-  Addr load_bias_;
-  Addr vaddr_start_ = 0;
-  Addr vaddr_end_ = 0;
-  SymbolInfo symbol_info_;
+  AbiModule abi_module_;
 };
 
 // TODO(https://fxbug.dev/324136435): Replace the code and functions copied from
@@ -144,12 +150,13 @@ class LoadModule {
       return false;
     }
 
-    SetModuleVaddrBounds(*module_, load_info_, loader.load_bias());
+    ld::SetModuleVaddrBounds(module_->module(), load_info_, loader.load_bias());
 
     // TODO(https://fxbug.dev/331804983): After loading is done, split the rest
     // of the logic that performs decoding into a separate function.
 
-    if (DecodeModuleDynamic(*module_, diag, loader.memory(), dyn_phdr).is_error()) [[unlikely]] {
+    if (DecodeModuleDynamic(module_->module(), diag, loader.memory(), dyn_phdr).is_error())
+        [[unlikely]] {
       return false;
     };
 
@@ -169,7 +176,7 @@ class LoadModule {
   template <class Elf = elfldltl::Elf<>, class Diagnostics, class Memory,
             typename... DynamicObservers>
   constexpr fit::result<bool, cpp20::span<const typename Elf::Dyn>> DecodeModuleDynamic(
-      Module& module, Diagnostics& diag, Memory& memory,
+      Module::AbiModule& module, Diagnostics& diag, Memory& memory,
       const std::optional<typename Elf::Phdr>& dyn_phdr, DynamicObservers&&... dynamic_observers) {
     using Dyn = const typename Elf::Dyn;
 
@@ -188,26 +195,13 @@ class LoadModule {
 
     cpp20::span<const Dyn> dyn = *read_dyn;
 
-    Module::SymbolInfo symbol_info;
     if (!elfldltl::DecodeDynamic(
-            diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(symbol_info),
+            diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(module.symbols),
             std::forward<DynamicObservers>(dynamic_observers)...)) [[unlikely]] {
       return fit::error{false};
     }
 
-    module.set_symbol_info(symbol_info);
-
     return fit::ok(dyn);
-  }
-
-  // TODO(https://fxbug.dev/324136435): This is a modified version of
-  // ld::SetModuleVaddrBounds
-  constexpr void SetModuleVaddrBounds(Module& module, const LoadInfo& load_info,
-                                      typename Elf::size_type load_bias) {
-    module.set_load_bias(load_bias);
-    auto vaddr_start = load_info.vaddr_start() + load_bias;
-    auto vaddr_end = vaddr_start + load_info.vaddr_size();
-    module.set_vaddr_range(vaddr_start, vaddr_end);
   }
 
   std::unique_ptr<Module> module_;

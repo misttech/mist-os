@@ -11,8 +11,8 @@ namespace dl {
 // When a Module is destroyed, it gets unmapped (if it was successfully
 // loaded) and its data is no longer accessible.
 Module::~Module() {
-  if (size_t size = vaddr_end_ - vaddr_start_; size > 0) {
-    Unmap(vaddr_start_, size);
+  if (size_t size = abi_module_.vaddr_end - abi_module_.vaddr_start; size > 0) {
+    Unmap(abi_module_.vaddr_start, size);
   }
 }
 
