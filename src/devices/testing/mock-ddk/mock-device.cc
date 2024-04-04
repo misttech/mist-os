@@ -7,6 +7,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdf/cpp/protocol.h>
+#include <zircon/types.h>
 
 #include <algorithm>
 #include <latch>
@@ -169,6 +170,8 @@ void MockDevice::SetMetadata(uint32_t type, const void* data, size_t data_length
   metadata_[type] = std::move(owned);
   PropagateMetadata();
 }
+
+void MockDevice::SetConfigVmo(zx::vmo config_vmo) { config_vmo_ = std::move(config_vmo); }
 
 void MockDevice::SetVariable(const char* name, const char* data) {
   if (data) {

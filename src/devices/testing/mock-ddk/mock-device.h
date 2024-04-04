@@ -20,6 +20,7 @@
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
+#include <zircon/types.h>
 
 #include <list>
 #include <memory>
@@ -172,6 +173,10 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   // calls device_get_metadata
   void SetMetadata(uint32_t type, const void* data, size_t data_length);
 
+  // Structured configuration VMO is often set for the parent of a device, to be available when the
+  // device calls device_get_config_vmo
+  void SetConfigVmo(zx::vmo config_vmo);
+
   // Variables are often set for the parent of a device, to be available when the device
   // calls device_get_variable.
   // Passing in nullptr for |data| will unset the variable.
@@ -285,6 +290,10 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   zx_status_t GetMetadataSize(uint32_t type, size_t* out_size);
   friend zx_status_t device_get_metadata_size(zx_device_t* device, uint32_t type, size_t* out_size);
 
+  // device_get_config_vmo calls GetConfigVmo:
+  zx::vmo& GetConfigVmo() { return config_vmo_; }
+  friend zx_status_t device_get_config_vmo(zx_device_t* device, zx_handle_t* config_vmo);
+
   // device_get_varaible calls GetVariable:
   zx_status_t GetVariable(const char* name, char* out, size_t size, size_t* size_actual);
   friend zx_status_t device_get_variable(zx_device_t* device, const char* name, char* out,
@@ -318,6 +327,10 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
 
   // Map of metadata set by SetMetadata.
   std::unordered_map<uint32_t, std::vector<uint8_t>> metadata_;
+
+  // Set by SetConfigVmo.
+  zx::vmo config_vmo_;
+
   // Map of variables set by SetVariable.
   std::unordered_map<std::string, std::string> variables_;
 

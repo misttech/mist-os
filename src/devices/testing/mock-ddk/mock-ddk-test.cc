@@ -15,8 +15,7 @@
 #include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
-
-#include <algorithm>
+#include <zircon/types.h>
 
 #include <ddktl/device.h>
 #include <zxtest/zxtest.h>
@@ -105,6 +104,15 @@ class TestDevice : public DeviceType {
     if (status == ZX_OK) {
       data.resize(actual);
       return zx::ok(data);
+    }
+    return zx::error(status);
+  }
+
+  zx::result<zx::vmo> GetConfigVmo() {
+    zx::vmo vmo;
+    auto status = device_get_config_vmo(parent_, vmo.reset_and_get_address());
+    if (status == ZX_OK) {
+      return zx::ok(std::move(vmo));
     }
     return zx::error(status);
   }
@@ -392,6 +400,27 @@ TEST(MockDdk, SetMetadata) {
   ASSERT_TRUE(metadata_result.is_ok());
   ASSERT_EQ(metadata_result.value().size(), sizeof(kSource3));
   ASSERT_BYTES_EQ(metadata_result.value().data(), kSource3, sizeof(kSource3));
+}
+
+TEST(MockDdk, SetConfigVmo) {
+  auto parent = MockDevice::FakeRootParent();  // Hold on to the parent during the test.
+  auto result = TestDevice::Bind(parent.get());
+  ASSERT_TRUE(result.is_ok());
+  TestDevice* test_device = result.value();
+
+  // As expected, there is no config vmo available in devices:
+  auto vmo_result = test_device->GetConfigVmo();
+  ASSERT_TRUE(vmo_result.is_ok());
+  ASSERT_EQ(*vmo_result, ZX_HANDLE_INVALID);
+
+  zx::vmo config_vmo;
+  ASSERT_OK(zx::vmo::create(1024, 0, &config_vmo));
+  zx_handle_t config_vmo_handle = config_vmo.get();
+  parent->SetConfigVmo(std::move(config_vmo));
+
+  vmo_result = test_device->GetConfigVmo();
+  ASSERT_TRUE(vmo_result.is_ok());
+  ASSERT_EQ(*vmo_result, config_vmo_handle);
 }
 
 TEST(MockDdk, SetVariable) {

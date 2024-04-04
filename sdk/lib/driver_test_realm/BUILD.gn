@@ -100,6 +100,7 @@ executable("fake_resolver_bin") {
   sources = [ "fake_resolver.cc" ]
   data_deps = [ "fake_driver:driver_package" ]
   deps = [
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",

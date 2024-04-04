@@ -133,6 +133,15 @@ zx_status_t device_get_protocol(const zx_device_t* device, uint32_t proto_id, vo
   return device->GetProtocol(proto_id, protocol);
 }
 
+__EXPORT zx_status_t device_get_config_vmo(zx_device_t* device, zx_handle_t* config_vmo) {
+  std::lock_guard guard(libdriver_lock);
+  if (device == nullptr || config_vmo == nullptr) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  *config_vmo = device->GetConfigVmo().release();
+  return ZX_OK;
+}
+
 __EXPORT
 zx_status_t device_add_metadata(zx_device_t* device, uint32_t type, const void* data,
                                 size_t length) {

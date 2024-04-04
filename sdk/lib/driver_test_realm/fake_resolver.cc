@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.component.decl/cpp/fidl.h>
 #include <fidl/fuchsia.component.resolution/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -11,9 +12,14 @@
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/vmo.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
 
+#include <cstdint>
 #include <fstream>
+#include <string_view>
+#include <vector>
 
 namespace {
 
@@ -48,52 +54,63 @@ class FakeComponentResolver final
     std::string_view pkg_url = relative_path.substr(0, pos);
     relative_path.remove_prefix(pos + 1);
 
-    auto file = fidl::CreateEndpoints<fuchsia_io::File>();
-    if (file.is_error()) {
-      FX_SLOG(ERROR, "FakeComponentResolver request not supported.",
-              FX_KV("url", std::string(relative_path).c_str()));
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-      return;
-    }
-
-    zx_handle_t dir = pkg_dir_.channel().get();
-    if (is_boot) {
-      dir = boot_dir_.channel().get();
-    }
-
-    zx_status_t status =
-        fdio_open_at(dir, std::string(relative_path).data(),
-                     static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable),
-                     file->server.channel().release());
-    if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to open manifest.",
-              FX_KV("manifest", std::string(relative_path).c_str()));
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-      return;
-    }
-    fidl::WireResult result =
-        fidl::WireCall(file->client)->GetBackingMemory(fuchsia_io::wire::VmoFlags::kRead);
-    if (!result.ok()) {
+    zx::result manifest_vmo = ReadFileToVmo(relative_path, is_boot);
+    if (manifest_vmo.is_error()) {
       FX_SLOG(ERROR, "Failed to read manifest.",
               FX_KV("manifest", std::string(relative_path).c_str()));
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
       return;
     }
-    auto& response = result.value();
-    if (response.is_error()) {
-      FX_SLOG(ERROR, "Failed to read manifest.",
-              FX_KV("manifest", std::string(relative_path).c_str()));
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
-      return;
-    }
-    zx::vmo& vmo = response.value()->vmo;
-    uint64_t size;
-    status = vmo.get_prop_content_size(&size);
+
+    uint64_t manifest_size;
+    zx_status_t status = manifest_vmo->get_prop_content_size(&manifest_size);
     if (status != ZX_OK) {
       FX_SLOG(ERROR, "Failed to get vmo size.",
               FX_KV("manifest", std::string(relative_path).c_str()));
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
       return;
+    }
+
+    std::vector<uint8_t> manifest;
+    manifest.resize(manifest_size);
+    status = manifest_vmo->read(manifest.data(), 0, manifest_size);
+    if (status != ZX_OK) {
+      FX_SLOG(ERROR, "Failed to read manifest vmo.",
+              FX_KV("manifest", std::string(relative_path).c_str()));
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
+      return;
+    }
+
+    auto declaration = fidl::Unpersist<fuchsia_component_decl::Component>(manifest);
+    if (declaration.is_error()) {
+      FX_SLOG(ERROR, "Failed to parse component manifest.",
+              FX_KV("manifest", std::string(relative_path).c_str()));
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInvalidManifest);
+      return;
+    }
+
+    // Check if there is a config file associated with the driver, and read if it exists.
+    uint64_t config_size = 0;
+    zx::vmo config_vmo;
+
+    if (declaration->config() &&
+        declaration->config()->value_source()->package_path().has_value()) {
+      std::string config_path = declaration->config()->value_source()->package_path().value();
+      zx::result config_file = ReadFileToVmo(config_path, is_boot);
+      if (config_file.is_error()) {
+        FX_SLOG(ERROR, "Failed to read config vmo.", FX_KV("config", config_path.c_str()));
+        completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
+        return;
+      }
+
+      status = config_file->get_prop_content_size(&config_size);
+      if (status != ZX_OK) {
+        FX_SLOG(ERROR, "Failed to get vmo size.", FX_KV("config", config_path.c_str()));
+        completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
+        return;
+      }
+
+      config_vmo = std::move(*config_file);
     }
 
     // Not all boot components resolved by this resolver are packaged (e.g. root.cm) so they do
@@ -134,16 +151,26 @@ class FakeComponentResolver final
                        .directory(std::move(dir_clone_result.value()))
                        .Build();
 
-    auto component = fuchsia_component_resolution::wire::Component::Builder(arena)
-                         .url(request->component_url)
-                         .abi_revision(abi_revision)
-                         .decl(fuchsia_mem::wire::Data::WithBuffer(arena,
-                                                                   fuchsia_mem::wire::Buffer{
-                                                                       .vmo = std::move(vmo),
-                                                                       .size = size,
-                                                                   }))
-                         .package(package)
-                         .Build();
+    auto builder =
+        fuchsia_component_resolution::wire::Component::Builder(arena)
+            .url(request->component_url)
+            .abi_revision(abi_revision)
+            .decl(fuchsia_mem::wire::Data::WithBuffer(arena,
+                                                      fuchsia_mem::wire::Buffer{
+                                                          .vmo = std::move(*manifest_vmo),
+                                                          .size = manifest_size,
+                                                      }))
+            .package(package);
+
+    if (config_vmo.is_valid()) {
+      builder.config_values(
+          fuchsia_mem::wire::Data::WithBuffer(arena, fuchsia_mem::wire::Buffer{
+                                                         .vmo = std::move(config_vmo),
+                                                         .size = config_size,
+                                                     }));
+    }
+
+    auto component = builder.Build();
 
     FX_SLOG(DEBUG, "Successfully Resolved", FX_KV("url", relative_path));
     completer.ReplySuccess(component);
@@ -153,6 +180,43 @@ class FakeComponentResolver final
                           ResolveWithContextCompleter::Sync& completer) override {
     FX_SLOG(ERROR, "FakeComponentResolver does not currently support ResolveWithContext");
     completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInvalidArgs);
+  }
+
+  zx::result<zx::vmo> ReadFileToVmo(std::string_view path, bool is_boot) {
+    zx_handle_t dir = pkg_dir_.channel().get();
+    if (is_boot) {
+      dir = boot_dir_.channel().get();
+    }
+
+    auto file_ep = fidl::CreateEndpoints<fuchsia_io::File>();
+    if (file_ep.is_error()) {
+      FX_SLOG(ERROR, "Failed to create file endpoints");
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+
+    zx_status_t status =
+        fdio_open_at(dir, std::string(path).data(),
+                     static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable),
+                     file_ep->server.channel().release());
+    if (status != ZX_OK) {
+      FX_SLOG(ERROR, "Failed to open file.", FX_KV("file", std::string(path).c_str()));
+      return zx::error(ZX_ERR_IO);
+    }
+
+    fidl::WireResult result =
+        fidl::WireCall(file_ep->client)->GetBackingMemory(fuchsia_io::wire::VmoFlags::kRead);
+    if (!result.ok()) {
+      FX_SLOG(DEBUG, "Failed to read file.", FX_KV("file", std::string(path).c_str()));
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
+
+    auto& response = result.value();
+    if (response.is_error()) {
+      FX_SLOG(ERROR, "Failed to read file.", FX_KV("file", std::string(path).c_str()));
+      return zx::error(ZX_ERR_IO);
+    }
+
+    return zx::ok(std::move(response.value()->vmo));
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> boot_dir_;
