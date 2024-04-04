@@ -18,7 +18,7 @@ OFFSET = { SIGN ~ NUM }
 EXIT = { "exit" }
 
 REG_PREFIX = _{ "%r" }
-REG_NUMBER = { ASCII_DIGIT{1, 2} }
+REG_NUMBER = @{ ASCII_DIGIT{1, 2} }
 REG = _{ REG_PREFIX ~ REG_NUMBER }
 DEREF = { "[" ~ REG ~ OFFSET? ~ "]" }
 
@@ -29,6 +29,12 @@ UNARY_OP = @{ ( "neg" ~ ( "32" )? ) | "le16" | "le32" | "le64" | "be16" | "be32"
 
 ALU_INSTRUCTION = { ( UNARY_OP ~ REG ) |
                     ( BINARY_OP  ~ REG ~ "," ~ (REG | IMM) ) }
+
+BASE_ATOMIC_OP = @{ "add" | "and" | "or" | "xor" | "cmpxchg" | "xchg" }
+ATOMIC_OP = @{ BASE_ATOMIC_OP ~ ( "32" )? }
+
+FETCH = { "fetch" }
+ATOMIC_INSTRUCTION = { "lock" ~ FETCH ? ~ ATOMIC_OP ~ DEREF ~ "," ~ REG }
 
 STORE_REG_OP = @{ "stxb" | "stxh" | "stxw" | "stxdw" }
 STORE_IMM_OP = @{ "stb" | "sth" | "stw" | "stdw" }
@@ -55,6 +61,7 @@ JMP_INSTRUCTION = { JMP_CONDITIONAL |
 ASM_INSTRUCTION = { (   ALU_INSTRUCTION |
                         MEM_INSTRUCTION |
                         JMP_INSTRUCTION |
+                        ATOMIC_INSTRUCTION |
                         ""
                     ) ~ EOL }
 

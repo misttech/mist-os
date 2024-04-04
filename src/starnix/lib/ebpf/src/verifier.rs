@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![allow(unused_variables)]
+
 use crate::{
     visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source},
     EbpfError, MapSchema, BPF_MAX_INSTS, BPF_SIZE_MASK, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
@@ -1127,6 +1129,119 @@ impl ComputationContext {
         Ok(())
     }
 
+    fn log_atomic_operation(
+        &mut self,
+        op_name: &str,
+        verification_context: &mut VerificationContext<'_>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) {
+        bpf_log!(
+            self,
+            verification_context,
+            "lock {}{} [{}{}], {}",
+            if fetch { "fetch " } else { "" },
+            op_name,
+            display_register(dst),
+            print_offset(offset),
+            display_register(src),
+        );
+    }
+
+    fn raw_atomic_operation(
+        &mut self,
+        op_name: &str,
+        verification_context: &mut VerificationContext<'_>,
+        width: DataWidth,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+        op: impl FnOnce(Type, Type) -> Result<Type, String>,
+    ) -> Result<(), String> {
+        self.log_atomic_operation(op_name, verification_context, fetch, dst, offset, src);
+        let addr = self.reg(dst)?.clone();
+        let field = self.apply_mapping(verification_context, &addr, Field::new(offset, width))?;
+        let value = self.reg(src)?;
+        let loaded_type = self.load_memory(addr.clone(), field)?;
+        let result = op(loaded_type.clone(), value.clone())?;
+        let mut next = self.next()?;
+        next.store_memory(&addr, field, result)?;
+        if fetch {
+            next.set_reg(src, loaded_type)?;
+        }
+        verification_context.states.push(next);
+        Ok(())
+    }
+
+    fn atomic_operation(
+        &mut self,
+        op_name: &str,
+        verification_context: &mut VerificationContext<'_>,
+        width: DataWidth,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+        alu_type: AluType,
+        op: impl Fn(u64, u64) -> u64,
+    ) -> Result<(), String> {
+        self.raw_atomic_operation(
+            op_name,
+            verification_context,
+            width,
+            fetch,
+            dst,
+            offset,
+            src,
+            |v1: Type, v2: Type| Self::apply_computation(v1, v2, alu_type, op),
+        )
+    }
+
+    fn raw_atomic_cmpxchg(
+        &mut self,
+        op_name: &str,
+        verification_context: &mut VerificationContext<'_>,
+        dst: Register,
+        offset: i16,
+        src: Register,
+        jump_width: JumpWidth,
+        op: impl Fn(u64, u64) -> bool,
+    ) -> Result<(), String> {
+        self.log_atomic_operation(op_name, verification_context, true, dst, offset, src);
+        let width = match jump_width {
+            JumpWidth::W32 => DataWidth::U32,
+            JumpWidth::W64 => DataWidth::U64,
+        };
+        let addr = self.reg(dst)?.clone();
+        let field = self.apply_mapping(verification_context, &addr, Field::new(offset, width))?;
+        let dst = self.load_memory(addr.clone(), field)?;
+        let value = self.reg(src)?;
+        let r0 = self.reg(0)?;
+        let branch = self.compute_branch(jump_width, &dst, r0, op)?;
+        // r0 = dst
+        if branch.unwrap_or(true) {
+            let mut next = self.next()?;
+            let (dst, r0) =
+                Type::constraint(&mut next, JumpType::Eq, jump_width, dst.clone(), r0.clone());
+            next.set_reg(0, dst)?;
+            next.store_memory(&addr, field, value.clone())?;
+            verification_context.states.push(next);
+        }
+        // r0 != dst
+        if !branch.unwrap_or(false) {
+            let mut next = self.next()?;
+            let (dst, r0) =
+                Type::constraint(&mut next, JumpType::Ne, jump_width, dst.clone(), r0.clone());
+            next.set_reg(0, dst.clone())?;
+            next.store_memory(&addr, field, dst)?;
+            verification_context.states.push(next);
+        }
+
+        Ok(())
+    }
     fn endianness<BO: ByteOrder>(
         &mut self,
         op_name: &str,
@@ -2144,6 +2259,237 @@ impl BpfVisitor for ComputationContext {
             JumpWidth::W64,
             |x, y| x & y != 0,
         )
+    }
+
+    fn atomic_add<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(
+            "add32",
+            context,
+            DataWidth::U32,
+            fetch,
+            dst,
+            offset,
+            src,
+            AluType::Add,
+            |x, y| alu32(x, y, |x, y| x + y),
+        )
+    }
+
+    fn atomic_add64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(
+            "add",
+            context,
+            DataWidth::U64,
+            fetch,
+            dst,
+            offset,
+            src,
+            AluType::Add,
+            |x, y| x + y,
+        )
+    }
+
+    fn atomic_and<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(
+            "and32",
+            context,
+            DataWidth::U32,
+            fetch,
+            dst,
+            offset,
+            src,
+            AluType::Bitwise,
+            |x, y| alu32(x, y, |x, y| x & y),
+        )
+    }
+
+    fn atomic_and64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(
+            "and",
+            context,
+            DataWidth::U64,
+            fetch,
+            dst,
+            offset,
+            src,
+            AluType::Bitwise,
+            |x, y| x & y,
+        )
+    }
+
+    fn atomic_or<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(
+            "or32",
+            context,
+            DataWidth::U32,
+            fetch,
+            dst,
+            offset,
+            src,
+            AluType::Bitwise,
+            |x, y| alu32(x, y, |x, y| x | y),
+        )
+    }
+
+    fn atomic_or64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(
+            "or",
+            context,
+            DataWidth::U64,
+            fetch,
+            dst,
+            offset,
+            src,
+            AluType::Bitwise,
+            |x, y| x | y,
+        )
+    }
+
+    fn atomic_xor<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(
+            "xor32",
+            context,
+            DataWidth::U32,
+            fetch,
+            dst,
+            offset,
+            src,
+            AluType::Bitwise,
+            |x, y| alu32(x, y, |x, y| x ^ y),
+        )
+    }
+
+    fn atomic_xor64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(
+            "xor",
+            context,
+            DataWidth::U64,
+            fetch,
+            dst,
+            offset,
+            src,
+            AluType::Bitwise,
+            |x, y| x ^ y,
+        )
+    }
+
+    fn atomic_xchg<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(
+            "xchg32",
+            context,
+            DataWidth::U32,
+            fetch,
+            dst,
+            offset,
+            src,
+            AluType::Plain,
+            |_, x| x,
+        )
+    }
+
+    fn atomic_xchg64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.raw_atomic_operation(
+            "xchg",
+            context,
+            DataWidth::U64,
+            fetch,
+            dst,
+            offset,
+            src,
+            |_, x| Ok(x),
+        )
+    }
+
+    fn atomic_cmpxchg<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.raw_atomic_cmpxchg("cmpxchg32", context, dst, offset, src, JumpWidth::W32, |x, y| {
+            comp32(x, y, |x, y| x == y)
+        })
+    }
+
+    fn atomic_cmpxchg64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.raw_atomic_cmpxchg("cmpxchg", context, dst, offset, src, JumpWidth::W64, |x, y| x == y)
     }
 
     fn load<'a>(

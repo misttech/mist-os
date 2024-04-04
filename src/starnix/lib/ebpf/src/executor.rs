@@ -7,7 +7,11 @@ use crate::{
     BpfValue, EbpfProgram, EpbfRunContext, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
-use std::{mem::MaybeUninit, pin::Pin};
+use std::{
+    mem::MaybeUninit,
+    pin::Pin,
+    sync::atomic::{AtomicU32, AtomicU64, Ordering},
+};
 use zerocopy::AsBytes;
 
 pub fn execute_with_arguments<C: EpbfRunContext>(
@@ -167,6 +171,60 @@ impl<C: EpbfRunContext> ComputationContext<'_, C> {
         let result = op(op1, op2);
         self.next();
         self.set_reg(dst, result.into());
+        Ok(())
+    }
+
+    fn atomic_operation(
+        &mut self,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+        op: impl Fn(&mut Self, &AtomicU32, u32) -> u32,
+    ) -> Result<(), String> {
+        let addr = self.reg(dst).add(offset as u64);
+        // TODO How to statically check alignment?
+        if addr.as_usize() % std::mem::size_of::<AtomicU32>() != 0 {
+            return Err(format!("misaligned access"));
+        }
+        // SAFETY
+        //
+        // The address has been verified by the verifier that ensured the memory is valid for
+        // reading and writing.
+        let atomic = unsafe { &*addr.as_ptr::<AtomicU32>() };
+        let value = self.reg(src).as_u32();
+        let old_value = op(self, atomic, value);
+        if fetch {
+            self.set_reg(src, old_value.into());
+        }
+        self.next();
+        Ok(())
+    }
+
+    fn atomic_operation64(
+        &mut self,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+        op: impl Fn(&mut Self, &AtomicU64, u64) -> u64,
+    ) -> Result<(), String> {
+        let addr = self.reg(dst).add(offset as u64);
+        // TODO How to statically check alignment?
+        if addr.as_usize() % std::mem::size_of::<AtomicU64>() != 0 {
+            return Err(format!("misaligned access"));
+        }
+        // SAFETY
+        //
+        // The address has been verified by the verifier that ensured the memory is valid for
+        // reading and writing.
+        let atomic = unsafe { &*addr.as_ptr::<AtomicU64>() };
+        let value = self.reg(src).as_u64();
+        let old_value = op(self, atomic, value);
+        if fetch {
+            self.set_reg(src, old_value.into());
+        }
+        self.next();
         Ok(())
     }
 
@@ -660,6 +718,150 @@ impl<C: EpbfRunContext> BpfVisitor for ComputationContext<'_, C> {
         offset: i16,
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| x & y != 0)
+    }
+
+    fn atomic_add<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(fetch, dst, offset, src, |_, a, v| a.fetch_add(v, Ordering::SeqCst))
+    }
+
+    fn atomic_add64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation64(fetch, dst, offset, src, |_, a, v| a.fetch_add(v, Ordering::SeqCst))
+    }
+
+    fn atomic_and<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(fetch, dst, offset, src, |_, a, v| a.fetch_and(v, Ordering::SeqCst))
+    }
+
+    fn atomic_and64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation64(fetch, dst, offset, src, |_, a, v| a.fetch_and(v, Ordering::SeqCst))
+    }
+
+    fn atomic_or<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(fetch, dst, offset, src, |_, a, v| a.fetch_or(v, Ordering::SeqCst))
+    }
+
+    fn atomic_or64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation64(fetch, dst, offset, src, |_, a, v| a.fetch_or(v, Ordering::SeqCst))
+    }
+
+    fn atomic_xor<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(fetch, dst, offset, src, |_, a, v| a.fetch_xor(v, Ordering::SeqCst))
+    }
+
+    fn atomic_xor64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation64(fetch, dst, offset, src, |_, a, v| a.fetch_xor(v, Ordering::SeqCst))
+    }
+
+    fn atomic_xchg<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(fetch, dst, offset, src, |_, a, v| a.swap(v, Ordering::SeqCst))
+    }
+
+    fn atomic_xchg64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation64(fetch, dst, offset, src, |_, a, v| a.swap(v, Ordering::SeqCst))
+    }
+
+    fn atomic_cmpxchg<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation(false, dst, offset, src, |this, a, v| {
+            let r0 = this.reg(0).as_u32();
+            let r0 = match a.compare_exchange(r0, v, Ordering::SeqCst, Ordering::SeqCst) {
+                Ok(v) | Err(v) => v,
+            };
+            this.set_reg(0, r0.into());
+            0
+        })
+    }
+
+    fn atomic_cmpxchg64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic_operation64(false, dst, offset, src, |this, a, v| {
+            let r0 = this.reg(0).as_u64();
+            let r0 = match a.compare_exchange(r0, v, Ordering::SeqCst, Ordering::SeqCst) {
+                Ok(v) | Err(v) => v,
+            };
+            this.set_reg(0, r0.into());
+            0
+        })
     }
 
     fn load<'a>(

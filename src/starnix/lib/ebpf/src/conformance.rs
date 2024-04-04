@@ -6,12 +6,12 @@
 pub mod test {
     use crate::{
         new_bpf_type_identifier, BpfValue, EbpfHelper, EbpfProgramBuilder, FunctionSignature,
-        NullVerifierLogger, Type, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_B, BPF_CALL,
-        BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_H, BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT,
-        BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE,
-        BPF_JSLT, BPF_LD, BPF_LDX, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR,
-        BPF_RSH, BPF_SRC_IMM, BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W,
-        BPF_XOR,
+        NullVerifierLogger, Type, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC,
+        BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
+        BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE,
+        BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX, BPF_LSH, BPF_MEM,
+        BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM, BPF_SRC_REG, BPF_ST,
+        BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG, BPF_XOR,
     };
     use linux_uapi::bpf_insn;
     use pest::{iterators::Pair, Parser};
@@ -41,7 +41,7 @@ pub mod test {
 
         fn as_i32(&self) -> i32 {
             match self {
-                Self::Plus(v) => u32::try_from(*v).unwrap() as i32,
+                Self::Plus(v) => (*v as u32) as i32,
                 Self::Minus(v) => i32::try_from(-i64::try_from(*v).unwrap()).unwrap(),
             }
         }
@@ -169,6 +169,9 @@ pub mod test {
                     Rule::ALU_INSTRUCTION => {
                         vec![Self::parse_alu_instruction(entry)]
                     }
+                    Rule::ATOMIC_INSTRUCTION => {
+                        vec![Self::parse_atomic_instruction(entry)]
+                    }
                     Rule::JMP_INSTRUCTION => {
                         vec![Self::parse_jmp_instruction(entry)]
                     }
@@ -292,6 +295,54 @@ pub mod test {
                 }
                 r @ _ => unreachable!("unexpected rule {r:?}"),
             }
+            instruction
+        }
+
+        fn parse_atomic_instruction(pair: Pair<'_, Rule>) -> bpf_insn {
+            let mut instruction = bpf_insn::default();
+            let mut inner = pair.into_inner();
+            let (op, fetch) = {
+                let next = inner.next().unwrap();
+                let fetch = next.as_rule() == Rule::FETCH;
+                if fetch {
+                    (inner.next().unwrap(), fetch)
+                } else {
+                    (next, false)
+                }
+            };
+            assert_eq!(op.as_rule(), Rule::ATOMIC_OP);
+            let (op, is_32) = {
+                let op = op.as_str();
+                if op.ends_with("32") {
+                    (&op[0..op.len() - 2], true)
+                } else {
+                    (&op[..], false)
+                }
+            };
+            instruction.code = BPF_ATOMIC | BPF_STX;
+            if is_32 {
+                instruction.code |= BPF_W;
+            } else {
+                instruction.code |= BPF_DW;
+            };
+            let mut imm = match op {
+                "add" => BPF_ADD,
+                "and" => BPF_AND,
+                "or" => BPF_OR,
+                "xor" => BPF_XOR,
+                "xchg" => BPF_XCHG,
+                "cmpxchg" => BPF_CMPXCHG,
+                _ => unreachable!("unexpected operation {op}"),
+            };
+            if fetch {
+                imm |= BPF_FETCH;
+            }
+            instruction.imm = imm as i32;
+            let (dst_reg, offset) = Self::parse_deref(inner.next().unwrap());
+            let src_reg = Self::parse_reg(inner.next().unwrap());
+            instruction.set_dst_reg(dst_reg);
+            instruction.set_src_reg(src_reg);
+            instruction.off = offset;
             instruction
         }
 

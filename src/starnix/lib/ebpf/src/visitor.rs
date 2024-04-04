@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use crate::{
-    BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_B, BPF_CALL, BPF_CLS_MASK, BPF_DIV, BPF_DW,
-    BPF_END, BPF_EXIT, BPF_H, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
-    BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDDW,
-    BPF_LDX, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SIZE_MASK,
-    BPF_SRC_MASK, BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_SUB_OP_MASK, BPF_TO_BE, BPF_W,
-    BPF_XOR,
+    BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CLS_MASK,
+    BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H, BPF_JA, BPF_JEQ, BPF_JGE,
+    BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE,
+    BPF_JSLT, BPF_LD, BPF_LDDW, BPF_LDX, BPF_LOAD_STORE_MASK, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV,
+    BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SIZE_MASK, BPF_SRC_MASK, BPF_SRC_REG, BPF_ST, BPF_STX,
+    BPF_SUB, BPF_SUB_OP_MASK, BPF_TO_BE, BPF_W, BPF_XCHG, BPF_XOR,
 };
 use linux_uapi::bpf_insn;
 
@@ -407,6 +407,112 @@ pub trait BpfVisitor {
         dst: Register,
         src: Source,
         offset: i16,
+    ) -> Result<(), String>;
+
+    fn atomic_add<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String>;
+
+    fn atomic_add64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String>;
+
+    fn atomic_and<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String>;
+
+    fn atomic_and64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String>;
+
+    fn atomic_or<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String>;
+
+    fn atomic_or64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String>;
+
+    fn atomic_xor<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String>;
+
+    fn atomic_xor64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String>;
+
+    fn atomic_xchg<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String>;
+
+    fn atomic_xchg64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String>;
+
+    fn atomic_cmpxchg<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String>;
+
+    fn atomic_cmpxchg64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        offset: i16,
+        src: Register,
     ) -> Result<(), String>;
 
     fn load<'a>(
@@ -889,10 +995,6 @@ pub trait BpfVisitor {
                 return invalid_op_code();
             }
             BPF_STX | BPF_ST | BPF_LDX => {
-                if instruction.code & BPF_MEM != BPF_MEM {
-                    // Unsupported instruction.
-                    return invalid_op_code();
-                }
                 let width = match instruction.code & BPF_SIZE_MASK {
                     BPF_B => DataWidth::U8,
                     BPF_H => DataWidth::U16,
@@ -901,6 +1003,10 @@ pub trait BpfVisitor {
                     _ => unreachable!(),
                 };
                 if class == BPF_LDX {
+                    if instruction.code & BPF_LOAD_STORE_MASK != BPF_MEM {
+                        // Unsupported instruction.
+                        return invalid_op_code();
+                    }
                     return self.load(
                         context,
                         instruction.dst_reg(),
@@ -909,12 +1015,152 @@ pub trait BpfVisitor {
                         width,
                     );
                 } else {
-                    let src = if class == BPF_ST {
-                        Source::Value(instruction.imm as u64)
+                    if instruction.code & BPF_LOAD_STORE_MASK == BPF_MEM {
+                        let src = if class == BPF_ST {
+                            Source::Value(instruction.imm as u64)
+                        } else {
+                            Source::Reg(instruction.src_reg())
+                        };
+                        return self.store(
+                            context,
+                            instruction.dst_reg(),
+                            instruction.off,
+                            src,
+                            width,
+                        );
+                    } else if instruction.code & BPF_LOAD_STORE_MASK == BPF_ATOMIC {
+                        if !matches!(width, DataWidth::U32 | DataWidth::U64) {
+                            return Err(format!(
+                                "unsupported atomic operation of width {}",
+                                width.bytes()
+                            ));
+                        }
+                        let operation = instruction.imm as u8;
+                        let fetch = operation & BPF_FETCH == BPF_FETCH;
+                        let is_64 = width == DataWidth::U64;
+                        const BPF_ADD_AND_FETCH: u8 = BPF_ADD | BPF_FETCH;
+                        const BPF_AND_AND_FETCH: u8 = BPF_AND | BPF_FETCH;
+                        const BPF_OR_AND_FETCH: u8 = BPF_OR | BPF_FETCH;
+                        const BPF_XOR_AND_FETCH: u8 = BPF_XOR | BPF_FETCH;
+                        return match operation {
+                            BPF_ADD | BPF_ADD_AND_FETCH => {
+                                if is_64 {
+                                    self.atomic_add64(
+                                        context,
+                                        fetch,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                } else {
+                                    self.atomic_add(
+                                        context,
+                                        fetch,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                }
+                            }
+                            BPF_AND | BPF_AND_AND_FETCH => {
+                                if is_64 {
+                                    self.atomic_and64(
+                                        context,
+                                        fetch,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                } else {
+                                    self.atomic_and(
+                                        context,
+                                        fetch,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                }
+                            }
+                            BPF_OR | BPF_OR_AND_FETCH => {
+                                if is_64 {
+                                    self.atomic_or64(
+                                        context,
+                                        fetch,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                } else {
+                                    self.atomic_or(
+                                        context,
+                                        fetch,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                }
+                            }
+                            BPF_XOR | BPF_XOR_AND_FETCH => {
+                                if is_64 {
+                                    self.atomic_xor64(
+                                        context,
+                                        fetch,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                } else {
+                                    self.atomic_xor(
+                                        context,
+                                        fetch,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                }
+                            }
+                            BPF_XCHG => {
+                                if is_64 {
+                                    self.atomic_xchg64(
+                                        context,
+                                        fetch,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                } else {
+                                    self.atomic_xchg(
+                                        context,
+                                        fetch,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                }
+                            }
+                            BPF_CMPXCHG => {
+                                if is_64 {
+                                    self.atomic_cmpxchg64(
+                                        context,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                } else {
+                                    self.atomic_cmpxchg(
+                                        context,
+                                        instruction.dst_reg(),
+                                        instruction.off,
+                                        instruction.src_reg(),
+                                    )
+                                }
+                            }
+                            _ => Err(format!("invalid atomic operation {:x}", operation)),
+                        };
                     } else {
-                        Source::Reg(instruction.src_reg())
-                    };
-                    return self.store(context, instruction.dst_reg(), instruction.off, src, width);
+                        // Unsupported instruction.
+                        return invalid_op_code();
+                    }
                 }
             }
             _ => unreachable!(),

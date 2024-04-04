@@ -34,16 +34,17 @@ pub const BPF_SRC_REG: u8 = linux_uapi::BPF_X as u8;
 pub const BPF_SRC_IMM: u8 = linux_uapi::BPF_K as u8;
 pub const BPF_SRC_MASK: u8 = BPF_SRC_REG | BPF_SRC_IMM;
 
+// The mods for the load/store
 // The instruction code for immediate loads
 pub const BPF_IMM: u8 = linux_uapi::BPF_IMM as u8;
+pub const BPF_MEM: u8 = linux_uapi::BPF_MEM as u8;
+pub const BPF_ATOMIC: u8 = linux_uapi::BPF_ATOMIC as u8;
+pub const BPF_LOAD_STORE_MASK: u8 = BPF_IMM | BPF_MEM | BPF_ATOMIC;
 
 // The mask for the swap operations
 pub const BPF_TO_BE: u8 = linux_uapi::BPF_TO_BE as u8;
 pub const BPF_TO_LE: u8 = linux_uapi::BPF_TO_LE as u8;
 pub const BPF_END_TYPE_MASK: u8 = BPF_TO_BE | BPF_TO_LE;
-
-// The mask for the load/store mode
-pub const BPF_MEM: u8 = linux_uapi::BPF_MEM as u8;
 
 // The different size value
 pub const BPF_B: u8 = linux_uapi::BPF_B as u8;
@@ -83,6 +84,11 @@ pub const BPF_JLT: u8 = linux_uapi::BPF_JLT as u8;
 pub const BPF_JLE: u8 = linux_uapi::BPF_JLE as u8;
 pub const BPF_JSLT: u8 = linux_uapi::BPF_JSLT as u8;
 pub const BPF_JSLE: u8 = linux_uapi::BPF_JSLE as u8;
+
+// Specific atomic operation
+pub const BPF_FETCH: u8 = linux_uapi::BPF_FETCH as u8;
+pub const BPF_XCHG: u8 = linux_uapi::BPF_XCHG as u8;
+pub const BPF_CMPXCHG: u8 = linux_uapi::BPF_CMPXCHG as u8;
 
 // The load double operation that allows to write 64 bits into a register.
 pub const BPF_LDDW: u8 = BPF_LD | BPF_DW;
