@@ -153,8 +153,8 @@ class BlockBuffer {
   void *data_ = nullptr;
 };
 
-inline fs::SharedMutex &GetGlobalLock() {
-  static fbl::NoDestructor<fs::SharedMutex> global_lock;
+inline std::shared_mutex &GetGlobalLock() {
+  static fbl::NoDestructor<std::shared_mutex> global_lock;
   return *global_lock;
 }
 

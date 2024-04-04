@@ -115,12 +115,12 @@ struct DirtySeglistInfo {
 // for active log information
 struct CursegInfo {
   BlockBuffer<SummaryBlock> sum_blk;
-  uint32_t segno = 0;            // current segment number
-  uint32_t zone = 0;             // current zone number
-  uint32_t next_segno = 0;       // preallocated segment
-  fs::SharedMutex curseg_mutex;  // lock for consistency
-  uint16_t next_blkoff = 0;      // next block offset to write
-  uint8_t alloc_type = 0;        // current allocation type
+  uint32_t segno = 0;              // current segment number
+  uint32_t zone = 0;               // current zone number
+  uint32_t next_segno = 0;         // preallocated segment
+  std::shared_mutex curseg_mutex;  // lock for consistency
+  uint16_t next_blkoff = 0;        // next block offset to write
+  uint8_t alloc_type = 0;          // current allocation type
 };
 
 // For SIT manager
@@ -421,14 +421,14 @@ class SegmentManager {
   F2fs *fs_ = nullptr;
   SuperblockInfo &superblock_info_;
 
-  fs::SharedMutex sentry_lock_;        // to protect SIT cache
+  std::shared_mutex sentry_lock_;      // to protect SIT cache
   std::unique_ptr<SitInfo> sit_info_;  // whole segment information
 
-  fs::SharedMutex segmap_lock_;  // free segmap lock
+  std::shared_mutex segmap_lock_;  // free segmap lock
   std::unique_ptr<FreeSegmapInfo> free_info_
       __TA_GUARDED(segmap_lock_);  // free segment information
 
-  fs::SharedMutex seglist_lock_;  // lock for segment bitmaps
+  std::shared_mutex seglist_lock_;  // lock for segment bitmaps
   std::unique_ptr<DirtySeglistInfo> dirty_info_
       __TA_GUARDED(seglist_lock_);          // dirty segment information
   CursegInfo curseg_array_[kNrCursegType];  // active segment information

@@ -334,7 +334,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
 
   // Mutex for the data of this vnode. This is a shared mutex to support derived classes
   // implementing multiple simultaneous readers if desired.
-  mutable SharedMutex mutex_;
+  mutable std::shared_mutex mutex_;
 
   // Returns the number of open connections, not counting node_reference connections. See Open().
   size_t open_count() const __TA_REQUIRES_SHARED(mutex_) { return open_count_; }

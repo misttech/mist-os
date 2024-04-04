@@ -402,7 +402,7 @@ class FileCache {
   using PageTreeTraits = fbl::DefaultKeyedObjectTraits<pgoff_t, Page>;
   using PageTree = fbl::WAVLTree<pgoff_t, Page *, PageTreeTraits>;
 
-  fs::SharedMutex tree_lock_;
+  std::shared_mutex tree_lock_;
   // If its file is orphaned, set it to prevent further dirty Pages.
   std::atomic_flag is_orphan_ = ATOMIC_FLAG_INIT;
   std::condition_variable_any recycle_cvar_;

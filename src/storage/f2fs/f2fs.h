@@ -316,7 +316,7 @@ class F2fs final {
 
   bool on_recovery_ = false;  // recovery is doing or not
   // for inode number management
-  fs::SharedMutex vnode_set_mutex_;
+  std::shared_mutex vnode_set_mutex_;
   std::map<ino_t, uint32_t> vnode_set_ __TA_GUARDED(vnode_set_mutex_);
   size_t vnode_set_size_[static_cast<size_t>(VnodeSet::kMax)] __TA_GUARDED(vnode_set_mutex_) = {
       0,

@@ -11,32 +11,15 @@
 
 namespace fs {
 
-// Provides a wrapper around std::shared_mutex and std::shared_lock that has thread safety analysis
-// annotations. The current implementations do not have these so breaks thread safety analysis. This
-// wrapper contains only the parts of the API we need.
+// Drop-in replacement for std::shared_lock that has thread safety annotations. The current libcxx
+// implementation does not have these annotations, and thus don't work correctly.
 //
-// TODO: this can be removed and callers replaced with std::shared_mutex and std::shared_lock if we
-// update to an implementation that is annotated with thread capabilities properly.
-class __TA_CAPABILITY("shared_mutex") SharedMutex {
- public:
-  SharedMutex() = default;
-  SharedMutex(const SharedMutex&) = delete;
-
-  // Exclusive locking
-  void lock() __TA_ACQUIRE() { mutex_.lock(); }
-  void unlock() __TA_RELEASE() { mutex_.unlock(); }
-
-  // Shared locking.
-  void lock_shared() __TA_ACQUIRE_SHARED() { mutex_.lock_shared(); }
-  void unlock_shared() __TA_RELEASE_SHARED() { mutex_.unlock_shared(); }
-
- private:
-  std::shared_mutex mutex_;
-};
-
+// TODO(https://fxbug.dev/42080556): this can be removed replaced with std::shared_lock if we update
+// to an implementation that is annotated with the correct thread capabilities.
 class __TA_SCOPED_CAPABILITY SharedLock {
  public:
-  __WARN_UNUSED_CONSTRUCTOR explicit SharedLock(SharedMutex& m) __TA_ACQUIRE_SHARED(m) : lock_(m) {}
+  __WARN_UNUSED_CONSTRUCTOR explicit SharedLock(std::shared_mutex& m) __TA_ACQUIRE_SHARED(m)
+      : lock_(m) {}
   // It seems like this should be __TA_RELEASE_SHARED instead of __TA_RELEASE but
   // __TA_RELEASE_SHARED gives errors when a ScopedLock goes out of scope:
   //
@@ -50,7 +33,7 @@ class __TA_SCOPED_CAPABILITY SharedLock {
   void unlock() __TA_RELEASE() { lock_.unlock(); }
 
  private:
-  std::shared_lock<SharedMutex> lock_;
+  std::shared_lock<std::shared_mutex> lock_;
 };
 
 }  // namespace fs

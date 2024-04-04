@@ -464,7 +464,7 @@ class SuperblockInfo {
 
   std::vector<std::string> extension_list_;
 
-  fs::SharedMutex mutex_;  // for checkpoint data
+  std::shared_mutex mutex_;  // for checkpoint data
 };
 
 #if 0  // porting needed

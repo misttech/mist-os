@@ -75,7 +75,7 @@ class VnodeCache {
   using DirtyVnodeList = fbl::DoublyLinkedList<fbl::RefPtr<VnodeF2fs>>;
 
   std::mutex table_lock_{};
-  fs::SharedMutex list_lock_{};
+  std::shared_mutex list_lock_{};
   VnodeTable vnode_table_ __TA_GUARDED(table_lock_){};
   DirtyVnodeList dirty_list_ __TA_GUARDED(list_lock_){};
   uint64_t ndirty_dir_ __TA_GUARDED(list_lock_){0};

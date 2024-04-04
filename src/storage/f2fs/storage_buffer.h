@@ -68,7 +68,7 @@ class StorageBuffer {
   VmoKeyList free_keys_ __TA_GUARDED(mutex_);
   VmoKeyList reserved_keys_ __TA_GUARDED(mutex_);
   std::condition_variable_any cvar_;
-  fs::SharedMutex mutex_;
+  std::shared_mutex mutex_;
 };
 
 using OperationCallback = fit::function<void(const StorageOperations &, zx_status_t status)>;

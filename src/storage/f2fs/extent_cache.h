@@ -64,7 +64,7 @@ class ExtentTree : public fbl::WAVLTreeContainable<ExtentTree *> {
   // as the key.
   using ExtentNodeTreeTraits = fbl::DefaultKeyedObjectTraits<pgoff_t, ExtentNode>;
   using ExtentNodeTree = fbl::WAVLTree<pgoff_t, std::unique_ptr<ExtentNode>, ExtentNodeTreeTraits>;
-  fs::SharedMutex tree_lock_;
+  std::shared_mutex tree_lock_;
   ExtentNodeTree extent_node_tree_ __TA_GUARDED(tree_lock_);
   std::optional<ExtentInfo> largest_extent_info_ __TA_GUARDED(tree_lock_);
 };

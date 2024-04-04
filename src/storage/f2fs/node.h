@@ -213,8 +213,8 @@ class NodeManager {
   SuperblockInfo &superblock_info_;
   block_t nat_blkaddr_ = 0;  // starting block address of NAT
 
-  fs::SharedMutex nat_tree_lock_;   // protect nat_tree_lock
-  uint32_t nat_entries_count_ = 0;  // the number of nat cache entries
+  std::shared_mutex nat_tree_lock_;  // protect nat_tree_lock
+  uint32_t nat_entries_count_ = 0;   // the number of nat cache entries
 
   using NatTreeTraits = fbl::DefaultKeyedObjectTraits<nid_t, NatEntry>;
   using NatTree = fbl::WAVLTree<nid_t, std::unique_ptr<NatEntry>, NatTreeTraits>;
@@ -224,7 +224,7 @@ class NodeManager {
   NatList clean_nat_list_ __TA_GUARDED(nat_tree_lock_);  // a list for cached clean nats
   NatList dirty_nat_list_ __TA_GUARDED(nat_tree_lock_);  // a list for cached dirty nats
 
-  fs::SharedMutex free_nid_tree_lock_;                 // protect free nid list
+  std::shared_mutex free_nid_tree_lock_;               // protect free nid list
   std::mutex build_lock_;                              // lock for building free nids
   nid_t max_nid_ = 0;                                  // the maximum number of node ids
   nid_t next_scan_nid_ __TA_GUARDED(build_lock_) = 0;  // the next nid to be scanned

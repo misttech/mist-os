@@ -144,7 +144,7 @@ class VmoManager {
   zx::result<VmoMapping *> FindVmoNodeUnsafe(pgoff_t index) __TA_REQUIRES_SHARED(mutex_);
   zx::result<VmoMapping *> GetVmoNodeUnsafe(pgoff_t index) __TA_REQUIRES(mutex_);
 
-  fs::SharedMutex mutex_;
+  std::shared_mutex mutex_;
   VmoTree vmo_tree_ __TA_GUARDED(mutex_);
   const VmoMode mode_;
 
