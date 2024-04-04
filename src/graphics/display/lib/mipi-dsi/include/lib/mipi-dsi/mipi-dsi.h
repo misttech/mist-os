@@ -5,6 +5,8 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_MIPI_DSI_INCLUDE_LIB_MIPI_DSI_MIPI_DSI_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_MIPI_DSI_INCLUDE_LIB_MIPI_DSI_MIPI_DSI_H_
 
+#include <lib/stdcompat/span.h>
+
 #include <cstddef>
 #include <cstdint>
 
@@ -23,9 +25,11 @@
 // TODO(https://fxbug.dev/328078798): Move all the constants below to the
 // `mipi_dsi` namespace.
 
-// Assigned Virtual Channel ID
-// TODO(payamm): Will need to generate and maintain VCID for multi-display
-// solutions
+// Virtual Channel Identifier specified by the MIPI DSI Peripheral.
+//
+// All the MIPI DSI display panels specified in `lib/device-protocol/display-panel.h`
+// are programmed to use `kMipiDsiVirtualChanId` as their Virtual Channel
+// Identifier.
 constexpr uint8_t kMipiDsiVirtualChanId = 0;
 
 // Data types for DSI Processor-to-Peripheral packets.
@@ -213,6 +217,51 @@ enum class DsiPixelStreamPacketFormat : uint8_t {
   // mipi_dsi1 8.8.25 "Compressed Pixel Stream, Long Packet, Data Type =
   // 00 1011 (0x0B)", pages 104-105
   kCompressed = 0x0b,
+};
+
+// Describes a DSI Host(Processor)-to-Peripheral command and the Peripheral's
+// response.
+//
+// The Processor sends an outgoing packet composed of `virtual_channel_id`,
+// `data_type` and `payload`.
+//
+// `response` may point to a buffer to receive the payload bytes sent by the
+// Peripheral (before the Processor finishes reading from the Peripheral), or
+// a buffer that has the response payloads (after the reading finishes).
+struct DsiCommandAndResponse {
+  // Specifies the Virtual Channel the packet is transmitted on.
+  // Also known as "virtual channel identifier" in MIPI-DSI specs.
+  //
+  // Must be >= 0 and <= 3.
+  // Must match the hardware configuration of the Peripheral.
+  uint8_t virtual_channel_id;
+
+  // Specifies the type (short or long) and the format of the outgoing packet.
+  //
+  // Must be a valid Processor-sourced Data Type specified in mipi_dsi1
+  // Section 8.7 "Processor to Peripheral Direction (Processor-Sourced) Packet
+  // Data Types".
+  uint8_t data_type;
+
+  // The payload (application data) bytes in the Processor-to-Peripheral packet.
+  //
+  // Depending on the Processor-to-Peripheral `data_type`, `payload` may be
+  // empty.
+  //
+  // The size of `payload` must match the packet format specified in
+  // mipi_dsi1 Section 8.8 "Processor-to-Peripheral Transactions – Detailed
+  // Format Description".
+  cpp20::span<const uint8_t> payload;
+
+  // The buffer for the payload (application data) bytes in the
+  // Peripheral-to-Processor packet.
+  //
+  // Empty if the Processor expects to receive no payload bytes from the
+  // Peripheral.
+  //
+  // Otherwise, the Processor expects to receive exactly `response.size()`
+  // bytes of payload in the response sent by the Peripheral.
+  cpp20::span<uint8_t> response_payload;
 };
 
 }  // namespace mipi_dsi

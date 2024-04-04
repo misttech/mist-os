@@ -6,15 +6,16 @@
 
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/ddk/debug.h>
+#include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <fbl/auto_lock.h>
+#include <fbl/string_buffer.h>
 
 #include "src/graphics/display/lib/designware-dsi/dw-mipi-dsi-reg.h"
-#include "src/graphics/display/lib/mipi-dsi/include/lib/mipi-dsi/mipi-dsi.h"
 
 // Header Creation Macros
 #define GEN_HDR_WC_MSB(x) ((x & 0xFF) << 16)
@@ -73,6 +74,27 @@ constexpr int32_t DpiPixelToDphyLaneByteClockCycle(int32_t pixels, int64_t dpi_p
   int32_t dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio =
       static_cast<int32_t>(dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio_i64);
   return pixels * dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio;
+}
+
+void LogBytes(cpp20::span<const uint8_t> bytes) {
+  if (bytes.empty()) {
+    return;
+  }
+
+  static constexpr size_t kByteCountPerPrint = 16;
+  // Stores up to `kByteCountPerPrint` bytes in "0x01,0x02,..." format
+  static constexpr size_t kStringBufferSize = kByteCountPerPrint * 5 + 1;
+  fbl::StringBuffer<kStringBufferSize> string_buffer;
+  for (size_t i = 0; i < bytes.size(); i++) {
+    if (i % kByteCountPerPrint == 0 && i != 0) {
+      zxlogf(INFO, "%s", string_buffer.c_str());
+      string_buffer.Clear();
+    }
+    string_buffer.AppendPrintf("0x%02x,", bytes[i]);
+  }
+  if (!string_buffer.empty()) {
+    zxlogf(INFO, "%s", string_buffer.c_str());
+  }
 }
 
 }  // namespace
@@ -189,11 +211,32 @@ zx_status_t DsiHostController::PhyWaitForReady() {
 }
 
 zx_status_t DsiHostController::SendCmd(const mipi_dsi_cmd_t* cmd_list, size_t cmd_count) {
-  zx_status_t status = ZX_OK;
-  for (size_t i = 0; i < cmd_count && status == ZX_OK; i++) {
-    status = SendCommand(cmd_list[i]);
+  for (const mipi_dsi_cmd_t& banjo_command : cpp20::span(cmd_list, cmd_count)) {
+    const mipi_dsi::DsiCommandAndResponse command = {
+        .virtual_channel_id = banjo_command.virt_chn_id,
+        .data_type = banjo_command.dsi_data_type,
+        .payload = cpp20::span(banjo_command.pld_data_list, banjo_command.pld_data_count),
+        .response_payload = cpp20::span(banjo_command.rsp_data_list, banjo_command.rsp_data_count),
+    };
+    zx_status_t status = IssueCommand(command);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to issue a command: %s", zx_status_get_string(status));
+      return status;
+    }
   }
-  return status;
+  return ZX_OK;
+}
+
+zx::result<> DsiHostController::IssueCommands(
+    cpp20::span<const mipi_dsi::DsiCommandAndResponse> commands) {
+  for (const mipi_dsi::DsiCommandAndResponse& command : commands) {
+    zx_status_t status = IssueCommand(command);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to issue a command: %s", zx_status_get_string(status));
+      return zx::error(status);
+    }
+  }
+  return zx::ok();
 }
 
 void DsiHostController::SetMode(dsi_mode_t mode) {
@@ -437,18 +480,16 @@ zx_status_t DsiHostController::WaitforCmdNotFull() { return WaitforFifo(kBitCmdF
 
 zx_status_t DsiHostController::WaitforCmdEmpty() { return WaitforFifo(kBitCmdEmpty, 1); }
 
-void DsiHostController::DumpCmd(const mipi_dsi_cmd_t& cmd) {
-  zxlogf(ERROR, "\n\t\t MIPI DSI Command:");
-  zxlogf(ERROR, "\t\t\t\t VIC = 0x%x (%d)", cmd.virt_chn_id, cmd.virt_chn_id);
-  zxlogf(ERROR, "\t\t\t\t Data Type = 0x%x (%d)", cmd.dsi_data_type, cmd.dsi_data_type);
-  zxlogf(ERROR, "\t\t\t\t ACK = 0x%x (%d)", cmd.flags, cmd.flags);
-  zxlogf(ERROR, "\t\t\t\t Payload size = 0x%lx (%ld)", cmd.pld_data_count, cmd.pld_data_count);
-  zxlogf(ERROR, "\t\t\t\t Payload Data: [");
-
-  for (size_t i = 0; i < cmd.pld_data_count; i++) {
-    zxlogf(ERROR, "0x%x, ", cmd.pld_data_list[i]);
-  }
-  zxlogf(ERROR, "]\n");
+void DsiHostController::LogCommand(const mipi_dsi::DsiCommandAndResponse& command) {
+  zxlogf(INFO, "MIPI DSI Outgoing Packet:");
+  zxlogf(INFO, "Virtual Channel ID = 0x%x (%d)", command.virtual_channel_id,
+         command.virtual_channel_id);
+  zxlogf(INFO, "Data Type = 0x%x (%d)", command.data_type, command.data_type);
+  zxlogf(INFO, "Payload size = %zu", command.payload.size());
+  zxlogf(INFO, "Payload Data: [");
+  LogBytes(command.payload);
+  zxlogf(INFO, "]");
+  zxlogf(INFO, "Response payload size = %zu", command.response_payload.size());
 }
 
 zx_status_t DsiHostController::GenericPayloadRead(uint32_t* data) {
@@ -509,41 +550,52 @@ zx_status_t DsiHostController::WaitforBtaAck() {
 }
 
 // MIPI DSI Functions as implemented by DWC IP
-zx_status_t DsiHostController::GenWriteShort(const mipi_dsi_cmd_t& cmd) {
-  // Check that the payload size and command match
-  if ((cmd.pld_data_count > 2) || (cmd.pld_data_count > 0 && cmd.pld_data_list == nullptr) ||
-      (cmd.dsi_data_type & kMipiDsiDtGenShortWrite0) != kMipiDsiDtGenShortWrite0) {
-    zxlogf(ERROR, "Rejecting invalid generic short command");
+zx_status_t DsiHostController::GenWriteShort(const mipi_dsi::DsiCommandAndResponse& command) {
+  if (command.payload.size() > 2) {
+    zxlogf(ERROR, "Invalid payload size (%zu) for a Generic Short Write command",
+           command.payload.size());
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (command.data_type != kMipiDsiDtGenShortWrite0 &&
+      command.data_type != kMipiDsiDtGenShortWrite1 &&
+      command.data_type != kMipiDsiDtGenShortWrite2 &&
+      command.data_type != kMipiDsiDtSetMaxRetPkt) {
+    zxlogf(ERROR, "Invalid data type (%d) for Generic Short Write", command.data_type);
     return ZX_ERR_INVALID_ARGS;
   }
 
   uint32_t regVal = 0;
-  regVal |= GEN_HDR_DT(cmd.dsi_data_type);
-  regVal |= GEN_HDR_VC(cmd.virt_chn_id);
-  if (cmd.pld_data_count >= 1) {
-    regVal |= GEN_HDR_WC_LSB(cmd.pld_data_list[0]);
+  regVal |= GEN_HDR_DT(command.data_type);
+  regVal |= GEN_HDR_VC(command.virtual_channel_id);
+  if (command.payload.size() >= 1) {
+    regVal |= GEN_HDR_WC_LSB(command.payload[0]);
   }
-  if (cmd.pld_data_count == 2) {
-    regVal |= GEN_HDR_WC_MSB(cmd.pld_data_list[1]);
+  if (command.payload.size() == 2) {
+    regVal |= GEN_HDR_WC_MSB(command.payload[1]);
   }
 
   return GenericHdrWrite(regVal);
 }
 
-zx_status_t DsiHostController::DcsWriteShort(const mipi_dsi_cmd_t& cmd) {
+zx_status_t DsiHostController::DcsWriteShort(const mipi_dsi::DsiCommandAndResponse& command) {
   // Check that the payload size and command match
-  if ((cmd.pld_data_count != 1 && cmd.pld_data_count != 2) || (cmd.pld_data_list == nullptr) ||
-      (cmd.dsi_data_type & kMipiDsiDtDcsShortWrite0) != kMipiDsiDtDcsShortWrite0) {
-    zxlogf(ERROR, "Rejecting invalid DCS short command");
+  if (command.payload.size() != 1 && command.payload.size() != 2) {
+    zxlogf(ERROR, "Invalid payload size (%zu) for a DCS Short Write command",
+           command.payload.size());
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (command.data_type != kMipiDsiDtDcsShortWrite0 &&
+      command.data_type != kMipiDsiDtDcsShortWrite1) {
+    zxlogf(ERROR, "Invalid data type (%d) for Generic Short Write", command.data_type);
     return ZX_ERR_INVALID_ARGS;
   }
 
   uint32_t regVal = 0;
-  regVal |= GEN_HDR_DT(cmd.dsi_data_type);
-  regVal |= GEN_HDR_VC(cmd.virt_chn_id);
-  regVal |= GEN_HDR_WC_LSB(cmd.pld_data_list[0]);
-  if (cmd.pld_data_count == 2) {
-    regVal |= GEN_HDR_WC_MSB(cmd.pld_data_list[1]);
+  regVal |= GEN_HDR_DT(command.data_type);
+  regVal |= GEN_HDR_VC(command.virtual_channel_id);
+  regVal |= GEN_HDR_WC_LSB(command.payload[0]);
+  if (command.payload.size() == 2) {
+    regVal |= GEN_HDR_WC_MSB(command.payload[1]);
   }
 
   return GenericHdrWrite(regVal);
@@ -551,22 +603,18 @@ zx_status_t DsiHostController::DcsWriteShort(const mipi_dsi_cmd_t& cmd) {
 
 // This function writes a generic long command. We can only write a maximum of FIFO_DEPTH
 // to the payload fifo. This value is implementation specific.
-zx_status_t DsiHostController::GenWriteLong(const mipi_dsi_cmd_t& cmd) {
+zx_status_t DsiHostController::GenWriteLong(const mipi_dsi::DsiCommandAndResponse& command) {
   zx_status_t status = ZX_OK;
   uint32_t pld_data_idx = 0;  // payload data index
   uint32_t regVal = 0;
-  ZX_DEBUG_ASSERT(cmd.pld_data_count < kMaxPldFifoDepth);
-  size_t ts = cmd.pld_data_count;  // initial transfer size
 
-  if (ts > 0 && cmd.pld_data_list == nullptr) {
-    zxlogf(ERROR, "Rejecting invalid generic long write command");
-    return ZX_ERR_INVALID_ARGS;
-  }
+  ZX_DEBUG_ASSERT(command.payload.size() < kMaxPldFifoDepth);
+  size_t ts = command.payload.size();  // initial transfer size
 
   // first write complete words
   while (ts >= 4) {
-    regVal = cmd.pld_data_list[pld_data_idx + 0] << 0 | cmd.pld_data_list[pld_data_idx + 1] << 8 |
-             cmd.pld_data_list[pld_data_idx + 2] << 16 | cmd.pld_data_list[pld_data_idx + 3] << 24;
+    regVal = command.payload[pld_data_idx + 0] << 0 | command.payload[pld_data_idx + 1] << 8 |
+             command.payload[pld_data_idx + 2] << 16 | command.payload[pld_data_idx + 3] << 24;
     pld_data_idx += 4;
 
     status = GenericPayloadWrite(regVal);
@@ -579,12 +627,12 @@ zx_status_t DsiHostController::GenWriteLong(const mipi_dsi_cmd_t& cmd) {
 
   // Write remaining bytes
   if (ts > 0) {
-    regVal = cmd.pld_data_list[pld_data_idx++] << 0;
+    regVal = command.payload[pld_data_idx++] << 0;
     if (ts > 1) {
-      regVal |= cmd.pld_data_list[pld_data_idx++] << 8;
+      regVal |= command.payload[pld_data_idx++] << 8;
     }
     if (ts > 2) {
-      regVal |= cmd.pld_data_list[pld_data_idx++] << 16;
+      regVal |= command.payload[pld_data_idx++] << 16;
     }
     status = GenericPayloadWrite(regVal);
     if (status != ZX_OK) {
@@ -595,33 +643,36 @@ zx_status_t DsiHostController::GenWriteLong(const mipi_dsi_cmd_t& cmd) {
 
   // At this point, we have written all of our mipi payload to FIFO. Let's transmit it
   regVal = 0;
-  regVal |= GEN_HDR_DT(cmd.dsi_data_type);
-  regVal |= GEN_HDR_VC(cmd.virt_chn_id);
-  regVal |= GEN_HDR_WC_LSB(static_cast<uint32_t>(cmd.pld_data_count) & 0xFF);
-  regVal |= GEN_HDR_WC_MSB((cmd.pld_data_count & 0xFF00) >> 16);
+  regVal |= GEN_HDR_DT(command.data_type);
+  regVal |= GEN_HDR_VC(command.virtual_channel_id);
+  regVal |= GEN_HDR_WC_LSB(static_cast<uint32_t>(command.payload.size()) & 0xFF);
+  regVal |= GEN_HDR_WC_MSB((command.payload.size() & 0xFF00) >> 16);
 
   return GenericHdrWrite(regVal);
 }
 
-zx_status_t DsiHostController::GenRead(const mipi_dsi_cmd_t& cmd) {
+zx_status_t DsiHostController::GenRead(const mipi_dsi::DsiCommandAndResponse& command) {
   uint32_t regVal = 0;
   zx_status_t status = ZX_OK;
 
   // valid cmd packet
-  if ((cmd.rsp_data_list == nullptr) || (cmd.pld_data_count > 2) ||
-      (cmd.pld_data_count > 0 && cmd.pld_data_list == nullptr)) {
-    zxlogf(ERROR, "Rejecting invalid generic read command");
+  if (command.payload.size() > 2) {
+    zxlogf(ERROR, "Invalid payload size (%zu) for a Generic Read command", command.payload.size());
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (command.response_payload.empty()) {
+    zxlogf(ERROR, "Response payload buffer is empty for a Generic Read command");
     return ZX_ERR_INVALID_ARGS;
   }
 
   regVal = 0;
-  regVal |= GEN_HDR_DT(cmd.dsi_data_type);
-  regVal |= GEN_HDR_VC(cmd.virt_chn_id);
-  if (cmd.pld_data_count >= 1) {
-    regVal |= GEN_HDR_WC_LSB(cmd.pld_data_list[0]);
+  regVal |= GEN_HDR_DT(command.data_type);
+  regVal |= GEN_HDR_VC(command.virtual_channel_id);
+  if (command.payload.size() >= 1) {
+    regVal |= GEN_HDR_WC_LSB(command.payload[0]);
   }
-  if (cmd.pld_data_count == 2) {
-    regVal |= GEN_HDR_WC_MSB(cmd.pld_data_list[1]);
+  if (command.payload.size() == 2) {
+    regVal |= GEN_HDR_WC_MSB(command.payload[1]);
   }
 
   // Packet is ready. Let's enable BTA first
@@ -640,7 +691,7 @@ zx_status_t DsiHostController::GenRead(const mipi_dsi_cmd_t& cmd) {
   // Got ACK. Let's start reading
   // We should only read rlen worth of DATA. Let's hope the device is not sending
   // more than it should.
-  size_t ts = cmd.rsp_data_count;
+  size_t ts = command.response_payload.size();
   uint32_t rsp_data_idx = 0;
   uint32_t data;
   while (ts >= 4) {
@@ -649,10 +700,10 @@ zx_status_t DsiHostController::GenRead(const mipi_dsi_cmd_t& cmd) {
       zxlogf(ERROR, "Failed to read payload data: %s", zx_status_get_string(status));
       return status;
     }
-    cmd.rsp_data_list[rsp_data_idx++] = static_cast<uint8_t>((data >> 0) & 0xFF);
-    cmd.rsp_data_list[rsp_data_idx++] = static_cast<uint8_t>((data >> 8) & 0xFF);
-    cmd.rsp_data_list[rsp_data_idx++] = static_cast<uint8_t>((data >> 16) & 0xFF);
-    cmd.rsp_data_list[rsp_data_idx++] = static_cast<uint8_t>((data >> 24) & 0xFF);
+    command.response_payload[rsp_data_idx++] = static_cast<uint8_t>((data >> 0) & 0xFF);
+    command.response_payload[rsp_data_idx++] = static_cast<uint8_t>((data >> 8) & 0xFF);
+    command.response_payload[rsp_data_idx++] = static_cast<uint8_t>((data >> 16) & 0xFF);
+    command.response_payload[rsp_data_idx++] = static_cast<uint8_t>((data >> 24) & 0xFF);
     ts -= 4;
   }
 
@@ -663,12 +714,12 @@ zx_status_t DsiHostController::GenRead(const mipi_dsi_cmd_t& cmd) {
       zxlogf(ERROR, "Failed to read payload data: %s", zx_status_get_string(status));
       return status;
     }
-    cmd.rsp_data_list[rsp_data_idx++] = (data >> 0) & 0xFF;
+    command.response_payload[rsp_data_idx++] = (data >> 0) & 0xFF;
     if (ts > 1) {
-      cmd.rsp_data_list[rsp_data_idx++] = (data >> 8) & 0xFF;
+      command.response_payload[rsp_data_idx++] = (data >> 8) & 0xFF;
     }
     if (ts > 2) {
-      cmd.rsp_data_list[rsp_data_idx++] = (data >> 16) & 0xFF;
+      command.response_payload[rsp_data_idx++] = (data >> 16) & 0xFF;
     }
   }
 
@@ -677,39 +728,40 @@ zx_status_t DsiHostController::GenRead(const mipi_dsi_cmd_t& cmd) {
   return status;
 }
 
-zx_status_t DsiHostController::SendCommand(const mipi_dsi_cmd_t& cmd) {
+zx_status_t DsiHostController::IssueCommand(const mipi_dsi::DsiCommandAndResponse& command) {
   fbl::AutoLock lock(&command_lock_);
   zx_status_t status = ZX_OK;
 
-  switch (cmd.dsi_data_type) {
+  switch (command.data_type) {
     case kMipiDsiDtGenShortWrite0:
     case kMipiDsiDtGenShortWrite1:
     case kMipiDsiDtGenShortWrite2:
     case kMipiDsiDtSetMaxRetPkt:
-      status = GenWriteShort(cmd);
+      status = GenWriteShort(command);
       break;
     case kMipiDsiDtGenLongWrite:
     case kMipiDsiDtDcsLongWrite:
-      status = GenWriteLong(cmd);
+      status = GenWriteLong(command);
       break;
     case kMipiDsiDtGenShortRead0:
     case kMipiDsiDtGenShortRead1:
     case kMipiDsiDtGenShortRead2:
     case kMipiDsiDtDcsRead0:
-      status = GenRead(cmd);
+      status = GenRead(command);
       break;
     case kMipiDsiDtDcsShortWrite0:
     case kMipiDsiDtDcsShortWrite1:
-      status = DcsWriteShort(cmd);
+      status = DcsWriteShort(command);
       break;
     default:
-      zxlogf(ERROR, "Unsupported/Invalid DSI Command type: %d", cmd.dsi_data_type);
+      zxlogf(ERROR, "Unsupported/Invalid DSI command data type: %d", command.data_type);
       status = ZX_ERR_INVALID_ARGS;
   }
 
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to send DSI command: %s", zx_status_get_string(status));
-    DumpCmd(cmd);
+    zxlogf(ERROR, "Failed to perform DSI command and/or response: %s",
+           zx_status_get_string(status));
+    LogCommand(command);
   }
 
   return status;

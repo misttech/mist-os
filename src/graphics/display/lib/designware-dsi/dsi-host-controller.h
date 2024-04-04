@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_DSI_DSI_HOST_CONTROLLER_H_
 
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
+#include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/types.h>
@@ -25,6 +26,7 @@ class DsiHostController {
   void PowerDown();
   void SetMode(dsi_mode_t mode);
   zx_status_t SendCmd(const mipi_dsi_cmd_t* cmd_list, size_t cmd_count);
+  zx::result<> IssueCommands(cpp20::span<const mipi_dsi::DsiCommandAndResponse> commands);
   void PhyPowerUp();
   void PhyPowerDown();
   void PhySendCode(uint32_t code, uint32_t parameter);
@@ -44,18 +46,18 @@ class DsiHostController {
   zx_status_t WaitforPldRNotEmpty() TA_REQ(command_lock_);
   zx_status_t WaitforCmdNotFull() TA_REQ(command_lock_);
   zx_status_t WaitforCmdEmpty() TA_REQ(command_lock_);
-  void DumpCmd(const mipi_dsi_cmd_t& cmd);
+  void LogCommand(const mipi_dsi::DsiCommandAndResponse& command);
   zx_status_t GenericPayloadRead(uint32_t* data) TA_REQ(command_lock_);
   zx_status_t GenericHdrWrite(uint32_t data) TA_REQ(command_lock_);
   zx_status_t GenericPayloadWrite(uint32_t data) TA_REQ(command_lock_);
   void EnableBta() TA_REQ(command_lock_);
   void DisableBta() TA_REQ(command_lock_);
   zx_status_t WaitforBtaAck() TA_REQ(command_lock_);
-  zx_status_t GenWriteShort(const mipi_dsi_cmd_t& cmd) TA_REQ(command_lock_);
-  zx_status_t DcsWriteShort(const mipi_dsi_cmd_t& cmd) TA_REQ(command_lock_);
-  zx_status_t GenWriteLong(const mipi_dsi_cmd_t& cmd) TA_REQ(command_lock_);
-  zx_status_t GenRead(const mipi_dsi_cmd_t& cmd) TA_REQ(command_lock_);
-  zx_status_t SendCommand(const mipi_dsi_cmd_t& cmd);
+  zx_status_t GenWriteShort(const mipi_dsi::DsiCommandAndResponse& command) TA_REQ(command_lock_);
+  zx_status_t DcsWriteShort(const mipi_dsi::DsiCommandAndResponse& command) TA_REQ(command_lock_);
+  zx_status_t GenWriteLong(const mipi_dsi::DsiCommandAndResponse& command) TA_REQ(command_lock_);
+  zx_status_t GenRead(const mipi_dsi::DsiCommandAndResponse& command) TA_REQ(command_lock_);
+  zx_status_t IssueCommand(const mipi_dsi::DsiCommandAndResponse& command);
   zx_status_t GetColorCode(color_code_t c, bool& packed, uint8_t& code);
   zx_status_t GetVideoMode(video_mode_t v, uint8_t& mode);
 
