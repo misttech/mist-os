@@ -1265,8 +1265,8 @@ impl Task {
     }
 
     /// Get the SELinux security ID of the current task, or `None` if not set.
-    pub fn get_current_sid(&self) -> Option<SecurityId> {
-        self.thread_group.read().selinux_state.as_ref().map(|state| state.current_sid)
+    pub fn get_current_sid(&self) -> SecurityId {
+        self.thread_group.read().selinux_state.current_sid
     }
 
     fn update_logging_span(&self, debug_info: &starnix_logging::TaskDebugInfo) {

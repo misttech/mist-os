@@ -496,10 +496,14 @@ mod tests {
 
         // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
         // in the system.
-        let elf_state = SeLinuxResolvedElfState { sid: SecurityId::initial(InitialSid::Kernel) };
-        assert_eq!(task.thread_group.read().selinux_state.as_ref(), None);
+        let kernel_sid = SecurityId::initial(InitialSid::Kernel);
+        let elf_state = SeLinuxResolvedElfState { sid: kernel_sid };
+
+        assert!(task.thread_group.read().selinux_state.current_sid != kernel_sid);
+
+        let before_hook_sid = task.thread_group.read().selinux_state.current_sid;
         update_state_on_exec(&mut task, &Some(elf_state));
-        assert_eq!(task.thread_group.read().selinux_state.as_ref(), None);
+        assert_eq!(task.thread_group.read().selinux_state.current_sid, before_hook_sid);
     }
 
     #[fuchsia::test]
@@ -515,10 +519,7 @@ mod tests {
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid };
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut task, &Some(elf_state));
-        assert_eq!(
-            task.thread_group.read().selinux_state.as_ref().expect("missing SELinux state"),
-            &initial_state
-        );
+        assert_eq!(task.thread_group.read().selinux_state, initial_state);
     }
 
     #[fuchsia::test]
@@ -527,7 +528,7 @@ mod tests {
         let initial_state = SeLinuxThreadGroupState::for_kernel();
         let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
         let mut task = task;
-        task.thread_group.write().selinux_state = Some(initial_state.clone());
+        task.thread_group.write().selinux_state = initial_state.clone();
 
         let elf_sid = kernel
             .security_server
@@ -538,15 +539,7 @@ mod tests {
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid };
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut task, &Some(elf_state));
-        assert_eq!(
-            task.thread_group
-                .read()
-                .selinux_state
-                .as_ref()
-                .expect("missing SELinux state")
-                .current_sid,
-            elf_sid
-        );
+        assert_eq!(task.thread_group.read().selinux_state.current_sid, elf_sid);
     }
 
     #[fuchsia::test]
@@ -556,8 +549,7 @@ mod tests {
         let initial_state = SeLinuxThreadGroupState::for_kernel();
         let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
         let mut task = task;
-        task.thread_group.write().selinux_state = Some(initial_state.clone());
-
+        task.thread_group.write().selinux_state = initial_state.clone();
         let elf_sid = kernel
             .security_server
             .as_ref()
@@ -567,15 +559,7 @@ mod tests {
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid };
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut task, &Some(elf_state));
-        assert_eq!(
-            task.thread_group
-                .read()
-                .selinux_state
-                .as_ref()
-                .expect("missing SELinux state")
-                .current_sid,
-            elf_sid
-        );
+        assert_eq!(task.thread_group.read().selinux_state.current_sid, elf_sid);
     }
 
     #[fuchsia::test]

@@ -113,7 +113,7 @@ pub struct ThreadGroupMutableState {
     pub terminating: bool,
 
     /// The SELinux operations for this thread group.
-    pub selinux_state: Option<thread_group_hooks::SeLinuxThreadGroupState>,
+    pub selinux_state: thread_group_hooks::SeLinuxThreadGroupState,
 
     /// Time statistics accumulated from the children.
     pub children_time_stats: TaskTimeStats,
@@ -376,10 +376,8 @@ impl ThreadGroup {
     {
         let timers = TimerTable::new();
         let itimer_real_id = timers.create(CLOCK_REALTIME as ClockId, None).unwrap();
-        let selinux_state = thread_group_hooks::alloc_security(
-            &kernel,
-            parent.as_ref().and_then(|p| p.selinux_state.as_ref()),
-        );
+        let selinux_state =
+            thread_group_hooks::alloc_security(&kernel, parent.as_ref().map(|p| &p.selinux_state));
         let mut thread_group = ThreadGroup {
             kernel,
             process,
@@ -1297,12 +1295,13 @@ impl ThreadGroup {
         None
     }
 
-    /// Get the SELinux security ID of the thread group, or `None` if not set.
-    pub fn get_current_sid(&self) -> Option<SecurityId> {
+    /// Get the SELinux security ID of the thread group.
+    /// Returns a placeholder value if SELinux is not enabled.
+    pub fn get_current_sid(&self) -> SecurityId {
         // TODO(http://b/316181721): to avoid TOCTOU issues, once initial security contexts are
         // propagated to tasks in the system, in some cases using this API will need to be replaced
         // with call sites holding the state lock while making updates.
-        self.mutable_state.read().selinux_state.as_ref().map(|state| state.current_sid)
+        self.mutable_state.read().selinux_state.current_sid
     }
 }
 

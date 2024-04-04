@@ -3492,14 +3492,7 @@ impl BinderDriver {
                             .security_server
                             .as_ref()
                             .expect("SELinux is not enabled");
-                        let sid = target_task
-                            .thread_group
-                            .read()
-                            .selinux_state
-                            .as_ref()
-                            .expect("Using selinux state without SELinux enabled")
-                            .current_sid
-                            .clone();
+                        let sid = target_task.thread_group.read().selinux_state.current_sid.clone();
                         let mut security_context = security_server
                             .sid_to_security_context(sid)
                             .map_or(FsString::default(), FsString::from);

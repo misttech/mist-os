@@ -665,18 +665,17 @@ impl BytesFileOps for SeProcAttrNode {
         // SELinux is enabled, so the task must have `selinux_state`. Lock it for writing
         // and update it.
         let mut tg = task.thread_group.write();
-        let selinux_state = tg.selinux_state.as_mut().unwrap();
 
         use SeProcAttrNodeType::*;
         match self.attr {
-            Current => selinux_state.current_sid = sid.ok_or(errno!(EINVAL))?,
-            Exec => selinux_state.exec_sid = sid,
-            FsCreate => selinux_state.fscreate_sid = sid,
-            KeyCreate => selinux_state.keycreate_sid = sid,
+            Current => tg.selinux_state.current_sid = sid.ok_or(errno!(EINVAL))?,
+            Exec => tg.selinux_state.exec_sid = sid,
+            FsCreate => tg.selinux_state.fscreate_sid = sid,
+            KeyCreate => tg.selinux_state.keycreate_sid = sid,
             Previous => {
                 return error!(EINVAL);
             }
-            SockCreate => selinux_state.sockcreate_sid = sid,
+            SockCreate => tg.selinux_state.sockcreate_sid = sid,
         };
 
         Ok(())
@@ -692,14 +691,14 @@ impl BytesFileOps for SeProcAttrNode {
                 // Read the specified SELinux attribute's SID.
                 let sid = {
                     let tg = task.thread_group.read();
-                    tg.selinux_state.as_ref().and_then(|selinux_state| match self.attr {
-                        Current => Some(selinux_state.current_sid),
-                        Exec => selinux_state.exec_sid,
-                        FsCreate => selinux_state.fscreate_sid,
-                        KeyCreate => selinux_state.keycreate_sid,
-                        Previous => Some(selinux_state.previous_sid),
-                        SockCreate => selinux_state.sockcreate_sid,
-                    })
+                    match self.attr {
+                        Current => Some(tg.selinux_state.current_sid),
+                        Exec => tg.selinux_state.exec_sid,
+                        FsCreate => tg.selinux_state.fscreate_sid,
+                        KeyCreate => tg.selinux_state.keycreate_sid,
+                        Previous => Some(tg.selinux_state.previous_sid),
+                        SockCreate => tg.selinux_state.sockcreate_sid,
+                    }
                 };
 
                 // Convert it to a Security Context string.

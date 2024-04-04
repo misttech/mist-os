@@ -15,7 +15,7 @@ use starnix_uapi::{
 /// Checks if creating a task is allowed.
 pub(crate) fn check_task_create_access(
     permission_check: &impl PermissionCheck,
-    task_sid: Option<SecurityId>,
+    task_sid: SecurityId,
 ) -> Result<(), Errno> {
     // When creating a process there is no transition involved, the source and target SIDs
     // are the current SID.
@@ -27,52 +27,46 @@ pub(crate) fn check_task_create_access(
 /// elf if all required permissions are allowed.
 pub(crate) fn check_exec_access(
     permission_check: &impl PermissionCheck,
-    selinux_state: &Option<SeLinuxThreadGroupState>,
+    selinux_state: &SeLinuxThreadGroupState,
 ) -> Result<Option<SeLinuxResolvedElfState>, Errno> {
-    return selinux_state.as_ref().map_or(Ok(None), |selinux_state| {
-        let current_sid = selinux_state.current_sid;
-        let new_sid = if let Some(exec_sid) = selinux_state.exec_sid {
-            // Use the proc exec SID if set.
-            exec_sid
-        } else {
-            // TODO(http://b/320436714): Check typetransition rules from the current security
-            // context to the executable's security context. If none, use the current security
-            // context.
-            current_sid
-        };
-        if current_sid == new_sid {
-            // No domain transition.
-            // TODO(http://b/320436714): check that the current security context has execute
-            // rights to the executable file.
-        } else {
-            // Domain transition, check that transition is allowed.
-            if !permission_check.has_permission(current_sid, new_sid, ProcessPermission::Transition)
-            {
-                return error!(EACCES);
-            }
-            // TODO(http://b/320436714): Check executable permissions:
-            // - allow rule from `new_sid` to the executable's security context for entrypoint
-            //   permissions
-            // - allow rule from `current_sid` to the executable's security context for read
-            //   and execute permissions
+    let current_sid = selinux_state.current_sid;
+    let new_sid = if let Some(exec_sid) = selinux_state.exec_sid {
+        // Use the proc exec SID if set.
+        exec_sid
+    } else {
+        // TODO(http://b/320436714): Check typetransition rules from the current security
+        // context to the executable's security context. If none, use the current security
+        // context.
+        current_sid
+    };
+    if current_sid == new_sid {
+        // No domain transition.
+        // TODO(http://b/320436714): check that the current security context has execute
+        // rights to the executable file.
+    } else {
+        // Domain transition, check that transition is allowed.
+        if !permission_check.has_permission(current_sid, new_sid, ProcessPermission::Transition) {
+            return error!(EACCES);
         }
-        return Ok(Some(SeLinuxResolvedElfState { sid: new_sid }));
-    });
+        // TODO(http://b/320436714): Check executable permissions:
+        // - allow rule from `new_sid` to the executable's security context for entrypoint
+        //   permissions
+        // - allow rule from `current_sid` to the executable's security context for read
+        //   and execute permissions
+    }
+    Ok(Some(SeLinuxResolvedElfState { sid: new_sid }))
 }
 
 /// Updates the SELinux thread group state on exec, using the security ID associated with the
 /// resolved elf.
 pub(crate) fn update_state_on_exec(
-    selinux_state: &mut Option<SeLinuxThreadGroupState>,
+    selinux_state: &mut SeLinuxThreadGroupState,
     elf_selinux_state: &Option<SeLinuxResolvedElfState>,
 ) {
     // TODO(http://b/316181721): check if the previous state needs to be updated regardless.
     if let Some(elf_selinux_state) = elf_selinux_state {
-        selinux_state.as_mut().map(|selinux_state| {
-            selinux_state.previous_sid = selinux_state.current_sid;
-            selinux_state.current_sid = elf_selinux_state.sid;
-            selinux_state
-        });
+        selinux_state.previous_sid = selinux_state.current_sid;
+        selinux_state.current_sid = elf_selinux_state.sid;
     }
 }
 
@@ -81,8 +75,8 @@ pub(crate) fn update_state_on_exec(
 /// `permission`.
 pub fn check_getsched_access(
     permission_check: &impl PermissionCheck,
-    source_sid: Option<SecurityId>,
-    target_sid: Option<SecurityId>,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
 ) -> Result<(), Errno> {
     check_permission(permission_check, source_sid, target_sid, ProcessPermission::GetSched)
 }
@@ -91,8 +85,8 @@ pub fn check_getsched_access(
 /// `target_sid`.
 pub(crate) fn check_setsched_access(
     permission_check: &impl PermissionCheck,
-    source_sid: Option<SecurityId>,
-    target_sid: Option<SecurityId>,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
 ) -> Result<(), Errno> {
     check_permission(permission_check, source_sid, target_sid, ProcessPermission::SetSched)
 }
@@ -101,8 +95,8 @@ pub(crate) fn check_setsched_access(
 /// `target_sid`.
 pub(crate) fn check_getpgid_access(
     permission_check: &impl PermissionCheck,
-    source_sid: Option<SecurityId>,
-    target_sid: Option<SecurityId>,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
 ) -> Result<(), Errno> {
     check_permission(permission_check, source_sid, target_sid, ProcessPermission::GetPgid)
 }
@@ -111,8 +105,8 @@ pub(crate) fn check_getpgid_access(
 /// `target_sid`.
 pub(crate) fn check_setpgid_access(
     permission_check: &impl PermissionCheck,
-    source_sid: Option<SecurityId>,
-    target_sid: Option<SecurityId>,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
 ) -> Result<(), Errno> {
     check_permission(permission_check, source_sid, target_sid, ProcessPermission::SetPgid)
 }
@@ -120,8 +114,8 @@ pub(crate) fn check_setpgid_access(
 /// Checks if the task with `source_sid` is allowed to send `signal` to the task with `target_sid`.
 pub(crate) fn check_signal_access(
     permission_check: &impl PermissionCheck,
-    source_sid: Option<SecurityId>,
-    target_sid: Option<SecurityId>,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
     signal: Signal,
 ) -> Result<(), Errno> {
     match signal {
@@ -146,8 +140,8 @@ pub(crate) fn check_signal_access(
 /// Checks if the task with `source_sid` is allowed to trace the task with `target_sid`.
 pub(crate) fn check_ptrace_access(
     permission_check: &impl PermissionCheck,
-    source_sid: Option<SecurityId>,
-    target_sid: Option<SecurityId>,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
 ) -> Result<(), Errno> {
     check_permission(permission_check, source_sid, target_sid, ProcessPermission::Ptrace)
 }
@@ -155,34 +149,28 @@ pub(crate) fn check_ptrace_access(
 /// Checks if `permission` is allowed from the task with `source_sid` to the task with `target_sid`.
 fn check_permission(
     permission_check: &impl PermissionCheck,
-    source_sid: Option<SecurityId>,
-    target_sid: Option<SecurityId>,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
     permission: ProcessPermission,
 ) -> Result<(), Errno> {
-    // TODO(http://b/316181721): once security contexts are propagated to all tasks, revisit
-    // whether to deny access if the source or target SIDs are not set.
-    return source_sid.map_or(Ok(()), |source_sid| {
-        target_sid.map_or(Ok(()), |target_sid| {
-            match permission_check.has_permission(source_sid, target_sid, permission) {
-                true => Ok(()),
-                false => error!(EACCES),
-            }
-        })
-    });
+    match permission_check.has_permission(source_sid, target_sid, permission) {
+        true => Ok(()),
+        false => error!(EACCES),
+    }
 }
 
 /// Returns an `SeLinuxThreadGroupState` instance for a new task.
 pub fn alloc_security(
     kernel: &Kernel,
     parent: Option<&SeLinuxThreadGroupState>,
-) -> Option<SeLinuxThreadGroupState> {
+) -> SeLinuxThreadGroupState {
     if kernel.security_server.is_none() {
-        return None;
+        return SeLinuxThreadGroupState::for_selinux_disabled();
     };
-    Some(match parent {
+    match parent {
         Some(parent) => parent.clone(),
         None => SeLinuxThreadGroupState::for_kernel(),
-    })
+    }
 }
 
 /// The SELinux security structure for `ThreadGroup`.
@@ -209,10 +197,22 @@ pub struct SeLinuxThreadGroupState {
 
 impl SeLinuxThreadGroupState {
     /// Returns initial state for the kernel's root thread group.
-    pub fn for_kernel() -> Self {
+    pub(crate) fn for_kernel() -> Self {
         Self {
             current_sid: SecurityId::initial(InitialSid::Kernel),
             previous_sid: SecurityId::initial(InitialSid::Kernel),
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            sockcreate_sid: None,
+        }
+    }
+
+    /// Returns placeholder state for use when SELinux is not enabled.
+    fn for_selinux_disabled() -> Self {
+        Self {
+            current_sid: SecurityId::initial(InitialSid::Unlabeled),
+            previous_sid: SecurityId::initial(InitialSid::Unlabeled),
             exec_sid: None,
             fscreate_sid: None,
             keycreate_sid: None,
@@ -250,11 +250,9 @@ mod tests {
     #[fuchsia::test]
     fn task_create_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:fork_yes_t:s0")
-                .expect("invalid security context"),
-        );
+        let sid = security_server
+            .security_context_to_sid(b"u:object_r:fork_yes_t:s0")
+            .expect("invalid security context");
 
         assert_eq!(check_task_create_access(&security_server.as_permission_check(), sid), Ok(()));
     }
@@ -262,11 +260,9 @@ mod tests {
     #[fuchsia::test]
     fn task_create_denied_for_denied_type() {
         let security_server = security_server_with_policy();
-        let sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:fork_no_t:s0")
-                .expect("invalid security context"),
-        );
+        let sid = security_server
+            .security_context_to_sid(b"u:object_r:fork_no_t:s0")
+            .expect("invalid security context");
 
         assert_eq!(
             check_task_create_access(&security_server.as_permission_check(), sid),
@@ -284,14 +280,14 @@ mod tests {
         let exec_sid = security_server
             .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0")
             .expect("invalid security context");
-        let selinux_state = Some(SeLinuxThreadGroupState {
+        let selinux_state = SeLinuxThreadGroupState {
             current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
-        });
+        };
 
         assert_eq!(
             check_exec_access(&security_server.as_permission_check(), &selinux_state),
@@ -308,14 +304,14 @@ mod tests {
         let exec_sid = security_server
             .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0")
             .expect("invalid security context");
-        let selinux_state = Some(SeLinuxThreadGroupState {
+        let selinux_state = SeLinuxThreadGroupState {
             current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
-        });
+        };
 
         assert_eq!(
             check_exec_access(&security_server.as_permission_check(), &selinux_state),
@@ -326,16 +322,16 @@ mod tests {
     #[fuchsia::test]
     fn no_state_update_if_no_elf_state() {
         let initial_state = SeLinuxThreadGroupState::for_kernel();
-        let mut selinux_state = Some(initial_state.clone());
+        let mut selinux_state = initial_state.clone();
         update_state_on_exec(&mut selinux_state, &None);
-        assert_eq!(selinux_state.expect("missing SELinux state"), initial_state);
+        assert_eq!(selinux_state, initial_state);
     }
 
     #[fuchsia::test]
     fn state_is_updated_on_exec() {
         let security_server = security_server_with_policy();
         let initial_state = SeLinuxThreadGroupState::for_kernel();
-        let mut selinux_state = Some(initial_state.clone());
+        let mut selinux_state = initial_state.clone();
 
         let elf_sid = security_server
             .security_context_to_sid(b"u:object_r:test_valid_t:s0")
@@ -344,7 +340,7 @@ mod tests {
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut selinux_state, &Some(elf_state));
         assert_eq!(
-            selinux_state.expect("missing SELinux state"),
+            selinux_state,
             SeLinuxThreadGroupState {
                 current_sid: elf_sid,
                 exec_sid: initial_state.exec_sid,
@@ -359,16 +355,12 @@ mod tests {
     #[fuchsia::test]
     fn getsched_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_getsched_yes_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getsched_yes_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0")
+            .expect("invalid security context");
 
         assert_eq!(
             check_getsched_access(&security_server.as_permission_check(), source_sid, target_sid),
@@ -379,16 +371,12 @@ mod tests {
     #[fuchsia::test]
     fn getsched_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_getsched_no_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getsched_no_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0")
+            .expect("invalid security context");
 
         assert_eq!(
             check_getsched_access(&security_server.as_permission_check(), source_sid, target_sid),
@@ -399,16 +387,13 @@ mod tests {
     #[fuchsia::test]
     fn setsched_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_setsched_yes_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_setsched_target_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_setsched_yes_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_setsched_target_t:s0")
+            .expect("invalid security context");
+
         assert_eq!(
             check_setsched_access(&security_server.as_permission_check(), source_sid, target_sid),
             Ok(())
@@ -418,16 +403,13 @@ mod tests {
     #[fuchsia::test]
     fn setsched_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_setsched_no_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_setsched_target_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_setsched_no_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_setsched_target_t:s0")
+            .expect("invalid security context");
+
         assert_eq!(
             check_setsched_access(&security_server.as_permission_check(), source_sid, target_sid),
             error!(EACCES)
@@ -437,16 +419,13 @@ mod tests {
     #[fuchsia::test]
     fn getpgid_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_getpgid_yes_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_getpgid_target_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getpgid_yes_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getpgid_target_t:s0")
+            .expect("invalid security context");
+
         assert_eq!(
             check_getpgid_access(&security_server.as_permission_check(), source_sid, target_sid),
             Ok(())
@@ -456,16 +435,13 @@ mod tests {
     #[fuchsia::test]
     fn getpgid_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_getpgid_no_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_getpgid_target_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getpgid_no_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getpgid_target_t:s0")
+            .expect("invalid security context");
+
         assert_eq!(
             check_getpgid_access(&security_server.as_permission_check(), source_sid, target_sid),
             error!(EACCES)
@@ -475,16 +451,12 @@ mod tests {
     #[fuchsia::test]
     fn sigkill_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_kill_sigkill_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_kill_sigkill_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
+            .expect("invalid security context");
 
         assert_eq!(
             check_signal_access(
@@ -500,16 +472,12 @@ mod tests {
     #[fuchsia::test]
     fn sigchld_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_kill_sigchld_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_kill_sigchld_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
+            .expect("invalid security context");
 
         assert_eq!(
             check_signal_access(
@@ -525,16 +493,12 @@ mod tests {
     #[fuchsia::test]
     fn sigstop_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_kill_sigstop_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_kill_sigstop_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
+            .expect("invalid security context");
 
         assert_eq!(
             check_signal_access(
@@ -550,16 +514,12 @@ mod tests {
     #[fuchsia::test]
     fn signal_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_kill_signal_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_kill_signal_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
+            .expect("invalid security context");
 
         // The `signal` permission allows signals other than SIGKILL, SIGCHLD, SIGSTOP.
         assert_eq!(
@@ -576,16 +536,12 @@ mod tests {
     #[fuchsia::test]
     fn signal_access_denied_for_denied_signals() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_kill_signal_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_kill_signal_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
+            .expect("invalid security context");
 
         // The `signal` permission does not allow SIGKILL, SIGCHLD or SIGSTOP.
         for signal in [SIGCHLD, SIGKILL, SIGSTOP] {
@@ -604,16 +560,12 @@ mod tests {
     #[fuchsia::test]
     fn ptrace_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_ptrace_tracer_yes_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_ptrace_tracer_yes_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0")
+            .expect("invalid security context");
 
         assert_eq!(
             check_ptrace_access(&security_server.as_permission_check(), source_sid, target_sid),
@@ -624,16 +576,13 @@ mod tests {
     #[fuchsia::test]
     fn ptrace_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
-        let source_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_ptrace_tracer_no_t:s0")
-                .expect("invalid security context"),
-        );
-        let target_sid = Some(
-            security_server
-                .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0")
-                .expect("invalid security context"),
-        );
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_ptrace_tracer_no_t:s0")
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0")
+            .expect("invalid security context");
+
         assert_eq!(
             check_ptrace_access(&security_server.as_permission_check(), source_sid, target_sid),
             error!(EACCES)
@@ -644,8 +593,7 @@ mod tests {
     async fn alloc_security_selinux_disabled() {
         let (kernel, _current_task) = create_kernel_and_task();
 
-        let selinux_state = alloc_security(&kernel, None);
-        assert_eq!(selinux_state, None);
+        alloc_security(&kernel, None);
     }
 
     #[fuchsia::test]
@@ -655,14 +603,14 @@ mod tests {
         let selinux_state = alloc_security(&kernel, None);
         assert_eq!(
             selinux_state,
-            Some(SeLinuxThreadGroupState {
+            SeLinuxThreadGroupState {
                 current_sid: SecurityId::initial(InitialSid::Kernel),
                 previous_sid: SecurityId::initial(InitialSid::Kernel),
                 exec_sid: None,
                 fscreate_sid: None,
                 keycreate_sid: None,
                 sockcreate_sid: None,
-            })
+            }
         );
     }
 
@@ -672,7 +620,7 @@ mod tests {
         let (kernel, _current_task) = create_kernel_and_task_with_selinux(security_server);
 
         // Create a fake parent state, with values for some fields, to check for.
-        let mut parent_selinux_state = alloc_security(&kernel, None).unwrap();
+        let mut parent_selinux_state = alloc_security(&kernel, None);
         parent_selinux_state.current_sid = SecurityId::initial(InitialSid::Unlabeled);
         parent_selinux_state.exec_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
         parent_selinux_state.fscreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
@@ -680,6 +628,6 @@ mod tests {
         parent_selinux_state.sockcreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
 
         let selinux_state = alloc_security(&kernel, Some(&parent_selinux_state));
-        assert_eq!(selinux_state, Some(parent_selinux_state));
+        assert_eq!(selinux_state, parent_selinux_state);
     }
 }
