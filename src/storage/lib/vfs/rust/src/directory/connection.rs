@@ -11,7 +11,7 @@ use crate::{
         traversal_position::TraversalPosition,
         DirectoryOptions,
     },
-    execution_scope::ExecutionScope,
+    execution_scope::{yield_to_executor, ExecutionScope},
     node::{Node as _, OpenNode},
     object_request::Representation,
     path::Path,
@@ -23,8 +23,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
-    futures::future::poll_fn,
-    std::{convert::TryInto as _, task::Poll},
+    std::convert::TryInto as _,
     storage_trace::{self as trace, TraceFutureExt},
 };
 
@@ -43,22 +42,6 @@ pub trait DerivedConnection: Send + Sync {
 
     /// Whether these connections support mutable connections.
     const MUTABLE: bool;
-}
-
-async fn yield_to_executor() {
-    // Yield to the executor now, which should provide an opportunity for the spawned future to
-    // run.
-    let mut done = false;
-    poll_fn(|cx| {
-        if done {
-            Poll::Ready(())
-        } else {
-            done = true;
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    })
-    .await;
 }
 
 /// Handles functionality shared between mutable and immutable FIDL connections to a directory.  A

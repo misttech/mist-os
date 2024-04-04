@@ -29,6 +29,7 @@ use {
     pin_project::pin_project,
     slab::Slab,
     std::{
+        future::poll_fn,
         pin::Pin,
         sync::{Arc, Mutex},
     },
@@ -69,11 +70,18 @@ struct Inner {
     /// Waiters waiting for all tasks to be terminated.
     waiters: std::vec::Vec<oneshot::Sender<()>>,
 
-    /// Records if shutdown has been called on the executor.
-    is_shutdown: bool,
+    /// Records the kind of shutdown that has been called on the executor.
+    shutdown_state: ShutdownState,
 
     /// The number of active tasks preventing shutdown.
     active_count: usize,
+}
+
+#[derive(Copy, Clone, PartialEq)]
+enum ShutdownState {
+    Active,
+    Shutdown,
+    ForceShutdown,
 }
 
 impl Inner {
@@ -83,7 +91,7 @@ impl Inner {
     fn check_active_count(&mut self) {
         if self.active_count == 0 {
             // If shutting down, wake all registered tasks which will cause them to terminate.
-            if self.is_shutdown {
+            if self.shutdown_state == ShutdownState::Shutdown {
                 for (_, waker) in &self.registered {
                     waker.wake_by_ref();
                 }
@@ -179,6 +187,21 @@ impl ExecutionScope {
         self.executor.shutdown();
     }
 
+    /// Forcibly shut down the executor without respecting the active guards.
+    pub fn force_shutdown(&self) {
+        let mut inner = self.executor.inner.lock().unwrap();
+        inner.shutdown_state = ShutdownState::ForceShutdown;
+        for (_, waker) in &inner.registered {
+            waker.wake_by_ref();
+        }
+    }
+
+    /// Restores the executor so that it is no longer in the shut-down state.  Any tasks
+    /// that are still running will continue to run after calling this.
+    pub fn resurrect(&self) {
+        self.executor.inner.lock().unwrap().shutdown_state = ShutdownState::Active;
+    }
+
     /// Wait for all tasks to complete.
     pub async fn wait(&self) {
         let receiver = {
@@ -200,7 +223,7 @@ impl ExecutionScope {
     /// executor is shutting down.
     pub fn try_active_guard(&self) -> Option<ActiveGuard> {
         let mut inner = self.executor.inner.lock().unwrap();
-        if inner.is_shutdown {
+        if inner.shutdown_state != ShutdownState::Active {
             return None;
         }
         inner.active_count += 1;
@@ -225,7 +248,7 @@ impl Eq for ExecutionScope {}
 
 impl std::fmt::Debug for ExecutionScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct(stringify!(ExecutionScope)).finish()
+        f.write_fmt(format_args!("ExecutionScope {:?}", Arc::as_ptr(&self.executor)))
     }
 }
 
@@ -257,7 +280,7 @@ impl ExecutionScopeParams {
                 inner: Mutex::new(Inner {
                     registered: Slab::new(),
                     waiters: Vec::new(),
-                    is_shutdown: false,
+                    shutdown_state: ShutdownState::Active,
                     active_count: 0,
                 }),
                 #[cfg(target_os = "fuchsia")]
@@ -300,21 +323,22 @@ impl<F: 'static + Future<Output = ()> + Send> Future for TaskRunner<F> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let shutting_down = {
+        let shutdown_state = {
             let mut executor = this.task_state.executor.inner.lock().unwrap();
             executor.register_task(&mut this.task_state.task_id, cx.waker().clone());
-            executor.is_shutdown
+            executor.shutdown_state
         };
         match this.task.poll(cx) {
             Poll::Ready(()) => Poll::Ready(()),
-            Poll::Pending => {
-                if shutting_down && this.task_state.executor.inner.lock().unwrap().active_count == 0
+            Poll::Pending => match shutdown_state {
+                ShutdownState::Active => Poll::Pending,
+                ShutdownState::Shutdown
+                    if this.task_state.executor.inner.lock().unwrap().active_count > 0 =>
                 {
-                    Poll::Ready(())
-                } else {
                     Poll::Pending
                 }
-            }
+                _ => Poll::Ready(()),
+            },
         }
     }
 }
@@ -330,7 +354,7 @@ impl Executor {
 
     fn shutdown(&self) {
         let mut inner = self.inner.lock().unwrap();
-        inner.is_shutdown = true;
+        inner.shutdown_state = ShutdownState::Shutdown;
         inner.check_active_count();
     }
 }
@@ -352,15 +376,30 @@ impl Drop for ActiveGuard {
     }
 }
 
+/// Yields to the executor, providing an opportunity for other futures to run.
+pub async fn yield_to_executor() {
+    let mut done = false;
+    poll_fn(|cx| {
+        if done {
+            Poll::Ready(())
+        } else {
+            done = true;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await;
+}
+
 #[cfg(test)]
 mod tests {
-    use super::ExecutionScope;
+    use super::{yield_to_executor, ExecutionScope};
 
     use crate::directory::mutable::entry_constructor::EntryConstructor;
 
     use {
         fuchsia_async::{Task, TestExecutor, Timer},
-        futures::{channel::oneshot, task::Poll, Future},
+        futures::{channel::oneshot, stream::FuturesUnordered, task::Poll, Future, StreamExt},
         std::{
             pin::pin,
             sync::{
@@ -592,6 +631,89 @@ mod tests {
         scope.shutdown();
         scope.wait().await;
         assert!(received_msg.load(Ordering::Relaxed));
+    }
+
+    #[fuchsia::test]
+    async fn test_force_shutdown() {
+        let scope = ExecutionScope::new();
+        let scope_clone = scope.clone();
+        let ref_count = Arc::new(());
+        let ref_count_clone = ref_count.clone();
+
+        // Spawn a task that holds a reference.  When the task is dropped the reference will get
+        // dropped with it.
+        scope.spawn(async move {
+            let _ref_count_clone = ref_count_clone;
+
+            // Hold an active guard so that only a forced shutdown will work.
+            let _guard = scope_clone.active_guard();
+
+            let _: () = std::future::pending().await;
+        });
+
+        scope.force_shutdown();
+        scope.wait().await;
+
+        // The task should have been dropped leaving us with the only reference.
+        assert_eq!(Arc::strong_count(&ref_count), 1);
+
+        // Test resurrection...
+        scope.resurrect();
+
+        let ref_count_clone = ref_count.clone();
+        scope.spawn(async move {
+            // Yield so that if the executor is in the shutdown state, it will kill this task.
+            yield_to_executor().await;
+
+            // Take another reference count so that we can check we got here below.
+            let _ref_count = ref_count_clone.clone();
+
+            let _: () = std::future::pending().await;
+        });
+
+        while Arc::strong_count(&ref_count) != 3 {
+            yield_to_executor().await;
+        }
+
+        // Yield some more just to be sure the task isn't killed.
+        for _ in 0..5 {
+            yield_to_executor().await;
+            assert_eq!(Arc::strong_count(&ref_count), 3);
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_task_runs_once() {
+        let scope = ExecutionScope::new();
+
+        // Spawn a task.
+        scope.spawn(async {});
+
+        scope.shutdown();
+
+        let polled = Arc::new(AtomicBool::new(false));
+        let polled_clone = polled.clone();
+
+        let scope_clone = scope.clone();
+
+        // Use FuturesUnordered so that it uses its own waker.
+        let mut futures = FuturesUnordered::new();
+        futures.push(async move { scope_clone.wait().await });
+
+        // Poll it now to set up a waker.
+        assert_eq!(futures::poll!(futures.next()), Poll::Pending);
+
+        // Spawn another task.  When this task runs, wait still shouldn't be resolved because at
+        // this point the first task hasn't finished.
+        scope.spawn(async move {
+            assert_eq!(futures::poll!(futures.next()), Poll::Pending);
+            polled_clone.store(true, Ordering::Relaxed);
+        });
+
+        scope.wait().await;
+
+        // Make sure the second spawned task actually ran.
+        assert!(polled.load(Ordering::Relaxed));
     }
 
     mod mocks {
