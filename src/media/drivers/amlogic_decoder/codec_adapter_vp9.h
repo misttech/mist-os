@@ -5,7 +5,6 @@
 #ifndef SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_CODEC_ADAPTER_VP9_H_
 #define SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_CODEC_ADAPTER_VP9_H_
 
-#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/closure-queue/closure_queue.h>
@@ -52,11 +51,12 @@ class CodecAdapterVp9 : public AmlogicCodecAdapter, public Vp9Decoder::FrameData
   zx::unowned_bti CoreCodecBti() override;
   void CoreCodecSetSecureMemoryMode(
       CodecPort port, fuchsia::mediacodec::SecureMemoryMode secure_memory_mode) override;
-  fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
+  fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) override;
   void CoreCodecSetBufferCollectionInfo(
-      CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) override;
+      CodecPort port,
+      const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override;
   void CoreCodecStartStream() override;
   void CoreCodecQueueInputFormatDetails(
       const fuchsia::media::FormatDetails& per_stream_override_format_details) override;
@@ -135,7 +135,7 @@ class CodecAdapterVp9 : public AmlogicCodecAdapter, public Vp9Decoder::FrameData
 
   fuchsia::mediacodec::SecureMemoryMode secure_memory_mode_[kPortCount] = {};
   bool secure_memory_mode_set_[kPortCount] = {};
-  std::optional<fuchsia_sysmem2::SingleBufferSettings> buffer_settings_[kPortCount];
+  std::optional<fuchsia::sysmem::SingleBufferSettings> buffer_settings_[kPortCount];
 
   // Currently, AmlogicVideo::ParseVideo() can indirectly block on availability
   // of output buffers to make space in the ring buffer the parser is outputting
@@ -157,7 +157,7 @@ class CodecAdapterVp9 : public AmlogicCodecAdapter, public Vp9Decoder::FrameData
   // Skip any further processing in ProcessInput().
   bool is_cancelling_input_processing_ = false;
 
-  std::optional<fuchsia_sysmem2::BufferCollectionInfo> output_buffer_collection_info_;
+  std::optional<fuchsia::sysmem::BufferCollectionInfo_2> output_buffer_collection_info_;
 
   std::vector<const CodecBuffer*> all_output_buffers_;
   std::vector<CodecPacket*> all_output_packets_;
