@@ -259,11 +259,13 @@ impl Type {
     fn constraint(
         context: &mut ComputationContext,
         jump_type: JumpType,
+        jump_width: JumpWidth,
         type1: Self,
         type2: Self,
     ) -> (Self, Self) {
-        match (jump_type, &type1, &type2) {
+        match (jump_width, jump_type, &type1, &type2) {
             (
+                JumpWidth::W64,
                 JumpType::Eq,
                 Self::ScalarValue { value: value1, unknown_mask: known1, unwritten_mask: 0 },
                 Self::ScalarValue { value: value2, unknown_mask: known2, unwritten_mask: 0 },
@@ -276,11 +278,31 @@ impl Type {
                 (v.clone(), v)
             }
             (
+                JumpWidth::W32,
+                JumpType::Eq,
+                Self::ScalarValue { value: value1, unknown_mask: known1, unwritten_mask: 0 },
+                Self::ScalarValue { value: value2, unknown_mask: known2, unwritten_mask: 0 },
+            ) => {
+                let v1 = Self::ScalarValue {
+                    value: value1 | (value2 & (u32::MAX as u64)),
+                    unknown_mask: known1 & (known2 | ((u32::MAX as u64) << 32)),
+                    unwritten_mask: 0,
+                };
+                let v2 = Self::ScalarValue {
+                    value: value2 | (value1 & (u32::MAX as u64)),
+                    unknown_mask: known2 & (known1 | ((u32::MAX as u64) << 32)),
+                    unwritten_mask: 0,
+                };
+                (v1, v2)
+            }
+            (
+                JumpWidth::W64,
                 JumpType::Eq,
                 Self::ScalarValue { value: 0, unknown_mask: 0, .. },
                 Self::NullOr(_),
             )
             | (
+                JumpWidth::W64,
                 JumpType::Eq,
                 Self::NullOr(_),
                 Self::ScalarValue { value: 0, unknown_mask: 0, .. },
@@ -288,28 +310,33 @@ impl Type {
                 let zero = Type::from(0);
                 (zero.clone(), zero)
             }
-            (jump_type, Self::NullOr(t), Self::ScalarValue { value: 0, unknown_mask: 0, .. })
-                if jump_type.is_strict() =>
-            {
-                (*t.clone(), type2)
-            }
-            (jump_type, Self::ScalarValue { value: 0, unknown_mask: 0, .. }, Self::NullOr(t))
-                if jump_type.is_strict() =>
-            {
-                (type1, *t.clone())
-            }
+            (
+                JumpWidth::W64,
+                jump_type,
+                Self::NullOr(t),
+                Self::ScalarValue { value: 0, unknown_mask: 0, .. },
+            ) if jump_type.is_strict() => (*t.clone(), type2),
+            (
+                JumpWidth::W64,
+                jump_type,
+                Self::ScalarValue { value: 0, unknown_mask: 0, .. },
+                Self::NullOr(t),
+            ) if jump_type.is_strict() => (type1, *t.clone()),
 
             (
+                JumpWidth::W64,
                 JumpType::Eq,
                 Type::PtrToArray { id: id1, offset },
                 Type::PtrToEndArray { id: id2 },
             )
             | (
+                JumpWidth::W64,
                 JumpType::Le,
                 Type::PtrToArray { id: id1, offset },
                 Type::PtrToEndArray { id: id2 },
             )
             | (
+                JumpWidth::W64,
                 JumpType::Ge,
                 Type::PtrToEndArray { id: id1 },
                 Type::PtrToArray { id: id2, offset },
@@ -318,11 +345,13 @@ impl Type {
                 (type1, type2)
             }
             (
+                JumpWidth::W64,
                 JumpType::Lt,
                 Type::PtrToArray { id: id1, offset },
                 Type::PtrToEndArray { id: id2 },
             )
             | (
+                JumpWidth::W64,
                 JumpType::Gt,
                 Type::PtrToEndArray { id: id1 },
                 Type::PtrToArray { id: id2, offset },
@@ -330,7 +359,7 @@ impl Type {
                 context.update_array_bounds(id1.clone(), *offset + 1);
                 (type1, type2)
             }
-            (JumpType::Eq, _, _) => (type1.clone(), type1),
+            (JumpWidth::W64, JumpType::Eq, _, _) => (type1.clone(), type1),
             _ => (type1, type2),
         }
     }
@@ -951,6 +980,126 @@ impl ComputationContext {
         }
     }
 
+    fn apply_computation(
+        op1: Type,
+        op2: Type,
+        alu_type: AluType,
+        op: impl Fn(u64, u64) -> u64,
+    ) -> Result<Type, String> {
+        let result: Type = match (alu_type, op1, op2) {
+            (
+                _,
+                Type::ScalarValue { value: value1, unknown_mask: 0, .. },
+                Type::ScalarValue { value: value2, unknown_mask: 0, .. },
+            ) => op(value1, value2).into(),
+            (
+                AluType::Bitwise,
+                Type::ScalarValue {
+                    value: value1,
+                    unknown_mask: unknown_mask1,
+                    unwritten_mask: unwritten_mask1,
+                },
+                Type::ScalarValue {
+                    value: value2,
+                    unknown_mask: unknown_mask2,
+                    unwritten_mask: unwritten_mask2,
+                },
+            ) => {
+                let unknown_mask = unknown_mask1 | unknown_mask2;
+                let unwritten_mask = unwritten_mask1 | unwritten_mask2;
+                let value = op(value1, value2) & !unknown_mask;
+                Type::ScalarValue { value, unknown_mask, unwritten_mask }
+            }
+            (
+                AluType::Shift,
+                Type::ScalarValue {
+                    value: value1,
+                    unknown_mask: unknown_mask1,
+                    unwritten_mask: unwritten_mask1,
+                },
+                Type::ScalarValue { value: value2, unknown_mask: 0, .. },
+            ) => {
+                let value = op(value1, value2);
+                let unknown_mask = op(unknown_mask1, value2);
+                let unwritten_mask = op(unwritten_mask1, value2);
+                Type::ScalarValue { value, unknown_mask, unwritten_mask }
+            }
+            (
+                AluType::Arsh,
+                Type::ScalarValue {
+                    value: value1,
+                    unknown_mask: unknown_mask1,
+                    unwritten_mask: unwritten_mask1,
+                },
+                Type::ScalarValue { value: value2, unknown_mask: 0, .. },
+            ) => {
+                let unknown_mask = unknown_mask1.overflowing_shr(value2 as u32).0;
+                let unwritten_mask = unwritten_mask1.overflowing_shr(value2 as u32).0;
+                let value = op(value1, value2) & !unknown_mask;
+                Type::ScalarValue { value, unknown_mask, unwritten_mask }
+            }
+            (
+                alu_type,
+                Type::PtrToStack { offset: x },
+                Type::ScalarValue { value: y, unknown_mask: 0, .. },
+            ) if alu_type.is_ptr_compatible() => {
+                Type::PtrToStack { offset: run_on_stack_offset(x, |x| op(x, y)) }
+            }
+            (
+                alu_type,
+                Type::PtrToMemory { id, offset: x, buffer_size, fields, mappings },
+                Type::ScalarValue { value: y, unknown_mask: 0, .. },
+            ) if alu_type.is_ptr_compatible() => {
+                let offset = op(x, y);
+                Type::PtrToMemory {
+                    id: id.clone(),
+                    offset,
+                    buffer_size: buffer_size,
+                    fields: fields.clone(),
+                    mappings: mappings.clone(),
+                }
+            }
+            (
+                alu_type,
+                Type::PtrToArray { id, offset: x },
+                Type::ScalarValue { value: y, unknown_mask: 0, .. },
+            ) if alu_type.is_ptr_compatible() => {
+                let offset = op(x, y);
+                Type::PtrToArray { id: id.clone(), offset }
+            }
+            (
+                AluType::Sub,
+                Type::PtrToMemory { id: id1, offset: x1, .. },
+                Type::PtrToMemory { id: id2, offset: x2, .. },
+            )
+            | (
+                AluType::Sub,
+                Type::PtrToArray { id: id1, offset: x1 },
+                Type::PtrToArray { id: id2, offset: x2 },
+            ) if id1 == id2 => Type::from(op(x1, x2)),
+            (AluType::Sub, Type::PtrToStack { offset: x1 }, Type::PtrToStack { offset: x2 }) => {
+                Type::from(op(x1.reg(), x2.reg()))
+            }
+            (
+                AluType::Sub,
+                Type::PtrToArray { id: id1, .. },
+                Type::PtrToEndArray { id: id2, .. },
+            )
+            | (
+                AluType::Sub,
+                Type::PtrToEndArray { id: id1, .. },
+                Type::PtrToArray { id: id2, .. },
+            ) if id1 == id2 => Type::unknown_written_scalar_value(),
+            (
+                _,
+                Type::ScalarValue { unwritten_mask: 0, .. },
+                Type::ScalarValue { unwritten_mask: 0, .. },
+            ) => Type::unknown_written_scalar_value(),
+            _ => Type::default(),
+        };
+        Ok(result)
+    }
+
     fn alu(
         &mut self,
         op_name: Option<&str>,
@@ -971,117 +1120,7 @@ impl ComputationContext {
         }
         let op1 = self.reg(dst)?;
         let op2 = self.compute_source(src)?;
-        let result: Type = match (alu_type, op1, op2) {
-            (
-                _,
-                Type::ScalarValue { value: value1, unknown_mask: 0, .. },
-                Type::ScalarValue { value: value2, unknown_mask: 0, .. },
-            ) => op(*value1, value2).into(),
-            (
-                AluType::Bitwise,
-                Type::ScalarValue {
-                    value: value1,
-                    unknown_mask: unknown_mask1,
-                    unwritten_mask: unwritten_mask1,
-                },
-                Type::ScalarValue {
-                    value: value2,
-                    unknown_mask: unknown_mask2,
-                    unwritten_mask: unwritten_mask2,
-                },
-            ) => {
-                let unknown_mask = *unknown_mask1 | unknown_mask2;
-                let unwritten_mask = *unwritten_mask1 | unwritten_mask2;
-                let value = op(*value1, value2) & !unknown_mask;
-                Type::ScalarValue { value, unknown_mask, unwritten_mask }
-            }
-            (
-                AluType::Shift,
-                Type::ScalarValue {
-                    value: value1,
-                    unknown_mask: unknown_mask1,
-                    unwritten_mask: unwritten_mask1,
-                },
-                Type::ScalarValue { value: value2, unknown_mask: 0, .. },
-            ) => {
-                let value = op(*value1, value2);
-                let unknown_mask = op(*unknown_mask1, value2);
-                let unwritten_mask = op(*unwritten_mask1, value2);
-                Type::ScalarValue { value, unknown_mask, unwritten_mask }
-            }
-            (
-                AluType::Arsh,
-                Type::ScalarValue {
-                    value: value1,
-                    unknown_mask: unknown_mask1,
-                    unwritten_mask: unwritten_mask1,
-                },
-                Type::ScalarValue { value: value2, unknown_mask: 0, .. },
-            ) => {
-                let unknown_mask = unknown_mask1.overflowing_shr(value2 as u32).0;
-                let unwritten_mask = unwritten_mask1.overflowing_shr(value2 as u32).0;
-                let value = op(*value1, value2) & !unknown_mask;
-                Type::ScalarValue { value, unknown_mask, unwritten_mask }
-            }
-            (
-                alu_type,
-                Type::PtrToStack { offset: x },
-                Type::ScalarValue { value: y, unknown_mask: 0, .. },
-            ) if alu_type.is_ptr_compatible() => {
-                Type::PtrToStack { offset: run_on_stack_offset(*x, |x| op(x, y)) }
-            }
-            (
-                alu_type,
-                Type::PtrToMemory { id, offset: x, buffer_size, fields, mappings },
-                Type::ScalarValue { value: y, unknown_mask: 0, .. },
-            ) if alu_type.is_ptr_compatible() => {
-                let offset = op(*x, y);
-                Type::PtrToMemory {
-                    id: id.clone(),
-                    offset,
-                    buffer_size: *buffer_size,
-                    fields: fields.clone(),
-                    mappings: mappings.clone(),
-                }
-            }
-            (
-                alu_type,
-                Type::PtrToArray { id, offset: x },
-                Type::ScalarValue { value: y, unknown_mask: 0, .. },
-            ) if alu_type.is_ptr_compatible() => {
-                let offset = op(*x, y);
-                Type::PtrToArray { id: id.clone(), offset }
-            }
-            (
-                AluType::Sub,
-                Type::PtrToMemory { id: id1, offset: x1, .. },
-                Type::PtrToMemory { id: id2, offset: x2, .. },
-            )
-            | (
-                AluType::Sub,
-                Type::PtrToArray { id: id1, offset: x1 },
-                Type::PtrToArray { id: id2, offset: x2 },
-            ) if *id1 == id2 => Type::from(op(*x1, x2)),
-            (AluType::Sub, Type::PtrToStack { offset: x1 }, Type::PtrToStack { offset: x2 }) => {
-                Type::from(op(x1.reg(), x2.reg()))
-            }
-            (
-                AluType::Sub,
-                Type::PtrToArray { id: id1, .. },
-                Type::PtrToEndArray { id: id2, .. },
-            )
-            | (
-                AluType::Sub,
-                Type::PtrToEndArray { id: id1, .. },
-                Type::PtrToArray { id: id2, .. },
-            ) if *id1 == id2 => Type::unknown_written_scalar_value(),
-            (
-                _,
-                Type::ScalarValue { unwritten_mask: 0, .. },
-                Type::ScalarValue { unwritten_mask: 0, .. },
-            ) => Type::unknown_written_scalar_value(),
-            _ => Type::default(),
-        };
+        let result = Self::apply_computation(op1.clone(), op2, alu_type, op)?;
         let mut next = self.next()?;
         next.set_reg(dst, result)?;
         verification_context.states.push(next);
@@ -1119,6 +1158,63 @@ impl ComputationContext {
         Ok(())
     }
 
+    fn compute_branch(
+        &self,
+        jump_width: JumpWidth,
+        op1: &Type,
+        op2: &Type,
+        op: impl Fn(u64, u64) -> bool,
+    ) -> Result<Option<bool>, String> {
+        match (jump_width, op1, op2) {
+            (
+                _,
+                Type::ScalarValue { value: x, unknown_mask: 0, .. },
+                Type::ScalarValue { value: y, unknown_mask: 0, .. },
+            ) => Ok(Some(op(*x, *y))),
+
+            (
+                _,
+                Type::ScalarValue { unwritten_mask: 0, .. },
+                Type::ScalarValue { unwritten_mask: 0, .. },
+            )
+            | (
+                JumpWidth::W64,
+                Type::ScalarValue { value: 0, unknown_mask: 0, .. },
+                Type::NullOr(_),
+            )
+            | (
+                JumpWidth::W64,
+                Type::NullOr(_),
+                Type::ScalarValue { value: 0, unknown_mask: 0, .. },
+            ) => Ok(None),
+
+            (JumpWidth::W64, Type::PtrToStack { offset: x }, Type::PtrToStack { offset: y }) => {
+                Ok(Some(op(x.reg(), y.reg())))
+            }
+
+            (
+                JumpWidth::W64,
+                Type::PtrToMemory { id: id1, offset: x, .. },
+                Type::PtrToMemory { id: id2, offset: y, .. },
+            ) if *id1 == *id2 => Ok(Some(op(*x, *y))),
+
+            (
+                JumpWidth::W64,
+                Type::PtrToArray { id: id1, offset: x, .. },
+                Type::PtrToArray { id: id2, offset: y, .. },
+            ) if *id1 == *id2 => Ok(Some(op(*x, *y))),
+
+            (JumpWidth::W64, Type::PtrToArray { id: id1, .. }, Type::PtrToEndArray { id: id2 })
+            | (JumpWidth::W64, Type::PtrToEndArray { id: id1 }, Type::PtrToArray { id: id2, .. })
+                if *id1 == *id2 =>
+            {
+                Ok(None)
+            }
+
+            _ => Err(format!("non permitted comparaison at pc {}", self.pc)),
+        }
+    }
+
     fn conditional_jump(
         &mut self,
         op_name: &str,
@@ -1127,6 +1223,7 @@ impl ComputationContext {
         src: Source,
         offset: i16,
         jump_type: JumpType,
+        jump_width: JumpWidth,
         op: impl Fn(u64, u64) -> bool,
     ) -> Result<(), String> {
         bpf_log!(
@@ -1139,57 +1236,27 @@ impl ComputationContext {
         );
         let op1 = self.reg(dst)?;
         let op2 = self.compute_source(src.clone())?;
-        let apply_constraints_and_register =
-            |mut next: Self, jump_type: JumpType| -> Result<Self, String> {
-                if jump_type != JumpType::Unknown {
-                    let (new_op1, new_op2) =
-                        Type::constraint(&mut next, jump_type, op1.clone(), op2.clone());
-                    if dst < REGISTER_COUNT {
-                        next.set_reg(dst, new_op1)?;
+        let apply_constraints_and_register = |mut next: Self,
+                                              jump_type: JumpType|
+         -> Result<Self, String> {
+            if jump_type != JumpType::Unknown {
+                let (new_op1, new_op2) =
+                    Type::constraint(&mut next, jump_type, jump_width, op1.clone(), op2.clone());
+                if dst < REGISTER_COUNT {
+                    next.set_reg(dst, new_op1)?;
+                }
+                match src {
+                    Source::Reg(r) => {
+                        next.set_reg(r, new_op2)?;
                     }
-                    match src {
-                        Source::Reg(r) => {
-                            next.set_reg(r, new_op2)?;
-                        }
-                        _ => {
-                            // Nothing to do
-                        }
+                    _ => {
+                        // Nothing to do
                     }
                 }
-                Ok(next)
-            };
-        let branch = {
-            match (op1, &op2) {
-                (
-                    Type::ScalarValue { value: x, unknown_mask: 0, .. },
-                    Type::ScalarValue { value: y, unknown_mask: 0, .. },
-                ) => Some(op(*x, *y)),
-                (
-                    Type::ScalarValue { unwritten_mask: 0, .. },
-                    Type::ScalarValue { unwritten_mask: 0, .. },
-                )
-                | (Type::ScalarValue { value: 0, unknown_mask: 0, .. }, Type::NullOr(_))
-                | (Type::NullOr(_), Type::ScalarValue { value: 0, unknown_mask: 0, .. }) => None,
-                (Type::PtrToStack { offset: x }, Type::PtrToStack { offset: y }) => {
-                    Some(op(x.reg(), y.reg()))
-                }
-                (
-                    Type::PtrToMemory { id: id1, offset: x, .. },
-                    Type::PtrToMemory { id: id2, offset: y, .. },
-                ) if *id1 == *id2 => Some(op(*x, *y)),
-                (
-                    Type::PtrToArray { id: id1, offset: x, .. },
-                    Type::PtrToArray { id: id2, offset: y, .. },
-                ) if *id1 == *id2 => Some(op(*x, *y)),
-                (Type::PtrToArray { id: id1, .. }, Type::PtrToEndArray { id: id2 })
-                | (Type::PtrToEndArray { id: id1 }, Type::PtrToArray { id: id2, .. })
-                    if *id1 == *id2 =>
-                {
-                    None
-                }
-                _ => return Err(format!("non permitted comparaison at pc {}", self.pc)),
             }
+            Ok(next)
         };
+        let branch = self.compute_branch(jump_width, op1, &op2, op)?;
         if branch.unwrap_or(true) {
             // Do the jump
             verification_context
@@ -1224,6 +1291,12 @@ impl AluType {
             _ => false,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum JumpWidth {
+    W32,
+    W64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1683,9 +1756,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jeq32", context, dst, src, offset, JumpType::Eq, |x, y| {
-            comp32(x, y, |x, y| x == y)
-        })
+        self.conditional_jump(
+            "jeq32",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Eq,
+            JumpWidth::W32,
+            |x, y| comp32(x, y, |x, y| x == y),
+        )
     }
     fn jeq64<'a>(
         &mut self,
@@ -1694,7 +1774,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jeq", context, dst, src, offset, JumpType::Eq, |x, y| x == y)
+        self.conditional_jump(
+            "jeq",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Eq,
+            JumpWidth::W64,
+            |x, y| x == y,
+        )
     }
     fn jne<'a>(
         &mut self,
@@ -1703,9 +1792,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jne32", context, dst, src, offset, JumpType::Ne, |x, y| {
-            comp32(x, y, |x, y| x != y)
-        })
+        self.conditional_jump(
+            "jne32",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Ne,
+            JumpWidth::W32,
+            |x, y| comp32(x, y, |x, y| x != y),
+        )
     }
     fn jne64<'a>(
         &mut self,
@@ -1714,7 +1810,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jne", context, dst, src, offset, JumpType::Ne, |x, y| x != y)
+        self.conditional_jump(
+            "jne",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Ne,
+            JumpWidth::W64,
+            |x, y| x != y,
+        )
     }
     fn jge<'a>(
         &mut self,
@@ -1723,9 +1828,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jge32", context, dst, src, offset, JumpType::Ge, |x, y| {
-            comp32(x, y, |x, y| x >= y)
-        })
+        self.conditional_jump(
+            "jge32",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Ge,
+            JumpWidth::W32,
+            |x, y| comp32(x, y, |x, y| x >= y),
+        )
     }
     fn jge64<'a>(
         &mut self,
@@ -1734,7 +1846,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jge", context, dst, src, offset, JumpType::Ge, |x, y| x >= y)
+        self.conditional_jump(
+            "jge",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Ge,
+            JumpWidth::W64,
+            |x, y| x >= y,
+        )
     }
     fn jgt<'a>(
         &mut self,
@@ -1743,9 +1864,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jgt32", context, dst, src, offset, JumpType::Gt, |x, y| {
-            comp32(x, y, |x, y| x > y)
-        })
+        self.conditional_jump(
+            "jgt32",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Gt,
+            JumpWidth::W32,
+            |x, y| comp32(x, y, |x, y| x > y),
+        )
     }
     fn jgt64<'a>(
         &mut self,
@@ -1754,7 +1882,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jgt", context, dst, src, offset, JumpType::Gt, |x, y| x > y)
+        self.conditional_jump(
+            "jgt",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Gt,
+            JumpWidth::W64,
+            |x, y| x > y,
+        )
     }
     fn jle<'a>(
         &mut self,
@@ -1763,9 +1900,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jle32", context, dst, src, offset, JumpType::Le, |x, y| {
-            comp32(x, y, |x, y| x <= y)
-        })
+        self.conditional_jump(
+            "jle32",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Le,
+            JumpWidth::W32,
+            |x, y| comp32(x, y, |x, y| x <= y),
+        )
     }
     fn jle64<'a>(
         &mut self,
@@ -1774,7 +1918,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jle", context, dst, src, offset, JumpType::Le, |x, y| x <= y)
+        self.conditional_jump(
+            "jle",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Le,
+            JumpWidth::W64,
+            |x, y| x <= y,
+        )
     }
     fn jlt<'a>(
         &mut self,
@@ -1783,9 +1936,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jlt32", context, dst, src, offset, JumpType::Lt, |x, y| {
-            comp32(x, y, |x, y| x < y)
-        })
+        self.conditional_jump(
+            "jlt32",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Lt,
+            JumpWidth::W32,
+            |x, y| comp32(x, y, |x, y| x < y),
+        )
     }
     fn jlt64<'a>(
         &mut self,
@@ -1794,7 +1954,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jlt", context, dst, src, offset, JumpType::Lt, |x, y| x < y)
+        self.conditional_jump(
+            "jlt",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Lt,
+            JumpWidth::W64,
+            |x, y| x < y,
+        )
     }
     fn jsge<'a>(
         &mut self,
@@ -1810,6 +1979,7 @@ impl BpfVisitor for ComputationContext {
             src,
             offset,
             JumpType::LooseComparaison,
+            JumpWidth::W32,
             |x, y| scomp32(x, y, |x, y| x >= y),
         )
     }
@@ -1827,6 +1997,7 @@ impl BpfVisitor for ComputationContext {
             src,
             offset,
             JumpType::LooseComparaison,
+            JumpWidth::W64,
             |x, y| scomp64(x, y, |x, y| x >= y),
         )
     }
@@ -1844,6 +2015,7 @@ impl BpfVisitor for ComputationContext {
             src,
             offset,
             JumpType::StrictComparaison,
+            JumpWidth::W32,
             |x, y| scomp32(x, y, |x, y| x > y),
         )
     }
@@ -1861,6 +2033,7 @@ impl BpfVisitor for ComputationContext {
             src,
             offset,
             JumpType::StrictComparaison,
+            JumpWidth::W64,
             |x, y| scomp64(x, y, |x, y| x > y),
         )
     }
@@ -1878,6 +2051,7 @@ impl BpfVisitor for ComputationContext {
             src,
             offset,
             JumpType::LooseComparaison,
+            JumpWidth::W32,
             |x, y| scomp32(x, y, |x, y| x <= y),
         )
     }
@@ -1895,6 +2069,7 @@ impl BpfVisitor for ComputationContext {
             src,
             offset,
             JumpType::LooseComparaison,
+            JumpWidth::W64,
             |x, y| scomp64(x, y, |x, y| x <= y),
         )
     }
@@ -1912,6 +2087,7 @@ impl BpfVisitor for ComputationContext {
             src,
             offset,
             JumpType::StrictComparaison,
+            JumpWidth::W32,
             |x, y| scomp32(x, y, |x, y| x < y),
         )
     }
@@ -1929,6 +2105,7 @@ impl BpfVisitor for ComputationContext {
             src,
             offset,
             JumpType::StrictComparaison,
+            JumpWidth::W64,
             |x, y| scomp64(x, y, |x, y| x < y),
         )
     }
@@ -1939,9 +2116,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jset32", context, dst, src, offset, JumpType::Unknown, |x, y| {
-            comp32(x, y, |x, y| x & y != 0)
-        })
+        self.conditional_jump(
+            "jset32",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Unknown,
+            JumpWidth::W32,
+            |x, y| comp32(x, y, |x, y| x & y != 0),
+        )
     }
     fn jset64<'a>(
         &mut self,
@@ -1950,9 +2134,16 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump("jset", context, dst, src, offset, JumpType::Unknown, |x, y| {
-            x & y != 0
-        })
+        self.conditional_jump(
+            "jset",
+            context,
+            dst,
+            src,
+            offset,
+            JumpType::Unknown,
+            JumpWidth::W64,
+            |x, y| x & y != 0,
+        )
     }
 
     fn load<'a>(
