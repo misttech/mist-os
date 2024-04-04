@@ -210,23 +210,6 @@ zx_status_t DsiHostController::PhyWaitForReady() {
   return ZX_OK;
 }
 
-zx_status_t DsiHostController::SendCmd(const mipi_dsi_cmd_t* cmd_list, size_t cmd_count) {
-  for (const mipi_dsi_cmd_t& banjo_command : cpp20::span(cmd_list, cmd_count)) {
-    const mipi_dsi::DsiCommandAndResponse command = {
-        .virtual_channel_id = banjo_command.virt_chn_id,
-        .data_type = banjo_command.dsi_data_type,
-        .payload = cpp20::span(banjo_command.pld_data_list, banjo_command.pld_data_count),
-        .response_payload = cpp20::span(banjo_command.rsp_data_list, banjo_command.rsp_data_count),
-    };
-    zx_status_t status = IssueCommand(command);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to issue a command: %s", zx_status_get_string(status));
-      return status;
-    }
-  }
-  return ZX_OK;
-}
-
 zx::result<> DsiHostController::IssueCommands(
     cpp20::span<const mipi_dsi::DsiCommandAndResponse> commands) {
   for (const mipi_dsi::DsiCommandAndResponse& command : commands) {
