@@ -420,14 +420,6 @@ template("bazel_action") {
     # This is "safe" because the file is generated at GN gen time.
     inputs = [ bazel_launcher ] + _bazel_build_files
 
-    # Rebuild on any change known to git and let Bazel
-    # figure out if it actually needs to do work.
-    # See: https://fxbug.dev/42069003#c2
-    inputs += [
-      "//.git/HEAD",
-      "//.git/index",
-    ]
-
     inputs += [ _ninja_inputs_manifest ]
 
     depfile = "$target_gen_dir/$target_name.d"
