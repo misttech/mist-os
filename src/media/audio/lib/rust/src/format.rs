@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error, Result};
+use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_audio as faudio;
 use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_hardware_audio as fhaudio;
@@ -10,9 +11,16 @@ use fidl_fuchsia_media as fmedia;
 use regex::Regex;
 use std::fmt::Display;
 use std::io::{Cursor, Seek, SeekFrom, Write};
+use std::num::NonZeroU32;
 use std::{str::FromStr, time::Duration};
 
 pub const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";
+
+// Common sample sizes.
+const BITS_8: NonZeroU32 = const_unwrap_option(NonZeroU32::new(8));
+const BITS_16: NonZeroU32 = const_unwrap_option(NonZeroU32::new(16));
+const BITS_24: NonZeroU32 = const_unwrap_option(NonZeroU32::new(24));
+const BITS_32: NonZeroU32 = const_unwrap_option(NonZeroU32::new(32));
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct Format {
@@ -23,7 +31,7 @@ pub struct Format {
 
 impl Format {
     pub const fn bytes_per_frame(&self) -> u32 {
-        self.sample_type.bytes_per_sample() * self.channels
+        self.sample_type.size().total_bytes().get() * self.channels
     }
 
     pub fn frames_in_duration(&self, duration: std::time::Duration) -> u64 {
@@ -70,37 +78,6 @@ impl Format {
         // values from the packets received directly to stdout.
         Ok(cursor_writer.into_inner())
     }
-
-    pub fn is_supported_by(&self, supported_formats: &Vec<fhaudio::SupportedFormats>) -> bool {
-        let hardware_format = fhaudio::Format::from(self.clone());
-        let mut is_format_supported = false;
-
-        for supported_format in supported_formats {
-            let pcm_formats = supported_format.pcm_supported_formats.as_ref().unwrap().clone();
-
-            if pcm_formats.frame_rates.unwrap().contains(&self.frames_per_second)
-                && pcm_formats
-                    .bytes_per_sample
-                    .unwrap()
-                    .contains(&(self.sample_type.bytes_per_sample() as u8))
-                && pcm_formats
-                    .sample_formats
-                    .unwrap()
-                    .contains(&hardware_format.pcm_format.unwrap().sample_format)
-                && pcm_formats
-                    .valid_bits_per_sample
-                    .unwrap()
-                    .contains(&(self.sample_type.valid_bits_per_sample() as u8))
-                && pcm_formats.channel_sets.unwrap().into_iter().any(|channel_set| {
-                    channel_set.attributes.unwrap().len() == self.channels as usize
-                })
-            {
-                is_format_supported = true;
-                break;
-            }
-        }
-        is_format_supported
-    }
 }
 
 impl From<hound::WavSpec> for Format {
@@ -128,8 +105,8 @@ impl From<Format> for fhaudio::PcmFormat {
         Self {
             number_of_channels: value.channels as u8,
             sample_format: value.sample_type.into(),
-            bytes_per_sample: value.sample_type.bytes_per_sample() as u8,
-            valid_bits_per_sample: value.sample_type.valid_bits_per_sample() as u8,
+            bytes_per_sample: value.sample_type.size().total_bytes().get() as u8,
+            valid_bits_per_sample: value.sample_type.size().valid_bits().get() as u8,
             frame_rate: value.frames_per_second,
         }
     }
@@ -187,7 +164,7 @@ impl From<Format> for hound::WavSpec {
             channels: value.channels as u16,
             sample_format: value.sample_type.into(),
             sample_rate: value.frames_per_second,
-            bits_per_sample: value.sample_type.bits_per_sample() as u16,
+            bits_per_sample: value.sample_type.size().total_bits().get() as u16,
         }
     }
 }
@@ -220,8 +197,7 @@ impl FromStr for Format {
 
         if splits.len() != 3 {
             return Err(anyhow!(
-                "Expected 3 comma-separated values: 
-            <SampleRate>,<SampleType>,<Channels> but have {}.",
+                "Expected 3 comma-separated values: <SampleRate>,<SampleType>,<Channels> but have {}.",
                 splits.len()
             ));
         }
@@ -259,31 +235,13 @@ pub enum SampleType {
 }
 
 impl SampleType {
-    pub const fn bytes_per_sample(&self) -> u32 {
+    pub const fn size(&self) -> SampleSize {
         match self {
-            Self::Uint8 => 1,
-            Self::Int16 => 2,
-            Self::Int32 => 4,
-            Self::Float32 => 4,
-        }
-    }
-
-    pub const fn bits_per_sample(&self) -> u32 {
-        match self {
-            Self::Uint8 => 8,
-            Self::Int16 => 16,
-            Self::Int32 => 32,
-            Self::Float32 => 32,
-        }
-    }
-
-    pub const fn valid_bits_per_sample(&self) -> u32 {
-        match self {
-            Self::Uint8 => 8,
-            Self::Int16 => 16,
+            Self::Uint8 => SampleSize::from_full_bits(BITS_8),
+            Self::Int16 => SampleSize::from_full_bits(BITS_16),
             // Assuming Int32 is really "24 in 32".
-            Self::Int32 => 24,
-            Self::Float32 => 32,
+            Self::Int32 => const_unwrap_option(SampleSize::from_partial_bits(BITS_24, BITS_32)),
+            Self::Float32 => SampleSize::from_full_bits(BITS_32),
         }
     }
 
@@ -386,7 +344,7 @@ impl TryFrom<faudio::SampleType> for SampleType {
     }
 }
 
-impl From<(hound::SampleFormat, u16)> for SampleType {
+impl From<(hound::SampleFormat, u16 /* bits per sample */)> for SampleType {
     fn from(value: (hound::SampleFormat, u16)) -> Self {
         let (sample_format, bits_per_sample) = value;
         match sample_format {
@@ -397,6 +355,71 @@ impl From<(hound::SampleFormat, u16)> for SampleType {
             },
             hound::SampleFormat::Float => Self::Float32,
         }
+    }
+}
+
+impl TryFrom<(fhaudio::SampleFormat, SampleSize)> for SampleType {
+    type Error = String;
+
+    fn try_from(value: (fhaudio::SampleFormat, SampleSize)) -> Result<Self, Self::Error> {
+        let (sample_format, sample_size) = value;
+        let (valid_bits, total_bits) =
+            (sample_size.valid_bits().get(), sample_size.total_bits().get());
+        match sample_format {
+            fhaudio::SampleFormat::PcmUnsigned => match (valid_bits, total_bits) {
+                (8, 8) => Some(Self::Uint8),
+                _ => None,
+            },
+            fhaudio::SampleFormat::PcmSigned => match (valid_bits, total_bits) {
+                (16, 16) => Some(Self::Int16),
+                (24 | 32, 32) => Some(Self::Int32),
+                _ => None,
+            },
+            fhaudio::SampleFormat::PcmFloat => match (valid_bits, total_bits) {
+                (32, 32) => Some(Self::Float32),
+                _ => None,
+            },
+        }
+        .ok_or_else(|| "unsupported sample size".to_string())
+    }
+}
+
+/// The size of a single sample as a total number of bits, and the number of
+/// "valid" bits.
+///
+/// The number of valid bits is always less than or equal to the total.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SampleSize {
+    valid_bits: NonZeroU32,
+    total_bits: NonZeroU32,
+}
+
+impl SampleSize {
+    /// Returns a [SampleSize] where all given bits are valid.
+    pub const fn from_full_bits(total_bits: NonZeroU32) -> Self {
+        Self { valid_bits: total_bits, total_bits }
+    }
+
+    /// Returns a [SampleSize] where some bits are valid, if the number
+    /// of valid bits is less than or equal to the total bits.
+    pub const fn from_partial_bits(valid_bits: NonZeroU32, total_bits: NonZeroU32) -> Option<Self> {
+        if valid_bits.get() > total_bits.get() {
+            return None;
+        }
+        Some(Self { valid_bits, total_bits })
+    }
+
+    pub const fn total_bits(&self) -> NonZeroU32 {
+        self.total_bits
+    }
+
+    pub const fn total_bytes(&self) -> NonZeroU32 {
+        // It's safe to unwrap because `div_ceil` will always return at least 1 since `total_bits` is non-zero.
+        const_unwrap_option(NonZeroU32::new(self.total_bits.get().div_ceil(8)))
+    }
+
+    pub const fn valid_bits(&self) -> NonZeroU32 {
+        self.valid_bits
     }
 }
 

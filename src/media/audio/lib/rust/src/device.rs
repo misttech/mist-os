@@ -244,6 +244,12 @@ impl From<DevfsSelector> for fac::DeviceSelector {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegistrySelector(pub fadevice::TokenId);
 
+impl RegistrySelector {
+    pub fn token_id(&self) -> fadevice::TokenId {
+        self.0
+    }
+}
+
 impl Display for RegistrySelector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)

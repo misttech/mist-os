@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 pub mod device;
 pub mod format;
+pub mod format_set;
 
 pub use format::{parse_duration, str_to_clock, Format};
 
