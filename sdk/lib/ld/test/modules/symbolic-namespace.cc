@@ -6,6 +6,8 @@
 #include <lib/ld/module.h>
 #include <stdint.h>
 
+#include <algorithm>
+
 #include "test-start.h"
 
 extern "C" int64_t a();
@@ -23,13 +25,13 @@ extern "C" int64_t TestStart() {
   constexpr int kExtraDeps = 1;
 #endif
 
-  // Use a() to ensure we get a DT_NEEDED on libld-dep-a.so even with --as-needed.
+  // Use a() to ensure we get a DT_NEEDED on libld-dep-a.so even with
+  // --as-needed.
   int64_t symbolic_deps = a();
 
-  for (const auto* head = &ld::abi::_ld_abi.loaded_modules.get()->link_map; head;
-       head = head->next.get()) {
-    symbolic_deps += reinterpret_cast<const ld::abi::Abi<>::Module*>(head)->symbols_visible;
-  }
+  auto modules = ld::AbiLoadedModules(ld::abi::_ld_abi);
+  auto visible = [](const auto& module) { return module.symbols_visible; };
+  symbolic_deps += std::count_if(modules.begin(), modules.end(), visible);
 
   return symbolic_deps + kExtraDeps;
 }

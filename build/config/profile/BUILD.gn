@@ -48,13 +48,23 @@ foreach(file, profile_source_files_list_files) {
       [ "-fprofile-list=" + rebase_path(file, root_build_dir) ]
 }
 
+# A toolchain like user.basic that doesn't support the Fuchsia compiler ABI
+# can't be using the prebuilt runtime from the toolchain, so it shouldn't get
+# any implicit dependencies or configuration meant for that runtime.  If a
+# special-case runtime such as //src/lib/llvm-profdata is used it will be in
+# explicit deps and take care of those linking details for itself.
+_has_compiler_abi = toolchain_variant.tags + [ "no-compiler-abi" ] -
+                    [ "no-compiler-abi" ] == toolchain_variant.tags
+_fuchsia_prebuilt_runtime = _has_compiler_abi && is_fuchsia && !is_kernel
+
 variant("coverage") {
   common_flags = _coverage_common_flags
   inputs = _coverage_inputs
 
-  if (!is_kernel && is_fuchsia) {
+  if (_fuchsia_prebuilt_runtime) {
     # The statically-linked profiling runtime depends on libzircon.
-    # TODO(https://fxbug.dev/42139818): Ensure this works with shared_library() instances too!
+    # TODO(https://fxbug.dev/42139818): Ensure this works with
+    # shared_library() instances too!
     deps = [ "//src/zircon/lib/zircon" ]
 
     dynamic_linker_flags = "-dynamic-linker=coverage/ld.so.1"
@@ -108,7 +118,7 @@ variant("coverage-cts") {
       [ "-fprofile-list=" + rebase_path("profile-cts.list", root_build_dir) ]
   inputs += [ "profile-cts.list" ]
 
-  if (!is_kernel && is_fuchsia) {
+  if (_fuchsia_prebuilt_runtime) {
     # The statically-linked profiling runtime depends on libzircon.
     # TODO(https://fxbug.dev/42139818): Ensure this works with shared_library() instances too!
     deps = [ "//src/zircon/lib/zircon" ]
@@ -145,7 +155,7 @@ variant("coverage-cts") {
 variant("coverage-rust") {
   rustflags = [ "-Cinstrument-coverage" ]
 
-  if (!is_kernel && is_fuchsia) {
+  if (_fuchsia_prebuilt_runtime) {
     # The statically-linked profiling runtime depends on libzircon.
     # TODO(https://fxbug.dev/42139818): Ensure this works with shared_library() instances too!
     deps = [ "//src/zircon/lib/zircon" ]
@@ -177,7 +187,7 @@ variant("profile") {
                   root_build_dir)
   rustflags = [ "-Clink-arg=${libclang_rt_profile}" ]
 
-  if (!is_kernel && is_fuchsia) {
+  if (_fuchsia_prebuilt_runtime) {
     # The statically-linked profiling runtime depends on libzircon.
     # TODO(https://fxbug.dev/42139818): Ensure this works with shared_library() instances too!
     deps = [ "//src/zircon/lib/zircon" ]
