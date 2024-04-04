@@ -188,3 +188,53 @@ fuchsia_riscv_extra_features = []
 # This is the basic machine ABI that's standard for fuchsia-riscv64 user code.
 # This sets the `-mabi` string.
 fuchsia_riscv_abi = "lp64d"
+
+# Define a config that adds the necessary riscv compiler flags. Individual
+# targets can use this to override any of the default riscv features.
+#
+# Parameters:
+#
+#   exclude_letters:
+#     Optional: A list of riscv feature extension letters to exclude from
+#     "-march=..."
+#
+template("riscv64_abi_config") {
+  config(target_name) {
+    forward_variables_from(invoker, [ "visibility" ])
+
+    _extra_features =
+        fuchsia_riscv_implicit_features + fuchsia_riscv_extra_features
+    _features = fuchsia_riscv_profile.u64_mandatory
+    _features += _extra_features
+    _features -= _extra_features
+    _features += _extra_features
+
+    _extra_feature_letters = fuchsia_riscv_implicit_feature_letters +
+                             fuchsia_riscv_extra_feature_letters
+    _letters = fuchsia_riscv_profile.u64_mandatory_letters
+    _letters += _extra_feature_letters
+    _letters -= _extra_feature_letters
+    _letters += _extra_feature_letters
+
+    if (defined(invoker.exclude_letters)) {
+      _letters += invoker.exclude_letters
+      _letters -= invoker.exclude_letters
+    }
+
+    _march = "rv64" + string_join("", _letters)
+    foreach(feature, _features) {
+      _march += "_$feature"
+    }
+
+    cflags = [
+      "-march=$_march",
+      "-mabi=$fuchsia_riscv_abi",
+    ]
+    if (defined(invoker.cflags)) {
+      cflags += invoker.cflags
+    }
+
+    ldflags = cflags
+    asmflags = cflags
+  }
+}

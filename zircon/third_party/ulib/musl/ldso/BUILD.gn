@@ -37,6 +37,19 @@ source_set("ldso") {
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
+
+  # TODO(https://fxbug.dev/327630180): Temporarily disable vector extension for
+  # riscv on dynlink.c. Under asan-ubsan instrumentation, the dynamic loader
+  # already uses a lot of stack and we're somewhat close to the limit. Using
+  # vector instructions decrements the stack a bit more and pushes us below the
+  # limit leading to stack overflows. In the long run, the new dynamic linker
+  # may alleviate some of this and we can re-enable it then. It's probably
+  # better to keep sanitizer instrumentation here over vector instructions.
+  if (current_cpu == "riscv64" &&
+      toolchain_variant.tags + [ "instrumented" ] - [ "instrumented" ] !=
+      toolchain_variant.tags) {
+    configs += [ "//build/config/riscv64:no-vector" ]
+  }
 }
 
 source_set("dlstart") {
