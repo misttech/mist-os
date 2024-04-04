@@ -20,6 +20,7 @@ pub(crate) mod resolver;
 pub(crate) mod routing;
 pub(crate) mod routing_fns;
 pub(crate) mod storage;
+pub(crate) mod structured_dict;
 pub(crate) mod token;
 
 #[cfg(test)]

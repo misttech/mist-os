@@ -240,6 +240,7 @@ rustc_binary("bin") {
     "src/model/start.rs",
     "src/model/storage/admin_protocol.rs",
     "src/model/storage/mod.rs",
+    "src/model/structured_dict.rs",
     "src/model/testing/echo_service.rs",
     "src/model/testing/mocks.rs",
     "src/model/testing/mod.rs",

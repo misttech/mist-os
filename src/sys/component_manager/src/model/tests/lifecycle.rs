@@ -6,16 +6,14 @@ use {
     crate::{
         builtin_environment::BuiltinEnvironment,
         model::{
-            actions::{
-                resolve::sandbox_construction::ComponentInput, ActionSet, ShutdownAction,
-                ShutdownType, StartAction, StopAction,
-            },
+            actions::{ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction},
             component::{ComponentInstance, IncomingCapabilities, InstanceState, StartReason},
             error::{ActionError, ModelError, StartActionError},
             events::registry::EventSubscription,
             hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
             start::Start,
+            structured_dict::ComponentInput,
             testing::{
                 mocks::*,
                 out_dir::OutDir,

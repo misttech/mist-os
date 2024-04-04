@@ -4,12 +4,13 @@
 
 use {
     crate::model::{
-        actions::{resolve::sandbox_construction::ComponentInput, ActionKey, DiscoverAction},
+        actions::{ActionKey, DiscoverAction},
         component::{ComponentInstance, ComponentManagerInstance, StartReason},
         context::ModelContext,
         environment::Environment,
         error::ModelError,
         start::Start,
+        structured_dict::ComponentInput,
         token::InstanceRegistry,
     },
     cm_config::RuntimeConfig,
@@ -133,13 +134,11 @@ impl Model {
 pub mod tests {
     use {
         crate::model::{
-            actions::{
-                resolve::sandbox_construction::ComponentInput, ActionSet, ShutdownAction,
-                ShutdownType,
-            },
+            actions::{ActionSet, ShutdownAction, ShutdownType},
             error::ModelError,
             hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
+            structured_dict::ComponentInput,
             testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
         },
         async_trait::async_trait,

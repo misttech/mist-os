@@ -175,11 +175,11 @@ mod tests {
     use {
         super::*,
         crate::model::{
-            actions::resolve::sandbox_construction::ComponentInput,
             component::StartReason,
             context::ModelContext,
             error::{ActionError, ModelError, ResolveActionError},
             model::{Model, ModelParams},
+            structured_dict::ComponentInput,
             testing::mocks::MockResolver,
             token::InstanceRegistry,
         },

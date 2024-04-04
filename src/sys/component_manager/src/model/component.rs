@@ -9,8 +9,7 @@ use {
         model::{
             actions::{
                 resolve::sandbox_construction::{
-                    self, build_component_sandbox, extend_dict_with_offers, ComponentEnvironment,
-                    ComponentInput,
+                    self, build_component_sandbox, extend_dict_with_offers,
                 },
                 shutdown, start, ActionKey, ActionSet, DestroyAction, DiscoverAction,
                 ResolveAction, ShutdownAction, ShutdownType, StartAction, StopAction,
@@ -35,6 +34,7 @@ use {
             },
             routing_fns::RouteEntry,
             start::Start,
+            structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
             token::{InstanceToken, InstanceTokenState},
         },
         sandbox_util::{DictExt, RoutableExt},
@@ -1779,10 +1779,10 @@ pub struct ResolvedInstanceState {
     /// Dicts containing the capabilities we want to provide to each collection. Each new
     /// dynamic child gets a clone of one of these inputs (which is potentially extended by
     /// dynamic offers).
-    collection_inputs: HashMap<Name, ComponentInput>,
+    collection_inputs: StructuredDictMap<ComponentInput>,
 
     /// The environments declared by this component.
-    bedrock_environments: HashMap<Name, ComponentEnvironment>,
+    bedrock_environments: StructuredDictMap<ComponentEnvironment>,
 
     /// State held by the framework on behalf of the component's program, including
     /// its outgoing directory server endpoint. Present if and only if the component
@@ -1850,13 +1850,13 @@ impl ResolvedInstanceState {
             program_input_dict: Dict::new(),
             program_output_dict: Dict::new(),
             program_input_dict_additions: None,
-            collection_inputs: HashMap::new(),
-            bedrock_environments: HashMap::new(),
+            collection_inputs: Default::default(),
+            bedrock_environments: Default::default(),
             program_escrow,
         };
         state.add_static_children(component).await?;
 
-        let mut child_inputs = HashMap::new();
+        let mut child_inputs = Default::default();
         build_component_sandbox(
             component,
             &state.children,
@@ -2409,7 +2409,7 @@ impl ResolvedInstanceState {
         Ok(())
     }
 
-    async fn discover_static_children(&self, mut child_inputs: HashMap<Name, ComponentInput>) {
+    async fn discover_static_children(&self, mut child_inputs: StructuredDictMap<ComponentInput>) {
         for (child_name, child_instance) in &self.children {
             let child_name = Name::new(child_name.name()).unwrap();
             let child_input = child_inputs.remove(&child_name).expect("missing child dict");

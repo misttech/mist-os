@@ -5,12 +5,13 @@
 use {
     crate::model::{
         actions::{
-            resolve::sandbox_construction::ComponentInput, Action, ActionKey, ActionSet,
-            DiscoverAction, ResolveAction, ShutdownAction, ShutdownType, StartAction,
+            Action, ActionKey, ActionSet, DiscoverAction, ResolveAction, ShutdownAction,
+            ShutdownType, StartAction,
         },
         component::{ComponentInstance, IncomingCapabilities, InstanceState, StartReason},
         error::{ActionError, DestroyActionError},
         hooks::{Event, EventPayload},
+        structured_dict::ComponentInput,
     },
     ::routing::component_instance::ExtendedInstanceInterface,
     async_trait::async_trait,

@@ -209,11 +209,12 @@ mod tests {
     use {
         super::*,
         crate::model::{
-            actions::{resolve::sandbox_construction::ComponentInput, DiscoverAction},
+            actions::DiscoverAction,
             component::{ComponentManagerInstance, WeakExtendedInstance},
             context::ModelContext,
             environment::Environment,
             hooks::Hooks,
+            structured_dict::ComponentInput,
         },
         anyhow::{format_err, Error},
         assert_matches::assert_matches,

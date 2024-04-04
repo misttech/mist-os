@@ -739,8 +739,8 @@ mod tests {
     use {
         super::*,
         crate::model::{
-            actions::resolve::sandbox_construction::ComponentInput,
             component::StartReason,
+            structured_dict::ComponentInput,
             testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
         },
         assert_matches::assert_matches,

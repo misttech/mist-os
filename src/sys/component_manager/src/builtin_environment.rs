@@ -63,7 +63,6 @@ use {
         inspect_sink_provider::InspectSinkProvider,
         model::events::registry::EventSubscription,
         model::{
-            actions::resolve::sandbox_construction::ComponentInput,
             component::ComponentManagerInstance,
             environment::Environment,
             event_logger::EventLogger,
@@ -77,6 +76,7 @@ use {
             model::{Model, ModelParams},
             resolver::{box_arc_resolver, ResolverRegistry},
             storage::admin_protocol::StorageAdminDerivedCapability,
+            structured_dict::ComponentInput,
             token::InstanceRegistry,
         },
         root_stop_notifier::RootStopNotifier,

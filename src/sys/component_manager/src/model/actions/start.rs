@@ -616,13 +616,11 @@ mod tests {
     use super::*;
     use {
         crate::model::{
-            actions::{
-                resolve::sandbox_construction::ComponentInput, ActionSet, ShutdownAction,
-                ShutdownType, StopAction,
-            },
+            actions::{ActionSet, ShutdownAction, ShutdownType, StopAction},
             component::{Component, ResolvedInstanceState, UnresolvedInstanceState},
             error::ModelError,
             hooks::{EventType, Hook, HooksRegistration},
+            structured_dict::ComponentInput,
             testing::{
                 routing_test_helpers::RoutingTestBuilder,
                 test_helpers::{self, ActionsTest},

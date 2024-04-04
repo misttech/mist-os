@@ -4,10 +4,11 @@
 
 use {
     crate::model::{
-        actions::{resolve::sandbox_construction::ComponentInput, Action, ActionKey},
+        actions::{Action, ActionKey},
         component::{ComponentInstance, InstanceState, UnresolvedInstanceState},
         error::{ActionError, DiscoverActionError},
         hooks::{Event, EventPayload},
+        structured_dict::ComponentInput,
     },
     async_trait::async_trait,
     std::sync::Arc,

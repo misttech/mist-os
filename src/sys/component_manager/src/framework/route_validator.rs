@@ -412,9 +412,9 @@ mod tests {
     use {
         super::*,
         crate::model::{
-            actions::resolve::sandbox_construction::ComponentInput,
             component::StartReason,
             start::Start,
+            structured_dict::ComponentInput,
             testing::{
                 out_dir::OutDir,
                 test_helpers::{TestEnvironmentBuilder, TestModelResult},
