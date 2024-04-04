@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::anyhow;
 use futures::future::poll_fn;
 use futures::{Future, FutureExt};
 use std::collections::HashMap;
@@ -56,7 +55,7 @@ impl FrameValue {
 
                 match &mut *slot {
                     FrameValue::Ready(Ok(result)) => Poll::Ready(Ok(result.duplicate())),
-                    FrameValue::Ready(Err(e)) => Poll::Ready(Err(anyhow!("{e:?}"))),
+                    FrameValue::Ready(Err(e)) => Poll::Ready(Err(e.clone())),
                     FrameValue::Waiting(wakers) => {
                         wakers.push(ctx.waker().clone());
                         Poll::Pending

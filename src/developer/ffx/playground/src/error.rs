@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::sync::Arc;
+
 /// Result type that uses our error type as the default.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// A stack frame for errors which produce a backtrace.
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Frame {
     function: Option<String>,
     file: Option<String>,
@@ -21,9 +23,10 @@ struct Span {
 }
 
 /// Error type returned by failures when running playground commands.
+#[derive(Clone)]
 pub struct Error {
     stack: Vec<Frame>,
-    pub source: anyhow::Error,
+    pub source: Arc<anyhow::Error>,
 }
 
 impl<'a> std::fmt::Display for Error {
@@ -84,7 +87,7 @@ where
     T: Into<anyhow::Error>,
 {
     fn from(source: T) -> Error {
-        Error { stack: Vec::new(), source: source.into() }
+        Error { stack: Vec::new(), source: Arc::new(source.into()) }
     }
 }
 

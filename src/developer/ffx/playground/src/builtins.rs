@@ -358,10 +358,8 @@ impl ReplayableIteratorCursor for ServeCursor {
             }
             ServeCursorInner::Waiting(_, next) => NextAction::WaitForPoll(Arc::clone(next)),
             ServeCursorInner::Stored(value, next) => {
-                let value = value
-                    .as_mut()
-                    .map(|x| x.as_mut().map(Value::duplicate))
-                    .map_err(|x| anyhow!("{x:?}").into());
+                let value =
+                    value.as_mut().map(|x| x.as_mut().map(Value::duplicate)).map_err(|x| x.clone());
                 return (
                     async move { value }.boxed(),
                     Arc::clone(next) as Arc<dyn ReplayableIteratorCursor>,
@@ -384,7 +382,7 @@ impl ReplayableIteratorCursor for ServeCursor {
                         value
                             .as_mut()
                             .map(|x| x.as_mut().map(Value::duplicate))
-                            .map_err(|x| anyhow!("{x:?}").into()),
+                            .map_err(|x| x.clone()),
                     ),
                 })
                 .boxed();
