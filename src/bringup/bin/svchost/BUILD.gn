@@ -65,7 +65,6 @@ executable("svchost") {
     "//zircon/system/ulib/kcounter",
     "//zircon/system/ulib/kernel-debug",
     "//zircon/system/ulib/ktrace",
-    "//zircon/system/ulib/profile",
     "//zircon/system/ulib/svc",
     "//zircon/system/ulib/zx",
   ]

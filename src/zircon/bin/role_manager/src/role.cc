@@ -14,7 +14,6 @@
 #include <zircon/syscalls/profile.h>
 
 #include "resource.h"
-#include "zircon/system/ulib/profile/config.h"
 
 using zircon_profile::Role;
 

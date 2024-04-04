@@ -9,8 +9,8 @@
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/zircon/bin/role_manager/src/config.h"
 #include "zircon/syscalls/profile.h"
-#include "zircon/system/ulib/profile/config.h"
 
 namespace {
 

@@ -4,7 +4,6 @@
 
 #include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
-#include <fidl/fuchsia.scheduler.deprecated/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/zx/channel.h>
@@ -54,15 +53,6 @@ TEST(SvchostTest, FuchsiaWriteOnlyBootLogPresent) {
 
   auto result = fidl::WireCall(*client_end)->Get();
   ASSERT_OK(result.status(), "fuchsia_boot::WriteOnlyLog::Get failed");
-}
-
-TEST(SvchostTest, FuchsiaSchedulerProfileProviderPresent) {
-  auto client_end = component::Connect<fuchsia_scheduler_deprecated::ProfileProvider>();
-  ASSERT_TRUE(client_end.is_ok(),
-              "failed to connect to fuchsia_scheduler_deprecated::ProfileProvider");
-
-  auto result = fidl::WireCall(*client_end)->GetProfile(0, "");
-  ASSERT_OK(result.status(), "fuchsia_scheduler_deprecated::ProfileProvider::GetProfile failed");
 }
 
 TEST(SvchostTest, FuchsiaRootJobPresent) {

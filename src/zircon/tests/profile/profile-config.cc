@@ -10,7 +10,7 @@
 
 #include <zxtest/zxtest.h>
 
-#include "zircon/system/ulib/profile/config.h"
+#include "src/zircon/bin/role_manager/src/config.h"
 
 namespace {
 

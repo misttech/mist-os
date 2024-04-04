@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_SYSTEM_ULIB_PROFILE_CONFIG_H_
-#define ZIRCON_SYSTEM_ULIB_PROFILE_CONFIG_H_
+#ifndef SRC_ZIRCON_BIN_ROLE_MANAGER_SRC_CONFIG_H_
+#define SRC_ZIRCON_BIN_ROLE_MANAGER_SRC_CONFIG_H_
 
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/fit/result.h>
@@ -127,4 +127,4 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
 
 }  // namespace zircon_profile
 
-#endif  // ZIRCON_SYSTEM_ULIB_PROFILE_CONFIG_H_
+#endif  // SRC_ZIRCON_BIN_ROLE_MANAGER_SRC_CONFIG_H_

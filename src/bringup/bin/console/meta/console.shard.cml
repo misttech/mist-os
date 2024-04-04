@@ -139,7 +139,6 @@
         {
             protocol: [
                 "fuchsia.kernel.DebugBroker",
-                "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],
@@ -158,7 +157,10 @@
             to: "#console-launcher",
         },
         {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            protocol: [
+                "fuchsia.scheduler.deprecated.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
             from: "#role_manager",
             to: "#console-launcher",
         },

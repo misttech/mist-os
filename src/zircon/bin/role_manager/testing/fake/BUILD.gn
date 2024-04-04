@@ -12,8 +12,8 @@ executable("bin") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp:cpp",
+    "//src/zircon/bin/role_manager:config",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/profile:config",
   ]
 }
 

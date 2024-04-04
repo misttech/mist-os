@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/zx/resource.h>
 
-#include "zircon/system/ulib/profile/config.h"
+#include "config.h"
 
 class RoleManager : public fidl::WireServer<fuchsia_scheduler::RoleManager> {
  public:

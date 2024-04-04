@@ -404,14 +404,16 @@
         {
             protocol: [
                 "fuchsia.kernel.DebugBroker",
-                "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],
             from: "#svchost",
         },
         {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            protocol: [
+                "fuchsia.scheduler.deprecated.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
             from: "#role_manager",
         },
     ],

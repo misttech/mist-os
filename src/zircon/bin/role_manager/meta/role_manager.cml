@@ -9,6 +9,9 @@
     },
     capabilities: [
         {
+            protocol: [ "fuchsia.scheduler.deprecated.ProfileProvider" ],
+        },
+        {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
     ],
@@ -23,6 +26,10 @@
         },
     ],
     expose: [
+        {
+            protocol: [ "fuchsia.scheduler.deprecated.ProfileProvider" ],
+            from: "self",
+        },
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "self",

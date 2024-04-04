@@ -13,7 +13,6 @@ test("profile") {
     "//sdk/fidl/fuchsia.scheduler.deprecated:fuchsia.scheduler.deprecated_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/scheduler/cpp",
-    "//zircon/system/ulib/profile",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
@@ -31,7 +30,7 @@ test("profile-config") {
   deps = [
     ":profile-config-files",
     "//sdk/lib/fdio",
-    "//zircon/system/ulib/profile:config",
+    "//src/zircon/bin/role_manager:config",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

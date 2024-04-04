@@ -12,7 +12,6 @@
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/kernel-debug/kernel-debug.h>
 #include <lib/ktrace/ktrace.h>
-#include <lib/profile/profile.h>
 #include <lib/svc/outgoing.h>
 #include <lib/zx/job.h>
 #include <lib/zx/result.h>
@@ -167,26 +166,6 @@ int main(int argc, char** argv) {
     debug_resource = std::move(response.resource);
   }
 
-  // Get the profile resource.
-  zx::resource profile_resource;
-  {
-    zx::result client = component::ConnectAt<fuchsia_kernel::ProfileResource>(svc);
-    if (client.is_error()) {
-      fprintf(stderr, "svchost: unable to connect to %s: %s\n",
-              fidl::DiscoverableProtocolName<fuchsia_kernel::ProfileResource>,
-              client.status_string());
-      return 1;
-    }
-
-    fidl::WireResult result = fidl::WireCall(client.value())->Get();
-    if (!result.ok()) {
-      fprintf(stderr, "svchost: unable to get root resource: %s\n", result.status_string());
-      return 1;
-    }
-    auto& response = result.value();
-    profile_resource = std::move(response.resource);
-  }
-
   if (zx_status_t status = outgoing.ServeFromStartupInfo(); status != ZX_OK) {
     fprintf(stderr, "svchost: error: Failed to serve outgoing directory: %d (%s).\n", status,
             zx_status_get_string(status));
@@ -197,10 +176,6 @@ int main(int argc, char** argv) {
       {
           .provider = kernel_debug_get_service_provider(),
           .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(debug_resource.get())),
-      },
-      {
-          .provider = profile_get_service_provider(),
-          .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(profile_resource.get())),
       },
       {
           .provider = ktrace_get_service_provider(),

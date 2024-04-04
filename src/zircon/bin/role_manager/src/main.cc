@@ -6,6 +6,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include "profile.h"
 #include "role.h"
 
 int main(int argc, const char** argv) {
@@ -19,11 +20,27 @@ int main(int argc, const char** argv) {
   }
   std::unique_ptr<RoleManager> role_manager_service = std::move(create_result.value());
 
+  zx::result profile_create_result = ProfileProvider::Create();
+  if (profile_create_result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to create profile provider service: "
+                   << profile_create_result.status_string();
+    return -1;
+  }
+  std::unique_ptr<ProfileProvider> profile_provider_service =
+      std::move(profile_create_result.value());
+
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(dispatcher);
   zx::result result =
       outgoing.AddProtocol<fuchsia_scheduler::RoleManager>(std::move(role_manager_service));
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to add RoleManager protocol: " << result.status_string();
+    return -1;
+  }
+
+  result = outgoing.AddProtocol<fuchsia_scheduler_deprecated::ProfileProvider>(
+      std::move(profile_provider_service));
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add ProfileProvider protocol: " << result.status_string();
     return -1;
   }
 

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "zircon/syscalls/profile.h"
+#include "profile.h"
 
 #include <fidl/fuchsia.scheduler.deprecated/cpp/wire.h>
 #include <lib/fit/result.h>
-#include <lib/profile/profile.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
@@ -16,6 +15,7 @@
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/syscalls/profile.h>
 #include <zircon/types.h>
 
 #include <algorithm>
@@ -23,43 +23,11 @@
 #include <string>
 #include <string_view>
 
-#include "zircon/system/ulib/profile/config.h"
-
-namespace {
+#include "resource.h"
 
 constexpr char kConfigPath[] = "/config/profiles";
 
-using zircon_profile::ConfiguredProfiles;
 using zircon_profile::Role;
-
-class ProfileProvider : public fidl::WireServer<fuchsia_scheduler_deprecated::ProfileProvider> {
- public:
-  static zx::result<ProfileProvider*> Create(zx::resource profile_rsrc);
-
-  void OnConnect(async_dispatcher_t* dispatcher,
-                 fidl::ServerEnd<fuchsia_scheduler_deprecated::ProfileProvider> server_end) {
-    bindings_.AddBinding(dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure);
-  }
-
- private:
-  ProfileProvider(zx::resource profile_rsrc, ConfiguredProfiles profiles)
-      : profile_rsrc_(std::move(profile_rsrc)), profiles_(std::move(profiles)) {}
-
-  void GetProfile(GetProfileRequestView request, GetProfileCompleter::Sync& completer) override;
-
-  void GetDeadlineProfile(GetDeadlineProfileRequestView request,
-                          GetDeadlineProfileCompleter::Sync& completer) override;
-
-  void GetCpuAffinityProfile(GetCpuAffinityProfileRequestView request,
-                             GetCpuAffinityProfileCompleter::Sync& completer) override;
-
-  void SetProfileByRole(SetProfileByRoleRequestView request,
-                        SetProfileByRoleCompleter::Sync& completer) override;
-
-  fidl::ServerBindingGroup<fuchsia_scheduler_deprecated::ProfileProvider> bindings_;
-  zx::resource profile_rsrc_;
-  ConfiguredProfiles profiles_;
-};
 
 void ProfileProvider::GetProfile(GetProfileRequestView request,
                                  GetProfileCompleter::Sync& completer) {
@@ -223,12 +191,14 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
   }
 }
 
-constexpr const char* profile_svc_names[] = {
-    fidl::DiscoverableProtocolName<fuchsia_scheduler_deprecated::ProfileProvider>,
-    nullptr,
-};
+zx::result<std::unique_ptr<ProfileProvider>> ProfileProvider::Create() {
+  auto profile_rsrc_result = GetSystemProfileResource();
+  if (profile_rsrc_result.is_error()) {
+    FX_LOGS(ERROR) << "failed to get profile resource: " << profile_rsrc_result.status_string();
+    return profile_rsrc_result.take_error();
+  }
+  zx::resource profile_rsrc = std::move(profile_rsrc_result.value());
 
-zx::result<ProfileProvider*> ProfileProvider::Create(zx::resource profile_rsrc) {
   auto result = zircon_profile::LoadConfigs(kConfigPath);
   if (result.is_error()) {
     FX_SLOG(ERROR, "Failed to load configs", FX_KV("error", result.error_value()),
@@ -271,45 +241,6 @@ zx::result<ProfileProvider*> ProfileProvider::Create(zx::resource profile_rsrc) 
     }
   }
 
-  return zx::ok(new ProfileProvider{std::move(profile_rsrc), std::move(result.value())});
+  return zx::ok(std::unique_ptr<ProfileProvider>(
+      new ProfileProvider{std::move(profile_rsrc), std::move(result.value())}));
 }
-
-zx_status_t init(void** out_ctx) {
-  auto profile_rsrc = zx::resource{static_cast<zx_handle_t>(reinterpret_cast<uintptr_t>(*out_ctx))};
-  zx::result provider = ProfileProvider::Create(std::move(profile_rsrc));
-  if (!provider.is_ok()) {
-    return provider.status_value();
-  }
-  *out_ctx = provider.value();
-  return ZX_OK;
-}
-
-zx_status_t connect(void* ctx, async_dispatcher_t* dispatcher, const char* service_name,
-                    zx_handle_t request) {
-  if (std::string_view{service_name} ==
-      fidl::DiscoverableProtocolName<fuchsia_scheduler_deprecated::ProfileProvider>) {
-    static_cast<ProfileProvider*>(ctx)->OnConnect(
-        dispatcher,
-        fidl::ServerEnd<fuchsia_scheduler_deprecated::ProfileProvider>{zx::channel{request}});
-    return ZX_OK;
-  }
-
-  zx_handle_close(request);
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-constexpr zx_service_ops_t service_ops = {
-    .init = init,
-    .connect = connect,
-    .release = nullptr,
-};
-
-constexpr zx_service_provider_t profile_service_provider = {
-    .version = SERVICE_PROVIDER_VERSION,
-    .services = profile_svc_names,
-    .ops = &service_ops,
-};
-
-}  // namespace
-
-const zx_service_provider_t* profile_get_service_provider() { return &profile_service_provider; }

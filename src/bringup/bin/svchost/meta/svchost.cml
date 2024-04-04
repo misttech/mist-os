@@ -11,7 +11,6 @@
         {
             protocol: [
                 "fuchsia.kernel.DebugBroker",
-                "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],
@@ -28,7 +27,6 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.exception.Handler",
                 "fuchsia.kernel.DebugResource",
-                "fuchsia.kernel.ProfileResource",
                 "fuchsia.kernel.RootJob",
                 "fuchsia.logger.LogSink",
             ],
@@ -43,7 +41,6 @@
         {
             protocol: [
                 "fuchsia.kernel.DebugBroker",
-                "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],
