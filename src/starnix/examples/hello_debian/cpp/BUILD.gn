@@ -47,3 +47,8 @@ group("tests") {
   testonly = true
   deps = [ ":hello_debian_cpp_integration_test" ]
 }
+
+group("cpp") {
+  testonly = true
+  deps = [ ":hello_debian_cpp_package" ]
+}
