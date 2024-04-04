@@ -93,7 +93,7 @@ def main():
         inputs.update(files_from_package_set(config.bootfs_packages, deps))
         inputs.update([entry.source for entry in config.bootfs_files])
         inputs.add(config.kernel.path)
-        if config.devicetree != "None":
+        if config.devicetree:
             inputs.add(config.devicetree)
 
     with open(args.image_assembly_config, "r") as f:

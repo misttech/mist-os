@@ -106,6 +106,7 @@ from typing import (
     get_type_hints,
 )
 import typing
+import types
 
 __all__ = [
     "instance_from_dict",
@@ -233,6 +234,9 @@ def _parse_value_into(
     cls: Type[Union[Dict, List, Set, C]],
 ) -> Union[Dict, List, Set, C]:
     """For a class, attempt to parse it from the value."""
+    if value is None:
+        return None
+
     if typing.get_origin(cls) is dict:
         # dict values need to have a type
         type_args = typing.get_args(cls)
@@ -281,7 +285,10 @@ def _parse_value_into(
         # Create an object from this value
         return instance_from_dict(cls, value)
 
-    elif typing.get_origin(cls) is Union:
+    elif (
+        typing.get_origin(cls) is Union
+        or typing.get_origin(cls) is types.UnionType
+    ):
         # Unions are special, because we don't know what value we can make, so
         # just try them all, in order, until we get one that works.
         errors = []
@@ -309,7 +316,10 @@ def _has_field_types(cls: Type[Any]) -> bool:
     This is akin to [`typing.get_type_hints()`], except that this doesn't raise
     any errors on types that don't support annotations at all (like ['Union']).
     """
-    return "__annotations__" in cls.__dict__
+    for name, value in inspect.getmembers(cls):
+        if name == "__annotations__":
+            return True
+    return False
 
 
 ####

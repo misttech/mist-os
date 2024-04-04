@@ -5,7 +5,7 @@
 
 from dataclasses import dataclass, field
 import json
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Union
 import unittest
 
 from serialization import (
@@ -415,6 +415,191 @@ class SerializeFieldsTest(unittest.TestCase):
                 },
             ),
             instance,
+        )
+
+    def test_deserialize_class_with_union_fields_first_type(self):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            union_field: Union[int, List[str]]
+
+        self.assertEqual(
+            SimpleClass(42, 23),
+            instance_from_dict(
+                SimpleClass, {"int_field": 42, "union_field": 23}
+            ),
+        )
+
+    def test_deserialize_class_with_union_fields_second_type(self):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            union_field: Union[int, List[str]]
+
+        self.assertEqual(
+            SimpleClass(42, ["23"]),
+            instance_from_dict(
+                SimpleClass, {"int_field": 42, "union_field": ["23"]}
+            ),
+        )
+
+    def test_deserialize_class_with_optional_fields_new_syntax_with_value(self):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            str_field: str | None = None
+
+        self.assertEqual(
+            SimpleClass(42, "foo"),
+            instance_from_dict(
+                SimpleClass, {"int_field": 42, "str_field": "foo"}
+            ),
+        )
+
+    def test_deserialize_class_with_optional_fields_new_syntax_without_value(
+        self,
+    ):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            str_field: str | None = None
+
+        self.assertEqual(
+            SimpleClass(42),
+            instance_from_dict(SimpleClass, {"int_field": 42}),
+        )
+
+    def test_deserialize_class_with_optional_fields_new_syntax_with_explicit_none_value(
+        self,
+    ):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            str_field: str | None = None
+
+        self.assertEqual(
+            SimpleClass(42),
+            instance_from_dict(
+                SimpleClass, {"int_field": 42, "str_field": None}
+            ),
+        )
+
+        # Test when the field is not present
+        self.assertEqual(
+            SimpleClass(42),
+            instance_from_dict(SimpleClass, {"int_field": 42}),
+        )
+
+    def test_deserialize_class_with_union_fields_new_syntax_first_type(self):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            union_field: str | list[str]
+
+        self.assertEqual(
+            SimpleClass(42, "foo"),
+            instance_from_dict(
+                SimpleClass, {"int_field": 42, "union_field": "foo"}
+            ),
+        )
+
+    def test_deserialize_class_with_union_fields_new_syntax_second_type(self):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            union_field: int | list[str]
+
+        self.assertEqual(
+            SimpleClass(42, ["foo"]),
+            instance_from_dict(
+                SimpleClass, {"int_field": 42, "union_field": ["foo"]}
+            ),
+        )
+
+    def test_deserialize_class_with_optional_union_fields_new_syntax_first_type(
+        self,
+    ):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            union_field: str | list[int] | None = None
+
+        self.assertEqual(
+            SimpleClass(42, "foo"),
+            instance_from_dict(
+                SimpleClass, {"int_field": 42, "union_field": "foo"}
+            ),
+        )
+
+    def test_deserialize_class_with_optional_union_fields_new_syntax_second_type(
+        self,
+    ):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            union_field: list[int] | str | None = None
+
+        self.assertEqual(
+            SimpleClass(42, [23]),
+            instance_from_dict(
+                SimpleClass, {"int_field": 42, "union_field": [23]}
+            ),
+        )
+
+    def test_deserialize_class_with_optional_union_fields_new_syntax_with_no_value(
+        self,
+    ):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            union_field: str | list[int] | None = None
+
+        self.assertEqual(
+            SimpleClass(42),
+            instance_from_dict(SimpleClass, {"int_field": 42}),
+        )
+
+    def test_deserialize_class_with_optional_union_fields_new_syntax_with_explicit_none_value(
+        self,
+    ):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            union_field: str | list[int] | None = None
+
+        self.assertEqual(
+            SimpleClass(42),
+            instance_from_dict(
+                SimpleClass, {"int_field": 42, "union_field": None}
+            ),
+        )
+
+    def test_serialize_nested_classes(self):
+        @dataclass
+        class Inner:
+            int_field: int
+
+        @dataclass
+        class Outer:
+            inner: Inner
+
+        self.assertEqual(
+            {"inner": {"int_field": 43}},
+            instance_to_dict(Outer(Inner(43))),
+        )
+
+    def test_deserialize_nested_classes(self):
+        @dataclass
+        class Inner:
+            int_field: int
+
+        @dataclass
+        class Outer:
+            inner: Inner
+
+        self.assertEqual(
+            Outer(Inner(43)),
+            instance_from_dict(Outer, {"inner": {"int_field": 43}}),
         )
 
 
