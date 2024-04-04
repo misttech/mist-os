@@ -200,6 +200,7 @@ load(
     "//:build/bazel/repository_rules.bzl",
     "bazel_inputs_repository",
     "boringssl_repository",
+    "fuchsia_build_info_repository",
     "googletest_repository",
 )
 
@@ -207,6 +208,13 @@ load(
 local_repository(
     name = "com_google_absl",
     path = "third_party/abseil-cpp",
+)
+
+fuchsia_build_info_repository(
+    name = "fuchsia_build_info",
+    # LINT.IfChange
+    args = "//:fuchsia_build_generated/args.json",
+    # LINT.ThenChange(scripts/update_workspace.py)
 )
 
 googletest_repository(

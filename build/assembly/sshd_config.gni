@@ -15,7 +15,9 @@ declare_args() {
   #
   # But to pass it as a file to the Bazel build, we need to use the "label"
   # syntax, which is going to be fixed up below.
+  # LINT.IfChange
   authorized_ssh_keys_label = false
+  # LINT.ThenChange(//build/bazel/gn_build_args.txt)
 }
 
 # Set the default value for the path to the file.

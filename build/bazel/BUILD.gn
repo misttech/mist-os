@@ -112,8 +112,9 @@ action("generate_main_workspace") {
     "${bazel_main_top_dir}/download_config_file",
     "${bazel_main_top_dir}/generated-info.json",
     "${bazel_main_top_dir}/workspace/.bazelrc",
-    "${bazel_main_top_dir}/workspace/WORKSPACE.bazel",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/args.json",
     "${bazel_main_top_dir}/workspace/platform_mappings",
+    "${bazel_main_top_dir}/workspace/WORKSPACE.bazel",
 
     # The list of content hash files
     # LINT.IfChange

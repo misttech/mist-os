@@ -5,6 +5,7 @@
 import("//build/board.gni")
 
 declare_args() {
+  # LINT.IfChange
   # Product configuration of the current build
   build_info_product = ""
 
@@ -14,6 +15,8 @@ declare_args() {
   # Logical version of the current build. If not set, defaults to the timestamp
   # of the most recent update.
   build_info_version = ""
+
+  # LINT.ThenChange(//build/bazel/gn_build_args.txt)
 }
 
 build_info_files = {

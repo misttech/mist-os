@@ -7,9 +7,11 @@ import("//build/bazel/bazel_inputs.gni")
 import("//build/info/info.gni")
 
 declare_args() {
+  # LINT.IfChange
   # Truncate the date in the build_info to midnight UTC, and replace the commit
   # hash with one that's synthesized from that date.
   truncate_build_info_commit_date = false
+  # LINT.ThenChange(//build/bazel/gn_build_args.txt)
 }
 
 if (current_toolchain == default_toolchain) {

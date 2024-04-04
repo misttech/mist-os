@@ -951,6 +951,13 @@ common --enable_bzlmod=false
     ]
 
     # LINT.IfChange
+    generated.add_symlink(
+        os.path.join("workspace", "fuchsia_build_generated", "args.json"),
+        os.path.join(gn_output_dir, "args.json"),
+    )
+    # LINT.ThenChange(//build/bazel/repository_rules.bzl)
+
+    # LINT.IfChange
     generated_repositories_inputs["fuchsia_sdk"] = all_fuchsia_idk_metas
     # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
 

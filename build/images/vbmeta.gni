@@ -11,7 +11,10 @@ import("//build/compiled_action.gni")
 declare_args() {
   # If true, then a vbmeta image will be generated for provided ZBI
   # and the paving script will pave vbmeta images to the target device.
+  # LINT.IfChange
   use_vbmeta = false
+
+  # LINT.ThenChange(//build/bazel/gn_build_args.txt)
 
   # a key which will be used to sign VBMETA and images for AVB
   avb_key = ""
