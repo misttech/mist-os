@@ -142,6 +142,14 @@ tests=tests.json
         self.assertEqual(expected_out, ret.stdout, msg=msg)
         self.assertEqual(expected_status, ret.returncode, msg=msg)
 
+    def assert_error(
+        self,
+        args: List[str | Path],
+        expected_err: str,
+        msg: str = "",
+    ):
+        self.assert_output(args, "", expected_err, expected_status=1, msg=msg)
+
     def test_list(self):
         self.assert_output(["list"], "args\nbuild_info\ntests\n")
 
@@ -199,11 +207,9 @@ tests=tests.json
         )
 
         # Test unknown Ninja path
-        self.assert_output(
+        self.assert_error(
             ["ninja_path_to_gn_label", "obj/unknown/path"],
-            "",
-            expected_err="ERROR: Unknown Ninja target path: obj/unknown/path\n",
-            expected_status=1,
+            "ERROR: Unknown Ninja target path: obj/unknown/path\n",
         )
 
     def test_gn_labels_to_ninja_paths(self):
@@ -223,11 +229,9 @@ tests=tests.json
         )
 
         # Test unknown GN label
-        self.assert_output(
+        self.assert_error(
             ["gn_label_to_ninja_paths", "//unknown:label"],
-            "",
-            expected_err="ERROR: Unknown GN label (not in the configured graph): //unknown:label\n",
-            expected_status=1,
+            "ERROR: Unknown GN label (not in the configured graph): //unknown:label\n",
         )
 
         # Test unknown GN label
@@ -236,9 +240,28 @@ tests=tests.json
                 "gn_label_to_ninja_paths",
                 "--allow-unknown",
                 "unknown_path",
+                "unknown:label",
+            ],
+            "unknown:label\nunknown_path\n",
+        )
+
+        # Test that --allow_unknown does not pass unknown GN labels or absolute file paths.
+        self.assert_error(
+            [
+                "gn_label_to_ninja_paths",
+                "--allow-unknown",
                 "//unknown:label",
             ],
-            "//unknown:label\nunknown_path\n",
+            "ERROR: Unknown GN label (not in the configured graph): //unknown:label\n",
+        )
+
+        self.assert_error(
+            [
+                "gn_label_to_ninja_paths",
+                "--allow-unknown",
+                "/unknown/path",
+            ],
+            "ERROR: Unknown GN label (not in the configured graph): /unknown/path\n",
         )
 
     def test_fx_build_args_to_labels(self):
@@ -278,6 +301,15 @@ tests=tests.json
                 ],
                 ["first_path", "second_path"],
             ),
+            (
+                [
+                    "--allow-unknown",
+                    "--args",
+                    "//unknown",
+                    "//other:unknown",
+                ],
+                ["//unknown:unknown", "//other:unknown"],
+            ),
         ]
         for args, expected_list in _TEST_CASES:
             expected_out = "\n".join(expected_list) + "\n"
@@ -305,12 +337,11 @@ tests=tests.json
                 "ERROR: Unknown Ninja path: host_y64/unknown\n",
             ),
         ]
+        self.maxDiff = 1000
         for args, expected_err in _ERROR_CASES:
-            self.assert_output(
+            self.assert_error(
                 ["fx_build_args_to_labels", "--args"] + args,
-                expected_out="",
                 expected_err=expected_err,
-                expected_status=1,
             )
 
 

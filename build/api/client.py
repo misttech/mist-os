@@ -255,7 +255,7 @@ def cmd_ninja_path_to_gn_label(args: argparse.Namespace) -> int:
             labels.add(label)
             continue
 
-        if args.allow_unknown:
+        if args.allow_unknown and not path.startswith("/"):
             labels.add(path)
             continue
 
@@ -297,7 +297,7 @@ def cmd_gn_label_to_ninja_paths(args: argparse.Namespace) -> int:
         if paths:
             all_paths.extend(paths)
             continue
-        if args.allow_unknown:
+        if args.allow_unknown and not label.startswith("/"):
             all_paths.append(label)
             continue
         _error(f"Unknown GN label (not in the configured graph): {label}")
@@ -333,7 +333,7 @@ def cmd_fx_build_args_to_labels(args: argparse.Namespace) -> int:
             )
             return label
 
-        if args.allow_unknown:
+        if args.allow_unknown and not path.startswith("/"):
             return path
 
         _error(f"Unknown Ninja path: {path}")
