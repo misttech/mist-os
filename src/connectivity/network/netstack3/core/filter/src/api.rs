@@ -5,7 +5,7 @@
 use net_types::ip::{Ipv4, Ipv6};
 use netstack3_base::ContextPair;
 
-use crate::{FilterBindingsTypes, FilterContext, State, ValidState, ValidationError};
+use crate::{FilterBindingsTypes, FilterContext, Routines, ValidRoutines, ValidationError};
 
 /// The filtering API.
 pub struct FilterApi<C>(C);
@@ -39,17 +39,17 @@ where
     /// Panics if the provided state includes cyclic routine graphs.
     pub fn set_filter_state<RuleInfo: Clone>(
         &mut self,
-        v4: State<Ipv4, <C::BindingsContext as FilterBindingsTypes>::DeviceClass, RuleInfo>,
-        v6: State<Ipv6, <C::BindingsContext as FilterBindingsTypes>::DeviceClass, RuleInfo>,
+        v4: Routines<Ipv4, <C::BindingsContext as FilterBindingsTypes>::DeviceClass, RuleInfo>,
+        v6: Routines<Ipv6, <C::BindingsContext as FilterBindingsTypes>::DeviceClass, RuleInfo>,
     ) -> Result<(), ValidationError<RuleInfo>> {
-        let v4 = ValidState::new(v4)?;
-        let v6 = ValidState::new(v6)?;
+        let v4 = ValidRoutines::new(v4)?;
+        let v6 = ValidRoutines::new(v6)?;
 
         tracing::info!("updating filtering state:\nv4: {:?}\nv6: {:?}", v4.get(), v6.get());
 
         self.core_ctx().with_all_filter_state_mut(|state_v4, state_v6| {
-            *state_v4 = v4;
-            *state_v6 = v6;
+            state_v4.routines = v4;
+            state_v6.routines = v6;
         });
 
         Ok(())

@@ -8,7 +8,7 @@ use packet_formats::ip::IpExt;
 
 use crate::{
     filter::{
-        FilterBindingsTypes, FilterContext, FilterHandler, FilterImpl, FilterIpContext, ValidState,
+        FilterBindingsTypes, FilterContext, FilterHandler, FilterImpl, FilterIpContext, State,
     },
     BindingsContext, CoreCtx, StackState,
 };
@@ -34,10 +34,7 @@ impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::Filt
 impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
     FilterIpContext<I, BC> for CoreCtx<'_, BC, L>
 {
-    fn with_filter_state<O, F: FnOnce(&ValidState<I, BC::DeviceClass>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
+    fn with_filter_state<O, F: FnOnce(&State<I, BC::DeviceClass>) -> O>(&mut self, cb: F) -> O {
         let state = self.read_lock::<crate::lock_ordering::FilterState<I>>();
         cb(&state)
     }
@@ -48,7 +45,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv4>>
 {
     fn with_all_filter_state_mut<
         O,
-        F: FnOnce(&mut ValidState<Ipv4, BC::DeviceClass>, &mut ValidState<Ipv6, BC::DeviceClass>) -> O,
+        F: FnOnce(&mut State<Ipv4, BC::DeviceClass>, &mut State<Ipv6, BC::DeviceClass>) -> O,
     >(
         &mut self,
         cb: F,
@@ -62,13 +59,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv4>>
 impl<I: IpExt, BC: BindingsContext> RwLockFor<crate::lock_ordering::FilterState<I>>
     for StackState<BC>
 {
-    type Data = ValidState<I, BC::DeviceClass>;
+    type Data = State<I, BC::DeviceClass>;
 
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, ValidState<I, BC::DeviceClass>>
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, State<I, BC::DeviceClass>>
     where
         Self: 'l;
 
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, ValidState<I, BC::DeviceClass>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, State<I, BC::DeviceClass>>
     where
         Self: 'l;
 

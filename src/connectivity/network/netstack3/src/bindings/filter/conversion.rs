@@ -35,8 +35,8 @@ type CoreUninstalledRoutine<I> = netstack3_core::filter::UninstalledRoutine<
 >;
 type CoreHook<I> =
     netstack3_core::filter::Hook<I, fnet_filter::DeviceClass, fnet_filter_ext::RuleId>;
-type CoreState<I> =
-    netstack3_core::filter::State<I, fnet_filter::DeviceClass, fnet_filter_ext::RuleId>;
+type CoreRoutines<I> =
+    netstack3_core::filter::Routines<I, fnet_filter::DeviceClass, fnet_filter_ext::RuleId>;
 
 #[derive(Clone, Debug, Default, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
@@ -58,7 +58,7 @@ struct NatRoutines<I: IpExt> {
 }
 
 /// This is state that has almost entirely been converted to
-/// [`netstack3_core::filter::State`], but which retains some auxiliary
+/// [`netstack3_core::filter::Routines`], but which retains some auxiliary
 /// information to make it easy to merge with other controllers' state. In
 /// particular, it stores routines as BTreeMaps keyed by the routine's priority,
 /// which allows routines from other controllers to be merged into a single set
@@ -180,22 +180,22 @@ impl<I: IpExt> State<I> {
     }
 }
 
-impl<I: IpExt> From<State<I>> for CoreState<I> {
+impl<I: IpExt> From<State<I>> for CoreRoutines<I> {
     fn from(state: State<I>) -> Self {
         fn core_hook<I: IpExt>(routines: BTreeMap<RoutinePriority, CoreRoutine<I>>) -> CoreHook<I> {
             CoreHook { routines: routines.into_values().collect() }
         }
 
         let State { ip_routines, nat_routines } = state;
-        CoreState {
-            ip_routines: netstack3_core::filter::IpRoutines {
+        CoreRoutines {
+            ip: netstack3_core::filter::IpRoutines {
                 ingress: core_hook(ip_routines.ingress),
                 local_ingress: core_hook(ip_routines.local_ingress),
                 forwarding: core_hook(ip_routines.forwarding),
                 local_egress: core_hook(ip_routines.local_egress),
                 egress: core_hook(ip_routines.egress),
             },
-            nat_routines: netstack3_core::filter::NatRoutines {
+            nat: netstack3_core::filter::NatRoutines {
                 ingress: core_hook(nat_routines.ingress),
                 local_ingress: core_hook(nat_routines.local_ingress),
                 local_egress: core_hook(nat_routines.local_egress),

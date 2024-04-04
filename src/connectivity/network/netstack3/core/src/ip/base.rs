@@ -1161,7 +1161,7 @@ impl Ipv4StateBuilder {
             inner: Default::default(),
             icmp: icmp.build(),
             next_packet_id: Default::default(),
-            filter: RwLock::new(crate::filter::ValidState::default()),
+            filter: RwLock::new(crate::filter::State::default()),
         }
     }
 }
@@ -1182,7 +1182,7 @@ impl Ipv6StateBuilder {
             inner: Default::default(),
             icmp: icmp.build(),
             slaac_counters: Default::default(),
-            filter: RwLock::new(crate::filter::ValidState::default()),
+            filter: RwLock::new(crate::filter::State::default()),
         }
     }
 }
@@ -1191,11 +1191,11 @@ pub struct Ipv4State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
     pub(super) inner: IpStateInner<Ipv4, BT::Instant, StrongDeviceId>,
     pub(super) icmp: Icmpv4State<StrongDeviceId::Weak, BT>,
     pub(super) next_packet_id: AtomicU16,
-    pub(super) filter: RwLock<crate::filter::ValidState<Ipv4, BT::DeviceClass>>,
+    pub(super) filter: RwLock<crate::filter::State<Ipv4, BT::DeviceClass>>,
 }
 
 impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv4State<StrongDeviceId, BT> {
-    pub fn filter(&self) -> &RwLock<crate::filter::ValidState<Ipv4, BT::DeviceClass>> {
+    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv4, BT::DeviceClass>> {
         &self.filter
     }
 
@@ -1226,7 +1226,7 @@ pub struct Ipv6State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
     pub(super) inner: IpStateInner<Ipv6, BT::Instant, StrongDeviceId>,
     pub(super) icmp: Icmpv6State<StrongDeviceId::Weak, BT>,
     pub(super) slaac_counters: SlaacCounters,
-    pub(super) filter: RwLock<crate::filter::ValidState<Ipv6, BT::DeviceClass>>,
+    pub(super) filter: RwLock<crate::filter::State<Ipv6, BT::DeviceClass>>,
 }
 
 impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv6State<StrongDeviceId, BT> {
@@ -1234,7 +1234,7 @@ impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv6State<StrongDeviceI
         &self.slaac_counters
     }
 
-    pub fn filter(&self) -> &RwLock<crate::filter::ValidState<Ipv6, BT::DeviceClass>> {
+    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv6, BT::DeviceClass>> {
         &self.filter
     }
 

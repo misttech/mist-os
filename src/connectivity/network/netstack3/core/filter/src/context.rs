@@ -7,7 +7,7 @@ use core::fmt::Debug;
 use net_types::ip::{Ipv4, Ipv6};
 use packet_formats::ip::IpExt;
 
-use crate::state::validation::ValidState;
+use crate::state::State;
 
 /// Trait defining the `DeviceClass` type provided by bindings.
 ///
@@ -29,8 +29,7 @@ pub trait FilterBindingsTypes {
 /// a given lock level, while keeping test code free of locking concerns.
 pub trait FilterIpContext<I: IpExt, BT: FilterBindingsTypes> {
     /// Calls the function with a reference to filtering state.
-    fn with_filter_state<O, F: FnOnce(&ValidState<I, BT::DeviceClass>) -> O>(&mut self, cb: F)
-        -> O;
+    fn with_filter_state<O, F: FnOnce(&State<I, BT::DeviceClass>) -> O>(&mut self, cb: F) -> O;
 }
 
 /// A context for mutably accessing all filtering state at once, to allow IPv4
@@ -39,7 +38,7 @@ pub trait FilterContext<BT: FilterBindingsTypes> {
     /// Calls the function with a mutable reference to all filtering state.
     fn with_all_filter_state_mut<
         O,
-        F: FnOnce(&mut ValidState<Ipv4, BT::DeviceClass>, &mut ValidState<Ipv6, BT::DeviceClass>) -> O,
+        F: FnOnce(&mut State<Ipv4, BT::DeviceClass>, &mut State<Ipv6, BT::DeviceClass>) -> O,
     >(
         &mut self,
         cb: F,
@@ -49,7 +48,10 @@ pub trait FilterContext<BT: FilterBindingsTypes> {
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
-    use crate::state::{IpRoutines, State};
+    use crate::{
+        conntrack,
+        state::{validation::ValidRoutines, IpRoutines, Routines},
+    };
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     pub enum FakeDeviceClass {
@@ -63,21 +65,18 @@ pub(crate) mod testutil {
         type DeviceClass = FakeDeviceClass;
     }
 
-    pub struct FakeCtx<I: IpExt>(ValidState<I, FakeDeviceClass>);
+    pub struct FakeCtx<I: IpExt>(State<I, FakeDeviceClass>);
 
     impl<I: IpExt> FakeCtx<I> {
         pub fn with_ip_routines(routines: IpRoutines<I, FakeDeviceClass, ()>) -> Self {
-            let state = ValidState::new(State { ip_routines: routines, ..Default::default() })
+            let valid_state = ValidRoutines::new(Routines { ip: routines, ..Default::default() })
                 .expect("invalid state");
-            Self(state)
+            Self(State { routines: valid_state, conntrack: conntrack::Table::new() })
         }
     }
 
     impl<I: IpExt> FilterIpContext<I, FakeBindingsTypes> for FakeCtx<I> {
-        fn with_filter_state<O, F: FnOnce(&ValidState<I, FakeDeviceClass>) -> O>(
-            &mut self,
-            cb: F,
-        ) -> O {
+        fn with_filter_state<O, F: FnOnce(&State<I, FakeDeviceClass>) -> O>(&mut self, cb: F) -> O {
             let Self(state) = self;
             cb(&*state)
         }

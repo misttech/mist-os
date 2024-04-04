@@ -29,8 +29,9 @@ pub use packets::{
     TransportPacketSerializer, TxPacket,
 };
 pub use state::{
-    validation::{ValidState, ValidationError},
-    Action, Hook, IpRoutines, NatRoutines, Routine, Rule, State, UninstalledRoutine,
+    validation::{ValidRoutines, ValidationError},
+    Action, ConntrackExternalData, Hook, IpRoutines, NatRoutines, Routine, Routines, Rule, State,
+    UninstalledRoutine,
 };
 
 /// Testing-related utilities for use by other crates.

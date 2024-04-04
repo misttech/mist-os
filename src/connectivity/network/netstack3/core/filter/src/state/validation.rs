@@ -11,7 +11,7 @@ use core::fmt::Debug;
 use derivative::Derivative;
 use packet_formats::ip::IpExt;
 
-use crate::{Action, Hook, IpRoutines, NatRoutines, Routine, Rule, State, UninstalledRoutine};
+use crate::{Action, Hook, IpRoutines, NatRoutines, Routine, Routines, Rule, UninstalledRoutine};
 
 /// Provided filtering state was invalid.
 #[derive(Derivative, Debug)]
@@ -26,17 +26,17 @@ pub enum ValidationError<RuleInfo> {
 /// Witness type ensuring that the contained filtering state has been validated.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct ValidState<I: IpExt, DeviceClass>(State<I, DeviceClass, ()>);
+pub struct ValidRoutines<I: IpExt, DeviceClass>(Routines<I, DeviceClass, ()>);
 
-impl<I: IpExt, DeviceClass> ValidState<I, DeviceClass> {
+impl<I: IpExt, DeviceClass> ValidRoutines<I, DeviceClass> {
     /// Accesses the inner state.
-    pub fn get(&self) -> &State<I, DeviceClass, ()> {
+    pub fn get(&self) -> &Routines<I, DeviceClass, ()> {
         let Self(state) = self;
         &state
     }
 }
 
-impl<I: IpExt, DeviceClass: Clone + Debug> ValidState<I, DeviceClass> {
+impl<I: IpExt, DeviceClass: Clone + Debug> ValidRoutines<I, DeviceClass> {
     /// Validates the provide state and creates a new `ValidState` or returns a
     /// `ValidationError` if the state is invalid.
     ///
@@ -48,9 +48,9 @@ impl<I: IpExt, DeviceClass: Clone + Debug> ValidState<I, DeviceClass> {
     ///
     /// Panics if the provided state includes cyclic routine graphs.
     pub fn new<RuleInfo: Clone>(
-        state: State<I, DeviceClass, RuleInfo>,
+        state: Routines<I, DeviceClass, RuleInfo>,
     ) -> Result<Self, ValidationError<RuleInfo>> {
-        let State { ip_routines, nat_routines } = &state;
+        let Routines { ip: ip_routines, nat: nat_routines } = &state;
 
         // Ensure that no rule has a matcher that is unavailable in the context in which
         // the rule will be evaluated.
@@ -162,13 +162,13 @@ impl<I: IpExt, DeviceClass: Clone + Debug + Debug, RuleInfo: Clone>
     }
 }
 
-impl<I: IpExt, DeviceClass: Clone + Debug, RuleInfo: Clone> State<I, DeviceClass, RuleInfo> {
-    fn strip_debug_info(self) -> State<I, DeviceClass, ()> {
-        let Self { ip_routines, nat_routines } = self;
+impl<I: IpExt, DeviceClass: Clone + Debug, RuleInfo: Clone> Routines<I, DeviceClass, RuleInfo> {
+    fn strip_debug_info(self) -> Routines<I, DeviceClass, ()> {
+        let Self { ip: ip_routines, nat: nat_routines } = self;
         let mut index = UninstalledRoutineIndex::default();
-        State {
-            ip_routines: ip_routines.strip_debug_info(&mut index),
-            nat_routines: nat_routines.strip_debug_info(&mut index),
+        Routines {
+            ip: ip_routines.strip_debug_info(&mut index),
+            nat: nat_routines.strip_debug_info(&mut index),
         }
     }
 }

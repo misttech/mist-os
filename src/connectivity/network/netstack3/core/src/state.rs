@@ -93,11 +93,11 @@ impl<BT: BindingsTypes> StackState<BT> {
 
     pub(crate) fn filter<I: packet_formats::ip::IpExt>(
         &self,
-    ) -> &RwLock<crate::filter::ValidState<I, BT::DeviceClass>> {
+    ) -> &RwLock<crate::filter::State<I, BT::DeviceClass>> {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         struct Wrap<'a, I: packet_formats::ip::IpExt, DeviceClass>(
-            &'a RwLock<crate::filter::ValidState<I, DeviceClass>>,
+            &'a RwLock<crate::filter::State<I, DeviceClass>>,
         );
         let Wrap(state) = I::map_ip(
             IpInvariant(self),

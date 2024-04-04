@@ -146,7 +146,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.get().ip_routines.ingress,
+                &state.routines.get().ip.ingress,
                 packet,
                 Interfaces { ingress: Some(interface), egress: None },
             )
@@ -161,7 +161,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.get().ip_routines.local_ingress,
+                &state.routines.get().ip.local_ingress,
                 packet,
                 Interfaces { ingress: Some(interface), egress: None },
             )
@@ -181,7 +181,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.get().ip_routines.forwarding,
+                &state.routines.get().ip.forwarding,
                 packet,
                 Interfaces { ingress: Some(in_interface), egress: Some(out_interface) },
             )
@@ -196,7 +196,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.get().ip_routines.local_egress,
+                &state.routines.get().ip.local_egress,
                 packet,
                 Interfaces { ingress: None, egress: Some(interface) },
             )
@@ -211,7 +211,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.get().ip_routines.egress,
+                &state.routines.get().ip.egress,
                 packet,
                 Interfaces { ingress: None, egress: Some(interface) },
             )

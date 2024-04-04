@@ -16,6 +16,7 @@ use netstack3_sync::Mutex;
 /// struct and can be extracted with the [`Connection::external_data()`]
 /// function.
 #[allow(dead_code)]
+#[derive(Default)]
 pub struct Table<I: IpExt, E> {
     /// A connection is inserted into the map twice: once for the original
     /// tuple, and once for the reply tuple.

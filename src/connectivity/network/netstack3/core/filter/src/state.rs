@@ -14,7 +14,7 @@ use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip};
 use packet_formats::ip::IpExt;
 
-use crate::matchers::PacketMatcher;
+use crate::{conntrack, matchers::PacketMatcher, ValidRoutines};
 
 /// The action to take on a packet.
 #[derive(Derivative)]
@@ -164,13 +164,27 @@ pub struct NatRoutines<I: IpExt, DeviceClass, RuleInfo> {
     pub egress: Hook<I, DeviceClass, RuleInfo>,
 }
 
-/// IP version-specific filtering state.
+/// Data stored in [`conntrack::Connection`] that is only needed by filtering.
+#[derive(Default)]
+pub struct ConntrackExternalData {}
+
+/// IP version-specific filtering routine state.
 #[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 #[derivative(Default(bound = ""), Debug(bound = "DeviceClass: Debug"))]
-pub struct State<I: IpExt, DeviceClass, RuleInfo> {
+pub struct Routines<I: IpExt, DeviceClass, RuleInfo> {
     /// Routines that perform IP filtering.
-    pub ip_routines: IpRoutines<I, DeviceClass, RuleInfo>,
+    pub ip: IpRoutines<I, DeviceClass, RuleInfo>,
     /// Routines that perform IP filtering and NAT.
-    pub nat_routines: NatRoutines<I, DeviceClass, RuleInfo>,
+    pub nat: NatRoutines<I, DeviceClass, RuleInfo>,
+}
+
+/// IP version-specific filtering state.
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
+pub struct State<I: IpExt, DeviceClass> {
+    /// Routines used for filtering packets.
+    pub routines: ValidRoutines<I, DeviceClass>,
+    /// Connection tracking state.
+    pub conntrack: conntrack::Table<I, ConntrackExternalData>,
 }
