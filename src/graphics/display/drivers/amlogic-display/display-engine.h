@@ -19,7 +19,6 @@
 #include <cstdint>
 #include <memory>
 
-#include <ddktl/device.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
 
@@ -36,7 +35,7 @@
 
 namespace amlogic_display {
 
-class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, ddk::base_protocol> {
+class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
  public:
   // Factory method for production use.
   //

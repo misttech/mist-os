@@ -30,6 +30,7 @@
 #include <cstddef>
 #include <memory>
 
+#include <ddktl/device.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
