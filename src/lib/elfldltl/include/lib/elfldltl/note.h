@@ -421,8 +421,8 @@ template <class Elf, class Memory, typename... Callback>
 PhdrMemoryNoteObserver(Elf&&, Memory&, Callback&&...)
     -> PhdrMemoryNoteObserver<std::decay_t<Elf>::kData, Memory, std::decay_t<Callback>...>;
 
-// This returns a bool(ElfNote) callback object that can be passed to
-// elfldltl::PhdrFileNoteObserver or elfldltl::PhdrMemoryNoteObserver.  That
+// This returns a fit::result<fit::failed.bool >(ElfNote) callback object that
+// can be passed to PhdrFileNoteObserver or PhdrMemoryNoteObserver.  That
 // callback updates build_id to the file's (first) build ID note.  If the
 // optional second argument is true, that callback returns fit::ok(false) after
 // it's found the build ID, so that PhdrFileNoteObserver would continue to call

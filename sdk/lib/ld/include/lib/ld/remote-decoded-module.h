@@ -128,16 +128,20 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
       return false;
     }
 
-    // Decode phdrs to fill LoadInfo, build ID, etc.
+    // Instantiate the module so we can start to set its fields.
+    // The symbolizer_modid is not meaningful here.
+    this->EmplaceModule(0);
+
+    // Decode phdrs to fill LoadInfo, build ID, etc.  Only one pass over the
+    // phdrs is needed since metadata segments can be accessed by offset rather
+    // than vaddr, such as via the PhdrFileNoteObserver.
     auto& [ehdr_owner, phdrs_owner] = *headers;
     const Ehdr& ehdr = ehdr_owner;
     const cpp20::span<const Phdr> phdrs = phdrs_owner;
-    std::optional<elfldltl::ElfNote> build_id;
     constexpr elfldltl::NoArrayFromFile<std::byte> kNoBuildIdAllocator;
     auto result = DecodeModulePhdrs(  //
         diag, phdrs, this->load_info().GetPhdrObserver(page_size),
-        elfldltl::PhdrFileNoteObserver(Elf{}, mapped_vmo_, kNoBuildIdAllocator,
-                                       elfldltl::ObserveBuildIdNote(build_id)));
+        PhdrFileBuildIdObserver<Elf>(mapped_vmo_, kNoBuildIdAllocator, this->module()));
     if (!result) [[unlikely]] {
       // DecodeModulePhdrs only fails if Diagnostics said to give up.
       return false;
@@ -146,14 +150,6 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf> {
     auto [dyn_phdr, tls_phdr, relro_phdr, stack_size] = *result;
 
     exec_info_ = {.relative_entry = ehdr.entry, .stack_size = stack_size};
-
-    // After successfully decoding the phdrs, we may now instantiate the module
-    // and set its fields.  The symbolizer_modid is not meaningful here.
-    this->EmplaceModule(0);
-
-    if (build_id) {
-      this->module().build_id = build_id->desc;
-    }
 
     // Apply RELRO protection before segments are aligned & equipped with VMOs.
     if (!this->load_info().ApplyRelro(diag, relro_phdr, page_size, false)) {

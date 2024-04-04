@@ -166,10 +166,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
     // Now the module's image is in memory!  Decode phdrs for everything else
     // but the PT_LOADs for load_info_, already filled by LoadFromFile.
-    std::optional<elfldltl::ElfNote> build_id;
-    auto result = DecodeModulePhdrs(
-        diag, phdrs,
-        elfldltl::PhdrMemoryNoteObserver(Elf{}, memory(), elfldltl::ObserveBuildIdNote(build_id)));
+    auto result = DecodeModulePhdrs(  //
+        diag, phdrs, PhdrMemoryBuildIdObserver(memory(), decoded().module()));
     if (!result) [[unlikely]] {
       return {};
     }
@@ -178,10 +176,6 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     set_relro(relro_phdr);
 
     // Start filling in module() with pointers into the loaded image.
-
-    if (build_id) {
-      decoded().module().build_id = build_id->desc;
-    }
 
     // If there was a PT_TLS, fill in tls_module() to be published later.
     if (tls_phdr) {

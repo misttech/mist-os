@@ -12,6 +12,7 @@
 #include <lib/elfldltl/self.h>
 #include <lib/elfldltl/static-pie-with-vdso.h>
 #include <lib/elfldltl/symbol.h>
+#include <lib/ld/load.h>
 #include <lib/ld/module.h>
 
 #include <cstddef>
@@ -45,8 +46,7 @@ struct BootstrapModule {
 inline BootstrapModule FinishBootstrapModule(abi::Abi<>::Module& module,
                                              cpp20::span<const elfldltl::Elf<>::Dyn> dyn,
                                              size_t vaddr_start, size_t vaddr_size, size_t bias,
-                                             cpp20::span<const elfldltl::Elf<>::Phdr> phdrs,
-                                             const elfldltl::ElfNote& build_id) {
+                                             cpp20::span<const elfldltl::Elf<>::Phdr> phdrs) {
   module.link_map.addr = bias;
   module.link_map.ld = dyn.data();
   module.vaddr_start = vaddr_start;
@@ -54,7 +54,6 @@ inline BootstrapModule FinishBootstrapModule(abi::Abi<>::Module& module,
   module.phdrs = phdrs;
   module.soname = module.symbols.soname();
   module.link_map.name = module.soname.str().data();
-  module.build_id = build_id.desc;
   return {module, dyn};
 }
 
@@ -110,20 +109,18 @@ inline BootstrapModule BootstrapVdsoModule(Diagnostics&& diag, const void* vdso_
       *memory.ReadArrayFromFile<Phdr>(ehdr.phoff, elfldltl::NoArrayFromFile<Phdr>{}, ehdr.phnum);
 
   size_type vaddr_start, vaddr_size;
-  std::optional<elfldltl::ElfNote> build_id;
   std::optional<Phdr> dyn_phdr;
   elfldltl::DecodePhdrs(
       diag, phdrs, elfldltl::PhdrLoadObserver<elfldltl::Elf<>>(page_size, vaddr_start, vaddr_size),
       elfldltl::PhdrDynamicObserver<elfldltl::Elf<>>(dyn_phdr),
-      elfldltl::PhdrMemoryNoteObserver(elfldltl::Elf<>{}, memory,
-                                       elfldltl::ObserveBuildIdNote(build_id)));
+      PhdrMemoryBuildIdObserver(memory, vdso));
 
   const cpp20::span dyn = *memory.ReadArray<Dyn>(dyn_phdr->vaddr, dyn_phdr->memsz);
   elfldltl::DecodeDynamic(diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(vdso.symbols));
 
   const size_type bias = reinterpret_cast<uintptr_t>(vdso_base) - vaddr_start;
 
-  return FinishBootstrapModule(vdso, dyn, vaddr_start, vaddr_size, bias, phdrs, *build_id);
+  return FinishBootstrapModule(vdso, dyn, vaddr_start, vaddr_size, bias, phdrs);
 }
 
 // This bootstraps this dynamic linker itself, doing its own dynamic linking
@@ -144,37 +141,35 @@ inline BootstrapModule BootstrapSelfModule(Diagnostics&& diag, const abi::Abi<>:
   auto memory = elfldltl::Self<>::Memory();
   const cpp20::span phdrs = elfldltl::Self<>::Phdrs();
 
-  std::optional<elfldltl::ElfNote> build_id;
+  // We want this object to be in bss to reduce the amount of data pages which
+  // need COW.  In general the only data/bss we want should be part of
+  // `_ld_abi`, but the self module will always be in the `_ld_abi` list so it
+  // is safe to keep this object in .bss.  It will be protected to read only
+  // later.  The explicit .bss section attribute ensures this object is zero
+  // initialized, we will get an assembler error otherwise.  We also rely on
+  // this when only initializing some of the members of `self`.
+  [[gnu::section(".bss.self_module")]] __CONSTINIT static abi::Abi<>::Module self{
+      elfldltl::kLinkerZeroInitialized};
+  // Note, this call could be elided because it only sets `symbols` which will
+  // be immediately replaced.  In case this function changes to do more we
+  // should keep the call.  The compiler should be smart enough to figure out
+  // this is a dead store.
+  self.InitLinkerZeroInitialized();
+
   std::optional<Phdr> dyn_phdr;
-  elfldltl::DecodePhdrs(
+  elfldltl::DecodePhdrs(  //
       diag, phdrs, elfldltl::PhdrDynamicObserver<elfldltl::Elf<>>(dyn_phdr),
-      // Since this is the only phdr observer, tell it not to keep going after
-      // seeing a build ID note.
-      elfldltl::PhdrMemoryNoteObserver(elfldltl::Elf<>{}, memory,
-                                       elfldltl::ObserveBuildIdNote(build_id, false)));
+      PhdrMemoryBuildIdObserver(memory, self));
 
   const uintptr_t bias = elfldltl::Self<>::LoadBias();
   const uintptr_t start = memory.base() + bias;
   cpp20::span dyn = elfldltl::Self<>::Dynamic();
 
-  // We want this object to be in bss to reduce the amount of data pages which need COW. In general
-  // the only data/bss we want should be part of `_ld_abi`, but the self module will always be in
-  // the `_ld_abi` list so it is safe to keep this object in .bss. It will be protected to read only
-  // later. The explicit .bss section attribute ensures this object is zero initialized, we will get
-  // an assembler error otherwise. We also rely on this when only initializing some of the members
-  // of `self`.
-  [[gnu::section(".bss.self_module")]] __CONSTINIT static abi::Abi<>::Module self{
-      elfldltl::kLinkerZeroInitialized};
-  // Note, this call could be elided because it only sets `symbols` which will be immediately
-  // replaced. In case this function changes to do more we should keep the call. The compiler should
-  // be smart enough to figure out this is a dead store.
-  self.InitLinkerZeroInitialized();
-
   self.symbols =
       elfldltl::LinkStaticPieWithVdso(elfldltl::Self<>(), diag, vdso.symbols, vdso.link_map.addr);
 
   dyn = dyn.subspan(0, dyn_phdr->memsz / sizeof(Dyn));
-  return FinishBootstrapModule(self, dyn, start, memory.image().size(), bias, phdrs, *build_id);
+  return FinishBootstrapModule(self, dyn, start, memory.image().size(), bias, phdrs);
 }
 
 inline void CompleteBootstrapModule(abi::Abi<>::Module& module, size_t page_size) {

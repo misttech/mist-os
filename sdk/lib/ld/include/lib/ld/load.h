@@ -138,41 +138,48 @@ constexpr fit::result<bool, cpp20::span<const typename Elf::Dyn>> DecodeModuleDy
   return fit::ok(dyn);
 }
 
-// Return an observer object to be passed to elfldltl::*NoteObserver.  When
-// that object is destroyed, it fills in the Module::build_id field.  This can
-// be used either via elfldltl::PhdrFileNoteObserver in DecodeModulePhdrs, or
-// via elfldltl::PhdrMemoryNoteObserver in a second elfldltl::DecodePhdrs scan
-// performed after the module has been loaded.
+// This returns a callback that fills in the ABI module's build ID.  Use it
+// with elfldltl::PhdrFileNoteObserver or elfldltl::PhdrMemoryNoteObserver.
+// The module.build_id member must be default-initialized before this.
+//
+// The callback always return success so that the NoteObserver will never
+// short-circuit the phdrs scan it's part of, only short-circuit unnecessary
+// note scanning.
 template <class Elf = elfldltl::Elf<>>
-constexpr auto ObserveBuildIdNote(AbiModule<Elf>& module, bool keep_going = true) {
-  // Use the toolkit's generic observer to find the build ID note.
-  using ObserverResult = std::optional<elfldltl::ElfNote>&;
-  auto make_observer = [keep_going](ObserverResult& build_id) {
-    return elfldltl::ObserveBuildIdNote(build_id, keep_going);
-  };
-  using NoteObserver = decltype(make_observer(std::declval<ObserverResult>()));
-  using MakeObserver = decltype(make_observer);
-
-  // This wraps the generic observer with one whose destructor copies the
-  // results into the Module field.
-  class BuildIdObserver : public NoteObserver {
-   public:
-    constexpr BuildIdObserver(typename abi::Abi<Elf>::Module& module,
-                              const MakeObserver& make_observer)
-        : NoteObserver(make_observer(build_id_)), module_(module) {}
-
-    ~BuildIdObserver() {
-      if (build_id_) {
-        module_.build_id = build_id_->desc;
-      }
+constexpr auto ObserveBuildIdNote(AbiModule<Elf>& module) {
+  assert(module.build_id.empty());
+  return [&module](const auto& note) -> fit::result<fit::failed, bool> {
+    if (!note.IsBuildId()) {
+      // This is a different note, so keep looking.
+      return fit::ok(true);
     }
 
-   private:
-    typename abi::Abi<Elf>::Module& module_;
-    std::optional<elfldltl::ElfNote> build_id_;
-  };
+    // This is the build ID note.  After the first time through this path,
+    // more callbacks should have been short-circuited by the return below.
+    assert(module.build_id.empty());
 
-  return BuildIdObserver{module, make_observer};
+    module.build_id = note.desc;
+
+    // Tell the caller not to call again for another note.
+    return fit::ok(false);
+  };
+}
+
+// These are convenience wrappers around ObserveBuildIdNote when no other notes
+// are of interest in a phdrs scan.  They return phdr note observers reading
+// from the file or memory, respectively.
+
+template <class Elf = elfldltl::Elf<>, class File, typename Allocator>
+constexpr auto PhdrFileBuildIdObserver(File&& file, Allocator&& allocator, AbiModule<Elf>& module) {
+  return elfldltl::PhdrFileNoteObserver(Elf{}, std::forward<File>(file),
+                                        std::forward<Allocator>(allocator),
+                                        ObserveBuildIdNote<Elf>(module));
+}
+
+template <class Elf = elfldltl::Elf<>, class Memory>
+constexpr auto PhdrMemoryBuildIdObserver(Memory&& memory, AbiModule<Elf>& module) {
+  return elfldltl::PhdrMemoryNoteObserver(Elf{}, std::forward<Memory>(memory),
+                                          ObserveBuildIdNote<Elf>(module));
 }
 
 }  // namespace ld

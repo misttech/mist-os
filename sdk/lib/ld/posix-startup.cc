@@ -127,16 +127,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
 
   // A second phdr scan is needed to decode notes now that they can be
   // accessed in memory.
-  std::optional<elfldltl::ElfNote> build_id;
-  elfldltl::DecodePhdrs(
-      diag, phdrs,
-      // Since this is the only phdr observer, tell it not to keep going after
-      // seeing a build ID note.
-      elfldltl::PhdrMemoryNoteObserver(elfldltl::Elf<>{}, main_executable->memory(),
-                                       elfldltl::ObserveBuildIdNote(build_id, false)));
-  if (build_id) {
-    module.build_id = build_id->desc;
-  }
+  elfldltl::DecodePhdrs(diag, phdrs, PhdrMemoryBuildIdObserver(main_executable->memory(), module));
 
   if (phdr_info->tls_phdr) {
     main_executable->decoded().SetTls(diag, main_executable->memory(), *phdr_info->tls_phdr, 1);
