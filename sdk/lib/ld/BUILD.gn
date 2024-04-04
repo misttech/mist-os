@@ -13,6 +13,7 @@ import("//build/toolchain/zircon/user_basic_redirect.gni")
 # the `ld` namespace, which isn't itself part of of the passive ABI.
 library_headers("headers") {
   headers = [
+    "lib/ld/decoded-module-in-memory.h",
     "lib/ld/decoded-module.h",
     "lib/ld/diagnostics.h",
     "lib/ld/load-module.h",

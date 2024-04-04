@@ -15,6 +15,7 @@
 #include <lib/elfldltl/self.h>
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/static-vector.h>
+#include <lib/ld/decoded-module-in-memory.h>
 #include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
 #include <lib/ld/tls.h>
@@ -101,8 +102,7 @@ inline constexpr TlsDescResolver kTlsDescResolver{};
 // Its LoadInfo uses fixed storage bounded by kMaxSegments.  The Module is
 // allocated separately using the initial-exec allocator.
 
-using StartupLoadModuleBase = LoadModule<
-    DecodedModule<Elf, elfldltl::StaticVector<kMaxSegments>::Container, AbiModuleInline::kNo>>;
+using StartupLoadModuleBase = LoadModule<DecodedModuleInMemory<>>;
 
 template <class Loader>
 struct StartupLoadModule : public StartupLoadModuleBase,
