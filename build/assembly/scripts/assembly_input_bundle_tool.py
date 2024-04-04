@@ -119,14 +119,16 @@ def create_bundle(args: argparse.Namespace) -> None:
 
     # Write out a dep file if one is requested.
     if args.depfile:
-        DepFile.from_deps(assembly_config, deps).write_to(args.depfile)
+        with open(args.depfile, "w") as depfile:
+            DepFile.from_deps(assembly_config, deps).write_to(depfile)
 
     # Write out a fini manifest of the files that have been copied, to create a
     # package or archive that contains all of the files in the bundle.
     if args.export_manifest:
-        assembly_input_bundle.write_fini_manifest(
-            args.export_manifest, base_dir=args.outdir
-        )
+        with open(args.export_manifest, "w") as export_manifest:
+            assembly_input_bundle.write_fini_manifest(
+                export_manifest, base_dir=args.outdir
+            )
 
 
 def add_pkg_list_from_file(
@@ -319,10 +321,12 @@ def generate_package_creation_manifest(args: argparse.Namespace) -> None:
     the AIB contents manifest.
     """
     meta_package_content = {"name": args.name, "version": "0"}
-    json.dump(meta_package_content, args.meta_package)
+    with open(args.meta_package, "w") as meta_package:
+        json.dump(meta_package_content, meta_package)
     contents_manifest = args.contents_manifest.read()
-    args.output.write(contents_manifest)
-    args.output.write("meta/package={}".format(args.meta_package.name))
+    with open(args.output, "w") as output:
+        output.write(contents_manifest)
+        output.write("meta/package={}".format(args.meta_package))
 
 
 def generate_archive(args: argparse.Namespace) -> None:
@@ -378,7 +382,8 @@ def generate_archive(args: argparse.Namespace) -> None:
     subprocess.run(cmd_args, check=True)
 
     if args.depfile:
-        DepFile.from_deps(args.output, deps).write_to(args.depfile)
+        with open(args.depfile, "w") as depfile:
+            DepFile.from_deps(args.output, deps).write_to(depfile)
 
 
 def diff_bundles(args: argparse.Namespace) -> None:
@@ -536,12 +541,10 @@ def main():
     )
     bundle_creation_parser.add_argument(
         "--depfile",
-        type=argparse.FileType("w"),
         help="Path to write a dependency file to",
     )
     bundle_creation_parser.add_argument(
         "--export-manifest",
-        type=argparse.FileType("w"),
         help="Path to write a FINI manifest of the contents of the AIB",
     )
     bundle_creation_parser.add_argument(
@@ -622,11 +625,9 @@ def main():
     )
     package_creation_manifest_parser.add_argument("--name", required=True)
     package_creation_manifest_parser.add_argument(
-        "--meta-package", type=argparse.FileType("w"), required=True
+        "--meta-package", required=True
     )
-    package_creation_manifest_parser.add_argument(
-        "--output", type=argparse.FileType("w"), required=True
-    )
+    package_creation_manifest_parser.add_argument("--output", required=True)
     package_creation_manifest_parser.set_defaults(
         handler=generate_package_creation_manifest
     )
@@ -646,9 +647,7 @@ def main():
     archive_creation_parser.add_argument("--meta-far")
     archive_creation_parser.add_argument("--creation-manifest", required=True)
     archive_creation_parser.add_argument("--output", required=True)
-    archive_creation_parser.add_argument(
-        "--depfile", type=argparse.FileType("w")
-    )
+    archive_creation_parser.add_argument("--depfile")
     archive_creation_parser.set_defaults(handler=generate_archive)
 
     ###
