@@ -144,6 +144,7 @@ zx::result<> AmlTrip::CreateDevfsNode() {
 
   auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
                    .connector(std::move(connector.value()))
+                   .connector_supports(fuchsia_device_fs::ConnectionType::kController)
                    .class_name("trippoint");
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
