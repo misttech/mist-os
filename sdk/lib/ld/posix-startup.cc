@@ -90,7 +90,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   Module& module = main_executable->decoded().module();
 
   // We already have the direct pointer to the phdrs in the load image, from
-  // PT_PHDR even though we never see the Ehdr::phoff value.
+  // AT_PHDR even though we never see the Ehdr::phoff value.
   module.phdrs = phdrs;
 
   // Scan the phdrs for both the vaddr bounds that would normally be
@@ -106,7 +106,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
     return {};
   }
 
-  main_executable->set_relro(phdr_info->relro_phdr);
+  main_executable->decoded().set_relro(phdr_info->relro_phdr, startup.page_size);
 
   // The PT_PHDR gives the link-time view of the p_vaddr of the phdrs.  Since
   // we never saw the Ehdr, we can't use Ehdr::phoff to locate it among the

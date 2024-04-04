@@ -66,25 +66,23 @@ class MmapLoader {
     size_t size_ = 0;
   };
 
-  MmapLoader() = default;
+  explicit MmapLoader() : page_size_(sysconf(_SC_PAGESIZE)) {}
 
   explicit MmapLoader(size_t page_size) : page_size_(page_size) {}
+
+  MmapLoader(MmapLoader&& other) noexcept
+      : memory_{std::exchange(other.memory_, {})}, page_size_(other.page_size_) {}
+
+  MmapLoader& operator=(MmapLoader&& other) noexcept {
+    memory_ = std::exchange(other.memory_, {});
+    page_size_ = other.page_size_;
+    return *this;
+  }
 
   ~MmapLoader() {
     if (!image().empty()) {
       munmap(image().data(), image().size());
     }
-  }
-
-  MmapLoader(MmapLoader&& other) noexcept : memory_(other.memory_.image(), other.memory_.base()) {
-    other.memory().set_image({});
-  }
-
-  MmapLoader& operator=(MmapLoader&& other) noexcept {
-    memory_.set_image(other.memory_.image());
-    memory_.set_base(other.memory_.base());
-    other.memory_.set_image({});
-    return *this;
   }
 
   [[gnu::const]] size_t page_size() const { return page_size_; }
@@ -212,7 +210,7 @@ class MmapLoader {
   uintptr_t base() const { return memory_.base(); }
 
   DirectMemory memory_;
-  size_t page_size_ = sysconf(_SC_PAGESIZE);
+  size_t page_size_;
 };
 
 }  // namespace elfldltl

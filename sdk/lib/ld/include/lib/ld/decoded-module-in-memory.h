@@ -41,7 +41,26 @@ class DecodedModuleInMemory : public DecodedModule<ElfLayout, SegmentContainer, 
   using typename Base::LoadInfo;
   using typename Base::Module;
   using typename Base::Phdr;
+  using size_type = typename Elf::size_type;
   using Region = typename LoadInfo::Region;
+
+  struct DecodeResult {
+    size_type entry = 0;
+    std::optional<size_type> stack_size;
+    std::optional<typename Elf::Phdr> dyn_phdr;
+  };
+
+  // Set when the PT_GNU_RELRO phdr is seen by set_relro or DecodeFromMemory.
+  // If no such phdr is seen, this will be empty.  It can be passed directly to
+  // the Loader::Commit method.  Note these are the unadjusted module-relative
+  // vaddr bounds without the load bias applied.
+  constexpr const Region& relro_bounds() const { return relro_bounds_; }
+
+  constexpr void set_relro(std::optional<Phdr> relro_phdr, size_t page_size) {
+    if (relro_phdr) {
+      relro_bounds_ = this->load_info().RelroBounds(*relro_phdr, page_size);
+    }
+  }
 
   // This uses Loader API and File API objects to get the file's memory image
   // set up, which populates load_info().  This must be called after
@@ -92,6 +111,61 @@ class DecodedModuleInMemory : public DecodedModule<ElfLayout, SegmentContainer, 
 
     return std::nullopt;
   }
+
+  // After the module's image is in memory via LoadFromFile, this decodes the
+  // ehdr and phdrs for everything else but the PT_LOADs for load_info(),
+  // already filled by LoadFromFile.  Now module() is getting filled in with
+  // direct pointers into the loaded image.  If it has a PT_TLS, max_tls_modid
+  // will be incremented to set module().tls_modid.
+  template <class Diagnostics, class Memory>
+  constexpr std::optional<DecodeResult> DecodeFromMemory(  //
+      Diagnostics& diag, Memory&& memory, size_t page_size, const Ehdr& ehdr,
+      cpp20::span<const Phdr> phdrs, size_type& max_tls_modid) {
+    auto result = DecodeModulePhdrs(  //
+        diag, phdrs, PhdrMemoryBuildIdObserver(memory, this->module()));
+    if (!result) [[unlikely]] {
+      return std::nullopt;
+    }
+
+    auto [dyn_phdr, tls_phdr, relro_phdr, stack_size] = *result;
+
+    // Store the PT_GNU_RELRO details so relro_bounds() can be used later.
+    set_relro(relro_phdr, page_size);
+
+    // If there was a PT_TLS, fill in tls_module() to be published later.
+    if (tls_phdr) {
+      this->SetTls(diag, memory, *tls_phdr, ++max_tls_modid);
+    }
+
+    return DecodeResult{
+        .entry = ehdr.entry,
+        .stack_size = stack_size,
+        .dyn_phdr = dyn_phdr,
+    };
+  }
+
+  // This is a shorthand taking the successful return value from LoadFromFile
+  // (that is, the std::optional<...>::value_type of that std::optional<...>).
+  template <class Diagnostics, class Memory, class Headers>
+  constexpr std::optional<DecodeResult> DecodeFromMemory(  //
+      Diagnostics& diag, Memory&& memory, size_t page_size, Headers&& headers,
+      size_type& max_tls_modid) {
+    auto& [ehdr, phdrs] = headers;
+    return DecodeFromMemory(diag, memory, page_size, ehdr, phdrs, max_tls_modid);
+  }
+
+  // This consumes some Loader API object by calling its Commit method with the
+  // RELRO bounds.  The caller always takes ownership of the module load image
+  // mappings that the Loader previously owned.  The returned Loader::Relro
+  // object can be used to protect the RELRO region or can be explicitly
+  // discarded to (on Fuchsia) prevent further protection changes.
+  template <class Loader>
+  [[nodiscard]] constexpr auto CommitLoader(Loader loader) const {
+    return std::move(loader).Commit(relro_bounds());
+  }
+
+ private:
+  Region relro_bounds_;
 };
 
 }  // namespace ld

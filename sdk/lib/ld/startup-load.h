@@ -154,50 +154,30 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     // Read the file header and program headers into stack buffers and map in
     // the image.  This fills in load_info() as well as the module vaddr bounds
     // and phdrs fields.  Note that module().phdrs might remain empty if the
-    // phdrs aren't in the load image, so keep using the stack copy read from
-    // the file instead.
+    // phdrs aren't in the load image, so DecodeFromMemory will keep using the
+    // stack copy read from the file instead.
     auto headers = decoded().LoadFromFile(diag, loader_, std::forward<File>(file));
     if (!headers) [[unlikely]] {
       return {};
     }
-    auto& [ehdr_owner, phdrs_owner] = *headers;
-    const Ehdr& ehdr = ehdr_owner;
-    const cpp20::span<const Phdr> phdrs = phdrs_owner;
 
-    // Now the module's image is in memory!  Decode phdrs for everything else
-    // but the PT_LOADs for load_info_, already filled by LoadFromFile.
-    auto result = DecodeModulePhdrs(  //
-        diag, phdrs, PhdrMemoryBuildIdObserver(memory(), decoded().module()));
-    if (!result) [[unlikely]] {
+    // Now that there is a Memory object to use, decode everything else.
+    auto decode_result =
+        decoded().DecodeFromMemory(diag, memory(), loader_.page_size(), *headers, max_tls_modid);
+    if (!decode_result) [[unlikely]] {
       return {};
     }
 
-    auto [dyn_phdr, tls_phdr, relro_phdr, stack_size] = *result;
-    set_relro(relro_phdr);
-
-    // Start filling in module() with pointers into the loaded image.
-
-    // If there was a PT_TLS, fill in tls_module() to be published later.
-    if (tls_phdr) {
-      decoded().SetTls(diag, memory(), *tls_phdr, ++max_tls_modid);
-    }
-
-    // Now that there is a Memory object to use, decode the dynamic section.
-    size_t needed_count = DecodeDynamic(diag, dyn_phdr);
+    // Finally, decode the dynamic section.
+    size_t needed_count = DecodeDynamic(diag, decode_result->dyn_phdr);
 
     // Everything is now prepared to proceed with loading dependencies
     // and performing relocation.
     return {
         .needed_count = needed_count,
-        .entry = ehdr.entry + loader_.load_bias(),
-        .stack_size = stack_size,
+        .entry = decode_result->entry + loader_.load_bias(),
+        .stack_size = decode_result->stack_size,
     };
-  }
-
-  void set_relro(std::optional<Phdr> relro_phdr) {
-    if (relro_phdr) {
-      relro_ = this->load_info().RelroBounds(*relro_phdr, loader_.page_size());
-    }
   }
 
   void Relocate(Diagnostics& diag, const List& modules) {
@@ -223,7 +203,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   // part of preparing to apply RELRO protections.  But we have no need to hold
   // onto the Loader::Relro capability any longer.
   void CommitAndProtectRelro(Diagnostics& diag) {
-    std::ignore = std::move(loader_).Commit(relro_).Commit(diag);
+    std::ignore = decoded().CommitLoader(std::move(loader_)).Commit(diag);
   }
 
   List MakeList() {
@@ -475,7 +455,6 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
   Loader loader_;  // Must be initialized by constructor.
   cpp20::span<const Dyn> dynamic_;
-  LoadInfo::Region relro_{};
 };
 
 }  // namespace ld
