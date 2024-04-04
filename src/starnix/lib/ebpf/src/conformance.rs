@@ -298,8 +298,9 @@ pub mod test {
         fn parse_offset_or_exit(pair: Pair<'_, Rule>) -> i16 {
             match pair.as_rule() {
                 Rule::OFFSET => Self::parse_value(pair).as_i16(),
-                // This has no equivalent in ebpf. Just ignore.
-                Rule::EXIT => 0,
+                // This has no equivalent in ebpf. Ensure the verification fails if it takes
+                // branch.
+                Rule::EXIT => -1,
                 r @ _ => unreachable!("unexpected rule {r:?}"),
             }
         }
