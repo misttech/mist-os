@@ -108,24 +108,26 @@ action("generate_main_workspace") {
   depfile = "${target_gen_dir}/${target_name}.d"
 
   outputs = [
+    # LINT.IfChange
     "${bazel_main_top_dir}/bazel",
     "${bazel_main_top_dir}/download_config_file",
     "${bazel_main_top_dir}/generated-info.json",
     "${bazel_main_top_dir}/workspace/.bazelrc",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/args.json",
-    "${bazel_main_top_dir}/workspace/platform_mappings",
-    "${bazel_main_top_dir}/workspace/WORKSPACE.bazel",
 
     # The list of content hash files
-    # LINT.IfChange
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/bazel_rules_fuchsia.hash",
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/boringssl.hash",
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/com_google_googletest.hash",
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/fuchsia_clang.hash",
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/fuchsia_sdk.hash",
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/internal_sdk.hash",
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/prebuilt_clang.hash",
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/prebuilt_python.hash",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/bazel_rules_fuchsia.hash",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/boringssl.hash",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/com_google_googletest.hash",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_clang.hash",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_sdk.hash",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/internal_sdk.hash",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/prebuilt_clang.hash",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/prebuilt_python.hash",
+
+    # Other files.
+    "${bazel_main_top_dir}/workspace/platform_mappings",
+    "${bazel_main_top_dir}/workspace/WORKSPACE.bazel",
 
     # LINT.ThenChange(scripts/update_workspace.py)
   ]

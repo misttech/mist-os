@@ -840,7 +840,7 @@ common --enable_bzlmod=false
     # This is important for bazel_action.py which will also use these to
     # fix implicit dependency paths (see comments in this script for details).
     #
-    # In this case $BAZEL_TOPDIR/workspace/generated_repository_hashes/<repo_name>
+    # In this case $BAZEL_TOPDIR/workspace/fuchsia_build_generated/<repo_name>.hash
     # is a file that contains a single hexadecimal content hash corresponding to
     # the input files that were used to generate its content (except for symlinks
     # to input files outside of the Bazel topdir).
@@ -998,7 +998,7 @@ common --enable_bzlmod=false
     for repo_name in sorted(generated_repositories_inputs.keys()):
         repo_inputs = generated_repositories_inputs[repo_name]
         repo_hash_file = os.path.join(
-            "workspace", "generated_repository_hashes", repo_name + ".hash"
+            "workspace", "fuchsia_build_generated", repo_name + ".hash"
         )
         generated.add_file(repo_hash_file, md5_all_files(repo_inputs))
         if args.depfile:

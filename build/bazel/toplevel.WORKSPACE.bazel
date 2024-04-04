@@ -129,7 +129,7 @@ load(
 fuchsia_icu_config_repository(
     name = "fuchsia_icu_config",
     # LINT.IfChange
-    content_hash_file = "generated_repository_hashes/fuchsia_icu_config.hash",
+    content_hash_file = "fuchsia_build_generated/fuchsia_icu_config.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
 )
 
@@ -220,13 +220,13 @@ fuchsia_build_info_repository(
 googletest_repository(
     name = "com_google_googletest",
     # LINT.IfChange
-    content_hash_file = "generated_repository_hashes/com_google_googletest.hash",
+    content_hash_file = "fuchsia_build_generated/com_google_googletest.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
 )
 
 boringssl_repository(
     name = "boringssl",
-    content_hash_file = "generated_repository_hashes/boringssl.hash",
+    content_hash_file = "fuchsia_build_generated/boringssl.hash",
 )
 
 bazel_inputs_repository(
@@ -247,7 +247,7 @@ fuchsia_sdk_repository(
     name = "fuchsia_sdk",
     local_paths = ["%s/sdk/exported/bazel_fuchsia_sdk_idk" % ninja_output_dir],
     # LINT.IfChange
-    local_sdk_version_file = "//:generated_repository_hashes/fuchsia_sdk.hash",
+    local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_sdk.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
     fuchsia_api_level_override = "HEAD",
     buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
@@ -257,7 +257,7 @@ fuchsia_sdk_repository(
     name = "internal_sdk",
     local_paths = ["%s/sdk/exported/platform" % ninja_output_dir],
     # LINT.IfChange
-    local_sdk_version_file = "//:generated_repository_hashes/internal_sdk.hash",
+    local_sdk_version_file = "//:fuchsia_build_generated/internal_sdk.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
     parent_sdk = "@fuchsia_sdk",
     parent_sdk_local_paths = ["%s/sdk/exported/bazel_fuchsia_sdk_idk" % ninja_output_dir],
@@ -275,7 +275,7 @@ load(
 fuchsia_clang_repository(
     name = "fuchsia_clang",
     local_path = "prebuilt/third_party/clang/" + fuchsia_host_tag,
-    local_version_file = "//:generated_repository_hashes/fuchsia_clang.hash",
+    local_version_file = "//:fuchsia_build_generated/fuchsia_clang.hash",
 )
 
 # buildifier: disable=load-on-top
@@ -308,7 +308,7 @@ generate_prebuilt_clang_toolchain_repository(
     name = "prebuilt_clang",
     clang_install_dir = "prebuilt/third_party/clang/" + fuchsia_host_tag,
     # LINT.IfChange
-    repository_version_file = "generated_repository_hashes/prebuilt_clang.hash",
+    repository_version_file = "fuchsia_build_generated/prebuilt_clang.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
 )
 register_toolchains("@prebuilt_clang//:host_clang_%s_x64_cc_toolchain" % fuchsia_host_os)
@@ -323,7 +323,7 @@ load(
 compact_python_runtime_repository(
     name = "prebuilt_python",
     # LINT.IfChange
-    content_hash_file = "generated_repository_hashes/prebuilt_python.hash",
+    content_hash_file = "fuchsia_build_generated/prebuilt_python.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
 )
 
