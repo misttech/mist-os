@@ -164,13 +164,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 	}
 	ffxOutputsDir := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_outputs")
 
-	extraConfigs := ffxutil.ConfigSettings{
-		Level: "global",
-		Settings: map[string]any{
-			"daemon.autostart": false,
-		},
-	}
-	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, primaryTarget.Nodename(), primaryTarget.SSHKey(), ffxOutputsDir, extraConfigs)
+	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, primaryTarget.Nodename(), primaryTarget.SSHKey(), ffxOutputsDir)
 	if err != nil {
 		return cleanup, err
 	}
@@ -183,6 +177,15 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 		}
 	}
 	if err := ffx.Run(ctx, "config", "env"); err != nil {
+		return cleanup, err
+	}
+	// ffxutil disables the mdns discovery if it can find a FUCHSIA_DEVICE_ADDR
+	// to manually add to its targets. We should disable it from the start so
+	// that it is off during target setup as well.
+	if err := ffx.Run(ctx, "config", "set", "discovery.mdns.enabled", "false", "-l", "global"); err != nil {
+		return cleanup, err
+	}
+	if err := ffx.Run(ctx, "config", "set", "daemon.autostart", "false", "-l", "global"); err != nil {
 		return cleanup, err
 	}
 
