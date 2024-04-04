@@ -45,6 +45,8 @@ where
         let v4 = ValidState::new(v4)?;
         let v6 = ValidState::new(v6)?;
 
+        tracing::info!("updating filtering state:\nv4: {:?}\nv6: {:?}", v4.get(), v6.get());
+
         self.core_ctx().with_all_filter_state_mut(|state_v4, state_v6| {
             *state_v4 = v4;
             *state_v6 = v6;
