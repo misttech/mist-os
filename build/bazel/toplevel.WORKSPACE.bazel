@@ -130,7 +130,7 @@ fuchsia_icu_config_repository(
     name = "fuchsia_icu_config",
     # LINT.IfChange
     content_hash_file = "generated_repository_hashes/fuchsia_icu_config.hash",
-    # LINT.ThenChange(../scripts/update-workspace.py)
+    # LINT.ThenChange(scripts/update_workspace.py)
 )
 
 # buildifier: disable=load-on-top
@@ -221,7 +221,7 @@ googletest_repository(
     name = "com_google_googletest",
     # LINT.IfChange
     content_hash_file = "generated_repository_hashes/com_google_googletest.hash",
-    # LINT.ThenChange(../scripts/update-workspace.py)
+    # LINT.ThenChange(scripts/update_workspace.py)
 )
 
 boringssl_repository(
@@ -248,7 +248,7 @@ fuchsia_sdk_repository(
     local_paths = ["%s/sdk/exported/bazel_fuchsia_sdk_idk" % ninja_output_dir],
     # LINT.IfChange
     local_sdk_version_file = "//:generated_repository_hashes/fuchsia_sdk.hash",
-    # LINT.ThenChange(../scripts/update-workspace.py)
+    # LINT.ThenChange(scripts/update_workspace.py)
     fuchsia_api_level_override = "HEAD",
     buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
 )
@@ -258,7 +258,7 @@ fuchsia_sdk_repository(
     local_paths = ["%s/sdk/exported/platform" % ninja_output_dir],
     # LINT.IfChange
     local_sdk_version_file = "//:generated_repository_hashes/internal_sdk.hash",
-    # LINT.ThenChange(../scripts/update-workspace.py)
+    # LINT.ThenChange(scripts/update_workspace.py)
     parent_sdk = "@fuchsia_sdk",
     parent_sdk_local_paths = ["%s/sdk/exported/bazel_fuchsia_sdk_idk" % ninja_output_dir],
     fuchsia_api_level_override = "HEAD",
@@ -309,7 +309,7 @@ generate_prebuilt_clang_toolchain_repository(
     clang_install_dir = "prebuilt/third_party/clang/" + fuchsia_host_tag,
     # LINT.IfChange
     repository_version_file = "generated_repository_hashes/prebuilt_clang.hash",
-    # LINT.ThenChange(../scripts/update-workspace.py)
+    # LINT.ThenChange(scripts/update_workspace.py)
 )
 register_toolchains("@prebuilt_clang//:host_clang_%s_x64_cc_toolchain" % fuchsia_host_os)
 register_toolchains("@prebuilt_clang//:host_clang_%s_arm64_cc_toolchain" % fuchsia_host_os)
@@ -324,7 +324,7 @@ compact_python_runtime_repository(
     name = "prebuilt_python",
     # LINT.IfChange
     content_hash_file = "generated_repository_hashes/prebuilt_python.hash",
-    # LINT.ThenChange(../scripts/update-workspace.py)
+    # LINT.ThenChange(scripts/update_workspace.py)
 )
 
 register_toolchains("@prebuilt_python//:py_toolchain")
