@@ -41,6 +41,7 @@ source_set("common") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",

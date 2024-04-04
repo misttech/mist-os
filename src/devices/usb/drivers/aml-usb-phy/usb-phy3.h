@@ -21,8 +21,7 @@ class UsbPhy3 final : public UsbPhyBase {
   void dump_regs() const override;
 
  private:
-  void SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
-                       const std::array<uint32_t, 8>& pll_settings) override {
+  void SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio) override {
     // UsbPhy3 only supports host mode as of right now.
     ZX_ASSERT(mode == UsbMode::Host);
   }

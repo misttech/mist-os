@@ -18,15 +18,14 @@ class UsbPhy2 final : public UsbPhyBase {
   UsbPhy2(uint8_t idx, fdf::MmioBuffer mmio, bool is_otg_capable, UsbMode dr_mode)
       : UsbPhyBase(std::move(mmio), is_otg_capable, dr_mode), idx_(idx) {}
 
-  void InitPll(PhyType type, const std::array<uint32_t, 8>& pll_settings);
+  void InitPll(PhyType type, bool needs_hack);
 
   uint8_t idx() const { return idx_; }
 
   void dump_regs() const override;
 
  private:
-  void SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
-                       const std::array<uint32_t, 8>& pll_settings) override;
+  void SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio) override;
 
   const uint8_t idx_;  // For indexing into usbctrl_mmio.
 };

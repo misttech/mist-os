@@ -62,6 +62,10 @@ class FakePDev : public fidl::testing::WireTestBase<fuchsia_hardware_platform_de
  private:
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {}
 
+  void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
   void GetInterruptById(
       fuchsia_hardware_platform_device::wire::DeviceGetInterruptByIdRequest* request,
       GetInterruptByIdCompleter::Sync& completer) override {

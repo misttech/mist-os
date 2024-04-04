@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "aml-usb-phy-test.h"
-
 /dts-v1/;
 / {
     compatible = "fuchsia,test-dt";
@@ -19,8 +17,6 @@
             <0x0 0xFFF20000 0x0 0x1000>;
       reg-names = "usb-ctrl", "usb2-phy", "usb2-otg-phy", "usb3-phy";
       dr_modes = "host", "peripheral", "host";
-      pll-settings = <PLL_SETTING_1 PLL_SETTING_2 PLL_SETTING_3 PLL_SETTING_4>,
-      <PLL_SETTING_5 PLL_SETTING_6 PLL_SETTING_7 PLL_SETTING_8>;
       #phy-cells = <0>;
     };
 };

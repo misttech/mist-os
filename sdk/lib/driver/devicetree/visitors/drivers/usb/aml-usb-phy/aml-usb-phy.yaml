@@ -38,10 +38,6 @@ properties:
     items:
       enum: [ host, peripheral, otg ]
 
-  pll-settings:
-    $ref: /schemas/types.yaml#/definitions/uint32-array
-    description: PLL settings for the device.
-
   "#phy-cells":
     const: 0
 
@@ -49,7 +45,6 @@ required:
   - reg
   - reg-names
   - dr_modes
-  - pll-settings
   - "#phy-cells"
 
 additionalProperties: true
@@ -62,6 +57,4 @@ examples:
             <0x0 0xFFF00000 0x0 0x1000>;
       reg-names = "usb-ctrl", "usb2-phy";
       dr_modes = "host";
-      pll-settings = <0x100 0x2000 0x102300 0x50000>,
-        <0x54000 0x23 0xA 0xFFF0A000>;
     }

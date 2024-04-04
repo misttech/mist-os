@@ -9,6 +9,7 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <fbl/auto_lock.h>
@@ -31,7 +32,6 @@ namespace {
 }
 
 struct PhyMetadata {
-  std::array<uint32_t, 8> pll_settings;
   PhyType type;
   std::vector<UsbPhyMode> phy_modes;
 };
@@ -39,32 +39,8 @@ struct PhyMetadata {
 zx::result<PhyMetadata> ParseMetadata(
     const fidl::VectorView<fuchsia_driver_compat::wire::Metadata>& metadata) {
   PhyMetadata parsed_metadata;
-  bool found_pll_settings = false;
   bool found_phy_type = false;
   for (const auto& m : metadata) {
-    if (m.type == DEVICE_METADATA_PRIVATE) {
-      size_t size;
-      auto status = m.data.get_prop_content_size(&size);
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to get_prop_content_size %s", zx_status_get_string(status));
-        continue;
-      }
-
-      if (size != sizeof(PhyMetadata::pll_settings)) {
-        FDF_LOG(ERROR, "Unexpected metadata size: got %zu, expected %zu", size, sizeof(uint32_t));
-        continue;
-      }
-
-      status =
-          m.data.read(parsed_metadata.pll_settings.data(), 0, sizeof(parsed_metadata.pll_settings));
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to read %s", zx_status_get_string(status));
-        continue;
-      }
-
-      found_pll_settings = true;
-    }
-
     if (m.type == (DEVICE_METADATA_PRIVATE_PHY_TYPE | DEVICE_METADATA_PRIVATE)) {
       size_t size;
       auto status = m.data.get_prop_content_size(&size);
@@ -110,11 +86,11 @@ zx::result<PhyMetadata> ParseMetadata(
     }
   }
 
-  if (found_pll_settings && found_phy_type) {
+  if (found_phy_type) {
     return zx::ok(parsed_metadata);
   }
 
-  FDF_LOG(ERROR, "Failed to parse metadata. Metadata needs to have pll_settings and phy_type.");
+  FDF_LOG(ERROR, "Failed to parse metadata. Metadata needs to have phy_type.");
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
@@ -234,6 +210,7 @@ zx::result<> AmlUsbPhyDevice::Start() {
   std::vector<UsbPhy2> usbphy2;
   std::vector<UsbPhy3> usbphy3;
   zx::interrupt irq;
+  bool needs_hack = false;
   {
     zx::result pdev_result =
         incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
@@ -245,6 +222,14 @@ zx::result<> AmlUsbPhyDevice::Start() {
     if (!pdev.is_valid()) {
       FDF_LOG(ERROR, "Failed to get pdev");
       return zx::error(ZX_ERR_NO_RESOURCES);
+    }
+
+    auto dev_info = pdev->GetNodeDeviceInfo();
+    if (dev_info.ok() && dev_info->is_ok() && dev_info->value()->has_pid() &&
+        (dev_info->value()->pid() == bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2 ||
+         dev_info->value()->pid() == bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D3)) {
+      FDF_LOG(ERROR, "Using hack");
+      needs_hack = true;
     }
 
     if (auto mmio = MapMmio(pdev, 0); mmio.is_error()) {
@@ -301,8 +286,8 @@ zx::result<> AmlUsbPhyDevice::Start() {
 
   // Create and initialize device
   device_ = std::make_unique<AmlUsbPhy>(this, parsed_metadata.type, std::move(reset_register),
-                                        parsed_metadata.pll_settings, std::move(*usbctrl_mmio),
-                                        std::move(irq), std::move(usbphy2), std::move(usbphy3));
+                                        std::move(*usbctrl_mmio), std::move(irq),
+                                        std::move(usbphy2), std::move(usbphy3), needs_hack);
 
   {
     auto result = CreateNode();

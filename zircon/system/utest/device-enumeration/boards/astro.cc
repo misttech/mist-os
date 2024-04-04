@@ -17,7 +17,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:00:2:1/i2c-1/aml-i2c",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c",
       "sys/platform/05:03:17/aml-gpu-composite/aml-gpu",
-      "sys/platform/05:00:18/aml_usb_phy",
+      "sys/platform/05:03:18/aml_usb_phy",
       "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart",
       "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom",
 

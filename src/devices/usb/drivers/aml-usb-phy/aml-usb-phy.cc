@@ -123,7 +123,7 @@ zx_status_t AmlUsbPhy::InitPhy2() {
 
   // One time PLL initialization
   for (auto& phy : usbphy2_) {
-    phy.InitPll(type_, pll_settings_);
+    phy.InitPll(type_, needs_hack_);
   }
 
   return ZX_OK;
@@ -157,7 +157,7 @@ void AmlUsbPhy::ChangeMode(UsbPhyBase& phy, UsbMode new_mode) {
     FDF_LOG(ERROR, "Already in %d mode", static_cast<uint8_t>(new_mode));
     return;
   }
-  phy.SetMode(new_mode, usbctrl_mmio_, pll_settings_);
+  phy.SetMode(new_mode, usbctrl_mmio_);
 
   if (new_mode == UsbMode::Host) {
     ++controller_->xhci_;
@@ -269,10 +269,15 @@ void AmlUsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
     auto* mmio = &phy.mmio();
 
     if (request.connected()) {
-      PHY2_R14::Get().FromValue(pll_settings_[7]).WriteTo(mmio);
-      PHY2_R13::Get().FromValue(pll_settings_[5]).WriteTo(mmio);
+      PHY2_R14::Get().FromValue(0).set_i_rpu_sw2_en(3).set_fs(1).set_ls(1).set_hs_out_en(1).WriteTo(
+          mmio);
+      PHY2_R13::Get()
+          .FromValue(0)
+          .set_Update_PMA_signals(1)
+          .set_minimum_count_for_sync_detection(7)
+          .WriteTo(mmio);
     } else {
-      phy.InitPll(type_, pll_settings_);
+      phy.InitPll(type_, needs_hack_);
     }
   }
 

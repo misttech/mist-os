@@ -77,9 +77,9 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:1/aml-gpio/gpio/gpio-93/fusb302",
 
       // USB
-      "sys/platform/05:00:18/usb-phy-composite",
-      "sys/platform/05:00:18/usb-phy-composite/aml_usb_phy/dwc2/dwc2-composite/dwc2/usb-peripheral/function-000/cdc-eth-function",
-      "sys/platform/05:00:18/usb-phy-composite/aml_usb_phy/xhci",
+      "sys/platform/05:06:18/usb-phy-composite",
+      "sys/platform/05:06:18/usb-phy-composite/aml_usb_phy/dwc2/dwc2-composite/dwc2/usb-peripheral/function-000/cdc-eth-function",
+      "sys/platform/05:06:18/usb-phy-composite/aml_usb_phy/xhci",
       "sys/platform/00:00:2/xhci-composite/xhci",
 
       // USB 2.0 Hub

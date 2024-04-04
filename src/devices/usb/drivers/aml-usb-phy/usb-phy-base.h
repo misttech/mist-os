@@ -18,9 +18,8 @@ class UsbPhyBase {
   UsbMode dr_mode() const { return dr_mode_; }
 
   UsbMode phy_mode() { return phy_mode_; }
-  void SetMode(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
-               const std::array<uint32_t, 8>& pll_settings) {
-    SetModeInternal(mode, usbctrl_mmio, pll_settings);
+  void SetMode(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio) {
+    SetModeInternal(mode, usbctrl_mmio);
     phy_mode_ = mode;
   }
 
@@ -32,8 +31,7 @@ class UsbPhyBase {
       : mmio_(std::move(mmio)), is_otg_capable_(is_otg_capable), dr_mode_(dr_mode) {}
 
  private:
-  virtual void SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
-                               const std::array<uint32_t, 8>& pll_settings) = 0;
+  virtual void SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio) = 0;
 
   fdf::MmioBuffer mmio_;
   const bool is_otg_capable_;

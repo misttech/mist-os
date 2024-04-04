@@ -77,10 +77,6 @@ static const std::vector<fpbus::Bti> usb_btis{
     }},
 };
 
-// Static PLL configuration parameters.
-static const uint32_t pll_settings[] = {
-    0x09400414, 0x927e0000, 0xac5f69e5, 0xfe18, 0x8000fff, 0x78000, 0xe0004, 0xe000c,
-};
 static const PhyType type = kG12B;
 
 // aml_usb_phy manages 3 different controllers:
@@ -99,12 +95,6 @@ static const std::vector<UsbPhyMode> phy_modes = {
 
 static const std::vector<fpbus::Metadata> usb_phy_metadata{
     {{
-        .type = DEVICE_METADATA_PRIVATE,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&pll_settings),
-            reinterpret_cast<const uint8_t*>(&pll_settings) + sizeof(pll_settings)),
-    }},
-    {{
         .type = DEVICE_METADATA_PRIVATE_PHY_TYPE | DEVICE_METADATA_PRIVATE,
         .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&type),
                                      reinterpret_cast<const uint8_t*>(&type) + sizeof(type)),
@@ -120,7 +110,7 @@ static const std::vector<fpbus::Metadata> usb_phy_metadata{
 static const fpbus::Node usb_phy_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "usb-phy-pdev";
-  dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D;
   dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
   dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_USB_PHY_V2;
   dev.mmio() = usb_phy_mmios;

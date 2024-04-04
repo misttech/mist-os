@@ -20,7 +20,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:00:2:1/i2c-1/aml-i2c",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c",
       "sys/platform/05:05:17/aml-gpu-composite/aml-gpu",
-      "sys/platform/05:00:18/aml_usb_phy/aml_usb_phy",
+      "sys/platform/05:05:18/aml_usb_phy/aml_usb_phy",
       "sys/platform/05:05:12/aml_tdm/nelson-audio-i2s-out",
       "sys/platform/05:05:13/aml_pdm/nelson-audio-pdm-in",
       "sys/platform/00:00:29",  // registers device

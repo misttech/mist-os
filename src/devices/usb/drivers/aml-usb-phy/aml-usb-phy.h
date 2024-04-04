@@ -20,8 +20,8 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
  public:
   AmlUsbPhy(AmlUsbPhyDevice* controller, PhyType type,
             fidl::ClientEnd<fuchsia_hardware_registers::Device> reset_register,
-            std::array<uint32_t, 8> pll_settings, fdf::MmioBuffer usbctrl_mmio, zx::interrupt irq,
-            std::vector<UsbPhy2> usbphy2, std::vector<UsbPhy3> usbphy3)
+            fdf::MmioBuffer usbctrl_mmio, zx::interrupt irq, std::vector<UsbPhy2> usbphy2,
+            std::vector<UsbPhy3> usbphy3, bool needs_hack)
       : type_(type),
         controller_(controller),
         reset_register_(std::move(reset_register)),
@@ -29,7 +29,7 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
         usbphy2_(std::move(usbphy2)),
         usbphy3_(std::move(usbphy3)),
         irq_(std::move(irq)),
-        pll_settings_(pll_settings) {}
+        needs_hack_(needs_hack) {}
   ~AmlUsbPhy() override {
     irq_handler_.Cancel();
     irq_.destroy();
@@ -78,9 +78,9 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
   zx::interrupt irq_;
   async::IrqMethod<AmlUsbPhy, &AmlUsbPhy::HandleIrq> irq_handler_{this};
 
-  // Magic numbers for PLL from metadata
-  const std::array<uint32_t, 8> pll_settings_;
-
+  // S905D2 and S905D3 set a few PLL values differently. needs_hack_ is true if PID is S905D2 or
+  // S905D3.
+  const bool needs_hack_;
   bool dwc2_connected_ = false;
 };
 

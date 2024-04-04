@@ -20,8 +20,6 @@ namespace aml_usb_phy_visitor_dt {
 AmlUsbPhyVisitor::AmlUsbPhyVisitor()
     : fdf_devicetree::DriverVisitor({"amlogic,g12a-usb-phy", "amlogic,g12b-usb-phy"}) {
   fdf_devicetree::Properties properties = {};
-  properties.emplace_back(
-      std::make_unique<fdf_devicetree::Uint32ArrayProperty>(kPllSettings, true));
   properties.emplace_back(std::make_unique<fdf_devicetree::StringListProperty>(kDrModes, true));
   properties.emplace_back(std::make_unique<fdf_devicetree::StringListProperty>(kRegNames, true));
   properties.emplace_back(std::make_unique<fdf_devicetree::StringListProperty>(kCompatible, true));
@@ -36,19 +34,6 @@ zx::result<> AmlUsbPhyVisitor::DriverVisit(fdf_devicetree::Node& node,
             parser_output.status_string());
     return parser_output.take_error();
   }
-
-  std::vector<uint8_t> pll_settings_data;
-  for (auto pll_setting : (*parser_output)[kPllSettings]) {
-    auto data = pll_setting.AsUint32();
-    pll_settings_data.insert(pll_settings_data.end(), reinterpret_cast<const uint8_t*>(&data),
-                             reinterpret_cast<const uint8_t*>(&data) + sizeof(uint32_t));
-  }
-  fuchsia_hardware_platform_bus::Metadata pll_metadata = {{
-      .type = DEVICE_METADATA_PRIVATE,
-      .data = pll_settings_data,
-  }};
-  node.AddMetadata(std::move(pll_metadata));
-  FDF_LOG(DEBUG, "Added pll settings metadata to node '%s'.", node.name().c_str());
 
   PhyType phy_type;
   if (*parser_output->at(kCompatible)[0].AsStringList()->begin() == "amlogic,g12a-usb-phy") {

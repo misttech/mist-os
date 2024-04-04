@@ -228,8 +228,6 @@
 			registers = <&reset A311D_RESET1_REGISTER 4 0x0 0x10004>,
 				<&reset A311D_RESET1_LEVEL 4 0x0 0x30000>;
 			#phy-cells = <0>;
-			pll-settings = <0x09400414 0x927E0000 0xac5f69e5 0xfe18>,
-					<0x8000fff 0x78000 0xe0004 0xe000c>;
 		};
 
 		dwc2: usb@ff400000 {
