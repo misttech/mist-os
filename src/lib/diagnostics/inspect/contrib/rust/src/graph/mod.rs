@@ -71,7 +71,7 @@
 //! of events that will be tracked in a circular buffer in which the oldest events are rolled out.
 //!
 //! Even when tracking events is enabled, by default no metadata properties are tracked. If you
-//! wish to enable tracking a metadata property, call `.track_events()`  on the `MetadataItem`
+//! wish to enable tracking a metadata property, call `.track_events()`  on the `Metadata`
 //! passed when initializing the metadata of an edge or node.
 //!
 //! The events will be present on a `events` node under the `fuchsia.inspect.Graph` node.
@@ -185,7 +185,7 @@ where
     /// metadata.
     pub fn add_vertex<'a, M>(&self, id: I, initial_metadata: M) -> Vertex<I>
     where
-        M: IntoIterator<Item = &'a MetadataItem<'a>>,
+        M: IntoIterator<Item = &'a Metadata<'a>>,
         M::IntoIter: Clone,
     {
         Vertex::new(id, &self.topology_node, initial_metadata, self.events_node.clone())
@@ -193,7 +193,7 @@ where
 }
 
 /// A metadata item used to initialize metadata key value pairs of nodes and edges.
-pub struct MetadataItem<'a> {
+pub struct Metadata<'a> {
     /// The key of the metadata field.
     key: Cow<'a, str>,
     /// The value of the metadata field.
@@ -202,7 +202,7 @@ pub struct MetadataItem<'a> {
     track_events: bool,
 }
 
-impl<'a> MetadataItem<'a> {
+impl<'a> Metadata<'a> {
     /// Create a new metadata item with the given `key` and `value`.
     pub fn new(key: impl Into<Cow<'a, str>>, value: impl Into<MetadataValue<'a>>) -> Self {
         Self { key: key.into(), value: value.into(), track_events: false }
@@ -218,7 +218,7 @@ impl<'a> MetadataItem<'a> {
 
 fn record_metadata_items<'a, I>(node: &inspect::Node, metadata: I)
 where
-    I: Iterator<Item = &'a MetadataItem<'a>>,
+    I: Iterator<Item = &'a Metadata<'a>>,
 {
     for meta_item in metadata {
         if !meta_item.track_events {
@@ -278,7 +278,7 @@ where
         events_node: Option<Arc<Mutex<BoundedListNode>>>,
     ) -> Self
     where
-        M: IntoIterator<Item = &'a MetadataItem<'a>>,
+        M: IntoIterator<Item = &'a Metadata<'a>>,
         M::IntoIter: Clone,
     {
         let internal_id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -321,7 +321,7 @@ where
     /// given metadata.
     pub fn add_edge<'a, M>(&self, to: &mut Vertex<I>, initial_metadata: M) -> Edge
     where
-        M: IntoIterator<Item = &'a MetadataItem<'a>>,
+        M: IntoIterator<Item = &'a Metadata<'a>>,
         M::IntoIter: Clone,
     {
         Edge::new(self, to, initial_metadata, self.events_node.clone())
@@ -364,7 +364,7 @@ impl Edge {
     ) -> Self
     where
         I: VertexId,
-        M: IntoIterator<Item = &'a MetadataItem<'a>>,
+        M: IntoIterator<Item = &'a Metadata<'a>>,
         M::IntoIter: Clone,
     {
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -511,14 +511,14 @@ pub struct GraphMetadata {
 impl GraphMetadata {
     fn new<'a>(
         parent: &inspect::Node,
-        initial_metadata: impl Iterator<Item = &'a MetadataItem<'a>>,
+        initial_metadata: impl Iterator<Item = &'a Metadata<'a>>,
         events_node: Option<Arc<Mutex<BoundedListNode>>>,
         id_instrumentation: InstrumentationId<'static>,
     ) -> Self {
         let node = parent.create_child("meta");
         let mut map = BTreeMap::default();
         node.atomic_update(|node| {
-            for MetadataItem { key, value, track_events } in initial_metadata.into_iter() {
+            for Metadata { key, value, track_events } in initial_metadata.into_iter() {
                 Self::insert_to_map(&node, &mut map, key.to_string(), value, *track_events);
             }
         });
@@ -637,23 +637,19 @@ mod tests {
         let graph = Digraph::new(inspector.root(), DigraphOpts::default());
 
         // Create a new node with some properties.
-        let vertex_foo = graph.add_vertex(
-            "element-1",
-            &[MetadataItem::new("name", "foo"), MetadataItem::new("level", 1u64)],
-        );
+        let vertex_foo = graph
+            .add_vertex("element-1", &[Metadata::new("name", "foo"), Metadata::new("level", 1u64)]);
 
-        let mut vertex_bar = graph.add_vertex(
-            "element-2",
-            &[MetadataItem::new("name", "bar"), MetadataItem::new("level", 2i64)],
-        );
+        let mut vertex_bar = graph
+            .add_vertex("element-2", &[Metadata::new("name", "bar"), Metadata::new("level", 2i64)]);
 
         // Create a new edge.
         let edge_foo_bar = vertex_foo.add_edge(
             &mut vertex_bar,
             &[
-                MetadataItem::new("src", "on"),
-                MetadataItem::new("dst", "off"),
-                MetadataItem::new("type", "passive"),
+                Metadata::new("src", "on"),
+                Metadata::new("dst", "off"),
+                Metadata::new("type", "passive"),
             ],
         );
 
@@ -699,10 +695,10 @@ mod tests {
         let mut vertex = graph.add_vertex(
             "test-node",
             &[
-                MetadataItem::new("string_property", "i'm a string"),
-                MetadataItem::new("int_property", 2i64),
-                MetadataItem::new("uint_property", 4u64),
-                MetadataItem::new("boolean_property", true),
+                Metadata::new("string_property", "i'm a string"),
+                Metadata::new("int_property", 2i64),
+                Metadata::new("uint_property", 4u64),
+                Metadata::new("boolean_property", true),
             ],
         );
 
@@ -781,10 +777,10 @@ mod tests {
         let mut edge = vertex_one.add_edge(
             &mut vertex_two,
             &[
-                MetadataItem::new("string_property", "i'm a string"),
-                MetadataItem::new("int_property", 2i64),
-                MetadataItem::new("uint_property", 4u64),
-                MetadataItem::new("boolean_property", true),
+                Metadata::new("string_property", "i'm a string"),
+                Metadata::new("int_property", 2i64),
+                Metadata::new("uint_property", 4u64),
+                Metadata::new("boolean_property", true),
             ],
         );
 
@@ -859,12 +855,12 @@ mod tests {
     fn test_raii_semantics() {
         let inspector = inspect::Inspector::default();
         let graph = Digraph::new(inspector.root(), DigraphOpts::default());
-        let mut foo = graph.add_vertex("foo", &[MetadataItem::new("hello", true)]);
-        let bar = graph.add_vertex("bar", &[MetadataItem::new("hello", false)]);
+        let mut foo = graph.add_vertex("foo", &[Metadata::new("hello", true)]);
+        let bar = graph.add_vertex("bar", &[Metadata::new("hello", false)]);
         let mut baz = graph.add_vertex("baz", &[]);
 
-        let edge = bar.add_edge(&mut foo, &[MetadataItem::new("hey", "hi")]);
-        let edge_to_baz = bar.add_edge(&mut baz, &[MetadataItem::new("good", "bye")]);
+        let edge = bar.add_edge(&mut foo, &[Metadata::new("hey", "hi")]);
+        let edge_to_baz = bar.add_edge(&mut baz, &[Metadata::new("good", "bye")]);
 
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
@@ -1015,14 +1011,14 @@ mod tests {
         let graph = Digraph::new(inspector.root(), DigraphOpts::default().track_events(5));
         let mut vertex_one = graph.add_vertex(
             "test-node-1",
-            &[MetadataItem::new("name", "foo"), MetadataItem::new("level", 1u64).track_events()],
+            &[Metadata::new("name", "foo"), Metadata::new("level", 1u64).track_events()],
         );
-        let mut vertex_two = graph.add_vertex("test-node-2", &[MetadataItem::new("name", "bar")]);
+        let mut vertex_two = graph.add_vertex("test-node-2", &[Metadata::new("name", "bar")]);
         let mut edge = vertex_one.add_edge(
             &mut vertex_two,
             &[
-                MetadataItem::new("some-property", 10i64).track_events(),
-                MetadataItem::new("other", "not tracked"),
+                Metadata::new("some-property", 10i64).track_events(),
+                Metadata::new("other", "not tracked"),
             ],
         );
 
