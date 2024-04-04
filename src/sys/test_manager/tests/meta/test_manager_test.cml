@@ -20,14 +20,6 @@
             from: "#test_manager",
         },
         {
-            protocol: "fuchsia.test.manager.TestCaseEnumerator",
-            from: "#test_manager",
-        },
-        {
-            protocol: "fuchsia.test.manager.SuiteRunner",
-            from: "#test_manager",
-        },
-        {
             protocol: "fuchsia.test.manager.EarlyBootProfile",
             from: "#test_manager",
         },

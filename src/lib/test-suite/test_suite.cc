@@ -121,7 +121,7 @@ void TestSuite::Run(std::vector<fuchsia::test::Invocation> tests,
 bool TestSuite::ShouldSkipTest(const fuchsia::test::RunOptions& run_options,
                                const std::string& test_name) const {
   // Disabled tests are excluded && this test is disabled.
-  return run_options.has_include_disabled_tests() && !run_options.include_disabled_tests() &&
+  return !run_options.include_disabled_tests() &&
          (disabled_tests_.find(test_name) != disabled_tests_.end());
 }
 

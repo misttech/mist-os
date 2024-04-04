@@ -161,8 +161,6 @@
         },
         { protocol: "fuchsia.test.manager.Query" },
         { protocol: "fuchsia.test.manager.RunBuilder" },
-        { protocol: "fuchsia.test.manager.TestCaseEnumerator" },
-        { protocol: "fuchsia.test.manager.SuiteRunner" },
         { protocol: "fuchsia.test.manager.EarlyBootProfile" },
     ],
     use: [
@@ -654,14 +652,6 @@
         },
         {
             protocol: "fuchsia.test.manager.RunBuilder",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.test.manager.TestCaseEnumerator",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.test.manager.SuiteRunner",
             from: "self",
         },
         {

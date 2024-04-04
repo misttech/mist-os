@@ -3,16 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        debug_data_server,
-        run_events::{RunEvent, SuiteEvents},
-    },
+    crate::{debug_data_server, run_events::RunEvent},
     anyhow::Error,
     fidl::endpoints::create_endpoints,
     fidl_fuchsia_debugdata as fdebug, fidl_fuchsia_io as fio,
-    fidl_fuchsia_test_debug as ftest_debug,
-    fidl_fuchsia_test_manager::LaunchError,
-    fuchsia_async as fasync,
+    fidl_fuchsia_test_debug as ftest_debug, fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     fuchsia_component_test::LocalComponentHandles,
     fuchsia_fs::{directory::open_channel_in_namespace, OpenFlags},
@@ -143,59 +138,6 @@ impl DebugDataProcessor {
         }
         Ok(())
     }
-
-    /// Collect debug data produced by the corresponding |DebugDataSender|, and serve the resulting
-    /// data. In case debug data is produced, sends the event over |suite_event_sender|.
-    pub async fn collect_and_serve_for_suite(
-        self,
-        suite_event_sender: mpsc::Sender<Result<SuiteEvents, LaunchError>>,
-    ) -> Result<(), Error> {
-        let Self { directory, receiver, proxy_init_fn } = self;
-
-        // Avoid setting up resrources in the common case where no debug data is produced.
-        let peekable_reciever = receiver.ready_chunks(Self::MAX_SENT_VMOS).peekable();
-        pin_mut!(peekable_reciever);
-        if peekable_reciever.as_mut().peek().await.is_none() {
-            return Ok(());
-        }
-
-        enum MaybeOwnedDirectory {
-            Owned(tempfile::TempDir),
-            Unowned(&'static str),
-        }
-        let debug_directory = match directory {
-            DebugDataDirectory::Isolated { parent } => {
-                MaybeOwnedDirectory::Owned(tempfile::TempDir::new_in(parent)?)
-            }
-            DebugDataDirectory::Accumulating { dir } => MaybeOwnedDirectory::Unowned(dir),
-        };
-        let debug_directory_path = match &debug_directory {
-            MaybeOwnedDirectory::Owned(tmp) => tmp.path().to_string_lossy(),
-            MaybeOwnedDirectory::Unowned(dir) => std::borrow::Cow::Borrowed(*dir),
-        };
-
-        let (directory_proxy, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        open_channel_in_namespace(
-            &debug_directory_path,
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            server_end,
-        )?;
-
-        let proxy = proxy_init_fn()?;
-        proxy.set_directory(directory_proxy)?;
-        while let Some(chunk) = peekable_reciever.next().await {
-            proxy.add_debug_vmos(chunk).await?;
-        }
-        proxy.finish().await?;
-
-        debug_data_server::serve_directory_for_suite(&debug_directory_path, suite_event_sender)
-            .await?;
-
-        if let MaybeOwnedDirectory::Owned(tmp) = debug_directory {
-            tmp.close()?;
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -301,7 +243,7 @@ async fn serve_publisher(
 mod test {
     use {
         super::*,
-        crate::{run_events::RunEventPayload, run_events::SuiteEventPayload, utilities::stream_fn},
+        crate::{run_events::RunEventPayload, utilities::stream_fn},
         fidl::endpoints::create_proxy_and_stream,
         fuchsia_component_test::{
             Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
@@ -423,21 +365,6 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn serve_for_suite_no_requests() {
-        const TEST_URL: &str = "test-url";
-        let DebugDataForTestResult { processor, sender, stream } =
-            DebugDataProcessor::new_for_test(isolated_dir());
-        let test_realm = construct_test_realm(sender, TEST_URL).await.expect("build test realm");
-        test_realm.destroy().await.expect("destroy test realm");
-
-        let (event_sender, event_recv) = mpsc::channel(1);
-        processor.collect_and_serve_for_suite(event_sender).await.unwrap();
-
-        assert!(stream.collect::<Vec<_>>().await.is_empty());
-        assert!(event_recv.collect::<Vec<_>>().await.is_empty());
-    }
-
-    #[fuchsia::test]
     async fn serve_single_client() {
         const TEST_URL: &str = "test-url";
         let DebugDataForTestResult { processor, sender, stream } =
@@ -496,75 +423,6 @@ mod test {
                 ("data-sink-2".to_string(), TEST_URL.to_string()),
             };
             assert_eq!(files, expected);
-        };
-
-        futures::future::join4(processor_server_fut, test_fut, processor_fut, assertion_fut).await;
-    }
-
-    #[fuchsia::test]
-    async fn serve_for_suite_single_client() {
-        const TEST_URL: &str = "test-url";
-        let DebugDataForTestResult { processor, sender, stream } =
-            DebugDataProcessor::new_for_test(isolated_dir());
-        let test_realm = construct_test_realm(sender, TEST_URL).await.expect("build test realm");
-
-        let (vmo_request_received_send, vmo_request_received_recv) = mpsc::channel(2);
-        // Future running fuchsia.test.debug.DebugDataProcessor.
-        let processor_server_fut = run_test_processor(stream, vmo_request_received_send);
-        // Future running the 'test' (client of fuchsia.debugdata.Publisher)
-        let test_fut = async move {
-            let proxy = test_realm
-                .root
-                .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
-                .expect("connect to publisher");
-            let vmo_1 = zx::Vmo::create(VMO_SIZE).unwrap();
-            let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create();
-            proxy.publish("data-sink-1", vmo_1, vmo_token_server_1).expect("publish vmo");
-            drop(vmo_token_1);
-            let vmo_2 = zx::Vmo::create(VMO_SIZE).unwrap();
-            let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create();
-            proxy.publish("data-sink-2", vmo_2, vmo_token_server_2).expect("publish vmo");
-            drop(vmo_token_2);
-            drop(proxy);
-
-            vmo_request_received_recv.take(1).collect::<()>().await;
-            test_realm.destroy().await.expect("destroy test realm");
-        };
-
-        let (event_sender, event_recv) = mpsc::channel(10);
-        // Future that collects VMOs from the test realm and forwards
-        // them to fuchsia.debugdata.Publisher
-        let processor_fut = processor
-            .collect_and_serve_for_suite(event_sender)
-            .unwrap_or_else(|e| panic!("processor failed: {:?}", e));
-        // Future that collects produced debug artifact and asserts on contents.
-        let assertion_fut = async move {
-            let mut events: Vec<_> = event_recv.collect().await;
-            assert_eq!(events.len(), 1);
-            if let SuiteEventPayload::DebugData(iterator) =
-                events.pop().unwrap().unwrap().into_payload()
-            {
-                let iterator_proxy = iterator.into_proxy().unwrap();
-                let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next())
-                    .and_then(|debug_data| async move {
-                        Ok((
-                            debug_data.name.unwrap(),
-                            collect_string_from_socket(debug_data.socket.unwrap())
-                                .await
-                                .expect("Cannot read socket"),
-                        ))
-                    })
-                    .try_collect()
-                    .await
-                    .expect("file collection");
-                let expected = hashset! {
-                    ("data-sink-1".to_string(), TEST_URL.to_string()),
-                    ("data-sink-2".to_string(), TEST_URL.to_string()),
-                };
-                assert_eq!(files, expected);
-            } else {
-                assert!(false); // Event payload was not DebugData
-            }
         };
 
         futures::future::join4(processor_server_fut, test_fut, processor_fut, assertion_fut).await;
@@ -634,80 +492,6 @@ mod test {
                 ("data-sink-2".to_string(), TEST_URL.to_string()),
             };
             assert_eq!(files, expected);
-        };
-
-        futures::future::join4(processor_server_fut, test_fut, processor_fut, assertion_fut).await;
-    }
-
-    #[fuchsia::test]
-    async fn serve_for_suite_multiple_client() {
-        const TEST_URL: &str = "test-url";
-        let DebugDataForTestResult { processor, sender, stream } =
-            DebugDataProcessor::new_for_test(isolated_dir());
-        let test_realm = construct_test_realm(sender, TEST_URL).await.expect("build test realm");
-
-        let (vmo_request_received_send, vmo_request_received_recv) = mpsc::channel(2);
-        // Future running fuchsia.test.debug.DebugDataProcessor.
-        let processor_server_fut = run_test_processor(stream, vmo_request_received_send);
-        // Future running the 'test' (client of fuchsia.debugdata.Publisher)
-        let test_fut = async move {
-            let proxy_1 = test_realm
-                .root
-                .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
-                .expect("connect to publisher");
-            let vmo_1 = zx::Vmo::create(VMO_SIZE).unwrap();
-            let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create();
-            proxy_1.publish("data-sink-1", vmo_1, vmo_token_server_1).expect("publish vmo");
-            drop(vmo_token_1);
-            let proxy_2 = test_realm
-                .root
-                .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
-                .expect("connect to publisher");
-            let vmo_2 = zx::Vmo::create(VMO_SIZE).unwrap();
-            let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create();
-            proxy_2.publish("data-sink-2", vmo_2, vmo_token_server_2).expect("publish vmo");
-            drop(vmo_token_2);
-            drop(proxy_1);
-            drop(proxy_2);
-
-            vmo_request_received_recv.take(2).collect::<()>().await;
-            test_realm.destroy().await.expect("destroy test realm");
-        };
-
-        let (event_sender, event_recv) = mpsc::channel(10);
-        // Future that collects VMOs from the test realm and forwards
-        // them to fuchsia.debugdata.Publisher
-        let processor_fut = processor
-            .collect_and_serve_for_suite(event_sender)
-            .unwrap_or_else(|e| panic!("processor failed: {:?}", e));
-        // Future that collects produced debug artifact and asserts on contents.
-        let assertion_fut = async move {
-            let mut events: Vec<_> = event_recv.collect().await;
-            assert_eq!(events.len(), 1);
-            if let SuiteEventPayload::DebugData(iterator) =
-                events.pop().unwrap().unwrap().into_payload()
-            {
-                let iterator_proxy = iterator.into_proxy().unwrap();
-                let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next())
-                    .and_then(|debug_data| async move {
-                        Ok((
-                            debug_data.name.unwrap(),
-                            collect_string_from_socket(debug_data.socket.unwrap())
-                                .await
-                                .expect("read socket"),
-                        ))
-                    })
-                    .try_collect()
-                    .await
-                    .expect("file collection");
-                let expected = hashset! {
-                    ("data-sink-1".to_string(), TEST_URL.to_string()),
-                    ("data-sink-2".to_string(), TEST_URL.to_string()),
-                };
-                assert_eq!(files, expected);
-            } else {
-                assert!(false); // Event payload was not DebugData
-            }
         };
 
         futures::future::join4(processor_server_fut, test_fut, processor_fut, assertion_fut).await;

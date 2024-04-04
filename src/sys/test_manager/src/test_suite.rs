@@ -10,7 +10,7 @@ use {
         error::*,
         facet,
         facet::SuiteFacets,
-        run_events::{RunEvent, SuiteEvents},
+        run_events::RunEvent,
         running_suite, scheduler,
         scheduler::Scheduler,
         self_diagnostics::DiagnosticNode,
@@ -22,7 +22,7 @@ use {
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_test_manager as ftest_manager,
     ftest_manager::{
         LaunchError, RunControllerRequest, RunControllerRequestStream, SchedulingOptions,
-        SuiteControllerRequest, SuiteControllerRequestStream,
+        SuiteControllerRequest, SuiteControllerRequestStream, SuiteEvent as FidlSuiteEvent,
     },
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{
@@ -267,54 +267,11 @@ impl TestRunBuilder {
 const EVENTS_THRESHOLD: usize = 50;
 
 impl Suite {
-    pub(crate) async fn run(self, diagnostics: DiagnosticNode, accumulate_debug_data: bool) {
-        let diagnostics_ref = &diagnostics;
-
-        let debug_data_directory = match accumulate_debug_data {
-            true => DebugDataDirectory::Accumulating { dir: constants::DEBUG_DATA_FOR_SCP },
-            false => DebugDataDirectory::Isolated { parent: constants::ISOLATED_TMP },
-        };
-        let (debug_data_processor, debug_data_sender) =
-            DebugDataProcessor::new(debug_data_directory);
-
-        let (event_sender, event_receiver) = mpsc::channel(1024);
-
-        let debug_task = fasync::Task::local(
-            debug_data_processor
-                .collect_and_serve_for_suite(event_sender.clone())
-                .unwrap_or_else(|err| warn!(?err, "Error serving debug data")),
-        );
-
-        // This future returns the task which needs to be completed before completion.
-        let suite_run_fut = async move {
-            diagnostics_ref.set_property("execution", "executing");
-
-            let suite_node = diagnostics_ref.child("serial_executor").child("suite-0");
-            suite_node.set_property("url", self.test_url.clone());
-            run_single_suite_for_suite_runner(
-                self,
-                debug_data_sender,
-                suite_node,
-                event_sender,
-                event_receiver,
-            )
-            .await;
-
-            diagnostics_ref.set_property("execution", "complete");
-        };
-
-        suite_run_fut
-            .then(|_| async move {
-                debug_task.await;
-            })
-            .await;
-    }
-
     async fn run_controller(
         mut controller: SuiteControllerRequestStream,
         stop_sender: oneshot::Sender<()>,
         run_suite_remote_handle: futures::future::RemoteHandle<()>,
-        event_recv: mpsc::Receiver<Result<SuiteEvents, LaunchError>>,
+        event_recv: mpsc::Receiver<Result<FidlSuiteEvent, LaunchError>>,
     ) -> Result<(), Error> {
         let mut task = Some(run_suite_remote_handle);
         let mut stop_sender = Some(stop_sender);
@@ -340,22 +297,18 @@ impl Suite {
                         // connection after that.
                     }
                     SuiteControllerRequest::WatchEvents { responder } => {
-                        events_responder_sender
-                            .unbounded_send(EventResponder::New(responder))
-                            .unwrap_or_else(|e| {
-                                // If the handler is already done, drop responder without closing the
-                                // channel.
-                                e.into_inner().drop_without_shutdown();
-                            })
+                        warn!("Unimplemented WatchEvents suite controller request received: closing connection");
+                        // Dropping the remote handle for the suite execution task cancels it.
+                        drop(task.take());
+                        responder.control_handle().shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+                        break;
                     }
                     SuiteControllerRequest::GetEvents { responder } => {
-                        events_responder_sender
-                            .unbounded_send(EventResponder::Deprecated(responder))
-                            .unwrap_or_else(|e| {
-                                // If the handler is already done, drop responder without closing the
-                                // channel.
-                                e.into_inner().drop_without_shutdown();
-                            })
+                        events_responder_sender.unbounded_send(responder).unwrap_or_else(|e| {
+                            // If the handler is already done, drop responder without closing the
+                            // channel.
+                            e.into_inner().drop_without_shutdown();
+                        })
                     }
                     SuiteControllerRequest::_UnknownMethod { ordinal, control_handle, .. } => {
                         warn!(
@@ -377,7 +330,13 @@ impl Suite {
             while let Some(responder) = events_responder_recv.next().await {
                 let next_chunk_results: Vec<Result<_, _>> =
                     event_chunks.next().await.unwrap_or_default();
-                if responder.send(next_chunk_results)? {
+                let next_chunk_result: Result<Vec<_>, _> = next_chunk_results.into_iter().collect();
+                let done = match &next_chunk_result {
+                    Ok(events) => events.is_empty(),
+                    Err(_) => true,
+                };
+                responder.send(next_chunk_result)?;
+                if done {
                     break;
                 }
             }
@@ -403,138 +362,6 @@ impl Suite {
             }
         }
     }
-}
-
-enum EventResponder {
-    Deprecated(ftest_manager::SuiteControllerGetEventsResponder),
-    New(ftest_manager::SuiteControllerWatchEventsResponder),
-}
-
-impl EventResponder {
-    fn drop_without_shutdown(self) {
-        match self {
-            EventResponder::Deprecated(inner) => inner.drop_without_shutdown(),
-            EventResponder::New(inner) => inner.drop_without_shutdown(),
-        }
-    }
-
-    pub fn send(self, results: Vec<Result<SuiteEvents, LaunchError>>) -> Result<bool, fidl::Error> {
-        match self {
-            EventResponder::Deprecated(inner) => {
-                let result: Result<Vec<_>, _> =
-                    results.into_iter().map(|r| r.map(SuiteEvents::into)).collect();
-                let done = match &result {
-                    Ok(events) => events.is_empty(),
-                    Err(_) => true,
-                };
-                inner.send(result).map(|_| done)
-            }
-            EventResponder::New(inner) => {
-                let result: Result<Vec<_>, _> =
-                    results.into_iter().map(|r| r.map(SuiteEvents::into)).collect();
-                let done = match &result {
-                    Ok(events) => events.is_empty(),
-                    Err(_) => true,
-                };
-                inner.send(result).map(|_| done)
-            }
-        }
-    }
-}
-
-async fn run_single_suite_for_suite_runner(
-    suite: Suite,
-    debug_data_sender: DebugDataSender,
-    diagnostics: DiagnosticNode,
-    mut event_sender: mpsc::Sender<Result<SuiteEvents, LaunchError>>,
-    event_recv: mpsc::Receiver<Result<SuiteEvents, LaunchError>>,
-) {
-    let (stop_sender, stop_recv) = oneshot::channel::<()>();
-
-    let Suite {
-        test_url,
-        options,
-        controller,
-        resolver,
-        above_root_capabilities_for_test,
-        facets,
-        realm: suite_realm,
-    } = suite;
-
-    let run_test_fut = async {
-        diagnostics.set_property("execution", "get_facets");
-
-        let facets = match facets {
-            // Currently, all suites are passed in with unresolved facets by the
-            // SerialScheduler. ParallelScheduler will pass in Resolved facets
-            // once it is implemented.
-            facet::ResolveStatus::Resolved(result) => {
-                match result {
-                    Ok(facets) => facets,
-
-                    // This error is reported here instead of when the error was
-                    // first encountered because here is where it has access to
-                    // the SuiteController protocol server (Suite::run_controller)
-                    // which can report the error back to the test_manager client
-                    Err(error) => {
-                        event_sender.send(Err(error.into())).await.unwrap();
-                        return;
-                    }
-                }
-            }
-            facet::ResolveStatus::Unresolved => {
-                match facet::get_suite_facets(test_url.clone(), resolver.clone()).await {
-                    Ok(facets) => facets,
-                    Err(error) => {
-                        event_sender.send(Err(error.into())).await.unwrap();
-                        return;
-                    }
-                }
-            }
-        };
-        diagnostics.set_property("execution", "launch");
-        match running_suite::RunningSuite::launch(
-            &test_url,
-            facets,
-            resolver,
-            above_root_capabilities_for_test,
-            debug_data_sender,
-            &diagnostics,
-            &suite_realm,
-        )
-        .await
-        {
-            Ok(mut instance) => {
-                diagnostics.set_property("execution", "run_tests");
-                instance.run_tests(&test_url, options, event_sender, stop_recv).await;
-                diagnostics.set_property("execution", "tests_done");
-                diagnostics.set_property("execution", "tear_down");
-                if let Err(err) = instance.destroy(diagnostics.child("destroy")).await {
-                    // Failure to destroy an instance could mean that some component events fail to send.
-                    error!(
-                        ?diagnostics,
-                        ?err,
-                        "Failed to destroy instance. Debug data may be lost."
-                    );
-                }
-            }
-            Err(e) => {
-                event_sender.send(Err(e.into())).await.unwrap();
-            }
-        }
-    };
-    let (run_test_remote, run_test_handle) = run_test_fut.remote_handle();
-
-    let controller_fut =
-        Suite::run_controller(controller, stop_sender, run_test_handle, event_recv);
-    let ((), controller_ret) = futures::future::join(run_test_remote, controller_fut).await;
-
-    if let Err(e) = controller_ret {
-        warn!(?diagnostics, "Ended test {}: {:?}", test_url, e);
-    }
-
-    diagnostics.set_property("execution", "complete");
-    info!(?diagnostics, "Test destruction complete");
 }
 
 pub(crate) async fn run_single_suite(
@@ -670,7 +497,7 @@ where
 #[cfg(test)]
 mod tests {
     use {
-        super::*, fidl::endpoints::create_proxy_and_stream,
+        super::*, crate::run_events::SuiteEvents, fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_component_resolution as fresolution, fuchsia_async as fasync,
     };
 

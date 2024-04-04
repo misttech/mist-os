@@ -55,39 +55,29 @@ async fn main() -> Result<(), Error> {
     );
 
     info!("Reading capabilities from {}", args.manifest_name());
-    let routing_info_for_run_builder =
-        Arc::new(AboveRootCapabilitiesForTest::new(args.manifest_name()).await?);
-    let routing_info_for_query = routing_info_for_run_builder.clone();
-    let routing_info_for_task_test_case_enumerator = routing_info_for_run_builder.clone();
-    let routing_info_for_suite_runner = routing_info_for_run_builder.clone();
-
-    let resolver_for_run_builder = Arc::new(
+    let routing_info = Arc::new(AboveRootCapabilitiesForTest::new(args.manifest_name()).await?);
+    let routing_info_clone = routing_info.clone();
+    let resolver = Arc::new(
         connect_to_protocol::<fresolution::ResolverMarker>()
             .expect("Cannot connect to component resolver"),
     );
-    let resolver_for_query = resolver_for_run_builder.clone();
-    let resolver_for_test_case_enumerator = resolver_for_run_builder.clone();
-    let resolver_for_suite_runner = resolver_for_run_builder.clone();
-
-    let root_inspect_for_run_builder = Arc::new(RootDiagnosticNode::new(
+    let resolver_clone = resolver.clone();
+    let root_inspect = Arc::new(RootDiagnosticNode::new(
         fuchsia_inspect::component::inspector().root().clone_weak(),
     ));
-    let root_inspect_for_query = root_inspect_for_run_builder.clone();
-    let root_inspect_for_test_case_enumerator = root_inspect_for_run_builder.clone();
-    let root_inspect_for_suite_runner = root_inspect_for_run_builder.clone();
+    let root_inspect_query = root_inspect.clone();
 
     fs.dir("svc")
         .add_fidl_service(move |stream| {
-            let resolver = resolver_for_run_builder.clone();
-            let routing_info = routing_info_for_run_builder.clone();
-            let root_inspect = root_inspect_for_run_builder.clone();
-
+            let routing_info_for_task = routing_info_clone.clone();
+            let resolver = resolver.clone();
+            let root_inspect_clone = root_inspect.clone();
             fasync::Task::local(async move {
-                test_manager_lib::run_test_manager_run_builder_server(
+                test_manager_lib::run_test_manager(
                     stream,
                     resolver,
-                    routing_info,
-                    &*root_inspect,
+                    routing_info_for_task,
+                    &*root_inspect_clone,
                 )
                 .await
                 .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
@@ -95,16 +85,16 @@ async fn main() -> Result<(), Error> {
             .detach();
         })
         .add_fidl_service(move |stream| {
-            let resolver = resolver_for_query.clone();
-            let routing_info = routing_info_for_query.clone();
-            let root_inspect = root_inspect_for_query.clone();
+            let routing_info_for_task = routing_info.clone();
+            let resolver = resolver_clone.clone();
+            let root_inspect_clone = root_inspect_query.clone();
 
             fasync::Task::local(async move {
                 test_manager_lib::run_test_manager_query_server(
                     stream,
                     resolver,
-                    routing_info,
-                    &*root_inspect,
+                    routing_info_for_task,
+                    &*root_inspect_clone,
                 )
                 .await
                 .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
@@ -116,40 +106,6 @@ async fn main() -> Result<(), Error> {
                 test_manager_lib::serve_early_boot_profiles(stream)
                     .await
                     .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
-            })
-            .detach();
-        })
-        .add_fidl_service(move |stream| {
-            let resolver = resolver_for_test_case_enumerator.clone();
-            let routing_info = routing_info_for_task_test_case_enumerator.clone();
-            let root_inspect = root_inspect_for_test_case_enumerator.clone();
-
-            fasync::Task::local(async move {
-                test_manager_lib::run_test_manager_test_case_enumerator_server(
-                    stream,
-                    resolver,
-                    routing_info,
-                    &*root_inspect,
-                )
-                .await
-                .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
-            })
-            .detach();
-        })
-        .add_fidl_service(move |stream| {
-            let resolver = resolver_for_suite_runner.clone();
-            let routing_info = routing_info_for_suite_runner.clone();
-            let root_inspect = root_inspect_for_suite_runner.clone();
-
-            fasync::Task::local(async move {
-                test_manager_lib::run_test_manager_suite_runner_server(
-                    stream,
-                    resolver,
-                    routing_info,
-                    &*root_inspect,
-                )
-                .await
-                .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
             })
             .detach();
         });

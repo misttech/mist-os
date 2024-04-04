@@ -31,10 +31,6 @@ pub fn default_run_option() -> ftest_manager::RunOptions {
     }
 }
 
-pub fn default_run_suite_options() -> ftest_manager::RunSuiteOptions {
-    ftest_manager::RunSuiteOptions { run_disabled_tests: Some(false), ..Default::default() }
-}
-
 #[derive(Debug, Eq, PartialEq)]
 pub struct AttributedLog {
     pub log: String,
@@ -82,9 +78,6 @@ pub async fn collect_suite_events(
             SuiteEventPayload::TestCaseLog { .. } => {
                 panic!("not supported yet!")
             }
-            SuiteEventPayload::DebugData { .. } => {
-                panic!("not supported yet!")
-            }
         }
     }
     execution_task.await.context("test execution failed")?;
@@ -102,100 +95,6 @@ pub async fn collect_suite_events(
     }
 
     Ok((events, collected_logs))
-}
-
-pub async fn collect_suite_events_with_watch(
-    suite_instance: SuiteRunInstance,
-    filter_debug_data: bool,
-) -> Result<(Vec<RunEvent>, Vec<AttributedLog>), Error> {
-    let (sender, mut recv) = mpsc::channel(1);
-    let execution_task = fasync::Task::spawn(async move {
-        suite_instance.collect_events_with_watch(sender, filter_debug_data).await
-    });
-    let mut events = vec![];
-    let mut log_tasks = vec![];
-    while let Some(event) = recv.next().await {
-        match event.payload {
-            SuiteEventPayload::RunEvent(RunEvent::CaseStdout { name, mut stdout_message }) => {
-                if stdout_message.ends_with("\n") {
-                    stdout_message.truncate(stdout_message.len() - 1)
-                }
-                let logs = stdout_message.split("\n");
-                for log in logs {
-                    // gtest produces this line when tests are randomized. As of
-                    // this writing, our gtest_main binary *always* randomizes.
-                    if log.contains("Note: Randomizing tests' orders with a seed of") {
-                        continue;
-                    }
-                    events.push(RunEvent::case_stdout(name.clone(), log.to_string()));
-                }
-            }
-            SuiteEventPayload::RunEvent(RunEvent::CaseStderr { name, mut stderr_message }) => {
-                if stderr_message.ends_with("\n") {
-                    stderr_message.truncate(stderr_message.len() - 1)
-                }
-                let logs = stderr_message.split("\n");
-                for log in logs {
-                    events.push(RunEvent::case_stderr(name.clone(), log.to_string()));
-                }
-            }
-            SuiteEventPayload::RunEvent(e) => events.push(e),
-            SuiteEventPayload::SuiteLog { log_stream } => {
-                let t = fasync::Task::spawn(log_stream.collect::<Vec<_>>());
-                log_tasks.push(t);
-            }
-            SuiteEventPayload::TestCaseLog { .. } => {
-                panic!("not supported yet!")
-            }
-            SuiteEventPayload::DebugData { filename, socket } => {
-                events.push(RunEvent::DebugData { filename, socket })
-            }
-        }
-    }
-    execution_task.await.context("test execution failed")?;
-
-    let mut collected_logs = vec![];
-    for t in log_tasks {
-        let logs = t.await;
-        for log_result in logs {
-            let log = log_result?;
-            collected_logs.push(AttributedLog {
-                log: log.msg().unwrap().to_string(),
-                moniker: log.moniker.clone(),
-            });
-        }
-    }
-
-    Ok((events, collected_logs))
-}
-
-/// Runs a test suite.
-pub struct SuiteRunner {
-    proxy: ftest_manager::SuiteRunnerProxy,
-}
-
-impl SuiteRunner {
-    /// Create new instance
-    pub fn new(proxy: ftest_manager::SuiteRunnerProxy) -> Self {
-        Self { proxy }
-    }
-
-    pub fn take_proxy(self) -> ftest_manager::SuiteRunnerProxy {
-        self.proxy
-    }
-
-    /// Starts the suite run, returning the suite run controller wrapped in a SuiteRunInstance.
-    pub fn start_suite_run(
-        &self,
-        test_url: &str,
-        options: ftest_manager::RunSuiteOptions,
-    ) -> Result<SuiteRunInstance, Error> {
-        let (controller_proxy, controller) =
-            fidl::endpoints::create_proxy().context("Cannot create proxy")?;
-        self.proxy.run(test_url, options, controller).context("Error starting tests")?;
-
-        return Ok(SuiteRunInstance { controller_proxy: controller_proxy.into() });
-    }
 }
 
 /// Builds and runs test suite(s).
@@ -279,7 +178,7 @@ impl TestBuilder {
                 break;
             }
             for fidl_event in fidl_events {
-                match fidl_event.payload.expect("Details cannot be empty") {
+                match fidl_event.payload.expect("Payload cannot be empty") {
                     ftest_manager::RunEventPayload::Artifact(
                         ftest_manager::Artifact::DebugData(iterator),
                     ) => {
@@ -340,18 +239,6 @@ pub struct SuiteEvent {
 }
 
 impl SuiteEvent {
-    // Note: This is only used with SuiteRunner, not RunBuilder.
-    pub fn debug_data<S: Into<String>>(
-        timestamp: Option<i64>,
-        filename: S,
-        socket: fidl::Socket,
-    ) -> Self {
-        Self {
-            timestamp,
-            payload: SuiteEventPayload::DebugData { filename: filename.into(), socket },
-        }
-    }
-
     pub fn case_found(timestamp: Option<i64>, name: String) -> Self {
         SuiteEvent { timestamp, payload: SuiteEventPayload::RunEvent(RunEvent::case_found(name)) }
     }
@@ -438,27 +325,16 @@ impl SuiteEvent {
 
 pub enum SuiteEventPayload {
     /// Logger for test suite
-    SuiteLog {
-        log_stream: LogStream,
-    },
+    SuiteLog { log_stream: LogStream },
 
     /// Logger for a test case in suite.
-    TestCaseLog {
-        name: String,
-        log_stream: LogStream,
-    },
+    TestCaseLog { name: String, log_stream: LogStream },
 
     /// Test events.
     RunEvent(RunEvent),
-
-    // Debug data. Note: This is only used with SuiteRunner, not RunBuilder.
-    DebugData {
-        filename: String,
-        socket: fidl::Socket,
-    },
 }
 
-#[derive(PartialEq, Debug, Eq, Hash, Ord, PartialOrd)]
+#[derive(PartialEq, Debug, Eq, Hash, Ord, PartialOrd, Clone)]
 pub enum RunEvent {
     CaseFound { name: String },
     CaseStarted { name: String },
@@ -469,7 +345,6 @@ pub enum RunEvent {
     SuiteStarted,
     SuiteCustom { component: String, filename: String, contents: String },
     SuiteStopped { status: ftest_manager::SuiteStatus },
-    DebugData { filename: String, socket: fidl::Socket },
 }
 
 impl RunEvent {
@@ -537,14 +412,6 @@ impl RunEvent {
     pub fn suite_stopped(status: ftest_manager::SuiteStatus) -> Self {
         Self::SuiteStopped { status }
     }
-
-    pub fn debug_data<S>(filename: S, socket: fidl::Socket) -> Self
-    where
-        S: Into<String>,
-    {
-        Self::DebugData { filename: filename.into(), socket }
-    }
-
     /// Returns the name of the test case to which the event belongs, if applicable.
     pub fn test_case_name(&self) -> Option<&String> {
         match self {
@@ -556,8 +423,7 @@ impl RunEvent {
             | RunEvent::CaseFinished { name } => Some(name),
             RunEvent::SuiteStarted
             | RunEvent::SuiteStopped { .. }
-            | RunEvent::SuiteCustom { .. }
-            | RunEvent::DebugData { .. } => None,
+            | RunEvent::SuiteCustom { .. } => None,
         }
     }
 
@@ -569,7 +435,7 @@ impl RunEvent {
 
 /// Groups events by stdout, stderr and non stdout/stderr events to make it easy to compare them
 /// in tests.
-#[derive(Default, Debug, Eq, PartialEq)]
+#[derive(Default, Debug, Eq, PartialEq, Clone)]
 pub struct GroupedRunEvents {
     // order of events is maintained.
     pub non_artifact_events: Vec<RunEvent>,
@@ -691,7 +557,7 @@ impl FidlSuiteEventProcessor {
         mut sender: mpsc::Sender<SuiteEvent>,
     ) -> Result<(), Error> {
         let timestamp = event.timestamp;
-        let e = match event.payload.expect("Details cannot be null, please file bug.") {
+        let e = match event.payload.expect("Payload cannot be null, please file bug.") {
             FidlSuiteEventPayload::CaseFound(cf) => {
                 self.case_map.insert(cf.identifier, cf.test_case_name.clone());
                 SuiteEvent::case_found(timestamp, cf.test_case_name).into()
@@ -859,247 +725,6 @@ impl FidlSuiteEventProcessor {
         }
         Ok(())
     }
-
-    async fn process_event(
-        &mut self,
-        event: ftest_manager::Event,
-        mut sender: mpsc::Sender<SuiteEvent>,
-        filter_debug_data: bool,
-    ) -> Result<(), Error> {
-        let timestamp = event.timestamp;
-        let e = match event.details.expect("Details cannot be null, please file bug.") {
-            ftest_manager::EventDetails::TestCaseFound(cf) => {
-                let test_case_name =
-                    cf.test_case_name.expect("test_case_name must be specified, please file bug.");
-                self.case_map.insert(
-                    cf.test_case_id.expect("test_case_id must be specified, please file bug."),
-                    test_case_name.clone(),
-                );
-                SuiteEvent::case_found(timestamp, test_case_name).into()
-            }
-            ftest_manager::EventDetails::TestCaseStarted(cs) => {
-                let test_case_name = self.get_test_case_name(
-                    cs.test_case_id.expect("test_case_id must be specified, please file bug."),
-                );
-                SuiteEvent::case_started(timestamp, test_case_name).into()
-            }
-            ftest_manager::EventDetails::TestCaseStopped(cs) => {
-                let test_case_name = self.get_test_case_name(
-                    cs.test_case_id.expect("test_case_id must be specified, please file bug."),
-                );
-                if let Some(outputs) = self.std_output_map.remove(
-                    &cs.test_case_id.expect("test_case_id must be specified, please file bug."),
-                ) {
-                    for s in outputs {
-                        s.await.context(format!(
-                            "error collecting stdout/stderr of {}",
-                            test_case_name
-                        ))?;
-                    }
-                }
-                SuiteEvent::case_stopped(
-                    timestamp,
-                    test_case_name,
-                    to_case_status(cs.result.expect("result must be specified, please file bug.")),
-                )
-                .into()
-            }
-            ftest_manager::EventDetails::TestCaseFinished(cf) => {
-                let test_case_name = self.get_test_case_name(
-                    cf.test_case_id.expect("test_case_id must be specified, please file bug."),
-                );
-                SuiteEvent::case_finished(timestamp, test_case_name).into()
-            }
-            ftest_manager::EventDetails::TestCaseArtifactGenerated(ca) => {
-                let name = self.get_test_case_name(
-                    ca.test_case_id.expect("test_case_id must be specified, please file bug."),
-                );
-                match ca.artifact.expect("artifact must be specified, please file bug.") {
-                    ftest_manager::Artifact::Stdout(stdout) => {
-                        let (s, mut r) = mpsc::channel(1024);
-                        let stdout_task =
-                            fasync::Task::spawn(collect_and_send_string_output(stdout, s));
-                        let mut sender_clone = sender.clone();
-                        let send_stdout_task = fasync::Task::spawn(async move {
-                            while let Some(msg) = r.next().await {
-                                sender_clone
-                                    .send(SuiteEvent::case_stdout(None, &name, msg))
-                                    .await
-                                    .context(format!("cannot send logs for {}", name))?;
-                            }
-                            Ok(())
-                        });
-                        match self.std_output_map.get_mut(
-                            &ca.test_case_id
-                                .expect("test_case_id must be specified, please file bug."),
-                        ) {
-                            Some(v) => {
-                                v.push(stdout_task);
-                                v.push(send_stdout_task);
-                            }
-                            None => {
-                                self.std_output_map.insert(
-                                    ca.test_case_id
-                                        .expect("test_case_id must be specified, please file bug."),
-                                    vec![stdout_task, send_stdout_task],
-                                );
-                            }
-                        }
-                        None
-                    }
-                    ftest_manager::Artifact::Stderr(stderr) => {
-                        let (s, mut r) = mpsc::channel(1024);
-                        let stderr_task =
-                            fasync::Task::spawn(collect_and_send_string_output(stderr, s));
-                        let mut sender_clone = sender.clone();
-                        let send_stderr_task = fasync::Task::spawn(async move {
-                            while let Some(msg) = r.next().await {
-                                sender_clone
-                                    .send(SuiteEvent::case_stderr(None, &name, msg))
-                                    .await
-                                    .context(format!("cannot send logs for {}", name))?;
-                            }
-                            Ok(())
-                        });
-                        match self.std_output_map.get_mut(
-                            &ca.test_case_id
-                                .expect("test_case_id must be specified, please file bug."),
-                        ) {
-                            Some(v) => {
-                                v.push(stderr_task);
-                                v.push(send_stderr_task);
-                            }
-                            None => {
-                                self.std_output_map.insert(
-                                    ca.test_case_id
-                                        .expect("test_case_id must be specified, please file bug."),
-                                    vec![stderr_task, send_stderr_task],
-                                );
-                            }
-                        }
-                        None
-                    }
-                    ftest_manager::Artifact::Log(log) => match LogStream::from_syslog(log) {
-                        Ok(log_stream) => {
-                            SuiteEvent::test_case_log(timestamp, name, log_stream).into()
-                        }
-                        Err(e) => {
-                            warn!("Cannot collect logs for test suite: {:?}", e);
-                            None
-                        }
-                    },
-                    _ => {
-                        panic!("not supported")
-                    }
-                }
-            }
-            ftest_manager::EventDetails::SuiteArtifactGenerated(sa) => {
-                match sa.artifact.expect("artifact must be specified, please file bug.") {
-                    ftest_manager::Artifact::Stdout(_) => {
-                        panic!("not supported")
-                    }
-                    ftest_manager::Artifact::Stderr(_) => {
-                        panic!("not supported")
-                    }
-                    ftest_manager::Artifact::Log(log) => match LogStream::from_syslog(log) {
-                        Ok(log_stream) => SuiteEvent::suite_log(timestamp, log_stream).into(),
-                        Err(e) => {
-                            warn!("Cannot collect logs for test suite: {:?}", e);
-                            None
-                        }
-                    },
-                    ftest_manager::Artifact::Custom(custom_artifact) => {
-                        let ftest_manager::DirectoryAndToken { directory, token } =
-                            custom_artifact.directory_and_token.unwrap();
-                        let component_moniker = custom_artifact.component_moniker.unwrap();
-                        let mut sender_clone = sender.clone();
-                        fasync::Task::spawn(async move {
-                            let directory = directory.into_proxy().unwrap();
-                            let entries: Vec<_> =
-                                fuchsia_fs::directory::readdir_recursive(&directory, None)
-                                    .try_collect()
-                                    .await
-                                    .expect("read custom artifact directory");
-                            for entry in entries.into_iter() {
-                                let file = fuchsia_fs::directory::open_file_no_describe(
-                                    &directory,
-                                    &entry.name,
-                                    fio::OpenFlags::RIGHT_READABLE,
-                                )
-                                .unwrap();
-                                let contents =
-                                    fuchsia_fs::file::read_to_string(&file).await.unwrap();
-                                sender_clone
-                                    .send(SuiteEvent::suite_custom(
-                                        timestamp,
-                                        component_moniker.clone(),
-                                        entry.name,
-                                        contents,
-                                    ))
-                                    .await
-                                    .unwrap();
-                            }
-                            // Drop the token here - we must keep the token open for the duration that
-                            // the directory is in use.
-                            drop(token);
-                        })
-                        .detach();
-                        None
-                    }
-                    ftest_manager::Artifact::DebugData(iterator) => {
-                        if !filter_debug_data {
-                            let mut sender_clone = sender.clone();
-                            let proxy = iterator.into_proxy().context("Create proxy")?;
-                            fasync::Task::spawn(async move {
-                                loop {
-                                    let data = proxy.get_next().await.unwrap();
-                                    if data.is_empty() {
-                                        break;
-                                    }
-                                    for data_file in data {
-                                        let socket =
-                                            data_file.socket.expect("File cannot be empty");
-                                        sender_clone
-                                            .send(SuiteEvent::debug_data(
-                                                timestamp,
-                                                data_file.name.expect("Name cannot be empty"),
-                                                socket,
-                                            ))
-                                            .await
-                                            .unwrap();
-                                    }
-                                }
-                            })
-                            .detach();
-                        }
-                        None
-                    }
-                    _ => {
-                        panic!("not supported")
-                    }
-                }
-            }
-            ftest_manager::EventDetails::SuiteStarted(_started) => SuiteEvent {
-                timestamp,
-                payload: SuiteEventPayload::RunEvent(RunEvent::SuiteStarted),
-            }
-            .into(),
-            ftest_manager::EventDetails::SuiteStopped(stopped) => SuiteEvent {
-                timestamp,
-                payload: SuiteEventPayload::RunEvent(RunEvent::SuiteStopped {
-                    status: to_suite_status(
-                        stopped.result.expect("result must be specified, please file bug."),
-                    ),
-                }),
-            }
-            .into(),
-            SuiteEventPayloadUnknown!() => panic!("Unrecognized SuiteEvent"),
-        };
-        if let Some(item) = e {
-            sender.send(item).await.context("Cannot send event")?;
-        }
-        Ok(())
-    }
 }
 
 #[derive(Debug, thiserror::Error, Eq, PartialEq, Copy, Clone)]
@@ -1178,57 +803,5 @@ impl SuiteRunInstance {
             }
         }
         Ok(())
-    }
-
-    pub async fn collect_events_with_watch(
-        &self,
-        sender: mpsc::Sender<SuiteEvent>,
-        filter_debug_data: bool,
-    ) -> Result<(), Error> {
-        let controller_proxy = self.controller_proxy.clone();
-        let mut processor = FidlSuiteEventProcessor::new();
-        loop {
-            match controller_proxy.watch_events().await? {
-                Err(e) => return Err(SuiteLaunchError::from(e).into()),
-                Ok(events) => {
-                    if events.len() == 0 {
-                        break;
-                    }
-                    for event in events {
-                        if let Err(e) =
-                            processor.process_event(event, sender.clone(), filter_debug_data).await
-                        {
-                            warn!("error running test suite: {:?}", e);
-                            let _ = controller_proxy.kill();
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-fn to_case_status(outcome: ftest_manager::TestCaseResult) -> ftest_manager::CaseStatus {
-    match outcome {
-        ftest_manager::TestCaseResult::Passed => ftest_manager::CaseStatus::Passed,
-        ftest_manager::TestCaseResult::Failed => ftest_manager::CaseStatus::Failed,
-        ftest_manager::TestCaseResult::TimedOut => ftest_manager::CaseStatus::TimedOut,
-        ftest_manager::TestCaseResult::Skipped => ftest_manager::CaseStatus::Skipped,
-        ftest_manager::TestCaseResult::Error => ftest_manager::CaseStatus::Error,
-        _ => ftest_manager::CaseStatus::Error,
-    }
-}
-
-fn to_suite_status(outcome: ftest_manager::SuiteResult) -> ftest_manager::SuiteStatus {
-    match outcome {
-        ftest_manager::SuiteResult::Finished => ftest_manager::SuiteStatus::Passed,
-        ftest_manager::SuiteResult::Failed => ftest_manager::SuiteStatus::Failed,
-        ftest_manager::SuiteResult::DidNotFinish => ftest_manager::SuiteStatus::DidNotFinish,
-        ftest_manager::SuiteResult::TimedOut => ftest_manager::SuiteStatus::TimedOut,
-        ftest_manager::SuiteResult::Stopped => ftest_manager::SuiteStatus::Stopped,
-        ftest_manager::SuiteResult::InternalError => ftest_manager::SuiteStatus::InternalError,
-        _ => ftest_manager::SuiteStatus::InternalError,
     }
 }

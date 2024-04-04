@@ -28,7 +28,7 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fidl_fuchsia_test as ftest,
     fidl_fuchsia_test_manager as ftest_manager,
     ftest::Invocation,
-    ftest_manager::{CaseStatus, LaunchError, SuiteStatus},
+    ftest_manager::{CaseStatus, LaunchError, SuiteEvent as FidlSuiteEvent, SuiteStatus},
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_component::client::connect_to_protocol_at_dir_root,
     fuchsia_component_test::{
@@ -169,7 +169,7 @@ impl RunningSuite {
         &mut self,
         test_url: &str,
         mut options: ftest_manager::RunOptions,
-        mut sender: mpsc::Sender<Result<SuiteEvents, LaunchError>>,
+        mut sender: mpsc::Sender<Result<FidlSuiteEvent, LaunchError>>,
         mut stop_recv: oneshot::Receiver<()>,
     ) {
         debug!("running test suite {}", test_url);
@@ -349,7 +349,7 @@ impl RunningSuite {
     /// Find any custom artifact users under the test realm and report them via sender.
     async fn report_custom_artifacts(
         &mut self,
-        sender: &mut mpsc::Sender<Result<SuiteEvents, LaunchError>>,
+        sender: &mut mpsc::Sender<Result<FidlSuiteEvent, LaunchError>>,
     ) -> Result<(), Error> {
         // TODO(https://fxbug.dev/42074399): Support custom artifacts when test is running in outside
         // realm.
@@ -924,7 +924,7 @@ async fn run_invocations(
     invocations: Vec<Invocation>,
     run_options: fidl_fuchsia_test::RunOptions,
     counter: &AtomicU32,
-    sender: &mut mpsc::Sender<Result<SuiteEvents, LaunchError>>,
+    sender: &mut mpsc::Sender<Result<FidlSuiteEvent, LaunchError>>,
     timeout_fut: futures::future::Shared<fasync::Timer>,
 ) -> Result<SuiteStatus, anyhow::Error> {
     let (run_listener_client, mut run_listener) =
