@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/examples/services/cpp/fidl.h>
+#include <fidl/fuchsia.examples.services/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/sys/cpp/component_context.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <cstdlib>
-#include <iostream>
+#include <utility>
 
 struct Account {
   // Account owner's name
@@ -21,36 +20,43 @@ struct Account {
 };
 
 // Implementation of the `fuchsia.examples.services/ReadOnlyAccount` protocol
-class ProtectedAccount : public fuchsia::examples::services::ReadOnlyAccount {
+class ProtectedAccount : public fidl::Server<fuchsia_examples_services::ReadOnlyAccount> {
  public:
-  explicit ProtectedAccount(Account account) : account_(account) {}
+  explicit ProtectedAccount(Account account) : account_(std::move(account)) {}
 
-  void GetOwner(GetOwnerCallback callback) override { callback(account_.name); }
-  void GetBalance(GetBalanceCallback callback) override { callback(account_.balance); }
+  void GetOwner(GetOwnerCompleter::Sync& completer) override { completer.Reply({account_.name}); }
+  void GetBalance(GetBalanceCompleter::Sync& completer) override {
+    completer.Reply({account_.balance});
+  }
 
  private:
   Account account_;
 };
 
 // Implementation of the `fuchsia.examples.services/ReadWriteAccount` protocol
-class OpenAccount : public fuchsia::examples::services::ReadWriteAccount {
+class OpenAccount : public fidl::Server<fuchsia_examples_services::ReadWriteAccount> {
  public:
-  explicit OpenAccount(Account account) : account_(account) {}
+  explicit OpenAccount(Account account) : account_(std::move(account)) {}
 
-  void GetOwner(GetOwnerCallback callback) override { callback(account_.name); }
-  void GetBalance(GetBalanceCallback callback) override { callback(account_.balance); }
-  void Debit(int64_t amount, DebitCallback callback) override {
-    if (account_.balance >= amount) {
-      account_.balance -= amount;
-      callback(true);
+  void GetOwner(GetOwnerCompleter::Sync& completer) override { completer.Reply({account_.name}); }
+
+  void GetBalance(GetBalanceCompleter::Sync& completer) override {
+    completer.Reply({account_.balance});
+  }
+
+  void Debit(DebitRequest& request, DebitCompleter::Sync& completer) override {
+    if (account_.balance >= request.amount()) {
+      account_.balance -= request.amount();
+      completer.Reply({true});
     } else {
-      callback(false);
+      completer.Reply({false});
     }
     FX_SLOG(INFO, "Account balance updated: ", FX_KV("balance", account_.balance));
   }
-  void Credit(int64_t amount, CreditCallback callback) override {
-    account_.balance += amount;
-    callback();
+
+  void Credit(CreditRequest& request, CreditCompleter::Sync& completer) override {
+    account_.balance += request.amount();
+    completer.Reply();
     FX_SLOG(INFO, "Account balance updated: ", FX_KV("balance", account_.balance));
   }
 
@@ -60,34 +66,44 @@ class OpenAccount : public fuchsia::examples::services::ReadWriteAccount {
 
 int main(int argc, const char* argv[], char* envp[]) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
   // Read program arguments and construct the account
   if (argc < 3) {
     FX_SLOG(ERROR, "Invalid number of arguments.");
     return -1;
   }
+
+  component::OutgoingDirectory outgoing(loop.dispatcher());
+  auto result = outgoing.ServeFromStartupInfo();
+  if (result.is_error()) {
+    FX_SLOG(ERROR, "Failed to serve outgoing directory.");
+    return -1;
+  }
+
   auto name = argv[1];
   auto balance = atoi(argv[2]);
   Account user_account = {.name = name, .balance = balance};
   FX_SLOG(INFO, "Starting bank account provider", FX_KV("name", user_account.name.c_str()),
           FX_KV("balance", user_account.balance));
 
-  // Set up handler for BankAccount service
-  sys::ServiceHandler handler;
-  fuchsia::examples::services::BankAccount::Handler bank_service(&handler);
+  fidl::ServerBindingGroup<fuchsia_examples_services::ReadOnlyAccount> read_only_bindings;
+  fidl::ServerBindingGroup<fuchsia_examples_services::ReadWriteAccount> read_write_bindings;
 
-  // Add protocol implementations to the service handler
   ProtectedAccount protected_account(user_account);
-  fidl::BindingSet<fuchsia::examples::services::ReadOnlyAccount> read_only_bindings;
-  bank_service.add_read_only(read_only_bindings.GetHandler(&protected_account));
-
   OpenAccount open_account(user_account);
-  fidl::BindingSet<fuchsia::examples::services::ReadWriteAccount> read_write_bindings;
-  bank_service.add_read_write(read_write_bindings.GetHandler(&open_account));
 
-  // Publish the service to the outgoing directory
-  context->outgoing()->AddService<fuchsia::examples::services::BankAccount>(std::move(handler));
+  auto handler = fuchsia_examples_services::BankAccount::InstanceHandler({
+      .read_only = read_only_bindings.CreateHandler(&protected_account, loop.dispatcher(),
+                                                    fidl::kIgnoreBindingClosure),
+      .read_write = read_write_bindings.CreateHandler(&open_account, loop.dispatcher(),
+                                                      fidl::kIgnoreBindingClosure),
+  });
+
+  result = outgoing.AddService<fuchsia_examples_services::BankAccount>(std::move(handler));
+  if (result.is_error()) {
+    FX_SLOG(ERROR, "Failed to add service to outgoing.");
+    return -1;
+  }
 
   loop.Run();
   return 0;

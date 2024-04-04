@@ -24,8 +24,8 @@ test("branch-bin") {
 executable("provider-bin") {
   output_name = "provider_bin_cpp"
   deps = [
-    "//examples/components/services/fidl:fuchsia.examples.services_hlcpp",
-    "//sdk/lib/sys/cpp",
+    "//examples/components/services/fidl:fuchsia.examples.services_cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

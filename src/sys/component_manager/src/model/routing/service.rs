@@ -10,9 +10,7 @@ use {
             error::{CapabilityProviderError, ModelError, OpenError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             mutable_directory::MutableDirectory,
-            routing::{
-                CapabilityOpenRequest, CapabilitySource, OpenOptions, RouteSource, RoutingError,
-            },
+            routing::{CapabilityOpenRequest, CapabilitySource, OpenOptions, RouteSource},
         },
     },
     async_trait::async_trait,
@@ -26,9 +24,10 @@ use {
     fuchsia_async::{DurationExt, TimeoutExt},
     fuchsia_zircon as zx,
     futures::{
+        channel::oneshot,
         future::{join_all, BoxFuture},
         lock::Mutex,
-        FutureExt,
+        stream::TryStreamExt,
     },
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
     routing::capability_source::{
@@ -220,6 +219,14 @@ impl AnonymizedServiceRoute {
     }
 }
 
+enum WatcherEntry {
+    /// The watcher has not reached idle yet. The inner sender option will be used by the watcher
+    /// to notify when it does transition to the ReachedIdle state if one exists.
+    WaitingForIdle(Option<oneshot::Sender<()>>),
+    /// The watcher transitions to this state when it has seen at least one idle event.
+    ReachedIdle,
+}
+
 struct AnonymizedAggregateServiceDirInner {
     /// Directory that contains all aggregated service instances.
     pub dir: Arc<SimpleImmutableDir>,
@@ -232,6 +239,10 @@ struct AnonymizedAggregateServiceDirInner {
         ServiceInstanceDirectoryKey<AggregateInstance>,
         Arc<ServiceInstanceDirectoryEntry<AggregateInstance>>,
     >,
+
+    /// This contains entries for directory watchers that are listening for service instances.
+    /// The value is an enum to indicate the various states that the watcher can be in.
+    watchers_spawned: HashMap<AggregateInstance, WatcherEntry>,
 }
 
 pub struct AnonymizedAggregateServiceDir {
@@ -266,6 +277,7 @@ impl AnonymizedAggregateServiceDir {
             inner: Mutex::new(AnonymizedAggregateServiceDirInner {
                 dir: simple_immutable_dir(),
                 entries: HashMap::new(),
+                watchers_spawned: HashMap::new(),
             }),
         }
     }
@@ -291,26 +303,79 @@ impl AnonymizedAggregateServiceDir {
 
     /// Adds directory entries from services exposed by a member of the aggregate.
     async fn add_entries_from_instance(
-        &self,
+        self: &Arc<Self>,
         instance: &AggregateInstance,
     ) -> Result<(), ModelError> {
         let parent =
             self.parent.upgrade().map_err(|err| ModelError::ComponentInstanceError { err })?;
+        let service_name = self.route.service_name.as_str();
         match self.aggregate_capability_provider.route_instance(instance).await {
             Ok(source) => {
                 // Add entries for the component `name`, from its `source`,
                 // the service exposed by the component.
-                if let Err(err) = self.add_entries_from_capability_source(instance, source).await {
-                    parent
-                        .with_logger_as_default(|| {
-                            error!(
-                                component=%instance,
-                                service_name=%self.route.service_name,
-                                error=%err,
-                                "Failed to add service entries from component, skipping",
-                            );
-                        })
-                        .await;
+                // We will use this oneshot channel to know when we have reached the idle state
+                // on the directory watcher that is collecting service instances.
+                let (idle_sender, idle_receiver) = oneshot::channel::<()>();
+
+                // We don't want the inner lock to be held while doing an await on the
+                // idle_receiver so we do our state checking and modification while holding the
+                // lock, then return if we should do the idle_receiver wait.
+                let do_wait = {
+                    let mut inner = self.inner.lock().await;
+                    if let Some(existing) = inner.watchers_spawned.get(instance) {
+                        // We have an existing entry. This means the watcher has already been
+                        // spawned.
+                        match existing {
+                            WatcherEntry::WaitingForIdle(None) => {
+                                // This means we did not have a idle_sender when we spanwed the watcher
+                                // initially in |on_started_async|, so add one now.
+                                inner.watchers_spawned.insert(
+                                    instance.clone(),
+                                    WatcherEntry::WaitingForIdle(Some(idle_sender)),
+                                );
+
+                                // Since we put in our idle_sender, we will want to do a wait.
+                                true
+                            }
+                            WatcherEntry::ReachedIdle => {
+                                // Since the watcher has already reached idle, don't wait.
+                                false
+                            }
+                            WatcherEntry::WaitingForIdle(Some(_)) => {
+                                // This should be impossible as there is no concurrent entry into
+                                // this code for the same instance.
+                                unreachable!()
+                            }
+                        }
+                    } else {
+                        // We have no existing entry, so no watcher has been spawned.
+                        // We will insert the entry with our idle_sender and spawn the watcher.
+                        inner.watchers_spawned.insert(
+                            instance.clone(),
+                            WatcherEntry::WaitingForIdle(Some(idle_sender)),
+                        );
+                        self.spawn_instance_watcher_task(instance.clone(), source.clone())?;
+
+                        // Since we put in our idle_sender, we will want to do a wait.
+                        true
+                    }
+                };
+
+                if do_wait {
+                    // Waits for the watcher to reach and idle event.
+                    idle_receiver.await.map_err(|err| {
+                        error!(
+                            component=%instance,
+                            service_name=%service_name,
+                            error=%err,
+                            "Failed to reach idle state on the service instance directory watcher.",
+                        );
+
+                        ModelError::open_directory_error(
+                            parent.moniker.clone(),
+                            instance.to_string(),
+                        )
+                    })?;
                 }
             }
             Err(err) => {
@@ -318,7 +383,7 @@ impl AnonymizedAggregateServiceDir {
                     .with_logger_as_default(|| {
                         error!(
                             component=%instance,
-                            service_name=%self.route.service_name,
+                            service_name=%service_name,
                             error=%err,
                             "Failed to route service capability from component, skipping",
                         );
@@ -329,52 +394,216 @@ impl AnonymizedAggregateServiceDir {
         Ok(())
     }
 
-    async fn add_entries_from_capability_source_lazy(
-        self: Arc<Self>,
-        instance: &AggregateInstance,
+    /// Spawns a new task on the parent's nonblocking_task_group to create and run a directory
+    /// watcher for the service instances for the aggregate.
+    fn spawn_instance_watcher_task(
+        self: &Arc<Self>,
+        instance: AggregateInstance,
         source: CapabilitySource,
     ) -> Result<(), ModelError> {
         let task_group = self.parent.upgrade()?.nonblocking_task_group();
-        // Lazily add entries for instances from the service exposed by this component.
-        // This has to happen after this function, the Started hook handler, returns because
-        // `add_entries_from_capability_source` reads from the exposed service directory
-        // to enumerates service instances, but this directory is not served until the
-        // component is actually running. The component is only started *after* all hooks run.
-        let instance = instance.clone();
-        let add_instances_to_dir = async move {
-            self.add_entries_from_capability_source(&instance, source)
-                .then(|result| async {
-                    if let Err(e) = result {
-                        error!(error = ?e, "failed to add service instances");
-                    }
-                })
-                .await;
+        let self_clone = self.clone();
+        let instance_watcher_task = async move {
+            let service_name = self_clone.route.service_name.as_str();
+
+            // The CapabilitySource must be for a service capability.
+            if source.type_name() != CapabilityTypeName::Service {
+                error!(
+                    component=%instance,
+                    service_name=%service_name,
+                    "The CapabilitySource has an invalid type: '{}'.", source.type_name()
+                );
+                return;
+            }
+
+            let result = self_clone.wait_for_service_directory(&instance, &source).await;
+            if let Err(err) = result {
+                error!(
+                    component=%instance,
+                    service_name=%service_name,
+                    error=%err,
+                    "Failed to wait_for_service_directory.",
+                );
+                return;
+            }
+
+            let watcher = self_clone.create_instance_watcher(&instance, &source).await;
+
+            match watcher {
+                Ok(watcher) => {
+                    // This is a long running watcher that is alive until the source component
+                    // removes the service directory.
+                    self_clone.run_instance_watcher(watcher, &instance, source).await;
+                }
+                Err(err) => {
+                    error!(
+                        component=%instance,
+                        service_name=%service_name,
+                        error=%err,
+                        "Failed to create_instance_watcher.",
+                    );
+                }
+            }
         };
-        task_group.spawn(add_instances_to_dir);
+
+        task_group.spawn(instance_watcher_task);
         Ok(())
     }
 
-    /// Opens the service capability at `source` and adds entries for each service instance.
-    ///
-    /// Entry names are named by joining the originating child component instance,
-    /// `child_name`, and the service instance name, with a comma.
+    /// Waits for the service directory to be present. This is done by recursively waiting for each
+    /// directory in the source_path. This is a no-op if the source is not a component type.
+    async fn wait_for_service_directory(
+        &self,
+        instance: &AggregateInstance,
+        source: &CapabilitySource,
+    ) -> Result<(), ModelError> {
+        match source {
+            CapabilitySource::Component { capability, component } => {
+                let target = self
+                    .parent
+                    .upgrade()
+                    .map_err(|err| ModelError::ComponentInstanceError { err })?;
+
+                let source_path_pieces = capability.source_path().unwrap().split();
+
+                let mut curr_path = Vec::new();
+                for piece in source_path_pieces {
+                    let component = component.upgrade()?;
+                    let (proxy, server_end) =
+                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                            .expect("failed to create proxy");
+                    // Start the path with a leading slash since if curr_path is empty, the
+                    // open_outgoing function doesn't work on an empty path string.
+                    // Inside, the "/" is turned into a "." through canonicalize_path.
+                    let curr_path_joined = format!("/{}", curr_path.join("/"));
+                    component
+                        .open_outgoing(
+                            fio::OpenFlags::DIRECTORY,
+                            curr_path_joined.as_str(),
+                            &mut server_end.into_channel(),
+                        )
+                        .await?;
+                    let watcher =
+                        fuchsia_fs::directory::Watcher::new(&proxy).await.map_err(|err| {
+                            error!(
+                                component=%instance,
+                                service_name=%self.route.service_name,
+                                error=%err,
+                                "Failed to get the outgoing watcher for the path '{}'.",
+                                curr_path_joined.as_str()
+                            );
+                            ModelError::open_directory_error(
+                                target.moniker.clone(),
+                                instance.to_string(),
+                            )
+                        })?;
+
+                    enum StreamErrorType {
+                        Found,
+                        StreamError(fuchsia_fs::directory::WatcherStreamError),
+                        Exit,
+                    }
+
+                    let piece_borrow = piece.as_str();
+                    let result = watcher
+                        .map_err(|e| StreamErrorType::StreamError(e))
+                        .try_for_each(|entry| async move {
+                            let mut inner = self.inner.lock().await;
+                            if !inner.watchers_spawned.contains_key(&instance) {
+                                // Our task entry doesn't exist, it is removed in |on_stopped_async|,
+                                // so we can exit early.
+                                return Err(StreamErrorType::Exit);
+                            }
+
+                            match entry.event {
+                                fuchsia_fs::directory::WatchEvent::ADD_FILE
+                                | fuchsia_fs::directory::WatchEvent::EXISTING => {
+                                    let filename =
+                                        entry.filename.as_path().to_str().unwrap().to_owned();
+                                    if filename.as_str() != piece_borrow {
+                                        return Ok(());
+                                    }
+
+                                    // Use error to terminate the try_for_each and move on to the
+                                    // next piece in the path.
+                                    return Err(StreamErrorType::Found);
+                                }
+                                fuchsia_fs::directory::WatchEvent::IDLE => {
+                                    let watcher_entry =
+                                        inner.watchers_spawned.get_mut(&instance).unwrap();
+
+                                    // Notifying the idle_sender if it exists but transition back
+                                    // to waiting for idle as we are still not in the inner instance
+                                    // watcher.
+                                    match watcher_entry {
+                                        WatcherEntry::WaitingForIdle(sender_option) => {
+                                            if let Some(sender) = sender_option.take() {
+                                                let _ = sender.send(());
+                                            }
+
+                                            *watcher_entry = WatcherEntry::WaitingForIdle(None);
+                                        }
+                                        WatcherEntry::ReachedIdle => {
+                                            // Inner watcher should not be running yet. That is
+                                            // where we set ReachedIdle.
+                                            unreachable!();
+                                        }
+                                    };
+
+                                    Ok(())
+                                }
+                                _ => Ok(()),
+                            }
+                        })
+                        .await;
+
+                    match result {
+                        Err(StreamErrorType::Found) => {
+                            curr_path.push(piece);
+                            continue;
+                        }
+                        Err(StreamErrorType::StreamError(err)) => {
+                            error!(
+                                component=%instance,
+                                service_name=%self.route.service_name,
+                                error=%err,
+                                "Watcher in wait_for_service_directory ran into read error."
+                            );
+                        }
+                        Err(StreamErrorType::Exit) => {
+                            // Early exit, no log needed.
+                        }
+                        Ok(()) => {
+                            error!(
+                                component=%instance,
+                                service_name=%self.route.service_name,
+                                "Watcher in wait_for_service_directory did not find the path piece before completing.",
+                            );
+                        }
+                    };
+
+                    return Err(ModelError::open_directory_error(
+                        target.moniker.clone(),
+                        instance.to_string(),
+                    ));
+                }
+            }
+            // NOTE: If `source` is `AnonymizedAggregate`, the service
+            // directory must already exist, so there is no need to watch
+            _ => {}
+        };
+        Ok(())
+    }
+
+    /// Opens the service capability at `source` and creates a directory_watcher on it.
     ///
     /// # Errors
     /// Returns an error if `source` is not a service capability, or could not be opened.
-    pub async fn add_entries_from_capability_source(
+    async fn create_instance_watcher(
         &self,
         instance: &AggregateInstance,
-        source: CapabilitySource,
-    ) -> Result<(), ModelError> {
-        let mut inner = self.inner.lock().await;
-
-        // The CapabilitySource must be for a service capability.
-        if source.type_name() != CapabilityTypeName::Service {
-            return Err(ModelError::RoutingError {
-                err: RoutingError::unsupported_capability_type(source.type_name()),
-            });
-        }
-
+        source: &CapabilitySource,
+    ) -> Result<fuchsia_fs::directory::Watcher, ModelError> {
         let target =
             self.parent.upgrade().map_err(|err| ModelError::ComponentInstanceError { err })?;
 
@@ -392,45 +621,145 @@ impl AnonymizedAggregateServiceDir {
         .open()
         .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || Err(OpenError::Timeout))
         .await?;
-        let dirents = fuchsia_fs::directory::readdir(&proxy).await.map_err(|e| {
+
+        fuchsia_fs::directory::Watcher::new(&proxy).await.map_err(|err| {
             error!(
-                "Error reading entries from service directory for component '{}', \
-                capability name '{}'. Error: {}",
-                target.moniker.clone(),
-                source.source_name().map(Name::as_str).unwrap_or("<no capability>"),
-                e
+                component=%instance,
+                service_name=%self.route.service_name,
+                error=%err,
+                "Failed to create service instance directory watcher.",
             );
             ModelError::open_directory_error(target.moniker.clone(), instance.to_string())
-        })?;
-        let rng = &mut rand::thread_rng();
-        for dirent in dirents {
-            let instance_key = ServiceInstanceDirectoryKey::<AggregateInstance> {
-                source_id: instance.clone(),
-                service_instance: FlyStr::new(&dirent.name),
-            };
-            // It's possible to enter this function multiple times with the same input, so
-            // check for duplicates.
-            if inner.entries.contains_key(&instance_key) {
-                continue;
+        })
+    }
+
+    /// Runs the directory watcher on the service directory. This will discover additions and
+    /// removals of service instances through the various events. For new and existing events,
+    /// an entry will be added, and for removed events the entry is removed.
+    async fn run_instance_watcher(
+        &self,
+        watcher: fuchsia_fs::directory::Watcher,
+        instance: &AggregateInstance,
+        source: CapabilitySource,
+    ) -> () {
+        let source_arc = Arc::new(source.clone());
+        let source_borrow = &source_arc;
+        let result = watcher
+            .map_err(|e| Some(e))
+            .try_for_each(|message| async move {
+                let filename = message.filename.as_path().to_str().unwrap().to_owned();
+                let mut inner = self.inner.lock().await;
+                if !inner.watchers_spawned.contains_key(&instance) {
+                    // Our task entry doesn't exist, it is removed in |on_stopped_async|,
+                    // so we can exit early.
+                    return Err(None);
+                }
+
+                if message.event == fuchsia_fs::directory::WatchEvent::DELETED {
+                    // Our directory was deleted, so we can exit early.
+                    return Err(None);
+                }
+
+                if filename == "." {
+                    // Ignore the "." file.
+                    return Ok::<(), Option<fuchsia_fs::directory::WatcherStreamError>>(());
+                }
+
+                match message.event {
+                    fuchsia_fs::directory::WatchEvent::ADD_FILE
+                    | fuchsia_fs::directory::WatchEvent::EXISTING => {
+                        let instance_key = ServiceInstanceDirectoryKey::<AggregateInstance> {
+                            source_id: instance.clone(),
+                            service_instance: FlyStr::new(&filename),
+                        };
+
+                        // Check for duplicate entries.
+                        if inner.entries.contains_key(&instance_key) {
+                            return Ok(());
+                        }
+                        let name = Self::generate_instance_id(&mut rand::thread_rng());
+                        let entry = Arc::new(ServiceInstanceDirectoryEntry::<AggregateInstance> {
+                            name: name.clone(),
+                            capability_source: source_borrow.clone(),
+                            source_id: instance_key.source_id.clone(),
+                            service_instance: instance_key.service_instance.clone(),
+                        });
+                        let result = inner.dir.add_node(&name, entry.clone());
+                        if let Err(err) = result {
+                            error!(
+                                component=%instance,
+                                service_name=%self.route.service_name,
+                                error=%err,
+                                "Failed to add node to inner directory.",
+                            );
+                        }
+                        inner.entries.insert(instance_key, entry);
+                        Ok(())
+                    }
+                    fuchsia_fs::directory::WatchEvent::REMOVE_FILE => {
+                        let instance_key = ServiceInstanceDirectoryKey::<AggregateInstance> {
+                            source_id: instance.clone(),
+                            service_instance: FlyStr::new(&filename),
+                        };
+
+                        let removed_entry = inner.entries.remove(&instance_key);
+                        match removed_entry {
+                            Some(removed_entry) => {
+                                let result = inner.dir.remove_node(&removed_entry.name);
+                                if let Err(err) = result {
+                                    error!(
+                                        component=%instance,
+                                        service_name=%self.route.service_name,
+                                        error=%err,
+                                        "Failed to remove node from inner directory.",
+                                    );
+                                }
+                            }
+                            None => {}
+                        };
+
+                        Ok(())
+                    }
+                    fuchsia_fs::directory::WatchEvent::IDLE => {
+                        let watcher_entry = inner.watchers_spawned.get_mut(&instance).unwrap();
+
+                        // Transition the watcher to the ReachedIdle state, notifying the
+                        // idle_sender if it exists.
+                        match watcher_entry {
+                            WatcherEntry::WaitingForIdle(sender_option) => {
+                                if let Some(sender) = sender_option.take() {
+                                    // Ignore the send result since we still transition to
+                                    // ReachedIdle.
+                                    let _send_result = sender.send(());
+                                }
+
+                                *watcher_entry = WatcherEntry::ReachedIdle;
+                            }
+                            WatcherEntry::ReachedIdle => {}
+                        }
+
+                        Ok(())
+                    }
+                    fuchsia_fs::directory::WatchEvent::DELETED => unreachable!(),
+                }
+            })
+            .await;
+        if let Err(Some(err)) = result {
+            let fuchsia_fs::directory::WatcherStreamError::ChannelRead(status) = err;
+            if status != zx::Status::PEER_CLOSED {
+                error!(
+                    component=%instance,
+                    service_name=%self.route.service_name,
+                    "Instance watcher stream closed with error {:?}.", status
+                );
             }
-            let name = Self::generate_instance_id(rng);
-            let entry: Arc<ServiceInstanceDirectoryEntry<AggregateInstance>> =
-                Arc::new(ServiceInstanceDirectoryEntry::<AggregateInstance> {
-                    name: name.clone(),
-                    capability_source: Arc::new(source.clone()),
-                    source_id: instance_key.source_id.clone(),
-                    service_instance: instance_key.service_instance.clone(),
-                });
-            inner.dir.add_node(&name, entry.clone()).map_err(|err| {
-                ModelError::ServiceDirError { moniker: target.moniker.clone(), err }
-            })?;
-            inner.entries.insert(instance_key, entry);
         }
-        Ok(())
     }
 
     /// Adds directory entries from services exposed by all children in the aggregated collection.
-    pub fn add_entries_from_children<'a>(self: &'a Self) -> BoxFuture<'a, Result<(), ModelError>> {
+    pub fn add_entries_from_children<'a>(
+        self: &'a Arc<Self>,
+    ) -> BoxFuture<'a, Result<(), ModelError>> {
         // Return a boxed future here because this function can be called from routing::get_default_provider
         // which creates a recursive loop when initializing the capability provider for collection sourced
         // services.
@@ -470,7 +799,17 @@ impl AnonymizedAggregateServiceDir {
             let capability_source =
                 self.aggregate_capability_provider.route_instance(&instance).await?;
 
-            self.add_entries_from_capability_source_lazy(&instance, capability_source).await?;
+            // If we have not already spawned a watcher task we want to do that here.
+            let mut inner = self.inner.lock().await;
+            if !inner.watchers_spawned.contains_key(&instance) {
+                // We have not spawned the watcher, so we create the entry with a None oneshot
+                // sender that will eventually be replaced with one if necessary from the
+                // |add_entries_from_instance| method.
+                inner.watchers_spawned.insert(instance.clone(), WatcherEntry::WaitingForIdle(None));
+
+                // Spawn the watcher.
+                self.spawn_instance_watcher_task(instance, capability_source)?;
+            }
         }
         Ok(())
     }
@@ -490,6 +829,7 @@ impl AnonymizedAggregateServiceDir {
                 }
             }
             inner.entries.retain(|key, _| !matches!(&key.source_id, AggregateInstance::Child(n) if n == target_child_moniker));
+            inner.watchers_spawned.remove(&AggregateInstance::Child(target_child_moniker.clone()));
         }
         Ok(())
     }
@@ -627,7 +967,9 @@ mod tests {
         super::*,
         crate::model::{
             component::StartReason,
+            routing::RoutingError,
             start::Start,
+            testing::out_dir::OutDir,
             testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder},
         },
         ::routing::{
@@ -646,7 +988,9 @@ mod tests {
 
     #[derive(Clone)]
     struct MockAnonymizedCapabilityProvider {
-        instances: HashMap<AggregateInstance, WeakComponentInstance>,
+        /// Use an Arc<Mutex> for the instances so that we can mutate it after the Aggregate
+        /// directory has been created in the test.
+        instances: Arc<Mutex<HashMap<AggregateInstance, WeakComponentInstance>>>,
     }
 
     #[async_trait]
@@ -662,6 +1006,8 @@ mod tests {
                 }),
                 component: self
                     .instances
+                    .lock()
+                    .await
                     .get(instance)
                     .ok_or_else(|| match instance {
                         AggregateInstance::Parent => RoutingError::OfferFromParentNotFound {
@@ -684,7 +1030,7 @@ mod tests {
         }
 
         async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
-            Ok(self.instances.keys().cloned().collect())
+            Ok(self.instances.lock().await.keys().cloned().collect())
         }
 
         fn clone_boxed(&self) -> Box<dyn AnonymizedAggregateCapabilityProvider<ComponentInstance>> {
@@ -879,13 +1225,13 @@ mod tests {
             root.find_and_maybe_resolve(&"static_b".parse().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
-            instances: hashmap! {
+            instances: Arc::new(Mutex::new(hashmap! {
                 AggregateInstance::Child("coll1:foo".try_into().unwrap()) => foo_component.as_weak(),
                 AggregateInstance::Child("coll1:bar".try_into().unwrap()) => bar_component.as_weak(),
                 AggregateInstance::Child("coll2:baz".try_into().unwrap()) => baz_component.as_weak(),
                 AggregateInstance::Child("static_a".try_into().unwrap()) => static_a_component.as_weak(),
                 AggregateInstance::Child("static_b".try_into().unwrap()) => static_b_component.as_weak(),
-            },
+            })),
         };
 
         let route = AnonymizedServiceRoute {
@@ -899,15 +1245,15 @@ mod tests {
             service_name: "my.service.Service".parse().unwrap(),
         };
 
-        let dir = AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider));
+        let dir =
+            Arc::new(AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider)));
 
         if init_service_dir {
             dir.add_entries_from_children().await.expect("failed to add entries");
         }
 
-        let dir_arc = Arc::new(dir);
-        root.hooks.install(dir_arc.hooks()).await;
-        (test, dir_arc)
+        root.hooks.install(dir.hooks()).await;
+        (test, dir)
     }
 
     #[fuchsia::test]
@@ -997,6 +1343,406 @@ mod tests {
             let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
             assert_eq!(dir_contents.len(), 6);
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_anonymized_service_directory_with_dynamic_instances() {
+        let components = create_test_component_decls();
+
+        let mut foo_out_dir = OutDir::new();
+        let mut bar_out_dir = OutDir::new();
+        let mut static_a_out_dir = OutDir::new();
+
+        // Start out "foo" with no entries in the svc directory.
+        let foo_svc = pseudo_directory! {};
+        foo_out_dir.add_entry("/svc".parse().unwrap(), foo_svc.clone());
+
+        // Start out "bar" with 1 service instance in the svc directory.
+        let bar_service = pseudo_directory! {
+            "default" => pseudo_directory! {
+                "member" => pseudo_directory! {}
+            }
+        };
+        let bar_svc = pseudo_directory! {
+            "my.service.Service" => bar_service.clone(),
+        };
+        bar_out_dir.add_entry("/svc".parse().unwrap(), bar_svc);
+
+        // Start out "static_a" with no entries in the svc directory.
+        let static_a_svc = pseudo_directory! {};
+        static_a_out_dir.add_entry("/svc".parse().unwrap(), static_a_svc.clone());
+
+        let test = RoutingTestBuilder::new("root", components)
+            .set_component_outgoing_host_fn("foo", foo_out_dir.host_fn())
+            .set_component_outgoing_host_fn("bar", bar_out_dir.host_fn())
+            .set_component_outgoing_host_fn("static_a", static_a_out_dir.host_fn())
+            .build()
+            .await;
+
+        test.create_dynamic_child(&Moniker::root(), "coll1", ChildBuilder::new().name("foo")).await;
+        test.create_dynamic_child(&Moniker::root(), "coll1", ChildBuilder::new().name("bar")).await;
+        let root = test.model.root();
+        let foo_component =
+            root.find_and_maybe_resolve(&"coll1:foo".parse().unwrap()).await.unwrap();
+        let bar_component =
+            root.find_and_maybe_resolve(&"coll1:bar".parse().unwrap()).await.unwrap();
+        let static_a_component =
+            root.find_and_maybe_resolve(&"static_a".parse().unwrap()).await.unwrap();
+
+        let provider = MockAnonymizedCapabilityProvider {
+            instances: Arc::new(Mutex::new(hashmap! {
+                AggregateInstance::Child("coll1:foo".try_into().unwrap()) => foo_component.as_weak(),
+                AggregateInstance::Child("coll1:bar".try_into().unwrap()) => bar_component.as_weak(),
+                AggregateInstance::Child("static_a".try_into().unwrap()) => static_a_component.as_weak(),
+            })),
+        };
+
+        let route = AnonymizedServiceRoute {
+            source_moniker: Moniker::root(),
+            members: vec![
+                AggregateMember::Collection("coll1".parse().unwrap()),
+                AggregateMember::Collection("coll2".parse().unwrap()),
+                AggregateMember::Child("static_a".try_into().unwrap()),
+            ],
+            service_name: "my.service.Service".parse().unwrap(),
+        };
+
+        let dir_arc = Arc::new(AnonymizedAggregateServiceDir::new(
+            root.as_weak(),
+            route,
+            Box::new(provider.clone()),
+        ));
+        root.hooks.install(dir_arc.hooks()).await;
+        dir_arc.add_entries_from_children().await.unwrap();
+
+        let execution_scope = ExecutionScope::new();
+        let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
+
+        // Ensure the instance we had initially in "bar" is there.
+        let entries = dir_arc.entries().await.len();
+        assert_eq!(entries, 1);
+
+        let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
+            .await
+            .expect("failed to read directory entries");
+        let previous_entries = entries;
+
+        // Add 1 instance to "foo" and ensure we can get it.
+        let foo_service = pseudo_directory! {
+            "default" => pseudo_directory! {
+                "member" => pseudo_directory! {},
+            },
+        };
+        foo_svc
+            .add_node("my.service.Service", foo_service.clone())
+            .expect("Could not add service node.");
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        let entries = dir_arc.entries().await.len();
+        assert_eq!(entries, previous_entries + 1);
+        let previous_entries = entries;
+
+        // Add another instance (total of 2) to "foo" and ensure we can get it.
+        foo_service
+            .add_node(
+                "secondary",
+                pseudo_directory! {
+                    "member" => pseudo_directory! {},
+                },
+            )
+            .expect("Could not add service node.");
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        let entries = dir_arc.entries().await.len();
+        assert_eq!(entries, previous_entries + 1);
+        let previous_entries = entries;
+
+        // Add another instance to "bar", which had 1 instance previously and ensure we can get it.
+        bar_service
+            .add_node(
+                "secondary",
+                pseudo_directory! {
+                    "member" => pseudo_directory! {},
+                },
+            )
+            .expect("Could not add service node.");
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        let entries = dir_arc.entries().await.len();
+        assert_eq!(entries, previous_entries + 1);
+        let previous_entries = entries;
+
+        // Add 2 instances to the "static_a" and ensure we can get it.
+        static_a_svc
+            .add_node(
+                "my.service.Service",
+                pseudo_directory! {
+                    "default" => pseudo_directory! {
+                        "member" => pseudo_directory! {},
+                    },
+                    "secondary" => pseudo_directory! {
+                        "member" => pseudo_directory! {},
+                    },
+                },
+            )
+            .expect("Could not add service node.");
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        if dir_contents.len() == previous_entries + 1 {
+            // in case we caught the change before both were seen.
+            wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        }
+        let entries = dir_arc.entries().await.len();
+        assert_eq!(entries, previous_entries + 2);
+
+        // Read the directory for final check.
+        // 2 in each of the 3 components.
+        let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
+            .await
+            .expect("failed to read directory entries");
+        assert_eq!(dir_contents.len(), 6);
+        for entry in &dir_contents {
+            let instance_dir = fuchsia_fs::directory::open_directory(
+                &dir_proxy,
+                &entry.name,
+                fio::OpenFlags::empty(),
+            )
+            .await
+            .expect("failed to open collection dir");
+
+            // Make sure we're reading the expected directory.
+            let instance_dir_contents = fuchsia_fs::directory::readdir(&instance_dir)
+                .await
+                .expect("failed to read instances of collection dir");
+            assert!(instance_dir_contents.iter().find(|d| d.name == "member").is_some());
+        }
+
+        // Remove some entries to make sure removal flow works.
+        bar_service.remove_node("default").expect("Failed to remove default from bar.");
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        assert_eq!(dir_contents.len(), 5);
+
+        bar_service.remove_node("secondary").expect("Failed to remove secondary from bar.");
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        assert_eq!(dir_contents.len(), 4);
+    }
+
+    #[fuchsia::test]
+    async fn test_anonymized_service_directory_with_dynamic_instances_dynamic_child() {
+        let components = create_test_component_decls();
+        let mut baz_out_dir = OutDir::new();
+        // Setup "baz" with 1 instance.
+        let baz_service = pseudo_directory! {
+            "default" => pseudo_directory! {
+                "member" => pseudo_directory! {}
+            }
+        };
+        let baz_svc = pseudo_directory! {
+            "my.service.Service" => baz_service.clone(),
+        };
+        baz_out_dir.add_entry("/svc".parse().unwrap(), baz_svc);
+
+        let test = RoutingTestBuilder::new("root", components)
+            .set_component_outgoing_host_fn("baz", baz_out_dir.host_fn())
+            .build()
+            .await;
+
+        let root = test.model.root();
+
+        let provider =
+            MockAnonymizedCapabilityProvider { instances: Arc::new(Mutex::new(hashmap! {})) };
+
+        let route = AnonymizedServiceRoute {
+            source_moniker: Moniker::root(),
+            members: vec![AggregateMember::Collection("coll2".parse().unwrap())],
+            service_name: "my.service.Service".parse().unwrap(),
+        };
+
+        let dir_arc = Arc::new(AnonymizedAggregateServiceDir::new(
+            root.as_weak(),
+            route,
+            Box::new(provider.clone()),
+        ));
+        root.hooks.install(dir_arc.hooks()).await;
+
+        // Initialize the aggregate. There are no components yet so it will be empty.
+        dir_arc.add_entries_from_children().await.unwrap();
+        let execution_scope = ExecutionScope::new();
+        let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
+        let entries = dir_arc.entries().await.len();
+        assert_eq!(entries, 0);
+        let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
+            .await
+            .expect("failed to read directory entries");
+
+        // Create and start "baz" component. Ensure the start hook added the entry since the
+        // aggregate already exists.
+        test.create_dynamic_child(&Moniker::root(), "coll2", ChildBuilder::new().name("baz")).await;
+        let baz_component =
+            root.find_and_maybe_resolve(&"coll2:baz".parse().unwrap()).await.unwrap();
+        provider.instances.lock().await.insert(
+            AggregateInstance::Child("coll2:baz".try_into().unwrap()),
+            baz_component.as_weak(),
+        );
+        baz_component.ensure_started(&StartReason::Eager).await.unwrap();
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        let entries = dir_arc.entries().await.len();
+        assert_eq!(entries, 1);
+        let previous_entries = entries;
+
+        // Add one more instance to "baz"
+        baz_service
+            .add_node(
+                "secondary",
+                pseudo_directory! {
+                    "member" => pseudo_directory! {},
+                },
+            )
+            .expect("Could not add service node.");
+        wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        let entries = dir_arc.entries().await.len();
+        assert_eq!(entries, previous_entries + 1);
+
+        // Validate they both have "member".
+        let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
+            .await
+            .expect("failed to read directory entries");
+        assert_eq!(dir_contents.len(), 2);
+        for entry in &dir_contents {
+            let instance_dir = fuchsia_fs::directory::open_directory(
+                &dir_proxy,
+                &entry.name,
+                fio::OpenFlags::empty(),
+            )
+            .await
+            .expect("failed to open collection dir");
+
+            // Make sure we're reading the expected directory.
+            let instance_dir_contents = fuchsia_fs::directory::readdir(&instance_dir)
+                .await
+                .expect("failed to read instances of collection dir");
+            assert!(instance_dir_contents.iter().find(|d| d.name == "member").is_some());
+        }
+
+        // Remove some entries to make sure removal flow works.
+        baz_service.remove_node("default").expect("Failed to remove default from baz.");
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        assert_eq!(dir_contents.len(), 1);
+
+        baz_service.remove_node("secondary").expect("Failed to remove secondary from baz.");
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        assert_eq!(dir_contents.len(), 0);
+    }
+
+    #[fuchsia::test]
+    async fn test_anonymized_service_directory_with_dynamic_instances_start_before_add() {
+        let components = create_test_component_decls();
+        let mut static_b_out_dir = OutDir::new();
+
+        // Setup "static_b" with 1 instance.
+        let static_b_service = pseudo_directory! {
+            "default" => pseudo_directory! {
+                "member" => pseudo_directory! {}
+            }
+        };
+        let static_b_svc = pseudo_directory! {
+            "my.service.Service" => static_b_service.clone(),
+        };
+        static_b_out_dir.add_entry("/svc".parse().unwrap(), static_b_svc);
+
+        let test = RoutingTestBuilder::new("root", components)
+            .set_component_outgoing_host_fn("static_b", static_b_out_dir.host_fn())
+            .build()
+            .await;
+
+        let root = test.model.root();
+        let static_b_component =
+            root.find_and_maybe_resolve(&"static_b".parse().unwrap()).await.unwrap();
+
+        let provider = MockAnonymizedCapabilityProvider {
+            instances: Arc::new(Mutex::new(hashmap! {
+                AggregateInstance::Child("static_b".try_into().unwrap()) => static_b_component.as_weak(),
+            })),
+        };
+
+        let route = AnonymizedServiceRoute {
+            source_moniker: Moniker::root(),
+            members: vec![AggregateMember::Child("static_b".try_into().unwrap())],
+            service_name: "my.service.Service".parse().unwrap(),
+        };
+
+        let dir_arc = Arc::new(AnonymizedAggregateServiceDir::new(
+            root.as_weak(),
+            route,
+            Box::new(provider.clone()),
+        ));
+        root.hooks.install(dir_arc.hooks()).await;
+
+        let execution_scope = ExecutionScope::new();
+        let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
+
+        // Ensure we are starting with 0 entries.
+        let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
+            .await
+            .expect("failed to read directory entries");
+        assert_eq!(dir_contents.len(), 0);
+
+        // We will start "static_b" before we add_entries_from_children.
+        static_b_component.ensure_started(&StartReason::Eager).await.unwrap();
+
+        // Ensure that the start hook added the instance.
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        let entries = dir_arc.entries().await.len();
+        assert_eq!(entries, 1);
+        assert_eq!(dir_contents.len(), 1);
+
+        // This should be a no-op.
+        dir_arc.add_entries_from_children().await.unwrap();
+        let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
+            .await
+            .expect("failed to read directory entries");
+        let entries = dir_arc.entries().await.len();
+        assert_eq!(entries, 1);
+        assert_eq!(dir_contents.len(), 1);
+
+        // Add another instance to "static_b", which had 1 instance previously.
+        static_b_service
+            .add_node(
+                "secondary",
+                pseudo_directory! {
+                    "member" => pseudo_directory! {},
+                },
+            )
+            .expect("Could not add service node.");
+        wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        let entries = dir_arc.entries().await.len();
+        assert_eq!(entries, 2);
+
+        // Check both.
+        let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
+            .await
+            .expect("failed to read directory entries");
+        assert_eq!(dir_contents.len(), 2);
+        for entry in &dir_contents {
+            let instance_dir = fuchsia_fs::directory::open_directory(
+                &dir_proxy,
+                &entry.name,
+                fio::OpenFlags::empty(),
+            )
+            .await
+            .expect("failed to open collection dir");
+
+            // Make sure we're reading the expected directory.
+            let instance_dir_contents = fuchsia_fs::directory::readdir(&instance_dir)
+                .await
+                .expect("failed to read instances of collection dir");
+            assert!(instance_dir_contents.iter().find(|d| d.name == "member").is_some());
+        }
+
+        // Remove some entries to make sure removal flow works.
+        static_b_service.remove_node("default").expect("Failed to remove default from bar.");
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        assert_eq!(dir_contents.len(), 1);
+
+        static_b_service.remove_node("secondary").expect("Failed to remove secondary from bar.");
+        let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+        assert_eq!(dir_contents.len(), 0);
     }
 
     #[fuchsia::test]
@@ -1116,12 +1862,12 @@ mod tests {
             root.find_and_maybe_resolve(&"container/coll:bar".parse().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
-            instances: hashmap! {
+            instances: Arc::new(Mutex::new(hashmap! {
                 AggregateInstance::Parent => root.as_weak(),
                 AggregateInstance::Self_ => container_component.as_weak(),
                 AggregateInstance::Child("coll:foo".try_into().unwrap()) => foo_component.as_weak(),
                 AggregateInstance::Child("coll:bar".try_into().unwrap()) => bar_component.as_weak(),
-            },
+            })),
         };
 
         let route = AnonymizedServiceRoute {
@@ -1134,20 +1880,20 @@ mod tests {
             service_name: "my.service.Service".parse().unwrap(),
         };
 
-        let dir = AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider));
+        let dir =
+            Arc::new(AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider)));
         dir.add_entries_from_children().await.unwrap();
 
-        let dir_arc = Arc::new(dir);
-        root.hooks.install(dir_arc.hooks()).await;
+        root.hooks.install(dir.hooks()).await;
 
         let execution_scope = ExecutionScope::new();
-        let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
+        let dir_proxy = open_dir(execution_scope.clone(), dir.dir_entry().await);
 
         // List the entries of the directory served by `open`, and compare them to the
         // internal state.
         let instance_names = {
             let instance_names: HashSet<_> =
-                dir_arc.entries().await.into_iter().map(|e| e.name.clone()).collect();
+                dir.entries().await.into_iter().map(|e| e.name.clone()).collect();
             let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
             let dir_instance_names: HashSet<_> = dir_contents.into_iter().map(|d| d.name).collect();
             assert_eq!(instance_names.len(), 4);
@@ -1174,14 +1920,14 @@ mod tests {
         // Add entries from the children again. This should be a no-op since all of them are
         // already there and we prevent duplicates.
         let dir_contents = {
-            let previous_entries: HashSet<_> = dir_arc
+            let previous_entries: HashSet<_> = dir
                 .entries()
                 .await
                 .into_iter()
                 .map(|e| (e.name.clone(), e.source_id.clone(), e.service_instance.clone()))
                 .collect();
-            dir_arc.add_entries_from_children().await.unwrap();
-            let entries: HashSet<_> = dir_arc
+            dir.add_entries_from_children().await.unwrap();
+            let entries: HashSet<_> = dir
                 .entries()
                 .await
                 .into_iter()
@@ -1315,10 +2061,10 @@ mod tests {
             root.find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
-            instances: hashmap! {
+            instances: Arc::new(Mutex::new(hashmap! {
                 AggregateInstance::Child("coll1:foo".try_into().unwrap()) => foo_component.as_weak(),
                 // "bar" not added to induce a routing failure on route_instance
-            },
+            })),
         };
 
         let route = AnonymizedServiceRoute {
@@ -1327,7 +2073,8 @@ mod tests {
             service_name: "my.service.Service".parse().unwrap(),
         };
 
-        let dir = AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider));
+        let dir =
+            Arc::new(AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider)));
 
         dir.add_entries_from_children().await.unwrap();
         // Entries from foo should be available even though we can't route to bar
@@ -1382,11 +2129,11 @@ mod tests {
             root.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
-            instances: hashmap! {
+            instances: Arc::new(Mutex::new(hashmap! {
                 AggregateInstance::Child("coll1:foo".try_into().unwrap()) => foo_component.as_weak(),
                 AggregateInstance::Child("coll2:bar".try_into().unwrap()) => bar_component.as_weak(),
                 AggregateInstance::Child("static_a".try_into().unwrap()) => static_a_component.as_weak(),
-            },
+            })),
         };
 
         let route = AnonymizedServiceRoute {
@@ -1398,7 +2145,8 @@ mod tests {
             service_name: "my.service.Service".parse().unwrap(),
         };
 
-        let dir = AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider));
+        let dir =
+            Arc::new(AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider)));
 
         dir.add_entries_from_children().await.unwrap();
 
