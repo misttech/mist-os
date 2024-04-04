@@ -23,7 +23,7 @@ namespace abi {
 // ld::abi::Abi::Module holds all the information about an ELF module that's
 // still relevant at runtime after it's been loaded and dynamically linked.
 // This is enough for basic dl_iterate_phdr and dlsym implementations and the
-// like to interrogate the iniital-exec set of modules.  A runtime loading
+// like to interrogate the initial-exec set of modules.  A runtime loading
 // implementation can also provide data about runtime modules in this format.
 //
 // This type is defined in the ld::abi namespace because these layouts form

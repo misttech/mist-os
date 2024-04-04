@@ -8,6 +8,8 @@
 
 namespace dl {
 
-void Module::Unmap(uintptr_t vaddr, size_t len) { munmap(reinterpret_cast<void*>(vaddr), len); }
+void ModuleHandle::Unmap(uintptr_t vaddr, size_t len) {
+  munmap(reinterpret_cast<void*>(vaddr), len);
+}
 
 }  // namespace dl

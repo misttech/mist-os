@@ -52,7 +52,7 @@ class RuntimeDynamicLinker {
 
   // Attempt to find the loaded module with the given name, returning a nullptr
   // if the module was not found.
-  Module* FindModule(Soname name);
+  ModuleHandle* FindModule(Soname name);
 
   template <class OSImpl>
   fit::result<Error, void*> Open(const char* file, int mode) {
@@ -60,18 +60,18 @@ class RuntimeDynamicLinker {
     if (already_loaded.is_error()) [[unlikely]] {
       return already_loaded.take_error();
     }
-    // If the Module for `file` was found, return a reference to it.
+    // If the module for `file` was found, return a reference to it.
     if (already_loaded.value()) {
       return fit::ok(already_loaded.value());
     }
 
-    // A Module for `file` does not yet exist, so allocate one now to be passed
-    // to the LoadModule created below. This allocation occurs before retrieving
-    // the file and initializing a diagnostics object so as to return an
-    // OutOfMemory error early if one occurs.
+    // A ModuleHandle for `file` does not yet exist, so allocate one now to be
+    // passed to the LoadModule created below. This allocation occurs before
+    // retrieving the file and initializing a diagnostics object so as to return
+    // an OutOfMemory error early if one occurs.
     fbl::AllocChecker ac;
-    auto module = Module::Create(Soname{file}, ac);
-    if (!module) [[unlikely]] {
+    auto module = ModuleHandle::Create(Soname{file}, ac);
+    if (!ac.check()) [[unlikely]] {
       return Error::OutOfMemory();
     }
 
@@ -85,7 +85,7 @@ class RuntimeDynamicLinker {
       return diag.take_error();
     }
 
-    LoadModule<OSImpl> load_module{*std::move(module)};
+    LoadModule<OSImpl> load_module{std::move(module)};
     if (!load_module.Load(diag, std::move(lookup.value()))) [[unlikely]] {
       return diag.take_error();
     }
@@ -94,25 +94,25 @@ class RuntimeDynamicLinker {
     // return its reference back to the caller, but are not meant to be invoked
     // directly by this function. These will be abstracted away eventually.
     auto loaded_module = std::move(load_module).take_module();
-    Module* module_ref = loaded_module.get();
+    ModuleHandle* module_ref = loaded_module.get();
     loaded_modules_.push_back(std::move(loaded_module));
 
     return diag.ok(module_ref);
   }
 
-  fit::result<Error, void*> LookupSymbol(Module* module, const char* ref);
+  fit::result<Error, void*> LookupSymbol(ModuleHandle* module, const char* ref);
 
  private:
   // Perform basic argument checking and check whether a module for `file` was
   // already loaded. An error is returned if bad input was given. Otherwise,
   // return a reference to the module if it was already loaded, or nullptr if
   // a module for `file` was not found.
-  fit::result<Error, Module*> CheckOpen(const char* file, int mode);
+  fit::result<Error, ModuleHandle*> CheckOpen(const char* file, int mode);
 
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
   // TODO(https://fxbug.dev/324136831): support startup modules
-  fbl::DoublyLinkedList<std::unique_ptr<Module>> loaded_modules_;
+  fbl::DoublyLinkedList<std::unique_ptr<ModuleHandle>> loaded_modules_;
 };
 
 }  // namespace dl

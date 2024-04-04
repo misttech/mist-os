@@ -11,6 +11,7 @@
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/static-vector.h>
 #include <lib/fit/result.h>
+#include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
 #include <lib/ld/module.h>
 
@@ -20,6 +21,8 @@
 #include "diagnostics.h"
 
 namespace dl {
+
+using Elf = elfldltl::Elf<>;
 
 // TODO(https://fxbug.dev/324136435): These KMax* variables are copied from
 // //sdk/lib/ld/startup-load.h, we should share these symbols instead.
@@ -32,38 +35,37 @@ inline constexpr size_t kMaxSegments = 8;
 inline constexpr size_t kMaxPhdrs = 32;
 static_assert(kMaxPhdrs > kMaxSegments);
 
-// TODO(https://fxbug.dev/324136831): comment on how Module relates to
+// TODO(https://fxbug.dev/324136831): comment on how ModuleHandle relates to
 // startup modules when the latter is supported.
 // TODO(https://fxbug.dev/328135195): comment on the reference counting when
 // that gets implemented.
 
-// A Module is created for every unique ELF file object loaded either
+// A ModuleHandle is created for every unique ELF file object loaded either
 // directly or indirectly as a dependency of another module. It holds the
 // ld::abi::Abi<...>::Module data structure that describes the module in the
 // passive ABI (see //sdk/lib/ld/module.h).
 
-// A Module is created for the ELF file in `dlopen`, when the
-// LoadModule::Load function decodes and loads the file into memory. Whereas a
+// A ModuleHandle is created for the ELF file in `dlopen` and is passed to the
+// LoadModule::Load function to decode and load the file into memory. Whereas a
 // LoadModule is ephemeral and lives only as long as it takes to load a module
-// and its dependencies in `dlopen`, the Module is a "permanent" data
+// and its dependencies in `dlopen`, the ModuleHandle is a "permanent" data
 // structure that is kept alive in the RuntimeDynamicLinker's `loaded_modules`
 // list until the module is unloaded.
 
-// While this is an internal API, a Module* is the void* handle returned
+// While this is an internal API, a ModuleHandle* is the void* handle returned
 // by the public <dlfcn.h> API.
-class Module : public fbl::DoublyLinkedListable<std::unique_ptr<Module>> {
+class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHandle>> {
  public:
-  using Elf = elfldltl::Elf<>;
   using Addr = Elf::Addr;
   using Soname = elfldltl::Soname<>;
   using SymbolInfo = elfldltl::SymbolInfo<Elf>;
   using AbiModule = ld::AbiModule<>;
 
   // Not copyable, but movable.
-  Module(const Module&) = delete;
-  Module(Module&&) = default;
+  ModuleHandle(const ModuleHandle&) = delete;
+  ModuleHandle(ModuleHandle&&) = default;
 
-  ~Module();
+  ~ModuleHandle();
 
   // TODO(https://fxbug.dev/324136435): This should also match against the
   // SONAME, like ld::LoadModule does.
@@ -71,13 +73,12 @@ class Module : public fbl::DoublyLinkedListable<std::unique_ptr<Module>> {
 
   constexpr const Soname& name() const { return name_; }
 
-  static std::optional<std::unique_ptr<Module>> Create(Soname name, fbl::AllocChecker& ac) {
-    auto module = std::unique_ptr<Module>{new (ac) Module};
-    if (!ac.check()) {
-      return std::nullopt;
+  static std::unique_ptr<ModuleHandle> Create(Soname name, fbl::AllocChecker& ac) {
+    auto module = std::unique_ptr<ModuleHandle>{new (ac) ModuleHandle};
+    if (module) [[likely]] {
+      module->name_ = name;
     }
-    module->name_ = name;
-    return std::move(module);
+    return module;
   }
 
   constexpr AbiModule& module() { return abi_module_; }
@@ -89,40 +90,48 @@ class Module : public fbl::DoublyLinkedListable<std::unique_ptr<Module>> {
   const SymbolInfo& symbol_info() const { return abi_module_.symbols; }
 
  private:
-  Module() = default;
+  ModuleHandle() = default;
 
   static void Unmap(uintptr_t vaddr, size_t len);
   Soname name_;
   AbiModule abi_module_;
 };
 
+using LoadModuleBase =
+    ld::LoadModule<ld::DecodedModule<Elf, elfldltl::StaticVector<kMaxSegments>::Container,
+                                     ld::AbiModuleInline::kNo>>;
+
 // TODO(https://fxbug.dev/324136435): Replace the code and functions copied from
 // ld::LoadModule to use them directly; then continue to use methods directly
 // from the //sdk/lib/ld public API, refactoring them into shared code as needed.
 template <class OSImpl>
-class LoadModule {
+class LoadModule : public LoadModuleBase {
  public:
   using Loader = typename OSImpl::Loader;
   using File = typename OSImpl::File;
   using Relro = typename Loader::Relro;
-  using Elf = elfldltl::Elf<>;
   using Phdr = Elf::Phdr;
   using Ehdr = Elf::Ehdr;
   using Soname = elfldltl::Soname<>;
   using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StaticVector<kMaxSegments>::Container>;
 
-  // A LoadModule takes temporary ownership of the Module as it sets requisite
-  // information on the object during the loading process. If an error occurs
-  // during this process, LoadModule will clean up this module object in its own
-  // destruction.
-  explicit LoadModule(std::unique_ptr<Module> module) : module_(std::move(module)) {}
+  // A LoadModule takes temporary ownership of the ModuleHandle as it sets
+  // requisite information on its AbiModule during the loading process. If an error
+  // occurs during this process, LoadModule will clean up the module handle in
+  // its own destruction.
+  explicit LoadModule(std::unique_ptr<ModuleHandle> module)
+      : LoadModuleBase{module->name()}, module_(std::move(module)) {
+    // The DecodeModule will use the module's AbiModule to attach information to
+    // as it performs decoding operations.
+    decoded().set_module(module_->module());
+  }
 
   // This must be the last method called on LoadModule and can only be called
   // with `std::move(load_module).take_module();`.
   // Calling this method indicates that the module has been loaded successfully
   // and will give the caller ownership of the module, handing off the
   // responsibility for managing its lifetime and unmapping.
-  std::unique_ptr<Module> take_module() && { return std::move(module_); }
+  std::unique_ptr<ModuleHandle> take_module() && { return std::move(module_); }
 
   // TODO(https://fxbug.dev/324136435): This is a gutted version of
   // StartupModule::Load, just to get the basic dlopen test case working, and is
@@ -150,12 +159,12 @@ class LoadModule {
       return false;
     }
 
-    ld::SetModuleVaddrBounds(module_->module(), load_info_, loader.load_bias());
+    ld::SetModuleVaddrBounds(decoded().module(), load_info_, loader.load_bias());
 
     // TODO(https://fxbug.dev/331804983): After loading is done, split the rest
     // of the logic that performs decoding into a separate function.
 
-    if (DecodeModuleDynamic(module_->module(), diag, loader.memory(), dyn_phdr).is_error())
+    if (ld::DecodeModuleDynamic(decoded().module(), diag, loader.memory(), dyn_phdr).is_error())
         [[unlikely]] {
       return false;
     };
@@ -171,40 +180,7 @@ class LoadModule {
   }
 
  private:
-  // TODO(https://fxbug.dev/324136435): This is a modified version of libdl's
-  // DecodeModuleDynamic
-  template <class Elf = elfldltl::Elf<>, class Diagnostics, class Memory,
-            typename... DynamicObservers>
-  constexpr fit::result<bool, cpp20::span<const typename Elf::Dyn>> DecodeModuleDynamic(
-      Module::AbiModule& module, Diagnostics& diag, Memory& memory,
-      const std::optional<typename Elf::Phdr>& dyn_phdr, DynamicObservers&&... dynamic_observers) {
-    using Dyn = const typename Elf::Dyn;
-
-    if (!dyn_phdr) [[unlikely]] {
-      return fit::error{diag.FormatError("no PT_DYNAMIC program header found")};
-    }
-
-    const size_t count = dyn_phdr->filesz / sizeof(Dyn);
-    auto read_dyn = memory.template ReadArray<Dyn>(dyn_phdr->vaddr, count);
-    if (!read_dyn) [[unlikely]] {
-      return fit::error{
-          diag.FormatError("cannot read", count, "entries from PT_DYNAMIC",
-                           elfldltl::FileAddress{dyn_phdr->vaddr}),
-      };
-    }
-
-    cpp20::span<const Dyn> dyn = *read_dyn;
-
-    if (!elfldltl::DecodeDynamic(
-            diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(module.symbols),
-            std::forward<DynamicObservers>(dynamic_observers)...)) [[unlikely]] {
-      return fit::error{false};
-    }
-
-    return fit::ok(dyn);
-  }
-
-  std::unique_ptr<Module> module_;
+  std::unique_ptr<ModuleHandle> module_;
   LoadInfo load_info_;
   Relro loader_relro_;
 };

@@ -8,6 +8,6 @@
 
 namespace dl {
 
-void Module::Unmap(uintptr_t vaddr, size_t len) { zx::vmar::root_self()->unmap(vaddr, len); }
+void ModuleHandle::Unmap(uintptr_t vaddr, size_t len) { zx::vmar::root_self()->unmap(vaddr, len); }
 
 }  // namespace dl

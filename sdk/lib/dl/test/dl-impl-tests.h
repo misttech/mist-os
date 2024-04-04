@@ -52,7 +52,7 @@ class DlImplTests : public DlTestsBase {
   }
 
   fit::result<Error, void*> DlSym(void* module, const char* ref) {
-    return dynamic_linker_.LookupSymbol(static_cast<Module*>(module), ref);
+    return dynamic_linker_.LookupSymbol(static_cast<ModuleHandle*>(module), ref);
   }
 
  private:
