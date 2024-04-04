@@ -64,6 +64,7 @@ workbench_platform_config = {
             "mouse",
             "touchscreen",
         ],
+        "with_synthetic_device_support": True,
     },
     "power": {
         "suspend_enabled": True,
