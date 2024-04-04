@@ -4,16 +4,6 @@
 {
     actions: [
         {
-            type: "skip",
-            matchers: [
-                "IPv4Sockets/*",
-
-                // Netstack3-produced entries for getifaddrs() do not all have interface
-                // names.
-                "IPv4UDPUnboundSockets/IPv4UDPUnboundExternalNetworkingSocketTest.*",
-            ],
-        },
-        {
             type: "expect_failure",
             matchers: [
                 // Netstack3 does not support SO_REUSEADDR and only partially supports
