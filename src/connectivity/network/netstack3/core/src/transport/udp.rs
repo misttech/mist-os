@@ -1653,6 +1653,7 @@ where
         remote_port: UdpRemotePort,
     ) -> Result<(), ConnectError> {
         let (core_ctx, bindings_ctx) = self.contexts();
+        debug!("connect on {id:?} to {remote_ip:?}:{remote_port:?}");
         datagram::connect(core_ctx, bindings_ctx, id, remote_ip, remote_port, ())
     }
 
@@ -1671,6 +1672,7 @@ where
         device_id: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     ) -> Result<(), SocketError> {
         let (core_ctx, bindings_ctx) = self.contexts();
+        debug!("set device on {id:?} to {device_id:?}");
         datagram::set_device(core_ctx, bindings_ctx, id, device_id)
     }
 
@@ -2008,6 +2010,7 @@ where
     /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn disconnect(&mut self, id: &UdpApiSocketId<I, C>) -> Result<(), ExpectedConnError> {
         let (core_ctx, bindings_ctx) = self.contexts();
+        debug!("disconnect {id:?}");
         datagram::disconnect_connected(core_ctx, bindings_ctx, id)
     }
 
@@ -2026,6 +2029,7 @@ where
         which: ShutdownType,
     ) -> Result<(), ExpectedConnError> {
         let (core_ctx, bindings_ctx) = self.contexts();
+        debug!("shutdown {id:?} {which:?}");
         datagram::shutdown_connected(core_ctx, bindings_ctx, id, which)
     }
 
@@ -2055,6 +2059,7 @@ where
         C::BindingsContext,
     > {
         let (core_ctx, bindings_ctx) = self.contexts();
+        debug!("close {id:?}");
         datagram::close(core_ctx, bindings_ctx, id)
     }
 
@@ -2104,6 +2109,7 @@ where
         port: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
         let (core_ctx, bindings_ctx) = self.contexts();
+        debug!("listen on {id:?} on {addr:?}:{port:?}");
         datagram::listen(core_ctx, bindings_ctx, id, addr, port)
     }
 
