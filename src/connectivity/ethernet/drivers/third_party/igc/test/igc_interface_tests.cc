@@ -197,10 +197,14 @@ class IgcInterfaceTest : public fdf_testing::DriverTestFixture<TestFixtureConfig
       fdf::internal::kDefaultOps.Write32(ctx, mmio, val, offs);
       if (offs == static_cast<zx_off_t>(IGC_TDT(0))) {
         // This is the offset used for QueueTx.
-        test->queue_tx_called_.Signal();
+        std::lock_guard lock(test->tx_tail_mutex_);
+        ++test->num_tx_tail_updates_;
+        test->tx_tail_updated_.notify_all();
       } else if (offs == static_cast<zx_off_t>(IGC_RDT(0))) {
         // This is the offset used for QueueRxSpace.
-        test->queue_rx_space_called_.Signal();
+        std::lock_guard lock(test->rx_tail_mutex_);
+        ++test->num_rx_tail_updates_;
+        test->rx_tail_updated_.notify_all();
       }
     };
 
@@ -215,14 +219,30 @@ class IgcInterfaceTest : public fdf_testing::DriverTestFixture<TestFixtureConfig
 
   void TearDown() override { ASSERT_OK(StopDriver().status_value()); }
 
-  void WaitForQueueTx() {
-    queue_tx_called_.Wait();
-    queue_tx_called_.Reset();
+  void WaitForTxTailUpdates(size_t num_updates_to_wait_for) {
+    std::unique_lock lock(tx_tail_mutex_);
+    while (num_tx_tail_updates_ != num_updates_to_wait_for) {
+      tx_tail_updated_.wait(lock);
+    }
+    num_tx_tail_updates_ = 0;
   }
 
-  void WaitForQueueRxSpace() {
-    queue_rx_space_called_.Wait();
-    queue_rx_space_called_.Reset();
+  void WaitForRxTailUpdates(size_t num_updates_to_wait_for) {
+    std::unique_lock lock(rx_tail_mutex_);
+    while (num_rx_tail_updates_ != num_updates_to_wait_for) {
+      rx_tail_updated_.wait(lock);
+    }
+    num_rx_tail_updates_ = 0;
+  }
+
+  void ClearNumTxTailUpdates() {
+    std::lock_guard lock(tx_tail_mutex_);
+    num_tx_tail_updates_ = 0;
+  }
+
+  void ClearNumRxTailUpdates() {
+    std::lock_guard lock(rx_tail_mutex_);
+    num_rx_tail_updates_ = 0;
   }
 
   fdf::Arena arena_{'IGCT'};
@@ -233,8 +253,14 @@ class IgcInterfaceTest : public fdf_testing::DriverTestFixture<TestFixtureConfig
 
   // Used for MMIO buffer overrides and event triggering.
   fdf::MmioBufferOps override_ops_ = fdf::internal::kDefaultOps;
-  libsync::Completion queue_tx_called_;
-  libsync::Completion queue_rx_space_called_;
+
+  std::condition_variable tx_tail_updated_;
+  size_t num_tx_tail_updates_ = 0;
+  std::mutex tx_tail_mutex_;
+
+  std::condition_variable rx_tail_updated_;
+  size_t num_rx_tail_updates_ = 0;
+  std::mutex rx_tail_mutex_;
 
   // The VMO faked by this test class to simulate the one that netdevice creates in real case.
   zx::vmo test_vmo_;
@@ -350,8 +376,9 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueTxStarted) {
   // Call start to change the state of driver.
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->Start().status());
 
+  ClearNumTxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueTx(tx_buffers).status());
-  WaitForQueueTx();
+  WaitForTxTailUpdates(tx_buffers.count());
 
   RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
@@ -359,7 +386,9 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueTxStarted) {
     auto driver_tx_buffer_info = driver.TxBuffer();
 
     // Verify the data in tx descriptor ring.
+    EXPECT_EQ(adapter->txh_ind, 0u);
     EXPECT_EQ(adapter->txt_ind, kTxBufferCount);
+    EXPECT_EQ(adapter->txr_len, kTxBufferCount);
     igc_tx_desc* first_desc_entry = &adapter->txdr[0];
     EXPECT_EQ(first_desc_entry->lower.data,
               (uint32_t)(IGC_TXD_CMD_EOP | IGC_TXD_CMD_IFCS | IGC_TXD_CMD_RS | kFirstRegionLength));
@@ -388,8 +417,9 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueTxStarted) {
     tx_buffer_extra[i].data = region_list_extra;
   }
 
+  ClearNumTxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueTx(tx_buffer_extra).status());
-  WaitForQueueTx();
+  WaitForTxTailUpdates(tx_buffer_extra.count());
 
   RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
@@ -401,6 +431,11 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueTxStarted) {
     EXPECT_EQ(adapter->txt_ind, kTxBufferCount);
     // But the buffer id at the same slot has been changed.
     EXPECT_EQ(driver_tx_buffer_info[1].buffer_id, ei::kEthTxDescRingCount + 1);
+    // And the length of the tx descriptor ring should equal the sum of the two QueueTx operations.
+    // Technically this exceeds the maximum TX depth since this test doesn't respect the depth
+    // indicated by the driver. The driver currently does not reject this since netdevice is
+    // responsible for only queueing as many TX buffers as the device can handle.
+    EXPECT_EQ(adapter->txr_len, ei::kEthTxDescRingCount + kTxBufferCount);
   });
 }
 
@@ -424,15 +459,18 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueRxSpace) {
   ASSERT_OK(
       netdev_client_.sync().buffer(arena_)->PrepareVmo(kVmoId, std::move(test_vmo_)).status());
 
+  ClearNumRxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueRxSpace(rx_space_buffer).status());
-  WaitForQueueRxSpace();
+  WaitForRxTailUpdates(rx_space_buffer.count());
 
   RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
     auto adapter = driver.Adapter();
     auto driver_rx_buffer_info = driver.RxBuffer();
 
+    EXPECT_EQ(adapter->rxh_ind, 0u);
     EXPECT_EQ(adapter->rxt_ind, kRxBufferCount);
+    EXPECT_EQ(adapter->rxr_len, kRxBufferCount);
 
     EXPECT_EQ(driver_rx_buffer_info[0].buffer_id, 0U);
     EXPECT_TRUE(driver_rx_buffer_info[0].available);
@@ -459,8 +497,9 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueRxSpace) {
     rx_space_buffer_extra[i].region = buffer_region;
   }
 
+  ClearNumRxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueRxSpace(rx_space_buffer_extra).status());
-  WaitForQueueRxSpace();
+  WaitForRxTailUpdates(rx_space_buffer_extra.count());
 
   RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
@@ -472,6 +511,11 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueRxSpace) {
     // But the buffer id at the same slot has been changed.
     EXPECT_EQ(driver_rx_buffer_info[1].buffer_id, ei::kEthRxBufCount + 1);
     EXPECT_TRUE(driver_rx_buffer_info[1].available);
+    // And the length of the rx descriptor ring should equal the sum of the two QueueRxSpace
+    // operations. Technically this exceeds the maximum RX depth since this test doesn't respect the
+    // depth indicated by the driver. The driver currently does not reject this since netdevice is
+    // responsible for only queueing as many RX space buffers as the device can handle.
+    EXPECT_EQ(adapter->rxr_len, ei::kEthRxBufCount + kRxBufferCount);
   });
 }
 
@@ -520,11 +564,13 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplStop) {
   ASSERT_OK(
       netdev_client_.sync().buffer(arena_)->PrepareVmo(kVmoId, std::move(test_vmo_)).status());
 
+  ClearNumRxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueRxSpace(rx_space_buffer).status());
-  WaitForQueueRxSpace();
+  WaitForRxTailUpdates(rx_space_buffer.count());
 
+  ClearNumTxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueTx(tx_buffer).status());
-  WaitForQueueTx();
+  WaitForTxTailUpdates(tx_buffer.count());
 
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->Stop().status());
 
@@ -561,9 +607,13 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplStop) {
 
     // The rx head index should stopped at the tail index of the rx descriptor ring.
     EXPECT_EQ(adapter->rxh_ind, adapter->rxt_ind);
+    // The length of the rx descriptor ring should indicate that it's empty.
+    EXPECT_EQ(adapter->rxr_len, 0u);
 
     // The tx head index should stopped at the tail index of the tx descriptor ring.
     EXPECT_EQ(adapter->txh_ind, adapter->txt_ind);
+    // The length of the tx descriptor ring should indicate that it's empty.
+    EXPECT_EQ(adapter->txr_len, 0u);
   });
 }
 

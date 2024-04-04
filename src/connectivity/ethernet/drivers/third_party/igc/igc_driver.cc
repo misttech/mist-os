@@ -406,6 +406,7 @@ void IgcDriver::InitTransmitUnit() {
   u64 bus_addr = adapter_->txd_phys;
   adapter_->txh_ind = 0;
   adapter_->txt_ind = 0;
+  adapter_->txr_len = 0;
 
   // Base and length of TX Ring.
   IGC_WRITE_REG(hw, IGC_TDLEN(0), kEthTxDescRingCount * sizeof(struct igc_tx_desc));
@@ -481,6 +482,7 @@ void IgcDriver::InitReceiveUnit() {
   u64 bus_addr = adapter_->rxd_phys;
   adapter_->rxh_ind = 0;
   adapter_->rxt_ind = 0;
+  adapter_->rxr_len = 0;
 
   srrctl |= IGC_SRRCTL_DESCTYPE_ADV_ONEBUF;
 
@@ -576,6 +578,7 @@ void IgcDriver::ReapTxBuffers() {
     results[reap_count].status = ZX_OK;
 
     reap_count++;
+    adapter_->txr_len--;
     n = (n + 1) & (kEthTxDescRingCount - 1);
   }
   if (reap_count > 0) {
@@ -641,9 +644,8 @@ void IgcDriver::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
 
     size_t buf_idx = 0;
     uint32_t& rxh = adapter_->rxh_ind;
-    const uint32_t& rxt = adapter_->rxt_ind;
 
-    while (rxh != rxt) {
+    while (adapter_->rxr_len > 0) {
       // Populate empty buffers.
       fidl::VectorView<netdriver::wire::RxBufferPart> parts(arena, 1);
       parts[0] = {.id = rx_buffers_[rxh].buffer_id, .offset = 0, .length = 0};
@@ -662,6 +664,7 @@ void IgcDriver::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
       adapter_->rxdr[rxh].wb.upper.status_error = 0;
       rxh = (rxh + 1) & (kEthRxBufCount - 1);
       buf_idx++;
+      adapter_->rxr_len--;
       ZX_ASSERT_MSG(buf_idx <= kEthRxBufCount, "buf_idx: %zu", buf_idx);
     }
     if (buf_idx > 0) {
@@ -685,12 +688,12 @@ void IgcDriver::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
 
   size_t res_idx = 0;
   uint32_t& txh = adapter_->txh_ind;
-  const uint32_t& txt = adapter_->txt_ind;
-  while (txh != txt) {
+  while (adapter_->txr_len > 0) {
     adapter_->txdr[txh].upper.fields.status = 0;
     results[res_idx].id = tx_buffers_[txh].buffer_id;
     results[res_idx].status = ZX_ERR_UNAVAILABLE;
     res_idx++;
+    adapter_->txr_len--;
     txh = (txh + 1) & (kEthTxDescRingCount - 1);
   }
   if (res_idx > 0) {
@@ -769,12 +772,13 @@ void IgcDriver::QueueTx(netdriver::wire::NetworkDeviceImplQueueTxRequest* reques
     cur_desc->lower.data =
         (uint32_t)(IGC_TXD_CMD_EOP | IGC_TXD_CMD_IFCS | IGC_TXD_CMD_RS | region.length);
 
+    adapter_->txr_len++;
     // Update the tx descriptor ring tail index
     n = (n + 1) & (kEthTxDescRingCount - 1);
+    // Update the last filled buffer to the adapter. This should point to one descriptor past the
+    // last valid descriptor. Thus it's written after incrementing the tail.
+    IGC_WRITE_REG(&adapter_->hw, IGC_TDT(0), n);
   }
-
-  //  Update the last filled buffer to the adapter.
-  IGC_WRITE_REG(&adapter_->hw, IGC_TDT(0), n);
 }
 
 void IgcDriver::QueueRxSpace(netdriver::wire::NetworkDeviceImplQueueRxSpaceRequest* request,
@@ -811,14 +815,16 @@ void IgcDriver::QueueRxSpace(netdriver::wire::NetworkDeviceImplQueueRxSpaceReque
                   "Something went wrong physical buffer allocation.");
     cur_desc->wb.upper.status_error = 0;
 
+    adapter_->rxr_len++;
+
+    // Inform the hw the last ready-to-write buffer by setting the descriptor tail pointer. This
+    // should point to the last valid descriptor. Thus it's written before incrementing the tail.
+    IGC_WRITE_REG(&adapter_->hw, IGC_RDT(0), rxdr_tail);
+
     // Increase the tail index of rx descriptor ring, note that after this loop ends, rxdr_tail
     // should points to the descriptor right after the last ready-to-write buffer's descriptor.
     rxdr_tail = (rxdr_tail + 1) & (kEthRxBufCount - 1);
   }
-
-  // Inform the hw the last ready-to-write buffer(which is at rxdr_tail - 1) by setting the
-  // descriptor tail pointer.
-  IGC_WRITE_REG(&adapter_->hw, IGC_RDT(0), rxdr_tail - 1);
 }
 
 void IgcDriver::PrepareVmo(netdriver::wire::NetworkDeviceImplPrepareVmoRequest* request,
@@ -957,8 +963,9 @@ void IgcDriver::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq_ba
       // Release the buffer in internal buffer info array.
       rx_buffers_[adapter_->rxh_ind].available = false;
 
-      // Update the head index of rx descriptor ring.
+      // Update the head index of rx descriptor ring and the number of ring entries.
       adapter_->rxh_ind = (adapter_->rxh_ind + 1) & (kEthRxBufCount - 1);
+      adapter_->rxr_len--;
 
       // Update buffer index and check whether the local buffer array is full.
       buf_idx++;

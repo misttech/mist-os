@@ -146,8 +146,10 @@ class IgcDriver final : public fdf::DriverBase,
 
     uint32_t txh_ind;  // Index of the head of awaiting(for the adapter to pick up) buffers in txdr.
     uint32_t txt_ind;  // Index of the tail of awaiting(for the adapter to pick up) buffers in txdr.
+    uint32_t txr_len;  // Number of current entries in txdr.
     uint32_t rxh_ind;  // Index of the head of available buffers in rxdr.
     uint32_t rxt_ind;  // Index of the tail of available buffers in rxdr.
+    uint32_t rxr_len;  // Number of current entries in rxdr.
     // Protect the rx data path between the two operations: QueueRxSpace and IgcIrqThreadFunc.
     std::mutex rx_lock;
     // Protect the tx data path between the two operations: QueueTx and ReapTxBuffers.
