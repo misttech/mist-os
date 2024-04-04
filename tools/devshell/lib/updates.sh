@@ -273,11 +273,11 @@ function is-listening-on-port {
   local port=$1
 
   if [[ "$(uname -s)" == "Darwin" ]]; then
-    if netstat -anp tcp | grep -v TIME_WAIT | awk '{print $4}' | grep "\.${port}$" > /dev/null; then
+    if netstat -anp tcp | grep -v TIME_WAIT | grep -v FIN_WAIT1 | awk '{print $4}' | grep "\.${port}$" > /dev/null; then
       return 0
     fi
   else
-    if ss -f inet -f inet6 -an exclude time-wait | awk '{print $5}' | grep ":${port}$" > /dev/null; then
+    if ss -f inet -f inet6 -an exclude time-wait exclude fin-wait-1 | awk '{print $5}' | grep ":${port}$" > /dev/null; then
       return 0
     fi
   fi
