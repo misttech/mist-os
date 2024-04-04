@@ -138,7 +138,7 @@ fuchsia_product_bundle(
     main = ":image.vim3",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
     product_bundle_name = "fuchsia",
-    recovery = "//products/zedboot:vim3_with_fvm",
+    recovery = "//products/zedboot:vim3",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )
