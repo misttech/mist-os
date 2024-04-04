@@ -88,21 +88,6 @@ static const std::vector<fpbus::Metadata> eth_mac_device_metadata{
     }},
 };
 
-static const eth_dev_metadata_t eth_mac_device = {
-    .vid = PDEV_VID_DESIGNWARE,
-    .pid = 0,
-    .did = PDEV_DID_DESIGNWARE_ETH_MAC,
-};
-
-static const std::vector<fpbus::Metadata> eth_board_metadata{
-    {{
-        .type = DEVICE_METADATA_ETH_MAC_DEVICE,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&eth_mac_device),
-            reinterpret_cast<const uint8_t*>(&eth_mac_device) + sizeof(eth_mac_device)),
-    }},
-};
-
 static const fpbus::Node dwmac_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "dwmac";
@@ -119,10 +104,6 @@ static const fpbus::Node dwmac_dev = []() {
 const std::vector<fdf::BindRule> kEthBoardRules = {
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_ethernet_board::SERVICE,
                             bind_fuchsia_hardware_ethernet_board::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
-                            bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_VID_DESIGNWARE),
-    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
-                            bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_ETH_MAC),
 };
 
 const std::vector<fdf::NodeProperty> kEthBoardProperties = {
@@ -159,7 +140,6 @@ zx_status_t AddEthComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   eth_board_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D;
   eth_board_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_ETH;
   eth_board_dev.mmio() = eth_board_mmios;
-  eth_board_dev.metadata() = eth_board_metadata;
 
   const std::vector<fdf::ParentSpec> kEthParents = {
       fdf::ParentSpec{{

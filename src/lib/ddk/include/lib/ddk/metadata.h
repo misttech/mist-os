@@ -111,9 +111,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 #define DEVICE_METADATA_WIFI_CONFIG 0x49464957  // WIFI
 
 // type: eth_dev_metadata_t
-#define DEVICE_METADATA_ETH_MAC_DEVICE 0x43414D45  // EMAC
-
-// type: eth_dev_metadata_t
 #define DEVICE_METADATA_ETH_PHY_DEVICE 0x59485045  // EPHY
 
 // type: FIDL fuchsia.hardware.i2c/I2CBusMetadata

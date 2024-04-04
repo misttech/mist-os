@@ -163,21 +163,6 @@ zx_status_t AmlEthernet::Bind() {
     }
   }
 
-  // Populate board specific information
-  eth_dev_metadata_t mac_info;
-  size_t actual;
-  status = device_get_metadata(parent(), DEVICE_METADATA_ETH_MAC_DEVICE, &mac_info,
-                               sizeof(eth_dev_metadata_t), &actual);
-  if (status != ZX_OK || actual != sizeof(eth_dev_metadata_t)) {
-    zxlogf(ERROR, "aml-ethernet: Could not get MAC metadata %d", status);
-    return status;
-  }
-
-  zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, mac_info.vid},
-      {BIND_PLATFORM_DEV_DID, 0, mac_info.did},
-  };
-
   auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
   outgoing_ = component::OutgoingDirectory(dispatcher);
 
@@ -206,7 +191,6 @@ zx_status_t AmlEthernet::Bind() {
   };
 
   return DdkAdd(ddk::DeviceAddArgs("aml-ethernet")
-                    .set_props(props)
                     .set_fidl_service_offers(offers)
                     .set_outgoing_dir(endpoints->client.TakeChannel()));
 }
