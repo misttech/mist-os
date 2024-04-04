@@ -25,9 +25,10 @@ use crate::matchers::PacketMatcher;
 pub enum Action<I: IpExt, DeviceClass, RuleInfo> {
     /// Accept the packet.
     ///
-    /// This is a terminal action for the current routine, i.e. no further rules
-    /// will be evaluated for this packet in the routine in which this rule is
-    /// installed. Subsequent routines on the same hook will still be evaluated.
+    /// This is a terminal action for the current *installed* routine, i.e. no
+    /// further rules will be evaluated for this packet in the installed routine
+    /// (or any subroutines) in which this rule is installed. Subsequent
+    /// routines installed on the same hook will still be evaluated.
     Accept,
     /// Drop the packet.
     ///
@@ -35,10 +36,8 @@ pub enum Action<I: IpExt, DeviceClass, RuleInfo> {
     /// will be evaluated for this packet, even in other routines on the same
     /// hook.
     Drop,
-    // TODO(https://fxbug.dev/318718273): implement jumping and returning.
     /// Jump from the current routine to the specified uninstalled routine.
     Jump(UninstalledRoutine<I, DeviceClass, RuleInfo>),
-    // TODO(https://fxbug.dev/318718273): implement jumping and returning.
     /// Stop evaluation of the current routine and return to the calling routine
     /// (the routine from which the current routine was jumped), continuing
     /// evaluation at the next rule.
@@ -48,7 +47,6 @@ pub enum Action<I: IpExt, DeviceClass, RuleInfo> {
     Return,
 }
 
-// TODO(https://fxbug.dev/318718273): implement jumping and returning.
 /// A handle to a [`Routine`] that is not installed in a particular hook, and
 /// therefore is only run if jumped to from another routine.
 #[derive(Derivative)]
@@ -61,6 +59,12 @@ impl<I: IpExt, DeviceClass, RuleInfo> UninstalledRoutine<I, DeviceClass, RuleInf
     /// Creates a new uninstalled routine with the provided contents.
     pub fn new(rules: Vec<Rule<I, DeviceClass, RuleInfo>>) -> Self {
         Self(Arc::new(Routine { rules }))
+    }
+
+    /// Returns the inner routine.
+    pub fn get(&self) -> &Routine<I, DeviceClass, RuleInfo> {
+        let Self(inner) = self;
+        &*inner
     }
 }
 

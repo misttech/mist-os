@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// The result of packet processing at a given filtering hook.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(test, derive(Debug, Clone, Copy, PartialEq))]
 pub enum Verdict {
     /// The packet should continue traversing the stack.
     Accept,
@@ -23,6 +23,46 @@ pub enum Verdict {
 pub(crate) struct Interfaces<'a, D> {
     pub ingress: Option<&'a D>,
     pub egress: Option<&'a D>,
+}
+
+/// The result of packet processing for a given routine.
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+enum RoutineResult {
+    /// The packet should stop traversing the rest of the current installed
+    /// routine, but continue travsering other routines installed in the hook.
+    Accept,
+    /// The packet should continue at the next rule in the calling chain.
+    Return,
+    /// The packet should be dropped immediately.
+    Drop,
+}
+
+fn check_routine<I, P, D, DeviceClass>(
+    Routine { rules }: &Routine<I, DeviceClass, ()>,
+    packet: &mut P,
+    interfaces: &Interfaces<'_, D>,
+) -> RoutineResult
+where
+    I: IpExt,
+    P: IpPacket<I>,
+    D: InterfaceProperties<DeviceClass>,
+{
+    for Rule { matcher, action, validation_info: () } in rules {
+        if matcher.matches(packet, &interfaces) {
+            match action {
+                Action::Accept => return RoutineResult::Accept,
+                Action::Return => return RoutineResult::Return,
+                Action::Drop => return RoutineResult::Drop,
+                // TODO(https://fxbug.dev/332739892): enforce some kind of maximum depth on the
+                // routine graph to prevent a stack overflow here.
+                Action::Jump(target) => match check_routine(target.get(), packet, interfaces) {
+                    result @ (RoutineResult::Accept | RoutineResult::Drop) => return result,
+                    RoutineResult::Return => continue,
+                },
+            }
+        }
+    }
+    RoutineResult::Return
 }
 
 fn check_routines_for_hook<I, P, D, DeviceClass>(
@@ -36,17 +76,10 @@ where
     D: InterfaceProperties<DeviceClass>,
 {
     let Hook { routines } = hook;
-    for Routine { rules } in routines {
-        for Rule { matcher, action, validation_info: () } in rules {
-            if matcher.matches(packet, &interfaces) {
-                match action {
-                    Action::Accept => break,
-                    Action::Drop => return Verdict::Drop,
-                    Action::Jump(_) | Action::Return => {
-                        todo!("https://fxbug.dev/318718273: implement jumping and returning")
-                    }
-                }
-            }
+    for routine in routines {
+        match check_routine(&routine, packet, &interfaces) {
+            RoutineResult::Accept | RoutineResult::Return => {}
+            RoutineResult::Drop => return Verdict::Drop,
         }
     }
     Verdict::Accept
@@ -243,7 +276,7 @@ pub mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec;
+    use alloc::{vec, vec::Vec};
     use ip_test_macro::ip_test;
     use net_types::ip::{Ip, Ipv4, Ipv6};
     use test_case::test_case;
@@ -258,8 +291,49 @@ mod tests {
         packets::testutil::internal::{
             ArbitraryValue, FakeIpPacket, FakeTcpSegment, TestIpExt, TransportPacketExt,
         },
-        state::IpRoutines,
+        state::{IpRoutines, UninstalledRoutine},
     };
+
+    impl<I: IpExt> Rule<I, FakeDeviceClass, ()> {
+        fn new(
+            matcher: PacketMatcher<I, FakeDeviceClass>,
+            action: Action<I, FakeDeviceClass, ()>,
+        ) -> Self {
+            Rule { matcher, action, validation_info: () }
+        }
+    }
+
+    #[test]
+    fn return_by_default_if_no_matching_rules_in_routine() {
+        assert_eq!(
+            check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
+                &Routine { rules: Vec::new() },
+                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &Interfaces { ingress: None, egress: None },
+            ),
+            RoutineResult::Return
+        );
+
+        // A subroutine should also yield `Return` if no rules match, allowing
+        // the calling routine to continue execution after the `Jump`.
+        let routine = Routine {
+            rules: vec![
+                Rule::new(
+                    PacketMatcher::default(),
+                    Action::Jump(UninstalledRoutine::new(Vec::new())),
+                ),
+                Rule::new(PacketMatcher::default(), Action::Drop),
+            ],
+        };
+        assert_eq!(
+            check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
+                &routine,
+                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &Interfaces { ingress: None, egress: None },
+            ),
+            RoutineResult::Drop
+        );
+    }
 
     #[test]
     fn accept_by_default_if_no_matching_rules_in_hook() {
@@ -274,23 +348,10 @@ mod tests {
     }
 
     #[test]
-    fn accept_verdict_terminal_for_single_routine() {
+    fn accept_by_default_if_return_from_routine() {
         let hook = Hook {
             routines: vec![Routine {
-                rules: vec![
-                    // Accept all traffic.
-                    Rule {
-                        matcher: PacketMatcher::default(),
-                        action: Action::Accept,
-                        validation_info: (),
-                    },
-                    // Drop all traffic.
-                    Rule {
-                        matcher: PacketMatcher::default(),
-                        action: Action::Drop,
-                        validation_info: (),
-                    },
-                ],
+                rules: vec![Rule::new(PacketMatcher::default(), Action::Return)],
             }],
         };
 
@@ -305,27 +366,59 @@ mod tests {
     }
 
     #[test]
-    fn drop_verdict_terminal_for_entire_hook() {
+    fn accept_terminal_for_installed_routine() {
+        let routine = Routine {
+            rules: vec![
+                // Accept all traffic.
+                Rule::new(PacketMatcher::default(), Action::Accept),
+                // Drop all traffic.
+                Rule::new(PacketMatcher::default(), Action::Drop),
+            ],
+        };
+        assert_eq!(
+            check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
+                &routine,
+                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &Interfaces { ingress: None, egress: None },
+            ),
+            RoutineResult::Accept
+        );
+
+        // `Accept` should also be propagated from subroutines.
+        let routine = Routine {
+            rules: vec![
+                // Jump to a routine that accepts all traffic.
+                Rule::new(
+                    PacketMatcher::default(),
+                    Action::Jump(UninstalledRoutine::new(vec![Rule::new(
+                        PacketMatcher::default(),
+                        Action::Accept,
+                    )])),
+                ),
+                // Drop all traffic.
+                Rule::new(PacketMatcher::default(), Action::Drop),
+            ],
+        };
+        assert_eq!(
+            check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
+                &routine,
+                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &Interfaces { ingress: None, egress: None },
+            ),
+            RoutineResult::Accept
+        );
+
+        // Now put that routine in a hook that also includes *another* installed
+        // routine which drops all traffic. The first installed routine should
+        // terminate at its `Accept` result, but the hook should terminate at
+        // the `Drop` result in the second routine.
         let hook = Hook {
             routines: vec![
-                Routine {
-                    rules: vec![
-                        // Accept all traffic.
-                        Rule {
-                            matcher: PacketMatcher::default(),
-                            action: Action::Accept,
-                            validation_info: (),
-                        },
-                    ],
-                },
+                routine,
                 Routine {
                     rules: vec![
                         // Drop all traffic.
-                        Rule {
-                            matcher: PacketMatcher::default(),
-                            action: Action::Drop,
-                            validation_info: (),
-                        },
+                        Rule::new(PacketMatcher::default(), Action::Drop),
                     ],
                 },
             ],
@@ -341,16 +434,130 @@ mod tests {
         );
     }
 
+    #[test]
+    fn drop_terminal_for_entire_hook() {
+        let hook = Hook {
+            routines: vec![
+                Routine {
+                    rules: vec![
+                        // Drop all traffic.
+                        Rule::new(PacketMatcher::default(), Action::Drop),
+                    ],
+                },
+                Routine {
+                    rules: vec![
+                        // Accept all traffic.
+                        Rule::new(PacketMatcher::default(), Action::Accept),
+                    ],
+                },
+            ],
+        };
+
+        assert_eq!(
+            check_routines_for_hook::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
+                &hook,
+                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                Interfaces { ingress: None, egress: None },
+            ),
+            Verdict::Drop
+        );
+    }
+
+    #[test]
+    fn jump_recursively_evaluates_target_routine() {
+        // Drop result from a target routine is propagated to the calling
+        // routine.
+        let routine = Routine {
+            rules: vec![Rule::new(
+                PacketMatcher::default(),
+                Action::Jump(UninstalledRoutine::new(vec![Rule::new(
+                    PacketMatcher::default(),
+                    Action::Drop,
+                )])),
+            )],
+        };
+        assert_eq!(
+            check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
+                &routine,
+                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &Interfaces { ingress: None, egress: None },
+            ),
+            RoutineResult::Drop
+        );
+
+        // Accept result from a target routine is also propagated to the calling
+        // routine.
+        let routine = Routine {
+            rules: vec![
+                Rule::new(
+                    PacketMatcher::default(),
+                    Action::Jump(UninstalledRoutine::new(vec![Rule::new(
+                        PacketMatcher::default(),
+                        Action::Accept,
+                    )])),
+                ),
+                Rule::new(PacketMatcher::default(), Action::Drop),
+            ],
+        };
+        assert_eq!(
+            check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
+                &routine,
+                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &Interfaces { ingress: None, egress: None },
+            ),
+            RoutineResult::Accept
+        );
+
+        // Return from a target routine results in continued evaluation of the
+        // calling routine.
+        let routine = Routine {
+            rules: vec![
+                Rule::new(
+                    PacketMatcher::default(),
+                    Action::Jump(UninstalledRoutine::new(vec![Rule::new(
+                        PacketMatcher::default(),
+                        Action::Return,
+                    )])),
+                ),
+                Rule::new(PacketMatcher::default(), Action::Drop),
+            ],
+        };
+        assert_eq!(
+            check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
+                &routine,
+                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &Interfaces { ingress: None, egress: None },
+            ),
+            RoutineResult::Drop
+        );
+    }
+
+    #[test]
+    fn return_terminal_for_single_routine() {
+        let routine = Routine {
+            rules: vec![
+                Rule::new(PacketMatcher::default(), Action::Return),
+                // Drop all traffic.
+                Rule::new(PacketMatcher::default(), Action::Drop),
+            ],
+        };
+
+        assert_eq!(
+            check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
+                &routine,
+                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &Interfaces { ingress: None, egress: None },
+            ),
+            RoutineResult::Return
+        );
+    }
+
     #[ip_test]
     fn filter_handler_implements_ip_hooks_correctly<I: Ip + TestIpExt>() {
         fn drop_all_traffic<I: TestIpExt>(
             matcher: PacketMatcher<I, FakeDeviceClass>,
         ) -> Hook<I, FakeDeviceClass, ()> {
-            Hook {
-                routines: vec![Routine {
-                    rules: vec![Rule { matcher, action: Action::Drop, validation_info: () }],
-                }],
-            }
+            Hook { routines: vec![Routine { rules: vec![Rule::new(matcher, Action::Drop)] }] }
         }
 
         // Ingress hook should use ingress routines and check the input
@@ -454,8 +661,8 @@ mod tests {
             dst_port: Option<PortMatcher>,
             action: Action<I, FakeDeviceClass, ()>,
         ) -> Rule<I, FakeDeviceClass, ()> {
-            Rule {
-                matcher: PacketMatcher {
+            Rule::new(
+                PacketMatcher {
                     transport_protocol: Some(TransportProtocolMatcher {
                         proto: <&FakeTcpSegment as TransportPacketExt<I>>::proto(),
                         src_port,
@@ -464,8 +671,7 @@ mod tests {
                     ..Default::default()
                 },
                 action,
-                validation_info: (),
-            }
+            )
         }
 
         fn default_filter_rules<I: IpExt>() -> Routine<I, FakeDeviceClass, ()> {
@@ -522,14 +728,13 @@ mod tests {
     fn filter_on_wlan_only<I: Ip + TestIpExt>(interface: FakeDeviceId) -> Verdict {
         fn drop_wlan_traffic<I: IpExt>() -> Routine<I, FakeDeviceClass, ()> {
             Routine {
-                rules: vec![Rule {
-                    matcher: PacketMatcher {
+                rules: vec![Rule::new(
+                    PacketMatcher {
                         in_interface: Some(InterfaceMatcher::Id(wlan_interface().id)),
                         ..Default::default()
                     },
-                    action: Action::Drop,
-                    validation_info: (),
-                }],
+                    Action::Drop,
+                )],
             }
         }
 

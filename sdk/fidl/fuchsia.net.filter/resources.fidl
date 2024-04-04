@@ -261,9 +261,10 @@ type Matchers = table {
 type Action = flexible union {
     /// Accept the packet.
     ///
-    /// This is a terminal action for the current routine, i.e. no further rules
-    /// will be evaluated for this packet in the routine in which this rule is
-    /// installed. Subsequent routines on the same hook will still be evaluated.
+    /// This is a terminal action for the current *installed* routine, i.e. no
+    /// further rules will be evaluated for this packet in the installed routine
+    /// (or any subroutines) in which this rule is installed. Subsequent
+    /// routines installed on the same hook will still be evaluated.
     1: accept Empty;
     /// Drop the packet.
     ///
