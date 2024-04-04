@@ -27,5 +27,10 @@ ffx_plugin("ffx_product_get_artifacts") {
     "//third_party/rust_crates:camino",
   ]
 
-  test_deps = [ "//src/lib/assembly/partitions_config" ]
+  inputs = [ "//build/sdk/meta/test_data/single_vd_manifest.json" ]
+
+  test_deps = [
+    "//src/lib/assembly/partitions_config",
+    "//third_party/rust_crates:tempfile",
+  ]
 }

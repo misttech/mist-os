@@ -4,7 +4,7 @@
 
 //! FFX plugin for the paths of a group of artifacts inside product bundle.
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use assembly_manifest::Image;
 use camino::{Utf8Path, Utf8PathBuf};
 use errors::ffx_bail;
@@ -12,7 +12,7 @@ use ffx_core::ffx_plugin;
 use ffx_product_get_artifacts_args::GetArtifactsCommand;
 use ffx_writer::Writer;
 use fidl_fuchsia_developer_ffx_ext::RepositoryConfig;
-use sdk_metadata::{ProductBundle, Type};
+use sdk_metadata::{ProductBundle, Type, VirtualDeviceManifest};
 use std::io::Write;
 use utf8_path::path_relative_from;
 
@@ -170,8 +170,21 @@ fn extract_emu_artifacts(
     collect_system_artifacts(&mut product_bundle.system_b)?;
     collect_system_artifacts(&mut product_bundle.system_r)?;
 
-    if let Some(path) = product_bundle.virtual_devices_path {
+    if let Some(path) = product_bundle.virtual_devices_path.clone() {
         artifacts.push(compute_path(&path)?);
+
+        // Also append the virtual device paths mentioned in manifest
+        let virtual_device =
+            VirtualDeviceManifest::from_path(&product_bundle.virtual_devices_path)?;
+        let devices = virtual_device.device_paths.values().cloned();
+        for device in devices {
+            artifacts.push(compute_path(
+                &path
+                    .parent()
+                    .ok_or(anyhow!(format!("Path does not have a parent: {}", &path)))?
+                    .join(&device),
+            )?);
+        }
     }
     Ok(artifacts.iter().map(|x| x.to_string()).collect::<Vec<_>>())
 }
@@ -182,6 +195,11 @@ mod tests {
 
     use assembly_partitions_config::PartitionsConfig;
     use sdk_metadata::ProductBundleV2;
+    use std::fs::File;
+    use tempfile::TempDir;
+
+    const VIRTUAL_DEVICE_VALID: &str =
+        include_str!("../../../../../../../build/sdk/meta/test_data/single_vd_manifest.json");
 
     #[test]
     fn test_get_flashing_artifacts() {
@@ -303,6 +321,13 @@ mod tests {
         let mut cursor = std::io::Cursor::new(json);
         let config: PartitionsConfig = PartitionsConfig::from_reader(&mut cursor).unwrap();
 
+        let temp = TempDir::new().unwrap();
+        let tempdir = Utf8Path::from_path(temp.path()).unwrap().canonicalize_utf8().unwrap();
+
+        let virtual_device = tempdir.join("manifest.json");
+        let mut vd_file1 = File::create(&virtual_device).unwrap();
+        vd_file1.write_all(VIRTUAL_DEVICE_VALID.as_bytes()).unwrap();
+
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
             product_version: "".to_string(),
@@ -324,12 +349,12 @@ mod tests {
             system_r: None,
             repositories: vec![],
             update_package_hash: None,
-            virtual_devices_path: None,
+            virtual_devices_path: Some(virtual_device.clone()),
         });
         let cmd = GetArtifactsCommand {
             product_bundle: Utf8PathBuf::new(),
             relative_path: false,
-            artifacts_group: Type::Flash,
+            artifacts_group: Type::Emu,
         };
         let artifacts = extract_emu_artifacts(pb.clone(), cmd).unwrap();
         let expected_artifacts = vec![
@@ -338,6 +363,8 @@ mod tests {
             String::from("/tmp/product_bundle/system_a/fvm.blk"),
             String::from("qemu/path"),
             String::from("/tmp/product_bundle/system_a/fxfs.blk"),
+            virtual_device.to_string(),
+            tempdir.join("device.json").to_string(),
         ];
         assert_eq!(expected_artifacts, artifacts);
     }
