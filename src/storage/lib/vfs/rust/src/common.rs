@@ -305,7 +305,7 @@ pub enum CreationMode {
     Always,
 }
 
-#[cfg(feature = "uses_deprecated_open_mode")]
+#[cfg(fuchsia_api_level_less_than = "19")]
 impl From<fio::OpenMode> for CreationMode {
     fn from(value: fio::OpenMode) -> Self {
         match value {
@@ -316,7 +316,7 @@ impl From<fio::OpenMode> for CreationMode {
     }
 }
 
-#[cfg(feature = "uses_deprecated_open_mode")]
+#[cfg(fuchsia_api_level_less_than = "19")]
 impl From<CreationMode> for fio::OpenMode {
     fn from(value: CreationMode) -> Self {
         match value {
@@ -327,7 +327,7 @@ impl From<CreationMode> for fio::OpenMode {
     }
 }
 
-#[cfg(not(feature = "uses_deprecated_open_mode"))]
+#[cfg(fuchsia_api_level_at_least = "19")]
 impl From<fio::CreationMode> for CreationMode {
     fn from(value: fio::CreationMode) -> Self {
         match value {
@@ -338,7 +338,7 @@ impl From<fio::CreationMode> for CreationMode {
     }
 }
 
-#[cfg(not(feature = "uses_deprecated_open_mode"))]
+#[cfg(fuchsia_api_level_at_least = "19")]
 impl From<CreationMode> for fio::CreationMode {
     fn from(value: CreationMode) -> Self {
         match value {
@@ -349,9 +349,9 @@ impl From<CreationMode> for fio::CreationMode {
     }
 }
 
-#[cfg(not(feature = "uses_deprecated_open_mode"))]
+#[cfg(fuchsia_api_level_at_least = "19")]
 type CreationModeFidl = fio::CreationMode;
-#[cfg(feature = "uses_deprecated_open_mode")]
+#[cfg(fuchsia_api_level_less_than = "19")]
 type CreationModeFidl = fio::OpenMode;
 
 impl PartialEq<CreationModeFidl> for CreationMode {

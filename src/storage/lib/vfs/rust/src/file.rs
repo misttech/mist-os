@@ -222,7 +222,7 @@ pub trait File: Node {
     }
 
     /// Preallocate disk space for this range.
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn allocate(
         &self,
         _offset: u64,
@@ -233,7 +233,7 @@ pub trait File: Node {
     }
 
     /// Set the merkle tree and the descriptor for this file and mark the file as fsverity-enabled.
-    #[cfg(feature = "target_api_level_head")]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn enable_verity(
         &self,
         _options: fio::VerificationOptions,
