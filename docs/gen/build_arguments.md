@@ -190,16 +190,17 @@ To GN, this path _should_ be:
 
 But to pass it as a file to the Bazel build, we need to use the "label"
 syntax, which is going to be fixed up below.
+LINT.IfChange
 
 **Current value (from the default):** `false`
 
-From //build/assembly/sshd_config.gni:18
+From //build/assembly/sshd_config.gni:19
 
 ### avb_algorithm
 
 **Current value (from the default):** `"DEPRECATED"`
 
-From //build/images/vbmeta.gni:41
+From //build/images/vbmeta.gni:44
 
 ### avb_atx_metadata
 
@@ -211,7 +212,7 @@ From //boards/arm64.gni:37
 
 **Overridden from the default:** `""`
 
-From //build/images/vbmeta.gni:20
+From //build/images/vbmeta.gni:23
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
@@ -219,7 +220,7 @@ From //boards/common/x64-common.gni:70
 
 **Overridden from the default:** `""`
 
-From //build/images/vbmeta.gni:20
+From //build/images/vbmeta.gni:23
 
 ### avb_key
 
@@ -231,7 +232,7 @@ From //boards/arm64.gni:39
 
 **Overridden from the default:** `""`
 
-From //build/images/vbmeta.gni:17
+From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
@@ -239,7 +240,7 @@ From //boards/common/x64-common.gni:68
 
 **Overridden from the default:** `""`
 
-From //build/images/vbmeta.gni:17
+From //build/images/vbmeta.gni:20
 
 ### base_driver_package_labels
 
@@ -567,7 +568,7 @@ DEPRECATED:  Remove when no boards set a value for these.
 
 **Current value (from the default):** `[]`
 
-From //build/images/vbmeta.gni:40
+From //build/images/vbmeta.gni:43
 
 ### board_fastboot_unlock_credentials
 
@@ -792,7 +793,7 @@ From //out/not-default/args.gn:5
 
 **Overridden from the default:** `"arm64"`
 
-From //build/info/info.gni:12
+From //build/info/info.gni:13
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
@@ -800,10 +801,11 @@ From //out/not-default/args.gn:5
 
 **Overridden from the default:** `"x64"`
 
-From //build/info/info.gni:12
+From //build/info/info.gni:13
 
 ### build_info_product
 
+LINT.IfChange
 Product configuration of the current build
 
 **Current value for `target_cpu = "arm64"`:** `"bringup"`
@@ -812,7 +814,7 @@ From //out/not-default/args.gn:6
 
 **Overridden from the default:** `""`
 
-From //build/info/info.gni:9
+From //build/info/info.gni:10
 
 **Current value for `target_cpu = "x64"`:** `"bringup"`
 
@@ -820,7 +822,7 @@ From //out/not-default/args.gn:6
 
 **Overridden from the default:** `""`
 
-From //build/info/info.gni:9
+From //build/info/info.gni:10
 
 ### build_info_version
 
@@ -829,7 +831,7 @@ of the most recent update.
 
 **Current value (from the default):** `""`
 
-From //build/info/info.gni:16
+From //build/info/info.gni:17
 
 ### build_libvulkan_img_rgx
 
@@ -1418,10 +1420,11 @@ From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:35
 DO NOT SET THIS IN A PRODUCT DEFINITION!!  FOR DEVELOPER USE ONLY
 TODO(https://fxbug.dev/42082693): Remove this when we have a solution for
 changing the netcfg configuration at runtime.
+LINT.IfChange
 
 **Current value (from the default):** `false`
 
-From //src/connectivity/policy/netcfg/delegated_network_provisioning.gni:9
+From //src/connectivity/policy/netcfg/delegated_network_provisioning.gni:10
 
 ### delivery_blob_type
 
@@ -3246,7 +3249,7 @@ extra_vbmeta_descriptors = [{
 
 **Current value (from the default):** `false`
 
-From //build/images/vbmeta.gni:37
+From //build/images/vbmeta.gni:40
 
 ### fastboot_product
 
@@ -6688,7 +6691,7 @@ more information.
 If the prefix begins with "//", it will be rebased to be relative to the
 root build directory.
 
-**Current value (from the default):** `"//prebuilt/third_party/bin/"`
+**Current value (from the default):** `"//prebuilt/third_party/rust/bin/"`
 
 From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:65
 
@@ -7296,7 +7299,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"f8dQO_hoWlKmhDD7w42ZZA1acJoC6NlGKe28JEBsONIC"`
+**Current value (from the default):** `"LBYFiFzFndX6bEpG56fkO3Dmb05wpgcfFzMYZG5u3dwC"`
 
 From //build/rust/config.gni:38
 
@@ -8042,12 +8045,13 @@ From //build/config/BUILDCONFIG.gn:106
 
 ### truncate_build_info_commit_date
 
+LINT.IfChange
 Truncate the date in the build_info to midnight UTC, and replace the commit
 hash with one that's synthesized from that date.
 
 **Current value (from the default):** `false`
 
-From //build/info/BUILD.gn:12
+From //build/info/BUILD.gn:13
 
 ### tsan_default_options
 
@@ -8411,6 +8415,7 @@ From //build/config/features.gni:10
 
 If true, then a vbmeta image will be generated for provided ZBI
 and the paving script will pave vbmeta images to the target device.
+LINT.IfChange
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
@@ -8418,7 +8423,7 @@ From //boards/arm64.gni:35
 
 **Overridden from the default:** `false`
 
-From //build/images/vbmeta.gni:14
+From //build/images/vbmeta.gni:15
 
 **Current value for `target_cpu = "x64"`:** `true`
 
@@ -8426,7 +8431,7 @@ From //boards/common/x64-common.gni:66
 
 **Overridden from the default:** `false`
 
-From //build/images/vbmeta.gni:14
+From //build/images/vbmeta.gni:15
 
 ### use_vboot
 
@@ -8784,7 +8789,7 @@ Partition name from where image will be verified
 
 **Current value (from the default):** `"zircon"`
 
-From //build/images/vbmeta.gni:23
+From //build/images/vbmeta.gni:26
 
 ### zx_assert_level
 
