@@ -45,6 +45,7 @@ pub struct EnvironmentContext {
     pub(crate) runtime_args: ConfigMap,
     env_file_path: Option<PathBuf>,
     pub(crate) cache: Arc<crate::cache::Cache<Config>>,
+    self_path: PathBuf,
 }
 
 impl std::cmp::PartialEq for EnvironmentContext {
@@ -77,7 +78,15 @@ impl EnvironmentContext {
         env_file_path: Option<PathBuf>,
     ) -> Self {
         let cache = Arc::default();
-        Self { kind, exe_kind, env_vars, runtime_args, env_file_path, cache }
+        Self {
+            kind,
+            exe_kind,
+            env_vars,
+            runtime_args,
+            env_file_path,
+            cache,
+            self_path: std::env::current_exe().unwrap(),
+        }
     }
 
     /// Initialize an environment type for a config domain context, with a
@@ -361,7 +370,7 @@ impl EnvironmentContext {
         }
 
         if let ExecutableKind::MainFfx = self.exe_kind {
-            return Ok(std::env::current_exe()?);
+            return Ok(self.self_path.clone());
         }
 
         let sdk = self.get_sdk().await.with_context(|| {
@@ -593,6 +602,7 @@ mod test {
                 runtime_args: Default::default(),
                 env_file_path: Default::default(),
                 cache: Default::default(),
+                self_path: std::env::current_exe().unwrap(),
             }
         }
     }
