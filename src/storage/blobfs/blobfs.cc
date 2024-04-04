@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <lib/async/cpp/task.h>
 #include <lib/cksum.h>
+#include <lib/fit/defer.h>
 #include <lib/sync/completion.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/event.h>
@@ -51,7 +52,6 @@
 #include "src/storage/lib/vfs/cpp/journal/journal.h"
 #include "src/storage/lib/vfs/cpp/journal/replay.h"
 #include "src/storage/lib/vfs/cpp/journal/superblock.h"
-#include "src/storage/lib/vfs/cpp/scoped_vnode_open.h"
 
 namespace blobfs {
 namespace {
@@ -426,9 +426,10 @@ zx_status_t Blobfs::LoadAndVerifyBlob(uint32_t node_index) {
 
   // Create a blob and open it (required for verification).
   fbl::RefPtr<Blob> blob = fbl::MakeRefCounted<Blob>(*this, node_index, *inode.value());
-  fs::ScopedVnodeOpen opener;
-  if (zx_status_t status = opener.Open(blob); status != ZX_OK)
+  if (zx_status_t status = blob->Open(nullptr); status != ZX_OK) {
     return status;
+  }
+  auto blob_closer = fit::defer([&blob] { blob->Close(); });
   return blob->Verify();
 }
 

@@ -5,32 +5,29 @@
 #ifndef SRC_STORAGE_BLOBFS_TEST_TEST_SCOPED_VNODE_OPEN_H_
 #define SRC_STORAGE_BLOBFS_TEST_TEST_SCOPED_VNODE_OPEN_H_
 
-#include <gtest/gtest.h>
+#include <zircon/assert.h>
 
-#include "src/storage/lib/vfs/cpp/scoped_vnode_open.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 
-// Simple wrapper around fs::ScopedVnodeOpen that EXPECTs all calls to succeed.
+// Scoped wrapper for Vnodes that asserts open/closing nodes to succeed. This avoids test cases
+// proceeding in an invalid state if these operations fail, and ensures the node's open count is
+// correctly managed in tests.
 class TestScopedVnodeOpen {
  public:
-  // This uses an explicit Open() call so errors can be reported.
-  explicit TestScopedVnodeOpen(
-      fs::Vnode* vn, const fs::VnodeConnectionOptions& opts = fs::VnodeConnectionOptions()) {
-    EXPECT_EQ(ZX_OK, opener_.Open(vn, opts));
+  explicit TestScopedVnodeOpen(const fbl::RefPtr<fs::Vnode>& node) : vnode_(node) {
+    zx_status_t status = vnode_->Open(nullptr);
+    ZX_ASSERT_MSG(status == ZX_OK, "Failed to open node: %s", zx_status_get_string(status));
   }
 
-  template <typename Node>
-  explicit TestScopedVnodeOpen(
-      const fbl::RefPtr<Node>& node,
-      const fs::VnodeConnectionOptions& opts = fs::VnodeConnectionOptions()) {
-    EXPECT_EQ(ZX_OK, opener_.Open(node, opts));
+  ~TestScopedVnodeOpen() {
+    zx_status_t status = vnode_->Close();
+    ZX_ASSERT_MSG(status == ZX_OK, "Failed to close node: %s", zx_status_get_string(status));
   }
-
-  ~TestScopedVnodeOpen() { EXPECT_EQ(ZX_OK, opener_.Close()); }
 
  private:
-  fs::ScopedVnodeOpen opener_;
+  fbl::RefPtr<fs::Vnode> vnode_ = nullptr;
 };
 
 }  // namespace blobfs

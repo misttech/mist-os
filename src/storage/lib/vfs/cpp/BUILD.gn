@@ -48,7 +48,6 @@ static_library("cpp") {
       "pager_thread_pool.h",
       "pseudo_dir.h",
       "pseudo_file.h",
-      "queue.h",
       "ref_counted.h",
       "remote_dir.h",
       "service.h",

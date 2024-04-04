@@ -115,31 +115,24 @@ class BlobLoaderTest : public TestWithParam<TestParamType> {
 
   uint32_t LookupInode(const BlobInfo& info) { return LookupBlob(info)->Ino(); }
 
-  zx_status_t LoadBlobData(Blob* blob, std::vector<uint8_t>& data) {
+  static zx::result<std::vector<uint8_t>> LoadBlobData(const fbl::RefPtr<Blob>& blob) {
     TestScopedVnodeOpen opener(blob);  // Blob must be open to get the vmo.
 
     zx::vmo vmo;
     if (zx_status_t status = blob->GetVmo(fuchsia_io::wire::VmoFlags::kRead, &vmo); status != ZX_OK)
-      return status;
+      return zx::error(status);
     EXPECT_TRUE(vmo.is_valid());  // Always expect a valid blob on success.
 
     // Use vmo::read instead of direct read so that we can synchronously fail if the pager fails.
     uint64_t size;
     if (zx_status_t status = vmo.get_prop_content_size(&size); status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
-    data.resize(size);
-    if (zx_status_t status = vmo.read(data.data(), 0, size); status != ZX_OK) {
-      data.resize(0);
-      return status;
+    std::vector<uint8_t> blob_data(size);
+    if (zx_status_t status = vmo.read(blob_data.data(), 0, size); status != ZX_OK) {
+      return zx::error(status);
     }
-    return ZX_OK;
-  }
-
-  std::vector<uint8_t> LoadBlobData(Blob* blob) {
-    std::vector<uint8_t> result;
-    EXPECT_EQ(ZX_OK, LoadBlobData(blob, result));
-    return result;
+    return zx::ok(std::move(blob_data));
   }
 
   CompressionAlgorithm LookupCompression(const BlobInfo& info) {
@@ -185,8 +178,9 @@ TEST_P(BlobLoaderTest, SmallBlob) {
 
   auto blob = LookupBlob(*info);
 
-  std::vector<uint8_t> data = LoadBlobData(blob.get());
-  ASSERT_TRUE(info->DataEquals(data.data(), data.size()));
+  zx::result blob_data = LoadBlobData(blob);
+  ASSERT_TRUE(blob_data.is_ok()) << blob_data.status_string();
+  ASSERT_TRUE(info->DataEquals(blob_data->data(), blob_data->size()));
 
   // Verify there's no Merkle data for this small blob.
   const auto& merkle = GetBlobMerkleData(blob.get());
@@ -201,8 +195,9 @@ TEST_P(BlobLoaderTest, LargeBlob) {
 
   auto blob = LookupBlob(*info);
 
-  std::vector<uint8_t> data = LoadBlobData(blob.get());
-  ASSERT_TRUE(info->DataEquals(data.data(), data.size()));
+  zx::result blob_data = LoadBlobData(blob);
+  ASSERT_TRUE(blob_data.is_ok()) << blob_data.status_string();
+  ASSERT_TRUE(info->DataEquals(blob_data->data(), blob_data->size()));
 
   CheckMerkleTreeContents(GetBlobMerkleData(blob.get()), *info);
 }
@@ -215,8 +210,9 @@ TEST_P(BlobLoaderTest, LargeBlobWithNonAlignedLength) {
 
   auto blob = LookupBlob(*info);
 
-  std::vector<uint8_t> data = LoadBlobData(blob.get());
-  ASSERT_TRUE(info->DataEquals(data.data(), data.size()));
+  zx::result blob_data = LoadBlobData(blob);
+  ASSERT_TRUE(blob_data.is_ok()) << blob_data.status_string();
+  ASSERT_TRUE(info->DataEquals(blob_data->data(), blob_data->size()));
 
   CheckMerkleTreeContents(GetBlobMerkleData(blob.get()), *info);
 }
