@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/camera3/cpp/fidl.h>
+#include <fuchsia/element/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -48,9 +49,16 @@ int Setup(std::optional<zx::duration> auto_cycle_interval, async::Loop* buffer_c
     return EXIT_FAILURE;
   }
 
+  fuchsia::element::GraphicalPresenterHandle graphical_presenter;
+  status = context->svc()->Connect(graphical_presenter.NewRequest());
+  if (status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to request GraphicalPresenter service.";
+    return EXIT_FAILURE;
+  }
+
   // Create the collage.
   auto collage_result = camera_flatland::BufferCollageFlatland::Create(
-      std::move(flatland_connection), std::move(flatland_allocator),
+      std::move(flatland_connection), std::move(flatland_allocator), std::move(graphical_presenter),
       std::move(buffer_collage_allocator), [&buffer_collage_loop] { buffer_collage_loop->Quit(); });
   if (collage_result.is_error()) {
     FX_PLOGS(ERROR, collage_result.error()) << "Failed to create BufferCollageFlatland.";
@@ -123,8 +131,8 @@ int Setup(std::optional<zx::duration> auto_cycle_interval, async::Loop* buffer_c
   cycler->SetHandlers(std::move(add_collection_handler), std::move(remove_collection_handler),
                       std::move(show_buffer_handler), std::move(mute_handler));
 
-  // Publish the view service.
-  context->outgoing()->AddPublicService(collage->GetHandler());
+  // Present the view.
+  collage->PresentView();
 
   // Serve the Lifecycle protocol that cleanly quits the component.
   // This binds to a process handle, so it's not added to the outgoing directory.

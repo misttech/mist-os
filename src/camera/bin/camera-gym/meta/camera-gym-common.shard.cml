@@ -8,25 +8,17 @@
         binary: "bin/camera_gym_bin",
         lifecycle: { stop_event: "notify" },
     },
-    capabilities: [
-        {
-            protocol: [ "fuchsia.ui.app.ViewProvider" ],
-        },
-    ],
     use: [
         {
             protocol: [
                 "fuchsia.camera3.DeviceWatcher",
+                "fuchsia.element.GraphicalPresenter",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.tracing.provider.Registry",
             ],
         },
     ],
     expose: [
-        {
-            protocol: "fuchsia.ui.app.ViewProvider",
-            from: "self",
-        },
         {
             protocol: "fuchsia.component.Binder",
             from: "framework",

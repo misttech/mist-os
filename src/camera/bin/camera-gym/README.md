@@ -3,6 +3,7 @@
 Example app to exercise the various stream configurations available for Sherlock.
 
 ## Flatland Instruction
+
 See go/try-flatland
 
 Note: Currently flatland support is limited to showing only camera streams on supported physical device.
@@ -31,16 +32,19 @@ Include the `camera-gym` package and disable flatland:
 ### How to Run in Automatic Mode
 
 Flatland
+
 ```
 > ffx session add fuchsia-pkg://fuchsia.com/camera-gym#meta/camera-gym.cm
 ```
 
 GFX
+
 ```
 > ffx session add fuchsia-pkg://fuchsia.com/camera-gym#meta/camera-gym-gfx.cm
 ```
 
 ### How to Run in Manual Mode
+
 Currently only supported in GFX
 
 ```
@@ -62,24 +66,22 @@ Start by finding the moniker of the camera-gym-gfx-manual that you started above
                   Type:  CML Component
        Component State:  Resolved
  Incoming Capabilities:  /svc/fuchsia.camera3.DeviceWatcher
+                         /svc/fuchsia.element.GraphicalPresenter
                          /svc/fuchsia.sysmem.Allocator
                          /svc/fuchsia.tracing.provider.Registry
-                         /svc/fuchsia.ui.scenic.Scenic
                          /data
                          /svc/fuchsia.logger.LogSink
-  Exposed Capabilities:  fuchsia.ui.app.ViewProvider
-                         fuchsia.camera.gym.Controller
+  Exposed Capabilities:  fuchsia.camera.gym.Controller
                          fuchsia.component.Binder
            Merkle root:  00b7161f6f83225e1e525819d0fdc2ac17f927adbec8b618e6e536cc44c2046a
        Execution State:  Running
-          Start reason:  '/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/elements:vd5ioej4lvcshlgb' requested capability 'fuchsia.ui.app.ViewProvider'
+          Start reason:  '/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/elements:vd5ioej4lvcshlgb' requested capability 'fuchsia.component.Binder'
          Running since:  2022-09-21 17:13:10.895060505 UTC
                 Job ID:  610356
             Process ID:  610388
  Outgoing Capabilities:  debug
                          fuchsia.camera.gym.Controller
                          fuchsia.modular.Lifecycle
-                         fuchsia.ui.app.ViewProvider
 > ffx component explore /core/session-manager/session:session/workstation_session/login_shell/application_shell:1/elements:vd5ioej4lvcshlgb
 $ camera-gym-ctl --set-description=0
 OK
@@ -87,7 +89,7 @@ $
 ```
 
 > NOTE: command prompts below beginning with `$` denote the `ffx component
-> explore` shell.
+explore` shell.
 
 ### How to Run Manual Mode Scripts
 
@@ -95,13 +97,13 @@ $
 test_simple.sh
 ```
 
-  Running this bash script will cycle through all configs and all streams forever.
+Running this bash script will cycle through all configs and all streams forever.
 
 ```
 test_crop.sh
 ```
 
-  Running this bash script will cycle through crop settings in steps of 1/40's.
+Running this bash script will cycle through crop settings in steps of 1/40's.
 
 ### How to turn text descriptions on/off
 
@@ -120,7 +122,7 @@ $ camera-gym-ctl --set-description=1
 ### How to Capture a Frame in Manual Mode
 
 Caveat (b/200839146): The current frame capture feature only works while a
-single stream is running.  Trying to do so with multiple streams running at the
+single stream is running. Trying to do so with multiple streams running at the
 same time will result capturing from a stream randomly selected from all of
 those running.
 

@@ -7,6 +7,7 @@
 #include <fuchsia/images/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
+#include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
@@ -16,6 +17,7 @@
 #include <lib/fpromise/promise.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
+#include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <lib/zx/eventpair.h>
@@ -40,13 +42,8 @@ using CaptureFrameCommand = fuchsia::camera::gym::CaptureFrameCommand;
 
 constexpr uint32_t kViewRequestTimeoutMs = 5000;
 
-BufferCollageFlatland::BufferCollageFlatland()
-    : loop_(&kAsyncLoopConfigNoAttachToCurrentThread), view_provider_binding_(this) {
+BufferCollageFlatland::BufferCollageFlatland() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
   SetStopOnError(sysmem_allocator_);
-  view_provider_binding_.set_error_handler([this](zx_status_t status) {
-    FX_PLOGS(DEBUG, status) << "ViewProvider client disconnected.";
-    view_provider_binding_.Unbind();
-  });
 }
 
 BufferCollageFlatland::~BufferCollageFlatland() {
@@ -59,6 +56,7 @@ BufferCollageFlatland::~BufferCollageFlatland() {
 fpromise::result<std::unique_ptr<BufferCollageFlatland>, zx_status_t> BufferCollageFlatland::Create(
     std::unique_ptr<simple_present::FlatlandConnection> flatland_connection,
     fuchsia::ui::composition::AllocatorHandle flatland_allocator,
+    fuchsia::element::GraphicalPresenterHandle graphical_presenter,
     fuchsia::sysmem::AllocatorHandle sysmem_allocator, fit::closure stop_callback) {
   auto collage = std::unique_ptr<BufferCollageFlatland>(new BufferCollageFlatland);
   collage->start_time_ = zx::clock::get_monotonic();
@@ -66,6 +64,12 @@ fpromise::result<std::unique_ptr<BufferCollageFlatland>, zx_status_t> BufferColl
   collage->flatland_connection_ = std::move(flatland_connection);
   zx_status_t status =
       collage->flatland_allocator_.Bind(std::move(flatland_allocator), collage->loop_.dispatcher());
+  if (status != ZX_OK) {
+    FX_PLOGS(ERROR, status);
+    return fpromise::error(status);
+  }
+  status = collage->graphical_presenter_.Bind(std::move(graphical_presenter),
+                                              collage->loop_.dispatcher());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status);
     return fpromise::error(status);
@@ -85,10 +89,6 @@ fpromise::result<std::unique_ptr<BufferCollageFlatland>, zx_status_t> BufferColl
     return fpromise::error(status);
   }
   return fpromise::ok(std::move(collage));
-}
-
-fidl::InterfaceRequestHandler<fuchsia::ui::app::ViewProvider> BufferCollageFlatland::GetHandler() {
-  return fit::bind_member(this, &BufferCollageFlatland::OnNewRequest);
 }
 
 // Called by stream_cycler when a new camera stream is available.
@@ -251,20 +251,7 @@ void BufferCollageFlatland::PostShowBuffer(uint32_t collection_id, uint32_t buff
   });
 }
 
-void BufferCollageFlatland::OnNewRequest(
-    fidl::InterfaceRequest<fuchsia::ui::app::ViewProvider> request) {
-  if (view_provider_binding_.is_bound()) {
-    request.Close(ZX_ERR_ALREADY_BOUND);
-    return;
-  }
-  view_provider_binding_.Bind(std::move(request), loop_.dispatcher());
-}
-
 void BufferCollageFlatland::Stop() {
-  if (view_provider_binding_.is_bound()) {
-    FX_LOGS(WARNING) << "Collage closing view channel due to server error.";
-    view_provider_binding_.Close(ZX_ERR_INTERNAL);
-  }
   flatland_->Clear();
   collection_views_.clear();
   loop_.Quit();
@@ -377,21 +364,17 @@ void BufferCollageFlatland::SetupBaseView() {
   flatland_->SetRootTransform(kRootTransformId);
 }
 
-void BufferCollageFlatland::CreateViewWithViewRef(
-    zx::eventpair view_token, fuchsia::ui::views::ViewRefControl view_ref_control,
-    fuchsia::ui::views::ViewRef view_ref) {
-  FX_NOTIMPLEMENTED() << "GFX is deprecated.";
-}
-
-void BufferCollageFlatland::CreateView2(fuchsia::ui::app::CreateView2Args args) {
-  async::PostTask(loop_.dispatcher(), [this, args = std::move(args)]() mutable {
+void BufferCollageFlatland::PresentView() {
+  async::PostTask(loop_.dispatcher(), [this]() mutable {
     parent_watcher_.set_error_handler([this](zx_status_t status) {
       FX_LOGS(ERROR) << "Error from fuchsia::ui::composition::ParentViewportWatcher: "
                      << zx_status_get_string(status);
       Stop();
     });
     auto view_identity = scenic::NewViewIdentityOnCreation();
-    flatland_->CreateView2(std::move(*args.mutable_view_creation_token()), std::move(view_identity),
+    auto [view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
+
+    flatland_->CreateView2(std::move(view_token), std::move(view_identity),
                            /* protocols = */ {}, parent_watcher_.NewRequest());
 
     parent_watcher_->GetLayout([this](auto layout_info) {
@@ -401,6 +384,15 @@ void BufferCollageFlatland::CreateView2(fuchsia::ui::app::CreateView2Args args) 
       SetupBaseView();
       flatland_connection_->Present({}, [](auto) {});
     });
+
+    fuchsia::element::ViewSpec view_spec;
+    view_spec.set_viewport_creation_token(std::move(parent_viewport_token));
+    graphical_presenter_->PresentView(
+        std::move(view_spec), nullptr, nullptr,
+        [](fuchsia::element::GraphicalPresenter_PresentView_Result result) {
+          if (result.is_err())
+            FX_LOGS(ERROR) << "PresentView failed";
+        });
   });
 }
 }  // namespace camera_flatland

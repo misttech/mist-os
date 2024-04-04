@@ -5,12 +5,10 @@
 #ifndef SRC_CAMERA_BIN_CAMERA_GYM_BUFFER_COLLAGE_FLATLAND_H_
 #define SRC_CAMERA_BIN_CAMERA_GYM_BUFFER_COLLAGE_FLATLAND_H_
 
+#include <fuchsia/element/cpp/fidl.h>
 #include <fuchsia/math/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
-#include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
-#include <fuchsia/ui/gfx/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/fidl/cpp/binding.h>
@@ -79,12 +77,12 @@ struct CollectionView {
 // This class takes ownership of the display and presents the contents of buffer collections in a
 // grid pattern. Unless otherwise noted, public methods are thread-safe and private methods must
 // only be called from the loop's thread.
-class BufferCollageFlatland : public fuchsia::ui::app::ViewProvider {
+class BufferCollageFlatland {
  public:
   using CommandStatusHandler =
       fit::function<void(fuchsia::camera::gym::Controller_SendCommand_Result)>;
 
-  ~BufferCollageFlatland() override;
+  ~BufferCollageFlatland();
 
   // Creates a new BufferCollage instance using the provided interface handles. After returning, if
   // the instance stops running, either due to an error or explicit action, |stop_callback| is
@@ -92,10 +90,8 @@ class BufferCollageFlatland : public fuchsia::ui::app::ViewProvider {
   static fpromise::result<std::unique_ptr<BufferCollageFlatland>, zx_status_t> Create(
       std::unique_ptr<simple_present::FlatlandConnection> flatland_connection,
       fuchsia::ui::composition::AllocatorHandle flatland_allocator,
+      fuchsia::element::GraphicalPresenterHandle graphical_presenter,
       fuchsia::sysmem::AllocatorHandle sysmem_allocator, fit::closure stop_callback = nullptr);
-
-  // Returns the view request handler.
-  fidl::InterfaceRequestHandler<fuchsia::ui::app::ViewProvider> GetHandler();
 
   // Registers a new buffer collection and adds it to the views, updating the layout of existing
   // collections to fit. Returns an id representing the collection. Collections are initially
@@ -114,11 +110,11 @@ class BufferCollageFlatland : public fuchsia::ui::app::ViewProvider {
   void PostShowBuffer(uint32_t collection_id, uint32_t buffer_index, zx::eventpair* release_fence,
                       std::optional<fuchsia::math::RectF> subregion);
 
+  // Present view to graphical presenter.
+  void PresentView();
+
  private:
   BufferCollageFlatland();
-
-  // Requests a new view.
-  void OnNewRequest(fidl::InterfaceRequest<fuchsia::ui::app::ViewProvider> request);
 
   // Disconnects all channels, quits the loop, and calls the stop callback.
   void Stop();
@@ -142,23 +138,15 @@ class BufferCollageFlatland : public fuchsia::ui::app::ViewProvider {
   // Initialize flatland root view.
   void SetupBaseView();
 
-  // |fuchsia::ui::app::ViewProvider|
-  void CreateView2(fuchsia::ui::app::CreateView2Args args) override;
-
-  // |fuchsia::ui::app::ViewProvider|
-  void CreateViewWithViewRef(zx::eventpair view_token,
-                             fuchsia::ui::views::ViewRefControl view_ref_control,
-                             fuchsia::ui::views::ViewRef view_ref) override;
-
   // Thread used for processing camera stream buffers and calling Flatland API.
   async::Loop loop_;
   fuchsia::sysmem::AllocatorPtr sysmem_allocator_;
+  fuchsia::element::GraphicalPresenterPtr graphical_presenter_;
   fit::closure stop_callback_;
   std::unique_ptr<simple_present::FlatlandConnection> flatland_connection_;
   fuchsia::ui::composition::Flatland* flatland_;
   fuchsia::ui::composition::ParentViewportWatcherPtr parent_watcher_;
   fuchsia::ui::composition::AllocatorPtr flatland_allocator_;
-  fidl::Binding<fuchsia::ui::app::ViewProvider> view_provider_binding_;
   std::map<uint32_t, CollectionView> collection_views_;
 
   uint32_t width_ = 0;
