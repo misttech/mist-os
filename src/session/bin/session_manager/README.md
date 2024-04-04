@@ -23,7 +23,7 @@ is desirable for a production configuration.
 
 ### Running manually
 
-Use the [`ffx session`]((/docs/development/tools/ffx/getting-started.md) tool
+Use the [`ffx session`](/docs/development/tools/ffx/getting-started.md) tool
 to launch a specific session:
 
 ```
