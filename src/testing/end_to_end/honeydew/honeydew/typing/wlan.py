@@ -98,18 +98,19 @@ class BssType(enum.IntEnum):
     MESH = 4
 
 
-class ChannelBandwidth(enum.IntEnum):
+class ChannelBandwidth(enum.StrEnum):
     """Channel Bandwidth
 
     Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:src/testing/sl4f/src/wlan/types.rs
     """
 
-    CBW20 = 0
-    CBW40 = 1
-    CBW40BELOW = 2
-    CBW80 = 3
-    CBW160 = 4
-    CBW80P80 = 5
+    CBW20 = "Cbw20"
+    CBW40 = "Cbw40"
+    CBW40BELOW = "Cbw40Below"
+    CBW80 = "Cbw80"
+    CBW160 = "Cbw160"
+    CBW80P80 = "Cbw80P80"
+    UNKNOWN = "Unknown"
 
 
 class Protection(enum.IntEnum):

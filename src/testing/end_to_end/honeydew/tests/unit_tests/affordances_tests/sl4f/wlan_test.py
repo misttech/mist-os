@@ -205,7 +205,7 @@ class WlanSL4FTests(unittest.TestCase):
                     "ies": [3, 2, 1],
                     "channel": {
                         "primary": 1,
-                        "cbw": 0,
+                        "cbw": "Cbw20",
                         "secondary80": 3,
                     },
                     "rssi_dbm": 4,
@@ -219,7 +219,7 @@ class WlanSL4FTests(unittest.TestCase):
                     "ies": [3, 2],
                     "channel": {
                         "primary": 1,
-                        "cbw": 0,
+                        "cbw": "Cbw20",
                         "secondary80": 3,
                     },
                     "rssi_dbm": 4,
@@ -287,7 +287,7 @@ class WlanSL4FTests(unittest.TestCase):
                     "snr_db": 5,
                     "channel": {
                         "primary": 1,
-                        "cbw": 0,
+                        "cbw": "Cbw20",
                         "secondary80": 3,
                     },
                     "protection": 1,
@@ -344,7 +344,7 @@ class WlanSL4FTests(unittest.TestCase):
                     "snr_db": 5,
                     "channel": {
                         "primary": 1,
-                        "cbw": 0,
+                        "cbw": "Cbw20",
                         "secondary80": 3,
                     },
                     "protection": 1,
@@ -369,7 +369,7 @@ class WlanSL4FTests(unittest.TestCase):
                     "snr_db": 5,
                     "channel": {
                         "primary": 1,
-                        "cbw": 0,
+                        "cbw": "Cbw20",
                         "secondary80": 3,
                     },
                     "protection": 1,
@@ -394,7 +394,7 @@ class WlanSL4FTests(unittest.TestCase):
                     "snr_db": 5,
                     "channel": {
                         "primary": 1,
-                        "cbw": 0,
+                        "cbw": "Cbw20",
                         "secondary80": 3,
                     },
                     "protection": 1,
