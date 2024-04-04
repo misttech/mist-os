@@ -17,8 +17,9 @@ use starnix_uapi::{
     errno,
     errors::Errno,
     file_mode::{mode, FileMode},
-    off_t,
+    gid_t, off_t,
     open_flags::OpenFlags,
+    uid_t,
 };
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -143,6 +144,21 @@ impl<'a> StaticDirectoryBuilder<'a> {
 
 pub struct StaticDirectory {
     entries: BTreeMap<&'static FsStr, FsNodeHandle>,
+}
+
+impl StaticDirectory {
+    pub fn force_chown(&self, current_task: &CurrentTask, uid: Option<uid_t>, gid: Option<gid_t>) {
+        for (_, node) in self.entries.iter() {
+            node.update_info(|info| {
+                info.chown(uid, gid);
+            });
+
+            let Some(static_dir) = node.downcast_ops::<Arc<StaticDirectory>>() else {
+                continue;
+            };
+            static_dir.force_chown(current_task, uid, gid);
+        }
+    }
 }
 
 impl FsNodeOps for Arc<StaticDirectory> {

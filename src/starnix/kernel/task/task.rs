@@ -12,7 +12,7 @@ use crate::{
         PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState, SeccompStateValue,
         ThreadGroup, ThreadState, UtsNamespaceHandle, Waiter, ZombieProcess,
     },
-    vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsString},
+    vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString},
 };
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
@@ -751,6 +751,10 @@ pub struct Task {
 
     /// Tell you whether you are tracing syscall entry / exit without a lock.
     pub trace_syscalls: AtomicBool,
+
+    // The pid directory, so it doesn't have to be generated and thrown away on every access.
+    // See https://fxbug.dev/291962828 for details.
+    pub proc_pid_directory_cache: Mutex<Option<FsNodeHandle>>,
 }
 
 /// The decoded cross-platform parts we care about for page fault exception reports.
@@ -908,6 +912,7 @@ impl Task {
             seccomp_filter_state,
             logging_span: OnceCell::new(),
             trace_syscalls: AtomicBool::new(false),
+            proc_pid_directory_cache: Mutex::new(None),
         };
         #[cfg(any(test, debug_assertions))]
         {
@@ -929,10 +934,6 @@ impl Task {
 
     pub fn exit_signal(&self) -> Option<Signal> {
         self.persistent_info.lock().exit_signal
-    }
-
-    pub fn set_creds(&self, creds: Credentials) {
-        self.persistent_info.lock().creds = creds;
     }
 
     pub fn fs(&self) -> &Arc<FsContext> {
@@ -1281,6 +1282,8 @@ impl Releasable for Task {
 
     fn release(mut self, context: (ThreadState, &mut Locked<'_, TaskRelease>)) {
         let (thread_state, _) = context;
+
+        *self.proc_pid_directory_cache.get_mut() = None;
 
         self.ptrace_disconnect();
 

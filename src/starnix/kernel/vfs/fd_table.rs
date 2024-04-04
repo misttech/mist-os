@@ -115,8 +115,7 @@ impl FdTableStore {
         if raw_fd >= self.entries.len() {
             return None;
         }
-        let mut removed = None;
-        std::mem::swap(&mut removed, &mut self.entries[raw_fd]);
+        let removed = self.entries[raw_fd].take();
         if removed.is_some() && raw_fd < self.next_fd.raw() as usize {
             self.next_fd = *fd;
         }

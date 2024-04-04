@@ -13,8 +13,8 @@ use crate::{
         CallbackSymlinkNode, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
         DynamicFileSource, FdNumber, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
         FsNodeInfo, FsNodeOps, FsStr, FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget,
-        SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget, VecDirectory,
-        VecDirectoryEntry,
+        SimpleFileNode, StaticDirectory, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
+        VecDirectory, VecDirectoryEntry,
     },
 };
 use fuchsia_zircon as zx;
@@ -24,17 +24,17 @@ use regex::Regex;
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
 use starnix_uapi::{
-    auth::CAP_SYS_RESOURCE,
+    auth::{Credentials, CAP_SYS_RESOURCE},
     errno, error,
     errors::Errno,
     file_mode::mode,
-    off_t,
+    gid_t, off_t,
     open_flags::OpenFlags,
     ownership::{TempRef, WeakRef},
     pid_t,
     resource_limits::Resource,
     time::duration_to_scheduler_clock,
-    uapi,
+    uapi, uid_t,
     user_address::UserAddress,
     OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN, RLIM_INFINITY,
 };
@@ -42,7 +42,7 @@ use std::{borrow::Cow, ffi::CString, sync::Arc};
 
 /// TaskDirectory delegates most of its operations to StaticDirectory, but we need to override
 /// FileOps::as_pid so that these directories can be used in places that expect a pidfd.
-struct TaskDirectory {
+pub struct TaskDirectory {
     pid: pid_t,
     node_ops: Box<dyn FsNodeOps>,
     file_ops: Box<dyn FileOps>,
@@ -64,6 +64,40 @@ impl TaskDirectory {
             // process."
             FsNodeInfo::new_factory(mode!(IFDIR, 0o777), task.creds().euid_as_fscred()),
         )
+    }
+
+    /// If state is Some and points to a StaticDirectory, change the uid and the
+    /// gid on all reachable files to creds.euid and creds.egid.  See proc(5)
+    /// for details.
+    pub fn maybe_force_chown(
+        current_task: &CurrentTask,
+        state: &mut Option<FsNodeHandle>,
+        creds: &Credentials,
+    ) {
+        let Some(ref mut pd) = &mut *state else {
+            return;
+        };
+        let Some(pd_ops) = pd.downcast_ops::<Arc<crate::fs::proc::pid_directory::TaskDirectory>>()
+        else {
+            return;
+        };
+        pd_ops.force_chown(current_task, &pd, Some(creds.euid), Some(creds.egid));
+    }
+
+    fn force_chown(
+        &self,
+        current_task: &CurrentTask,
+        node: &FsNodeHandle,
+        uid: Option<uid_t>,
+        gid: Option<gid_t>,
+    ) {
+        node.update_info(|info| {
+            info.chown(uid, gid);
+        });
+        let Some(dir) = self.node_ops.as_any().downcast_ref::<Arc<StaticDirectory>>() else {
+            return;
+        };
+        dir.force_chown(current_task, uid, gid);
     }
 }
 
@@ -1013,10 +1047,32 @@ impl StatusFile {
 impl DynamicFileSource for StatusFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let task = &self.0.upgrade();
-        let info = self.1.lock().clone();
+        let (tgid, pid, creds_string) = {
+            // Collect everything stored in info in this block.  There is a lock ordering
+            // issue with the task lock acquired below, and cloning info is
+            // expensive.
+            let info = self.1.lock();
+            write!(sink, "Name:\t")?;
+            sink.write(info.command().as_bytes());
+            let creds = info.creds();
+            (
+                info.pid(),
+                info.tid(),
+                format!(
+                    "Uid:\t{}\t{}\t{}\t{}\nGid:\t{}\t{}\t{}\t{}\nGroups:\t{}",
+                    creds.uid,
+                    creds.euid,
+                    creds.saved_uid,
+                    creds.euid,
+                    creds.gid,
+                    creds.egid,
+                    creds.saved_gid,
+                    creds.egid,
+                    creds.groups.iter().map(|n| n.to_string()).join(" ")
+                ),
+            )
+        };
 
-        write!(sink, "Name:\t")?;
-        sink.write(info.command().as_bytes());
         writeln!(sink)?;
 
         if let Some(task) = task {
@@ -1027,8 +1083,8 @@ impl DynamicFileSource for StatusFile {
             if let Some(task) = task { task.state_code() } else { TaskStateCode::Zombie };
         writeln!(sink, "State:\t{} ({})", state_code.code_char(), state_code.name())?;
 
-        writeln!(sink, "Tgid:\t{}", info.pid())?;
-        writeln!(sink, "Pid:\t{}", info.tid())?;
+        writeln!(sink, "Tgid:\t{}", tgid)?;
+        writeln!(sink, "Pid:\t{}", pid)?;
         let (ppid, threads, tracer_pid) = if let Some(task) = task {
             let tracer_pid = task.read().ptrace.as_ref().map_or(0, |p| p.get_pid());
             let task_group = task.thread_group.read();
@@ -1040,10 +1096,7 @@ impl DynamicFileSource for StatusFile {
         writeln!(sink, "PPid:\t{}", ppid)?;
         writeln!(sink, "TracerPid:\t{}", tracer_pid)?;
 
-        let creds = info.creds();
-        writeln!(sink, "Uid:\t{}\t{}\t{}\t{}", creds.uid, creds.euid, creds.saved_uid, creds.euid)?;
-        writeln!(sink, "Gid:\t{}\t{}\t{}\t{}", creds.gid, creds.egid, creds.saved_gid, creds.egid)?;
-        writeln!(sink, "Groups:\t{}", creds.groups.iter().map(|n| n.to_string()).join(" "))?;
+        writeln!(sink, "{}", creds_string)?;
         track_stub!(TODO("https://fxbug.dev/322873739"), "/proc/pid/status fsuid");
 
         if let Some(task) = task {

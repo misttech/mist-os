@@ -265,7 +265,14 @@ impl FsNodeOps for Arc<ProcDirectory> {
                 let pid = pid_string.parse::<pid_t>().map_err(|_| errno!(ENOENT))?;
                 let weak_task = current_task.get_task(pid);
                 let task = weak_task.upgrade().ok_or_else(|| errno!(ENOENT))?;
-                Ok(pid_directory(current_task, &node.fs(), &task))
+                let mut pd_state = task.proc_pid_directory_cache.lock();
+                if let Some(pd) = &*pd_state {
+                    Ok(pd.clone())
+                } else {
+                    let pd = pid_directory(current_task, &node.fs(), &task);
+                    *pd_state = Some(pd.clone());
+                    Ok(pd)
+                }
             }
         }
     }

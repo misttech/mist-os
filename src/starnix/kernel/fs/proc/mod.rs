@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 mod fs;
-mod pid_directory;
+pub mod pid_directory;
 mod proc_directory;
 mod sysctl;
 mod sysrq;

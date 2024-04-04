@@ -8,6 +8,7 @@ use crate::{
         task::{decode_page_fault_exception_report, get_signal_for_general_exception},
     },
     execution::{create_zircon_process, TaskInfo},
+    fs::proc::pid_directory::TaskDirectory,
     loader::{load_executable, resolve_executable, ResolvedElf},
     mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor},
     selinux::hooks::current_task_hooks as selinux_hooks,
@@ -225,6 +226,14 @@ impl CurrentTask {
 
     pub fn temp_task(&self) -> TempRef<'_, Task> {
         TempRef::from(&self.task)
+    }
+
+    pub fn set_creds(&self, creds: Credentials) {
+        *self.temp_task().persistent_info.lock().creds_mut() = creds;
+        // The /proc/pid direectory's ownership is updated when the task's euid
+        // or egid changes. See proc(5).
+        let mut state = self.proc_pid_directory_cache.lock();
+        TaskDirectory::maybe_force_chown(self, &mut state, &self.creds());
     }
 
     #[inline(always)]

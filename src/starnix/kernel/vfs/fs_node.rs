@@ -192,7 +192,7 @@ impl FsNodeInfo {
         self.time_status_change = utc::utc_now();
     }
 
-    fn chown(&mut self, owner: Option<uid_t>, group: Option<gid_t>) {
+    pub fn chown(&mut self, owner: Option<uid_t>, group: Option<gid_t>) {
         if let Some(owner) = owner {
             self.uid = owner;
         }
