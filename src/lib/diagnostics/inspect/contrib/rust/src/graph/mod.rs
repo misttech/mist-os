@@ -227,6 +227,7 @@ where
         match meta_item.value {
             MetadataValue::Int(value) => node.record_int(meta_item.key.as_ref(), value),
             MetadataValue::Uint(value) => node.record_uint(meta_item.key.as_ref(), value),
+            MetadataValue::Double(value) => node.record_double(meta_item.key.as_ref(), value),
             MetadataValue::Str(ref value) => {
                 node.record_string(meta_item.key.as_ref(), value.as_ref())
             }
@@ -425,6 +426,7 @@ impl Drop for Edge {
 enum MetadataProperty {
     Int(inspect::IntProperty),
     Uint(inspect::UintProperty),
+    Double(inspect::DoubleProperty),
     Str(inspect::StringProperty),
     Bool(inspect::BoolProperty),
 }
@@ -433,6 +435,7 @@ enum MetadataProperty {
 pub enum MetadataValue<'a> {
     Int(i64),
     Uint(u64),
+    Double(f64),
     Str(Cow<'a, str>),
     Bool(bool),
 }
@@ -442,6 +445,7 @@ impl MetadataValue<'_> {
         match self {
             Self::Int(value) => node.record_int(key, *value),
             Self::Uint(value) => node.record_uint(key, *value),
+            Self::Double(value) => node.record_double(key, *value),
             Self::Str(value) => node.record_string(key, value.as_ref()),
             Self::Bool(value) => node.record_bool(key, *value),
         }
@@ -460,7 +464,11 @@ macro_rules! impl_from_for_metadata_value {
     };
 }
 
-impl_from_for_metadata_value!([(i8, i16, i32, i64), Int, i64], [(u8, u16, u32, u64), Uint, u64]);
+impl_from_for_metadata_value!(
+    [(i8, i16, i32, i64), Int, i64],
+    [(u8, u16, u32, u64), Uint, u64],
+    [(f32, f64), Double, f64]
+);
 
 impl From<bool> for MetadataValue<'_> {
     fn from(value: bool) -> MetadataValue<'static> {
@@ -547,6 +555,15 @@ impl GraphMetadata {
                     self.log_update_key(key.as_ref(), &value)
                 }
             }
+            (
+                Some((MetadataProperty::Double(property), track_events)),
+                MetadataValue::Double(x),
+            ) => {
+                property.set(*x);
+                if *track_events {
+                    self.log_update_key(key.as_ref(), &value)
+                }
+            }
             (Some((MetadataProperty::Bool(property), track_events)), MetadataValue::Bool(x)) => {
                 property.set(*x);
                 if *track_events {
@@ -611,6 +628,10 @@ impl GraphMetadata {
             MetadataValue::Uint(value) => {
                 let property = node.create_uint(&key, *value);
                 map.insert(key, (MetadataProperty::Uint(property), track_events));
+            }
+            MetadataValue::Double(value) => {
+                let property = node.create_double(&key, *value);
+                map.insert(key, (MetadataProperty::Double(property), track_events));
             }
             MetadataValue::Str(value) => {
                 let property = node.create_string(&key, value);
@@ -699,6 +720,7 @@ mod tests {
                 Metadata::new("int_property", 2i64),
                 Metadata::new("uint_property", 4u64),
                 Metadata::new("boolean_property", true),
+                Metadata::new("double_property", 2.5),
             ],
         );
 
@@ -711,6 +733,7 @@ mod tests {
                             int_property: 2i64,
                             uint_property: 4u64,
                             boolean_property: true,
+                            double_property: 2.5f64,
                         },
                         "relationships": {}
                     },
@@ -721,6 +744,7 @@ mod tests {
         // We can update all properties.
         vertex.meta().set("int_property", 1i64);
         vertex.meta().set("uint_property", 3u64);
+        vertex.meta().set("double_property", 4.25);
         vertex.meta().set("boolean_property", false);
         vertex.meta().set("string_property", "hello world");
 
@@ -735,6 +759,7 @@ mod tests {
                             string_property: "hello world",
                             int_property: 1i64,
                             uint_property: 3u64,
+                            double_property: 4.25f64,
                             boolean_property: false,
                             new_one: 123i64,
                         },
@@ -748,6 +773,7 @@ mod tests {
         vertex.meta().remove("string_property");
         vertex.meta().remove("int_property");
         vertex.meta().remove("uint_property");
+        vertex.meta().remove("double_property");
         vertex.meta().remove("boolean_property");
 
         assert_data_tree!(inspector, root: {
@@ -781,12 +807,14 @@ mod tests {
                 Metadata::new("int_property", 2i64),
                 Metadata::new("uint_property", 4u64),
                 Metadata::new("boolean_property", true),
+                Metadata::new("double_property", 2.5),
             ],
         );
 
         // We can update all properties.
         edge.meta().set("int_property", 1i64);
         edge.meta().set("uint_property", 3u64);
+        edge.meta().set("double_property", 4.25);
         edge.meta().set("boolean_property", false);
         edge.meta().set("string_property", "hello world");
 
@@ -805,6 +833,7 @@ mod tests {
                                     string_property: "hello world",
                                     int_property: 1i64,
                                     uint_property: 3u64,
+                                    double_property: 4.25f64,
                                     boolean_property: false,
                                     new_one: 123i64,
                                 },
@@ -823,6 +852,7 @@ mod tests {
         edge.meta().remove("string_property");
         edge.meta().remove("int_property");
         edge.meta().remove("uint_property");
+        edge.meta().remove("double_property");
         edge.meta().remove("boolean_property");
 
         // Or even change the type.
