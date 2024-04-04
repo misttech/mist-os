@@ -16,7 +16,6 @@
             protocol: [
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.vulkan.loader.Loader",
             ],

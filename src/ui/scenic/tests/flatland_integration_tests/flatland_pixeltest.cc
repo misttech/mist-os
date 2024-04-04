@@ -261,7 +261,7 @@ TEST_P(ParameterizedYUVPixelTest, YUVTest) {
   rbc_args.set_export_token(std::move(bc_tokens.export_token));
   rbc_args.set_buffer_collection_token(std::move(scenic_token));
   fuc::Allocator_RegisterBufferCollection_Result result;
-  ASSERT_OK(flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result));
+  flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result);
   ASSERT_FALSE(result.is_err());
 
   // Use the local token to allocate a protected buffer.

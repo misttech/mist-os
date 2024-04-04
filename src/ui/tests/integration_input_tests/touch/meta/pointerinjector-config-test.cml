@@ -19,7 +19,6 @@
                 "fuchsia.kernel.Stats",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.input.ImeService",
                 "fuchsia.vulkan.loader.Loader",

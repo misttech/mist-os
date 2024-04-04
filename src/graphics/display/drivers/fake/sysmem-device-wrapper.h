@@ -22,7 +22,7 @@ namespace display {
 // Clients of FakeDisplayStack pass a SysmemDeviceWrapper into the constructor to provide a
 // sysmem implementation to the display driver, with the goal of supporting the following use cases:
 //   - display driver unit tests want to use a self-contained/hermetic sysmem implementation, to
-//     help cover error paths.
+//     improve reliability of test results.
 //   - system integration tests may want to use the "global" sysmem so that multiple components
 //     can use it to coordinate memory allocation, for example tests which involve Scenic, Magma,
 //     and the display driver.

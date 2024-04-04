@@ -56,7 +56,6 @@ async fn assemble_realm(
     // routed from peers.
     b.route_from_parent::<fidl_fuchsia_tracing_provider::RegistryMarker>(&scenic_test_realm).await;
     b.route_from_parent::<fidl_fuchsia_sysmem::AllocatorMarker>(&scenic_test_realm).await;
-    b.route_from_parent::<fidl_fuchsia_sysmem2::AllocatorMarker>(&scenic_test_realm).await;
     b.route_from_parent::<fidl_fuchsia_vulkan_loader::LoaderMarker>(&scenic_test_realm).await;
     b.route_from_parent::<fidl_fuchsia_scheduler::RoleManagerMarker>(&scenic_test_realm).await;
 
