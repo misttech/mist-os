@@ -20,10 +20,9 @@ use derivative::Derivative;
 use either::Either;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4,
-        Ipv4Addr, Ipv6, Ipv6Addr,
+        GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6,
     },
-    AddrAndPortFormatter, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
+    MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::{
@@ -52,8 +51,8 @@ use crate::{
     },
     socket::{
         address::{
-            AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackConnIpAddr, DualStackListenerIpAddr,
-            ListenerAddr, ListenerIpAddr, SocketIpAddr, StrictlyZonedAddr,
+            AddrIsMappedError, ConnAddr, ConnInfoAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr,
+            SocketIpAddr,
         },
         datagram::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
@@ -64,7 +63,7 @@ use crate::{
             DualStackIpExt, EitherIpSocket, ExpectedConnError, ExpectedUnboundError, FoundSockets,
             InUseError, IpExt, IpOptions, MulticastMembershipInterfaceSelector,
             NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
-            SetMulticastMembershipError, SocketHopLimits, SocketInfo as DatagramSocketInfo,
+            SetMulticastMembershipError, SocketHopLimits, SocketInfo,
             SocketState as DatagramSocketState, WrapOtherStackIpOptions,
             WrapOtherStackIpOptionsMut,
         },
@@ -607,10 +606,16 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
         try_alloc_listen_port::<I, D, BT>(rng, is_available)
     }
 
-    fn conn_addr_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
+    fn conn_info_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
         state: &Self::ConnState<I, D>,
-    ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
-        I::conn_addr_from_state(state)
+    ) -> datagram::ConnInfo<I::Addr, D> {
+        let ConnAddr { ip, device } = I::conn_addr_from_state(state);
+        let ConnInfoAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } =
+            ip.into();
+        datagram::ConnInfo::new(local_ip, local_port, remote_ip, remote_port.into(), || {
+            // The invariant that a zone is present if needed is upheld by connect.
+            device.clone().expect("device must be bound for addresses that require zones")
+        })
     }
 
     fn try_alloc_local_id<I: IpExt, D: device::WeakId, BC: RngContext>(
@@ -920,138 +925,6 @@ impl<I: IpExt, D: device::WeakId, BT: UdpBindingsTypes> PortAllocImpl
             AddrVec::Listen(l) => self.listeners().get_by_addr(&l).is_none(),
             AddrVec::Conn(c) => self.conns().get_by_addr(&c).is_none(),
         } && self.get_shadower_counts(&a) == 0)
-    }
-}
-
-/// Information associated with a UDP connection.
-#[derive(Debug, GenericOverIp)]
-#[cfg_attr(test, derive(PartialEq))]
-#[generic_over_ip(A, IpAddress)]
-pub struct ConnInfo<A: IpAddress, D> {
-    /// The local address associated with a UDP connection.
-    pub local_ip: StrictlyZonedAddr<A, SpecifiedAddr<A>, D>,
-    /// The local port associated with a UDP connection.
-    pub local_port: NonZeroU16,
-    /// The remote address associated with a UDP connection.
-    pub remote_ip: StrictlyZonedAddr<A, SpecifiedAddr<A>, D>,
-    /// The remote port associated with a UDP connection.
-    pub remote_port: UdpRemotePort,
-}
-
-// NB: This can't be expressed as a From impl because the BT type becomes
-// unconstrained.
-fn conn_addr_to_conn_info<I, D, BT>(
-    c: ConnAddr<I::DualStackConnIpAddr<Udp<BT>>, D>,
-) -> ConnInfo<I::Addr, D>
-where
-    I: DualStackIpExt,
-    D: Clone + Debug,
-    BT: UdpBindingsTypes,
-{
-    fn to_ipv6_mapped(a: SpecifiedAddr<Ipv4Addr>) -> SpecifiedAddr<Ipv6Addr> {
-        a.get().to_ipv6_mapped()
-    }
-
-    let ConnAddr { ip, device } = c;
-    #[derive(GenericOverIp)]
-    #[generic_over_ip(I, Ip)]
-    struct Wrapper<I: DualStackIpExt, BT: UdpBindingsTypes>(I::DualStackConnIpAddr<Udp<BT>>);
-    let (local_ip, IpInvariant(local_port), remote_ip, IpInvariant(remote_port)) = I::map_ip(
-        Wrapper(ip),
-        |Wrapper(ConnIpAddr { local: (local_ip, local_id), remote: (remote_ip, remote_id) })| {
-            (local_ip.into(), IpInvariant(local_id), remote_ip.into(), IpInvariant(remote_id))
-        },
-        |Wrapper(dual_stack_conn_ip_addr)| match dual_stack_conn_ip_addr {
-            DualStackConnIpAddr::ThisStack(ConnIpAddr {
-                local: (local_ip, local_id),
-                remote: (remote_ip, remote_id),
-            }) => {
-                (local_ip.into(), IpInvariant(local_id), remote_ip.into(), IpInvariant(remote_id))
-            }
-            DualStackConnIpAddr::OtherStack(ConnIpAddr {
-                local: (local_ip, local_id),
-                remote: (remote_ip, remote_id),
-            }) => (
-                to_ipv6_mapped(local_ip.into()),
-                IpInvariant(local_id),
-                to_ipv6_mapped(remote_ip.into()),
-                IpInvariant(remote_id),
-            ),
-        },
-    );
-
-    ConnInfo {
-        local_ip: StrictlyZonedAddr::new_with_zone(local_ip, || {
-            device.clone().expect("device must be bound for addresses that require zones")
-        }),
-        local_port,
-        remote_ip: StrictlyZonedAddr::new_with_zone(remote_ip, || {
-            device.expect("device must be bound for addresses that require zones")
-        }),
-        remote_port,
-    }
-}
-
-/// Information associated with a UDP listener
-#[derive(GenericOverIp)]
-#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
-#[generic_over_ip(A, IpAddress)]
-pub struct ListenerInfo<A: IpAddress, D> {
-    /// The local address associated with a UDP listener, or `None` for any
-    /// address.
-    pub local_ip: Option<StrictlyZonedAddr<A, SpecifiedAddr<A>, D>>,
-    /// The local port associated with a UDP listener.
-    pub local_port: NonZeroU16,
-}
-
-impl<A: IpAddress, D>
-    From<ListenerAddr<<A::Version as DualStackIpExt>::DualStackListenerIpAddr<NonZeroU16>, D>>
-    for ListenerInfo<A, D>
-where
-    A::Version: DualStackIpExt,
-{
-    fn from(
-        ListenerAddr { ip, device }: ListenerAddr<
-            <A::Version as DualStackIpExt>::DualStackListenerIpAddr<NonZeroU16>,
-            D,
-        >,
-    ) -> Self {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct Wrapper<I: DualStackIpExt>(I::DualStackListenerIpAddr<NonZeroU16>);
-        let (addr, IpInvariant(identifier)): (Option<SpecifiedAddr<A>>, _) = A::Version::map_ip(
-            Wrapper(ip),
-            |Wrapper(ListenerIpAddr { addr, identifier })| {
-                (addr.map(SocketIpAddr::into), IpInvariant(identifier))
-            },
-            |Wrapper(addr)| match addr {
-                DualStackListenerIpAddr::ThisStack(ListenerIpAddr { addr, identifier }) => {
-                    (addr.map(SocketIpAddr::into), IpInvariant(identifier))
-                }
-                DualStackListenerIpAddr::OtherStack(ListenerIpAddr { addr, identifier }) => (
-                    SpecifiedAddr::new(
-                        addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, SocketIpAddr::addr)
-                            .to_ipv6_mapped()
-                            .get(),
-                    ),
-                    IpInvariant(identifier),
-                ),
-                DualStackListenerIpAddr::BothStacks(identifier) => (None, IpInvariant(identifier)),
-            },
-        );
-
-        let local_ip = addr.map(|addr| {
-            StrictlyZonedAddr::new_with_zone(addr, || {
-                device.expect("device must be bound for addresses that require zones")
-            })
-        });
-        Self { local_ip, local_port: identifier }
-    }
-}
-
-impl<A: IpAddress, D> From<NonZeroU16> for ListenerInfo<A, D> {
-    fn from(local_port: NonZeroU16) -> Self {
-        Self { local_ip: None, local_port }
     }
 }
 
@@ -2196,7 +2069,7 @@ where
         id: &UdpApiSocketId<I, C>,
     ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_info(core_ctx, bindings_ctx, id).into()
+        datagram::get_info(core_ctx, bindings_ctx, id)
     }
 
     /// Use an existing socket to listen for incoming UDP packets.
@@ -2340,54 +2213,7 @@ where
             + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
     {
         DatagramStateContext::for_each_socket(self.core_ctx(), |_ctx, socket_id, socket_state| {
-            inspector.record_debug_child(socket_id, |node| {
-                socket_state.record_common_info(node);
-
-                let socket_info = socket_state.to_socket_info().into();
-                let (local, remote) = match socket_info {
-                    SocketInfo::Unbound => (None, None),
-                    SocketInfo::Listener(ListenerInfo { local_ip, local_port }) => (
-                        Some((
-                            local_ip.map_or_else(
-                                || ZonedAddr::Unzoned(I::UNSPECIFIED_ADDRESS),
-                                |addr| addr.into_inner_without_witness(),
-                            ),
-                            local_port,
-                        )),
-                        None,
-                    ),
-                    SocketInfo::Connected(ConnInfo {
-                        local_ip,
-                        local_port,
-                        remote_ip,
-                        remote_port,
-                    }) => (
-                        Some((local_ip.into_inner_without_witness(), local_port)),
-                        Some((remote_ip.into_inner_without_witness(), remote_port)),
-                    ),
-                };
-
-                match local {
-                    None => node.record_str("LocalAddress", "[NOT BOUND]"),
-                    Some((addr, port)) => node.record_display(
-                        "LocalAddress",
-                        AddrAndPortFormatter::<_, _, I>::new(
-                            addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
-                            port,
-                        ),
-                    ),
-                };
-                match remote {
-                    None => node.record_str("RemoteAddress", "[NOT CONNECTED]"),
-                    Some((addr, port)) => node.record_display(
-                        "RemoteAddress",
-                        AddrAndPortFormatter::<_, _, I>::new(
-                            addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
-                            u16::from(port),
-                        ),
-                    ),
-                };
-            })
+            socket_state.record_common_info(inspector, socket_id);
         });
     }
 }
@@ -2613,33 +2439,6 @@ impl<
     }
 }
 
-/// Information about the addresses for a socket.
-#[derive(GenericOverIp)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[generic_over_ip(A, IpAddress)]
-pub enum SocketInfo<A: IpAddress, D> {
-    /// The socket was not bound.
-    Unbound,
-    /// The socket was listening.
-    Listener(ListenerInfo<A, D>),
-    /// The socket was connected.
-    Connected(ConnInfo<A, D>),
-}
-
-impl<I: IpExt, D: device::WeakId, BT: UdpBindingsTypes> From<DatagramSocketInfo<I, D, Udp<BT>>>
-    for SocketInfo<I::Addr, D>
-{
-    fn from(value: DatagramSocketInfo<I, D, Udp<BT>>) -> Self {
-        match value {
-            DatagramSocketInfo::Unbound => Self::Unbound,
-            DatagramSocketInfo::Listener(addr) => Self::Listener(addr.into()),
-            DatagramSocketInfo::Connected(addr) => {
-                Self::Connected(conn_addr_to_conn_info::<I, D, BT>(addr))
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use alloc::{
@@ -2661,7 +2460,7 @@ mod tests {
     use net_declare::net_ip_v4 as ip_v4;
     use net_declare::net_ip_v6;
     use net_types::{
-        ip::{IpAddr, Ipv4, Ipv6, Ipv6SourceAddr},
+        ip::{IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
         AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _, ZonedAddr,
     };
     use packet::Buf;
@@ -2685,7 +2484,7 @@ mod tests {
             testutil::{DualStackSendIpPacketMeta, FakeIpDeviceIdCtx},
             ResolveRouteError, SendIpPacketMeta,
         },
-        socket::{self, datagram::MulticastInterfaceSelector},
+        socket::{self, datagram::MulticastInterfaceSelector, StrictlyZonedAddr},
         testutil::{set_logger_for_test, TestIpExt as _},
         uninstantiable::UninstantiableWrapper,
     };
@@ -3584,11 +3383,11 @@ mod tests {
         let info = api.get_info(&socket);
         let (conn_local_ip, conn_remote_ip) = assert_matches!(
             info,
-            SocketInfo::Connected(ConnInfo {
+            SocketInfo::Connected(datagram::ConnInfo {
                 local_ip: conn_local_ip,
                 remote_ip: conn_remote_ip,
-                local_port: _,
-                remote_port: _,
+                local_identifier: _,
+                remote_identifier: _,
             }) => (conn_local_ip, conn_remote_ip)
         );
         assert_eq!(
@@ -3786,11 +3585,11 @@ mod tests {
             .expect("connect should succeed");
         assert_eq!(
             api.get_info(&socket),
-            SocketInfo::Connected(ConnInfo {
+            SocketInfo::Connected(datagram::ConnInfo {
                 local_ip: StrictlyZonedAddr::new_unzoned_or_panic(local_ip),
-                local_port: LOCAL_PORT,
+                local_identifier: LOCAL_PORT,
                 remote_ip: StrictlyZonedAddr::new_unzoned_or_panic(other_remote_ip),
-                remote_port: OTHER_REMOTE_PORT.into(),
+                remote_identifier: OTHER_REMOTE_PORT.into(),
             })
         );
     }
@@ -3820,11 +3619,11 @@ mod tests {
 
         assert_eq!(
             api.get_info(&socket),
-            SocketInfo::Connected(ConnInfo {
+            SocketInfo::Connected(datagram::ConnInfo {
                 local_ip: StrictlyZonedAddr::new_unzoned_or_panic(local_ip),
-                local_port: LOCAL_PORT,
+                local_identifier: LOCAL_PORT,
                 remote_ip: StrictlyZonedAddr::new_unzoned_or_panic(remote_ip),
-                remote_port: REMOTE_PORT.into()
+                remote_identifier: REMOTE_PORT.into()
             })
         );
     }
@@ -3865,7 +3664,7 @@ mod tests {
         let info = assert_matches!(info, SocketInfo::Connected(info) => info);
         assert_eq!(info.local_ip.into_inner(), ZonedAddr::Unzoned(local_ip));
         assert_eq!(info.remote_ip.into_inner(), ZonedAddr::Unzoned(remote_ip));
-        assert_eq!(info.remote_port, REMOTE_PORT.into());
+        assert_eq!(info.remote_identifier, u16::from(REMOTE_PORT));
 
         // Check first frame.
         let (meta, frame_body) =
@@ -4368,7 +4167,7 @@ mod tests {
             .listen(&socket, None, None)
             .map(|()| {
                 let info = api.get_info(&socket);
-                assert_matches!(info, SocketInfo::Listener(info) => info.local_port)
+                assert_matches!(info, SocketInfo::Listener(info) => info.local_identifier)
             })
             .map_err(Either::unwrap_right);
         assert_eq!(result, expected_result);
@@ -4772,11 +4571,11 @@ mod tests {
         let info = api.get_info(&socket);
         assert_eq!(
             info,
-            SocketInfo::Connected(ConnInfo {
+            SocketInfo::Connected(datagram::ConnInfo {
                 local_ip: StrictlyZonedAddr::new_unzoned_or_panic(local_ip::<I>()),
-                local_port: LOCAL_PORT,
+                local_identifier: LOCAL_PORT,
                 remote_ip: StrictlyZonedAddr::new_unzoned_or_panic(remote_ip::<I>()),
-                remote_port: REMOTE_PORT.into(),
+                remote_identifier: REMOTE_PORT.into(),
             })
         );
     }
@@ -4812,8 +4611,13 @@ mod tests {
         let mut get_conn_port = |id| {
             let info = api.get_info(&id);
             let info = assert_matches!(info, SocketInfo::Connected(info) => info);
-            let ConnInfo { local_ip: _, local_port, remote_ip: _, remote_port: _ } = info;
-            local_port
+            let datagram::ConnInfo {
+                local_ip: _,
+                local_identifier,
+                remote_ip: _,
+                remote_identifier: _,
+            } = info;
+            local_identifier
         };
         let port_a = get_conn_port(conn_a).get();
         let port_b = get_conn_port(conn_b).get();
@@ -4876,8 +4680,8 @@ mod tests {
         let mut get_listener_port = |id| {
             let info = api.get_info(&id);
             let info = assert_matches!(info, SocketInfo::Listener(info) => info);
-            let ListenerInfo { local_ip: _, local_port } = info;
-            local_port
+            let datagram::ListenerInfo { local_ip: _, local_identifier } = info;
+            local_identifier
         };
         let wildcard_port = get_listener_port(wildcard_list);
         let specified_port = get_listener_port(specified_list);
@@ -4900,7 +4704,10 @@ mod tests {
         for listener in listeners {
             assert_eq!(
                 api.get_info(&listener),
-                SocketInfo::Listener(ListenerInfo { local_ip: None, local_port: LOCAL_PORT })
+                SocketInfo::Listener(datagram::ListenerInfo {
+                    local_ip: None,
+                    local_identifier: LOCAL_PORT
+                })
             );
         }
     }
@@ -5389,9 +5196,9 @@ mod tests {
         let info = api.get_info(&socket);
         let info = assert_matches!(info, SocketInfo::Connected(info) => info);
         assert_eq!(info.local_ip.into_inner(), local_ip.map_zone(FakeWeakDeviceId));
-        assert_eq!(info.local_port, LOCAL_PORT);
+        assert_eq!(info.local_identifier, LOCAL_PORT);
         assert_eq!(info.remote_ip.into_inner(), remote_ip.map_zone(FakeWeakDeviceId));
-        assert_eq!(info.remote_port, REMOTE_PORT.into());
+        assert_eq!(info.remote_identifier, u16::from(REMOTE_PORT));
     }
 
     #[ip_test]
@@ -5406,7 +5213,7 @@ mod tests {
         let info = api.get_info(&specified);
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip.unwrap().into_inner(), local_ip.map_zone(FakeWeakDeviceId));
-        assert_eq!(info.local_port, LOCAL_PORT);
+        assert_eq!(info.local_identifier, LOCAL_PORT);
 
         // Check getting info on wildcard listener.
         let wildcard = api.create();
@@ -5414,7 +5221,7 @@ mod tests {
         let info = api.get_info(&wildcard);
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip, None);
-        assert_eq!(info.local_port, OTHER_LOCAL_PORT);
+        assert_eq!(info.local_identifier, OTHER_LOCAL_PORT);
     }
 
     #[ip_test]
@@ -5717,13 +5524,13 @@ mod tests {
 
         assert_eq!(
             api.get_info(&socket),
-            SocketInfo::Connected(ConnInfo {
+            SocketInfo::Connected(datagram::ConnInfo {
                 local_ip: StrictlyZonedAddr::new_with_zone(ll_addr, || FakeWeakDeviceId(
                     MultipleDevicesId::A
                 )),
-                local_port: LOCAL_PORT,
+                local_identifier: LOCAL_PORT,
                 remote_ip: StrictlyZonedAddr::new_unzoned_or_panic(remote_ip::<Ipv6>()),
-                remote_port: REMOTE_PORT.into(),
+                remote_identifier: REMOTE_PORT.into(),
             })
         );
     }
@@ -6277,8 +6084,7 @@ mod tests {
         let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
         let listener = api.create();
         api.listen(&listener, None, None).expect("dualstack listen should succeed");
-        let port =
-            assert_matches!(api.get_info(&listener), SocketInfo::Listener(info) => info.local_port);
+        let port = assert_matches!(api.get_info(&listener), SocketInfo::Listener(info) => info.local_identifier);
         assert_eq!(port, AVAILABLE_PORT);
     }
 
@@ -6438,9 +6244,9 @@ mod tests {
 
         assert_eq!(
             api.get_info(&listener),
-            SocketInfo::Listener(ListenerInfo {
+            SocketInfo::Listener(datagram::ListenerInfo {
                 local_ip: bind_addr.map(StrictlyZonedAddr::new_unzoned_or_panic),
-                local_port: LOCAL_PORT,
+                local_identifier: LOCAL_PORT,
             })
         );
     }
@@ -6558,13 +6364,13 @@ mod tests {
         if expected_outcome.is_ok() {
             assert_matches!(
                 api.get_info(&socket),
-                SocketInfo::Connected(ConnInfo{
+                SocketInfo::Connected(datagram::ConnInfo{
                     local_ip: _,
-                    local_port: _,
+                    local_identifier: _,
                     remote_ip: found_remote_ip,
-                    remote_port: found_remote_port,
+                    remote_identifier: found_remote_port,
                 }) if found_remote_ip.addr() == remote_ip &&
-                    found_remote_port == REMOTE_PORT.into()
+                    found_remote_port == u16::from(REMOTE_PORT)
             );
             // Disconnect the socket, returning it to the original state.
             assert_eq!(api.disconnect(&socket), Ok(()));
@@ -6620,13 +6426,13 @@ mod tests {
         if expected_outcome.is_ok() {
             assert_matches!(
                 api.get_info(&socket),
-                SocketInfo::Connected(ConnInfo{
+                SocketInfo::Connected(datagram::ConnInfo{
                     local_ip: _,
-                    local_port: _,
+                    local_identifier: _,
                     remote_ip: found_remote_ip,
-                    remote_port: found_remote_port,
+                    remote_identifier: found_remote_port,
                 }) if found_remote_ip.addr() == remote_ip &&
-                    found_remote_port == REMOTE_PORT.into()
+                    found_remote_port == u16::from(REMOTE_PORT)
             );
             // Disconnect the socket, returning it to the original state.
             assert_eq!(api.disconnect(&socket), Ok(()));
@@ -6635,12 +6441,13 @@ mod tests {
         // Verify the original state is preserved.
         assert_matches!(
             api.get_info(&socket),
-            SocketInfo::Listener(ListenerInfo {
-                local_ip: found_local_ip, local_port: found_local_port
+            SocketInfo::Listener(datagram::ListenerInfo {
+                local_ip: found_local_ip,
+                local_identifier: found_local_port,
             }) if found_local_port == LOCAL_PORT &&
                 local_ip == found_local_ip.map(
-                        |a| a.addr().get()
-                    ).unwrap_or(Ipv6::UNSPECIFIED_ADDRESS)
+                    |a| a.addr().get()
+                ).unwrap_or(Ipv6::UNSPECIFIED_ADDRESS)
         );
     }
 
@@ -6692,13 +6499,13 @@ mod tests {
         };
         assert_matches!(
             api.get_info(&socket),
-            SocketInfo::Connected(ConnInfo{
+            SocketInfo::Connected(datagram::ConnInfo{
                 local_ip: _,
-                local_port: _,
+                local_identifier: _,
                 remote_ip: found_remote_ip,
-                remote_port: found_remote_port,
+                remote_identifier: found_remote_port,
             }) if found_remote_ip.addr() == expected_remote_ip &&
-                found_remote_port == expected_remote_port.into()
+                found_remote_port == u16::from(expected_remote_port)
         );
 
         // Disconnect the socket and verify it returns to unbound state.

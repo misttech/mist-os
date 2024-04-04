@@ -7,12 +7,13 @@
 use core::{
     fmt::{self, Debug, Display, Formatter},
     marker::PhantomData,
+    num::NonZeroU16,
     ops::Deref,
 };
 
 use derivative::Derivative;
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr, Ipv6Addr, Ipv6SourceAddr},
+    ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6Addr, Ipv6SourceAddr},
     MulticastAddr, NonMappedAddr, ScopeableAddress, SpecifiedAddr, UnicastAddr, Witness, ZonedAddr,
 };
 
@@ -228,6 +229,15 @@ pub struct ListenerIpAddr<A: IpAddress, LI> {
     pub(crate) identifier: LI,
 }
 
+impl<A: IpAddress, LI: Into<NonZeroU16>> Into<(Option<SpecifiedAddr<A>>, NonZeroU16)>
+    for ListenerIpAddr<A, LI>
+{
+    fn into(self) -> (Option<SpecifiedAddr<A>>, NonZeroU16) {
+        let Self { addr, identifier } = self;
+        (addr.map(Into::into), identifier.into())
+    }
+}
+
 /// The address of a listening socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ListenerAddr<A, D> {
@@ -250,12 +260,28 @@ impl<TA, OA, D> AsRef<Option<D>> for EitherStack<ListenerAddr<TA, D>, ListenerAd
     }
 }
 
-/// The IP address and identifier (port) of a connected socket.
+/// The IP addresses and identifiers (ports) of a connected socket.
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
 #[generic_over_ip(A, IpAddress)]
-pub struct ConnIpAddr<A: IpAddress, LI, RI> {
-    pub(crate) local: (SocketIpAddr<A>, LI),
-    pub(crate) remote: (SocketIpAddr<A>, RI),
+pub struct ConnIpAddrInner<A, LI, RI> {
+    pub(crate) local: (A, LI),
+    pub(crate) remote: (A, RI),
+}
+
+/// The IP addresses and identifiers (ports) of a connected socket.
+pub type ConnIpAddr<A, LI, RI> = ConnIpAddrInner<SocketIpAddr<A>, LI, RI>;
+/// The IP addresses (mapped if dual-stack) and identifiers (ports) of a connected socket.
+pub type ConnInfoAddr<A, RI> = ConnIpAddrInner<SpecifiedAddr<A>, NonZeroU16, RI>;
+
+impl<A: IpAddress, LI: Into<NonZeroU16>, RI> From<ConnIpAddr<A, LI, RI>> for ConnInfoAddr<A, RI> {
+    fn from(
+        ConnIpAddr { local: (local_ip, local_identifier), remote: (remote_ip, remote_identifier) }: ConnIpAddr<A, LI, RI>,
+    ) -> Self {
+        Self {
+            local: (local_ip.into(), local_identifier.into()),
+            remote: (remote_ip.into(), remote_identifier),
+        }
+    }
 }
 
 /// The address of a connected socket.
@@ -268,7 +294,7 @@ pub struct ConnAddr<A, D> {
 
 /// The IP address and identifier (port) of a dual-stack listening socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub enum DualStackListenerIpAddr<A: IpAddress, LI>
+pub enum DualStackListenerIpAddr<A: IpAddress, LI: Into<NonZeroU16>>
 where
     A::Version: DualStackIpExt,
 {
@@ -278,12 +304,27 @@ where
     BothStacks(LI),
 }
 
-impl<A: IpAddress, NewIp: DualStackIpExt, LI> GenericOverIp<NewIp>
+impl<A: IpAddress, NewIp: DualStackIpExt, LI: Into<NonZeroU16>> GenericOverIp<NewIp>
     for DualStackListenerIpAddr<A, LI>
 where
     A::Version: DualStackIpExt,
 {
     type Type = DualStackListenerIpAddr<NewIp::Addr, LI>;
+}
+
+impl<LI: Into<NonZeroU16>> Into<(Option<SpecifiedAddr<Ipv6Addr>>, NonZeroU16)>
+    for DualStackListenerIpAddr<Ipv6Addr, LI>
+{
+    fn into(self) -> (Option<SpecifiedAddr<Ipv6Addr>>, NonZeroU16) {
+        match self {
+            Self::ThisStack(listener_ip_addr) => listener_ip_addr.into(),
+            Self::OtherStack(ListenerIpAddr { addr, identifier }) => (
+                Some(addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, SocketIpAddr::addr).to_ipv6_mapped()),
+                identifier.into(),
+            ),
+            Self::BothStacks(identifier) => (None, identifier.into()),
+        }
+    }
 }
 
 /// The IP address and identifiers (ports) of a dual-stack connected socket.
@@ -302,6 +343,23 @@ where
     A::Version: DualStackIpExt,
 {
     type Type = DualStackConnIpAddr<NewIp::Addr, LI, RI>;
+}
+
+impl<LI: Into<NonZeroU16>, RI> From<DualStackConnIpAddr<Ipv6Addr, LI, RI>>
+    for ConnInfoAddr<Ipv6Addr, RI>
+{
+    fn from(addr: DualStackConnIpAddr<Ipv6Addr, LI, RI>) -> Self {
+        match addr {
+            DualStackConnIpAddr::ThisStack(conn_ip_addr) => conn_ip_addr.into(),
+            DualStackConnIpAddr::OtherStack(ConnIpAddr {
+                local: (local_ip, local_identifier),
+                remote: (remote_ip, remote_identifier),
+            }) => ConnInfoAddr {
+                local: (local_ip.addr().to_ipv6_mapped(), local_identifier.into()),
+                remote: (remote_ip.addr().to_ipv6_mapped(), remote_identifier),
+            },
+        }
+    }
 }
 
 impl<I: Ip, A: SocketMapAddrSpec> From<ListenerIpAddr<I::Addr, A::LocalIdentifier>>

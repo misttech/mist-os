@@ -32,9 +32,10 @@ use netstack3_core::{
     icmp,
     ip::{IpSockCreateAndSendError, IpSockSendError},
     socket::{
-        self as core_socket, ConnectError, ExpectedConnError, ExpectedUnboundError,
-        MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, NotDualStackCapableError,
-        SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType,
+        self as core_socket, ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError,
+        ListenerInfo, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
+        NotDualStackCapableError, SetDualStackEnabledError, SetMulticastMembershipError,
+        ShutdownType, SocketInfo,
     },
     sync::Mutex as CoreMutex,
     udp, IpExt,
@@ -129,10 +130,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type LocalIdentifier: OptionFromU16 + Into<u16> + Send;
     type RemoteIdentifier: From<u16> + Into<u16> + Send;
     type SocketInfo: IntoFidl<LocalAddress<I, WeakDeviceId<BindingsCtx>, Self::LocalIdentifier>>
-        + TryIntoFidl<
-            RemoteAddress<I, WeakDeviceId<BindingsCtx>, Self::RemoteIdentifier>,
-            Error = fposix::Errno,
-        >;
+        + TryIntoFidl<RemoteAddress<I, WeakDeviceId<BindingsCtx>, u16>, Error = fposix::Errno>;
     type SendError: IntoErrno;
     type SendToError: IntoErrno;
 
@@ -299,7 +297,7 @@ where
     type SetIpTransparentError = Never;
     type LocalIdentifier = NonZeroU16;
     type RemoteIdentifier = udp::UdpRemotePort;
-    type SocketInfo = udp::SocketInfo<I::Addr, WeakDeviceId<BindingsCtx>>;
+    type SocketInfo = SocketInfo<I::Addr, WeakDeviceId<BindingsCtx>>;
     type SendError = Either<udp::SendError, fposix::Errno>;
     type SendToError = Either<LocalAddressError, udp::SendToError>;
 
@@ -551,7 +549,7 @@ where
     type SetIpTransparentError = NotSupportedError;
     type LocalIdentifier = NonZeroU16;
     type RemoteIdentifier = u16;
-    type SocketInfo = icmp::SocketInfo<I::Addr, WeakDeviceId<BindingsCtx>>;
+    type SocketInfo = SocketInfo<I::Addr, WeakDeviceId<BindingsCtx>>;
     type SendError = core_socket::SendError<packet_formats::error::ParseError>;
     type SendToError = either::Either<
         LocalAddressError,
@@ -2130,83 +2128,43 @@ impl IntoErrno for NotSupportedError {
     }
 }
 
-impl<I: Ip, D> IntoFidl<LocalAddress<I, D, NonZeroU16>> for udp::SocketInfo<I::Addr, D> {
+impl<I: Ip, D> IntoFidl<LocalAddress<I, D, NonZeroU16>> for SocketInfo<I::Addr, D> {
     fn into_fidl(self) -> LocalAddress<I, D, NonZeroU16> {
-        let (local_ip, local_port) = match self {
+        let (local_ip, local_identifier) = match self {
             Self::Unbound => (None, None),
-            Self::Listener(udp::ListenerInfo { local_ip, local_port }) => {
-                (local_ip, Some(local_port))
+            Self::Listener(ListenerInfo { local_ip, local_identifier }) => {
+                (local_ip, Some(local_identifier))
             }
-            Self::Connected(udp::ConnInfo {
+            Self::Connected(ConnInfo {
                 local_ip,
-                local_port,
+                local_identifier,
                 remote_ip: _,
-                remote_port: _,
-            }) => (Some(local_ip), Some(local_port)),
+                remote_identifier: _,
+            }) => (Some(local_ip), Some(local_identifier)),
         };
-        LocalAddress { address: local_ip, identifier: local_port }
+        LocalAddress { address: local_ip, identifier: local_identifier }
     }
 }
 
-impl<I: Ip, D> TryIntoFidl<RemoteAddress<I, D, udp::UdpRemotePort>>
-    for udp::SocketInfo<I::Addr, D>
-{
-    type Error = fposix::Errno;
-    fn try_into_fidl(self) -> Result<RemoteAddress<I, D, udp::UdpRemotePort>, Self::Error> {
-        match self {
-            Self::Unbound | Self::Listener(_) => Err(fposix::Errno::Enotconn),
-            Self::Connected(udp::ConnInfo {
-                local_ip: _,
-                local_port: _,
-                remote_ip,
-                remote_port,
-            }) => match remote_port {
-                // Match Linux and report `ENOTCONN` for requests to
-                // 'get_peername` when the connection's remote port is 0.
-                udp::UdpRemotePort::Unset => Err(fposix::Errno::Enotconn),
-                udp::UdpRemotePort::Set(remote_port) => {
-                    Ok(RemoteAddress { address: remote_ip, identifier: remote_port.into() })
-                }
-            },
-        }
-    }
-}
-
-impl<I: Ip, D: Clone> IntoFidl<LocalAddress<I, D, NonZeroU16>> for icmp::SocketInfo<I::Addr, D> {
-    fn into_fidl(self) -> LocalAddress<I, D, NonZeroU16> {
-        let (address, identifier) = match self {
-            Self::Unbound => (None, None),
-            Self::Bound { local_ip, id, device } => (
-                local_ip.map(|addr| {
-                    core_socket::StrictlyZonedAddr::new_with_zone(addr, || {
-                        device.expect("device must be bound for addresses that require zones")
-                    })
-                }),
-                Some(id),
-            ),
-            Self::Connected { local_ip, id, remote_ip: _, remote_id: _, device } => (
-                Some(core_socket::StrictlyZonedAddr::new_with_zone(local_ip, || {
-                    device.expect("device must be bound for addresses that require zones")
-                })),
-                Some(id),
-            ),
-        };
-        LocalAddress { address, identifier }
-    }
-}
-
-impl<I: Ip, D: Clone> TryIntoFidl<RemoteAddress<I, D, u16>> for icmp::SocketInfo<I::Addr, D> {
+impl<I: Ip, D> TryIntoFidl<RemoteAddress<I, D, u16>> for SocketInfo<I::Addr, D> {
     type Error = fposix::Errno;
     fn try_into_fidl(self) -> Result<RemoteAddress<I, D, u16>, Self::Error> {
         match self {
-            Self::Unbound | Self::Bound { .. } => Err(fposix::Errno::Enotconn),
-            Self::Connected { local_ip: _, id: _, remote_ip, remote_id, device } => {
-                Ok(RemoteAddress {
-                    address: core_socket::StrictlyZonedAddr::new_with_zone(remote_ip, || {
-                        device.expect("device must be bound for addresses that require zones")
-                    }),
-                    identifier: remote_id,
-                })
+            Self::Unbound | Self::Listener(_) => Err(fposix::Errno::Enotconn),
+            Self::Connected(ConnInfo {
+                local_ip: _,
+                local_identifier: _,
+                remote_ip,
+                remote_identifier,
+            }) => {
+                if remote_identifier == 0 {
+                    // Match Linux and report `ENOTCONN` for requests to
+                    // 'get_peername` when the connection's remote port is 0 for
+                    // both UDP and ICMP Echo sockets.
+                    Err(fposix::Errno::Enotconn)
+                } else {
+                    Ok(RemoteAddress { address: remote_ip, identifier: remote_identifier })
+                }
             }
         }
     }

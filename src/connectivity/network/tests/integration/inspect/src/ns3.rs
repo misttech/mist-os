@@ -165,12 +165,7 @@ async fn inspect_datagram_sockets<I: net_types::ip::Ip + TestIpExt>(
 
     let want_local = AddrAndPortFormatter::<_, _, I>::new(addr, SRC_PORT).to_string();
     let want_remote = match socket_state {
-        SocketState::Connected => match proto {
-            fposix_socket::DatagramSocketProtocol::Udp => {
-                AddrAndPortFormatter::<_, _, I>::new(addr, DST_PORT).to_string()
-            }
-            fposix_socket::DatagramSocketProtocol::IcmpEcho => addr.to_string(),
-        },
+        SocketState::Connected => AddrAndPortFormatter::<_, _, I>::new(addr, DST_PORT).to_string(),
         SocketState::Bound => "[NOT CONNECTED]".to_string(),
     };
     let want_proto = match proto {

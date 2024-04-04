@@ -130,7 +130,7 @@ pub mod inspect {
 /// Methods for dealing with ICMP sockets.
 pub mod icmp {
     pub use crate::ip::icmp::socket::{
-        IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId, SocketInfo,
+        IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId,
     };
 }
 
@@ -206,8 +206,9 @@ pub mod socket {
     pub use address::{AddrIsMappedError, StrictlyZonedAddr};
     pub use base::{NotDualStackCapableError, SetDualStackEnabledError, ShutdownType};
     pub use datagram::{
-        ConnectError, ExpectedConnError, ExpectedUnboundError, MulticastInterfaceSelector,
-        MulticastMembershipInterfaceSelector, SendError, SendToError, SetMulticastMembershipError,
+        ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError, ListenerInfo,
+        MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, SendError, SendToError,
+        SetMulticastMembershipError, SocketInfo,
     };
 }
 
@@ -254,8 +255,8 @@ pub mod types {
 /// Methods for dealing with UDP sockets.
 pub mod udp {
     pub use crate::transport::udp::{
-        ConnInfo, ListenerInfo, SendError, SendToError, SocketInfo, UdpBindingsTypes,
-        UdpReceiveBindingsContext, UdpRemotePort, UdpSocketId,
+        SendError, SendToError, UdpBindingsTypes, UdpReceiveBindingsContext, UdpRemotePort,
+        UdpSocketId,
     };
 }
 

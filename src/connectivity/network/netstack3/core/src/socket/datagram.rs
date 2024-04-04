@@ -14,7 +14,7 @@ use core::{
     fmt::Debug,
     hash::Hash,
     marker::PhantomData,
-    num::NonZeroU8,
+    num::{NonZeroU16, NonZeroU8},
     ops::{Deref, DerefMut},
 };
 
@@ -22,7 +22,7 @@ use derivative::Derivative;
 use either::Either;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6},
-    MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
+    AddrAndPortFormatter, MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
 };
 use packet::BufferMut;
 use packet_formats::ip::IpProtoExt;
@@ -36,7 +36,7 @@ use crate::{
     error::ExistsError,
     error::{LocalAddressError, NotFoundError, RemoteAddressError, SocketError, ZonedAddressError},
     filter::TransportPacketSerializer,
-    inspect::Inspector,
+    inspect::{Inspector, InspectorDeviceExt},
     ip::{
         socket::{
             IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
@@ -48,13 +48,13 @@ use crate::{
     socket::{
         self,
         address::{
-            dual_stack_remote_ip, try_unmap, AddrVecIter, ConnAddr, ConnIpAddr,
+            dual_stack_remote_ip, try_unmap, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr,
             DualStackConnIpAddr, DualStackListenerIpAddr, DualStackRemoteIp, ListenerAddr,
             ListenerIpAddr, SocketIpAddr, TryUnmapResult,
         },
         AddrVec, BoundSocketMap, EitherStack, InsertError, MaybeDualStack,
         NotDualStackCapableError, Shutdown, ShutdownType, SocketMapAddrSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec,
+        SocketMapConflictPolicy, SocketMapStateSpec, StrictlyZonedAddr,
     },
     sync::{MapRcNotifier, RemoveResourceResult, RemoveResourceResultWithContext, RwLock},
 };
@@ -126,17 +126,17 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S
 }
 
 impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SocketState<I, D, S> {
-    pub(crate) fn to_socket_info(&self) -> SocketInfo<I, D, S> {
+    fn to_socket_info(&self) -> SocketInfo<I::Addr, D> {
         match self {
             Self::Unbound(_) => SocketInfo::Unbound,
             Self::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
                 match socket_type {
                     BoundSocketStateType::Listener { state, sharing: _ } => {
                         let ListenerState { addr, ip_options: _ } = state;
-                        SocketInfo::Listener(addr.clone())
+                        SocketInfo::Listener(addr.clone().into())
                     }
                     BoundSocketStateType::Connected { state, sharing: _ } => {
-                        SocketInfo::Connected(S::conn_addr_from_state(state))
+                        SocketInfo::Connected(S::conn_info_from_state(&state))
                     }
                 }
             }
@@ -144,9 +144,59 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SocketState<I, D, S> {
     }
 
     /// Record inspect information generic to each datagram protocol.
-    pub(crate) fn record_common_info<N: Inspector>(&self, inspector: &mut N) {
-        inspector.record_str("TransportProtocol", S::NAME);
-        inspector.record_str("NetworkProtocol", I::NAME);
+    pub(crate) fn record_common_info<N: Inspector + InspectorDeviceExt<D>>(
+        &self,
+        inspector: &mut N,
+        socket_id: &S::SocketId<I, D>,
+    ) {
+        inspector.record_debug_child(socket_id, |node| {
+            node.record_str("TransportProtocol", S::NAME);
+            node.record_str("NetworkProtocol", I::NAME);
+
+            let socket_info = self.to_socket_info();
+            let (local, remote) = match socket_info {
+                SocketInfo::Unbound => (None, None),
+                SocketInfo::Listener(ListenerInfo { local_ip, local_identifier }) => (
+                    Some((
+                        local_ip.map_or_else(
+                            || ZonedAddr::Unzoned(I::UNSPECIFIED_ADDRESS),
+                            |addr| addr.into_inner_without_witness(),
+                        ),
+                        local_identifier,
+                    )),
+                    None,
+                ),
+                SocketInfo::Connected(ConnInfo {
+                    local_ip,
+                    local_identifier,
+                    remote_ip,
+                    remote_identifier,
+                }) => (
+                    Some((local_ip.into_inner_without_witness(), local_identifier)),
+                    Some((remote_ip.into_inner_without_witness(), remote_identifier)),
+                ),
+            };
+            match local {
+                None => node.record_str("LocalAddress", "[NOT BOUND]"),
+                Some((addr, port)) => node.record_display(
+                    "LocalAddress",
+                    AddrAndPortFormatter::<_, _, I>::new(
+                        addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
+                        port,
+                    ),
+                ),
+            };
+            match remote {
+                None => node.record_str("RemoteAddress", "[NOT CONNECTED]"),
+                Some((addr, port)) => node.record_display(
+                    "RemoteAddress",
+                    AddrAndPortFormatter::<_, _, I>::new(
+                        addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
+                        port,
+                    ),
+                ),
+            };
+        });
     }
 }
 
@@ -963,13 +1013,16 @@ pub trait DualStackIpExt: super::DualStackIpExt {
         + Sync;
 
     /// A listener address for dual-stack operation.
-    type DualStackListenerIpAddr<LocalIdentifier: Clone + Debug + Send + Sync>: Clone
+    type DualStackListenerIpAddr<LocalIdentifier: Clone + Debug + Send + Sync + Into<NonZeroU16>>: Clone
         + Debug
         + Send
-        + Sync;
+        + Sync
+        + Into<(Option<SpecifiedAddr<Self::Addr>>, NonZeroU16)>;
 
     /// A connected address for dual-stack operation.
-    type DualStackConnIpAddr<S: DatagramSocketSpec>: Clone + Debug;
+    type DualStackConnIpAddr<S: DatagramSocketSpec>: Clone
+        + Debug
+        + Into<ConnInfoAddr<Self::Addr, <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier>>;
 
     /// Connection state for a dual-stack socket.
     type DualStackConnState<D: Eq + Hash + Debug + Send + Sync, S: DatagramSocketSpec>: Debug
@@ -1013,7 +1066,7 @@ impl DualStackIpExt for Ipv4 {
     type DualStackBoundSocketId<D: device::WeakId, S: DatagramSocketSpec> = EitherIpSocket<D, S>;
     type OtherStackIpOptions<State: Clone + Debug + Default + Send + Sync> = ();
     /// IPv4 sockets can't listen on dual-stack addresses.
-    type DualStackListenerIpAddr<LocalIdentifier: Clone + Debug + Send + Sync> =
+    type DualStackListenerIpAddr<LocalIdentifier: Clone + Debug + Send + Sync + Into<NonZeroU16>> =
         ListenerIpAddr<Self::Addr, LocalIdentifier>;
     /// IPv4 sockets cannot connect on dual-stack addresses.
     type DualStackConnIpAddr<S: DatagramSocketSpec> = ConnIpAddr<
@@ -1052,7 +1105,7 @@ impl DualStackIpExt for Ipv6 {
     type OtherStackIpOptions<State: Clone + Debug + Default + Send + Sync> = State;
     /// IPv6 listeners can listen on dual-stack addresses (if the protocol
     /// and socket are dual-stack-enabled).
-    type DualStackListenerIpAddr<LocalIdentifier: Clone + Debug + Send + Sync> =
+    type DualStackListenerIpAddr<LocalIdentifier: Clone + Debug + Send + Sync + Into<NonZeroU16>> =
         DualStackListenerIpAddr<Self::Addr, LocalIdentifier>;
     /// IPv6 sockets can connect on dual-stack addresses (if the protocol and
     /// socket are dual-stack-enabled).
@@ -1150,7 +1203,9 @@ pub trait DatagramSocketSpec: Sized {
     /// [`ListenerIpAddr`] or [`DualStackListenerIpAddr`].
     /// Non-dual-stack-capable protocols (like ICMP and raw IP sockets) should
     /// just use [`ListenerIpAddr`].
-    type ListenerIpAddr<I: IpExt>: Clone + Debug;
+    type ListenerIpAddr<I: IpExt>: Clone
+        + Debug
+        + Into<(Option<SpecifiedAddr<I::Addr>>, NonZeroU16)>;
 
     /// The sharing state for a socket.
     ///
@@ -1167,7 +1222,9 @@ pub trait DatagramSocketSpec: Sized {
     /// [`ConnIpAddr`] or [`DualStackConnIpAddr`].
     /// Non-dual-stack-capable protocols (like ICMP and raw IP sockets) should
     /// just use [`ConnIpAddr`].
-    type ConnIpAddr<I: IpExt>: Clone + Debug;
+    type ConnIpAddr<I: IpExt>: Clone
+        + Debug
+        + Into<ConnInfoAddr<I::Addr, <Self::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier>>;
 
     /// The type of a state held by a connected socket.
     ///
@@ -1247,10 +1304,10 @@ pub trait DatagramSocketSpec: Sized {
         ) -> Result<(), InUseError>,
     ) -> Option<<Self::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>;
 
-    /// Retrieves the associated connection ip addr from the connection state.
-    fn conn_addr_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
+    /// Retrieves the associated connection info from the connection state.
+    fn conn_info_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
         state: &Self::ConnState<I, D>,
-    ) -> ConnAddr<Self::ConnIpAddr<I>, D>;
+    ) -> ConnInfo<I::Addr, D>;
 
     /// Tries to allocate a local identifier.
     fn try_alloc_local_id<I: IpExt, D: device::WeakId, BC: RngContext>(
@@ -1302,11 +1359,86 @@ pub(crate) fn collect_all_sockets<
     core_ctx.with_all_sockets(|socket_set| socket_set.keys().map(|s| s.clone().into()).collect())
 }
 
-#[derive(Debug)]
-pub(crate) enum SocketInfo<I: Ip + DualStackIpExt, D, S: DatagramSocketSpec> {
+/// Information associated with a datagram listener.
+#[derive(GenericOverIp)]
+#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
+#[generic_over_ip(A, IpAddress)]
+pub struct ListenerInfo<A: IpAddress, D> {
+    /// The local address associated with a datagram listener, or `None` for any
+    /// address.
+    pub local_ip: Option<StrictlyZonedAddr<A, SpecifiedAddr<A>, D>>,
+    /// The local port associated with a datagram listener.
+    pub local_identifier: NonZeroU16,
+}
+
+impl<A: IpAddress, LA: Into<(Option<SpecifiedAddr<A>>, NonZeroU16)>, D> From<ListenerAddr<LA, D>>
+    for ListenerInfo<A, D>
+{
+    fn from(ListenerAddr { ip, device }: ListenerAddr<LA, D>) -> Self {
+        let (addr, local_identifier) = ip.into();
+        Self {
+            local_ip: addr.map(|addr| {
+                StrictlyZonedAddr::new_with_zone(addr, || {
+                    // The invariant that a zone is present if needed is upheld by
+                    // set_bindtodevice and bind.
+                    device.expect("device must be bound for addresses that require zones")
+                })
+            }),
+            local_identifier,
+        }
+    }
+}
+
+impl<A: IpAddress, D> From<NonZeroU16> for ListenerInfo<A, D> {
+    fn from(local_identifier: NonZeroU16) -> Self {
+        Self { local_ip: None, local_identifier }
+    }
+}
+
+/// Information associated with a datagram connection.
+#[derive(Debug, GenericOverIp)]
+#[cfg_attr(test, derive(PartialEq))]
+#[generic_over_ip(A, IpAddress)]
+pub struct ConnInfo<A: IpAddress, D> {
+    /// The local address associated with a datagram connection.
+    pub local_ip: StrictlyZonedAddr<A, SpecifiedAddr<A>, D>,
+    /// The local identifier associated with a datagram connection.
+    pub local_identifier: NonZeroU16,
+    /// The remote address associated with a datagram connection.
+    pub remote_ip: StrictlyZonedAddr<A, SpecifiedAddr<A>, D>,
+    /// The remote identifier associated with a datagram connection.
+    pub remote_identifier: u16,
+}
+
+impl<A: IpAddress, D> ConnInfo<A, D> {
+    /// Construct a new `ConnInfo`.
+    pub fn new(
+        local_ip: SpecifiedAddr<A>,
+        local_identifier: NonZeroU16,
+        remote_ip: SpecifiedAddr<A>,
+        remote_identifier: u16,
+        mut get_zone: impl FnMut() -> D,
+    ) -> Self {
+        Self {
+            local_ip: StrictlyZonedAddr::new_with_zone(local_ip, &mut get_zone),
+            local_identifier,
+            remote_ip: StrictlyZonedAddr::new_with_zone(remote_ip, &mut get_zone),
+            remote_identifier,
+        }
+    }
+}
+
+/// Information about the addresses for a socket.
+#[derive(GenericOverIp)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[generic_over_ip(A, IpAddress)]
+pub enum SocketInfo<A: IpAddress, D> {
+    /// The socket is not bound.
     Unbound,
-    Listener(ListenerAddr<S::ListenerIpAddr<I>, D>),
-    Connected(ConnAddr<S::ConnIpAddr<I>, D>),
+    /// The socket is listening.
+    Listener(ListenerInfo<A, D>),
+    /// The socket is connected.
+    Connected(ConnInfo<A, D>),
 }
 
 pub(crate) fn close<
@@ -1829,7 +1961,7 @@ pub(crate) fn get_info<
     core_ctx: &mut CC,
     _bindings_ctx: &mut BC,
     id: &S::SocketId<I, CC::WeakDeviceId>,
-) -> SocketInfo<I, CC::WeakDeviceId, S> {
+) -> SocketInfo<I::Addr, CC::WeakDeviceId> {
     core_ctx.with_socket_state(id, |_core_ctx, state| state.to_socket_info())
 }
 
@@ -4900,8 +5032,8 @@ mod test {
     enum FakeAddrSpec {}
 
     impl SocketMapAddrSpec for FakeAddrSpec {
-        type LocalIdentifier = u8;
-        type RemoteIdentifier = char;
+        type LocalIdentifier = NonZeroU16;
+        type RemoteIdentifier = u16;
     }
 
     #[derive(Debug)]
@@ -4918,7 +5050,7 @@ mod test {
         // Any attempt to insert a connection with the following remote port
         // will conflict.
         ConnectionConflicts {
-            remote_port: char,
+            remote_port: u16,
         },
     }
 
@@ -4981,7 +5113,8 @@ mod test {
         type OtherStackIpOptions<I: IpExt> = SocketHopLimits<I::OtherVersion>;
         type SocketMapSpec<I: IpExt, D: device::WeakId> = (Self, I, D);
         type SharingState = Sharing;
-        type ListenerIpAddr<I: IpExt> = I::DualStackListenerIpAddr<u8>;
+        type ListenerIpAddr<I: IpExt> =
+            I::DualStackListenerIpAddr<<FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier>;
         type ConnIpAddr<I: IpExt> = I::DualStackConnIpAddr<Self>;
         type ConnStateExtra = ();
         type ConnState<I: IpExt, D: Debug + Eq + Hash + Send + Sync> =
@@ -5013,15 +5146,22 @@ mod test {
         }
         fn try_alloc_listen_identifier<I: Ip, D: device::WeakId>(
             _bindings_ctx: &mut impl RngContext,
-            is_available: impl Fn(u8) -> Result<(), InUseError>,
-        ) -> Option<u8> {
-            (0..=u8::MAX).find(|i| is_available(*i).is_ok())
+            is_available: impl Fn(
+                <FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+            ) -> Result<(), InUseError>,
+        ) -> Option<<FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier> {
+            (1..=u16::MAX).map(|i| NonZeroU16::new(i).unwrap()).find(|i| is_available(*i).is_ok())
         }
 
-        fn conn_addr_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
+        fn conn_info_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
             state: &Self::ConnState<I, D>,
-        ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
-            I::conn_addr_from_state(state)
+        ) -> ConnInfo<I::Addr, D> {
+            let ConnAddr { ip, device } = I::conn_addr_from_state(state);
+            let ConnInfoAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } =
+                ip.into();
+            ConnInfo::new(local_ip, local_port, remote_ip, remote_port, || {
+                device.clone().expect("device must be bound for addresses that require zones")
+            })
         }
 
         fn try_alloc_local_id<I: IpExt, D: device::WeakId, BC: RngContext>(
@@ -5029,7 +5169,8 @@ mod test {
             _bindings_ctx: &mut BC,
             _flow: DatagramFlowId<I::Addr, <FakeAddrSpec as SocketMapAddrSpec>::RemoteIdentifier>,
         ) -> Option<<FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier> {
-            (0..u8::MAX).find_map(|identifier| {
+            (1..u16::MAX).find_map(|identifier| {
+                let identifier = NonZeroU16::new(identifier).unwrap();
                 bound
                     .listeners()
                     .could_insert(
@@ -5053,7 +5194,14 @@ mod test {
 
     impl<I: IpExt, D: device::WeakId>
         SocketMapConflictPolicy<
-            ConnAddr<ConnIpAddr<I::Addr, u8, char>, D>,
+            ConnAddr<
+                ConnIpAddr<
+                    I::Addr,
+                    <FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+                    <FakeAddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+                >,
+                D,
+            >,
             Sharing,
             I,
             D,
@@ -5062,7 +5210,14 @@ mod test {
     {
         fn check_insert_conflicts(
             sharing: &Sharing,
-            addr: &ConnAddr<ConnIpAddr<I::Addr, u8, char>, D>,
+            addr: &ConnAddr<
+                ConnIpAddr<
+                    I::Addr,
+                    <FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+                    <FakeAddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+                >,
+                D,
+            >,
             _socketmap: &SocketMap<AddrVec<I, D, FakeAddrSpec>, Bound<Self>>,
         ) -> Result<(), InsertError> {
             let ConnAddr { ip: ConnIpAddr { local: _, remote: (_remote_ip, port) }, device: _ } =
@@ -5082,7 +5237,10 @@ mod test {
 
     impl<I: IpExt, D: device::WeakId>
         SocketMapConflictPolicy<
-            ListenerAddr<ListenerIpAddr<I::Addr, u8>, D>,
+            ListenerAddr<
+                ListenerIpAddr<I::Addr, <FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+                D,
+            >,
             Sharing,
             I,
             D,
@@ -5091,7 +5249,10 @@ mod test {
     {
         fn check_insert_conflicts(
             sharing: &Sharing,
-            _addr: &ListenerAddr<ListenerIpAddr<I::Addr, u8>, D>,
+            _addr: &ListenerAddr<
+                ListenerIpAddr<I::Addr, <FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+                D,
+            >,
             _socketmap: &SocketMap<AddrVec<I, D, FakeAddrSpec>, Bound<Self>>,
         ) -> Result<(), InsertError> {
             match sharing {
@@ -5666,7 +5827,7 @@ mod test {
             &mut bindings_ctx,
             &socket,
             Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
-            'a',
+            1234,
             body,
         )
         .expect("succeeds");
@@ -5700,7 +5861,7 @@ mod test {
                 &mut bindings_ctx,
                 &socket,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
-                'a',
+                1234,
                 body,
             ),
             Err(Either::Right(SendToError::CreateAndSend(_)))
@@ -5817,47 +5978,6 @@ mod test {
         assert!(!get_ip_transparent(&mut core_ctx, &unbound));
     }
 
-    // Translates a listener addr from the associated type to a concrete type.
-    fn convert_listener_addr<I: DualStackIpExt, LI: Clone + Debug + Send + Sync>(
-        addr: I::DualStackListenerIpAddr<LI>,
-    ) -> MaybeDualStack<DualStackListenerIpAddr<I::Addr, LI>, ListenerIpAddr<I::Addr, LI>> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct Wrapper<I: DualStackIpExt, LI: Clone + Debug + Send + Sync>(
-            I::DualStackListenerIpAddr<LI>,
-        );
-        I::map_ip(
-            Wrapper(addr),
-            |Wrapper(addr)| MaybeDualStack::NotDualStack(addr),
-            |Wrapper(addr)| MaybeDualStack::DualStack(addr),
-        )
-    }
-
-    // Translates a conn addr from the associated type to a concrete type.
-    fn convert_conn_addr<I: DualStackIpExt, S: DatagramSocketSpec>(
-        addr: I::DualStackConnIpAddr<S>,
-    ) -> MaybeDualStack<
-        DualStackConnIpAddr<
-            I::Addr,
-            <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
-            <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
-        >,
-        ConnIpAddr<
-            I::Addr,
-            <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
-            <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
-        >,
-    > {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct Wrapper<I: DualStackIpExt, S: DatagramSocketSpec>(I::DualStackConnIpAddr<S>);
-        I::map_ip(
-            Wrapper(addr),
-            |Wrapper(addr)| MaybeDualStack::NotDualStack(addr),
-            |Wrapper(addr)| MaybeDualStack::DualStack(addr),
-        )
-    }
-
     #[derive(Eq, PartialEq)]
     enum OriginalSocketState {
         Unbound,
@@ -5916,9 +6036,9 @@ mod test {
             );
 
         let socket = create(&mut core_ctx, ());
-        const LOCAL_PORT: u8 = 10;
-        const ORIGINAL_REMOTE_PORT: char = 'a';
-        const NEW_REMOTE_PORT: char = 'b';
+        const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(10));
+        const ORIGINAL_REMOTE_PORT: u16 = 1234;
+        const NEW_REMOTE_PORT: u16 = 5678;
 
         // Setup the original socket state.
         match original {
@@ -5976,44 +6096,26 @@ mod test {
         match original {
             OriginalSocketState::Unbound => assert_matches!(info, SocketInfo::Unbound),
             OriginalSocketState::Listener => {
-                let ip =
-                    assert_matches!(info, SocketInfo::Listener(ListenerAddr{ip, device: _}) => ip);
-                let identifier = match convert_listener_addr::<I, _>(ip) {
-                    MaybeDualStack::DualStack(DualStackListenerIpAddr::ThisStack(
-                        ListenerIpAddr { addr: _, identifier },
-                    )) => identifier,
-                    MaybeDualStack::DualStack(DualStackListenerIpAddr::OtherStack(
-                        ListenerIpAddr { addr: _, identifier },
-                    ))
-                    | MaybeDualStack::DualStack(DualStackListenerIpAddr::BothStacks(identifier)) => {
-                        identifier
-                    }
-                    MaybeDualStack::NotDualStack(ListenerIpAddr { addr: _, identifier }) => {
-                        identifier
-                    }
-                };
-                assert_eq!(LOCAL_PORT, identifier);
+                let local_port = assert_matches!(
+                    info,
+                    SocketInfo::Listener(ListenerInfo {
+                        local_ip: _,
+                        local_identifier,
+                    }) => local_identifier
+                );
+                assert_eq!(LOCAL_PORT, local_port);
             }
             OriginalSocketState::Connected => {
-                let ip =
-                    assert_matches!(info, SocketInfo::Connected(ConnAddr{ip, device: _}) => ip);
-                let identifier = match convert_conn_addr::<I, _>(ip) {
-                    MaybeDualStack::DualStack(addr) => match addr {
-                        DualStackConnIpAddr::ThisStack(ConnIpAddr {
-                            local: _,
-                            remote: (_addr, identifier),
-                        }) => identifier,
-                        DualStackConnIpAddr::OtherStack(ConnIpAddr {
-                            local: _,
-                            remote: (_addr, identifier),
-                        }) => identifier,
-                    },
-                    MaybeDualStack::NotDualStack(ConnIpAddr {
-                        local: _,
-                        remote: (_addr, identifier),
-                    }) => identifier,
-                };
-                assert_eq!(ORIGINAL_REMOTE_PORT, identifier)
+                let remote_port = assert_matches!(
+                    info,
+                    SocketInfo::Connected(ConnInfo {
+                        local_ip: _,
+                        local_identifier: _,
+                        remote_ip: _,
+                        remote_identifier,
+                    }) => remote_identifier
+                );
+                assert_eq!(ORIGINAL_REMOTE_PORT, remote_port);
             }
         }
     }
@@ -6040,7 +6142,7 @@ mod test {
                 },
             );
 
-        const REMOTE_PORT: char = 'a';
+        const REMOTE_PORT: u16 = 1234;
         let socket = create(&mut core_ctx, ());
         connect(
             &mut core_ctx,
@@ -6109,8 +6211,8 @@ mod test {
                 },
             );
 
-        const LOCAL_PORT: u8 = 10;
-        const REMOTE_PORT: char = 'a';
+        const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(10));
+        const REMOTE_PORT: u16 = 1234;
 
         let socket1 = create(&mut core_ctx, ());
         let socket2 = create(&mut core_ctx, ());

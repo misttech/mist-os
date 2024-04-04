@@ -5,7 +5,9 @@
 //! General-purpose socket utilities common to device layer and IP layer
 //! sockets.
 
-use core::{convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData};
+use core::{
+    convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData, num::NonZeroU16,
+};
 
 use derivative::Derivative;
 use net_types::{
@@ -207,7 +209,7 @@ pub(crate) fn specify_unspecified_remote<I: SocketIpExt, A: From<SocketIpAddr<I:
 /// identifiers for a protocol.
 pub trait SocketMapAddrSpec {
     /// The local identifier portion of a socket address.
-    type LocalIdentifier: Copy + Clone + Debug + Send + Sync + Hash + Eq;
+    type LocalIdentifier: Copy + Clone + Debug + Send + Sync + Hash + Eq + Into<NonZeroU16>;
     /// The remote identifier portion of a socket address.
     type RemoteIdentifier: Copy + Clone + Debug + Send + Sync + Hash + Eq;
 }
@@ -1012,6 +1014,7 @@ mod tests {
     use alloc::{collections::HashSet, vec, vec::Vec};
 
     use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4Addr, Ipv6, Ipv6Addr};
     use test_case::test_case;
@@ -1079,7 +1082,7 @@ mod tests {
     enum FakeAddrSpec {}
 
     impl SocketMapAddrSpec for FakeAddrSpec {
-        type LocalIdentifier = u16;
+        type LocalIdentifier = NonZeroU16;
         type RemoteIdentifier = ();
     }
 
@@ -1239,26 +1242,29 @@ mod tests {
     }
 
     const LISTENER_ADDR: ListenerAddr<
-        ListenerIpAddr<Ipv4Addr, u16>,
+        ListenerIpAddr<Ipv4Addr, NonZeroU16>,
         FakeWeakDeviceId<FakeDeviceId>,
     > = ListenerAddr {
         ip: ListenerIpAddr {
             addr: Some(unsafe { SocketIpAddr::new_unchecked(net_ip_v4!("1.2.3.4")) }),
-            identifier: 0,
+            identifier: const_unwrap_option(NonZeroU16::new(1)),
         },
         device: None,
     };
 
-    const CONN_ADDR: ConnAddr<ConnIpAddr<Ipv4Addr, u16, ()>, FakeWeakDeviceId<FakeDeviceId>> =
-        ConnAddr {
-            ip: unsafe {
-                ConnIpAddr {
-                    local: (SocketIpAddr::new_unchecked(net_ip_v4!("5.6.7.8")), 0),
-                    remote: (SocketIpAddr::new_unchecked(net_ip_v4!("8.7.6.5")), ()),
-                }
-            },
-            device: None,
-        };
+    const CONN_ADDR: ConnAddr<
+        ConnIpAddr<Ipv4Addr, NonZeroU16, ()>,
+        FakeWeakDeviceId<FakeDeviceId>,
+    > = ConnAddr {
+        ip: ConnIpAddr {
+            local: (
+                unsafe { SocketIpAddr::new_unchecked(net_ip_v4!("5.6.7.8")) },
+                const_unwrap_option(NonZeroU16::new(1)),
+            ),
+            remote: unsafe { (SocketIpAddr::new_unchecked(net_ip_v4!("8.7.6.5")), ()) },
+        },
+        device: None,
+    };
 
     #[test]
     fn bound_insert_get_remove_listener() {
@@ -1315,7 +1321,10 @@ mod tests {
         ]
         .map(|(ip, identifier)| ListenerAddr {
             device: None,
-            ip: ListenerIpAddr { addr: ip.map(|x| SocketIpAddr::new(x).unwrap()), identifier },
+            ip: ListenerIpAddr {
+                addr: ip.map(|x| SocketIpAddr::new(x).unwrap()),
+                identifier: NonZeroU16::new(identifier).unwrap(),
+            },
         });
         let conn_addrs = [
             (net_ip_v4!("3.3.3.3"), 3, net_ip_v4!("4.4.4.4")),
@@ -1323,7 +1332,10 @@ mod tests {
         ]
         .map(|(local_ip, local_identifier, remote_ip)| ConnAddr {
             ip: ConnIpAddr {
-                local: (SocketIpAddr::new(local_ip).unwrap(), local_identifier),
+                local: (
+                    SocketIpAddr::new(local_ip).unwrap(),
+                    NonZeroU16::new(local_identifier).unwrap(),
+                ),
                 remote: (SocketIpAddr::new(remote_ip).unwrap(), ()),
             },
             device: None,

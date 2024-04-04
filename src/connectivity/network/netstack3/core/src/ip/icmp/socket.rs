@@ -19,7 +19,7 @@ use either::Either;
 
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker},
-    AddrAndPortFormatter, SpecifiedAddr, Witness as _, ZonedAddr,
+    SpecifiedAddr, ZonedAddr,
 };
 use packet::{BufferMut, Serializer};
 use packet_formats::{
@@ -40,7 +40,7 @@ use crate::{
     },
     socket::{
         self,
-        address::{ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr},
+        address::{ConnAddr, ConnInfoAddr, ConnIpAddr},
         datagram::{
             self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
             DatagramSocketSet, DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError,
@@ -176,46 +176,6 @@ impl<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> WeakIcmpSocketId<I,
 
 pub(crate) type IcmpSocketSet<I, D, BT> = DatagramSocketSet<I, D, Icmp<BT>>;
 pub(crate) type IcmpSocketState<I, D, BT> = datagram::SocketState<I, D, Icmp<BT>>;
-
-impl<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> IcmpSocketState<I, D, BT> {
-    fn to_icmp_socket_info(&self) -> SocketInfo<I::Addr, D> {
-        match self {
-            Self::Unbound(_) => SocketInfo::Unbound,
-            Self::Bound(datagram::BoundSocketState { socket_type, original_bound_addr: _ }) => {
-                match socket_type {
-                    datagram::BoundSocketStateType::Listener { state, sharing: _ } => {
-                        let datagram::ListenerState {
-                            addr: ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
-                            ip_options: _,
-                        } = state;
-                        SocketInfo::Bound {
-                            local_ip: addr.map(Into::into),
-                            id: *identifier,
-                            device: device.clone(),
-                        }
-                    }
-                    datagram::BoundSocketStateType::Connected { state, sharing: _ } => {
-                        // Rustfmt gives bad formatting when the following two destructures
-                        // are combined into one.
-                        let datagram::ConnState {
-                            addr: ConnAddr { ip, device },
-                            extra: remote_id,
-                            ..
-                        } = state;
-                        let ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) } = ip;
-                        SocketInfo::Connected {
-                            remote_ip: (*remote_ip).into(),
-                            local_ip: (*local_ip).into(),
-                            id: *id,
-                            device: device.clone(),
-                            remote_id: *remote_id,
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 #[derive(Clone)]
 pub(crate) struct IcmpConn<S> {
@@ -423,11 +383,15 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
     // it can be reported later.
     type ConnStateExtra = u16;
 
-    fn conn_addr_from_state<I: datagram::IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
-        state: &Self::ConnState<I, D>,
-    ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
-        let datagram::ConnState { addr, .. } = state;
-        addr.clone()
+    fn conn_info_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
+        datagram::ConnState { addr: ConnAddr { ip, device }, extra, .. }: &Self::ConnState<I, D>,
+    ) -> datagram::ConnInfo<I::Addr, D> {
+        let ConnInfoAddr { local: (local_ip, local_identifier), remote: (remote_ip, ()) } =
+            ip.clone().into();
+        datagram::ConnInfo::new(local_ip, local_identifier, remote_ip, *extra, || {
+            // The invariant that a zone is present if needed is upheld by connect.
+            device.clone().expect("device must be bound for addresses that require zones")
+        })
     }
 
     fn try_alloc_local_id<I: IpExt, D: device::WeakId, BC: RngContext>(
@@ -797,10 +761,10 @@ where
     pub fn get_info(
         &mut self,
         id: &IcmpApiSocketId<I, C>,
-    ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
-        StateContext::with_socket_state(self.core_ctx(), id, |_core_ctx, state| {
-            state.to_icmp_socket_info()
-        })
+    ) -> datagram::SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>
+    {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::get_info(core_ctx, bindings_ctx, id)
     }
 
     /// Sets the bound device for a socket.
@@ -963,90 +927,9 @@ where
             + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
     {
         DatagramStateContext::for_each_socket(self.core_ctx(), |_ctx, socket_id, socket_state| {
-            inspector.record_debug_child(socket_id, |node| {
-                socket_state.record_common_info(node);
-
-                let socket_info = socket_state.to_icmp_socket_info();
-                let (local, remote) = match socket_info {
-                    SocketInfo::Unbound => (None, None),
-                    SocketInfo::Bound { local_ip, id, device } => (
-                        Some((
-                            local_ip.map_or_else(
-                                || ZonedAddr::Unzoned(I::UNSPECIFIED_ADDRESS),
-                                |addr| {
-                                    ZonedAddr::new_zoned_if_necessary(addr.into_addr(), || {
-                                        device.expect("address needs a zone but device missing")
-                                    })
-                                },
-                            ),
-                            id,
-                        )),
-                        None,
-                    ),
-                    SocketInfo::Connected { local_ip, device, id, remote_ip, remote_id: _ } => (
-                        Some((
-                            ZonedAddr::new_zoned_if_necessary(local_ip.into_addr(), || {
-                                device.clone().expect("address needs a zone but device missing")
-                            }),
-                            id,
-                        )),
-                        Some(ZonedAddr::new_zoned_if_necessary(remote_ip.into_addr(), || {
-                            device.clone().expect("address needs a zone but device missing")
-                        })),
-                    ),
-                };
-
-                match local {
-                    None => node.record_str("LocalAddress", "[NOT BOUND]"),
-                    Some((addr, port)) => node.record_display(
-                        "LocalAddress",
-                        AddrAndPortFormatter::<_, _, I>::new(
-                            addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
-                            port,
-                        ),
-                    ),
-                };
-                match remote {
-                    None => node.record_str("RemoteAddress", "[NOT CONNECTED]"),
-                    Some(addr) => node.record_display(
-                        "RemoteAddress",
-                        addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
-                    ),
-                };
-            })
+            socket_state.record_common_info(inspector, socket_id);
         });
     }
-}
-
-/// Socket information about an ICMP socket.
-#[derive(Debug, GenericOverIp, PartialEq, Eq)]
-#[generic_over_ip(A, IpAddress)]
-pub enum SocketInfo<A: IpAddress, D> {
-    /// The socket is unbound.
-    Unbound,
-    /// The socket is bound.
-    Bound {
-        /// The bound local IP address.
-        local_ip: Option<SpecifiedAddr<A>>,
-        /// The ID field used for ICMP echoes.
-        id: NonZeroU16,
-        /// An optional device that is bound.
-        device: Option<D>,
-    },
-    /// The socket is connected.
-    Connected {
-        /// The remote IP address this socket is connected to.
-        remote_ip: SpecifiedAddr<A>,
-        /// The bound local IP address.
-        local_ip: SpecifiedAddr<A>,
-        /// The ID field used for ICMP echoes.
-        id: NonZeroU16,
-        /// An optional device that is bound.
-        device: Option<D>,
-        /// Unused when sending/receiving packets, but will be reported back to
-        /// user.
-        remote_id: u16,
-    },
 }
 
 #[cfg(test)]
@@ -1068,6 +951,7 @@ mod tests {
     use crate::{
         device::loopback::{LoopbackCreationProperties, LoopbackDevice},
         ip::icmp::tests::FakeIcmpCtx,
+        socket::StrictlyZonedAddr,
         testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC},
     };
 
@@ -1248,24 +1132,26 @@ mod tests {
         const ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(1));
 
         let id = api.create();
-        assert_eq!(api.get_info(&id), SocketInfo::Unbound);
+        assert_eq!(api.get_info(&id), datagram::SocketInfo::Unbound);
 
         api.bind(&id, None, Some(ICMP_ID)).unwrap();
         assert_eq!(
             api.get_info(&id),
-            SocketInfo::Bound { local_ip: None, id: ICMP_ID, device: None }
+            datagram::SocketInfo::Listener(datagram::ListenerInfo {
+                local_ip: None,
+                local_identifier: ICMP_ID
+            })
         );
 
         api.connect(&id, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), REMOTE_ID).unwrap();
         assert_eq!(
             api.get_info(&id),
-            SocketInfo::Connected {
-                local_ip: I::FAKE_CONFIG.local_ip,
-                remote_ip: I::FAKE_CONFIG.remote_ip,
-                id: ICMP_ID,
-                device: None,
-                remote_id: REMOTE_ID,
-            }
+            datagram::SocketInfo::Connected(datagram::ConnInfo {
+                local_ip: StrictlyZonedAddr::new_unzoned_or_panic(I::FAKE_CONFIG.local_ip),
+                local_identifier: ICMP_ID,
+                remote_ip: StrictlyZonedAddr::new_unzoned_or_panic(I::FAKE_CONFIG.remote_ip),
+                remote_identifier: REMOTE_ID,
+            })
         );
     }
 }
