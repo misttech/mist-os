@@ -29,6 +29,21 @@ using bt::testing::FakeController;
 namespace bt_hci_virtual {
 namespace {
 
+const char* ChannelTypeToString(Channel chan_type) {
+  switch (chan_type) {
+    case Channel::ACL:
+      return "ACL";
+    case Channel::EMULATOR:
+      return "EMULATOR";
+    case Channel::COMMAND:
+      return "COMMAND";
+    case Channel::ISO:
+      return "ISO";
+    case Channel::SNOOP:
+      return "SNOOP";
+  }
+}
+
 FakeController::Settings SettingsFromFidl(const ftest::EmulatorSettings& input) {
   FakeController::Settings settings;
   if (input.has_hci_config() && input.hci_config() == ftest::HciConfig::LE_ONLY) {
@@ -244,7 +259,7 @@ zx_status_t EmulatorDevice::GetProtocol(uint32_t proto_id, void* out_proto) {
 }
 
 zx_status_t EmulatorDevice::OpenChan(Channel chan_type, zx_handle_t chan) {
-  bt_log(TRACE, "virtual", "open HCI channel\n");
+  bt_log(TRACE, "virtual", "Opening %s HCI channel", ChannelTypeToString(chan_type));
 
   zx::channel in(chan);
 
