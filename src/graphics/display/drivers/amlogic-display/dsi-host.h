@@ -6,24 +6,17 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DSI_HOST_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <lib/fit/function.h>
+#include <lib/mmio/mmio-buffer.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
-#include <unistd.h>
-#include <zircon/compiler.h>
 
+#include <cstdint>
 #include <memory>
-#include <optional>
 
-#include <ddktl/device.h>
-#include <hwreg/mmio.h>
-
-#include "src/graphics/display/drivers/amlogic-display/common.h"
-#include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/lcd.h"
 #include "src/graphics/display/drivers/amlogic-display/mipi-phy.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
-#include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
 namespace amlogic_display {

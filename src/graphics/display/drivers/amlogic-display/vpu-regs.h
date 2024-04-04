@@ -6,8 +6,10 @@
 
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VPU_REGS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VPU_REGS_H_
+
+#include <cstdint>
+
 #include <hwreg/bitfields.h>
-#include <hwreg/mmio.h>
 
 #define VPU_VIU_OSD1_CTRL_STAT (0x1a10 << 2)
 #define VPU_VIU_OSD1_COLOR_ADDR (0x1a11 << 2)

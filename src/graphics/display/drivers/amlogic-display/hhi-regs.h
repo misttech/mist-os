@@ -5,6 +5,8 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HHI_REGS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HHI_REGS_H_
 
+#include <cstdint>
+
 #include <hwreg/bitfields.h>
 
 // The register definitions here are from AMLogic A311D Datasheet version 08.

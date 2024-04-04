@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -14,16 +15,13 @@
 #include <cstdint>
 #include <utility>
 
-#include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
-#include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/power-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-regs.h"
-#include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 
@@ -443,7 +441,7 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
       .WriteTo(&vpu_mmio_);
   VdinLFifoCtrlReg::Get().FromValue(0).set_fifo_buf_size(0x780).WriteTo(&vpu_mmio_);
 
-  // Setup input channel FIFO.src/graphics/display/drivers/amlogic-display/video-input-regs.h
+  // Setup input channel FIFO.
   VideoInputChannelFifoControl3::Get(kVideoInputModuleId)
       .ReadFrom(&vpu_mmio_)
       .set_channel6_data_enabled(true)

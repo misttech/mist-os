@@ -7,7 +7,6 @@
 #include <cstdint>
 
 #include <hwreg/bitfields.h>
-#include <hwreg/mmio.h>
 
 // VPP register is part of VPU register space
 #define DOLBY_PATH_CTRL (0x1a0c << 2)

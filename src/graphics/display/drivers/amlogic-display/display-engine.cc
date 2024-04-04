@@ -5,45 +5,36 @@
 #include "src/graphics/display/drivers/amlogic-display/display-engine.h"
 
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
-#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
-#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
-#include <lib/fzl/vmo-mapper.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/channel.h>
-#include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
-#include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
-#include <zircon/threads.h>
 #include <zircon/types.h>
 
 #include <cinttypes>
 #include <cstddef>
 #include <memory>
 
-#include <ddk/metadata/display.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
-#include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/capture.h"
-#include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"

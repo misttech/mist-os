@@ -5,11 +5,14 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_HOST_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_HOST_H_
 
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
-#include <lib/mmio/mmio.h>
+#include <fuchsia/hardware/i2cimpl/c/banjo.h>
+#include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
+#include <zircon/types.h>
 
-#include "src/graphics/display/drivers/amlogic-display/common.h"
+#include <cstdint>
+#include <memory>
+
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 

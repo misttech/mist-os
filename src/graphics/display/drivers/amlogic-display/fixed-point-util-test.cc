@@ -4,10 +4,6 @@
 
 #include "src/graphics/display/drivers/amlogic-display/fixed-point-util.h"
 
-#include <zircon/assert.h>
-
-#include <cstdint>
-
 #include <gtest/gtest.h>
 
 namespace amlogic_display {

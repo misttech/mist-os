@@ -10,12 +10,13 @@
 #include <lib/zx/result.h>
 #include <unistd.h>
 #include <zircon/assert.h>
+#include <zircon/status.h>
 #include <zircon/syscalls/smc.h>
+#include <zircon/types.h>
 
 #include <memory>
 
 #include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter-top-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"

@@ -7,14 +7,18 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/loop.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/ddk/device.h>
+#include <lib/fit/function.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
+#include <threads.h>
+#include <zircon/syscalls/port.h>
 
+#include <cstddef>
 #include <memory>
-#include <optional>
 
 #include <fbl/mutex.h>
 

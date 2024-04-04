@@ -6,11 +6,12 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_TRANSMITTER_H_
 
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
-#include <lib/mmio/mmio.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 
+#include <cstdint>
 #include <memory>
 
 #include <fbl/mutex.h>

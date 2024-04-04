@@ -12,7 +12,6 @@
 #include <lib/zx/result.h>
 
 #include <memory>
-#include <optional>
 
 #include <fbl/mutex.h>
 

@@ -6,26 +6,15 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VIDEO_INPUT_UNIT_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/mmio/mmio.h>
-#include <lib/zircon-internal/thread_annotations.h>
-#include <lib/zx/bti.h>
-#include <lib/zx/handle.h>
-#include <lib/zx/interrupt.h>
-#include <lib/zx/pmt.h>
-#include <threads.h>
-#include <zircon/compiler.h>
-#include <zircon/types.h>
+#include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 
-#include <fbl/auto_lock.h>
-#include <fbl/condition_variable.h>
-#include <fbl/mutex.h>
-
-#include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"

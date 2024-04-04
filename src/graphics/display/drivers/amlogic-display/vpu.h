@@ -6,18 +6,18 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VPU_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/mmio/mmio.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/zircon-internal/thread_annotations.h>
-#include <zircon/compiler.h>
+#include <lib/zx/result.h>
+#include <zircon/types.h>
 
-#include <optional>
+#include <cstdint>
+#include <memory>
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
-#include "src/graphics/display/drivers/amlogic-display/vout.h"
-#include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 
 namespace amlogic_display {
 

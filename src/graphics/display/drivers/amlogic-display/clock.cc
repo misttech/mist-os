@@ -7,8 +7,8 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
 #include <zircon/assert.h>
-#include <zircon/status.h>
 
 #include <cstdint>
 
@@ -20,6 +20,7 @@
 #include "src/graphics/display/drivers/amlogic-display/dsi.h"
 #include "src/graphics/display/drivers/amlogic-display/fixed-point-util.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {

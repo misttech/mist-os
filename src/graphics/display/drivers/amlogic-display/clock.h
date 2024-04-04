@@ -6,23 +6,15 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CLOCK_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fuchsia/hardware/dsiimpl/c/banjo.h>
-#include <lib/ddk/driver.h>
-#include <lib/mmio/mmio.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
-#include <unistd.h>
-#include <zircon/compiler.h>
 
-#include <optional>
+#include <cstdint>
 
-#include <ddktl/device.h>
 #include <hwreg/mmio.h>
 
-#include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/dsi.h"
-#include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
-#include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {

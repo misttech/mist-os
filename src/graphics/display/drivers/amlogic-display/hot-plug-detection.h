@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/loop.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/ddk/device.h>
 #include <lib/fit/function.h>
@@ -14,8 +15,11 @@
 #include <lib/zx/result.h>
 #include <threads.h>
 #include <zircon/compiler.h>
+#include <zircon/syscalls/port.h>
 
-#include <optional>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 
 #include <fbl/mutex.h>
 

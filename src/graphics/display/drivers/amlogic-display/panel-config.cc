@@ -6,9 +6,9 @@
 
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/device-protocol/display-panel.h>
-#include <lib/stdcompat/span.h>
-#include <lib/zx/result.h>
 #include <zircon/types.h>
+
+#include <cstdint>
 
 #include "src/graphics/display/drivers/amlogic-display/initcodes-inl.h"
 #include "src/graphics/display/drivers/amlogic-display/panel/boe-tv070wsm-fitipower-jd9364-astro.h"

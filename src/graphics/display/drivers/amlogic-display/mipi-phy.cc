@@ -7,11 +7,17 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
+
+#include <cstdint>
+#include <memory>
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
+#include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/dsi.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
 namespace amlogic_display {

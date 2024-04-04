@@ -6,19 +6,11 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_MIPI_PHY_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
-#include <lib/ddk/device.h>
 #include <lib/mmio/mmio-buffer.h>
-#include <lib/mmio/mmio.h>
-#include <unistd.h>
-#include <zircon/compiler.h>
+#include <lib/zx/result.h>
 
-#include <optional>
+#include <cstdint>
 
-#include <ddktl/device.h>
-
-#include "src/graphics/display/drivers/amlogic-display/common.h"
-#include "src/graphics/display/drivers/amlogic-display/dsi.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
 namespace amlogic_display {

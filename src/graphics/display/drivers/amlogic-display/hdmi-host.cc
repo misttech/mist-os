@@ -5,12 +5,12 @@
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
+#include <unistd.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
-
-#include <limits>
 
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>

@@ -7,14 +7,21 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/stdcompat/span.h>
+#include <lib/zx/bti.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
+#include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmar.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/threads.h>
+#include <zircon/syscalls.h>
 #include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>

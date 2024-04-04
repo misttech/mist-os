@@ -8,9 +8,9 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/fit/defer.h>
-#include <zircon/status.h>
+#include <lib/zx/result.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
 #include <memory>

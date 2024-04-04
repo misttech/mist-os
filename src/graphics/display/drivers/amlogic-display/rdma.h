@@ -6,17 +6,24 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_RDMA_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/loop.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio-buffer.h>
-#include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/pmt.h>
-#include <threads.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
+#include <lib/zx/vmo.h>
+#include <zircon/syscalls/port.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>

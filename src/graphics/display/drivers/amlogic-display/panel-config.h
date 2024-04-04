@@ -7,8 +7,6 @@
 
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/stdcompat/span.h>
-#include <lib/zx/result.h>
-#include <zircon/types.h>
 
 #include <cstdint>
 

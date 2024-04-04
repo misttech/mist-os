@@ -11,7 +11,6 @@
 #include <cstdint>
 
 #include <hwreg/bitfields.h>
-#include <hwreg/mmio.h>
 
 namespace amlogic_display {
 
@@ -131,7 +130,8 @@ class VideoInputCommandControl : public hwreg::RegisterBase<VideoInputCommandCon
       case InputSource::kSecondBt656:
         return set_input_source_selection(input_source);
     }
-    ZX_DEBUG_ASSERT_MSG(false, "Unsupported input source: %" PRIu32, static_cast<uint32_t>(input_source));
+    ZX_DEBUG_ASSERT_MSG(false, "Unsupported input source: %" PRIu32,
+                        static_cast<uint32_t>(input_source));
     return set_input_source_selection(InputSource::kNoInput);
   }
 

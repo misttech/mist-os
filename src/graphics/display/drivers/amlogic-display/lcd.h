@@ -6,13 +6,11 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_LCD_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
-#include <lib/fit/function.h>
-#include <unistd.h>
-#include <zircon/compiler.h>
+#include <lib/ddk/device.h>
+#include <lib/zx/result.h>
 
-#include <fbl/alloc_checker.h>
-#include <hwreg/mmio.h>
+#include <cstdint>
+#include <memory>
 
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"

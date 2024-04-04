@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
+#include <lib/ddk/driver.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>

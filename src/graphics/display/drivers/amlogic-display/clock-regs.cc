@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 
-#include <lib/ddk/debug.h>
 #include <zircon/assert.h>
 
 #include "src/graphics/display/drivers/amlogic-display/fixed-point-util.h"

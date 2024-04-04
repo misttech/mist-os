@@ -4,20 +4,24 @@
 
 #include "src/graphics/display/drivers/amlogic-display/lcd.h"
 
-#include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
+#include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
-#include <lib/device-protocol/display-panel.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
+#include <lib/zx/time.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
+
+#include <array>
+#include <cstdint>
 
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 

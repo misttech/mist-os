@@ -4,18 +4,25 @@
 
 #include "src/graphics/display/drivers/amlogic-display/dsi-host.h"
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/display-panel.h>
+#include <lib/fit/function.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
+#include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/dsi.h"
+#include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/lcd.h"
+#include "src/graphics/display/drivers/amlogic-display/mipi-phy.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 

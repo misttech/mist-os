@@ -5,10 +5,11 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_RDMA_REGS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_RDMA_REGS_H_
 
-#include <lib/mmio/mmio.h>
+#include <lib/mmio/mmio-buffer.h>
+
+#include <cstdint>
 
 #include <hwreg/bitfields.h>
-#include <hwreg/mmio.h>
 
 // The register definitions here are from AMLogic S912 Datasheet revision 0.1.
 // The information was cross-checked against AMLogic's VLSI GXL RDMA

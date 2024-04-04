@@ -6,14 +6,13 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_ENGINE_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/interrupt.h>
-#include <unistd.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -22,7 +21,6 @@
 #include <memory>
 
 #include <ddktl/device.h>
-#include <fbl/auto_lock.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
 

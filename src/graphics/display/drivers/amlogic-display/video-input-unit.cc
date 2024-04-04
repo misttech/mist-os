@@ -7,40 +7,27 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
-#include <lib/zx/clock.h>
-#include <lib/zx/pmt.h>
-#include <lib/zx/time.h>
-#include <lib/zx/vmar.h>
-#include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/syscalls.h>
-#include <zircon/threads.h>
 #include <zircon/types.h>
-#include <zircon/utc.h>
 
 #include <algorithm>
-#include <cfloat>
 #include <cmath>
 #include <cstdint>
 #include <memory>
 
 #include <ddktl/device.h>
-#include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
-#include "src/graphics/display/drivers/amlogic-display/display-engine.h"
-#include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/image-info.h"
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
-#include "src/graphics/display/drivers/amlogic-display/rdma-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/frame.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {
 

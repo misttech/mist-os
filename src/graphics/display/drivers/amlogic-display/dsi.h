@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DSI_H_
 
 #include <algorithm>
+#include <cstdint>
 
 namespace amlogic_display {
 

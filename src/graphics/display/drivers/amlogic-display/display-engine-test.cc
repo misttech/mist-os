@@ -12,8 +12,6 @@
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/mmio/mmio-buffer.h>
-#include <zircon/syscalls/object.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>

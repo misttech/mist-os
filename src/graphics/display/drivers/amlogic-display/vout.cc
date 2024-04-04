@@ -5,20 +5,26 @@
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fidl/fuchsia.images2/cpp/wire.h>
-#include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
-#include <lib/device-protocol/display-panel.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <lib/ddk/debug.h>
+#include <lib/ddk/device.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/drivers/amlogic-display/clock.h"
+#include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/dsi-host.h"
 #include "src/graphics/display/drivers/amlogic-display/logging.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"

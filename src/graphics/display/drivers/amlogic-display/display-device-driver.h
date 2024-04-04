@@ -5,9 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_H_
 
-#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <zircon/types.h>
 
 #include <memory>

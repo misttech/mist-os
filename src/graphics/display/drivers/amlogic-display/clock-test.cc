@@ -4,13 +4,15 @@
 
 #include "src/graphics/display/drivers/amlogic-display/clock.h"
 
-#include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/device-protocol/display-panel.h>
+#include <lib/zx/result.h>
 #include <zircon/assert.h>
+
+#include <cstdint>
+#include <vector>
 
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/drivers/amlogic-display/dsi.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/lib/testing/predicates/status.h"
 

@@ -5,16 +5,14 @@
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <lib/async-loop/loop.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
+#include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
-#include <zircon/threads.h>
 #include <zircon/types.h>
 
 #include <memory>

@@ -4,13 +4,18 @@
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 
+#include <lib/zx/result.h>
+
+#include <algorithm>
 #include <iterator>
 #include <list>
+#include <memory>
 
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace amlogic_display {

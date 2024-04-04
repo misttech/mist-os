@@ -6,16 +6,21 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VOUT_H_
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
-#include <lib/device-protocol/display-panel.h>
+#include <lib/ddk/device.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <cstdint>
+#include <memory>
 
 #include "src/graphics/display/drivers/amlogic-display/clock.h"
 #include "src/graphics/display/drivers/amlogic-display/dsi-host.h"
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
+#include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
