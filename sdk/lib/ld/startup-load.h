@@ -111,6 +111,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   using List = fbl::DoublyLinkedList<StartupLoadModule*>;
   using PreloadedModulesList = std::pair<List, cpp20::span<const Dyn>>;
 
+  using NeededCountObserver = elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded>;
+
   StartupLoadModule() = delete;
 
   StartupLoadModule(StartupLoadModule&&) = default;
@@ -162,39 +164,30 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     }
 
     // Now that there is a Memory object to use, decode everything else.
-    auto decode_result =
-        decoded().DecodeFromMemory(diag, memory(), loader_.page_size(), *headers, max_tls_modid);
-    if (!decode_result) [[unlikely]] {
-      return {};
+    StartupLoadResult result;
+    if (auto decode_result = decoded().DecodeFromMemory(  //
+            diag, memory(), loader_.page_size(), *headers, max_tls_modid,
+            NeededCountObserver(result.needed_count))) [[likely]] {
+      // Save the span of Dyn entries for LoadDeps to scan later.  With that,
+      // everything is now prepared to proceed with loading dependencies and
+      // performing relocation.
+      dynamic_ = decode_result->dynamic;
+
+      // The caller may also want these fields for a main executable.
+      result.entry = decode_result->entry + loader_.load_bias();
+      result.stack_size = decode_result->stack_size;
     }
-
-    // Finally, decode the dynamic section.
-    size_t needed_count = DecodeDynamic(diag, decode_result->dyn_phdr);
-
-    // Everything is now prepared to proceed with loading dependencies
-    // and performing relocation.
-    return {
-        .needed_count = needed_count,
-        .entry = decode_result->entry + loader_.load_bias(),
-        .stack_size = decode_result->stack_size,
-    };
+    return result;
   }
+
+  // If a module is constructed manually rather than by Load, this points it at
+  // its PT_DYNAMIC segment in memory.
+  void set_dynamic(cpp20::span<const Dyn> dynamic) { dynamic_ = dynamic; }
 
   void Relocate(Diagnostics& diag, const List& modules) {
     elfldltl::RelocateRelative(diag, memory(), reloc_info(), load_bias());
     auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, kTlsDescResolver);
     elfldltl::RelocateSymbolic(memory(), diag, reloc_info(), symbol_info(), load_bias(), resolver);
-  }
-
-  // Returns number of DT_NEEDED entries. See StartupLoadResult, for why that is useful.
-  size_t DecodeDynamic(Diagnostics& diag, const std::optional<Phdr>& dyn_phdr) {
-    using NeededObserver = elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded>;
-    size_t count = 0;
-    // Save the span of Dyn entries for LoadDeps to scan later.
-    dynamic_ =
-        *DecodeModuleDynamic(decoded().module(), diag, memory(), dyn_phdr, NeededObserver(count),
-                             elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()));
-    return count;
   }
 
   // Since later failures will be fatal anyway, we can go ahead and commit the

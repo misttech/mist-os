@@ -36,18 +36,22 @@ class DecodedModuleInMemory : public DecodedModule<ElfLayout, SegmentContainer, 
   using Base =
       DecodedModule<ElfLayout, SegmentContainer, InlineModule, WithRelocInfo, SegmentWrapper>;
 
+  using typename Base::Dyn;
   using typename Base::Ehdr;
   using typename Base::Elf;
   using typename Base::LoadInfo;
   using typename Base::Module;
   using typename Base::Phdr;
-  using size_type = typename Elf::size_type;
+  using typename Base::size_type;
   using Region = typename LoadInfo::Region;
 
+  // This is the successful return value of DecodeFromMemory, below.  Some
+  // or all of these things may be useless to some callers, but the startup
+  // dynamic linker uses each in some cases.
   struct DecodeResult {
-    size_type entry = 0;
+    cpp20::span<const Dyn> dynamic;  // PT_DYNAMIC contents in memory.
+    size_type entry = 0;             // e_entry entry point, needs load bias.
     std::optional<size_type> stack_size;
-    std::optional<typename Elf::Phdr> dyn_phdr;
   };
 
   // Set when the PT_GNU_RELRO phdr is seen by set_relro or DecodeFromMemory.
@@ -116,11 +120,18 @@ class DecodedModuleInMemory : public DecodedModule<ElfLayout, SegmentContainer, 
   // ehdr and phdrs for everything else but the PT_LOADs for load_info(),
   // already filled by LoadFromFile.  Now module() is getting filled in with
   // direct pointers into the loaded image.  If it has a PT_TLS, max_tls_modid
-  // will be incremented to set module().tls_modid.
-  template <class Diagnostics, class Memory>
-  constexpr std::optional<DecodeResult> DecodeFromMemory(  //
+  // will be incremented to set module().tls_modid.  The reloc_info() and
+  // module() data is filled from the PT_DYNAMIC, but additional observer
+  // objects for elfldltl::DecodeDynamic can be passed for e.g. DT_NEEDED.
+  //
+  // The return value's `dynamic` member points to the PT_DYNAMIC as read using
+  // the Memory object; it also has the stack size request (if any) and the
+  // e_entry header field without load bias adjustment applied.
+  template <class Diagnostics, class Memory, class... DynamicObservers>
+  [[nodiscard]] constexpr std::optional<DecodeResult> DecodeFromMemory(  //
       Diagnostics& diag, Memory&& memory, size_t page_size, const Ehdr& ehdr,
-      cpp20::span<const Phdr> phdrs, size_type& max_tls_modid) {
+      cpp20::span<const Phdr> phdrs, size_type& max_tls_modid,
+      DynamicObservers&&... dynamic_observers) {
     auto result = DecodeModulePhdrs(  //
         diag, phdrs, PhdrMemoryBuildIdObserver(memory, this->module()));
     if (!result) [[unlikely]] {
@@ -137,21 +148,30 @@ class DecodedModuleInMemory : public DecodedModule<ElfLayout, SegmentContainer, 
       this->SetTls(diag, memory, *tls_phdr, ++max_tls_modid);
     }
 
+    auto dynamic = this->DecodeDynamic(diag, memory, dyn_phdr,
+                                       std::forward<DynamicObservers>(dynamic_observers)...);
+
+    if (dynamic.is_error()) [[unlikely]] {
+      return std::nullopt;
+    }
+
     return DecodeResult{
+        .dynamic = *dynamic,
         .entry = ehdr.entry,
         .stack_size = stack_size,
-        .dyn_phdr = dyn_phdr,
     };
   }
 
   // This is a shorthand taking the successful return value from LoadFromFile
   // (that is, the std::optional<...>::value_type of that std::optional<...>).
-  template <class Diagnostics, class Memory, class Headers>
-  constexpr std::optional<DecodeResult> DecodeFromMemory(  //
+  template <class Diagnostics, class Memory, class Headers, class... DynamicObservers>
+  [[nodiscard]] constexpr std::optional<DecodeResult> DecodeFromMemory(  //
       Diagnostics& diag, Memory&& memory, size_t page_size, Headers&& headers,
-      size_type& max_tls_modid) {
+      size_type& max_tls_modid, DynamicObservers&&... dynamic_observers) {
     auto& [ehdr, phdrs] = headers;
-    return DecodeFromMemory(diag, memory, page_size, ehdr, phdrs, max_tls_modid);
+    return DecodeFromMemory(  //
+        diag, memory, page_size, ehdr, phdrs, max_tls_modid,
+        std::forward<DynamicObservers>(dynamic_observers)...);
   }
 
   // This consumes some Loader API object by calling its Commit method with the

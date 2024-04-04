@@ -133,7 +133,10 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
     main_executable->decoded().SetTls(diag, main_executable->memory(), *phdr_info->tls_phdr, 1);
   }
 
-  size_t needed_count = main_executable->DecodeDynamic(diag, phdr_info->dyn_phdr);
+  size_t needed_count = 0;
+  main_executable->set_dynamic(*main_executable->decoded().DecodeDynamic(  //
+      diag, main_executable->memory(), phdr_info->dyn_phdr,
+      StartupModule::NeededCountObserver(needed_count)));
 
   return {main_executable, needed_count};
 }
