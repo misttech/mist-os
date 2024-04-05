@@ -2010,13 +2010,7 @@ impl ResolvedInstanceState {
     /// [`Router`]s. This [`Dict`] is used to generate the `exposed_dir`. This function creates a new [`Dict`],
     /// so allocation cost is paid only when called.
     pub async fn make_exposed_dict(&self) -> Dict {
-        // Unwrap is safe because `ResolvedInstanceState` is held within `ComponentInstance`.
-        let routing_task_group = self.weak_component.upgrade().unwrap().blocking_task_group();
-        let dict = Router::dict_routers_to_open(
-            &self.weak_component,
-            &self.component_output_dict,
-            routing_task_group,
-        );
+        let dict = Router::dict_routers_to_open(&self.weak_component, &self.component_output_dict);
         Self::extend_exposed_dict_with_legacy(&self.weak_component, self.decl(), &dict);
         dict
     }
