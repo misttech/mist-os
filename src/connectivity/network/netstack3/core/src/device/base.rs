@@ -19,14 +19,14 @@ use net_types::{
 use packet::Buf;
 
 use crate::{
-    context::{CounterContext, InstantContext, TimerHandler},
+    context::{CounterContext, InstantContext, TimerBindingsTypes, TimerHandler},
     counters::Counter,
     device::{
         arp::ArpCounters,
         ethernet::{EthernetLinkDevice, EthernetTimerId},
         id::{
             BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
-            StrongId, WeakId,
+            EthernetWeakDeviceId, StrongId, WeakId,
         },
         loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId},
         pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId},
@@ -176,27 +176,21 @@ pub(crate) struct DeviceLayerTimerId<BT: DeviceLayerTypes>(DeviceLayerTimerIdInn
 )]
 enum DeviceLayerTimerIdInner<BT: DeviceLayerTypes> {
     /// A timer event for an Ethernet device.
-    Ethernet(EthernetTimerId<EthernetDeviceId<BT>>),
+    Ethernet(EthernetTimerId<EthernetWeakDeviceId<BT>>),
 }
 
-impl<BT: DeviceLayerTypes> From<EthernetTimerId<EthernetDeviceId<BT>>> for DeviceLayerTimerId<BT> {
-    fn from(id: EthernetTimerId<EthernetDeviceId<BT>>) -> DeviceLayerTimerId<BT> {
+impl<BT: DeviceLayerTypes> From<EthernetTimerId<EthernetWeakDeviceId<BT>>>
+    for DeviceLayerTimerId<BT>
+{
+    fn from(id: EthernetTimerId<EthernetWeakDeviceId<BT>>) -> DeviceLayerTimerId<BT> {
         DeviceLayerTimerId(DeviceLayerTimerIdInner::Ethernet(id))
     }
 }
 
-impl_timer_context!(
-    BT: DeviceLayerTypes,
-    DeviceLayerTimerId<BT>,
-    EthernetTimerId<EthernetDeviceId<BT>>,
-    DeviceLayerTimerId(DeviceLayerTimerIdInner::Ethernet(id)),
-    id
-);
-
 impl<CC, BT> TimerHandler<BT, DeviceLayerTimerId<BT>> for CC
 where
     BT: DeviceLayerTypes,
-    CC: TimerHandler<BT, EthernetTimerId<EthernetDeviceId<BT>>>,
+    CC: TimerHandler<BT, EthernetTimerId<EthernetWeakDeviceId<BT>>>,
 {
     fn handle_timer(
         &mut self,
@@ -515,6 +509,7 @@ pub trait DeviceLayerTypes:
     DeviceLayerStateTypes
     + socket::DeviceSocketTypes
     + LinkResolutionContext<EthernetLinkDevice>
+    + TimerBindingsTypes
     + 'static
 {
 }
@@ -522,6 +517,7 @@ impl<
         BC: DeviceLayerStateTypes
             + socket::DeviceSocketTypes
             + LinkResolutionContext<EthernetLinkDevice>
+            + TimerBindingsTypes
             + 'static,
     > DeviceLayerTypes for BC
 {

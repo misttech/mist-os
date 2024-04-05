@@ -15,7 +15,7 @@ use lock_order::{
 use const_unwrap::const_unwrap_option;
 use net_types::{
     ethernet::Mac,
-    ip::{Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
+    ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
     BroadcastAddress, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
 use packet::{Buf, BufferMut, InnerPacketBuilder as _, Nested, Serializer};
@@ -35,8 +35,8 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CounterContext, RecvFrameContext, ResourceCounterContext, RngContext, SendFrameContext,
-        TimerContext, TimerHandler,
+        CoreTimerContext, CounterContext, RecvFrameContext, ResourceCounterContext, RngContext,
+        SendFrameContext, TimerContext2, TimerHandler,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
     device::{
@@ -59,9 +59,9 @@ use crate::{
             HeldDeviceSockets, ParseSentFrameError, ReceivedFrame, SentFrame,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
-        Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
-        DeviceReceiveFrameSpec, DeviceSendFrameError, EthernetDeviceCounters, EthernetDeviceId,
-        FrameDestination, RecvIpFrameMeta,
+        Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTimerId,
+        DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError, EthernetDeviceCounters,
+        EthernetDeviceId, EthernetWeakDeviceId, FrameDestination, RecvIpFrameMeta,
     },
     ip::{
         device::nud::{
@@ -81,11 +81,11 @@ const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
 /// The execution context for an Ethernet device provided by bindings.
 pub(crate) trait EthernetIpLinkDeviceBindingsContext<DeviceId>:
-    RngContext + TimerContext<EthernetTimerId<DeviceId>>
+    RngContext + TimerContext2
 {
 }
-impl<DeviceId, BC: RngContext + TimerContext<EthernetTimerId<DeviceId>>>
-    EthernetIpLinkDeviceBindingsContext<DeviceId> for BC
+impl<DeviceId, BC: RngContext + TimerContext2> EthernetIpLinkDeviceBindingsContext<DeviceId>
+    for BC
 {
 }
 
@@ -188,6 +188,14 @@ pub struct CoreCtxWithDeviceId<
 > {
     pub(crate) core_ctx: &'a mut CC,
     pub(crate) device_id: &'a CC::DeviceId,
+}
+
+impl<BT: BindingsTypes, L> CoreTimerContext<EthernetTimerId<EthernetWeakDeviceId<BT>>, BT>
+    for CoreCtx<'_, BT, L>
+{
+    fn convert_timer(dispatch_id: EthernetTimerId<EthernetWeakDeviceId<BT>>) -> BT::DispatchId {
+        DeviceLayerTimerId::from(dispatch_id).into()
+    }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>>
@@ -813,56 +821,33 @@ fn deliver_as(
 /// A timer ID for Ethernet devices.
 ///
 /// `D` is the type of device ID that identifies different Ethernet devices.
-#[derive(Clone, Eq, PartialEq, Debug, Hash)]
-pub(crate) enum EthernetTimerId<D> {
+#[derive(Clone, Eq, PartialEq, Debug, Hash, GenericOverIp)]
+#[generic_over_ip()]
+pub enum EthernetTimerId<D: device::WeakId> {
     Arp(ArpTimerId<EthernetLinkDevice, D>),
     Nudv6(NudTimerId<Ipv6, EthernetLinkDevice, D>),
 }
 
-impl<D> From<ArpTimerId<EthernetLinkDevice, D>> for EthernetTimerId<D> {
-    fn from(id: ArpTimerId<EthernetLinkDevice, D>) -> EthernetTimerId<D> {
-        EthernetTimerId::Arp(id)
+impl<I: Ip, D: device::WeakId> From<NudTimerId<I, EthernetLinkDevice, D>> for EthernetTimerId<D> {
+    fn from(id: NudTimerId<I, EthernetLinkDevice, D>) -> EthernetTimerId<D> {
+        I::map_ip(id, EthernetTimerId::Arp, EthernetTimerId::Nudv6)
     }
 }
 
-impl<D> From<NudTimerId<Ipv6, EthernetLinkDevice, D>> for EthernetTimerId<D> {
-    fn from(id: NudTimerId<Ipv6, EthernetLinkDevice, D>) -> EthernetTimerId<D> {
-        EthernetTimerId::Nudv6(id)
-    }
-}
-
-impl<CC, BC> TimerHandler<BC, EthernetTimerId<CC::DeviceId>> for CC
+impl<CC, BC> TimerHandler<BC, EthernetTimerId<CC::WeakDeviceId>> for CC
 where
     BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
-        + TimerHandler<BC, NudTimerId<Ipv6, EthernetLinkDevice, CC::DeviceId>>
-        + TimerHandler<BC, ArpTimerId<EthernetLinkDevice, CC::DeviceId>>,
+        + TimerHandler<BC, NudTimerId<Ipv6, EthernetLinkDevice, CC::WeakDeviceId>>
+        + TimerHandler<BC, ArpTimerId<EthernetLinkDevice, CC::WeakDeviceId>>,
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: EthernetTimerId<CC::DeviceId>) {
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: EthernetTimerId<CC::WeakDeviceId>) {
         match id {
             EthernetTimerId::Arp(id) => self.handle_timer(bindings_ctx, id),
             EthernetTimerId::Nudv6(id) => self.handle_timer(bindings_ctx, id),
         }
     }
 }
-
-// If we are provided with an impl of `TimerContext<EthernetTimerId<_>>`, then
-// we can in turn provide impls of `TimerContext` for ARP, NDP, IGMP, and MLD
-// timers.
-impl_timer_context!(
-    DeviceId,
-    EthernetTimerId<DeviceId>,
-    ArpTimerId::<EthernetLinkDevice, DeviceId>,
-    EthernetTimerId::Arp(id),
-    id
-);
-impl_timer_context!(
-    DeviceId,
-    EthernetTimerId<DeviceId>,
-    NudTimerId::<Ipv6, EthernetLinkDevice, DeviceId>,
-    EthernetTimerId::Nudv6(id),
-    id
-);
 
 /// Send an IP packet in an Ethernet frame.
 ///
@@ -1476,14 +1461,26 @@ impl DeviceStateSpec for EthernetLinkDevice {
     type External<BT: DeviceLayerTypes> = BT::EthernetDeviceState;
     type CreationProperties = EthernetCreationProperties;
     type Counters = EthernetDeviceCounters;
+    type TimerId<D: device::WeakId> = EthernetTimerId<D>;
 
-    fn new_link_state<BT: DeviceLayerTypes>(
+    fn new_link_state<
+        CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
+        BC: DeviceLayerTypes + TimerContext2,
+    >(
+        bindings_ctx: &mut BC,
+        self_id: CC::WeakDeviceId,
         EthernetCreationProperties { mac, max_frame_size }: Self::CreationProperties,
-    ) -> Self::Link<BT> {
+    ) -> Self::Link<BC> {
+        let ipv4_arp = Mutex::new(ArpState::new(bindings_ctx, self_id.clone(), |arp| {
+            CC::convert_timer(EthernetTimerId::from(arp))
+        }));
+        let ipv6_nud = Mutex::new(NudState::new(bindings_ctx, self_id, |nud| {
+            CC::convert_timer(EthernetTimerId::from(nud))
+        }));
         EthernetDeviceState {
             counters: Default::default(),
-            ipv4_arp: Default::default(),
-            ipv6_nud: Default::default(),
+            ipv4_arp,
+            ipv6_nud,
             ipv4_nud_config: Default::default(),
             ipv6_nud_config: Default::default(),
             static_state: StaticEthernetDeviceState { mac, max_frame_size },
@@ -1564,7 +1561,7 @@ mod tests {
     }
 
     type FakeBindingsCtx = crate::context::testutil::FakeBindingsCtx<
-        EthernetTimerId<FakeDeviceId>,
+        EthernetTimerId<FakeWeakDeviceId<FakeDeviceId>>,
         nud::Event<Mac, FakeDeviceId, Ipv4, FakeInstant>,
         (),
         (),
@@ -1981,11 +1978,16 @@ mod tests {
         // and that we don't send an Ethernet frame whose size is greater than
         // the MTU.
         fn test(size: usize, expect_frames_sent: bool) {
-            let mut ctx = crate::context::testutil::FakeCtxWithCoreCtx::with_core_ctx(
-                FakeCoreCtx::with_inner_and_outer_state(
-                    FakeEthernetCtx::new(FAKE_CONFIG_V4.local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE),
-                    ArpState::default(),
-                ),
+            let mut ctx = crate::context::testutil::FakeCtxWithCoreCtx::with_default_bindings_ctx(
+                |bindings_ctx| {
+                    FakeCoreCtx::with_inner_and_outer_state(
+                        FakeEthernetCtx::new(
+                            FAKE_CONFIG_V4.local_mac,
+                            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                        ),
+                        ArpState::new(bindings_ctx, FakeWeakDeviceId(FakeDeviceId), Into::into),
+                    )
+                },
             );
             NeighborApi::<Ipv4, EthernetLinkDevice, _>::new(ctx.as_mut())
                 .insert_static_entry(
@@ -2020,11 +2022,13 @@ mod tests {
 
     #[test]
     fn broadcast() {
-        let mut ctx = crate::context::testutil::FakeCtxWithCoreCtx::with_core_ctx(
-            FakeCoreCtx::with_inner_and_outer_state(
-                FakeEthernetCtx::new(FAKE_CONFIG_V4.local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE),
-                ArpState::default(),
-            ),
+        let mut ctx = crate::context::testutil::FakeCtxWithCoreCtx::with_default_bindings_ctx(
+            |bindings_ctx| {
+                FakeCoreCtx::with_inner_and_outer_state(
+                    FakeEthernetCtx::new(FAKE_CONFIG_V4.local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE),
+                    ArpState::new(bindings_ctx, FakeWeakDeviceId(FakeDeviceId), Into::into),
+                )
+            },
         );
         let crate::testutil::ContextPair { core_ctx, bindings_ctx } = &mut ctx;
         send_ip_frame(

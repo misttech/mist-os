@@ -567,16 +567,16 @@ impl<T: DeviceStateSpec, BT: DeviceLayerTypes> BasePrimaryDeviceId<T, BT> {
         BaseDeviceId { rc: PrimaryRc::clone_strong(rc) }
     }
 
-    pub(crate) fn new(
-        ip: IpLinkDeviceState<T, BT>,
+    pub(crate) fn new<F: FnOnce(BaseWeakDeviceId<T, BT>) -> IpLinkDeviceState<T, BT>>(
+        ip: F,
         external_state: T::External<BT>,
         bindings_id: BT::DeviceIdentifier,
     ) -> Self {
         Self {
-            rc: PrimaryRc::new_cyclic(move |weak_ref| BaseDeviceState {
-                ip,
-                external_state,
-                weak_cookie: Arc::new(WeakCookie { bindings_id, weak_ref }),
+            rc: PrimaryRc::new_cyclic(move |weak_ref| {
+                let weak_cookie = Arc::new(WeakCookie { bindings_id, weak_ref });
+                let ip = ip(BaseWeakDeviceId { cookie: Arc::clone(&weak_cookie) });
+                BaseDeviceState { ip, external_state, weak_cookie }
             }),
         }
     }

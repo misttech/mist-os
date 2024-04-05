@@ -144,6 +144,16 @@ impl<CC, BC> ContextPair<CC, BC> {
     }
 
     #[cfg(test)]
+    pub(crate) fn with_default_bindings_ctx<F: FnOnce(&mut BC) -> CC>(builder: F) -> Self
+    where
+        BC: Default,
+    {
+        let mut bindings_ctx = BC::default();
+        let core_ctx = builder(&mut bindings_ctx);
+        Self { core_ctx, bindings_ctx }
+    }
+
+    #[cfg(test)]
     pub(crate) fn as_mut(&mut self) -> ContextPair<&mut CC, &mut BC> {
         let Self { core_ctx, bindings_ctx } = self;
         ContextPair { core_ctx, bindings_ctx }

@@ -24,7 +24,9 @@ use packet_formats::ethernet::{
 use tracing::trace;
 
 use crate::{
-    context::{CounterContext, ResourceCounterContext, SendFrameContext},
+    context::{
+        CoreTimerContext, CounterContext, ResourceCounterContext, SendFrameContext, TimerContext2,
+    },
     device::{
         self,
         id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
@@ -84,10 +86,16 @@ impl DeviceStateSpec for LoopbackDevice {
     type External<BT: DeviceLayerTypes> = BT::LoopbackDeviceState;
     type CreationProperties = LoopbackCreationProperties;
     type Counters = EthernetDeviceCounters;
+    type TimerId<D: device::WeakId> = Never;
 
-    fn new_link_state<BT: DeviceLayerTypes>(
+    fn new_link_state<
+        CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
+        BC: DeviceLayerTypes + TimerContext2,
+    >(
+        _bindings_ctx: &mut BC,
+        _self_id: CC::WeakDeviceId,
         LoopbackCreationProperties { mtu }: Self::CreationProperties,
-    ) -> Self::Link<BT> {
+    ) -> Self::Link<BC> {
         LoopbackDeviceState {
             counters: Default::default(),
             mtu,

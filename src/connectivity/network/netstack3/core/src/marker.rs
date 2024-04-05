@@ -11,8 +11,8 @@ use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
     context::{
-        CounterContext, InstantBindingsTypes, ReferenceNotifiers, RngContext, TimerContext,
-        TimerContext2, TracingContext,
+        CounterContext, InstantBindingsTypes, ReferenceNotifiers, RngContext, TimerBindingsTypes,
+        TimerContext, TracingContext,
     },
     device::{
         self, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, EthernetDeviceId,
@@ -121,6 +121,7 @@ pub trait BindingsTypes:
     + FilterBindingsTypes
     + IcmpBindingsTypes
     + UdpBindingsTypes
+    + TimerBindingsTypes<DispatchId = TimerId<Self>>
 {
 }
 
@@ -131,6 +132,7 @@ impl<O> BindingsTypes for O where
         + FilterBindingsTypes
         + IcmpBindingsTypes
         + UdpBindingsTypes
+        + TimerBindingsTypes<DispatchId = TimerId<Self>>
 {
 }
 
@@ -173,17 +175,11 @@ where
 
 /// The execution context provided by bindings.
 pub trait BindingsContext:
-    IpBindingsContext<Ipv4>
-    + IpBindingsContext<Ipv6>
-    + TimerContext<TimerId<Self>>
-    + TimerContext2<DispatchId = TimerId<Self>>
+    IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> + TimerContext<TimerId<Self>>
 {
 }
 
 impl<BC> BindingsContext for BC where
-    BC: IpBindingsContext<Ipv4>
-        + IpBindingsContext<Ipv6>
-        + TimerContext<TimerId<Self>>
-        + TimerContext2<DispatchId = TimerId<Self>>
+    BC: IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> + TimerContext<TimerId<Self>>
 {
 }

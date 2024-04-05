@@ -27,5 +27,7 @@ pub use time::{
 
 /// Test utilities provided to all crates.
 pub mod testutil {
+    pub use crate::time::local_timer_heap::testutil::LocalTimerHeapTestExt;
+
     pub use crate::time::testutil::{FakeInstant, FakeInstantCtx};
 }

@@ -4,13 +4,14 @@
 
 //! Types for dealing with time and timers.
 
-use derivative::Derivative;
+use core::convert::Infallible as Never;
 
+use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use tracing::trace;
 
 use crate::{
-    context::{TimerContext, TimerHandler},
+    context::{CoreCtx, CoreTimerContext, TimerContext, TimerHandler},
     device::{DeviceId, DeviceLayerTimerId},
     ip::{
         device::{IpDeviceIpExt, IpDeviceTimerId},
@@ -20,7 +21,7 @@ use crate::{
     BindingsTypes,
 };
 
-pub use netstack3_base::Instant;
+pub use netstack3_base::{Instant, LocalTimerHeap};
 
 /// The identifier for any timer event.
 #[derive(Derivative, GenericOverIp)]
@@ -173,5 +174,14 @@ where
             TimerId(TimerIdInner::Ipv4Device(x)) => self.handle_timer(bindings_ctx, x),
             TimerId(TimerIdInner::Ipv6Device(x)) => self.handle_timer(bindings_ctx, x),
         }
+    }
+}
+
+impl<'a, BT, L> CoreTimerContext<Never, BT> for CoreCtx<'a, BT, L>
+where
+    BT: BindingsTypes,
+{
+    fn convert_timer(dispatch_id: Never) -> <BT as netstack3_base::TimerBindingsTypes>::DispatchId {
+        match dispatch_id {}
     }
 }

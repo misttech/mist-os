@@ -5,13 +5,15 @@
 //! A pure IP device, capable of directly sending/receiving IPv4 & IPv6 packets.
 
 use alloc::vec::Vec;
+use core::convert::Infallible as Never;
 use net_types::ip::{Ip, IpVersion, Mtu};
 use packet::{Buf, BufferMut, Serializer};
 use tracing::warn;
 
 use crate::{
-    context::ResourceCounterContext,
+    context::{CoreTimerContext, ResourceCounterContext, TimerContext2},
     device::{
+        self,
         queue::{
             tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler},
             TransmitQueueFrameError,
@@ -86,10 +88,16 @@ impl DeviceStateSpec for PureIpDevice {
     type Counters = PureIpDeviceCounters;
     const IS_LOOPBACK: bool = false;
     const DEBUG_TYPE: &'static str = "PureIP";
+    type TimerId<D: device::WeakId> = Never;
 
-    fn new_link_state<BT: DeviceLayerTypes>(
+    fn new_link_state<
+        CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
+        BC: DeviceLayerTypes + TimerContext2,
+    >(
+        _bindings_ctx: &mut BC,
+        _self_id: CC::WeakDeviceId,
         PureIpDeviceCreationProperties { mtu }: Self::CreationProperties,
-    ) -> Self::Link<BT> {
+    ) -> Self::Link<BC> {
         PureIpDeviceState {
             dynamic_state: RwLock::new(DynamicPureIpDeviceState { mtu }),
             tx_queue: Default::default(),

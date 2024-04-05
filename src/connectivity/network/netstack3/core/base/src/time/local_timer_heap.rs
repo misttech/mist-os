@@ -19,6 +19,7 @@ use crate::{CoreTimerContext, Instant, InstantBindingsTypes, TimerBindingsTypes,
 ///
 /// Note that to provide fast timer deletion, `LocalTimerHeap` requires `K` to
 /// be `Clone` and the implementation assumes that the clone is cheap.
+#[derive(Debug)]
 pub struct LocalTimerHeap<K, V, BT: TimerBindingsTypes + InstantBindingsTypes> {
     next_wakeup: BT::Timer,
     heap: KeyedHeap<K, V, BT::Instant>,
@@ -122,6 +123,7 @@ where
 /// A timer heap that is keyed on `K`.
 ///
 /// This type is used to support [`LocalTimerHeap`].
+#[derive(Debug)]
 struct KeyedHeap<K, V, T> {
     // Implementation note: The map is the source of truth for the desired
     // firing time for a timer `K`. The heap has a copy of the scheduled time
@@ -229,6 +231,7 @@ impl<K: Hash + Eq + Clone, V, T: Instant> KeyedHeap<K, V, T> {
 }
 
 /// The entry kept in [`LocalTimerHeap`]'s internal hash map.
+#[derive(Debug, Eq, PartialEq)]
 struct MapEntry<T, V> {
     time: T,
     value: V,
@@ -237,6 +240,7 @@ struct MapEntry<T, V> {
 /// A reusable struct to place a value and a timestamp in a [`BinaryHeap`].
 ///
 /// Its `Ord` implementation is tuned to make [`BinaryHeap`] a min heap.
+#[derive(Debug)]
 struct HeapEntry<T, K> {
     time: T,
     key: K,
@@ -262,6 +266,71 @@ impl<T: Instant, K> Ord for HeapEntry<T, K> {
 impl<T: Instant, K> PartialOrd for HeapEntry<T, K> {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(Ord::cmp(self, other))
+    }
+}
+
+// TODO(https://fxbug.dev/332936622): Gate behind testutil feature flag or move
+// to testutil only crate.
+pub(crate) mod testutil {
+    use core::fmt::Debug;
+
+    use super::*;
+
+    /// Test assertion extensions for [`LocalTimerHeap`].
+    pub trait LocalTimerHeapTestExt<K, V, BC: TimerContext2>: Sealed {
+        /// Asserts installed timers with an iterator of `(key, value, instant)`
+        /// tuples.
+        #[track_caller]
+        fn assert_timers(&self, timers: impl IntoIterator<Item = (K, V, BC::Instant)>);
+
+        /// Like [`LocalTimerHeap::assert_timers`], but asserts based on a
+        /// duration after `bindings_ctx.now()`.
+        #[track_caller]
+        fn assert_timers_after(
+            &self,
+            bindings_ctx: &mut BC,
+            timers: impl IntoIterator<Item = (K, V, Duration)>,
+        ) {
+            let now = bindings_ctx.now();
+            self.assert_timers(timers.into_iter().map(|(k, v, d)| (k, v, now.add(d))))
+        }
+
+        /// Assets that the next time to fire has `key` and `value`.
+        fn assert_top(&mut self, key: &K, value: &V);
+    }
+
+    pub trait Sealed {}
+
+    impl<K, V, BC: InstantBindingsTypes + TimerBindingsTypes> Sealed for LocalTimerHeap<K, V, BC> {}
+
+    impl<K, V, BC> LocalTimerHeapTestExt<K, V, BC> for LocalTimerHeap<K, V, BC>
+    where
+        K: Hash + Eq + Clone + Debug,
+        V: Debug + Eq + PartialEq,
+        BC: TimerContext2,
+    {
+        #[track_caller]
+        fn assert_timers(&self, timers: impl IntoIterator<Item = (K, V, BC::Instant)>) {
+            let map = timers
+                .into_iter()
+                .map(|(k, value, time)| (k, MapEntry { value, time }))
+                .collect::<HashMap<_, _>>();
+            assert_eq!(&self.heap.map, &map);
+        }
+
+        #[track_caller]
+        fn assert_top(&mut self, key: &K, value: &V) {
+            // NB: We can't know that the top of the heap holds a valid entry,
+            // so we need to do the slow thing and look in the map for this
+            // assertion.
+            let top = self
+                .heap
+                .map
+                .iter()
+                .min_by_key(|(_key, MapEntry { time, .. })| time)
+                .map(|(key, MapEntry { time: _, value })| (key, value));
+            assert_eq!(top, Some((key, value)));
+        }
     }
 }
 

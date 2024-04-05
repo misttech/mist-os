@@ -1875,7 +1875,7 @@ mod tests {
         device::{
             loopback::{LoopbackCreationProperties, LoopbackDevice},
             testutil::FakeDeviceId,
-            DeviceId,
+            DeviceId, EthernetLinkDevice,
         },
         ip::{
             device::IpDeviceConfigurationContext as DeviceIpDeviceConfigurationContext,
@@ -2577,7 +2577,10 @@ mod tests {
 
             // Don't keep any strong device IDs to the device before removing.
             core::mem::drop(device_id);
-            ctx.core_api().device().remove_device(eth_device_id).into_removed();
+            ctx.core_api()
+                .device::<EthernetLinkDevice>()
+                .remove_device(eth_device_id)
+                .into_removed();
             Err(MmsError::NoDevice(ResolveRouteError::Unreachable))
         } else {
             Ok(Mms::from_mtu::<I>(

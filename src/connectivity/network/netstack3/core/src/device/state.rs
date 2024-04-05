@@ -8,7 +8,11 @@ use alloc::sync::Arc;
 use core::fmt::Debug;
 
 use crate::{
-    device::{socket::HeldDeviceSockets, DeviceCounters, DeviceLayerTypes, OriginTracker},
+    context::{CoreTimerContext, TimerContext2},
+    device::{
+        self, socket::HeldDeviceSockets, Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes,
+        OriginTracker,
+    },
     inspect::Inspectable,
     ip::{device::state::DualStackIpDeviceState, types::RawMetric},
     sync::RwLock,
@@ -17,7 +21,7 @@ use crate::{
 
 /// Provides the specifications for device state held by [`BaseDeviceId`] in
 /// [`BaseDeviceState`].
-pub trait DeviceStateSpec: Send + Sync + 'static {
+pub trait DeviceStateSpec: Device + Sized + Send + Sync + 'static {
     /// The link state.
     type Link<BT: DeviceLayerTypes>: Send + Sync;
     /// The external (bindings) state.
@@ -26,10 +30,18 @@ pub trait DeviceStateSpec: Send + Sync + 'static {
     type CreationProperties: Debug;
     /// Device-specific counters.
     type Counters: Inspectable;
+    /// The timer identifier required by this device state.
+    type TimerId<D: device::WeakId>;
 
     /// Creates a new link state from the given properties.
-    fn new_link_state<BT: DeviceLayerTypes>(properties: Self::CreationProperties)
-        -> Self::Link<BT>;
+    fn new_link_state<
+        CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
+        BC: DeviceLayerTypes + TimerContext2,
+    >(
+        bindings_ctx: &mut BC,
+        self_id: CC::WeakDeviceId,
+        properties: Self::CreationProperties,
+    ) -> Self::Link<BC>;
 
     /// Marker for loopback devices.
     const IS_LOOPBACK: bool;

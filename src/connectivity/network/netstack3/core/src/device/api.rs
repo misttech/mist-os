@@ -12,7 +12,10 @@ use packet::BufferMut;
 use tracing::debug;
 
 use crate::{
-    context::{ContextPair, RecvFrameContext, ReferenceNotifiers, ResourceCounterContext},
+    context::{
+        ContextPair, CoreTimerContext, RecvFrameContext, ReferenceNotifiers,
+        ResourceCounterContext, TimerContext2,
+    },
     device::{
         config::{
             ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration,
@@ -23,9 +26,9 @@ use crate::{
         loopback::LoopbackDevice,
         pure_ip::PureIpDevice,
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
-        AnyDevice, BaseDeviceId, BasePrimaryDeviceId, Device, DeviceCollectionContext,
-        DeviceCounters, DeviceId, DeviceIdContext, DeviceLayerStateTypes, DeviceLayerTypes,
-        DeviceProvider, DeviceReceiveFrameSpec, OriginTrackerContext,
+        AnyDevice, BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device,
+        DeviceCollectionContext, DeviceCounters, DeviceId, DeviceIdContext, DeviceLayerStateTypes,
+        DeviceLayerTypes, DeviceProvider, DeviceReceiveFrameSpec, OriginTrackerContext,
     },
     for_any_device_id,
     ip::{
@@ -90,10 +93,16 @@ where
         external_state: D::External<C::BindingsContext>,
     ) -> <C::CoreContext as DeviceIdContext<D>>::DeviceId {
         debug!("adding {} device with {:?} metric:{metric}", D::DEBUG_TYPE, properties);
-        let core_ctx = self.core_ctx();
+        let (core_ctx, bindings_ctx) = self.contexts();
         let origin = core_ctx.origin_tracker();
         let primary = BasePrimaryDeviceId::new(
-            IpLinkDeviceStateInner::new(D::new_link_state(properties), metric, origin),
+            |weak_ref| {
+                IpLinkDeviceStateInner::new(
+                    D::new_link_state::<C::CoreContext, _>(bindings_ctx, weak_ref, properties),
+                    metric,
+                    origin,
+                )
+            },
             external_state,
             bindings_id,
         );
@@ -370,13 +379,14 @@ pub trait DeviceApiCoreContext<
     D: Device + DeviceStateSpec + DeviceReceiveFrameSpec,
     BC: DeviceApiBindingsContext,
 >:
-    DeviceIdContext<D, DeviceId = BaseDeviceId<D, BC>>
+    DeviceIdContext<D, DeviceId = BaseDeviceId<D, BC>, WeakDeviceId = BaseWeakDeviceId<D, BC>>
     + OriginTrackerContext
     + DeviceCollectionContext<D, BC>
     + DeviceConfigurationContext<D>
     + RecvFrameContext<BC, D::FrameMetadata<BaseDeviceId<D, BC>>>
     + ResourceCounterContext<Self::DeviceId, DeviceCounters>
     + ResourceCounterContext<Self::DeviceId, D::Counters>
+    + CoreTimerContext<D::TimerId<Self::WeakDeviceId>, BC>
 {
 }
 
@@ -384,18 +394,20 @@ impl<O, D, BC> DeviceApiCoreContext<D, BC> for O
 where
     D: Device + DeviceStateSpec + DeviceReceiveFrameSpec,
     BC: DeviceApiBindingsContext,
-    O: DeviceIdContext<D, DeviceId = BaseDeviceId<D, BC>>
+    O: DeviceIdContext<D, DeviceId = BaseDeviceId<D, BC>, WeakDeviceId = BaseWeakDeviceId<D, BC>>
         + OriginTrackerContext
         + DeviceCollectionContext<D, BC>
         + DeviceConfigurationContext<D>
         + RecvFrameContext<BC, D::FrameMetadata<BaseDeviceId<D, BC>>>
         + ResourceCounterContext<Self::DeviceId, DeviceCounters>
-        + ResourceCounterContext<Self::DeviceId, D::Counters>,
+        + ResourceCounterContext<Self::DeviceId, D::Counters>
+        + CoreTimerContext<D::TimerId<Self::WeakDeviceId>, BC>,
 {
 }
 
 /// A marker trait for all the bindings context traits required to fulfill the
 /// [`DeviceApi`].
-pub trait DeviceApiBindingsContext: DeviceLayerTypes + ReferenceNotifiers {}
+pub trait DeviceApiBindingsContext: DeviceLayerTypes + ReferenceNotifiers + TimerContext2 {}
 
-impl<O> DeviceApiBindingsContext for O where O: DeviceLayerTypes + ReferenceNotifiers {}
+impl<O> DeviceApiBindingsContext for O where O: DeviceLayerTypes + ReferenceNotifiers + TimerContext2
+{}

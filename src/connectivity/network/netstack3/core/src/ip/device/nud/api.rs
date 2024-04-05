@@ -117,7 +117,7 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
         let (result, do_multicast_solicit) = core_ctx.with_nud_state_mut(
             device_id,
-            |NudState { neighbors, last_gc: _ }, core_ctx| {
+            |NudState { neighbors, timer_heap, .. }, core_ctx| {
                 match neighbors.entry(*dst) {
                     Entry::Vacant(entry) => {
                         // Initiate link resolution.
@@ -127,7 +127,7 @@ where
                             DynamicNeighborState::Incomplete(Incomplete::new_with_notifier(
                                 core_ctx,
                                 bindings_ctx,
-                                device_id,
+                                timer_heap,
                                 *dst,
                                 notifier,
                             )),
@@ -145,7 +145,7 @@ where
                             (LinkResolutionResult::Resolved(*link_address), false)
                         }
                         NeighborState::Dynamic(e) => {
-                            e.resolve_link_addr(core_ctx, bindings_ctx, device_id, *dst)
+                            e.resolve_link_addr(core_ctx, bindings_ctx, timer_heap, device_id, *dst)
                         }
                     },
                 }
@@ -196,7 +196,9 @@ where
 
         core_ctx.with_nud_state_mut_and_sender_ctx(
             device_id,
-            |NudState { neighbors, last_gc: _ }, core_ctx| match neighbors.entry(neighbor) {
+            |NudState { neighbors, last_gc: _, timer_heap }, core_ctx| match neighbors
+                .entry(neighbor)
+            {
                 Entry::Occupied(mut occupied) => {
                     let previous =
                         core::mem::replace(occupied.get_mut(), NeighborState::Static(link_address));
@@ -214,7 +216,7 @@ where
                             entry.cancel_timer_and_complete_resolution(
                                 core_ctx,
                                 bindings_ctx,
-                                device_id,
+                                timer_heap,
                                 neighbor,
                                 link_address,
                             );
@@ -251,16 +253,19 @@ where
         let neighbor =
             validate_neighbor_addr(neighbor).ok_or(NeighborRemovalError::IpAddressInvalid)?;
 
-        core_ctx.with_nud_state_mut(device_id, |NudState { neighbors, last_gc: _ }, _config| {
-            match neighbors.remove(&neighbor).ok_or(NotFoundError)? {
-                NeighborState::Dynamic(mut entry) => {
-                    entry.cancel_timer(bindings_ctx, device_id, neighbor);
+        core_ctx.with_nud_state_mut(
+            device_id,
+            |NudState { neighbors, last_gc: _, timer_heap }, _config| {
+                match neighbors.remove(&neighbor).ok_or(NotFoundError)? {
+                    NeighborState::Dynamic(mut entry) => {
+                        entry.cancel_timer(bindings_ctx, timer_heap, neighbor);
+                    }
+                    NeighborState::Static(_) => {}
                 }
-                NeighborState::Static(_) => {}
-            }
-            bindings_ctx.on_event(Event::removed(device_id, neighbor, bindings_ctx.now()));
-            Ok(())
-        })
+                bindings_ctx.on_event(Event::removed(device_id, neighbor, bindings_ctx.now()));
+                Ok(())
+            },
+        )
     }
 
     /// Writes `device`'s neighbor state information into `inspector`.
