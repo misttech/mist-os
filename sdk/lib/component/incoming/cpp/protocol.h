@@ -35,10 +35,13 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpenServiceRoot(
 // `path` must be absolute, containing a leading "/". Default to "/svc/{name}"
 // where `{name}` is the fully qualified name of the FIDL Protocol.
 //
+// The operation completes asynchronously, which means a zx::ok() result does
+// not ensure that the requested protocol actually exists.
+//
 // # Errors
 //
-//   * `ZX_ERR_BAD_PATH`: `path` is too long.
-//   * `ZX_ERR_NOT_FOUND`: No entry was found using the provided `path`.
+//   * `ZX_ERR_INVALID_ARGS`: `path` is too long.
+//   * `ZX_ERR_NOT_FOUND`: A prefix of `path` cannot be found in the namespace.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<> Connect(fidl::ServerEnd<Protocol> server_end,
                      std::string_view path = fidl::DiscoverableProtocolDefaultPath<Protocol>) {
@@ -51,10 +54,13 @@ zx::result<> Connect(fidl::ServerEnd<Protocol> server_end,
 // `path` must be absolute, containing a leading "/". Default to "/svc/{name}"
 // where `{name}` is the fully qualified name of the FIDL Protocol.
 //
+// The operation completes asynchronously, which means a zx::ok() result does
+// not ensure that the requested protocol actually exists.
+//
 // # Errors
 //
-//   * `ZX_ERR_BAD_PATH`: `path` is too long.
-//   * `ZX_ERR_NOT_FOUND`: No entry was found using the provided `path`.
+//   * `ZX_ERR_INVALID_ARGS`: `path` is too long.
+//   * `ZX_ERR_NOT_FOUND`: A prefix of `path` cannot be found in the namespace.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<fidl::ClientEnd<Protocol>> Connect(
     std::string_view path = fidl::DiscoverableProtocolDefaultPath<Protocol>) {
@@ -76,10 +82,12 @@ zx::result<fidl::ClientEnd<Protocol>> Connect(
 //
 // `name` must be a valid entry in `svc_dir`.
 //
+// The operation completes asynchronously, which means a zx::ok() result does
+// not ensure that the requested protocol actually exists.
+//
 // # Errors
 //
-//   * `ZX_ERR_BAD_PATH`: `name` is too long.
-//   * `ZX_ERR_NOT_FOUND`: No entry was found using the provided `name`.
+//   * `ZX_ERR_INVALID_ARGS`: `name` is too long.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<> ConnectAt(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
                        fidl::ServerEnd<Protocol> server_end,
@@ -92,10 +100,12 @@ zx::result<> ConnectAt(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
 //
 // `name` must be a valid entry in `svc_dir`.
 //
+// The operation completes asynchronously, which means a zx::ok() result does
+// not ensure that the requested protocol actually exists.
+//
 // # Errors
 //
-//   * `ZX_ERR_BAD_PATH`: `name` is too long.
-//   * `ZX_ERR_NOT_FOUND`: No entry was found using the provided `name`.
+//   * `ZX_ERR_INVALID_ARGS`: `name` is too long.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<fidl::ClientEnd<Protocol>> ConnectAt(
     fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
