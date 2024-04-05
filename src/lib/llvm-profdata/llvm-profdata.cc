@@ -369,9 +369,10 @@ void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {
   size_bytes_ += header.NamesSize + PaddingBytesAfterNames;
 
 #if INSTR_PROF_RAW_VERSION >= 10
-  const size_t VTableSectionSize = header.NumVTables * sizeof(VTableProfData);
+  const size_t VTableSectionSize = static_cast<size_t>(header.NumVTables) * sizeof(VTableProfData);
   size_bytes_ += VTableSectionSize + PaddingSize(VTableSectionSize);
-  size_bytes_ += header.VNamesSize + PaddingSize(header.VNamesSize);
+  size_bytes_ +=
+      static_cast<size_t>(header.VNamesSize) + PaddingSize(static_cast<size_t>(header.VNamesSize));
 #endif
 }
 
