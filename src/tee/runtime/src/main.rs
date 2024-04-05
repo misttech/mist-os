@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod params;
 mod ta_loader;
 mod trusted_app;
 
 use std::{ffi::CString, fs::File, io::Read};
 
-use anyhow::{Context as _, Error};
+use anyhow::Error;
 use fidl_fuchsia_tee::{ApplicationRequest, ApplicationRequestStream};
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
@@ -23,29 +24,40 @@ fn read_ta_name() -> Result<CString, Error> {
     CString::new(s).map_err(|_| anyhow::anyhow!("nul found in name string"))
 }
 
-async fn run_application(stream: ApplicationRequestStream) -> Result<(), Error> {
+async fn run_application(mut stream: ApplicationRequestStream) -> Result<(), Error> {
     let name = read_ta_name()?;
     let interface = ta_loader::load_ta(&name)?;
 
-    let ta = trusted_app::TrustedApp::new(interface)?;
+    let mut ta = trusted_app::TrustedApp::new(interface)?;
 
-    stream
-        .map(|result| result.context("failed request"))
-        .try_for_each(|request| async move {
-            match request {
-                ApplicationRequest::OpenSession2 { .. } => {
-                    todo!();
-                }
-                ApplicationRequest::CloseSession { .. } => {
-                    todo!();
-                }
-                ApplicationRequest::InvokeCommand { .. } => {
-                    // TODO: Call ta.invoke_command
-                    todo!();
-                }
+    while let Some(request) = stream.next().await {
+        match request {
+            Ok(ApplicationRequest::OpenSession2 { parameter_set, responder }) => {
+                let (session_id, op_result) = ta.open_session(parameter_set)?;
+                responder.send(session_id, op_result)?;
             }
-        })
-        .await?;
+            Ok(ApplicationRequest::CloseSession { session_id, responder }) => {
+                ta.close_session(session_id)?;
+                responder.send()?;
+            }
+            Ok(ApplicationRequest::InvokeCommand {
+                session_id,
+                command_id,
+                parameter_set,
+                responder,
+            }) => {
+                let op_result = ta.invoke_command(session_id, command_id, parameter_set)?;
+                responder.send(op_result)?;
+            }
+            Err(e) => {
+                // TODO(https://fxbug.dev/332956721): If we get an unexpected message from the client
+                // we're supposed to tell the TA to close any open sessions and then destroy it.
+                // Same goes for errors in the handlers above.
+                tracing::warn!("Unexpected request: {e}");
+                break;
+            }
+        }
+    }
     ta.destroy();
     Ok(())
 }

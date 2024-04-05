@@ -6,7 +6,7 @@
 
 use anyhow::Error;
 
-use tee_internal_impl::binding::{TEE_Param, TEE_PropSetHandle, TEE_Result};
+use tee_internal_impl::binding::{TEE_Param, TEE_Result};
 
 pub type SessionContext = *mut ::std::os::raw::c_void;
 
@@ -19,19 +19,13 @@ pub trait TAInterface {
         params: *mut TEE_Param,
         session_context: *mut SessionContext,
     ) -> TEE_Result;
-    fn close_session(
+    fn close_session(&self, session_context: SessionContext);
+    fn invoke_command(
         &self,
         session_context: SessionContext,
         command_id: u32,
         param_types: u32,
         params: *mut TEE_Param,
-    ) -> TEE_Result;
-    fn invoke_command(
-        &self,
-        propset_or_enumerator: TEE_PropSetHandle,
-        name: *mut ::std::os::raw::c_char,
-        value_buffer: *mut ::std::os::raw::c_char,
-        value_buffer_len: *mut usize,
     ) -> TEE_Result;
 }
 
@@ -43,17 +37,12 @@ struct TAFunctions {
         params: *mut TEE_Param,
         session_context: *mut SessionContext,
     ) -> TEE_Result,
-    close_session_fn: fn(
+    close_session_fn: fn(session_context: SessionContext),
+    invoke_command_fn: fn(
         session_context: SessionContext,
         command_id: u32,
         param_types: u32,
         params: *mut TEE_Param,
-    ) -> TEE_Result,
-    invoke_command_fn: fn(
-        propset_or_enumerator: TEE_PropSetHandle,
-        name: *mut ::std::os::raw::c_char,
-        value_buffer: *mut ::std::os::raw::c_char,
-        value_buffer_len: *mut usize,
     ) -> TEE_Result,
 }
 
@@ -75,24 +64,18 @@ impl TAInterface for TAFunctions {
         (self.open_session_fn)(param_types, params, session_context)
     }
 
-    fn close_session(
+    fn close_session(&self, session_context: SessionContext) {
+        (self.close_session_fn)(session_context)
+    }
+
+    fn invoke_command(
         &self,
         session_context: SessionContext,
         command_id: u32,
         param_types: u32,
         params: *mut TEE_Param,
     ) -> TEE_Result {
-        (self.close_session_fn)(session_context, command_id, param_types, params)
-    }
-
-    fn invoke_command(
-        &self,
-        propset_or_enumerator: TEE_PropSetHandle,
-        name: *mut ::std::os::raw::c_char,
-        value_buffer: *mut ::std::os::raw::c_char,
-        value_buffer_len: *mut usize,
-    ) -> TEE_Result {
-        (self.invoke_command_fn)(propset_or_enumerator, name, value_buffer, value_buffer_len)
+        (self.invoke_command_fn)(session_context, command_id, param_types, params)
     }
 }
 

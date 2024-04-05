@@ -18,3 +18,17 @@ async fn noop_ta_lifecycle() -> Result<(), Error> {
     std::mem::drop(app);
     Ok(())
 }
+
+#[fuchsia::test]
+async fn noop_ta_session() -> Result<(), Error> {
+    // Connect to noop TA at /svc/fuchsia.tee.Application.<noop UUID>
+    let app =
+        connect_to_protocol_at_path::<ApplicationMarker>("/svc/fuchsia.tee.Application.NOOP-UUID")
+            .context("Failed to connect to application instance")?;
+    let (session_id, op_result) = app.open_session2(vec![]).await?;
+    assert_eq!(op_result.return_code, Some(0));
+    assert_eq!(session_id, 1);
+    app.close_session(session_id).await?;
+    std::mem::drop(app);
+    Ok(())
+}

@@ -295,7 +295,7 @@ pub const TEE_CORE_API_MAINTENANCE_VERSION: u32 = 1;
 pub const TEE_CORE_API_VERSION: u32 = 16908544;
 pub type TEE_Result = u32;
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TEE_UUID {
     pub timeLow: u32,
     pub timeMid: u16,
@@ -303,7 +303,7 @@ pub struct TEE_UUID {
     pub clockSeqAndNode: [u8; 8usize],
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TEE_Identity {
     pub login: u32,
     pub uuid: TEE_UUID,
@@ -315,16 +315,21 @@ pub union TEE_Param {
     pub value: TEE_Param__bindgen_ty_2,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TEE_Param__bindgen_ty_1 {
     pub buffer: *mut ::std::os::raw::c_void,
     pub size: usize,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TEE_Param__bindgen_ty_2 {
     pub a: u32,
     pub b: u32,
+}
+impl ::std::fmt::Debug for TEE_Param {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "TEE_Param {{ union }}")
+    }
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -352,19 +357,29 @@ pub union TEE_Attribute__bindgen_ty_1 {
     pub value: TEE_Attribute__bindgen_ty_1__bindgen_ty_2,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TEE_Attribute__bindgen_ty_1__bindgen_ty_1 {
     pub buffer: *mut ::std::os::raw::c_void,
     pub length: usize,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TEE_Attribute__bindgen_ty_1__bindgen_ty_2 {
     pub a: u32,
     pub b: u32,
 }
+impl ::std::fmt::Debug for TEE_Attribute__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "TEE_Attribute__bindgen_ty_1 {{ union }}")
+    }
+}
+impl ::std::fmt::Debug for TEE_Attribute {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "TEE_Attribute {{ content: {:?} }}", self.content)
+    }
+}
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TEE_ObjectInfo {
     pub objectType: u32,
     pub objectSize: u32,
@@ -390,7 +405,7 @@ pub struct __TEE_ObjectEnumHandle {
 pub type TEE_ObjectEnumHandle = *mut __TEE_ObjectEnumHandle;
 pub type TEE_OperationMode = u32;
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TEE_OperationInfo {
     pub algorithm: u32,
     pub operationClass: u32,
@@ -402,7 +417,7 @@ pub struct TEE_OperationInfo {
     pub handleState: u32,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TEE_OperationInfoKey {
     pub keySize: u32,
     pub requiredKeyUsage: u32,
@@ -427,7 +442,7 @@ pub struct __TEE_OperationHandle {
 }
 pub type TEE_OperationHandle = *mut __TEE_OperationHandle;
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TEE_Time {
     pub seconds: u32,
     pub millis: u32,
