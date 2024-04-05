@@ -20,8 +20,13 @@
 #include <threads.h>
 #include <zircon/errors.h>
 #include <zircon/listnode.h>
+#include <zircon/types.h>
 
-#include <ddk/usb-peripheral-config.h>
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -30,19 +35,31 @@
 #include <usb/peripheral.h>
 #include <usb/usb.h>
 
+#include "src/devices/usb/drivers/usb-peripheral/config-parser.h"
 #include "src/devices/usb/drivers/usb-peripheral/usb-function.h"
 
 namespace usb_peripheral {
 
 zx_status_t UsbPeripheral::Create(void* ctx, zx_device_t* parent) {
+  zx_handle_t structured_config_vmo;
+  auto status = device_get_config_vmo(parent, &structured_config_vmo);
+  if (status != ZX_OK || structured_config_vmo == ZX_HANDLE_INVALID) {
+    zxlogf(ERROR, "Failed to get usb peripheral config. Status: %d VMO handle: %d", status,
+           structured_config_vmo);
+    return ZX_ERR_INTERNAL;
+  }
+
+  auto config = usb_peripheral_config::Config::CreateFromVmo(zx::vmo(structured_config_vmo));
+
   fbl::AllocChecker ac;
-  auto device = fbl::make_unique_checked<UsbPeripheral>(&ac, parent);
+  auto device = fbl::make_unique_checked<UsbPeripheral>(&ac, parent, config);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  auto status = device->Init();
+  status = device->Init();
   if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to initialize usb peripheral - %d", status);
     return status;
   }
 
@@ -116,99 +133,92 @@ zx_status_t UsbPeripheral::Init() {
 
   status = DdkAdd("usb-peripheral", DEVICE_ADD_NON_BINDABLE);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "DdkAdd failed - %s", zx_status_get_string(status));
     return status;
   }
 
-  size_t metasize = 0;
-  status = device_get_metadata_size(parent(), DEVICE_METADATA_USB_CONFIG, &metasize);
+  PeripheralConfigParser peripheral_config = {};
+  status = peripheral_config.AddFunctions(config_.functions());
   if (status != ZX_OK) {
-    return ZX_OK;
-  }
-  constexpr auto alignment = []() {
-    return alignof(UsbConfig) > __STDCPP_DEFAULT_NEW_ALIGNMENT__ ? alignof(UsbConfig)
-                                                                 : __STDCPP_DEFAULT_NEW_ALIGNMENT__;
-  }();
-  fbl::AllocChecker ac;
-  UsbConfig* config =
-      reinterpret_cast<UsbConfig*>(new (std::align_val_t(alignment), &ac) unsigned char[metasize]);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-  auto call = fit::defer(
-      [=]() { operator delete[](reinterpret_cast<char*>(config), std::align_val_t(alignment)); });
-  status = device_get_metadata(parent(), DEVICE_METADATA_USB_CONFIG, config, metasize, &metasize);
-  if (status != ZX_OK) {
-    return ZX_OK;
-  }
-  device_desc_.id_vendor = config->vid;
-  device_desc_.id_product = config->pid;
-
-  size_t max_str_len = strnlen(config->manufacturer, sizeof(config->manufacturer));
-  status =
-      AllocStringDesc(fbl::String(config->manufacturer, max_str_len), &device_desc_.i_manufacturer);
-  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add usb functions from structured config - %d", status);
     return status;
   }
 
-  max_str_len = strnlen(config->product, sizeof(config->product));
-  status = AllocStringDesc(fbl::String(config->product, max_str_len), &device_desc_.i_product);
+  device_desc_.id_vendor = peripheral_config.vid();
+  device_desc_.id_product = peripheral_config.pid();
+
+  status = AllocStringDesc(peripheral_config.manufacturer(), &device_desc_.i_manufacturer);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to allocate manufacturer string descriptor - %d", status);
     return status;
   }
-  uint8_t raw_mac_addr[6];
-  status = device_get_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS, &raw_mac_addr,
-                               sizeof(raw_mac_addr), &actual);
 
-  if (status != ZX_OK || actual != sizeof(raw_mac_addr)) {
-    zxlogf(INFO,
-           "Serial number/MAC address not found. Using generic (non-unique) serial number.\n");
-  } else {
-    char buffer[sizeof(raw_mac_addr) * 3];
-    snprintf(buffer, sizeof(buffer), "%02X%02X%02X%02X%02X%02X", raw_mac_addr[0], raw_mac_addr[1],
-             raw_mac_addr[2], raw_mac_addr[3], raw_mac_addr[4], raw_mac_addr[5]);
-    memcpy(config->serial, buffer, sizeof(buffer));
+  status = AllocStringDesc(peripheral_config.product(), &device_desc_.i_product);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to allocate product string descriptor - %d", status);
+    return status;
   }
-  max_str_len = strnlen(config->serial, sizeof(config->serial));
-  actual = 0;
-  char buffer[256];
-  size_t metadata_size;
-  status = device_get_metadata_size(parent(), DEVICE_METADATA_SERIAL_NUMBER, &metadata_size);
-  if (status == ZX_OK) {
-    if (metadata_size >= sizeof(buffer)) {
-      return ZX_ERR_OUT_OF_RANGE;
+
+  auto serial = GetSerialNumber();
+  status = AllocStringDesc(serial, &device_desc_.i_serial_number);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add serial number descriptor - %d", status);
+    return status;
+  }
+
+  status = SetDefaultConfig(peripheral_config.functions());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to set default config - %d", status);
+    return status;
+  }
+
+  {
+    // Set interface right away if function devices are not added yet. If there are function
+    // devices, the interface is set once all functions are registered.
+    fbl::AutoLock lock(&lock_);
+    if (!function_devs_added_) {
+      dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
     }
-    status = device_get_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER, buffer, sizeof(buffer),
-                                 &actual);
-    if (actual >= sizeof(buffer)) {
-      return ZX_ERR_OUT_OF_RANGE;
-    }
-    buffer[actual] = 0;
-  }
-  if ((status != ZX_OK) || (actual == 0)) {
-    status =
-        AllocStringDesc(fbl::String(config->serial, max_str_len), &device_desc_.i_serial_number);
-  } else {
-    status = AllocStringDesc(fbl::String(buffer, actual), &device_desc_.i_serial_number);
-  }
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = SetDefaultConfig(reinterpret_cast<FunctionDescriptor*>(config->functions),
-                            (metasize - sizeof(UsbConfig)) / sizeof(FunctionDescriptor));
-  if (status != ZX_OK) {
-    dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
   }
 
   usb_monitor_.Start();
   return ZX_OK;
 }
 
-zx_status_t UsbPeripheral::AllocStringDesc(fbl::String desc, uint8_t* out_index) {
+std::string UsbPeripheral::GetSerialNumber() {
+  char buffer[256];
+  size_t actual = 0;
+  // Return serial number from metadata if present.
+  auto status =
+      device_get_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER, buffer, sizeof(buffer), &actual);
+  if (status == ZX_OK) {
+    return {buffer, actual};
+  }
+
+  // Use MAC address as the next option.
+  uint8_t raw_mac_addr[6];
+  status = device_get_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS, &raw_mac_addr,
+                               sizeof(raw_mac_addr), &actual);
+
+  if (status == ZX_OK && actual == sizeof(raw_mac_addr)) {
+    snprintf(buffer, sizeof(buffer), "%02X%02X%02X%02X%02X%02X", raw_mac_addr[0], raw_mac_addr[1],
+             raw_mac_addr[2], raw_mac_addr[3], raw_mac_addr[4], raw_mac_addr[5]);
+    return {buffer, actual};
+  }
+
+  zxlogf(INFO, "Serial number/MAC address not found. Using generic (non-unique) serial number.\n");
+
+  return std::string(kDefaultSerialNumber);
+}
+
+zx_status_t UsbPeripheral::AllocStringDesc(std::string desc, uint8_t* out_index) {
   fbl::AutoLock lock(&lock_);
 
   if (strings_.size() >= MAX_STRINGS) {
+    zxlogf(ERROR, "String descriptor limit reached");
     return ZX_ERR_NO_RESOURCES;
   }
+  desc.resize(MAX_STRING_LENGTH);
   strings_.push_back(std::move(desc));
 
   // String indices are 1-based.
@@ -310,6 +320,7 @@ zx_status_t UsbPeripheral::FunctionRegistered() {
     fbl::AllocChecker ac;
     auto* config_desc_bytes = new (&ac) uint8_t[length];
     if (!ac.check()) {
+      zxlogf(ERROR, "Building configuration descriptor failed due to no memory.");
       return ZX_ERR_NO_MEMORY;
     }
     auto* config_desc = reinterpret_cast<usb_configuration_descriptor_t*>(config_desc_bytes);
@@ -408,6 +419,7 @@ zx_status_t UsbPeripheral::AllocEndpoint(fbl::RefPtr<UsbFunction> function, uint
     start = IN_EP_START;
     end = IN_EP_END;
   } else {
+    zxlogf(ERROR, "Invalid direction.");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -420,6 +432,7 @@ zx_status_t UsbPeripheral::AllocEndpoint(fbl::RefPtr<UsbFunction> function, uint
     }
   }
 
+  zxlogf(ERROR, "Exceeded maximum supported endpoints.");
   return ZX_ERR_NO_RESOURCES;
 }
 
@@ -440,14 +453,14 @@ zx_status_t UsbPeripheral::GetDescriptor(uint8_t request_type, uint16_t value, u
       zxlogf(ERROR, "%s: device descriptor not set", __func__);
       return ZX_ERR_INTERNAL;
     }
-    if (length > sizeof(device_desc_))
-      length = sizeof(device_desc_);
+    length = std::min(length, sizeof(device_desc_));
     memcpy(buffer, &device_desc_, length);
     *out_actual = length;
     return ZX_OK;
   } else if (desc_type == USB_DT_CONFIG && index == 0) {
     index = value & 0xff;
     if (index >= configurations_.size()) {
+      zxlogf(ERROR, "Invalid configuration index: %d", index);
       return ZX_ERR_INVALID_ARGS;
     }
     auto& config_desc = configurations_[index]->config_desc;
@@ -456,9 +469,7 @@ zx_status_t UsbPeripheral::GetDescriptor(uint8_t request_type, uint16_t value, u
       return ZX_ERR_INTERNAL;
     }
     auto desc_length = config_desc.size();
-    if (length > desc_length) {
-      length = desc_length;
-    }
+    length = std::min(length, desc_length);
     memcpy(buffer, config_desc.data(), length);
     *out_actual = length;
     return ZX_OK;
@@ -477,6 +488,7 @@ zx_status_t UsbPeripheral::GetDescriptor(uint8_t request_type, uint16_t value, u
       // String indices are 1-based.
       string_index--;
       if (string_index >= strings_.size()) {
+        zxlogf(ERROR, "Invalid string index: %d", string_index);
         return ZX_ERR_INVALID_ARGS;
       }
       const char* string = strings_[string_index].c_str();
@@ -492,8 +504,7 @@ zx_status_t UsbPeripheral::GetDescriptor(uint8_t request_type, uint16_t value, u
       header->b_length = static_cast<uint8_t>(index);
     }
 
-    if (header->b_length < length)
-      length = header->b_length;
+    length = std::min<size_t>(header->b_length, length);
     memcpy(buffer, desc, length);
     *out_actual = length;
     return ZX_OK;
@@ -526,6 +537,7 @@ zx_status_t UsbPeripheral::SetConfiguration(uint8_t configuration) {
 zx_status_t UsbPeripheral::SetInterface(uint8_t interface, uint8_t alt_setting) {
   auto configuration = configurations_[configuration_ - 1];
   if (interface >= std::size(configuration->interface_map)) {
+    zxlogf(ERROR, "Invalid interface index: %d", interface);
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -533,6 +545,8 @@ zx_status_t UsbPeripheral::SetInterface(uint8_t interface, uint8_t alt_setting) 
   if (function != nullptr) {
     return function->SetInterface(interface, alt_setting);
   }
+
+  zxlogf(ERROR, "Function does not exist");
   return ZX_ERR_NOT_SUPPORTED;
 }
 
@@ -540,6 +554,7 @@ zx_status_t UsbPeripheral::AddFunction(UsbConfiguration& config, FunctionDescrip
   fbl::AutoLock lock(&lock_);
 
   if (functions_bound_) {
+    zxlogf(ERROR, "Functions are already bound");
     return ZX_ERR_BAD_STATE;
   }
 
@@ -634,7 +649,7 @@ void UsbPeripheral::ClearFunctionsComplete() {
   for (size_t i = 0; i < std::size(endpoint_map_); i++) {
     endpoint_map_[i].reset();
   }
-  strings_.reset();
+  strings_.clear();
 
   DeviceStateChanged();
 
@@ -924,17 +939,17 @@ zx_status_t UsbPeripheral::SetDeviceDescriptor(DeviceDescriptor desc) {
     device_desc_.id_product = desc.id_product;
     device_desc_.bcd_device = desc.bcd_device;
     zx_status_t status =
-        AllocStringDesc(fbl::String(desc.manufacturer.data(), desc.manufacturer.size()),
+        AllocStringDesc(std::string(desc.manufacturer.data(), desc.manufacturer.size()),
                         &device_desc_.i_manufacturer);
     if (status != ZX_OK) {
       return status;
     }
-    status = AllocStringDesc(fbl::String(desc.product.data(), desc.product.size()),
+    status = AllocStringDesc(std::string(desc.product.data(), desc.product.size()),
                              &device_desc_.i_product);
     if (status != ZX_OK) {
       return status;
     }
-    status = AllocStringDesc(fbl::String(desc.serial.data(), desc.serial.size()),
+    status = AllocStringDesc(std::string(desc.serial.data(), desc.serial.size()),
                              &device_desc_.i_serial_number);
     if (status != ZX_OK) {
       return status;
@@ -1039,7 +1054,7 @@ void UsbPeripheral::DdkRelease() {
   delete this;
 }
 
-zx_status_t UsbPeripheral::SetDefaultConfig(FunctionDescriptor* descriptors, size_t length) {
+zx_status_t UsbPeripheral::SetDefaultConfig(std::vector<FunctionDescriptor>& functions) {
   auto descriptor = fbl::MakeRefCounted<UsbConfiguration>();
   configurations_.push_back(descriptor);
   device_desc_.b_length = sizeof(usb_device_descriptor_t),
@@ -1053,17 +1068,25 @@ zx_status_t UsbPeripheral::SetDefaultConfig(FunctionDescriptor* descriptors, siz
   device_desc_.b_num_configurations = 1;
 
   zx_status_t status = ZX_OK;
-  for (size_t i = 0; i < length; i++) {
-    status = AddFunction(*descriptor, std::move(*(descriptors + i)));
+  for (auto function : functions) {
+    status = AddFunction(*descriptor, function);
     if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to add function: (%d:%d:%d) status: %s", function.interface_class,
+             function.interface_subclass, function.interface_protocol,
+             zx_status_get_string(status));
       return status;
     }
   }
 
-  if (status != ZX_OK)
-    return status;
+  if (!functions.empty()) {
+    status = BindFunctions();
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to bind functions. status: %s", zx_status_get_string(status));
+      return status;
+    }
+  }
 
-  return BindFunctions();
+  return ZX_OK;
 }
 
 static constexpr zx_driver_ops_t ops = []() {

@@ -1034,7 +1034,6 @@ zx_status_t Dwc2::Init() {
       fuchsia_hardware_usb_dci::UsbDciService::Name,
   };
   status = DdkAdd(ddk::DeviceAddArgs("dwc2")
-                      .forward_metadata(parent(), DEVICE_METADATA_USB_CONFIG)
                       .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS)
                       .forward_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER)
                       .set_fidl_service_offers(offers)

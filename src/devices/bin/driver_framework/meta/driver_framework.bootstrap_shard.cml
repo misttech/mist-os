@@ -71,8 +71,11 @@
         },
         {
             from: "parent",
-            to: "#boot-drivers",
-            config: [ "fuchsia.power.SuspendEnabled" ],
+            to: [ "#boot-drivers" ],
+            config: [
+                "fuchsia.power.SuspendEnabled",
+                "fuchsia.usb.PeripheralConfig.Functions",
+            ],
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",

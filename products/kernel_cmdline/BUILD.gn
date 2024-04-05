@@ -90,18 +90,6 @@ kernel_cmdline("oom.reboot-timeout--low") {
   args = [ "kernel.oom.reboot-timeout-ms=8000" ]
 }
 
-kernel_cmdline("driver.usb.peripheral--cdc_adb") {
-  args = [ "driver.usb.peripheral=cdc_adb" ]
-}
-
-kernel_cmdline("driver.usb.peripheral--cdc_fastboot") {
-  args = [ "driver.usb.peripheral=cdc_fastboot" ]
-}
-
-kernel_cmdline("driver.usb.peripheral--fastboot") {
-  args = [ "driver.usb.peripheral=fastboot" ]
-}
-
 # Should only be visible on x64.
 if (target_cpu == "x64") {
   kernel_cmdline("kernel.serial--legacy") {

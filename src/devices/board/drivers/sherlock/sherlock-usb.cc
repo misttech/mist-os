@@ -14,7 +14,6 @@
 #include <lib/fit/defer.h>
 #include <lib/zircon-internal/align.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
@@ -22,13 +21,10 @@
 #include <bind/fuchsia/hardware/usb/phy/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
-#include <ddk/usb-peripheral-config.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-common/aml-usb-phy.h>
 #include <usb/cdc.h>
 #include <usb/dwc2/metadata.h>
-#include <usb/peripheral-config.h>
-#include <usb/peripheral.h>
 #include <usb/usb.h>
 
 #include "sherlock.h"
@@ -78,13 +74,7 @@ constexpr dwc2_metadata_t dwc2_metadata = {
         },
 };
 
-using FunctionDescriptor = fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor;
-
 static std::vector<fpbus::Metadata> usb_metadata{
-    {{
-        .type = DEVICE_METADATA_USB_CONFIG,
-        // No metadata for this item.
-    }},
     {{
         .type = DEVICE_METADATA_PRIVATE,
         .data = std::vector<uint8_t>(
@@ -342,19 +332,9 @@ zx_status_t Sherlock::UsbInit() {
     return status;
   }
 
-  {
-    std::unique_ptr<usb::UsbPeripheralConfig> peripheral_config;
-    auto status = usb::UsbPeripheralConfig::CreateFromBootArgs(parent_, &peripheral_config);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to get usb config from boot args - %d", status);
-      return status;
-    }
-    usb_metadata[0].data() = peripheral_config->config_data();
-
-    status = AddDwc2Composite(pbus_, fidl_arena, arena);
-    if (status != ZX_OK) {
-      return status;
-    }
+  status = AddDwc2Composite(pbus_, fidl_arena, arena);
+  if (status != ZX_OK) {
+    return status;
   }
 
   return ZX_OK;

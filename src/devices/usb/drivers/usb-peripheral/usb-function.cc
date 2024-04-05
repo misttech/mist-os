@@ -24,6 +24,7 @@ void UsbFunction::DdkRelease() {
 zx_status_t UsbFunction::UsbFunctionSetInterface(
     const usb_function_interface_protocol_t* function_intf) {
   if (function_intf == nullptr) {
+    zxlogf(ERROR, "Invalid interface passed to UsbFunctionSetInterface");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -33,6 +34,7 @@ zx_status_t UsbFunction::UsbFunctionSetInterface(
   fbl::AllocChecker ac;
   auto* descriptors = new (&ac) uint8_t[length];
   if (!ac.check()) {
+    zxlogf(ERROR, "UsbFunctionSetInterface failed due to no memory.");
     return ZX_ERR_NO_MEMORY;
   }
 
@@ -47,15 +49,13 @@ zx_status_t UsbFunction::UsbFunctionSetInterface(
   auto status = peripheral_->ValidateFunction(fbl::RefPtr<UsbFunction>(this), descriptors, length,
                                               &num_interfaces_);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "UsbFunctionInterfaceClient::ValidateFunction() failed - %s",
+           zx_status_get_string(status));
     delete[] descriptors;
     return status;
   }
 
   descriptors_.reset(descriptors, length);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
   return peripheral_->FunctionRegistered();
 }
 
@@ -103,6 +103,7 @@ zx_status_t UsbFunction::SetConfigured(bool configured, usb_speed_t speed) {
   if (function_intf_.is_valid()) {
     return function_intf_.SetConfigured(configured, speed);
   } else {
+    zxlogf(ERROR, "SetConfigured failed as the interface is invalid.");
     return ZX_ERR_BAD_STATE;
   }
 }
@@ -111,6 +112,7 @@ zx_status_t UsbFunction::SetInterface(uint8_t interface, uint8_t alt_setting) {
   if (function_intf_.is_valid()) {
     return function_intf_.SetInterface(interface, alt_setting);
   } else {
+    zxlogf(ERROR, "SetInterface failed as the interface is invalid.");
     return ZX_ERR_BAD_STATE;
   }
 }
@@ -123,6 +125,7 @@ zx_status_t UsbFunction::Control(const usb_setup_t* setup, const void* write_buf
                                   reinterpret_cast<uint8_t*>(read_buffer), read_size,
                                   out_read_actual);
   } else {
+    zxlogf(ERROR, "Control failed as the interface is invalid.");
     return ZX_ERR_BAD_STATE;
   }
 }

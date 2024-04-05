@@ -21,10 +21,12 @@ fuchsia_driver("usb-peripheral-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
+    "config-parser.cc",
     "usb-function.cc",
     "usb-peripheral.cc",
   ]
   deps = [
+    ":usb-peripheral-config",
     ":usb_peripheral_bind",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",
@@ -46,38 +48,53 @@ fuchsia_driver("usb-peripheral-driver") {
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
   ]
-
-  # Set default configuration here, rather than relying on usbctl to do it.
-  defines = [
-    "USB_DEVICE_VID=0x18D1",
-    "USB_DEVICE_PID=0xA020",
-    "USB_DEVICE_MANUFACTURER=\"Zircon\"",
-    "USB_DEVICE_PRODUCT=\"CDC-Ethernet\"",
-    "USB_DEVICE_SERIAL=\"0123456789ABCDEF\"",
-    "USB_DEVICE_FUNCTIONS=\"cdc\"",
-  ]
 }
 
-fuchsia_driver_component("usb-peripheral") {
-  info = "usb-peripheral-info.json"
+fuchsia_component_manifest("manifest") {
   component_name = "usb-peripheral"
-  deps = [ ":usb-peripheral-driver" ]
   manifest = "meta/usb-peripheral.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("usb-peripheral-config") {
+  cm_label = ":manifest"
+}
+
+fuchsia_structured_config_values("default_values") {
+  cm_label = ":manifest"
+  values = {
+    functions = []
+  }
+}
+
+fuchsia_driver_component("driver") {
+  info = "usb-peripheral-info.json"
+  cm_label = ":manifest"
+  deps = [ ":usb-peripheral-driver" ]
+}
+
+group("usb-peripheral") {
+  deps = [
+    ":default_values",
+    ":driver",
+  ]
 }
 
 fuchsia_driver_package("package") {
   package_name = "usb-peripheral"
-  driver_components = [ ":usb-peripheral" ]
+  driver_components = [ ":driver" ]
+  deps = [ ":default_values" ]
 }
 
 test("usb-peripheral-unittest-bin") {
   sources = [
+    "config-parser.cc",
     "usb-function.cc",
     "usb-peripheral-test.cc",
     "usb-peripheral.cc",
   ]
   output_name = "usb-peripheral-unittest"
   deps = [
+    ":usb-peripheral-config",
     ":usb_peripheral_bind",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",
@@ -114,12 +131,6 @@ test("usb-peripheral-unittest-bin") {
 
 fuchsia_unittest_package("usb-peripheral-unittest") {
   deps = [ ":usb-peripheral-unittest-bin" ]
-  test_specs = {
-    environments = basic_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
 }
 
 group("tests") {

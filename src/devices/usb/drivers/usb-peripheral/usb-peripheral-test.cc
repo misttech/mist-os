@@ -16,11 +16,8 @@
 #include <zircon/syscalls.h>
 
 #include <cstring>
-#include <list>
-#include <map>
 #include <memory>
 
-#include <ddk/usb-peripheral-config.h>
 #include <usb/usb.h>
 #include <zxtest/zxtest.h>
 
@@ -69,13 +66,7 @@ class UsbPeripheralHarness : public zxtest::Test {
  public:
   void SetUp() override {
     root_device_ = MockDevice::FakeRootParent();
-    static const UsbConfig kConfig = []() {
-      UsbConfig config = {};
-      memcpy(config.serial, kSerialNumber, sizeof(kSerialNumber));
-      return config;
-    }();
     dci_ = std::make_unique<FakeDevice>();
-    root_device_->SetMetadata(DEVICE_METADATA_USB_CONFIG, &kConfig, sizeof(kConfig));
     root_device_->SetMetadata(DEVICE_METADATA_SERIAL_NUMBER, &kSerialNumber, sizeof(kSerialNumber));
     root_device_->AddProtocol(ZX_PROTOCOL_USB_DCI, dci_->proto()->ops, dci_->proto()->ctx);
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -83,8 +74,10 @@ class UsbPeripheralHarness : public zxtest::Test {
     root_device_->AddFidlService(fuchsia_hardware_usb_dci::UsbDciService::Name,
                                  std::move(endpoints->client));
 
-    zx::interrupt irq;
-    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
+    usb_peripheral_config::Config fake_config;
+    fake_config.functions() = {};
+    root_device_->SetConfigVmo(fake_config.ToVmo());
+
     ASSERT_OK(usb_peripheral::UsbPeripheral::Create(nullptr, root_device_.get()));
     ASSERT_EQ(1, root_device_->child_count());
     mock_dev_ = root_device_->GetLatestChild();

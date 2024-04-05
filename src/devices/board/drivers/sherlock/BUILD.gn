@@ -134,8 +134,6 @@ template("sherlock_driver") {
       "//src/devices/usb/lib/usb",
       "//src/devices/usb/lib/usb:cdc",
       "//src/devices/usb/lib/usb:dwc2",
-      "//src/devices/usb/lib/usb:peripheral",
-      "//src/devices/usb/lib/usb:peripheral-config",
       "//src/lib/ddk",
       "//src/lib/ddk:ddk-metadata-headers",
 

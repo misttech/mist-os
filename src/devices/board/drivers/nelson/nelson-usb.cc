@@ -13,7 +13,6 @@
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/align.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
@@ -22,14 +21,11 @@
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
 #include <bind/fuchsia/usb/phy/cpp/bind.h>
-#include <ddk/usb-peripheral-config.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-common/aml-usb-phy.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 #include <usb/cdc.h>
 #include <usb/dwc2/metadata.h>
-#include <usb/peripheral-config.h>
-#include <usb/peripheral.h>
 #include <usb/usb.h>
 
 #include "nelson.h"
@@ -76,8 +72,6 @@ static const dwc2_metadata_t dwc2_metadata = {
             16,   // for test function interrupt IN.
         },
 };
-
-using FunctionDescriptor = fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor;
 
 static const std::vector<fpbus::BootMetadata> usb_boot_metadata{
     {{
@@ -339,17 +333,7 @@ zx_status_t Nelson::UsbInit() {
     return status;
   }
 
-  std::unique_ptr<usb::UsbPeripheralConfig> peripheral_config;
-  status = usb::UsbPeripheralConfig::CreateFromBootArgs(parent_, &peripheral_config);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get usb config from boot args - %d", status);
-    return status;
-  }
   const std::vector<fpbus::Metadata> usb_metadata{
-      {{
-          .type = DEVICE_METADATA_USB_CONFIG,
-          .data = peripheral_config->config_data(),
-      }},
       {{
           .type = DEVICE_METADATA_PRIVATE,
           .data = std::vector<uint8_t>(

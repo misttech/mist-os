@@ -24,15 +24,12 @@
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
 #include <bind/fuchsia/usb/phy/cpp/bind.h>
-#include <ddk/usb-peripheral-config.h>
 #include <ddktl/device.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-common/aml-usb-phy.h>
 #include <soc/aml-meson/g12b-clk.h>
 #include <usb/cdc.h>
 #include <usb/dwc2/metadata.h>
-#include <usb/peripheral-config.h>
-#include <usb/peripheral.h>
 
 #include "src/devices/board/drivers/vim3/vim3-gpios.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
@@ -225,12 +222,7 @@ static const fpbus::Node xhci_dev = []() {
   return dev;
 }();
 
-using FunctionDescriptor = fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor;
-
 static const std::vector<fpbus::Metadata> usb_metadata{
-    {{
-        .type = DEVICE_METADATA_USB_CONFIG,
-    }},
     {{
         .type = DEVICE_METADATA_PRIVATE,
         .data = std::vector<uint8_t>(
@@ -382,14 +374,7 @@ zx_status_t Vim3::UsbInit() {
   }
 
   // Create DWC2 Device
-  std::unique_ptr<usb::UsbPeripheralConfig> peripheral_config;
-  auto status = usb::UsbPeripheralConfig::CreateFromBootArgs(parent_, &peripheral_config);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get usb config from boot args - %d", status);
-    return status;
-  }
-  dwc2_dev.metadata().value()[0].data().emplace(peripheral_config->config_data());
-  status = AddDwc2Composite(pbus_, fidl_arena, arena);
+  auto status = AddDwc2Composite(pbus_, fidl_arena, arena);
   if (status != ZX_OK) {
     return status;
   }

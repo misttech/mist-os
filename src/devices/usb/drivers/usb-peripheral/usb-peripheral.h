@@ -11,7 +11,7 @@
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/zx/channel.h>
 
-#include <vector>
+#include <utility>
 
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
@@ -23,6 +23,8 @@
 #include <fbl/vector.h>
 #include <usb-monitor-util/usb-monitor-util.h>
 #include <usb/request-cpp.h>
+
+#include "src/devices/usb/drivers/usb-peripheral/usb_peripheral_config.h"
 
 /*
     THEORY OF OPERATION
@@ -96,7 +98,8 @@ class UsbPeripheral : public UsbPeripheralType,
                       public ddk::EmptyProtocol<ZX_PROTOCOL_USB_PERIPHERAL>,
                       public ddk::UsbDciInterfaceProtocol<UsbPeripheral> {
  public:
-  explicit UsbPeripheral(zx_device_t* parent) : UsbPeripheralType(parent), dci_(parent) {}
+  explicit UsbPeripheral(zx_device_t* parent, usb_peripheral_config::Config config)
+      : UsbPeripheralType(parent), dci_(parent), config_(std::move(config)) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -126,7 +129,7 @@ class UsbPeripheral : public UsbPeripheralType,
   zx_status_t AllocInterface(fbl::RefPtr<UsbFunction> function, uint8_t* out_intf_num);
   zx_status_t AllocEndpoint(fbl::RefPtr<UsbFunction> function, uint8_t direction,
                             uint8_t* out_address);
-  zx_status_t AllocStringDesc(fbl::String desc, uint8_t* out_index);
+  zx_status_t AllocStringDesc(std::string desc, uint8_t* out_index);
   zx_status_t ValidateFunction(fbl::RefPtr<UsbFunction> function, void* descriptors, size_t length,
                                uint8_t* out_num_interfaces);
   zx_status_t FunctionRegistered();
@@ -154,6 +157,7 @@ class UsbPeripheral : public UsbPeripheralType,
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbPeripheral);
 
   static constexpr uint8_t MAX_STRINGS = 255;
+  static constexpr uint8_t MAX_STRING_LENGTH = 126;
 
   // OUT endpoints are in range 1 - 15, IN endpoints are in range 17 - 31.
   static constexpr uint8_t OUT_EP_START = 1;
@@ -176,6 +180,7 @@ class UsbPeripheral : public UsbPeripheralType,
   void ClearFunctions();
   // Updates the internal state after all functions have finished being removed.
   void ClearFunctionsComplete() __TA_REQUIRES(lock_);
+  std::string GetSerialNumber();
   zx_status_t DeviceStateChanged() __TA_REQUIRES(lock_);
   zx_status_t AddFunctionDevices() __TA_REQUIRES(lock_);
   void RemoveFunctionDevices() __TA_REQUIRES(lock_);
@@ -183,7 +188,7 @@ class UsbPeripheral : public UsbPeripheralType,
                             size_t length, size_t* out_actual);
   zx_status_t SetConfiguration(uint8_t configuration);
   zx_status_t SetInterface(uint8_t interface, uint8_t alt_setting);
-  zx_status_t SetDefaultConfig(FunctionDescriptor* descriptors, size_t length);
+  zx_status_t SetDefaultConfig(std::vector<FunctionDescriptor>& functions);
   int ListenerCleanupThread();
   void RequestComplete(usb_request_t* req);
 
@@ -195,7 +200,7 @@ class UsbPeripheral : public UsbPeripheralType,
   // Map from endpoint index to function.
   fbl::RefPtr<UsbFunction> endpoint_map_[USB_MAX_EPS];
   // Strings for USB string descriptors.
-  fbl::Vector<fbl::String> strings_ __TA_GUARDED(lock_);
+  std::vector<std::string> strings_ __TA_GUARDED(lock_);
   // List of usb_function_t.
   fbl::Vector<fbl::RefPtr<UsbConfiguration>> configurations_;
   // mutex for protecting our state
@@ -238,6 +243,8 @@ class UsbPeripheral : public UsbPeripheralType,
 
   fbl::Mutex pending_requests_lock_;
   usb::BorrowedRequestList<void> pending_requests_ __TA_GUARDED(pending_requests_lock_);
+
+  usb_peripheral_config::Config config_;
 };
 
 }  // namespace usb_peripheral
