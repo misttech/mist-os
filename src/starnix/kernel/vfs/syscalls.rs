@@ -264,7 +264,7 @@ pub fn sys_fcntl(
             if requested_flags.contains(OpenFlags::NOATIME)
                 && !file.flags().contains(OpenFlags::NOATIME)
             {
-                file.name.check_access(current_task, Access::NOATIME)?;
+                file.name.check_o_noatime_allowed(current_task)?;
             }
 
             file.update_file_flags(requested_flags, settable_flags);

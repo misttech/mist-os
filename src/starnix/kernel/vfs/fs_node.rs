@@ -1169,6 +1169,10 @@ impl FsNode {
         }
 
         if check_access {
+            if flags.contains(OpenFlags::NOATIME) {
+                self.check_o_noatime_allowed(current_task)?;
+            }
+
             self.check_access(current_task, mount, Access::from_open_flags(flags))?;
         }
 
@@ -1488,6 +1492,31 @@ impl FsNode {
         }
     }
 
+    /// Checks if O_NOATIME is allowed,
+    pub fn check_o_noatime_allowed(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        let creds = current_task.creds();
+
+        // Per open(2),
+        //
+        //   O_NOATIME (since Linux 2.6.8)
+        //      ...
+        //
+        //      This flag can be employed only if one of the following
+        //      conditions is true:
+        //
+        //      *  The effective UID of the process matches the owner UID
+        //         of the file.
+        //
+        //      *  The calling process has the CAP_FOWNER capability in
+        //         its user namespace and the owner UID of the file has a
+        //         mapping in the namespace.
+        if creds.has_capability(CAP_FOWNER) || creds.fsuid == self.info().uid {
+            Ok(())
+        } else {
+            error!(EPERM)
+        }
+    }
+
     /// Check whether the node can be accessed in the current context with the specified access
     /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
     /// owner or is in the file's group.
@@ -1501,25 +1530,18 @@ impl FsNode {
             mount.check_readonly_filesystem()?;
         }
 
-        let (node_uid, node_gid, mode) = {
-            let info = self.info();
-            (info.uid, info.gid, info.mode.bits())
-        };
-        let creds = current_task.creds();
-
-        if access.contains(Access::NOATIME)
-            && node_uid != creds.fsuid
-            && !creds.has_capability(CAP_FOWNER)
-        {
-            return error!(EPERM);
-        }
-
         match self.ops.check_access(self, current_task, access) {
             // Use the default access checks.
             Err(e) if e == ENOSYS => {}
             // The node implementation handled the access check.
             result @ _ => return result,
         }
+
+        let (node_uid, node_gid, mode) = {
+            let info = self.info();
+            (info.uid, info.gid, info.mode.bits())
+        };
+        let creds = current_task.creds();
 
         let mode_flags = if creds.has_capability(CAP_DAC_OVERRIDE) {
             if self.is_dir() {

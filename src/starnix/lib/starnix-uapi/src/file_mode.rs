@@ -165,7 +165,6 @@ mod inner_access {
             const EXEC = 1;
             const WRITE = 2;
             const READ = 4;
-            const NOATIME = 8;
 
             // Access mask is the part of access related to the file access mode. It is
             // exec/write/read.
@@ -175,16 +174,12 @@ mod inner_access {
 
     impl Access {
         pub fn from_open_flags(flags: OpenFlags) -> Self {
-            let base_flags = match flags & OpenFlags::ACCESS_MASK {
+            match flags & OpenFlags::ACCESS_MASK {
                 OpenFlags::RDONLY => Self::READ,
                 OpenFlags::WRONLY => Self::WRITE,
                 OpenFlags::RDWR => Self::READ | Self::WRITE,
                 _ => Self::EXIST, // Nonstandard access modes can be opened but will fail to read or write.
-            };
-            let noatime =
-                if flags.contains(OpenFlags::NOATIME) { Access::NOATIME } else { Access::empty() };
-
-            base_flags | noatime
+            }
         }
 
         pub fn rwx_bits(&self) -> u32 {

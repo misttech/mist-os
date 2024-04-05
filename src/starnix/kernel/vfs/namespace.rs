@@ -1547,6 +1547,11 @@ impl NamespaceNode {
         self.entry.node.check_access(current_task, &self.mount, access)
     }
 
+    /// Checks if O_NOATIME is allowed,
+    pub fn check_o_noatime_allowed(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.entry.node.check_o_noatime_allowed(current_task)
+    }
+
     pub fn truncate(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
         self.entry.node.truncate(current_task, &self.mount, length)
     }
