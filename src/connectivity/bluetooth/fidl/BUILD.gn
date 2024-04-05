@@ -4,6 +4,23 @@
 
 import("//build/fidl/fidl.gni")
 
+fidl("host") {
+  sdk_category = "internal"
+  name = "fuchsia.bluetooth.host"
+
+  sources = [ "host.fidl" ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.bluetooth",
+    "//sdk/fidl/fuchsia.bluetooth.bredr",
+    "//sdk/fidl/fuchsia.bluetooth.gatt",
+    "//sdk/fidl/fuchsia.bluetooth.gatt2",
+    "//sdk/fidl/fuchsia.bluetooth.le",
+    "//sdk/fidl/fuchsia.bluetooth.sys",
+  ]
+  enable_hlcpp = true
+}
+
 fidl("component") {
   name = "fuchsia.bluetooth.component"
 
