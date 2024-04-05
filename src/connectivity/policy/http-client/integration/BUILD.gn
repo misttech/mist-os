@@ -15,8 +15,10 @@ rustc_test("http_client_integration_test") {
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-hyper",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/sys/lib/component-events",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hyper",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [ "src/lib.rs" ]
@@ -29,15 +31,34 @@ fuchsia_test_component("component") {
   manifest = "meta/http_client_integration_test.cml"
   deps = [ ":http_client_integration_test" ]
   test_type = "system"
+  restricted_features = [ "config_capabilities" ]
 }
 
 fuchsia_test_package("http-client-integration-tests") {
   test_components = [ ":component" ]
   deps = [
+    ":config_idle_1ms",
+    ":config_never_idle",
+
     # The component under test.
     "../:component",
     "//src/connectivity/network/netstack:component-debug",
   ]
+}
+
+# A component providing configuration that the http client should never stop itself on idle.
+fuchsia_component_manifest("config_never_idle") {
+  component_name = "http-client-config-never-idle"
+  manifest = "meta/config_never_idle.cml"
+  restricted_features = [ "config_capabilities" ]
+}
+
+# A component providing configuration that the http client should stop itself if it did not
+# receive requests for 1 milliseconds.
+fuchsia_component_manifest("config_idle_1ms") {
+  component_name = "http-client-config-idle-1ms"
+  manifest = "meta/config_idle_1ms.cml"
+  restricted_features = [ "config_capabilities" ]
 }
 
 group("tests") {

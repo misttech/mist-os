@@ -46,7 +46,7 @@ pub use service::{
     ServiceObjLocal, ServiceObjTrait,
 };
 mod until_stalled;
-pub use until_stalled::StallableServiceFs;
+pub use until_stalled::{Item, StallableServiceFs};
 
 /// A filesystem which connects clients to services.
 ///

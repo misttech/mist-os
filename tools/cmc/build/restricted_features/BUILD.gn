@@ -24,7 +24,10 @@ group("config_capabilities") {
 
 # The allowlist of components that can customize timing of request delivery in CML.
 group("delivery_type") {
-  visibility = [ "//src/sys/component_manager/tests/*" ]
+  visibility = [
+    "//src/connectivity/policy/http-client/*",
+    "//src/sys/component_manager/tests/*",
+  ]
 }
 
 # The allowlist of components that can use the "allow_long_names" feature in CML.

@@ -4,13 +4,16 @@
 
 use {
     anyhow::Context as _,
-    fidl::prelude::*,
-    fidl_fuchsia_net_http as net_http,
+    fidl::{endpoints::ServerEnd, prelude::*},
+    fidl_fuchsia_io as fio, fidl_fuchsia_net_http as net_http,
+    fidl_fuchsia_process_lifecycle as flifecycle,
     fuchsia_async::{self as fasync, TimeoutExt as _},
-    fuchsia_component::server::{ServiceFs, ServiceFsDir},
+    fuchsia_component::server::{Item, ServiceFs, ServiceFsDir},
     fuchsia_hyper as fhyper,
+    fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{prelude::*, StreamExt},
+    futures::{future::Either, prelude::*, StreamExt},
+    http_client_config::Config,
     std::str::FromStr as _,
     tracing::{debug, error, info, trace},
 };
@@ -367,8 +370,12 @@ fn calculate_redirect(
     Some(hyper::Uri::from_parts(new_parts).ok()?)
 }
 
-async fn loader_server(stream: net_http::LoaderRequestStream) -> Result<(), anyhow::Error> {
+async fn loader_server(
+    stream: net_http::LoaderRequestStream,
+    idle_timeout: fasync::Duration,
+) -> Result<(), anyhow::Error> {
     let background_tasks = vfs::execution_scope::ExecutionScope::new();
+    let (stream, unbind_if_stalled) = detect_stall::until_stalled(stream, idle_timeout);
 
     stream
         .err_into::<anyhow::Error>()
@@ -393,7 +400,7 @@ async fn loader_server(stream: net_http::LoaderRequestStream) -> Result<(), anyh
                                     &final_url,
                                     &final_method,
                                     hyper_response,
-                                    scope,
+                                    scope.clone(),
                                 )
                                 .await
                             }
@@ -420,6 +427,16 @@ async fn loader_server(stream: net_http::LoaderRequestStream) -> Result<(), anyh
         .await?;
 
     background_tasks.wait().await;
+
+    // If the connection did not close or receive new messages within the timeout, send it
+    // over to component manager to wait for it on our behalf.
+    if let Ok(Some(server_end)) = unbind_if_stalled.await {
+        fuchsia_component::client::connect_channel_to_protocol_at::<net_http::LoaderMarker>(
+            server_end.into(),
+            "/escrow",
+        )?;
+    }
+
     Ok(())
 }
 
@@ -429,13 +446,78 @@ enum HttpServices {
 
 #[fuchsia::main]
 pub async fn main() -> Result<(), anyhow::Error> {
+    tracing::info!("http-client starting");
+
+    // TODO(https://fxbug.dev/333080598): This is quite some boilerplate to escrow the outgoing dir.
+    // Design some library function to handle the lifecycle requests.
+    let lifecycle =
+        fuchsia_runtime::take_startup_handle(HandleInfo::new(HandleType::Lifecycle, 0)).unwrap();
+    let lifecycle: zx::Channel = lifecycle.into();
+    let lifecycle: ServerEnd<flifecycle::LifecycleMarker> = lifecycle.into();
+    let (mut lifecycle_request_stream, lifecycle_control_handle) =
+        lifecycle.into_stream_and_control_handle().unwrap();
+
+    let config = Config::take_from_startup_handle();
+    let idle_timeout = if config.stop_on_idle_timeout_millis >= 0 {
+        fasync::Duration::from_millis(config.stop_on_idle_timeout_millis)
+    } else {
+        fasync::Duration::INFINITE
+    };
+
     let mut fs = ServiceFs::new();
     let _: &mut ServiceFsDir<'_, _> =
         fs.take_and_serve_directory_handle()?.dir("svc").add_fidl_service(HttpServices::Loader);
-    fs.for_each_concurrent(None, |services| async {
-        let HttpServices::Loader(stream) = services;
-        loader_server(stream).await.unwrap_or_else(|e: anyhow::Error| error!("{:?}", e))
-    })
-    .await;
+
+    let lifecycle_task = async move {
+        let Some(Ok(request)) = lifecycle_request_stream.next().await else {
+            return std::future::pending::<()>().await;
+        };
+        match request {
+            flifecycle::LifecycleRequest::Stop { .. } => {
+                // TODO(https://fxbug.dev/332341289): If the framework asks us to stop, we still
+                // end up dropping requests. If we teach the `ServiceFs` etc. libraries to skip
+                // the timeout when this happens, we can cleanly stop the component.
+                return;
+            }
+        }
+    };
+
+    let outgoing_dir_task = async move {
+        fs.until_stalled(idle_timeout)
+            .for_each_concurrent(None, |item| async {
+                match item {
+                    Item::Request(services, _active_guard) => {
+                        let HttpServices::Loader(stream) = services;
+                        loader_server(stream, idle_timeout)
+                            .await
+                            .unwrap_or_else(|e: anyhow::Error| error!("{:?}", e))
+                    }
+                    Item::Stalled(outgoing_directory) => {
+                        escrow_outgoing(lifecycle_control_handle.clone(), outgoing_directory.into())
+                    }
+                }
+            })
+            .await;
+    };
+
+    match futures::future::select(lifecycle_task.boxed_local(), outgoing_dir_task.boxed_local())
+        .await
+    {
+        Either::Left(_) => tracing::info!("http-client stopping because we are told to stop"),
+        Either::Right(_) => tracing::info!("http-client stopping because it is idle"),
+    }
+
     Ok(())
+}
+
+/// Escrow the outgoing directory server endpoint to component manager, such that we will receive
+/// the same server endpoint on the next execution.
+fn escrow_outgoing(
+    lifecycle_control_handle: flifecycle::LifecycleControlHandle,
+    outgoing_dir: ServerEnd<fio::DirectoryMarker>,
+) {
+    let outgoing_dir = Some(outgoing_dir);
+    lifecycle_control_handle
+        .send_on_escrow(flifecycle::LifecycleOnEscrowRequest { outgoing_dir, ..Default::default() })
+        .unwrap();
 }

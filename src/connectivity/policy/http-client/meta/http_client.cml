@@ -9,9 +9,13 @@
     program: {
         runner: "elf",
         binary: "bin/http_client",
+        lifecycle: { stop_event: "notify" },
     },
     capabilities: [
-        { protocol: "fuchsia.net.http.Loader" },
+        {
+            protocol: "fuchsia.net.http.Loader",
+            delivery: "on_readable",
+        },
     ],
     use: [
         {
@@ -24,6 +28,11 @@
             directory: "root-ssl-certificates",
             rights: [ "r*" ],
             path: "/config/ssl",
+        },
+        {
+            protocol: "fuchsia.net.http.Loader",
+            from: "self",
+            path: "/escrow/fuchsia.net.http.Loader",
         },
     ],
     expose: [

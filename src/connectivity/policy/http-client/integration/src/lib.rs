@@ -4,13 +4,16 @@
 
 #![cfg(test)]
 
+use component_events::{events::*, matcher::*};
 use fidl_fuchsia_net_http as http;
 use fuchsia_async as fasync;
 use fuchsia_component_test::ScopedInstance;
 use fuchsia_zircon as zx;
-use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
+use futures::stream::FuturesUnordered;
+use futures::{select, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use std::future::Future;
 use std::net::SocketAddr;
+use test_case::test_case;
 
 const ROOT_DOCUMENT: &str = "Root document\n";
 
@@ -25,7 +28,10 @@ const LOOP2: &str = "/loop2";
 const PENDING: &str = "/pending";
 const BIG_STREAM: &str = "/big_stream";
 
-async fn run<F: Future<Output = ()>>(func: impl Fn(http::LoaderProxy, SocketAddr) -> F) {
+async fn run_without_connecting<F: Future<Output = ()>>(
+    behavior: &str,
+    func: impl FnOnce(SocketAddr, ScopedInstance) -> F,
+) {
     use futures::future::Either;
     use hyper::{
         header,
@@ -108,14 +114,10 @@ async fn run<F: Future<Output = ()>>(func: impl Fn(http::LoaderProxy, SocketAddr
         .serve(make_svc);
 
     const HTTP_CLIENT_URL: &str = "#meta/http-client.cm";
-    let http_client = ScopedInstance::new("coll".into(), HTTP_CLIENT_URL.into())
+    let http_client = ScopedInstance::new(behavior.into(), HTTP_CLIENT_URL.into())
         .await
         .expect("failed to create http-client");
-    let loader = http_client
-        .connect_to_protocol_at_exposed_dir::<http::LoaderMarker>()
-        .expect("failed to connect to http client");
-
-    let fut = func(loader, server_addr);
+    let fut = func(server_addr, http_client);
     futures::pin_mut!(fut);
     match futures::future::select(fut, server).await {
         Either::Left(((), _server)) => {}
@@ -123,6 +125,19 @@ async fn run<F: Future<Output = ()>>(func: impl Fn(http::LoaderProxy, SocketAddr
             panic!("hyper server exited: {:?}", result);
         }
     }
+}
+
+async fn run<F: Future<Output = ()>>(
+    behavior: &str,
+    func: impl FnOnce(http::LoaderProxy, SocketAddr) -> F,
+) {
+    run_without_connecting(behavior, move |addr, http_client| async move {
+        let loader = http_client
+            .connect_to_protocol_at_exposed_dir::<http::LoaderMarker>()
+            .expect("failed to connect to http client");
+        func(loader, addr).await;
+    })
+    .await
 }
 
 fn make_request(method: &str, url: String, deadline: Option<zx::Time>) -> http::Request {
@@ -186,23 +201,28 @@ async fn check_body(body: Option<zx::Socket>, mut expected: &[u8]) {
     }
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn test_fetch_http() {
-    run(|loader, addr| async move {
-        let response = loader
-            .fetch(make_request("GET", format!("http://{}", addr), None))
-            .await
-            .expect("failed to fetch");
-        let () = check_response(&response);
-        let http::Response { body, .. } = response;
-        let () = check_body(body, ROOT_DOCUMENT.as_bytes()).await;
-    })
-    .await
+async fn check_loader_http(loader: http::LoaderProxy, addr: SocketAddr) {
+    let response = loader
+        .fetch(make_request("GET", format!("http://{}", addr), None))
+        .await
+        .expect("failed to fetch");
+    let () = check_response(&response);
+    let http::Response { body, .. } = response;
+    let () = check_body(body, ROOT_DOCUMENT.as_bytes()).await;
 }
 
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
 #[fasync::run_singlethreaded(test)]
-async fn test_fetch_past_deadline() {
-    run(|loader, addr| async move {
+async fn test_fetch_http(behavior: &str) {
+    run(behavior, check_loader_http).await
+}
+
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
+#[fasync::run_singlethreaded(test)]
+async fn test_fetch_past_deadline(behavior: &str) {
+    run(behavior, |loader, addr| async move {
         // Deadline expired 10 minutes ago!
         let deadline = Some(zx::Time::after(zx::Duration::from_minutes(-10)));
         let http::Response { error, body, .. } = loader
@@ -216,9 +236,11 @@ async fn test_fetch_past_deadline() {
     .await
 }
 
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
 #[fasync::run_singlethreaded(test)]
-async fn test_fetch_response_too_slow() {
-    run(|loader, addr| async move {
+async fn test_fetch_response_too_slow(behavior: &str) {
+    run(behavior, |loader, addr| async move {
         // Deadline expires 100ms from now.
         let deadline = Some(zx::Time::after(zx::Duration::from_millis(100)));
         let http::Response { error, body, .. } = loader
@@ -232,9 +254,11 @@ async fn test_fetch_response_too_slow() {
     .await
 }
 
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
 #[fasync::run_singlethreaded(test)]
-async fn test_fetch_https() {
-    run(|loader, addr| async move {
+async fn test_fetch_https(behavior: &str) {
+    run(behavior, |loader, addr| async move {
         let http::Response { error, body, .. } = loader
             .fetch(make_request("GET", format!("https://{}", addr), None))
             .await
@@ -246,9 +270,11 @@ async fn test_fetch_https() {
     .await
 }
 
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
 #[fasync::run_singlethreaded(test)]
-async fn test_start_http() {
-    run(|loader, addr| async move {
+async fn test_start_http(behavior: &str) {
+    run(behavior, |loader, addr| async move {
         let (tx, rx) = fidl::endpoints::create_endpoints();
 
         let () = loader
@@ -274,9 +300,11 @@ async fn test_start_http() {
     .await
 }
 
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
 #[fasync::run_singlethreaded(test)]
-async fn test_fetch_redirect() {
-    run(|loader, addr| async move {
+async fn test_fetch_redirect(behavior: &str) {
+    run(behavior, |loader, addr| async move {
         let response = loader
             .fetch(make_request("GET", format!("http://{}{}", addr, TRIGGER_301), None))
             .await
@@ -289,9 +317,11 @@ async fn test_fetch_redirect() {
     .await
 }
 
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
 #[fasync::run_singlethreaded(test)]
-async fn test_start_redirect() {
-    run(|loader, addr| async move {
+async fn test_start_redirect(behavior: &str) {
+    run(behavior, |loader, addr| async move {
         let (tx, rx) = fidl::endpoints::create_endpoints();
 
         let () = loader
@@ -338,9 +368,11 @@ async fn test_start_redirect() {
     .await
 }
 
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
 #[fasync::run_singlethreaded(test)]
-async fn test_fetch_see_other() {
-    run(|loader, addr| async move {
+async fn test_fetch_see_other(behavior: &str) {
+    run(behavior, |loader, addr| async move {
         let response = loader
             .fetch(make_request("POST", format!("http://{}{}", addr, SEE_OTHER), None))
             .await
@@ -353,9 +385,11 @@ async fn test_fetch_see_other() {
     .await
 }
 
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
 #[fasync::run_singlethreaded(test)]
-async fn test_start_see_other() {
-    run(|loader, addr| async move {
+async fn test_start_see_other(behavior: &str) {
+    run(behavior, |loader, addr| async move {
         let (tx, rx) = fidl::endpoints::create_endpoints();
 
         let () = loader
@@ -403,9 +437,11 @@ async fn test_start_see_other() {
     .await
 }
 
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
 #[fasync::run_singlethreaded(test)]
-async fn test_fetch_max_redirect() {
-    run(|loader, addr| async move {
+async fn test_fetch_max_redirect(behavior: &str) {
+    run(behavior, |loader, addr| async move {
         let http::Response { status_code, redirect, .. } = loader
             .fetch(make_request("GET", format!("http://{}{}", addr, LOOP1), None))
             .await
@@ -425,9 +461,11 @@ async fn test_fetch_max_redirect() {
     .await
 }
 
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
 #[fasync::run_singlethreaded(test)]
-async fn test_start_redirect_loop() {
-    run(|loader, addr| async move {
+async fn test_start_redirect_loop(behavior: &str) {
+    run(behavior, |loader, addr| async move {
         let (tx, rx) = fidl::endpoints::create_endpoints();
 
         let () = loader
@@ -483,9 +521,11 @@ async fn test_start_redirect_loop() {
     .await
 }
 
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
 #[fasync::run_singlethreaded(test)]
-async fn test_fetch_http_big_stream() {
-    run(|loader, addr| async move {
+async fn test_fetch_http_big_stream(behavior: &str) {
+    run(behavior, |loader, addr| async move {
         let response = loader
             .fetch(make_request("GET", format!("http://{}{}", addr, BIG_STREAM), None))
             .await
@@ -494,6 +534,176 @@ async fn test_fetch_http_big_stream() {
         let () = check_response_big(&response);
         let http::Response { body, .. } = response;
         let () = check_body(body, &big_vec()).await;
+    })
+    .await
+}
+
+/// Tests that the `http-client` component can actually stop if we configure it so.
+#[test_case("idle_1ms")]
+#[fasync::run_singlethreaded(test)]
+async fn test_http_client_stops(behavior: &str) {
+    run_without_connecting(behavior, |addr, http_client| async move {
+        let mut event_stream = EventStream::open().await.unwrap();
+
+        // Connect to the loader.
+        let loader =
+            http_client.connect_to_protocol_at_exposed_dir::<http::LoaderMarker>().unwrap();
+
+        // Cause the framework to deliver the loader server endpoint to the component.
+        // This will start the component.
+        check_loader_http(loader.clone(), addr).await;
+        _ = EventMatcher::ok()
+            .moniker(http_client.moniker())
+            .wait::<Started>(&mut event_stream)
+            .await
+            .unwrap();
+
+        // Wait for the component to stop because the connection stalled.
+        _ = EventMatcher::ok()
+            .stop(Some(ExitStatusMatcher::Clean))
+            .moniker(http_client.moniker())
+            .wait::<Stopped>(&mut event_stream)
+            .await
+            .unwrap();
+
+        // Now make a two-way call on the connection again and it should still work
+        // (by starting the component again).
+        check_loader_http(loader.clone(), addr).await;
+        _ = EventMatcher::ok()
+            .moniker(http_client.moniker())
+            .wait::<Started>(&mut event_stream)
+            .await
+            .unwrap();
+    })
+    .await
+}
+
+/// Tests that the `http-client` component doesn't stop if we configure it so.
+#[test_case("never_idle")]
+#[fasync::run_singlethreaded(test)]
+async fn test_http_client_never_stops(behavior: &str) {
+    run_without_connecting(behavior, |addr, http_client| async move {
+        let mut event_stream = EventStream::open().await.unwrap();
+
+        // Connect to the loader.
+        let loader =
+            http_client.connect_to_protocol_at_exposed_dir::<http::LoaderMarker>().unwrap();
+
+        // Cause the framework to deliver the loader server endpoint to the component.
+        // This will start the component.
+        check_loader_http(loader.clone(), addr).await;
+        _ = EventMatcher::ok()
+            .moniker(http_client.moniker())
+            .wait::<Started>(&mut event_stream)
+            .await
+            .unwrap();
+
+        // Wait a while. `http-client` should not stop.
+        // A timeout is not the most ideal thing. But if `http-client` incorrectly stopped,
+        // this test will flake. Having a flakily failing test should better than no test.
+        let mut stop_event = Box::pin(
+            EventMatcher::ok()
+                .moniker(http_client.moniker())
+                .wait::<Stopped>(&mut event_stream)
+                .fuse(),
+        );
+        select! {
+            event = &mut stop_event => panic!("Unexpected stop event {event:?}"),
+            _ = fasync::Timer::new(fasync::Duration::from_millis(200)).fuse() => {},
+        };
+    })
+    .await
+}
+
+/// If the client makes a `Start` FIDL call, the `LoaderClient` connection should prevent the
+/// component from exiting, even if there were no requests on that connection. The reason is
+/// the derived `LoaderClient` connection has state/context associated with it, and we
+/// configure the `http-client.cm` to not stop if those connections are open.
+#[test_case("idle_1ms")]
+#[fasync::run_singlethreaded(test)]
+async fn test_fetch_http_long_start_call_blocks_stop(behavior: &str) {
+    run_without_connecting(behavior, |addr, http_client| async move {
+        let mut event_stream = EventStream::open().await.unwrap();
+
+        // Connect to the loader with a buffered `Start` call.
+        let (client_end, server_end) = fidl::endpoints::create_endpoints::<http::LoaderMarker>();
+        let loader = client_end.into_proxy().unwrap();
+        let (tx, rx) = fidl::endpoints::create_endpoints();
+        let () = loader
+            .start(make_request("GET", format!("http://{}{}", addr, LOOP1), None), tx)
+            .expect("failed to start");
+        http_client.connect_request_to_protocol_at_exposed_dir(server_end).unwrap();
+
+        _ = EventMatcher::ok()
+            .moniker(http_client.moniker())
+            .wait::<Started>(&mut event_stream)
+            .await
+            .unwrap();
+        _ = fasync::OnSignals::new(&rx, zx::Signals::CHANNEL_READABLE).await.unwrap();
+
+        // Wait beyond the 1ms timeout. `http-client` should not stop.
+        // A timeout is not the most ideal thing. But if `http-client` incorrectly stopped,
+        // this test will flake. Having a flakily failing test should better than no test.
+        let mut stop_event = Box::pin(
+            EventMatcher::ok()
+                .moniker(http_client.moniker())
+                .wait::<Stopped>(&mut event_stream)
+                .fuse(),
+        );
+        select! {
+            event = &mut stop_event => panic!("Unexpected stop event {event:?}"),
+            _ = fasync::Timer::new(fasync::Duration::from_millis(200)).fuse() => {},
+        };
+
+        // `http-client` should still respond to connection requests. This would hang if the
+        // component incorrectly prematurely escrowed the outgoing directory.
+        check_loader_http(
+            http_client.connect_to_protocol_at_exposed_dir::<http::LoaderMarker>().unwrap(),
+            addr,
+        )
+        .await;
+
+        // Close the `LoaderClient`. `http-client` should then stop.
+        drop(rx);
+        _ = stop_event.await;
+    })
+    .await
+}
+
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
+#[fasync::run_singlethreaded(test)]
+async fn test_fetch_http_many_requests_at_different_intervals(behavior: &str) {
+    run(behavior, |loader, addr| async move {
+        // The http-client component may be configured to stop when idling for 1ms in the test,
+        // so we exercise request delays around that range.
+        for delay in 990..1010 {
+            check_loader_http(loader.clone(), addr).await;
+            fasync::Timer::new(fasync::Duration::from_micros(delay)).await;
+        }
+    })
+    .await
+}
+
+#[test_case("never_idle")]
+#[test_case("idle_1ms")]
+#[fasync::run_singlethreaded(test)]
+async fn test_fetch_http_many_concurrent_connections_at_different_intervals(behavior: &str) {
+    run_without_connecting(behavior, |addr, http_client| async move {
+        // The http-client component may be configured to stop when idling for 1ms in the test,
+        // so we exercise request delays around that range.
+        for delay in 990..1010 {
+            let tasks = FuturesUnordered::new();
+
+            for _ in 0..5 {
+                let loader =
+                    http_client.connect_to_protocol_at_exposed_dir::<http::LoaderMarker>().unwrap();
+                tasks.push(check_loader_http(loader, addr));
+            }
+
+            let () = tasks.collect().await;
+            fasync::Timer::new(fasync::Duration::from_micros(delay)).await;
+        }
     })
     .await
 }
