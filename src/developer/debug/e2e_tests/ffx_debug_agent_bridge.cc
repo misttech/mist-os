@@ -140,15 +140,9 @@ Err InitFfxIsolate(const std::string& isolate_dir) {
   std::string target_add_cmd = "ffx --isolate-dir " + isolate_dir + " target add ";
 
   if (auto dev = std::getenv(kFuchsiaDeviceSshAddr.data()); dev != nullptr) {
-    if (Ipv6HostPortIsMissingBrackets(dev)) {
-      target_add_cmd.push_back('[');
-    }
-
+    // Don't do any special handling for ipv6 addresses. It's expected that fx test correctly
+    // populates the environment variable in the expected format.
     target_add_cmd.append(dev);
-
-    if (Ipv6HostPortIsMissingBrackets(dev)) {
-      target_add_cmd.push_back(']');
-    }
 
     // When running the tests locally it's likely that the ssh port is not on the default port 22.
     // FX will fill in another environment variable for us in this case.
