@@ -61,7 +61,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
   sched::RunQueue<TestThread> queue;
   while (now < Time::Max() && provider.remaining_bytes() > 0) {
-    if (bool new_thread = provider.ConsumeBool()) {
+    if (provider.ConsumeBool()) {
       queue.Queue(*AllocateNewThread(provider, threads), now);
     }
 
