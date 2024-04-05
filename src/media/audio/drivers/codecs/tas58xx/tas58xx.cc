@@ -378,7 +378,7 @@ zx_status_t Tas58xx::SetEqualizerElement(signal_fidl::ElementState state) {
   }
   bool has_valid_equalizer_specific_state = state.has_type_specific() &&
                                             state.type_specific().is_equalizer() &&
-                                            state.type_specific().equalizer().has_bands_state();
+                                            state.type_specific().equalizer().has_band_states();
   if (state.has_enabled() && state.enabled() && !has_valid_equalizer_specific_state) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -410,9 +410,9 @@ zx_status_t Tas58xx::SetEqualizerElement(signal_fidl::ElementState state) {
     return status;
   }
   if (has_valid_equalizer_specific_state) {
-    auto& bands_state = state.type_specific().equalizer().bands_state();
-    for (size_t i = 0; i < bands_state.size(); ++i) {
-      auto& band = bands_state[i];
+    auto& band_states = state.type_specific().equalizer().band_states();
+    for (size_t i = 0; i < band_states.size(); ++i) {
+      auto& band = band_states[i];
       // The id we specify is an index to the array of bands.
       if (!band.has_id() || band.id() >= kEqualizerNumberOfBands ||
           // We allow the supported type if specified.
@@ -664,7 +664,7 @@ void Tas58xx::SendEqualizerWatchReply(
     signal_fidl::SignalProcessing::WatchElementStateCallback callback) {
   signal_fidl::ElementState state;
   signal_fidl::EqualizerElementState equalizer_state;
-  std::vector<signal_fidl::EqualizerBandState> bands_state;
+  std::vector<signal_fidl::EqualizerBandState> band_states;
 
   for (size_t i = 0; i < kEqualizerNumberOfBands; ++i) {
     signal_fidl::EqualizerBandState band;
@@ -674,9 +674,9 @@ void Tas58xx::SendEqualizerWatchReply(
     band.set_q(kSupportedQ);
     band.set_gain_db(gains_[i]);
 
-    bands_state.push_back(std::move(band));
+    band_states.push_back(std::move(band));
   }
-  equalizer_state.set_bands_state(std::move(bands_state));
+  equalizer_state.set_band_states(std::move(band_states));
   state.set_type_specific(
       signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(equalizer_state)));
   state.set_enabled(equalizer_enabled_);

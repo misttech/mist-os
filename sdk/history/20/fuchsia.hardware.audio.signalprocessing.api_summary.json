@@ -514,8 +514,8 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/EqualizerElementState.bands_state",
-        "ordinal": "1",
+        "name": "fuchsia.hardware.audio.signalprocessing/EqualizerElementState.band_states",
+        "ordinal": "2",
         "type": "vector<fuchsia.hardware.audio.signalprocessing/EqualizerBandState>:64"
     },
     {

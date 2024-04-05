@@ -977,8 +977,8 @@ zx_status_t ValidateElementState(
            element_state.type_specific()->Which() ==
                fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEqualizer &&
            element_state.type_specific()->equalizer().has_value() &&
-           element_state.type_specific()->equalizer()->bands_state().has_value() &&
-           !element_state.type_specific()->equalizer()->bands_state()->empty());
+           element_state.type_specific()->equalizer()->band_states().has_value() &&
+           !element_state.type_specific()->equalizer()->band_states()->empty());
 
       // Need additional EQ-specific checks on each EqualizerBandState.
       break;

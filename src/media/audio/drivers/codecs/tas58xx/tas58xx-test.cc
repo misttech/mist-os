@@ -823,52 +823,52 @@ TEST_F(Tas58xxSignalProcessingTest, WatchEqualizer) {
   ASSERT_TRUE(state_received.enabled());
   ASSERT_TRUE(state_received.has_type_specific());
   ASSERT_TRUE(state_received.type_specific().is_equalizer());
-  ASSERT_TRUE(state_received.type_specific().equalizer().has_bands_state());
+  ASSERT_TRUE(state_received.type_specific().equalizer().has_band_states());
 
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[0].has_id());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[1].has_id());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[2].has_id());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[3].has_id());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[4].has_id());
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[0].id(), 0);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[1].id(), 1);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[2].id(), 2);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[3].id(), 3);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[4].id(), 4);
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[0].has_id());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[1].has_id());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[2].has_id());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[3].has_id());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[4].has_id());
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[0].id(), 0);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[1].id(), 1);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[2].id(), 2);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[3].id(), 3);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[4].id(), 4);
 
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[0].has_type());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[1].has_type());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[2].has_type());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[3].has_type());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[4].has_type());
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[0].type(),
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[0].has_type());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[1].has_type());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[2].has_type());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[3].has_type());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[4].has_type());
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[0].type(),
             signal_fidl::EqualizerBandType::PEAK);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[1].type(),
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[1].type(),
             signal_fidl::EqualizerBandType::PEAK);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[2].type(),
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[2].type(),
             signal_fidl::EqualizerBandType::PEAK);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[3].type(),
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[3].type(),
             signal_fidl::EqualizerBandType::PEAK);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[4].type(),
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[4].type(),
             signal_fidl::EqualizerBandType::PEAK);
 
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[0].has_q());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[1].has_q());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[2].has_q());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[3].has_q());
-  ASSERT_TRUE(state_received.type_specific().equalizer().bands_state()[4].has_q());
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[0].q(), 1.f);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[1].q(), 1.f);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[2].q(), 1.f);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[3].q(), 1.f);
-  ASSERT_EQ(state_received.type_specific().equalizer().bands_state()[4].q(), 1.f);
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[0].has_q());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[1].has_q());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[2].has_q());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[3].has_q());
+  ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[4].has_q());
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[0].q(), 1.f);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[1].q(), 1.f);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[2].q(), 1.f);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[3].q(), 1.f);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[4].q(), 1.f);
 
   // Not enabled, this is ok, by default they are enabled.
-  ASSERT_FALSE(state_received.type_specific().equalizer().bands_state()[0].has_enabled());
-  ASSERT_FALSE(state_received.type_specific().equalizer().bands_state()[1].has_enabled());
-  ASSERT_FALSE(state_received.type_specific().equalizer().bands_state()[2].has_enabled());
-  ASSERT_FALSE(state_received.type_specific().equalizer().bands_state()[3].has_enabled());
-  ASSERT_FALSE(state_received.type_specific().equalizer().bands_state()[4].has_enabled());
+  ASSERT_FALSE(state_received.type_specific().equalizer().band_states()[0].has_enabled());
+  ASSERT_FALSE(state_received.type_specific().equalizer().band_states()[1].has_enabled());
+  ASSERT_FALSE(state_received.type_specific().equalizer().band_states()[2].has_enabled());
+  ASSERT_FALSE(state_received.type_specific().equalizer().band_states()[3].has_enabled());
+  ASSERT_FALSE(state_received.type_specific().equalizer().band_states()[4].has_enabled());
 }
 
 TEST_F(Tas58xxSignalProcessingTest, WatchEqualizerUpdates) {
@@ -886,7 +886,7 @@ TEST_F(Tas58xxSignalProcessingTest, WatchEqualizerUpdates) {
   ASSERT_TRUE(state_received.enabled());
   ASSERT_TRUE(state_received.has_type_specific());
   ASSERT_TRUE(state_received.type_specific().is_equalizer());
-  ASSERT_TRUE(state_received.type_specific().equalizer().has_bands_state());
+  ASSERT_TRUE(state_received.type_specific().equalizer().has_band_states());
 
   // A Watch after a SetPE disable must reply since the PE state changed.
   {
@@ -1008,7 +1008,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerBandDisabled) {
   band_control.set_enabled(false);
   bands_control.emplace_back(std::move(band_control));
   signal_fidl::EqualizerElementState eq_control;
-  eq_control.set_bands_state(std::move(bands_control));
+  eq_control.set_band_states(std::move(bands_control));
   auto control_params = signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
   control.set_type_specific(std::move(control_params));
   ASSERT_OK(signal_processing_client_->SetElementState(
@@ -1057,7 +1057,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerDifferentRequests) {
     band_control.set_id(band_id);
     bands_control.emplace_back(std::move(band_control));
     signal_fidl::EqualizerElementState eq_control;
-    eq_control.set_bands_state(std::move(bands_control));
+    eq_control.set_band_states(std::move(bands_control));
     auto control_params =
         signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
     control.set_type_specific(std::move(control_params));
@@ -1079,7 +1079,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerDifferentRequests) {
     band_control.set_id(12345);  // Bad id.
     bands_control.emplace_back(std::move(band_control));
     signal_fidl::EqualizerElementState eq_control;
-    eq_control.set_bands_state(std::move(bands_control));
+    eq_control.set_band_states(std::move(bands_control));
     auto control_params =
         signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
     control.set_type_specific(std::move(control_params));
@@ -1108,7 +1108,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerDifferentRequests) {
     band_control.set_frequency(96'000);  // Unsupported frequency.
     bands_control.emplace_back(std::move(band_control));
     signal_fidl::EqualizerElementState eq_control;
-    eq_control.set_bands_state(std::move(bands_control));
+    eq_control.set_band_states(std::move(bands_control));
     auto control_params =
         signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
     control.set_type_specific(std::move(control_params));
@@ -1176,7 +1176,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerBandEnabledWithCodecStarted) {
   band_control.set_gain_db(5.f);
   bands_control.emplace_back(std::move(band_control));
   signal_fidl::EqualizerElementState eq_control;
-  eq_control.set_bands_state(std::move(bands_control));
+  eq_control.set_band_states(std::move(bands_control));
   auto control_params = signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
   control.set_type_specific(std::move(control_params));
   ASSERT_OK(signal_processing_client_->SetElementState(
@@ -1250,7 +1250,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizer2BandsEnabled) {
     band_control.set_gain_db(1.2345f);
     bands_control.emplace_back(std::move(band_control));
     signal_fidl::EqualizerElementState eq_control;
-    eq_control.set_bands_state(std::move(bands_control));
+    eq_control.set_band_states(std::move(bands_control));
     auto control_params =
         signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
 
@@ -1280,7 +1280,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizer2BandsEnabled) {
     band_control.set_frequency(11'111);
     bands_control.emplace_back(std::move(band_control));
     signal_fidl::EqualizerElementState eq_control;
-    eq_control.set_bands_state(std::move(bands_control));
+    eq_control.set_band_states(std::move(bands_control));
     auto control_params =
         signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
 
@@ -1404,7 +1404,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerElementDisabled) {
     band_control.set_gain_db(5.f);
     bands_control.emplace_back(std::move(band_control));
     signal_fidl::EqualizerElementState eq_control;
-    eq_control.set_bands_state(std::move(bands_control));
+    eq_control.set_band_states(std::move(bands_control));
     auto control_params =
         signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
     control.set_type_specific(std::move(control_params));

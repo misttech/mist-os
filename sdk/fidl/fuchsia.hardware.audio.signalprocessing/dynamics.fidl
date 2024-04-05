@@ -166,8 +166,8 @@ type DynamicsBandState = table {
 /// State for an `Element` with `type` equal to `DYNAMICS`.
 type DynamicsElementState = table {
     /// Each id must match an id from `Dynamics.bands` and ids cannot be repeated.
-    /// `bands_state` must have at least one element.
-    /// The bands controlled by `bands_state` are determined by each `band.id`.
+    /// `band_states` must have at least one element.
+    /// The bands controlled by `band_states` are determined by each `band.id`.
     // Required.
     1: band_states vector<DynamicsBandState>:MAX_COUNT_DYNAMICS_BANDS;
 };
