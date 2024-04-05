@@ -5,14 +5,29 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
+stdcompat_cxx_versions = [
+  17,
+  20,
+]
+
+stdcompat_tests = [
+  "stdcompat-polyfills",
+  "stdcompat-polyfills-no-inline-variables",
+]
+foreach(cxx_version, stdcompat_cxx_versions) {
+  stdcompat_tests += [ "stdcompat-$cxx_version" ]
+}
+
 group("tests") {
   testonly = true
-  deps = [
-    ":stdcompat-polyfills-no-inline-variables-unit-test($host_toolchain)",
-    ":stdcompat-polyfills-unit-test($host_toolchain)",
-    ":stdcompat-tests",
-    ":stdcompat-unit-test($host_toolchain)",
-  ]
+
+  # All the Fuchsia tests are collected into a single package.
+  deps = [ ":stdcompat-tests" ]
+
+  # Add each individual test's host build.
+  foreach(test, stdcompat_tests) {
+    deps += [ ":$test-unit-test($host_toolchain)" ]
+  }
 }
 
 stdcompat_test_sources = [
@@ -62,6 +77,10 @@ test("stdcompat-polyfills-no-inline-variables-unit-test") {
   ]
 }
 
+fuchsia_unittest_component("stdcompat-polyfills-no-inline-variables-test") {
+  deps = [ ":stdcompat-polyfills-no-inline-variables-unit-test" ]
+}
+
 # This target will be forced to compile using stdcompat provided polyfills.
 test("stdcompat-polyfills-unit-test") {
   sources = stdcompat_test_sources
@@ -72,31 +91,39 @@ test("stdcompat-polyfills-unit-test") {
   ]
 }
 
-# This target will let the feature-test macro pick std implementation if available.
-test("stdcompat-unit-test") {
-  sources = stdcompat_test_sources
-  deps = [ ":stdcompat-test-deps" ]
-  configs += [ ":stdcompat-Wundef" ]
-}
-
-fuchsia_unittest_component("stdcompat-test") {
-  deps = [ ":stdcompat-unit-test" ]
-}
-
 fuchsia_unittest_component("stdcompat-polyfills-test") {
   deps = [ ":stdcompat-polyfills-unit-test" ]
 }
 
-fuchsia_unittest_component("stdcompat-polyfills-no-inline-variables-test") {
-  deps = [ ":stdcompat-polyfills-no-inline-variables-unit-test" ]
+# These targets will let the feature-test macros pick the std implementation if
+# available.  They test all the available C++ modes, not just the default one
+# configured in the build.
+
+foreach(cxx_version, stdcompat_cxx_versions) {
+  test("stdcompat-$cxx_version-unit-test") {
+    sources = stdcompat_test_sources
+    deps = [ ":stdcompat-test-deps" ]
+    configs += [
+      ":stdcompat-c++-$cxx_version",
+      ":stdcompat-Wundef",
+    ]
+  }
+
+  fuchsia_unittest_component("stdcompat-$cxx_version-test") {
+    deps = [ ":stdcompat-$cxx_version-unit-test" ]
+  }
+
+  config("stdcompat-c++-$cxx_version") {
+    visibility = [ ":*" ]
+    cflags_cc = [ "-std=c++$cxx_version" ]
+  }
 }
 
 fuchsia_test_package("stdcompat-tests") {
-  test_components = [
-    ":stdcompat-test",
-    ":stdcompat-polyfills-test",
-    ":stdcompat-polyfills-no-inline-variables-test",
-  ]
+  test_components = []
+  foreach(test, stdcompat_tests) {
+    test_components += [ ":$test-test" ]
+  }
 }
 
 config("stdcompat-Wundef") {
