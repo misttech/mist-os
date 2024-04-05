@@ -711,6 +711,10 @@ config("default_warnings") {
       "-Wno-stringop-overread",
     ]
   }
+
+  # TODO(https://fxbug.dev/331282813): Disable "-Wdeprecated-pragma" which
+  # warns for deprecated std::errc constants.
+  configs = [ ":Wno-deprecated-pragma" ]
 }
 
 # Code that goes into the SDK or otherwise contributes to the SDK surface area
@@ -1437,6 +1441,8 @@ config("no-tlsdesc") {
   ]
 }
 
+# TODO(https://fxbug.dev/331282813): Disable "-Wdeprecated-pragma" which
+# warns for deprecated std::errc constants.
 config("Wno-deprecated-pragma") {
   cflags = [ "-Wno-deprecated-pragma" ]
 }
