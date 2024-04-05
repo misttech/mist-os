@@ -5,8 +5,6 @@
 import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
-import("//build/icu/icu_fuchsia_component.gni")
-import("//build/icu/icu_fuchsia_package.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 group("tests") {
@@ -54,12 +52,9 @@ executable("bin") {
   ]
 }
 
-icu_fuchsia_component("sshd-component") {
+fuchsia_component("sshd-component") {
   component_name = "sshd"
   manifest = "meta/sshd.cml"
-
-  # Used by programs that need to load ICU locale data, such as tz-util.
-  icu_deps = [ "//src/lib/icu:icudtl" ]
 
   deps = [
     # Ensure this isn't included in production
@@ -83,9 +78,11 @@ fuchsia_component("sshd-host-component") {
   ]
 }
 
-icu_fuchsia_package("sshd-host") {
-  icu_deps = [ ":sshd-component" ]
-  deps = [ ":sshd-host-component" ]
+fuchsia_package("sshd-host") {
+  deps = [
+    ":sshd-component",
+    ":sshd-host-component",
+  ]
 }
 
 config_data_for_assembly("config") {
