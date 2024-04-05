@@ -17,6 +17,8 @@ use {
 pub enum ActionError {
     #[error("the instance could not be found")]
     InstanceNotFound,
+    #[error("the instance has not been resolved")]
+    InstanceNotResolved,
     #[error("component manager could not parse the moniker")]
     BadMoniker,
     #[error("component manager encountered an internal error")]
@@ -130,6 +132,7 @@ pub async fn destroy_instance_in_collection(
             fsys::DestroyError::Internal => ActionError::Internal.into(),
             fsys::DestroyError::BadMoniker => ActionError::BadMoniker.into(),
             fsys::DestroyError::InstanceNotFound => ActionError::InstanceNotFound.into(),
+            fsys::DestroyError::InstanceNotResolved => ActionError::InstanceNotResolved.into(),
             _ => ActionError::UnknownError.into(),
         })?;
     Ok(())

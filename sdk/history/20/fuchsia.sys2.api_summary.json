@@ -230,6 +230,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.sys2/DestroyError.INSTANCE_NOT_RESOLVED",
+        "value": "5"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.sys2/DestroyError.INTERNAL",
         "value": "1"
     },

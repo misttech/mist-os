@@ -27,6 +27,11 @@ pub fn format_action_error(moniker: &Moniker, err: ActionError) -> Error {
             FIND_LIST_OR_SHOW,
             LIFECYCLE_ERROR_HELP
         ),
+        ActionError::InstanceNotResolved => format_err!(
+            "\nError: The instance {moniker} has not been resolved.\n{}\n{}\n",
+            CHECK_TARGET_LOGS,
+            LIFECYCLE_ERROR_HELP
+        ),
         ActionError::BadMoniker => format_err!(
             "\nError: Component manager cannot parse the moniker `{}`. {}\n",
             moniker,

@@ -65,6 +65,10 @@ type DestroyError = flexible enum {
     BAD_MONIKER = 3;
     // The given child reference is invalid.
     BAD_CHILD_REF = 4;
+    // The instance identified by the given moniker exists but has not been
+    // resolved.
+    @available(added=20)
+    INSTANCE_NOT_RESOLVED = 5;
 };
 
 // Errors that can occur from unresolving a component instance

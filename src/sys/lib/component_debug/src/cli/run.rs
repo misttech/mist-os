@@ -134,8 +134,9 @@ pub async fn run_cmd<W: std::io::Write>(
             Ok(()) => {
                 writeln!(writer, "Destroyed existing component instance at {}...", moniker)?;
             }
-            Err(DestroyError::ActionError(ActionError::InstanceNotFound)) => {
-                // No component exists at this moniker. Nothing to do.
+            Err(DestroyError::ActionError(ActionError::InstanceNotFound))
+            | Err(DestroyError::ActionError(ActionError::InstanceNotResolved)) => {
+                // No resolved component exists at this moniker. Nothing to do.
             }
             Err(e) => return Err(format_destroy_error(&moniker, e)),
         }

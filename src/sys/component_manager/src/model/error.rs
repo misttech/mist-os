@@ -951,6 +951,9 @@ impl Into<fsys::DestroyError> for DestroyActionError {
     fn into(self) -> fsys::DestroyError {
         match self {
             DestroyActionError::InstanceNotFound { .. } => fsys::DestroyError::InstanceNotFound,
+            DestroyActionError::InstanceNotResolved { .. } => {
+                fsys::DestroyError::InstanceNotResolved
+            }
             _ => fsys::DestroyError::Internal,
         }
     }
