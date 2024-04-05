@@ -404,7 +404,7 @@ TEST(SanitizerUtilsTest, MemorySnapshotFull) {
           self.dlopen_dso_tdata = loaded("DlopenDsoThreadLocalDataPointer");
           self.dlopen_dso_tbss = loaded("DlopenDsoThreadLocalBssPointer");
 
-          const size_t self_idx = &self - threads.begin();
+          const size_t self_idx = &self - threads.data();
           const auto* ptr = &result.saw_thread_tss[self_idx];
           tss.Set(kTssPattern ^ reinterpret_cast<uintptr_t>(ptr));
           ptr = &result.saw_thread_specific[self_idx];
@@ -518,23 +518,23 @@ TEST(SanitizerUtilsTest, MemorySnapshotFull) {
 
   EXPECT_TRUE(result.saw_main_tss);
   for (bool& seen : result.saw_thread_tss) {
-    EXPECT_TRUE(seen, "saw_thread_tss[%zu]", &seen - result.saw_thread_tss.begin());
+    EXPECT_TRUE(seen, "saw_thread_tss[%zu]", &seen - result.saw_thread_tss.data());
   }
 
   EXPECT_TRUE(result.saw_main_specific);
   for (bool& seen : result.saw_thread_specific) {
-    EXPECT_TRUE(seen, "saw_thread_specific[%zu]", &seen - result.saw_thread_specific.begin());
+    EXPECT_TRUE(seen, "saw_thread_specific[%zu]", &seen - result.saw_thread_specific.data());
   }
 
   if constexpr (kHaveSpecialRegister) {
     for (bool& seen : result.saw_thread_special_registers) {
       EXPECT_TRUE(seen, "saw_thread_special_registers[%zu]",
-                  &seen - result.saw_thread_special_registers.begin());
+                  &seen - result.saw_thread_special_registers.data());
     }
   }
 
   for (const auto& t : result.dead_threads) {
-    EXPECT_TRUE(t.seen(), "dead thread %tu not seen", &t - result.dead_threads.begin());
+    EXPECT_TRUE(t.seen(), "dead thread %tu not seen", &t - result.dead_threads.data());
   }
 }
 
