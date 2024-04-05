@@ -6,7 +6,9 @@ use {
     anyhow::Error,
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy},
-    fidl_fuchsia_bluetooth_gatt as fbgatt, fidl_fuchsia_bluetooth_le as fble,
+    fidl_fuchsia_bluetooth_gatt as fbgatt,
+    fidl_fuchsia_bluetooth_host::{ReceiverMarker, ReceiverProxy},
+    fidl_fuchsia_bluetooth_le as fble,
     fidl_fuchsia_bluetooth_rfcomm_test::{RfcommTestMarker, RfcommTestProxy},
     fidl_fuchsia_bluetooth_snoop::{SnoopMarker, SnoopRequestStream},
     fidl_fuchsia_bluetooth_sys::{
@@ -44,25 +46,26 @@ const SECURE_STORE_MONIKER: &str = "fake-secure-store";
 /// Note: In order to prevent the component under test from terminating, any FIDL request or
 /// Proxy is preserved.
 enum Event {
-    Profile(Option<ProfileProxy>),
-    GattServer(Option<fbgatt::Server_Proxy>),
-    LeCentral(Option<fble::CentralProxy>),
-    LePeripheral(Option<fble::PeripheralProxy>),
     Access(Option<AccessProxy>),
     Bootstrap(Option<BootstrapProxy>),
     Config(Option<ConfigurationProxy>),
+    GattServer(Option<fbgatt::Server_Proxy>),
     HostWatcher(Option<HostWatcherProxy>),
+    LeCentral(Option<fble::CentralProxy>),
+    LePeripheral(Option<fble::PeripheralProxy>),
+    NameProvider(Option<NameProviderRequestStream>),
     Pairing(Option<PairingProxy>),
+    Profile(Option<ProfileProxy>),
+    Receiver(Option<ReceiverProxy>),
     RfcommTest(Option<RfcommTestProxy>),
     Snoop(Option<SnoopRequestStream>),
-    NameProvider(Option<NameProviderRequestStream>),
     // bt-init will not start up without a working SecureStore, so instead of just notifying the
     // test of requests, we also forward along the requests to a working implementation. As such,
     // there is no need to hold on to the requests in the Event.
     SecureStore,
 }
 
-const NUMBER_OF_EVENTS: usize = 13;
+const NUMBER_OF_EVENTS: usize = 14;
 
 impl From<SnoopRequestStream> for Event {
     fn from(src: SnoopRequestStream) -> Self {
@@ -97,47 +100,68 @@ async fn mock_client(
     mut sender: mpsc::Sender<Event>,
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
-    let profile_svc = handles.connect_to_protocol::<ProfileMarker>()?;
-    sender.send(Event::Profile(Some(profile_svc))).await.expect("failed sending ack to test");
+    let access_svc = handles.connect_to_protocol::<AccessMarker>()?;
+    sender.send(Event::Access(Some(access_svc))).await.expect("failed sending Access ack to test");
+
+    let bootstrap_svc = handles.connect_to_protocol::<BootstrapMarker>()?;
+    sender
+        .send(Event::Bootstrap(Some(bootstrap_svc)))
+        .await
+        .expect("failed sending Bootstrap ack to test");
+
+    let configuration_svc = handles.connect_to_protocol::<ConfigurationMarker>()?;
+    sender
+        .send(Event::Config(Some(configuration_svc)))
+        .await
+        .expect("failed sending Configuration ack to test");
 
     let gatt_server_svc = handles.connect_to_protocol::<fbgatt::Server_Marker>()?;
     sender
         .send(Event::GattServer(Some(gatt_server_svc)))
         .await
-        .expect("failed sending ack to test");
-
-    let le_central_svc = handles.connect_to_protocol::<fble::CentralMarker>()?;
-    sender.send(Event::LeCentral(Some(le_central_svc))).await.expect("failed sending ack to test");
-
-    let le_peripheral_svc = handles.connect_to_protocol::<fble::PeripheralMarker>()?;
-    sender
-        .send(Event::LePeripheral(Some(le_peripheral_svc)))
-        .await
-        .expect("failed sending ack to test");
-
-    let access_svc = handles.connect_to_protocol::<AccessMarker>()?;
-    sender.send(Event::Access(Some(access_svc))).await.expect("failed sending ack to test");
-
-    let bootstrap_svc = handles.connect_to_protocol::<BootstrapMarker>()?;
-    sender.send(Event::Bootstrap(Some(bootstrap_svc))).await.expect("failed sending ack to test");
-
-    let configuration_svc = handles.connect_to_protocol::<ConfigurationMarker>()?;
-    sender.send(Event::Config(Some(configuration_svc))).await.expect("failed sending ack to test");
+        .expect("failed sending GATT ack to test");
 
     let host_watcher_svc = handles.connect_to_protocol::<HostWatcherMarker>()?;
     sender
         .send(Event::HostWatcher(Some(host_watcher_svc)))
         .await
-        .expect("failed sending ack to test");
+        .expect("failed sending HostWatcher ack to test");
+
+    let le_central_svc = handles.connect_to_protocol::<fble::CentralMarker>()?;
+    sender
+        .send(Event::LeCentral(Some(le_central_svc)))
+        .await
+        .expect("failed sending LE Central ack to test");
+
+    let le_peripheral_svc = handles.connect_to_protocol::<fble::PeripheralMarker>()?;
+    sender
+        .send(Event::LePeripheral(Some(le_peripheral_svc)))
+        .await
+        .expect("failed sending LE Peripheral ack to test");
 
     let pairing_svc = handles.connect_to_protocol::<PairingMarker>()?;
-    sender.send(Event::Pairing(Some(pairing_svc))).await.expect("failed sending ack to test");
+    sender
+        .send(Event::Pairing(Some(pairing_svc)))
+        .await
+        .expect("failed sending Pairing ack to test");
+
+    let profile_svc = handles.connect_to_protocol::<ProfileMarker>()?;
+    sender
+        .send(Event::Profile(Some(profile_svc)))
+        .await
+        .expect("failed sending Profile ack to test");
+
+    let receiver_svc = handles.connect_to_protocol::<ReceiverMarker>()?;
+    sender
+        .send(Event::Receiver(Some(receiver_svc)))
+        .await
+        .expect("failed sending Receiver ack to test");
 
     let rfcomm_test_svc = handles.connect_to_protocol::<RfcommTestMarker>()?;
     sender
         .send(Event::RfcommTest(Some(rfcomm_test_svc)))
         .await
-        .expect("failed sending ack to test");
+        .expect("failed sending RFCOMM ack to test");
 
     Ok(())
 }
@@ -182,11 +206,13 @@ async fn bt_init_component_topology() {
     let mock_client_tx = sender.clone();
 
     let builder = RealmBuilder::new().await.expect("Failed to create test realm builder");
+
     // Add bt-init to the topology. The v2 component under test.
     let bt_init = builder
         .add_child(BT_INIT_MONIKER, BT_INIT_URL.to_string(), ChildOptions::new())
         .await
         .expect("Failed adding bt-init to topology");
+
     // Create bt-host collection
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
     realm_decl.collections.push(cm_rust::CollectionDecl {
@@ -198,6 +224,7 @@ async fn bt_init_component_topology() {
         persistent_storage: None,
     });
     builder.replace_realm_decl(realm_decl).await.unwrap();
+
     // Implementation of the Secure Store service for use by bt-gap.
     let secure_store = builder
         .add_child(SECURE_STORE_MONIKER, SECURE_STORE_URL.to_string(), ChildOptions::new())
@@ -238,15 +265,16 @@ async fn bt_init_component_topology() {
         .expect("Failed adding bt-init client mock to topology");
 
     // Add routes from bt-init to the mock bt-init client.
-    route_from_bt_init_to_mock_client::<ProfileMarker>(&builder).await;
-    route_from_bt_init_to_mock_client::<fbgatt::Server_Marker>(&builder).await;
-    route_from_bt_init_to_mock_client::<fble::CentralMarker>(&builder).await;
-    route_from_bt_init_to_mock_client::<fble::PeripheralMarker>(&builder).await;
     route_from_bt_init_to_mock_client::<AccessMarker>(&builder).await;
     route_from_bt_init_to_mock_client::<BootstrapMarker>(&builder).await;
     route_from_bt_init_to_mock_client::<ConfigurationMarker>(&builder).await;
+    route_from_bt_init_to_mock_client::<fbgatt::Server_Marker>(&builder).await;
     route_from_bt_init_to_mock_client::<HostWatcherMarker>(&builder).await;
+    route_from_bt_init_to_mock_client::<fble::CentralMarker>(&builder).await;
+    route_from_bt_init_to_mock_client::<fble::PeripheralMarker>(&builder).await;
     route_from_bt_init_to_mock_client::<PairingMarker>(&builder).await;
+    route_from_bt_init_to_mock_client::<ProfileMarker>(&builder).await;
+    route_from_bt_init_to_mock_client::<ReceiverMarker>(&builder).await;
     route_from_bt_init_to_mock_client::<RfcommTestMarker>(&builder).await;
 
     // Add proxy route between secure store and mock provider
@@ -263,9 +291,9 @@ async fn bt_init_component_topology() {
     builder
         .add_route(
             Route::new()
+                .capability(Capability::protocol::<NameProviderMarker>())
                 .capability(Capability::protocol::<SecureStoreMarker>())
                 .capability(Capability::protocol::<SnoopMarker>())
-                .capability(Capability::protocol::<NameProviderMarker>())
                 .from(&mock_provider)
                 .to(&bt_init),
         )
@@ -313,8 +341,8 @@ async fn bt_init_component_topology() {
         .expect("Failed adding temp storage route to SecureStore component");
     let test_topology = builder.build().await.unwrap();
 
-    // If the routing is correctly configured, we expect one of each of the Event enum to be
-    // sent (so, in total, 10 events)
+    // If the routing is correctly configured, we expect one of each of the Event enum to be sent
+    // In total, |NUMBER_OF_EVENTS| events
     let mut events = Vec::new();
     for i in 0..NUMBER_OF_EVENTS {
         let msg = format!("Unexpected error waiting for {:?} event", i);
@@ -325,19 +353,20 @@ async fn bt_init_component_topology() {
     assert_eq!(events.len(), NUMBER_OF_EVENTS);
     let discriminants: Vec<_> = events.iter().map(std::mem::discriminant).collect();
     for event in vec![
-        Event::Profile(None),
-        Event::GattServer(None),
-        Event::LeCentral(None),
-        Event::LePeripheral(None),
         Event::Access(None),
         Event::Bootstrap(None),
         Event::Config(None),
+        Event::GattServer(None),
         Event::HostWatcher(None),
+        Event::LeCentral(None),
+        Event::LePeripheral(None),
         Event::Pairing(None),
+        Event::Profile(None),
+        Event::Receiver(None),
         Event::RfcommTest(None),
-        Event::Snoop(None),
         Event::NameProvider(None),
         Event::SecureStore,
+        Event::Snoop(None),
     ] {
         let count = discriminants.iter().filter(|&&d| d == std::mem::discriminant(&event)).count();
         assert_eq!(
