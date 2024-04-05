@@ -9,6 +9,7 @@ use {
     },
     proc_macro2::TokenStream as TokenStream2,
     quote::{quote, ToTokens, TokenStreamExt},
+    syn::{punctuated::Punctuated, Meta, Token},
 };
 
 pub fn impl_derive_one_or_many(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error> {
@@ -112,17 +113,15 @@ fn parse_one_or_many_attributes(ast: &syn::DeriveInput) -> Result<OneOrManyAttri
     let mut min_length = None;
     let mut unique_items = None;
     for attr in &ast.attrs {
-        if !attr.path.is_ident("one_or_many") {
+        if !attr.path().is_ident("one_or_many") {
             continue;
         }
-        match attr
-            .parse_meta()
-            .map_err(|_| syn::Error::new_spanned(ast, "`one_or_many` attribute is not valid"))?
-        {
+        match &attr.meta {
             syn::Meta::List(l) => {
-                for attr in l.nested {
-                    match attr {
-                        syn::NestedMeta::Meta(syn::Meta::NameValue(attr)) => {
+                let nested = l.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+                for meta in nested {
+                    match meta {
+                        syn::Meta::NameValue(attr) => {
                             let ident = ident_from_path(&attr.path);
                             match &ident as &str {
                                 "expected" => extract_expected(ast, attr, &mut expected)?,

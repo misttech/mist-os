@@ -832,7 +832,6 @@ visibility = [
   "//src/storage/type-fprint:*",
   "//src/sys/lib/cm_rust:*",
   "//src/sys/time/lib/inspect-writable/macro:*",
-  "//tools/lib/cml/macro:*",
   "//tools/lib/config_client:*",
   "//tools/lib/reference_doc/macro:*",
 ]

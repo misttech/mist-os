@@ -95,8 +95,8 @@ pub fn extract_inner_type(
     attr: syn::MetaNameValue,
     inner_type: &mut Option<syn::LitStr>,
 ) -> Result<(), syn::Error> {
-    match attr.lit {
-        syn::Lit::Str(l) => {
+    match attr.value {
+        syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(l), .. }) => {
             if inner_type.is_some() {
                 return Err(syn::Error::new_spanned(ast, "duplicate `inner_type` attribute"));
             }
@@ -117,8 +117,8 @@ pub fn extract_min_length(
     attr: syn::MetaNameValue,
     min_length: &mut Option<usize>,
 ) -> Result<(), syn::Error> {
-    match attr.lit {
-        syn::Lit::Int(l) => {
+    match attr.value {
+        syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Int(l), .. }) => {
             if min_length.is_some() {
                 return Err(syn::Error::new_spanned(ast, "duplicate `min_length` attribute"));
             }
@@ -139,8 +139,8 @@ pub fn extract_unique_items(
     attr: syn::MetaNameValue,
     unique_items: &mut Option<bool>,
 ) -> Result<(), syn::Error> {
-    match attr.lit {
-        syn::Lit::Bool(b) => {
+    match attr.value {
+        syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Bool(b), .. }) => {
             if unique_items.is_some() {
                 return Err(syn::Error::new_spanned(ast, "duplicate `unique_items` attribute"));
             }
@@ -165,8 +165,8 @@ pub fn extract_expected(
     attr: syn::MetaNameValue,
     expected: &mut Option<syn::LitStr>,
 ) -> Result<(), syn::Error> {
-    match attr.lit {
-        syn::Lit::Str(l) => {
+    match attr.value {
+        syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(l), .. }) => {
             if expected.is_some() {
                 return Err(syn::Error::new_spanned(ast, "duplicate `expected` attribute"));
             }

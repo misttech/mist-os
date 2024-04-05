@@ -14913,7 +14913,6 @@ rust_library("syn-v1_0_98") {
   visibility += [ "//src/storage/type-fprint:*" ]
   visibility += [ "//src/sys/lib/cm_rust:*" ]
   visibility += [ "//src/sys/time/lib/inspect-writable/macro:*" ]
-  visibility += [ "//tools/lib/cml/macro:*" ]
   visibility += [ "//tools/lib/config_client:*" ]
   visibility += [ "//tools/lib/reference_doc/macro:*" ]
 
