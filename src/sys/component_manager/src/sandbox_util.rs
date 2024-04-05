@@ -345,13 +345,15 @@ impl<T: Routable + 'static> RoutableExt for T {
                 let entry = self.router.clone().into_directory_entry(
                     request,
                     self.entry_type,
+                    target.blocking_task_group(),
                     move |err| {
                         // TODO(https://fxbug.dev/319754472): Improve the fidelity of error logging.
                         // This should log into the component's log sink using the proper
                         // `report_routing_failure`, but that function requires a legacy
                         // `RouteRequest` at the moment.
+                        let group = target.nonblocking_task_group();
                         let target = target.clone();
-                        Some(Box::pin(async move {
+                        group.spawn(async move {
                             target
                                 .with_logger_as_default(|| {
                                     warn!(
@@ -359,8 +361,8 @@ impl<T: Routable + 'static> RoutableExt for T {
                                         target.moniker, err
                                     );
                                 })
-                                .await
-                        }))
+                                .await;
+                        });
                     },
                 );
 

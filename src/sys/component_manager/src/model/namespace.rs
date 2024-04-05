@@ -10,7 +10,7 @@ use {
             error::CreateNamespaceError,
             routing::{
                 self, route_and_open_capability,
-                router::{Request, Router},
+                router::{ErrorCapsule, Request, Router},
             },
         },
         sandbox_util::DictExt,
@@ -21,11 +21,12 @@ use {
     },
     bedrock_error::{BedrockError, Explain},
     cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl, UseStorageDecl},
+    cm_util::TaskGroup,
     fidl::{endpoints::ClientEnd, prelude::*},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
-        FutureExt, StreamExt,
+        StreamExt,
     },
     sandbox::{Capability, Dict, Directory, Open},
     serve_processargs::NamespaceBuilder,
@@ -36,6 +37,7 @@ use {
             serve_directory, DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest,
         },
         execution_scope::ExecutionScope,
+        ToObjectRequest,
     },
 };
 
@@ -122,18 +124,25 @@ async fn add_use_decls(
             cm_rust::UseDecl::Storage(storage) => {
                 storage_use(storage, use_, component).await?.into()
             }
-            cm_rust::UseDecl::Protocol(s) => {
-                service_or_protocol_use(UseDecl::Protocol(s.clone()), component, program_input_dict)
-                    .into()
-            }
-            cm_rust::UseDecl::Service(s) => {
-                service_or_protocol_use(UseDecl::Service(s.clone()), component, program_input_dict)
-                    .into()
-            }
+            cm_rust::UseDecl::Protocol(s) => service_or_protocol_use(
+                UseDecl::Protocol(s.clone()),
+                component,
+                program_input_dict,
+                component.blocking_task_group(),
+            )
+            .into(),
+            cm_rust::UseDecl::Service(s) => service_or_protocol_use(
+                UseDecl::Service(s.clone()),
+                component,
+                program_input_dict,
+                component.blocking_task_group(),
+            )
+            .into(),
             cm_rust::UseDecl::EventStream(s) => service_or_protocol_use(
                 UseDecl::EventStream(s.clone()),
                 component,
                 program_input_dict,
+                component.blocking_task_group(),
             )
             .into(),
             cm_rust::UseDecl::Runner(_) => {
@@ -299,6 +308,7 @@ fn service_or_protocol_use(
     use_: UseDecl,
     component: &Arc<ComponentInstance>,
     program_input_dict: &Dict,
+    blocking_task_group: TaskGroup,
 ) -> Open {
     match use_ {
         // Bedrock routing.
@@ -310,41 +320,36 @@ fn service_or_protocol_use(
             let Some(capability) =
                 program_input_dict.get_capability(&use_protocol_decl.target_path)
             else {
-                panic!(
-                    "router for capability {:?} is missing from program input dictionary for \
-                     component {}",
-                    use_protocol_decl.target_path, component.moniker
-                );
+                panic!("router for capability {:?} is missing from program input dictionary for component {}", use_protocol_decl.target_path, component.moniker);
             };
             let Capability::Router(router) = &capability else {
-                panic!(
-                    "program input dictionary for component {} had an entry with an unexpected \
-                     type: {:?}",
-                    component.moniker, capability
-                );
+                panic!("program input dictionary for component {} had an entry with an unexpected type: {:?}", component.moniker, capability);
             };
             let router = Router::from_any(router.clone());
             let legacy_request = RouteRequest::UseProtocol(use_protocol_decl.clone());
 
             // When there are router errors, they are sent to the error handler, which reports
-            // errors.
+            // errors and may attempt routing again via legacy.
             let weak_component = component.as_weak();
+            let errors_fn = move |err: ErrorCapsule| {
+                let legacy_request = legacy_request.clone();
+                let Ok(target) = weak_component.upgrade() else {
+                    return;
+                };
+                target.blocking_task_group().spawn(async move {
+                    let (error, open_request) = err.manually_handle();
+                    let object_request =
+                        open_request.flags.to_object_request(open_request.server_end);
+                    object_request.shutdown(error.as_zx_status());
+                    routing::report_routing_failure(&legacy_request, &target, &error).await
+                });
+            };
 
             Open::new(router.into_directory_entry(
                 request,
                 fio::DirentType::Service,
-                move |error: &BedrockError| {
-                    let Ok(target) = weak_component.upgrade() else {
-                        return None;
-                    };
-                    let legacy_request = legacy_request.clone();
-                    Some(
-                        async move {
-                            routing::report_routing_failure(&legacy_request, &target, error).await
-                        }
-                        .boxed(),
-                    )
-                },
+                blocking_task_group,
+                errors_fn,
             ))
         }
 
