@@ -6,6 +6,7 @@
 #define SRC_DEVELOPER_DEBUG_SHARED_MESSAGE_LOOP_H_
 
 #include <lib/fpromise/promise.h>
+#include <zircon/compiler.h>
 
 #include <deque>
 #include <functional>
@@ -19,14 +20,6 @@
 
 #include "src/developer/debug/shared/logging/file_line_function.h"
 #include "src/lib/fxl/macros.h"
-
-#if defined(__Fuchsia__)
-#include <zircon/compiler.h>
-#else
-// The macros for thread annotations aren't set up for non-Fuchsia builds.
-#undef __TA_REQUIRES
-#define __TA_REQUIRES(arg)
-#endif
 
 namespace debug {
 
@@ -310,10 +303,6 @@ class MessageLoop::WatchHandle {
 // Creates a nonblocking temporary pipe pipe and assigns the two ends of it to the two out
 // parameters. Returns true on success.
 bool CreateLocalNonBlockingPipe(fbl::unique_fd* out_end, fbl::unique_fd* in_end);
-
-#if !defined(__Fuchsia__)
-#undef __TA_REQUIRES
-#endif
 
 }  // namespace debug
 
