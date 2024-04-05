@@ -134,7 +134,6 @@ hlcpp_visibility = [
   "//src/connectivity/wlan/drivers/testing/lib/sim-env/*",
   "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/*",
   "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/*",
-  "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac:*",
   "//src/connectivity/wlan/drivers/wlanif/*",
   "//src/connectivity/wlan/lib/common/cpp:*",
   "//src/connectivity/wlan/lib/mlme/cpp/*",

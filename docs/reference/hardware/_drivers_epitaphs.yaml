@@ -614,3 +614,9 @@
   available_in_git: '380af2404204382e9f13d524b1c34894758b6715'
   areas: ['Display']
   path: '/src/graphics/display/drivers/simple'
+- short_description: 'nxpfmac - NXP fullmac WLAN driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '1019341'
+  available_in_git: 'd22f6edd4bd2570858a0bd39d52e32783ec4b9d5'
+  areas: ['WLAN']
+  path: '/src/connectivity/wlan/drivers/third_party/nxp/nxpfmac'

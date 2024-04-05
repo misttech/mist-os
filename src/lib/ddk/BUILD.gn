@@ -145,8 +145,6 @@ sdk_static_library("ddk") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio/test:*",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim:*",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test:*",
-    "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac:*",
-    "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan:*",
     "//src/connectivity/wlan/drivers/wlanif:*",
     "//src/connectivity/wlan/drivers/wlanif/test:*",
     "//src/connectivity/wlan/drivers/wlanphy:*",

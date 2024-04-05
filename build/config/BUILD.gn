@@ -751,30 +751,6 @@ config("Wno-strict-prototypes") {
   cflags = [ "-Wno-strict-prototypes" ]
 }
 
-config("Wno-sign-compare") {
-  cflags = [ "-Wno-sign-compare" ]
-  visibility =
-      [ "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan:*" ]
-}
-
-config("Wno-pointer-sign") {
-  cflags = [ "-Wno-pointer-sign" ]
-  visibility =
-      [ "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan:*" ]
-}
-
-config("Wno-incompatible-pointer-types-discards-qualifiers") {
-  cflags = [ "-Wno-incompatible-pointer-types-discards-qualifiers" ]
-  visibility =
-      [ "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan:*" ]
-}
-
-config("Wno-address-of-packed-member") {
-  cflags = [ "-Wno-address-of-packed-member" ]
-  visibility =
-      [ "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan:*" ]
-}
-
 config("Wno-undef") {
   cflags = [ "-Wno-undef" ]
   visibility = [ "//third_party/googletest:*" ]
@@ -782,10 +758,7 @@ config("Wno-undef") {
 
 config("Wno-bitfield-conversion") {
   cflags = [ "-Wno-bitfield-conversion" ]
-  visibility = [
-    "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac:*",
-    "//src/lib/vulkan:*",
-  ]
+  visibility = [ "//src/lib/vulkan:*" ]
 }
 
 # TODO(https://fxbug.dev/42085293): Remove the use of variable length arrays.
@@ -912,7 +885,6 @@ config("Wno-conversion") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim:*",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test:*",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test:*",
-    "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan:*",
     "//src/connectivity/wlan/drivers/wlanif:*",
     "//src/connectivity/wlan/drivers/wlanif/test:*",
     "//src/connectivity/wlan/drivers/wlanphy:*",
@@ -1113,7 +1085,6 @@ config("Wno-extra-semi") {
 config("Wno-implicit-fallthrough") {
   cflags = [ "-Wno-implicit-fallthrough" ]
   visibility = [
-    "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan:*",
     "//src/lib/fxl:third_party",
     "//third_party/rust_crates/compat/brotli",
     "//zircon/third_party/uapp/dash",
