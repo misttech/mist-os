@@ -703,8 +703,8 @@ async fn inspect_counters(name: &str) {
                         ValidSegmentsReceived: 0u64,
                         ReceivedSegmentsDispatched: 0u64,
                         "Errors": {
+                            ChecksumErrors: 0u64,
                             InvalidIpAddrsReceived: 0u64,
-                            InvalidIpPacketsReceived: 0u64,
                             InvalidSegmentsReceived: 0u64,
                             ReceivedSegmentsNoDispatch: 0u64,
                             ListenerQueueOverflow: 0u64,
@@ -730,8 +730,8 @@ async fn inspect_counters(name: &str) {
                         ValidSegmentsReceived: 0u64,
                         ReceivedSegmentsDispatched: 0u64,
                         "Errors": {
+                            ChecksumErrors: 0u64,
                             InvalidIpAddrsReceived: 0u64,
-                            InvalidIpPacketsReceived: 0u64,
                             InvalidSegmentsReceived: 0u64,
                             ReceivedSegmentsNoDispatch: 0u64,
                             ListenerQueueOverflow: 0u64,

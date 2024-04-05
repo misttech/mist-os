@@ -371,9 +371,6 @@ pub struct TcpCountersInner {
     /// Count of received IP packets that were dropped because they had
     /// unexpected IP addresses (either src or dst).
     pub invalid_ip_addrs_received: Counter,
-    /// Count of received IP packets that were dropped because they could not be
-    /// parsed.
-    pub invalid_ip_packets_received: Counter,
     /// Count of received TCP segments that were dropped because they could not
     /// be parsed.
     pub invalid_segments_received: Counter,
@@ -407,6 +404,8 @@ pub struct TcpCountersInner {
     pub failed_connection_attempts: Counter,
     /// Count of port reservation attempts that failed.
     pub failed_port_reservations: Counter,
+    /// Count of received segments whose checksums were invalid.
+    pub checksum_errors: Counter,
     // TODO(https://fxbug.dev/42052879): Add additional counters to achieve
     // parity with Netstack2.
 }

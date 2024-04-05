@@ -362,7 +362,6 @@ fn inspect_udp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &UdpCou
 fn inspect_tcp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &TcpCounters<I>) {
     let TcpCountersInner {
         invalid_ip_addrs_received,
-        invalid_ip_packets_received,
         invalid_segments_received,
         valid_segments_received,
         received_segments_dispatched,
@@ -376,17 +375,18 @@ fn inspect_tcp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &TcpCou
         active_connection_openings,
         failed_connection_attempts,
         failed_port_reservations,
+        checksum_errors,
     } = counters.as_ref();
     inspector.record_child("Rx", |inspector| {
         inspector.record_counter("ValidSegmentsReceived", valid_segments_received);
         inspector.record_counter("ReceivedSegmentsDispatched", received_segments_dispatched);
         inspector.record_child("Errors", |inspector| {
             inspector.record_counter("InvalidIpAddrsReceived", invalid_ip_addrs_received);
-            inspector.record_counter("InvalidIpPacketsReceived", invalid_ip_packets_received);
             inspector.record_counter("InvalidSegmentsReceived", invalid_segments_received);
             inspector.record_counter("ReceivedSegmentsNoDispatch", received_segments_no_dispatch);
             inspector.record_counter("ListenerQueueOverflow", listener_queue_overflow);
             inspector.record_counter("PassiveOpenNoRouteErrors", passive_open_no_route_errors);
+            inspector.record_counter("ChecksumErrors", checksum_errors);
         })
     });
     inspector.record_child("Tx", |inspector| {

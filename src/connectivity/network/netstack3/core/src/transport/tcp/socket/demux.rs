@@ -13,6 +13,7 @@ use tracing::{debug, error};
 use net_types::{ip::IpAddress, SpecifiedAddr};
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::{
+    error::ParseError,
     ip::IpProto,
     tcp::{
         TcpFlowAndSeqNum, TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
@@ -153,9 +154,14 @@ where
         {
             Ok(packet) => packet,
             Err(err) => {
-                core_ctx
-                    .increment(|counters: &TcpCounters<I>| &counters.invalid_ip_packets_received);
+                core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_segments_received);
                 debug!("tcp: failed parsing incoming packet {:?}", err);
+                match err {
+                    ParseError::Checksum => {
+                        core_ctx.increment(|counters: &TcpCounters<I>| &counters.checksum_errors);
+                    }
+                    ParseError::NotSupported | ParseError::NotExpected | ParseError::Format => {}
+                }
                 return Ok(());
             }
         };
