@@ -409,10 +409,6 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
   fuchsia_cpu_profiler::SessionStopResponse stats;
   stats.samples_collected() = inspecting_durations.size();
   if (!inspecting_durations.empty()) {
-    zx::ticks total_ticks;
-    for (zx::ticks ticks : inspecting_durations) {
-      total_ticks += ticks;
-    }
     auto ticks_per_second = zx::ticks::per_second();
     auto ticks_per_us = ticks_per_second / 1000000;
 
