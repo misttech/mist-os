@@ -43,10 +43,10 @@ pub struct SuspendResumeManager {
     /// | Power Mode        | Level |
     /// | ----------------- | ----- |
     /// | On                | 4     |
-    /// | Susepnd-to-Idle   | 3     |
+    /// | Suspend-to-Idle   | 3     |
     /// | Standby           | 2     |
-    /// | Susepnd-to-RAM    | 1     |
-    /// | Susepnd-to-Disk   | 0     |
+    /// | Suspend-to-RAM    | 1     |
+    /// | Suspend-to-Disk   | 0     |
     power_mode_lessor: OnceCell<fbroker::LessorSynchronousProxy>,
     inner: Mutex<SuspendResumeManagerInner>,
 }
