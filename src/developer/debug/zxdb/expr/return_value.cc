@@ -155,7 +155,7 @@ void GetReturnValue(const fxl::RefPtr<EvalContext>& context, const Function* fun
       // Pointers and references just act like integers.
       reg_or = context->GetAbi()->GetReturnRegisterForMachineInt();
     }
-  } else if (const Enumeration* enum_type = concrete->As<Enumeration>()) {
+  } else if (concrete->As<Enumeration>()) {
     // All enums should fit into machine words. If the register is too large, it will be truncated
     // below to only pick the low bytes.
     reg_or = context->GetAbi()->GetReturnRegisterForMachineInt();

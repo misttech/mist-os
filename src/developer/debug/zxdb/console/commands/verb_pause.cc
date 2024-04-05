@@ -168,7 +168,7 @@ void PauseSystem(fxl::RefPtr<CommandContext> cmd_context, System* system, bool c
     // Collect the status of all running processes.
     int paused_process_count = 0;
     for (const Target* target : weak_system->GetTargets()) {
-      if (const Process* process = target->GetProcess()) {
+      if (target->GetProcess()) {
         paused_process_count++;
         out.Append(" " + GetBullet() + " ");
         out.Append(FormatTarget(console_context, target));

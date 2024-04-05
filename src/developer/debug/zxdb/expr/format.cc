@@ -404,7 +404,7 @@ void FormatMemberPtr(FormatNode* node, const MemberPtr* type, const FormatOption
     return;
   }
 
-  if (const FunctionType* func = pointed_to_type->As<FunctionType>()) {
+  if (pointed_to_type->As<FunctionType>()) {
     // Pointers to member functions can be handled just like regular function pointers.
     FormatFunctionPointer(node, options, eval_context);
   } else {
@@ -590,7 +590,7 @@ void FillFormatNodeDescriptionFromValue(FormatNode* node, const FormatOptions& o
   } else if (const MemberPtr* member_ptr = type->As<MemberPtr>()) {
     // Pointers to class/struct members.
     FormatMemberPtr(node, member_ptr, options, context);
-  } else if (const FunctionType* func = type->As<FunctionType>()) {
+  } else if (type->As<FunctionType>()) {
     // Functions. These don't have a direct C++ equivalent without being
     // modified by a "pointer". Assume these act like pointers to functions.
     FormatFunctionPointer(node, options, context);
