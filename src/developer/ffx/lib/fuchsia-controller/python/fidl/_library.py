@@ -648,7 +648,7 @@ def alias_declaration(ir, root_ir, recurse_guard=None) -> type:
         except Exception:
             if ctor_type == "string":
                 base_type = str
-            elif ctor_type == "vector":
+            elif ctor_type == "vector" or ctor_type == "array":
                 # This can likely be annotated better, like constraining types.
                 # There is a doc explaining some of the limitations here at go/fidl-ir-aliases
                 # So for the time being this is just a generic list rather than anything specific

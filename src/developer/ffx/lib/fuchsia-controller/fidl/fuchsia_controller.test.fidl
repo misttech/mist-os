@@ -85,3 +85,5 @@ open protocol FlexibleMethodTester {
         some_bool_value bool;
     }) error zx.Status;
 };
+
+alias AliasOfArray = array<int16, 3>;
