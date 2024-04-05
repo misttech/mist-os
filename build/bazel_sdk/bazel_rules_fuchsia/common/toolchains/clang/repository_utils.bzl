@@ -4,10 +4,12 @@
 
 """Utilities related to Clang repositories. See README.md for details."""
 
+# Note: This is not a self-reference as //tools/clang is not a package, so we're
+# actually loading //:repository_utils.bzl.
+load(":repository_utils.bzl", "get_fuchsia_host_arch", "get_fuchsia_host_os")
 load(":toolchains/clang/clang_utils.bzl", "process_clang_builtins_output")
 load(":toolchains/clang/providers.bzl", "ClangInfo")
 load(":toolchains/clang/toolchain_utils.bzl", "define_clang_runtime_filegroups")
-load(":repository_utils.bzl", "get_fuchsia_host_arch", "get_fuchsia_host_os")
 
 def prepare_clang_repository(repo_ctx, clang_install_dir):
     """Prepare a repository directory for a clang toolchain creation.
