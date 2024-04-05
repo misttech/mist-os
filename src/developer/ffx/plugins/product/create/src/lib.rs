@@ -125,14 +125,12 @@ pub async fn pb_create_with_sdk_version(
     let (_gen_dir, update_package_hash, update_packages) =
         if let Some((version, epoch)) = update_details {
             let epoch: EpochFile = EpochFile::Version1 { epoch };
-            let abi_revision = None;
             let gen_dir = TempDir::new().context("creating temporary directory")?;
             let mut builder = UpdatePackageBuilder::new(
                 partitions.clone(),
                 partitions.hardware_revision.clone(),
                 version,
                 epoch,
-                abi_revision,
                 Utf8Path::from_path(gen_dir.path())
                     .context("checking if temporary directory is UTF-8")?,
             );

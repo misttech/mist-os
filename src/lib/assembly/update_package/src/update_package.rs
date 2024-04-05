@@ -60,10 +60,6 @@ pub struct UpdatePackageBuilder {
     /// Manifest of packages to include in the update.
     packages: UpdatePackagesManifest,
 
-    /// The ABI revision to use when building the packages for the update.
-    /// None will default to the `INVALID` ABI revision.
-    abi_revision: Option<version_history::AbiRevision>,
-
     /// The repository to use for the images packages.
     repository: RepositoryUrl,
 
@@ -175,7 +171,6 @@ impl UpdatePackageBuilder {
         board_name: impl AsRef<str>,
         version_file: impl AsRef<Path>,
         epoch: EpochFile,
-        abi_revision: Option<version_history::AbiRevision>,
         outdir: impl AsRef<Utf8Path>,
     ) -> Self {
         Self {
@@ -187,7 +182,6 @@ impl UpdatePackageBuilder {
             slot_primary: None,
             slot_recovery: None,
             packages: UpdatePackagesManifest::default(),
-            abi_revision,
             repository: RepositoryUrl::parse_host("fuchsia.com".to_string())
                 .expect("valid host from static string"),
             outdir: outdir.as_ref().to_path_buf(),
@@ -243,7 +237,7 @@ impl UpdatePackageBuilder {
         // accidentally add any checks without the necessary care.
         //
         // TODO(https://fxbug.dev/328812629): Clarify what this means.
-        let abi_revision = self.abi_revision.unwrap_or(version_history::AbiRevision::INVALID);
+        let abi_revision = version_history::AbiRevision::INVALID;
 
         // The update package needs to be named 'update' to be accepted by the
         // `system-updater`.  Follow that convention for images packages as well.
@@ -465,7 +459,6 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             epoch.clone(),
-            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
 
@@ -495,14 +488,14 @@ mod tests {
                                 "size": 0,
                                 "slot": "fuchsia",
                                 "type": "zbi",
-                                "url": "fuchsia-pkg://test.com/update_images_fuchsia/0?hash=6492b301db076a3be0a8065556423cd2b7d65bc75fd1025562dad0e0ba4ec647#zbi",
+                                "url": "fuchsia-pkg://test.com/update_images_fuchsia/0?hash=5e09a4766c1db520e8a871f8301e2046dc258bfb8eb1163c5f82d524d21d5c3f#zbi",
                             },
                     ],
                     "firmware":
                             [{
                                 "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                                 "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=ef241082037e069e82141f366d7296a483238fb32eee5ba0b5d6009814ae6910#firmware_tpl",
+                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=97ae32f0e5edfb0688f1a8bee3cab63d3de82b6c9fdb888f050da8eab17a18b2#firmware_tpl",
                                 "type": "tpl",
                             }],
 
@@ -534,7 +527,7 @@ mod tests {
         let expected_contents = "\
             board=9c579992f6e9f8cbd4ba81af6e23b1d5741e280af60f795e9c2bbcc76c4b7065\n\
             epoch.json=0362de83c084397826800778a1cf927280a5d5388cb1f828d77f74108726ad69\n\
-            images.json=e6c8327e0477561b2e1ee26ea881c47c7cff127b3242165ac0a689e5d22ee656\n\
+            images.json=95a71ad6b533ac0a5b5ef4effb68f10098b60664d04ee6d4b06de870d1b9edf5\n\
             packages.json=85a3911ff39c118ee1a4be5f7a117f58a5928a559f456b6874440a7fb8c47a9a\n\
             version=d2ff44655653e2cbbecaf89dbf33a8daa8867e41dade2c6b4f127c3f0450c96b\n\
         "
@@ -618,7 +611,6 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             epoch.clone(),
-            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
 
@@ -650,7 +642,7 @@ mod tests {
         let update_package = builder.build(tool_provider).unwrap();
         assert_eq!(
             update_package.merkle,
-            "e14832faa860680fe05f242e0caa634e66809438832e2e52b78fed727003b3da".parse().unwrap()
+            "128778df19f0f5d903c3d9ee291d367b8842830e05b90f48461c8005b815251a".parse().unwrap()
         );
         assert_eq!(update_package.package_manifests.len(), 4);
 
@@ -667,33 +659,31 @@ mod tests {
                                 "slot": "fuchsia",
                                 "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                                 "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_fuchsia/0?hash=6492b301db076a3be0a8065556423cd2b7d65bc75fd1025562dad0e0ba4ec647#zbi",
+                                "url": "fuchsia-pkg://test.com/update_images_fuchsia/0?hash=5e09a4766c1db520e8a871f8301e2046dc258bfb8eb1163c5f82d524d21d5c3f#zbi",
                             },
                             {
                                 "type": "zbi",
                                 "slot": "recovery",
                                 "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                                 "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_recovery/0?hash=22df31495fd69f3f1c18612016eff1191c6c7ae9481258a891fc8f8b63d26373#zbi",
+                                "url": "fuchsia-pkg://test.com/update_images_recovery/0?hash=0717335a7ccc00223d1f6b443cac36539dbf477f36abfbd4ac00623a6f587a47#zbi",
 
                             },
-
-                    {
+                            {
                                 "type": "vbmeta",
                                 "slot": "recovery",
                                 "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                                 "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_recovery/0?hash=22df31495fd69f3f1c18612016eff1191c6c7ae9481258a891fc8f8b63d26373#vbmeta",
+                                "url": "fuchsia-pkg://test.com/update_images_recovery/0?hash=0717335a7ccc00223d1f6b443cac36539dbf477f36abfbd4ac00623a6f587a47#vbmeta",
 
                             },
-
                     ],
                     "firmware": [
                              {
                                 "type" : "tpl",
                                 "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                                 "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=ef241082037e069e82141f366d7296a483238fb32eee5ba0b5d6009814ae6910#firmware_tpl",
+                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=97ae32f0e5edfb0688f1a8bee3cab63d3de82b6c9fdb888f050da8eab17a18b2#firmware_tpl",
                             },
                     ],
                 },
@@ -724,7 +714,7 @@ mod tests {
         let expected_contents = "\
             board=9c579992f6e9f8cbd4ba81af6e23b1d5741e280af60f795e9c2bbcc76c4b7065\n\
             epoch.json=0362de83c084397826800778a1cf927280a5d5388cb1f828d77f74108726ad69\n\
-            images.json=7ba3dd799c26f18d02d79ef063d9aa34c14bdbf2cde4f934af07e2ec9b30d36d\n\
+            images.json=13893c40dd7b244cb289dddc2d06dea49c61462830e1b33765874dcff5581096\n\
             packages.json=85a3911ff39c118ee1a4be5f7a117f58a5928a559f456b6874440a7fb8c47a9a\n\
             version=d2ff44655653e2cbbecaf89dbf33a8daa8867e41dade2c6b4f127c3f0450c96b\n\
         "
@@ -793,7 +783,6 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             epoch.clone(),
-            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
 
@@ -830,7 +819,6 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             EpochFile::Version1 { epoch: 0 },
-            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
         builder.set_name("update_2");
@@ -855,7 +843,6 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             EpochFile::Version1 { epoch: 0 },
-            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
         builder.set_name("update_2");
@@ -886,7 +873,6 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             EpochFile::Version1 { epoch: 0 },
-            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
 

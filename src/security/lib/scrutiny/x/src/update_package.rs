@@ -188,7 +188,6 @@ pub mod test {
             "board",
             version_file.path().to_path_buf(),
             epoch.clone(),
-            Some(0xECDB841C251A8CB9.into()),
             &pkg_path,
         );
         builder.add_slot_images(Slot::Primary(AssemblyManifest {

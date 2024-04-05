@@ -42,7 +42,6 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
         args.board_name,
         args.version_file,
         epoch,
-        /*abi_revision=*/ None,
         &args.outdir,
     );
 
