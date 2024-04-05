@@ -59,11 +59,7 @@ async fn c_crash() {
         .expect_err("kernel should close channel before replying");
 
     assert_matches!(
-        wait_for_exit_status(&mut events, &container_moniker).await,
-        ExitStatus::Crash(..)
-    );
-    assert_matches!(
-        wait_for_exit_status(&mut events, &kernel_moniker).await,
+        wait_for_exit_status(&mut events, &[&container_moniker, &kernel_moniker]).await,
         ExitStatus::Crash(..)
     );
 
@@ -162,10 +158,10 @@ async fn open_sysrq_trigger(realm: &RealmInstance) -> FileProxy {
     .unwrap()
 }
 
-async fn wait_for_exit_status(events: &mut EventStream, moniker: &str) -> ExitStatus {
-    info!(%moniker, "waiting for exit status");
+async fn wait_for_exit_status(events: &mut EventStream, monikers: &[&str]) -> ExitStatus {
+    info!(monikers = %monikers.join(","), "waiting for exit status");
     EventMatcher::ok()
-        .moniker(moniker)
+        .monikers(monikers)
         .wait::<Stopped>(events)
         .await
         .unwrap()
