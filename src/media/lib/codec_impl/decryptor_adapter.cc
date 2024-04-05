@@ -2,18 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/fidl/cpp/clone.h>
 #include <lib/media/codec_impl/codec_impl.h>
 #include <lib/media/codec_impl/codec_port.h>
 #include <lib/media/codec_impl/decryptor_adapter.h>
 #include <lib/media/codec_impl/log.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
 #include <cstdint>
 #include <limits>
 
+#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <safemath/safe_math.h>
 
 namespace {
@@ -95,11 +98,11 @@ void DecryptorAdapter::CoreCodecSetSecureMemoryMode(
   }
 }
 
-fuchsia::sysmem::BufferCollectionConstraints
-DecryptorAdapter::CoreCodecGetBufferCollectionConstraints(
+fuchsia_sysmem2::BufferCollectionConstraints
+DecryptorAdapter::CoreCodecGetBufferCollectionConstraints2(
     CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
     const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
-  fuchsia::sysmem::BufferCollectionConstraints result;
+  fuchsia_sysmem2::BufferCollectionConstraints result;
 
   // The CodecImpl won't hand us the sysmem token, so we shouldn't expect to have the token here.
   ZX_DEBUG_ASSERT(!partial_settings.has_sysmem_token());
@@ -110,56 +113,51 @@ DecryptorAdapter::CoreCodecGetBufferCollectionConstraints(
   // We can't ask for slack on output because VDEC has limited space and the HW requires each buffer
   // to be large enough to hold the largest compressed frame we might potentially see.
   if (port == kOutputPort) {
-    result.min_buffer_count_for_camping = kOutputMinBufferCountForCamping;
-    ZX_DEBUG_ASSERT(result.min_buffer_count_for_dedicated_slack == 0);
+    result.min_buffer_count_for_camping() = kOutputMinBufferCountForCamping;
+    ZX_DEBUG_ASSERT(!result.min_buffer_count_for_dedicated_slack().has_value());
   } else {
-    result.min_buffer_count_for_camping = kInputMinBufferCountForCamping;
-    result.min_buffer_count_for_dedicated_slack = kInputMinBufferCountForDedicatedSlack;
+    result.min_buffer_count_for_camping() = kInputMinBufferCountForCamping;
+    result.min_buffer_count_for_dedicated_slack() = kInputMinBufferCountForDedicatedSlack;
   }
-  ZX_DEBUG_ASSERT(result.min_buffer_count_for_shared_slack == 0);
-  ZX_DEBUG_ASSERT(result.max_buffer_count == 0);
-
-  result.has_buffer_memory_constraints = true;
+  ZX_DEBUG_ASSERT(!result.min_buffer_count_for_shared_slack().has_value());
+  ZX_DEBUG_ASSERT(!result.max_buffer_count().has_value());
 
   if (port == kOutputPort && is_secure()) {
-    result.buffer_memory_constraints = GetSecureOutputMemoryConstraints();
+    result.buffer_memory_constraints() = GetSecureOutputMemoryConstraints2();
   } else {
-    result.buffer_memory_constraints.physically_contiguous_required = false;
-    result.buffer_memory_constraints.secure_required = false;
+    auto& bmc = result.buffer_memory_constraints().emplace();
+    bmc.physically_contiguous_required() = false;
+    bmc.secure_required() = false;
   }
 
-  ZX_DEBUG_ASSERT(result.image_format_constraints_count == 0);
+  ZX_DEBUG_ASSERT(!result.image_format_constraints().has_value());
 
   // We don't have to fill out usage - CodecImpl takes care of that.
-  ZX_DEBUG_ASSERT(!result.usage.cpu);
-  ZX_DEBUG_ASSERT(!result.usage.display);
-  ZX_DEBUG_ASSERT(!result.usage.vulkan);
-  ZX_DEBUG_ASSERT(!result.usage.video);
-  ZX_DEBUG_ASSERT(!result.usage.none);
+  ZX_DEBUG_ASSERT(!result.usage().has_value());
 
   return result;
 }
 
 void DecryptorAdapter::CoreCodecSetBufferCollectionInfo(
-    CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) {
-  const auto& buffer_settings = buffer_collection_info.settings.buffer_settings;
+    CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
+  const auto& buffer_settings = *buffer_collection_info.settings()->buffer_settings();
   if (port == kInputPort) {
-    if (buffer_settings.coherency_domain != fuchsia::sysmem::CoherencyDomain::CPU) {
+    if (*buffer_settings.coherency_domain() != fuchsia_sysmem2::CoherencyDomain::kCpu) {
       events_->onCoreCodecFailCodec("DecryptorAdapter only supports CPU coherent input buffers");
       return;
     }
   } else if (!is_secure()) {  // port == kOutputPort
-    if (buffer_settings.coherency_domain != fuchsia::sysmem::CoherencyDomain::CPU) {
+    if (*buffer_settings.coherency_domain() != fuchsia_sysmem2::CoherencyDomain::kCpu) {
       events_->onCoreCodecFailCodec(
           "DecryptorAdapter only supports CPU coherent clear output buffers");
       return;
     }
   } else {  // port == kOutputPort && is_secure()
-    if (!buffer_settings.is_secure) {
+    if (!*buffer_settings.is_secure()) {
       events_->onCoreCodecFailCodec("Secure DecryptorAdapter requires secure buffers");
       return;
     }
-    if (buffer_settings.coherency_domain != fuchsia::sysmem::CoherencyDomain::INACCESSIBLE) {
+    if (*buffer_settings.coherency_domain() != fuchsia_sysmem2::CoherencyDomain::kInaccessible) {
       events_->onCoreCodecFailCodec(
           "Secure DecryptorAdapter only supports INACCESSIBLE coherent output buffers");
       return;
@@ -383,9 +381,23 @@ fuchsia::sysmem::BufferMemoryConstraints DecryptorAdapter::GetSecureOutputMemory
   constraints.cpu_domain_supported = false;
   constraints.inaccessible_domain_supported = true;
 
+  // This is only the default in the base class; actual decryptors that only output to secure heaps
+  // should only list those secure heaps.
   constraints.heap_permitted_count = 1;
   constraints.heap_permitted[0] = fuchsia::sysmem::HeapType::SYSTEM_RAM;
+
   return constraints;
+}
+
+fuchsia_sysmem2::BufferMemoryConstraints DecryptorAdapter::GetSecureOutputMemoryConstraints2()
+    const {
+  fuchsia::sysmem::BufferMemoryConstraints v1_constraints = GetSecureOutputMemoryConstraints();
+  auto constraints_result =
+      sysmem::V2CopyFromV1BufferMemoryConstraints(fidl::HLCPPToNatural(v1_constraints));
+  // DecryptorAdapter sub-class must provide valid v1 constraints (or preferably, provide valid
+  // v2 constraints by overriding GetSecureOutputMemoryConstraints2 instead).
+  ZX_ASSERT(constraints_result.is_ok());
+  return std::move(constraints_result.value());
 }
 
 void DecryptorAdapter::PostSerial(async_dispatcher_t* dispatcher, fit::closure to_run) {

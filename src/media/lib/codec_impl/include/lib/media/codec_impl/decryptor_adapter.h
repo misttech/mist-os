@@ -5,6 +5,7 @@
 #ifndef SRC_MEDIA_LIB_CODEC_IMPL_INCLUDE_LIB_MEDIA_CODEC_IMPL_DECRYPTOR_ADAPTER_H_
 #define SRC_MEDIA_LIB_CODEC_IMPL_INCLUDE_LIB_MEDIA_CODEC_IMPL_DECRYPTOR_ADAPTER_H_
 
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/media/drm/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -62,12 +63,11 @@ class DecryptorAdapter : public CodecAdapter {
   void CoreCodecInit(const fuchsia::media::FormatDetails& initial_input_format_details) override;
   void CoreCodecSetSecureMemoryMode(
       CodecPort port, fuchsia::mediacodec::SecureMemoryMode secure_memory_mode) override;
-  fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
+  fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) override;
   void CoreCodecSetBufferCollectionInfo(
-      CodecPort port,
-      const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override;
+      CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) override;
   void CoreCodecStartStream() override;
   void CoreCodecQueueInputFormatDetails(
       const fuchsia::media::FormatDetails& per_stream_override_format_details) override;
@@ -105,9 +105,17 @@ class DecryptorAdapter : public CodecAdapter {
  protected:
   // GetSecureOutputMemoryConstraints
   //
-  // If the specialized Decryptor supports working with secure memory, it should override this
-  // method to provide the proper coherency and permitted heaps that it can support.
+  // If the specialized Decryptor supports working with secure memory, it should override one of
+  // these methods (preferably GetSecureOutputMemoryConstraints2) to provide the proper coherency
+  // and permitted heaps that it can support.
+  //
+  // TODO(b/306258175): Finish removing GetSecureOutputMemoryConstraints when all sub-classes have
+  // moved to GetSecureOutputMemoryConstraints2.
+  //
+  // GetSecureOutputMemoryConstraints is deprecated; prefer GetSecureOutputMemoryConstraints2.
   virtual fuchsia::sysmem::BufferMemoryConstraints GetSecureOutputMemoryConstraints() const;
+  // Prefer to override this method, not GetSecureOutputMemoryConstraints.
+  virtual fuchsia_sysmem2::BufferMemoryConstraints GetSecureOutputMemoryConstraints2() const;
 
   // SetProcessingSchedulerProfile
   //
