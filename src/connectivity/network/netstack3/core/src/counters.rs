@@ -376,10 +376,19 @@ fn inspect_tcp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &TcpCou
         failed_connection_attempts,
         failed_port_reservations,
         checksum_errors,
+        resets_received,
+        resets_sent,
+        syns_received,
+        syns_sent,
+        fins_received,
+        fins_sent,
     } = counters.as_ref();
     inspector.record_child("Rx", |inspector| {
         inspector.record_counter("ValidSegmentsReceived", valid_segments_received);
         inspector.record_counter("ReceivedSegmentsDispatched", received_segments_dispatched);
+        inspector.record_counter("ResetsReceived", resets_received);
+        inspector.record_counter("SynsReceived", syns_received);
+        inspector.record_counter("FinsReceived", fins_received);
         inspector.record_child("Errors", |inspector| {
             inspector.record_counter("InvalidIpAddrsReceived", invalid_ip_addrs_received);
             inspector.record_counter("InvalidSegmentsReceived", invalid_segments_received);
@@ -391,6 +400,9 @@ fn inspect_tcp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &TcpCou
     });
     inspector.record_child("Tx", |inspector| {
         inspector.record_counter("SegmentsSent", segments_sent);
+        inspector.record_counter("ResetsSent", resets_sent);
+        inspector.record_counter("SynsSent", syns_sent);
+        inspector.record_counter("FinsSent", fins_sent);
         inspector.record_child("Errors", |inspector| {
             inspector.record_counter("SegmentSendErrors", segment_send_errors);
             inspector.record_counter("ActiveOpenNoRouteErrors", active_open_no_route_errors);

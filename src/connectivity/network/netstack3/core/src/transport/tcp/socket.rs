@@ -52,15 +52,16 @@ use crate::{
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
-    device::{self, AnyDevice, DeviceIdContext},
+    device::{self, AnyDevice, DeviceIdContext, WeakId},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
         icmp::IcmpErrorCode,
         socket::{
-            DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSocketHandler,
+            DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError,
+            IpSocketHandler, SendOptions,
         },
-        EitherDeviceId, TransportIpContext,
+        EitherDeviceId, IpExt, IpSockCreateAndSendError, TransportIpContext,
     },
     socket::{
         self,
@@ -76,11 +77,13 @@ use crate::{
     },
     sync::RwLock,
     transport::tcp::{
-        buffer::{IntoBuffers, ReceiveBuffer, SendBuffer},
+        buffer::{IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
+        segment::Segment,
         seqnum::SeqNum,
         socket::{accept_queue::AcceptQueue, demux::tcp_serialize_segment, isn::IsnGenerator},
         state::{CloseError, CloseReason, Closed, Initial, State, Takeable},
-        BufferSizes, ConnectionError, Mss, OptionalBufferSizes, SocketOptions, TcpCounters,
+        BufferSizes, ConnectionError, Control, Mss, OptionalBufferSizes, SocketOptions,
+        TcpCounters,
     },
 };
 
@@ -4312,6 +4315,7 @@ fn close_pending_sockets<I, CC, BC>(
                     close_pending_socket(
                         core_ctx,
                         bindings_ctx,
+                        &conn_id,
                         &demux_id,
                         timer,
                         state,
@@ -4323,6 +4327,7 @@ fn close_pending_sockets<I, CC, BC>(
                     close_pending_socket(
                         core_ctx,
                         bindings_ctx,
+                        &conn_id,
                         &demux_id,
                         timer,
                         state,
@@ -4339,6 +4344,7 @@ fn close_pending_sockets<I, CC, BC>(
 fn close_pending_socket<WireI, SockI, DC, BC>(
     core_ctx: &mut DC,
     bindings_ctx: &mut BC,
+    sock_id: &TcpSocketId<SockI, DC::WeakDeviceId, BC>,
     demux_id: &WireI::DemuxSocketId<DC::WeakDeviceId, BC>,
     timer: &mut BC::Timer,
     state: &mut State<
@@ -4370,14 +4376,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
 
     if let Some(reset) = state.abort() {
         let ConnAddr { ip, device: _ } = conn_addr;
-        let ser = tcp_serialize_segment(reset, *ip);
-        match core_ctx.send_ip_packet(bindings_ctx, ip_sock, ser, None) {
-            Ok(()) => core_ctx.increment(|counters| &counters.segments_sent),
-            Err((body, err)) => {
-                core_ctx.increment(|counters| &counters.segment_send_errors);
-                debug!("failed to reset connection to {:?}, body: {:?}, err: {:?}", ip, body, err)
-            }
-        }
+        send_tcp_segment(core_ctx, bindings_ctx, Some(sock_id), Some(ip_sock), *ip, reset.into());
     }
 }
 
@@ -4395,24 +4394,14 @@ fn do_send_inner<SockI, WireI, CC, BC>(
     CC: TransportIpContext<WireI, BC> + CounterContext<TcpCounters<SockI>>,
 {
     while let Some(seg) = conn.state.poll_send(u32::MAX, bindings_ctx.now(), &conn.socket_options) {
-        let ser = tcp_serialize_segment(seg, addr.ip.clone());
-        match core_ctx.send_ip_packet(bindings_ctx, &conn.ip_sock, ser, None) {
-            Ok(()) => core_ctx.increment(|counters| &counters.segments_sent),
-            Err((body, err)) => {
-                core_ctx.increment(|counters| &counters.segment_send_errors);
-                // Currently there are a few call sites to `do_send_inner` and they
-                // don't really care about the error, with Rust's strict
-                // `unused_result` lint, not returning an error that no one
-                // would care makes the code less cumbersome to write. So We do
-                // not return the error to caller but just log it instead. If
-                // we find a case where the caller is interested in the error,
-                // then we can always come back and change this.
-                debug!(
-                    "failed to send an ip packet on {:?}, body: {:?}, err: {:?}",
-                    conn_id, body, err
-                )
-            }
-        }
+        send_tcp_segment(
+            core_ctx,
+            bindings_ctx,
+            Some(conn_id),
+            Some(&conn.ip_sock),
+            addr.ip.clone(),
+            seg,
+        );
     }
 
     if let Some(instant) = conn.state.poll_send_at() {
@@ -4783,18 +4772,14 @@ where
     let poll_send_at = state.poll_send_at().expect("no retrans timer");
 
     // Send first SYN packet.
-    match core_ctx.send_ip_packet(
+    send_tcp_segment(
+        core_ctx,
         bindings_ctx,
-        &ip_sock,
-        tcp_serialize_segment(syn, conn_addr.ip),
-        None,
-    ) {
-        Ok(()) => core_ctx.increment(|counters| &counters.segments_sent),
-        Err((body, err)) => {
-            core_ctx.increment(|counters| &counters.segment_send_errors);
-            trace!("tcp: failed to send ip packet {:?}: {:?}", body, err);
-        }
-    }
+        Some(&sock_id),
+        Some(&ip_sock),
+        conn_addr.ip,
+        syn.into(),
+    );
 
     let mut timer = bindings_ctx.new_timer(convert_timer(sock_id.downgrade()));
     assert_eq!(bindings_ctx.schedule_timer_instant2(poll_send_at, &mut timer), None);
@@ -4927,6 +4912,76 @@ where
     }
 }
 
+/// Send the given TCP Segment.
+///
+/// A centralized send path for TCP segments that increments counters and logs
+/// errors.
+///
+/// When `ip_sock` is some, it is used to send the segment, otherwise, one is
+/// constructed on demand to send a oneshot segment.
+///
+/// `socket_id` is used strictly for logging. `None` can be provided in cases
+/// where the segment is not associated with any particular socket.
+fn send_tcp_segment<'a, WireI, SockI, CC, BC, D, O>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    socket_id: Option<&TcpSocketId<SockI, D, BC>>,
+    ip_sock: Option<&IpSock<WireI, D, O>>,
+    conn_addr: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
+    segment: Segment<SendPayload<'a>>,
+) where
+    WireI: Ip + IpExt,
+    SockI: Ip + IpExt + DualStackIpExt,
+    CC: CounterContext<TcpCounters<SockI>>
+        + IpSocketHandler<WireI, BC, DeviceId = D::Strong, WeakDeviceId = D>,
+    BC: TcpBindingsTypes,
+    D: WeakId,
+    O: SendOptions<WireI>,
+{
+    let control = segment.contents.control();
+    let result = match ip_sock {
+        Some(ip_sock) => {
+            let body = tcp_serialize_segment(segment, conn_addr);
+            core_ctx
+                .send_ip_packet(bindings_ctx, ip_sock, body, None)
+                .map_err(|(_serializer, err)| IpSockCreateAndSendError::Send(err))
+        }
+        None => {
+            let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = conn_addr;
+            core_ctx
+                .send_oneshot_ip_packet(
+                    bindings_ctx,
+                    None,
+                    Some(local_ip),
+                    remote_ip,
+                    IpProto::Tcp.into(),
+                    DefaultSendOptions,
+                    |_addr| tcp_serialize_segment(segment, conn_addr),
+                    None,
+                )
+                .map_err(|(err, _options)| err)
+        }
+    };
+    match result {
+        Ok(()) => {
+            core_ctx.increment(|counters| &counters.segments_sent);
+            match control {
+                None => {}
+                Some(Control::RST) => core_ctx.increment(|counters| &counters.resets_sent),
+                Some(Control::SYN) => core_ctx.increment(|counters| &counters.syns_sent),
+                Some(Control::FIN) => core_ctx.increment(|counters| &counters.fins_sent),
+            }
+        }
+        Err(err) => {
+            core_ctx.increment(|counters| &counters.segment_send_errors);
+            match socket_id {
+                Some(socket_id) => debug!("{:?}: failed to send segment: {:?}", socket_id, err),
+                None => debug!("TCP: failed to send segment: {:?}, {:?}", err, segment),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::{format, rc::Rc, string::String, sync::Arc, vec, vec::Vec};
@@ -4978,7 +5033,7 @@ mod tests {
             socket::testutil::FakeDualStackIpSocketCtx,
             socket::{
                 testutil::{FakeDeviceConfig, FakeFilterDeviceId},
-                IpSocketBindingsContext, IpSocketContext, MmsError, SendOptions,
+                IpSocketBindingsContext, IpSocketContext, MmsError,
             },
             testutil::DualStackSendIpPacketMeta,
             types::{ResolvedRoute, RoutableIpAddr},
@@ -6197,6 +6252,10 @@ mod tests {
                             context_name
                         );
                         assert_eq!(c.failed_connection_attempts.get(), 0, "{}", context_name);
+                        // Each side of the connection sends and receives a,
+                        // SYN, regardless of it initiated the connection.
+                        assert_eq!(c.syns_sent.get(), 1);
+                        assert_eq!(c.syns_received.get(), 1);
                     })
                 })
             };

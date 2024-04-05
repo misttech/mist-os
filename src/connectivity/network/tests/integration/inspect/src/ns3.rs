@@ -702,6 +702,9 @@ async fn inspect_counters(name: &str) {
                     "Rx": {
                         ValidSegmentsReceived: 0u64,
                         ReceivedSegmentsDispatched: 0u64,
+                        ResetsReceived: 0u64,
+                        SynsReceived: 0u64,
+                        FinsReceived: 0u64,
                         "Errors": {
                             ChecksumErrors: 0u64,
                             InvalidIpAddrsReceived: 0u64,
@@ -713,6 +716,9 @@ async fn inspect_counters(name: &str) {
                     },
                     "Tx": {
                         SegmentsSent: 0u64,
+                        ResetsSent: 0u64,
+                        SynsSent: 0u64,
+                        FinsSent: 0u64,
                         "Errors": {
                             SegmentSendErrors: 0u64,
                             ActiveOpenNoRouteErrors: 0u64,
@@ -729,6 +735,9 @@ async fn inspect_counters(name: &str) {
                     "Rx": {
                         ValidSegmentsReceived: 0u64,
                         ReceivedSegmentsDispatched: 0u64,
+                        ResetsReceived: 0u64,
+                        SynsReceived: 0u64,
+                        FinsReceived: 0u64,
                         "Errors": {
                             ChecksumErrors: 0u64,
                             InvalidIpAddrsReceived: 0u64,
@@ -740,6 +749,9 @@ async fn inspect_counters(name: &str) {
                     },
                     "Tx": {
                         SegmentsSent: 0u64,
+                        ResetsSent: 0u64,
+                        SynsSent: 0u64,
+                        FinsSent: 0u64,
                         "Errors": {
                             SegmentSendErrors: 0u64,
                             ActiveOpenNoRouteErrors: 0u64,

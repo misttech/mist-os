@@ -406,6 +406,18 @@ pub struct TcpCountersInner {
     pub failed_port_reservations: Counter,
     /// Count of received segments whose checksums were invalid.
     pub checksum_errors: Counter,
+    /// Count of received segments with the RST flag set.
+    pub resets_received: Counter,
+    /// Count of sent segments with the RST flag set.
+    pub resets_sent: Counter,
+    /// Count of received segments with the SYN flag set.
+    pub syns_received: Counter,
+    /// Count of sent segments with the SYN flag set.
+    pub syns_sent: Counter,
+    /// Count of received segments with the FIN flag set.
+    pub fins_received: Counter,
+    /// Count of sent segments with the FIN flag set.
+    pub fins_sent: Counter,
     // TODO(https://fxbug.dev/42052879): Add additional counters to achieve
     // parity with Netstack2.
 }

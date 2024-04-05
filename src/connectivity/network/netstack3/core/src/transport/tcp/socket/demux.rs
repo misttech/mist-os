@@ -29,7 +29,7 @@ use crate::{
     error::NotFoundError,
     filter::TransportPacketSerializer,
     ip::{
-        socket::{DefaultSendOptions, IpSocketHandler, MmsError},
+        socket::{DefaultSendOptions, MmsError},
         EitherDeviceId, IpSockCreationError, IpTransportContext, TransportIpContext,
         TransportReceiveError,
     },
@@ -179,6 +179,18 @@ where
             ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) };
 
         core_ctx.increment(|counters: &TcpCounters<I>| &counters.valid_segments_received);
+        match incoming.contents.control() {
+            None => {}
+            Some(Control::RST) => {
+                core_ctx.increment(|counters: &TcpCounters<I>| &counters.resets_received)
+            }
+            Some(Control::SYN) => {
+                core_ctx.increment(|counters: &TcpCounters<I>| &counters.syns_received)
+            }
+            Some(Control::FIN) => {
+                core_ctx.increment(|counters: &TcpCounters<I>| &counters.fins_received)
+            }
+        }
         handle_incoming_packet::<I, _, _>(core_ctx, bindings_ctx, conn_addr, device, incoming);
         Ok(())
     }
@@ -265,6 +277,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                         try_handle_incoming_for_listener::<WireI, WireI, CC, BC, _>(
                                             core_ctx,
                                             bindings_ctx,
+                                            &listener_id,
                                             isn,
                                             socket_state,
                                             incoming,
@@ -279,6 +292,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                         try_handle_incoming_for_listener::<_, _, CC, BC, _>(
                                             core_ctx,
                                             bindings_ctx,
+                                            &listener_id,
                                             isn,
                                             socket_state,
                                             incoming,
@@ -325,6 +339,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                         try_handle_incoming_for_listener::<_, _, CC, BC, _>(
                                             core_ctx,
                                             bindings_ctx,
+                                            &listener_id,
                                             isn,
                                             socket_state,
                                             incoming,
@@ -359,7 +374,6 @@ fn handle_incoming_packet<WireI, BC, CC>(
         }
     };
 
-    let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = conn_addr;
     if !found_socket {
         core_ctx.increment(|counters: &TcpCounters<WireI>| &counters.received_segments_no_dispatch);
 
@@ -370,26 +384,14 @@ fn handle_incoming_packet<WireI, BC, CC>(
         // there is no TCB, and therefore, no connection.
         if let Some(seg) = (Closed { reason: None::<Option<ConnectionError>> }.on_segment(incoming))
         {
-            match <CC as IpSocketHandler<WireI, _>>::send_oneshot_ip_packet(
+            tcp::socket::send_tcp_segment::<WireI, WireI, _, _, _, DefaultSendOptions>(
                 core_ctx,
                 bindings_ctx,
                 None,
-                Some(local_ip),
-                remote_ip,
-                IpProto::Tcp.into(),
-                DefaultSendOptions,
-                |_addr| tcp_serialize_segment(seg, conn_addr),
                 None,
-            ) {
-                Ok(()) => {
-                    core_ctx.increment(|counters: &TcpCounters<WireI>| &counters.segments_sent);
-                }
-                Err((err, DefaultSendOptions)) => {
-                    core_ctx
-                        .increment(|counters: &TcpCounters<WireI>| &counters.segment_send_errors);
-                    debug!("cannot construct an ip socket to respond RST: {:?}, ignoring", err);
-                }
-            }
+                conn_addr,
+                seg.into(),
+            );
         }
     } else {
         core_ctx.increment(|counters: &TcpCounters<WireI>| &counters.received_segments_dispatched);
@@ -682,14 +684,14 @@ where
     }
 
     if let Some(seg) = reply {
-        let body = tcp_serialize_segment(seg, conn_addr.ip);
-        match core_ctx.send_ip_packet(bindings_ctx, &ip_sock, body, None) {
-            Ok(()) => core_ctx.increment(|counters| &counters.segments_sent),
-            Err((body, err)) => {
-                core_ctx.increment(|counters| &counters.segment_send_errors);
-                debug!("tcp: failed to send ip packet {:?}: {:?}", body, err)
-            }
-        }
+        tcp::socket::send_tcp_segment(
+            core_ctx,
+            bindings_ctx,
+            Some(conn_id),
+            Some(&ip_sock),
+            conn_addr.ip,
+            seg.into(),
+        );
     }
 
     // Send any enqueued data, if there is any.
@@ -810,6 +812,7 @@ where
 fn try_handle_incoming_for_listener<SockI, WireI, CC, BC, DC>(
     core_ctx: &mut DC,
     bindings_ctx: &mut BC,
+    listener_id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
     isn: &IsnGenerator<BC::Instant>,
     socket_state: &mut TcpSocketStateInner<SockI, CC::WeakDeviceId, BC>,
     incoming: Segment<&[u8]>,
@@ -1047,14 +1050,14 @@ where
 
     // We can send a reply now if we got here.
     if let Some(seg) = reply {
-        let body = tcp_serialize_segment(seg, incoming_addrs);
-        match core_ctx.send_ip_packet(bindings_ctx, &ip_sock, body, None) {
-            Ok(()) => core_ctx.increment(|counters| &counters.segments_sent),
-            Err((body, err)) => {
-                core_ctx.increment(|counters| &counters.segment_send_errors);
-                debug!("tcp: failed to send ip packet {:?}: {:?}", body, err)
-            }
-        }
+        tcp::socket::send_tcp_segment(
+            core_ctx,
+            bindings_ctx,
+            Some(&listener_id),
+            Some(&ip_sock),
+            incoming_addrs,
+            seg.into(),
+        );
     }
 
     result
