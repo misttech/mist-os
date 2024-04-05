@@ -6,6 +6,8 @@
 
 import json
 import logging
+import subprocess
+import time
 
 from mobly import asserts
 from mobly import test_runner
@@ -47,6 +49,26 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
         got_device_name = output_json[0]["child"][0]["value"]
         # Assert FFX's target show device name matches Honeydew's.
         asserts.assert_equal(got_device_name, self.dut.device_name)
+
+    def test_target_echo_repeat(self) -> None:
+        """Test `ffx target echo --repeat` is resilient to daemon failure."""
+        process = self.dut.ffx.popen(
+            ["target", "echo", "--repeat"], stdout=subprocess.PIPE
+        )
+        line = process.stdout.readline()
+        asserts.assert_true(
+            line.startswith(b"SUCCESS"), f"First ping didn't succeed: {line}"
+        )
+        self.dut.ffx.run(["daemon", "stop"])
+        while True:
+            line = process.stdout.readline()
+            if line.startswith(b"ERROR"):
+                break
+        line = process.stdout.readline()
+        asserts.assert_true(
+            line.startswith(b"SUCCESS"),
+            f"Success didn't resume after error: {line}",
+        )
 
     # TODO(b/328505123): reenable when `ffx daemon stop` works in builders
     # def test_target_list_without_discovery(self) -> None:
