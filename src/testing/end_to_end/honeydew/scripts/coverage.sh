@@ -52,6 +52,13 @@ coverage \
     --start-directory $HONEYDEW_SRC/tests/unit_tests \
     --pattern "*_test.py"
 
+if [ $? -ne 0 ]; then
+    echo
+    echo "ERROR: coverage tool failed while running Honeydew unit tests."
+    echo "ERROR: Please fix the failrues and re-run."
+    exit 1
+fi
+
 echo "Generating coverage stats..."
 output=$(coverage report -m --include "$INCLUDE_FILES")
 # `coverage report` returns non-zero exit code when there is no coverage data to
