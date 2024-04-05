@@ -9,8 +9,6 @@
 
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.hardware.display.types/cpp/wire_types.h"
-
 namespace display {
 
 namespace {
