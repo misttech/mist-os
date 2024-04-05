@@ -14916,7 +14916,6 @@ rust_library("syn-v1_0_98") {
   visibility += [ "//tools/lib/cml/macro:*" ]
   visibility += [ "//tools/lib/config_client:*" ]
   visibility += [ "//tools/lib/reference_doc/macro:*" ]
-  visibility += [ "//tools/shush:*" ]
 
   applicable_licenses = [ ":syn-v1_0_98.license" ]
 }

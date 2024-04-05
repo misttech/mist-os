@@ -835,7 +835,6 @@ visibility = [
   "//tools/lib/cml/macro:*",
   "//tools/lib/config_client:*",
   "//tools/lib/reference_doc/macro:*",
-  "//tools/shush:*",
 ]
 
 [gn.package.thiserror."1.0.57"]
