@@ -8,11 +8,17 @@
 
 namespace {
 
-#if __cplusplus > 201703L
+#if __cplusplus > 202002L
+
+TEST(VersionTest, FeatureTestMacrosForCpp23) {
+  // TODO(https://fxbug.dev/42146550): Fill out expected values
+}
+
+#elif __cplusplus > 201703L
 
 TEST(VersionTest, FeatureTestMacrosForCpp20) {
-  // TODO(https://fxbug.dev/42146550): When std20 implementation catches up, string view implementation should be at
-  // latest draft.
+  // TODO(https://fxbug.dev/42146550): When std20 implementation catches up,
+  // string view implementation should be at latest draft.
 #if __cplusplus >= 201803L && __cpp_lib_string_view > 201606L
   static_assert(__cpp_lib_string_view == 201803L,
                 "'__cpp_lib_string_view' should be using draft 201803L for c++20.");
@@ -50,8 +56,9 @@ TEST(VersionTest, FeatureTestMacrosForCpp20) {
   static_assert(__cpp_lib_bind_front == 201907L,
                 "'__cpp_lib_bind_front' should be using draft 201907L for c++20.");
 #endif
-  // TODO(https://fxbug.dev/42146550): When libc++'s __cplusplus reflects C++20 as specified in the standard, move
-  // this into a separate #if branch for C++23.
+  // TODO(https://fxbug.dev/42146550): When libc++'s __cplusplus reflects C++20
+  // as specified in the standard, move this into a separate #if branch for
+  // C++23.
 #if defined(__cpp_lib_is_scoped_enum)
   static_assert(__cpp_lib_is_scoped_enum == 202011L,
                 "'__cpp_lib_is_scoped_enum' should be using draft 202011L for c++20.");
