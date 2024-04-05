@@ -33,8 +33,11 @@
 ******************************************************************************/
 /*$FreeBSD$*/
 
+#include <lib/device-protocol/pci.h>
+
+#include <memory>
+
 #include "e1000_api.h"
-#include "lib/device-protocol/pci.h"
 
 /*
  * NOTE: the following routines using the e1000
@@ -47,11 +50,13 @@ struct e1000_pci {
 };
 
 void e1000_write_pci_cfg(struct e1000_hw* hw, u32 reg, u16* value) {
-  hw2pci(hw)->pci->WriteConfig16(reg, *value);
+  ZX_DEBUG_ASSERT_COND(reg <= std::numeric_limits<uint16_t>::max());
+  hw2pci(hw)->pci->WriteConfig16(static_cast<uint16_t>(reg), *value);
 }
 
 void e1000_read_pci_cfg(struct e1000_hw* hw, u32 reg, u16* value) {
-  hw2pci(hw)->pci->ReadConfig16(reg, value);
+  ZX_DEBUG_ASSERT_COND(reg <= std::numeric_limits<uint16_t>::max());
+  hw2pci(hw)->pci->ReadConfig16(static_cast<uint16_t>(reg), value);
 }
 
 void e1000_pci_set_mwi(struct e1000_hw* hw) {
@@ -75,7 +80,8 @@ int32_t e1000_read_pcie_cap_reg(struct e1000_hw* hw, u32 reg, u16* value) {
     return E1000_ERR_CONFIG;
   }
 
-  hw2pci(hw)->pci->ReadConfig16(offset + reg, value);
+  ZX_DEBUG_ASSERT_COND(offset + reg <= std::numeric_limits<uint16_t>::max());
+  hw2pci(hw)->pci->ReadConfig16(static_cast<uint16_t>(offset + reg), value);
   return E1000_SUCCESS;
 }
 
@@ -90,11 +96,15 @@ int32_t e1000_write_pcie_cap_reg(struct e1000_hw* hw, u32 reg, u16* value) {
     return E1000_ERR_CONFIG;
   }
 
-  hw2pci(hw)->pci->WriteConfig16(offset + reg, *value);
+  ZX_DEBUG_ASSERT_COND(offset + reg <= std::numeric_limits<uint16_t>::max());
+  hw2pci(hw)->pci->WriteConfig16(static_cast<uint16_t>(offset + reg), *value);
   return E1000_SUCCESS;
 }
 
 zx_status_t e1000_pci_set_bus_mastering(const struct e1000_pci* pci, bool enabled) {
+  if (!pci->pci->is_valid()) {
+    return ZX_ERR_NOT_CONNECTED;
+  }
   return pci->pci->SetBusMastering(enabled);
 }
 
@@ -117,9 +127,8 @@ zx_status_t e1000_pci_get_device_info(const struct e1000_pci* pci, pci_device_in
 }
 
 zx_status_t e1000_pci_map_bar_buffer(const struct e1000_pci* pci, uint32_t bar_id,
-                                     uint32_t cache_policy, void* mmio) {
-  auto mmio_cast = reinterpret_cast<std::optional<fdf::MmioBuffer>*>(mmio);
-  return pci->pci->MapMmio(bar_id, cache_policy, mmio_cast);
+                                     uint32_t cache_policy, std::optional<fdf::MmioBuffer>* mmio) {
+  return pci->pci->MapMmio(bar_id, cache_policy, mmio);
 }
 
 zx_status_t e1000_pci_get_bar(const struct e1000_pci* pci, uint32_t bar_id, pci_bar_t* out_result) {
@@ -162,20 +171,21 @@ zx_status_t e1000_pci_map_interrupt(const struct e1000_pci* pci, uint32_t which_
   return status;
 }
 
-zx_status_t e1000_pci_connect_fragment_protocol(struct zx_device* parent, const char* fragment_name,
-                                                struct e1000_pci** pci) {
-  (*pci) = new struct e1000_pci;
-  (*pci)->pci = std::make_unique<ddk::Pci>(parent, fragment_name);
+zx_status_t e1000_pci_create(fidl::ClientEnd<fuchsia_hardware_pci::Device> client_end,
+                             struct e1000_pci** out_pci) {
+  std::unique_ptr pci = std::make_unique<e1000_pci>();
+  pci->pci = std::make_unique<ddk::Pci>(std::move(client_end));
 
-  if (!(*pci)->pci->is_valid()) {
-    return ZX_ERR_INTERNAL;
+  if (!pci->pci->is_valid()) {
+    return ZX_ERR_CONNECTION_REFUSED;
   }
+
+  *out_pci = pci.release();
 
   return ZX_OK;
 }
 
 void e1000_pci_free(struct e1000_pci* pci) {
-  pci->pci.reset();
   delete pci;
 }
 

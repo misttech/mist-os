@@ -37,15 +37,10 @@
 #define ZIRCON_THIRD_PARTY_DEV_ETHERNET_E1000_E1000_OSDEP_H_
 
 #include <assert.h>
-#include <fuchsia/hardware/ethernet/c/banjo.h>
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <lib/ddk/hw/inout.h>
-#include <lib/ddk/hw/reg.h>
-#include <lib/ddk/io-buffer.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/mmio-ptr/mmio-ptr.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/pci/hw.h>
 #include <stdbool.h>
@@ -57,6 +52,16 @@
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
+#include "log.h"
+
+#ifdef E1000_TEST
+#include "zircon/third_party/dev/ethernet/e1000/test/fake_mmio.h"
+#endif
+
+#ifndef ETHER_ADDR_LEN
+#define ETHER_ADDR_LEN 6
+#endif
+
 #define ASSERT(x) assert(x)
 
 #define nsec_delay(x) zx_nanosleep(zx_deadline_after(x))
@@ -66,11 +71,12 @@
 #define msec_delay_irq(x) nsec_delay(ZX_MSEC(x))
 
 /* Enable/disable debugging statements in shared code */
-#define DEBUGOUT(format, ...) zxlogf(DEBUG, "%s %d: " format, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define DEBUGOUT(format, ...) \
+  E1000_LOGF(DEBUG, "%s %d: " format, __FUNCTION__, __LINE__, ##__VA_ARGS__)
 #define DEBUGOUT1(...) DEBUGOUT(__VA_ARGS__)
 #define DEBUGOUT2(...) DEBUGOUT(__VA_ARGS__)
 #define DEBUGOUT3(...) DEBUGOUT(__VA_ARGS__)
-#define DEBUGFUNC(F) zxlogf(DEBUG, F "")
+#define DEBUGFUNC(F) E1000_LOGF(DEBUG, F "")
 
 #define STATIC static
 #define FALSE 0
@@ -97,9 +103,7 @@ typedef int8_t s8;
 // An opaque struct that contains a C++ PCI client.
 struct e1000_pci;
 
-#if defined(__cplusplus)
-extern "C" {
-#endif  // defined(__cplusplus)
+__BEGIN_CDECLS
 
 // A set of C wrappers around the C++ PCI methods.
 zx_status_t e1000_pci_set_bus_mastering(const struct e1000_pci* pci, bool enabled);
@@ -107,8 +111,6 @@ zx_status_t e1000_pci_ack_interrupt(const struct e1000_pci* pci);
 zx_status_t e1000_pci_read_config16(const struct e1000_pci* pci, uint16_t offset,
                                     uint16_t* out_value);
 zx_status_t e1000_pci_get_device_info(const struct e1000_pci* pci, pci_device_info_t* out_info);
-zx_status_t e1000_pci_map_bar_buffer(const struct e1000_pci* pci, uint32_t bar_id,
-                                     uint32_t cache_policy, void* mmio);
 zx_status_t e1000_pci_get_bar(const struct e1000_pci* pci, uint32_t bar_id, pci_bar_t* out_result);
 zx_status_t e1000_pci_get_bti(const struct e1000_pci* pci, uint32_t index, zx_handle_t* out_bti);
 zx_status_t e1000_pci_configure_interrupt_mode(const struct e1000_pci* pci,
@@ -117,21 +119,26 @@ zx_status_t e1000_pci_configure_interrupt_mode(const struct e1000_pci* pci,
 zx_status_t e1000_pci_map_interrupt(const struct e1000_pci* pci, uint32_t which_irq,
                                     zx_handle_t* out_interrupt);
 
-zx_status_t e1000_pci_connect_fragment_protocol(struct zx_device* parent, const char* fragment_name,
-                                                struct e1000_pci** pci);
-void e1000_pci_free(struct e1000_pci* pci);
-
 bool e1000_pci_is_valid(const struct e1000_pci* pci);
 
-#if defined(__cplusplus)
-}  // extern "C"
-#endif  // defined(__cplusplus)
+__END_CDECLS
+
+#ifdef __cplusplus
+// This is only needed by C++ code during setup, use ifdefs to allow it to use C++ types.
+zx_status_t e1000_pci_create(fidl::ClientEnd<fuchsia_hardware_pci::Device> client_end,
+                             struct e1000_pci** out_pci);
+void e1000_pci_free(struct e1000_pci* pci);
+
+zx_status_t e1000_pci_map_bar_buffer(const struct e1000_pci* pci, uint32_t bar_id,
+                                     uint32_t cache_policy, std::optional<fdf::MmioBuffer>* mmio);
+
+#endif  // __cplusplus
 
 struct e1000_osdep {
   struct e1000_pci* pci;
-  uintptr_t membase;
+  MMIO_PTR volatile uint8_t* membase;
   uintptr_t iobase;
-  uintptr_t flashbase;
+  MMIO_PTR volatile uint8_t* flashbase;
 };
 
 #define hw2pci(hw) ((struct e1000_osdep*)(hw)->back)->pci
@@ -139,15 +146,15 @@ struct e1000_osdep {
 #define hw2iobase(hw) (((struct e1000_osdep*)(hw)->back)->iobase)
 #define hw2flashbase(hw) (((struct e1000_osdep*)(hw)->back)->flashbase)
 
-#define e1000_writeb(v, a) writeb((v), (volatile void*)(uintptr_t)(a))
-#define e1000_writew(v, a) writew((v), (volatile void*)(uintptr_t)(a))
-#define e1000_writel(v, a) writel((v), (volatile void*)(uintptr_t)(a))
-#define e1000_writell(v, a) writell((v), (volatile void*)(uintptr_t)(a))
+#define e1000_writeb(v, a) MmioWrite8(v, (MMIO_PTR uint8_t*)(a))
+#define e1000_writew(v, a) MmioWrite16(v, (MMIO_PTR uint16_t*)(a))
+#define e1000_writel(v, a) MmioWrite32(v, (MMIO_PTR uint32_t*)(a))
+#define e1000_writell(v, a) MmioWrite64(v, (MMIO_PTR uint64_t*)(a))
 
-#define e1000_readb(a) readb((const volatile void*)(uintptr_t)(a))
-#define e1000_readw(a) readw((const volatile void*)(uintptr_t)(a))
-#define e1000_readl(a) readl((const volatile void*)(uintptr_t)(a))
-#define e1000_readll(a) readll((const volatile void*)(uintptr_t)(a))
+#define e1000_readb(a) MmioRead8((MMIO_PTR uint8_t*)(a))
+#define e1000_readw(a) MmioRead16((MMIO_PTR uint16_t*)(a))
+#define e1000_readl(a) MmioRead32((MMIO_PTR uint32_t*)(a))
+#define e1000_readll(a) MmioRead64((MMIO_PTR uint64_t*)(a))
 
 #define E1000_REGISTER(hw, reg) \
   (((hw)->mac.type >= e1000_82543) ? (u32)(reg) : e1000_translate_register_82542(reg))
@@ -196,4 +203,4 @@ struct e1000_osdep {
 
 #define ASSERT_NO_LOCKS()
 
-#endif /* _FUCHSIA_OS_H_ */
+#endif  // ZIRCON_THIRD_PARTY_DEV_ETHERNET_E1000_E1000_OSDEP_H_

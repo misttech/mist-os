@@ -3,17 +3,26 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/e1000.so",
         bind: "meta/bind/e1000_bind.bindbc",
         colocate: "false",
-        compat: "driver/e1000.so",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.network.driver.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.pci.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.network.driver.Service",
+            from: "self",
+        },
     ],
 }

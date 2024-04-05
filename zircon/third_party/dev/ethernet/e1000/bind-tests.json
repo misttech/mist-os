@@ -24,7 +24,7 @@
                 "name": "WrongProtocol",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.usb.BIND_PROTOCOL.INTERFACE"
+                    "fuchsia.hardware.usb.Service": "fuchsia.hardware.usb.Service.ZirconTransport"
                 }
             },
             {
@@ -40,7 +40,7 @@
                 "name": "UnsupportedDevice",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.hardware.pci.Service": "fuchsia.hardware.pci.Service.ZirconTransport",
+                    "fuchsia.hardware.pci.Service": "fuchsia.hardware.usb.Service.ZirconTransport",
                     "fuchsia.BIND_PCI_VID": "0x8086",
                     "fuchsia.BIND_PCI_DID": "0x24fd"
                 }

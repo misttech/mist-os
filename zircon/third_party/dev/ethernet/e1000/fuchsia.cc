@@ -26,86 +26,58 @@
  * SUCH DAMAGE.
  */
 
+#include "fuchsia.h"
+
+#include <fidl/fuchsia.hardware.network.driver/cpp/driver/fidl.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/async/cpp/task.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/pci/hw.h>
-#include <lib/sync/cpp/completion.h>
+#include <net/ethernet.h>
 #include <zircon/hw/pci.h>
 #include <zircon/syscalls/pci.h>
 
-#include <mutex>
+#include <fbl/auto_lock.h>
 
-#include "e1000_api.h"
-#include "src/lib/listnode/listnode.h"
+#include "support.h"
 
-typedef enum {
-  ETH_RUNNING = 0,
-  ETH_SUSPENDING,
-  ETH_SUSPENDED,
-} eth_state;
+#define I210_LINK_DELAY 1000
 
-#define IFF_PROMISC 0x100
-#define IFF_ALLMULTI 0x200
-
-#define em_mac_min e1000_82547
-#define igb_mac_min e1000_82575
-
-#define EM_RADV 64
-#define EM_RDTR 0
+/* PCI Config defines */
+#define EM_BAR_TYPE(v) ((v) & EM_BAR_TYPE_MASK)
+#define EM_BAR_TYPE_MASK 0x00000001
+#define EM_BAR_TYPE_MMEM 0x00000000
+#define EM_BAR_TYPE_IO 0x00000001
+#define EM_BAR_TYPE_FLASH 0x0014
+#define EM_BAR_MEM_TYPE(v) ((v) & EM_BAR_MEM_TYPE_MASK)
+#define EM_BAR_MEM_TYPE_MASK 0x00000006
+#define EM_BAR_MEM_TYPE_32BIT 0x00000000
+#define EM_BAR_MEM_TYPE_64BIT 0x00000004
+#define EM_MSIX_BAR 3 /* On 82575 */
 
 #define IGB_RX_PTHRESH \
   ((hw->mac.type == e1000_i354) ? 12 : ((hw->mac.type <= e1000_82576) ? 16 : 8))
 #define IGB_RX_HTHRESH 8
 #define IGB_RX_WTHRESH ((hw->mac.type == e1000_82576) ? 1 : 4)
 
-#define IGB_TX_PTHRESH ((hw->mac.type == e1000_i354) ? 20 : 8)
-#define IGB_TX_HTHRESH 1
-#define IGB_TX_WTHRESH ((hw->mac.type != e1000_82575) ? 1 : 16)
+#define EM_RADV 64
+#define EM_RDTR 0
 
 #define MAX_INTS_PER_SEC 8000
 #define DEFAULT_ITR (1000000000 / (MAX_INTS_PER_SEC * 256))
 
-/* PCI Config defines */
-#define EM_BAR_TYPE(v) ((v)&EM_BAR_TYPE_MASK)
-#define EM_BAR_TYPE_MASK 0x00000001
-#define EM_BAR_TYPE_MMEM 0x00000000
-#define EM_BAR_TYPE_IO 0x00000001
-#define EM_BAR_TYPE_FLASH 0x0014
-#define EM_BAR_MEM_TYPE(v) ((v)&EM_BAR_MEM_TYPE_MASK)
-#define EM_BAR_MEM_TYPE_MASK 0x00000006
-#define EM_BAR_MEM_TYPE_32BIT 0x00000000
-#define EM_BAR_MEM_TYPE_64BIT 0x00000004
-#define EM_MSIX_BAR 3 /* On 82575 */
-
-#define ETH_MTU 1500
-
-/* tunables */
-#define ETH_RXBUF_SIZE 2048
-#define ETH_RXHDR_SIZE 256
-#define ETH_RXBUF_COUNT 128
-
-#define ETH_TXBUF_SIZE 2048
-#define ETH_TXBUF_COUNT 32
-#define ETH_TXBUF_HSIZE 128
-#define ETH_TXBUF_DSIZE (ETH_TXBUF_SIZE - ETH_TXBUF_HSIZE)
-
-#define ETH_DRING_SIZE 2048
-
-#define ETH_ALLOC                                                            \
-  ((ETH_RXBUF_SIZE * ETH_RXBUF_COUNT) + (ETH_RXHDR_SIZE * ETH_RXBUF_COUNT) + \
-   (ETH_TXBUF_SIZE * ETH_TXBUF_COUNT) + (ETH_DRING_SIZE * 2))
-
-struct framebuf {
-  list_node_t node;
-  uintptr_t phys;
-  void* data;
-  size_t size;
+// The io-buffer lib uses DFv1 logging which needs this symbol to link.
+__EXPORT
+__WEAK zx_driver_rec __zircon_driver_rec__ = {
+    .ops = {},
+    .driver = {},
 };
 
 template <typename PtrType, typename UintType>
@@ -113,518 +85,770 @@ PtrType* PtrAdd(PtrType* ptr, UintType value) {
   return reinterpret_cast<PtrType*>(reinterpret_cast<uintptr_t>(ptr) + value);  // NOLINT
 }
 
-/*
- * See Intel 82574 Driver Programming Interface Manual, Section 10.2.6.9
- */
-#define TARC_SPEED_MODE_BIT (1 << 21) /* On PCI-E MACs only */
-#define TARC_ERRATA_BIT (1 << 26)     /* Note from errata on 82574 */
+namespace e1000 {
 
-struct txrx_funcs;
+namespace netdev = fuchsia_hardware_network;
+namespace netdriver = fuchsia_hardware_network_driver;
 
-struct adapter {
-  struct e1000_hw hw;
-  struct e1000_osdep osdep;
-  std::mutex lock;
-  zx_device_t* zxdev;
-  thrd_t thread;
-  zx_handle_t irqh;
-  zx_handle_t btih;
-  io_buffer_t buffer;
-  list_node_t free_frames;
-  list_node_t busy_frames;
-
-  // tx/rx descriptor rings
-  struct e1000_tx_desc* txd;
-  struct e1000_rx_desc* rxd;
-
-  // base physical addresses for
-  // tx/rx rings and rx buffers
-  // store as 64bit integer to match hw register size
-  uint64_t txd_phys;
-  uint64_t rxd_phys;
-  uint64_t rxb_phys;
-  uint64_t rxh_phys;
-  void* rxb;
-  void* rxh;
-  bool online;
-
-  eth_state state;
-
-  // callback interface to attached ethernet layer
-  ethernet_ifc_protocol_t ifc;
-
-  uint32_t tx_wr_ptr;
-  uint32_t tx_rd_ptr;
-  uint32_t rx_rd_ptr;
-
-  std::mutex send_lock;
-
-  std::optional<fdf::MmioBuffer> bar0_mmio;
-  std::optional<fdf::MmioBuffer> flash_mmio;
-  struct txrx_funcs* txrx;
-
-  pci_interrupt_mode_t irq_mode;
-
-  fdf::Dispatcher irq_dispatcher{nullptr};
-  libsync::Completion irq_dispatcher_shutdown;
-};
-
-namespace {
-
-void reap_tx_buffers(struct adapter* adapter) {
-  uint32_t n = adapter->tx_rd_ptr;
-  for (;;) {
-    struct e1000_tx_desc* desc = &adapter->txd[n];
-    if (!(desc->upper.fields.status & E1000_TXD_STAT_DD)) {
-      break;
-    }
-    struct framebuf* frame = list_remove_head_type(&adapter->busy_frames, struct framebuf, node);
-    if (frame == NULL) {
-      ZX_PANIC("e1000: frame is invalid");
-    }
-    // TODO: verify that this is the matching buffer to txd[n] addr?
-    list_add_tail(&adapter->free_frames, &frame->node);
-    desc->upper.fields.status = 0;
-    n = (n + 1) & (ETH_TXBUF_COUNT - 1);
-  }
-  adapter->tx_rd_ptr = n;
-}
-
-void shutdown_dispatcher_sync(struct adapter* adapter) {
-  if (adapter->irq_dispatcher.get()) {
-    adapter->irq_dispatcher.ShutdownAsync();
-    adapter->irq_dispatcher_shutdown.Wait();
-    adapter->irq_dispatcher.close();
-  }
-}
-
-void e1000_release(void* ctx) {
-  DEBUGOUT("entry");
-  auto* adapter = reinterpret_cast<struct adapter*>(ctx);
-  e1000_reset_hw(&adapter->hw);
-  e1000_pci_set_bus_mastering(adapter->osdep.pci, false);
-
-  io_buffer_release(&adapter->buffer);
-
-  zx_handle_close(adapter->btih);
-  zx_handle_close(adapter->irqh);
-  e1000_pci_free(adapter->osdep.pci);
-
-  shutdown_dispatcher_sync(adapter);
-
-  delete adapter;
-}
-
-void e1000_suspend(void* ctx, uint8_t requested_state, bool enable_wake, uint8_t suspend_reason) {
-  DEBUGOUT("entry");
-  auto* adapter = reinterpret_cast<struct adapter*>(ctx);
-
-  // e1000_release will destroy the adapter pointer, keep the zx_device pointer around for the
-  // suspend reply.
-  zx_device_t* zxdev = adapter->zxdev;
-
-  // Resume isn't supported in DFv1, which this driver is written for. Suspend is therefore only
-  // called on reboot or shutdown in which case we should treat the suspend as a release to ensure
-  // that the dispatcher is shut down correctly.
-  e1000_release(ctx);
-
-  device_suspend_reply(zxdev, ZX_OK, requested_state);
-}
-
-zx_protocol_device_t e1000_device_ops = {
-    .version = DEVICE_OPS_VERSION,
-    .release = e1000_release,
-    .suspend = e1000_suspend,
-};
-
-}  // namespace
-
-struct txrx_funcs {
-  zx_status_t (*eth_rx)(struct adapter* adapter, void** data, size_t* len);
-  void (*eth_rx_ack)(struct adapter* adapter);
-  void (*rxd_setup)(struct adapter* adapter);
-};
-
-zx_status_t igb_eth_rx(struct adapter* adapter, void** data, size_t* len) {
-  uint32_t n = adapter->rx_rd_ptr;
-  union e1000_adv_rx_desc* desc = (union e1000_adv_rx_desc*)&adapter->rxd[n];
-
-  if (!(desc->wb.upper.status_error & E1000_RXD_STAT_DD)) {
-    return ZX_ERR_SHOULD_WAIT;
+// A class meant to help make calls to CompleteTx and ensure that they follow the batching limits
+// imposed by the netdev protocol. Intended for creation of a temporary object each time CompleteTx
+// needs to be called. When all results have been pushed to the transaction the caller must call
+// Commit to finish the transaction. Note that Commit may also be called as part of Push if the
+// batch limit is reached.
+class CompleteTxTransaction {
+ public:
+  CompleteTxTransaction(struct adapter& adapter, fdf::Arena& arena)
+      : adapter_(adapter), arena_(arena), tx_results_(adapter.tx_results) {}
+  ~CompleteTxTransaction() {
+    ZX_DEBUG_ASSERT_MSG_COND(count_ == 0, "%zu uncommitted TX results left in transaction", count_);
   }
 
-  // copy out packet
-  *data = PtrAdd(adapter->rxb, ETH_RXBUF_SIZE * n);
-  *len = desc->wb.upper.length;
-
-  return ZX_OK;
-}
-
-void igb_eth_rx_ack(struct adapter* adapter) {
-  uint32_t n = adapter->rx_rd_ptr;
-  union e1000_adv_rx_desc* desc = (union e1000_adv_rx_desc*)&adapter->rxd[n];
-
-  // make buffer available to hw
-  desc->read.pkt_addr = adapter->rxb_phys + ETH_RXBUF_SIZE * n;
-  desc->read.hdr_addr = adapter->rxh_phys + ETH_RXHDR_SIZE * n;
-}
-
-void igb_rxd_setup(struct adapter* adapter) {
-  union e1000_adv_rx_desc* rxd = (union e1000_adv_rx_desc*)adapter->rxd;
-
-  for (int n = 0; n < ETH_RXBUF_COUNT; n++) {
-    rxd[n].read.pkt_addr = adapter->rxb_phys + ETH_RXBUF_SIZE * n;
-    rxd[n].read.hdr_addr = adapter->rxh_phys + ETH_RXHDR_SIZE * n;
-  }
-}
-
-struct txrx_funcs igb_txrx = {
-    .eth_rx = igb_eth_rx, .eth_rx_ack = igb_eth_rx_ack, .rxd_setup = igb_rxd_setup};
-
-zx_status_t em_eth_rx(struct adapter* adapter, void** data, size_t* len) {
-  uint32_t n = adapter->rx_rd_ptr;
-  union e1000_rx_desc_extended* desc = (union e1000_rx_desc_extended*)&adapter->rxd[n];
-
-  if (!(desc->wb.upper.status_error & E1000_RXD_STAT_DD)) {
-    return ZX_ERR_SHOULD_WAIT;
-  }
-
-  // copy out packet
-  *data = PtrAdd(adapter->rxb, ETH_RXBUF_SIZE * n);
-  *len = desc->wb.upper.length;
-
-  return ZX_OK;
-}
-
-void em_eth_rx_ack(struct adapter* adapter) {
-  uint32_t n = adapter->rx_rd_ptr;
-  union e1000_rx_desc_extended* desc = (union e1000_rx_desc_extended*)&adapter->rxd[n];
-
-  /* Zero out the receive descriptors status. */
-  desc->read.buffer_addr = adapter->rxb_phys + ETH_RXBUF_SIZE * n;
-  desc->wb.upper.status_error = 0;
-}
-
-void em_rxd_setup(struct adapter* adapter) {
-  union e1000_rx_desc_extended* rxd = (union e1000_rx_desc_extended*)adapter->rxd;
-
-  for (int n = 0; n < ETH_RXBUF_COUNT; n++) {
-    rxd[n].read.buffer_addr = adapter->rxb_phys + ETH_RXBUF_SIZE * n;
-    /* DD bits must be cleared */
-    rxd[n].wb.upper.status_error = 0;
-  }
-}
-
-struct txrx_funcs em_txrx = {
-    .eth_rx = em_eth_rx, .eth_rx_ack = em_eth_rx_ack, .rxd_setup = em_rxd_setup};
-
-zx_status_t lem_eth_rx(struct adapter* adapter, void** data, size_t* len) {
-  uint32_t n = adapter->rx_rd_ptr;
-  struct e1000_rx_desc* desc = &adapter->rxd[n];
-
-  if (!(desc->status & E1000_RXD_STAT_DD)) {
-    return ZX_ERR_SHOULD_WAIT;
-  }
-
-  // copy out packet
-  *data = PtrAdd(adapter->rxb, ETH_RXBUF_SIZE * n);
-  *len = desc->length;
-
-  return ZX_OK;
-}
-
-void lem_eth_rx_ack(struct adapter* adapter) {
-  uint32_t n = adapter->rx_rd_ptr;
-  struct e1000_rx_desc* desc = &adapter->rxd[n];
-
-  /* Zero out the receive descriptors status. */
-  desc->status = 0;
-}
-
-void lem_rxd_setup(struct adapter* adapter) {
-  struct e1000_rx_desc* rxd = adapter->rxd;
-
-  for (int n = 0; n < ETH_RXBUF_COUNT; n++) {
-    rxd[n].buffer_addr = adapter->rxb_phys + ETH_RXBUF_SIZE * n;
-    /* status bits must be cleared */
-    rxd[n].status = 0;
-  }
-}
-
-struct txrx_funcs lem_txrx = {
-    .eth_rx = lem_eth_rx, .eth_rx_ack = lem_eth_rx_ack, .rxd_setup = lem_rxd_setup};
-
-bool e1000_status_online(struct adapter* adapter) {
-  return E1000_READ_REG(&adapter->hw, E1000_STATUS) & E1000_STATUS_LU;
-}
-
-static int e1000_irq_thread(void* arg) {
-  auto* adapter = reinterpret_cast<struct adapter*>(arg);
-  struct e1000_hw* hw = &adapter->hw;
-  for (;;) {
-    zx_status_t r;
-    r = zx_interrupt_wait(adapter->irqh, NULL);
-    if (r != ZX_OK) {
-      DEBUGOUT("irq wait failed? %d", r);
-      break;
-    }
-    adapter->lock.lock();
-    unsigned irq = E1000_READ_REG(hw, E1000_ICR);
-    if (irq & E1000_ICR_RXT0) {
-      void* data;
-      size_t len;
-
-      while (adapter->txrx->eth_rx(adapter, &data, &len) == ZX_OK) {
-        if (adapter->ifc.ops && (adapter->state == ETH_RUNNING)) {
-          ethernet_ifc_recv(&adapter->ifc, reinterpret_cast<const uint8_t*>(data), len, 0);
-        }
-        adapter->txrx->eth_rx_ack(adapter);
-        uint32_t n = adapter->rx_rd_ptr;
-        E1000_WRITE_REG(&adapter->hw, E1000_RDT(0), n);
-        n = (n + 1) & (ETH_RXBUF_COUNT - 1);
-        adapter->rx_rd_ptr = n;
+  void Push(uint32_t id, zx_status_t status) {
+    tx_results_[count_].id = id;
+    tx_results_[count_].status = status;
+    ++count_;
+    if constexpr (kTxDepth > kTxResultsPerBatch) {
+      if (count_ == kTxResultsPerBatch) {
+        Commit();
       }
     }
-    if (irq & E1000_ICR_LSC) {
-      bool was_online = adapter->online;
-      bool online = e1000_status_online(adapter);
-      DEBUGOUT("ETH_IRQ_LSC fired: %d->%d", was_online, online);
-      if (online != was_online) {
-        adapter->online = online;
-        if (adapter->ifc.ops) {
-          ethernet_ifc_status(&adapter->ifc, online ? ETHERNET_STATUS_ONLINE : 0);
-        }
+  }
+
+  void Commit() {
+    if (count_ == 0) {
+      return;
+    }
+    tx_results_.set_count(count_);
+    if (fidl::OneWayStatus status = adapter_.ifc.buffer(arena_)->CompleteTx(tx_results_);
+        !status.ok()) {
+      FDF_LOG(ERROR, "Failed to complete TX: %s", status.FormatDescription().c_str());
+    }
+    count_ = 0;
+  }
+
+ private:
+  struct adapter& adapter_;
+  fdf::Arena& arena_;
+  fidl::VectorView<netdriver::wire::TxResult>& tx_results_;
+  size_t count_ = 0;
+};
+
+// A class meant to help make calls to CompleteRx and ensure that they follow the batching limits
+// imposed by the netdev protocol. Intended for creation of a temporary object each time CompleteRx
+// needs to be called. When all buffers have been pushed to the transaction the caller must call
+// Commit to finish the transaction. Note that Commit may also be called as part of Push if the
+// batch limit is reached.
+class CompleteRxTransaction {
+ public:
+  CompleteRxTransaction(struct adapter& adapter, fdf::Arena& arena)
+      : adapter_(adapter), arena_(arena), rx_buffers_(adapter.rx_buffers) {}
+  ~CompleteRxTransaction() {
+    ZX_DEBUG_ASSERT_MSG_COND(count_ == 0, "%zu uncommitted RX buffers left in transaction", count_);
+  }
+
+  void Push(uint32_t id, uint32_t length) {
+    rx_buffers_[count_].data[0].id = id;
+    rx_buffers_[count_].data[0].length = length;
+    ++count_;
+    if constexpr (kRxDepth > kRxBuffersPerBatch) {
+      if (count_ == kRxBuffersPerBatch) {
+        Commit();
       }
     }
-    if (adapter->irq_mode == PCI_INTERRUPT_MODE_LEGACY) {
-      e1000_pci_ack_interrupt(adapter->osdep.pci);
+  }
+
+  void Commit() {
+    if (count_ == 0) {
+      return;
     }
-    adapter->lock.unlock();
-  }
-  return 0;
-}
-
-static zx_status_t e1000_query(void* ctx, uint32_t options, ethernet_info_t* info) {
-  auto* adapter = reinterpret_cast<struct adapter*>(ctx);
-
-  if (options) {
-    return ZX_ERR_INVALID_ARGS;
+    rx_buffers_.set_count(count_);
+    if (fidl::OneWayStatus status = adapter_.ifc.buffer(arena_)->CompleteRx(rx_buffers_);
+        !status.ok()) {
+      FDF_LOG(ERROR, "Failed to complete RX: %s", status.FormatDescription().c_str());
+    }
+    count_ = 0;
   }
 
-  memset(info, 0, sizeof *info);
-  info->mtu = ETH_MTU;
-  memcpy(info->mac, adapter->hw.mac.addr, sizeof adapter->hw.mac.addr);
-  info->netbuf_size = sizeof(ethernet_netbuf_t);
+ private:
+  struct adapter& adapter_;
+  fdf::Arena& arena_;
+  fidl::VectorView<netdriver::wire::RxBuffer>& rx_buffers_;
+  size_t count_ = 0;
+};
 
-  return ZX_OK;
-}
-
-static void e1000_stop(void* ctx) {
-  auto* adapter = reinterpret_cast<struct adapter*>(ctx);
-  adapter->lock.lock();
-  adapter->ifc.ops = NULL;
-  adapter->lock.unlock();
-}
-
-static zx_status_t e1000_start(void* ctx, const ethernet_ifc_protocol_t* ifc) {
-  auto* adapter = reinterpret_cast<struct adapter*>(ctx);
-  zx_status_t status = ZX_OK;
-
-  adapter->lock.lock();
-  if (adapter->ifc.ops) {
-    status = ZX_ERR_BAD_STATE;
-  } else {
-    adapter->ifc = *ifc;
-    ethernet_ifc_status(&adapter->ifc, adapter->online ? ETHERNET_STATUS_ONLINE : 0);
-  }
-  adapter->lock.unlock();
-
-  return status;
-}
-
-zx_status_t eth_tx(struct adapter* adapter, const void* data, size_t len) {
-  if (len > ETH_TXBUF_DSIZE) {
-    DEBUGOUT("unsupported packet length %zu", len);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  std::lock_guard guard(adapter->send_lock);
-
-  reap_tx_buffers(adapter);
-
-  // obtain buffer, copy into it, setup descriptor
-  struct framebuf* frame = list_remove_head_type(&adapter->free_frames, struct framebuf, node);
-  if (frame == NULL) {
-    return ZX_ERR_NO_RESOURCES;
-  }
-
-  uint32_t n = adapter->tx_wr_ptr;
-  memcpy(frame->data, data, len);
-  // Pad out short packets.
-  if (len < 60) {
-    memset(PtrAdd(frame->data, len), 0, 60 - len);
-    len = 60;
-  }
-  struct e1000_tx_desc* desc = &adapter->txd[n];
-  desc->buffer_addr = frame->phys;
-  desc->lower.data = E1000_TXD_CMD_EOP | E1000_TXD_CMD_IFCS | E1000_TXD_CMD_RS | len;
-  list_add_tail(&adapter->busy_frames, &frame->node);
-
-  // inform hw of buffer availability
-  n = (n + 1) & (ETH_TXBUF_COUNT - 1);
-  adapter->tx_wr_ptr = n;
-  E1000_WRITE_REG(&adapter->hw, E1000_TDT(0), n);
-
-  return ZX_OK;
-}
-
-static void e1000_queue_tx(void* ctx, uint32_t options, ethernet_netbuf_t* netbuf,
-                           ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
-  auto* adapter = reinterpret_cast<struct adapter*>(ctx);
-  if (adapter->state != ETH_RUNNING) {
-    completion_cb(cookie, ZX_ERR_BAD_STATE, netbuf);
-    return;
-  }
-  // TODO: Add support for DMA directly from netbuf
-  zx_status_t status = eth_tx(adapter, netbuf->data_buffer, netbuf->data_size);
-  completion_cb(cookie, status, netbuf);
-}
-
-static zx_status_t e1000_set_param(void* ctx, uint32_t param, int32_t value, const uint8_t* data,
-                                   size_t data_size) {
-  return ZX_OK;
-}
-
-static ethernet_impl_protocol_ops_t e1000_ethernet_impl_ops = {.query = e1000_query,
-                                                               .stop = e1000_stop,
-                                                               .start = e1000_start,
-                                                               .queue_tx = e1000_queue_tx,
-                                                               .set_param = e1000_set_param};
-
-static void e1000_identify_hardware(struct adapter* adapter) {
-  struct e1000_pci* pci = adapter->osdep.pci;
+zx::result<> IdentifyHardware(struct e1000_pci* pci, struct e1000_hw& hw) {
   /* Make sure our PCI config space has the necessary stuff set */
-  e1000_pci_read_config16(pci, PCI_CONFIG_COMMAND, &adapter->hw.bus.pci_cmd_word);
+  e1000_read_pci_cfg(&hw, static_cast<uint16_t>(fuchsia_hardware_pci::Config::kCommand),
+                     &hw.bus.pci_cmd_word);
 
   /* Save off the information about this board */
-  pci_device_info_t pci_info;
-  zx_status_t status = e1000_pci_get_device_info(pci, &pci_info);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pci_get_device_info failure");
+  pci_device_info_t pci_info{};
+  if (zx_status_t status = e1000_pci_get_device_info(pci, &pci_info); status != ZX_OK) {
+    FDF_LOG(ERROR, "Could not get PCI device info: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  hw.vendor_id = pci_info.vendor_id;
+  hw.device_id = pci_info.device_id;
+  hw.revision_id = pci_info.revision_id;
+
+  e1000_read_pci_cfg(&hw, static_cast<uint16_t>(fuchsia_hardware_pci::Config::kSubsystemVendorId),
+                     &hw.subsystem_vendor_id);
+  e1000_read_pci_cfg(&hw, static_cast<uint16_t>(fuchsia_hardware_pci::Config::kSubsystemId),
+                     &hw.subsystem_device_id);
+
+  /* Do Shared Code Init and Setup */
+  if (e1000_set_mac_type(&hw)) {
+    FDF_LOG(ERROR, "e1000_set_mac_type init failure");
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  return zx::ok();
+}
+
+Driver::Driver(fdf::DriverStartArgs start_args,
+               fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : fdf::DriverBase("e1000", std::move(start_args), std::move(driver_dispatcher)) {}
+
+const adapter* Driver::Adapter() const { return device_->Adapter(); }
+
+adapter* Driver::Adapter() { return device_->Adapter(); }
+
+zx::result<> Driver::Start() {
+  if (device_) {
+    FDF_LOG(ERROR, "Driver already started");
+    return zx::error(ZX_ERR_ALREADY_EXISTS);
+  }
+  std::unique_ptr<adapter> adapter = std::make_unique<struct adapter>();
+  adapter->hw.back = &adapter->osdep;
+  adapter->hw.mac.max_frame_size = kMaxFrameSize;
+
+  auto compat_server = std::make_unique<compat::SyncInitializedDeviceServer>();
+
+  if (zx::result result = compat_server->Initialize(incoming(), outgoing(), node_name(), name());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to initialize compatibility server: %s", result.status_string());
+    return result.take_error();
+  }
+
+  zx::result pci_client_end = incoming()->Connect<fuchsia_hardware_pci::Service::Device>();
+  if (pci_client_end.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to PCI device: %s", pci_client_end.status_string());
+    return pci_client_end.take_error();
+  }
+
+  if (zx_status_t status = e1000_pci_create(std::move(pci_client_end.value()), &adapter->osdep.pci);
+      status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to create e1000 PCI struct: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  struct e1000_pci* pci = adapter->osdep.pci;
+
+  if (zx_status_t status = e1000_pci_set_bus_mastering(pci, true); status != ZX_OK) {
+    FDF_LOG(ERROR, "cannot enable bus mastering %d", status);
+    return zx::error(status);
+  }
+
+  if (zx_status_t status = e1000_pci_get_bti(pci, 0, adapter->bti.reset_and_get_address());
+      status != ZX_OK) {
+    FDF_LOG(ERROR, "failed to get BTI");
+    return zx::error(status);
+  }
+
+  // Request 1 interrupt of any mode.
+  pci_interrupt_mode_t irq_mode = PCI_INTERRUPT_MODE_DISABLED;
+  if (zx_status_t status = e1000_pci_configure_interrupt_mode(pci, 1, &irq_mode); status != ZX_OK) {
+    FDF_LOG(ERROR, "failed to configure irqs");
+    return zx::error(status);
+  }
+  adapter->irq_mode = fuchsia_hardware_pci::InterruptMode(irq_mode);
+  if (adapter->irq_mode.IsUnknown()) {
+    FDF_LOG(ERROR, "unknown interrupt mode: %u", irq_mode);
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  if (zx_status_t status = e1000_pci_map_interrupt(pci, 0, adapter->irq.reset_and_get_address());
+      status != ZX_OK) {
+    FDF_LOG(ERROR, "failed to map irq");
+    return zx::error(status);
+  }
+
+  if (zx::result<> result = IdentifyHardware(pci, adapter->hw); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to identify hardware: %s", result.status_string());
+    return result;
+  }
+
+  switch (adapter->hw.mac.type) {
+    case e1000_82573:
+    case e1000_82583:
+    case e1000_ich8lan:
+    case e1000_ich9lan:
+    case e1000_ich10lan:
+    case e1000_pchlan:
+    case e1000_pch2lan:
+    case e1000_pch_lpt:
+    case e1000_pch_spt:
+    case e1000_82575:
+    case e1000_82576:
+    case e1000_82580:
+    case e1000_i350:
+    case e1000_i354:
+    case e1000_i210:
+    case e1000_i211:
+    case e1000_vfadapt:
+    case e1000_vfadapt_i350:
+      adapter->has_amt = true;
+      break;
+    default:
+      break;
+  }
+
+  adapter->has_manage = e1000_enable_mng_pass_thru(&adapter->hw);
+
+  if (adapter->hw.mac.type >= igb_mac_min) {
+    device_ = std::make_unique<Device<e1000_adv_rx_desc>>(*this, std::move(adapter),
+                                                          std::move(compat_server));
+  } else if (adapter->hw.mac.type >= em_mac_min) {
+    device_ = std::make_unique<Device<e1000_rx_desc_extended>>(*this, std::move(adapter),
+                                                               std::move(compat_server));
+  } else {
+    device_ = std::make_unique<Device<e1000_rx_desc>>(*this, std::move(adapter),
+                                                      std::move(compat_server));
+  }
+  return device_->Start();
+}
+
+void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
+  device_->PrepareStop(std::move(completer));
+}
+
+template <typename RxDescriptor>
+Device<RxDescriptor>::Device(Driver& driver, std::unique_ptr<adapter>&& adapter,
+                             std::unique_ptr<compat::SyncInitializedDeviceServer>&& compat_server)
+    : DeviceBase(driver), adapter_(std::move(adapter)), compat_server_(std::move(compat_server)) {
+  for (auto& buffer : adapter_->rx_buffers) {
+    buffer = {
+        .meta = {.port = kPortId,
+                 .info = netdriver::wire::FrameInfo::WithNoInfo({}),
+                 .frame_type = netdev::wire::FrameType::kEthernet},
+        .data = {adapter_->rx_buffer_arena, 1},
+    };
+  }
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq_base,
+                                     zx_status_t status, const zx_packet_interrupt_t* interrupt) {
+  struct e1000_hw* hw = &adapter_->hw;
+  if (status != ZX_OK) [[unlikely]] {
+    FDF_LOG(ERROR, "irq wait failed? %s", zx_status_get_string(status));
     return;
   }
 
-  adapter->hw.vendor_id = pci_info.vendor_id;
-  adapter->hw.device_id = pci_info.device_id;
-  adapter->hw.revision_id = pci_info.revision_id;
-  e1000_pci_read_config16(pci, PCI_CONFIG_SUBSYS_VENDOR_ID, &adapter->hw.subsystem_vendor_id);
-  e1000_pci_read_config16(pci, PCI_CONFIG_SUBSYS_ID, &adapter->hw.subsystem_device_id);
+  auto ack_interrupt = fit::defer([&] {
+    adapter_->irq.ack();
+    if (adapter_->irq_mode == fuchsia_hardware_pci::InterruptMode::kLegacy) {
+      if (zx_status_t status = e1000_pci_ack_interrupt(adapter_->osdep.pci); status != ZX_OK) {
+        FDF_LOG(ERROR, "Failed to ack interrupt: %s", zx_status_get_string(status));
+      }
+    }
+  });
 
-  /* Do Shared Code Init and Setup */
-  if (e1000_set_mac_type(&adapter->hw)) {
-    zxlogf(ERROR, "e1000_set_mac_type init failure");
+  fdf::Arena arena('E1KD');
+
+  const unsigned irq = E1000_READ_REG(hw, E1000_ICR);
+
+  if (irq & E1000_ICR_RXT0) {
+    // Rx timer intr (ring 0)
+
+    uint16_t length = 0;
+    std::lock_guard lock(adapter_->rx_mutex);
+
+    CompleteRxTransaction transaction(*adapter_, arena);
+    for (; rx_ring_.Available(&length); rx_ring_.Pop()) {
+      transaction.Push(rx_ring_.HeadId(), length);
+    }
+    transaction.Commit();
+  }
+  if (irq & E1000_ICR_TXDW) {
+    // Transmit desc written back
+
+    std::lock_guard lock(adapter_->tx_mutex);
+
+    CompleteTxTransaction transaction(*adapter_, arena);
+    for (; tx_ring_.Available(); tx_ring_.Pop()) {
+      transaction.Push(tx_ring_.HeadId(), ZX_OK);
+    }
+    transaction.Commit();
+  }
+  if (irq & E1000_ICR_LSC) {
+    // Link status change
+    adapter_->hw.mac.get_link_status = true;
+    // Check link status asynchronously, this process can include sleeping and other delays, up to
+    // and including a full reset of the device. It will still happen in sequence with the interrupt
+    // handler (because it's using the same dispatcher) but it won't delay the interrupt ack.
+    on_link_state_change_task_.Post(dispatcher);
+  }
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::FlushTxQueue() {
+  fdf::Arena arena('E1KD');
+
+  CompleteTxTransaction transaction(*adapter_, arena);
+  for (; !tx_ring_.IsEmpty(); tx_ring_.Pop()) {
+    transaction.Push(tx_ring_.HeadId(), ZX_ERR_UNAVAILABLE);
+  }
+  transaction.Commit();
+  tx_ring_.Clear();
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::FlushRxSpace() {
+  fdf::Arena arena('E1KD');
+
+  CompleteRxTransaction transaction(*adapter_, arena);
+  for (; !rx_ring_.IsEmpty(); rx_ring_.Pop()) {
+    transaction.Push(rx_ring_.HeadId(), 0);
+  }
+  transaction.Commit();
+  rx_ring_.Clear();
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::UpdateOnlineStatus(bool perform_reset) {
+  struct e1000_hw* hw = &adapter_->hw;
+  bool link_check = false;
+
+  /* Get the cached link value or read phy for real */
+  switch (hw->phy.media_type) {
+    case e1000_media_type_copper:
+      if (hw->mac.get_link_status) {
+        if (hw->mac.type == e1000_pch_spt) {
+          msec_delay(50);
+        }
+        /* Do the work to read phy */
+        e1000_check_for_link(hw);
+        link_check = !hw->mac.get_link_status;
+        if (link_check) { /* ESB2 fix */
+          e1000_cfg_on_link_up(hw);
+        }
+      } else {
+        link_check = true;
+      }
+      break;
+    case e1000_media_type_fiber:
+      e1000_check_for_link(hw);
+      link_check = (E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_LU);
+      break;
+    case e1000_media_type_internal_serdes:
+      e1000_check_for_link(hw);
+      link_check = hw->mac.serdes_has_link;
+      break;
+    /* VF device is type_unknown */
+    case e1000_media_type_unknown:
+      e1000_check_for_link(hw);
+      link_check = !hw->mac.get_link_status;
+      __FALLTHROUGH;
+    default:
+      break;
+  }
+
+  /* Now check for a transition */
+  if (link_check && !online_) {
+    uint16_t link_speed = 0;
+    uint16_t link_duplex = 0;
+    e1000_get_speed_and_duplex(hw, &link_speed, &link_duplex);
+    /* Check if we must disable SPEED_MODE bit on PCI-E */
+    if ((link_speed != SPEED_1000) &&
+        ((hw->mac.type == e1000_82571) || (hw->mac.type == e1000_82572))) {
+      int tarc0;
+      tarc0 = E1000_READ_REG(hw, E1000_TARC(0));
+      tarc0 &= ~TARC_SPEED_MODE_BIT;
+      E1000_WRITE_REG(hw, E1000_TARC(0), tarc0);
+    }
+
+    /* Delay Link Up for Phy update */
+    if (((hw->mac.type == e1000_i210) || (hw->mac.type == e1000_i211)) &&
+        (hw->phy.id == I210_I_PHY_ID)) {
+      msec_delay(I210_LINK_DELAY);
+    }
+    /* Reset if the media type changed. */
+    if (hw->mac.type >= igb_mac_min && hw->dev_spec._82575.media_changed) {
+      hw->dev_spec._82575.media_changed = false;
+      adapter_->flags |= IGB_MEDIA_RESET;
+      std::lock_guard lock(adapter_->tx_mutex);
+      em_reset(adapter_.get(), tx_ring_);
+      FlushTxQueue();
+    }
+
+    if (perform_reset && adapter_->was_reset) {
+      e1000_clear_hw_cntrs_base_generic(&adapter_->hw);
+      e1000_disable_ulp_lpt_lp(&adapter_->hw, true);
+
+      {
+        std::lock_guard lock(mac_filter_mutex_);
+        SetMacFilterMode();
+      }
+
+      {
+        std::lock_guard lock(adapter_->tx_mutex);
+        InitializeTransmitUnit();
+      }
+
+      {
+        // Flush all queued RX space to get a clean start after re-initializing.
+        std::lock_guard lock(adapter_->rx_mutex);
+        FlushRxSpace();
+        InitializeReceiveUnit();
+      }
+      adapter_->was_reset = false;
+    }
+
+    online_ = true;
+
+    FDF_LOG(INFO, "Link is up %d Mbps %s", link_speed,
+            ((link_duplex == FULL_DUPLEX) ? "Full Duplex" : "Half Duplex"));
+
+    SendOnlineStatus(true);
+  } else if (!link_check && online_) {
+    FDF_LOG(INFO, "Link is down");
+    online_ = false;
+    SendOnlineStatus(false);
+    if (perform_reset) {
+      {
+        std::lock_guard lock(adapter_->tx_mutex);
+        em_reset(adapter_.get(), tx_ring_);
+
+        // Flush TX queue here since all those buffers are not going to be transmitted at this
+        // point. Do not flush the RX space however, doing so will just allow it to be queued up
+        // again making the flush pointless.
+        FlushTxQueue();
+      }
+
+      // Reset will disable interrupts, enable them again so we get link status change interrupts.
+      EnableInterrupts();
+      adapter_->was_reset = true;
+    }
+  }
+
+  /* Reset LAA into RAR[0] on 82571 */
+  if (hw->mac.type == e1000_82571 && e1000_get_laa_state_82571(hw)) {
+    e1000_rar_set(hw, hw->mac.addr, 0);
+  }
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::OnLinkStateChange(async_dispatcher_t*, async::TaskBase*, zx_status_t) {
+  UpdateOnlineStatus(true);
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::SendOnlineStatus(bool online) {
+  if (!adapter_->ifc.is_valid()) {
+    // This isn't an error. Status updates could happen before netdevice has fully started.
+    return;
+  }
+
+  fdf::Arena arena('E1KD');
+  auto builder = netdev::wire::PortStatus::Builder(arena);
+  builder.mtu(kEthMtu).flags(online_ ? netdev::wire::StatusFlags::kOnline
+                                     : netdev::wire::StatusFlags{});
+  if (fidl::OneWayStatus status =
+          adapter_->ifc.buffer(arena)->PortStatusChanged(kPortId, builder.Build());
+      !status.ok()) {
+    FDF_LOG(ERROR, "Failed to update port status: %s", status.FormatDescription().c_str());
     return;
   }
 }
 
-static zx_status_t e1000_allocate_pci_resources(struct adapter* adapter) {
-  struct e1000_pci* pci = adapter->osdep.pci;
-
-  zx_status_t status =
-      e1000_pci_map_bar_buffer(pci, 0u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &adapter->bar0_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pci_map_bar cannot map io %d", status);
-    return status;
+template <typename RxDescriptor>
+zx::result<> Device<RxDescriptor>::AllocatePciResources() {
+  if (zx_status_t status = e1000_pci_map_bar_buffer(
+          adapter_->osdep.pci, 0u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &adapter_->bar0_mmio);
+      status != ZX_OK) {
+    FDF_LOG(ERROR, "cannot map io %s", zx_status_get_string(status));
+    return zx::error(status);
   }
 
-  adapter->osdep.membase = (uintptr_t)adapter->bar0_mmio->get();
-  adapter->hw.hw_addr = (u8*)&adapter->osdep.membase;
+  adapter_->osdep.membase = static_cast<MMIO_PTR volatile uint8_t*>(adapter_->bar0_mmio->get());
+  // hw.hw_addr is never used for anything meaningful but it has to have a non-null value. There is
+  // one location where it's used to compute the flash address but that address is never used so
+  // this shouldn't matter. It used to be a pointer to the membase data member itself but that
+  // doesn't seem to make any sense if it was pointing to some mapped flash.
+  adapter_->hw.hw_addr = (u8*)adapter_->bar0_mmio->get();
 
   /* Only older adapters use IO mapping */
-  if (adapter->hw.mac.type < em_mac_min && adapter->hw.mac.type > e1000_82543) {
+  if (adapter_->hw.mac.type < em_mac_min && adapter_->hw.mac.type > e1000_82543) {
     /* Figure our where our IO BAR is. We've already mapped the first BAR as
      * MMIO, so it must be one of the remaining five. */
-    pci_bar_t bar = {};
     bool found_io_bar = false;
+    fidl::Arena arena;
     for (uint32_t i = 1; i < PCI_MAX_BAR_REGS; i++) {
-      if ((status = e1000_pci_get_bar(pci, i, &bar)) == ZX_OK && bar.type == PCI_BAR_TYPE_IO) {
-        adapter->osdep.iobase = bar.result.io.address;
-        adapter->hw.io_base = 0;
+      pci_bar_t bar;
+      if (zx_status_t status = e1000_pci_get_bar(adapter_->osdep.pci, i, &bar);
+          status == ZX_OK && bar.type == PCI_BAR_TYPE_IO) {
+        adapter_->osdep.iobase = bar.result.io.address;
+        adapter_->hw.io_base = 0;
         found_io_bar = true;
         break;
       }
     }
 
     if (!found_io_bar) {
-      zxlogf(ERROR, "Unable to locate IO BAR");
-      return ZX_ERR_IO_NOT_PRESENT;
+      FDF_LOG(ERROR, "Unable to locate IO BAR");
+      return zx::error(ZX_ERR_IO_NOT_PRESENT);
     }
   }
 
-  adapter->hw.back = &adapter->osdep;
-  return ZX_OK;
+  return zx::ok();
 }
 
-void e1000_setup_buffers(struct adapter* adapter, void* iomem, zx_paddr_t iophys) {
-  DEBUGOUT("iomem @%p (phys %" PRIxPTR ")", iomem, iophys);
+template <typename RxDescriptor>
+zx::result<> Device<RxDescriptor>::SetupDescriptors() {
+  const size_t rxd_ring_size = kRxDepth * sizeof(e1000_rx_desc);
+  const size_t txd_ring_size = kTxDepth * sizeof(e1000_tx_desc);
+  const size_t descriptor_buffer_size = txd_ring_size + rxd_ring_size;
 
-  list_initialize(&adapter->free_frames);
-  list_initialize(&adapter->busy_frames);
-
-  adapter->rxd = reinterpret_cast<e1000_rx_desc*>(iomem);
-  adapter->rxd_phys = iophys;
-  iomem = PtrAdd(iomem, ETH_DRING_SIZE);
-  iophys += ETH_DRING_SIZE;
-  memset(adapter->rxd, 0, ETH_DRING_SIZE);
-
-  adapter->txd = reinterpret_cast<e1000_tx_desc*>(iomem);
-  adapter->txd_phys = iophys;
-  iomem = PtrAdd(iomem, ETH_DRING_SIZE);
-  iophys += ETH_DRING_SIZE;
-  memset(adapter->txd, 0, ETH_DRING_SIZE);
-
-  adapter->rxb = iomem;
-  adapter->rxb_phys = iophys;
-  iomem = PtrAdd(iomem, ETH_RXBUF_SIZE * ETH_RXBUF_COUNT);
-  iophys += ETH_RXBUF_SIZE * ETH_RXBUF_COUNT;
-
-  adapter->rxh = iomem;
-  adapter->rxh_phys = iophys;
-  iomem = PtrAdd(iomem, ETH_RXHDR_SIZE * ETH_RXBUF_COUNT);
-  iophys += ETH_RXHDR_SIZE * ETH_RXBUF_COUNT;
-
-  adapter->txrx->rxd_setup(adapter);
-
-  for (int n = 0; n < ETH_TXBUF_COUNT - 1; n++) {
-    auto* txb = reinterpret_cast<struct framebuf*>(iomem);
-    txb->phys = iophys + ETH_TXBUF_HSIZE;
-    txb->size = ETH_TXBUF_SIZE - ETH_TXBUF_HSIZE;
-    txb->data = PtrAdd(iomem, ETH_TXBUF_HSIZE);
-    list_add_tail(&adapter->free_frames, &txb->node);
-
-    iomem = PtrAdd(iomem, ETH_TXBUF_SIZE);
-    iophys += ETH_TXBUF_SIZE;
+  if (zx_status_t status = io_buffer_init(&adapter_->buffer, adapter_->bti.get(),
+                                          descriptor_buffer_size, IO_BUFFER_RW | IO_BUFFER_CONTIG);
+      status != ZX_OK) {
+    FDF_LOG(ERROR, "cannot alloc io-buffer %d", status);
+    return zx::error(status);
   }
+
+  void* iomem = io_buffer_virt(&adapter_->buffer);
+  zx_paddr_t iophys = io_buffer_phys(&adapter_->buffer);
+
+  {
+    std::lock_guard lock(adapter_->rx_mutex);
+    memset(iomem, 0, rxd_ring_size);
+    rx_ring_.AssignDescriptorMmio(iomem);
+    adapter_->rxd_phys = iophys;
+    iomem = PtrAdd(iomem, rxd_ring_size);
+    iophys += rxd_ring_size;
+  }
+
+  {
+    std::lock_guard lock(adapter_->tx_mutex);
+    memset(iomem, 0, txd_ring_size);
+    tx_ring_.AssignDescriptorMmio(iomem);
+    adapter_->txd_phys = iophys;
+    iomem = PtrAdd(iomem, txd_ring_size);
+    iophys += txd_ring_size;
+  }
+
+  return zx::ok();
 }
 
-static void em_initialize_transmit_unit(struct adapter* adapter) {
-  struct e1000_hw* hw = &adapter->hw;
+template <typename RxDescriptor>
+zx::result<> Device<RxDescriptor>::Start() {
+  DEBUGOUT("Start entry");
+
+  vmo_store::Options options = {
+      .map =
+          vmo_store::MapOptions{
+              .vm_option = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_REQUIRE_NON_RESIZABLE,
+              .vmar = nullptr,
+          },
+      .pin =
+          vmo_store::PinOptions{
+              .bti = adapter_->bti.borrow(),
+              .bti_pin_options = ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE,
+              .index = true,
+          },
+  };
+
+  {
+    fbl::AutoLock vmo_lock(&vmo_lock_);
+    // Initialize VmoStore.
+    vmo_store_ = std::make_unique<VmoStore>(options);
+
+    if (zx_status_t status = vmo_store_->Reserve(netdriver::wire::kMaxVmos); status != ZX_OK) {
+      FDF_LOG(ERROR, "failed to reserve the capacity of VmoStore to max VMOs (%u): %s",
+              netdriver::wire::kMaxVmos, zx_status_get_string(status));
+      return zx::error(status);
+    }
+  }
+
+  if (zx::result<> result = AllocatePciResources(); result.is_error()) {
+    FDF_LOG(ERROR, "Allocation of PCI resources failed: %s", result.status_string());
+    return result;
+  }
+
+  struct e1000_hw* hw = &adapter_->hw;
+
+  /*
+  ** For ICH8 and family we need to
+  ** map the flash memory, and this
+  ** must happen after the MAC is
+  ** identified
+  */
+  if ((hw->mac.type == e1000_ich8lan) || (hw->mac.type == e1000_ich9lan) ||
+      (hw->mac.type == e1000_ich10lan) || (hw->mac.type == e1000_pchlan) ||
+      (hw->mac.type == e1000_pch2lan) || (hw->mac.type == e1000_pch_lpt)) {
+    if (zx_status_t status =
+            e1000_pci_map_bar_buffer(adapter_->osdep.pci, EM_BAR_TYPE_FLASH / 4,
+                                     ZX_CACHE_POLICY_UNCACHED_DEVICE, &adapter_->flash_mmio);
+        status != ZX_OK) {
+      FDF_LOG(ERROR, "Mapping of Flash failed");
+      return zx::error(status);
+    }
+    /* This is used in the shared code */
+    hw->flash_address = (u8*)adapter_->flash_mmio->get();
+    adapter_->osdep.flashbase = static_cast<MMIO_PTR uint8_t*>(adapter_->flash_mmio->get());
+  }
+  /*
+  ** In the new SPT device flash is not  a
+  ** separate BAR, rather it is also in BAR0,
+  ** so use the same tag and an offset handle for the
+  ** FLASH read/write macros in the shared code.
+  */
+  else if (hw->mac.type >= e1000_pch_spt) {
+    adapter_->osdep.flashbase = adapter_->osdep.membase + E1000_FLASH_BASE_ADDR;
+  }
+
+  s32 err = e1000_setup_init_funcs(hw, TRUE);
+  if (err) {
+    FDF_LOG(ERROR, "Setup of Shared code failed, error %d", err);
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  e1000_get_bus_info(hw);
+
+  hw->mac.autoneg = 1;
+  hw->phy.autoneg_wait_to_complete = FALSE;
+  hw->phy.autoneg_advertised = (ADVERTISE_10_HALF | ADVERTISE_10_FULL | ADVERTISE_100_HALF |
+                                ADVERTISE_100_FULL | ADVERTISE_1000_FULL);
+
+  /* Copper options */
+  if (hw->phy.media_type == e1000_media_type_copper) {
+    hw->phy.mdix = 0;
+    hw->phy.disable_polarity_correction = FALSE;
+    hw->phy.ms_type = e1000_ms_hw_default;
+  }
+
+  /*
+   * This controls when hardware reports transmit completion
+   * status.
+   */
+  hw->mac.report_tx_early = 1;
+
+  /* Check SOL/IDER usage */
+  if (e1000_check_reset_block(hw)) {
+    DEBUGOUT("PHY reset is blocked due to SOL/IDER session.");
+  }
+
+  /*
+  ** Start from a known state, this is
+  ** important in reading the nvm and
+  ** mac from that.eth_queue_tx
+  */
+  e1000_reset_hw(&adapter_->hw);
+
+  /* Make sure we have a good EEPROM before we read from it */
+  if (e1000_validate_nvm_checksum(hw) < 0) {
+    /*
+    ** Some PCI-E parts fail the first check due to
+    ** the link being in sleep state, call it again,
+    ** if it fails a second time its a real issue.
+    */
+    if (e1000_validate_nvm_checksum(hw) < 0) {
+      FDF_LOG(ERROR, "The EEPROM Checksum Is Not Valid");
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+  }
+
+  /* Copy the permanent MAC address out of the EEPROM */
+  if (e1000_read_mac_addr(hw) < 0) {
+    FDF_LOG(ERROR, "EEPROM read error while reading MAC address");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  {
+    std::lock_guard lock(adapter_->tx_mutex);
+    em_reset(adapter_.get(), tx_ring_);
+  }
+
+  adapter_->hw.mac.get_link_status = true;
+  UpdateOnlineStatus(false);
+
+  /* Non-AMT based hardware can now take control from firmware */
+  if (adapter_->has_manage && !adapter_->has_amt) {
+    em_get_hw_control(adapter_.get());
+  }
+
+  auto release_hw_control_on_failure = fit::defer([this]() {
+    if (adapter_->has_manage && !adapter_->has_amt) {
+      em_release_hw_control(adapter_.get());
+    }
+  });
+
+  if (zx::result result = SetupDescriptors(); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set up descriptors: %s", result.status_string());
+    return result.take_error();
+  }
+
+  if (zx::result<> result = AddNetworkDevice(); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add network device: %s", result.status_string());
+    return result.take_error();
+  }
+
+  irq_handler_.set_object(adapter_->irq.get());
+  if (zx_status_t status = irq_handler_.Begin(dispatcher()); status != ZX_OK) {
+    FDF_LOG(ERROR, "failed to begin IRQ handling: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  release_hw_control_on_failure.cancel();
+
+  DEBUGOUT("online");
+  return zx::ok();
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::PrepareStop(fdf::PrepareStopCompleter completer) {
+  irq_handler_.Cancel();
+  on_link_state_change_task_.Cancel();
+
+  em_release_hw_control(adapter_.get());
+
+  e1000_reset_hw(&adapter_->hw);
+
+  e1000_pci_set_bus_mastering(adapter_->osdep.pci, false);
+
+  io_buffer_release(&adapter_->buffer);
+
+  e1000_pci_free(adapter_->osdep.pci);
+
+  adapter_.reset();
+
+  completer(zx::ok());
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::InitializeTransmitUnit() {
+  struct e1000_hw* hw = &adapter_->hw;
   u32 tctl, txdctl = 0, tarc, tipg = 0;
 
   DEBUGOUT("em_initialize_transmit_unit: begin");
 
-  u64 bus_addr = adapter->txd_phys;
+  ZX_ASSERT(tx_ring_.IsEmpty());
+  tx_ring_.Clear();
+
+  const u64 bus_addr = adapter_->txd_phys;
 
   /* Base and Len of TX Ring */
-  E1000_WRITE_REG(hw, E1000_TDLEN(0), ETH_TXBUF_COUNT * sizeof(struct e1000_tx_desc));
+  E1000_WRITE_REG(hw, E1000_TDLEN(0), kTxDepth * sizeof(struct e1000_tx_desc));
   E1000_WRITE_REG(hw, E1000_TDBAH(0), (u32)(bus_addr >> 32));
   E1000_WRITE_REG(hw, E1000_TDBAL(0), (u32)bus_addr);
   /* Init the HEAD/TAIL indices */
   E1000_WRITE_REG(hw, E1000_TDT(0), 0);
   E1000_WRITE_REG(hw, E1000_TDH(0), 0);
 
-  DEBUGOUT("Base = %x, Length = %x", E1000_READ_REG(&adapter->hw, E1000_TDBAL(0)),
-           E1000_READ_REG(&adapter->hw, E1000_TDLEN(0)));
+  DEBUGOUT("Base = %x, Length = %x", E1000_READ_REG(hw, E1000_TDBAL(0)),
+           E1000_READ_REG(hw, E1000_TDLEN(0)));
   txdctl = 0;        /* clear txdctl */
   txdctl |= 0x1f;    /* PTHRESH */
   txdctl |= 1 << 8;  /* HTHRESH */
@@ -636,7 +860,7 @@ static void em_initialize_transmit_unit(struct adapter* adapter) {
   E1000_WRITE_REG(hw, E1000_TXDCTL(0), txdctl);
 
   /* Set the default values for the Tx Inter Packet Gap timer */
-  switch (adapter->hw.mac.type) {
+  switch (hw->mac.type) {
     case e1000_80003es2lan:
       tipg = DEFAULT_82543_TIPG_IPGR1;
       tipg |= DEFAULT_80003ES2LAN_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
@@ -647,50 +871,51 @@ static void em_initialize_transmit_unit(struct adapter* adapter) {
       tipg |= DEFAULT_82542_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
       break;
     default:
-      if ((adapter->hw.phy.media_type == e1000_media_type_fiber) ||
-          (adapter->hw.phy.media_type == e1000_media_type_internal_serdes))
+      if ((hw->phy.media_type == e1000_media_type_fiber) ||
+          (hw->phy.media_type == e1000_media_type_internal_serdes)) {
         tipg = DEFAULT_82543_TIPG_IPGT_FIBER;
-      else
+      } else {
         tipg = DEFAULT_82543_TIPG_IPGT_COPPER;
+      }
       tipg |= DEFAULT_82543_TIPG_IPGR1 << E1000_TIPG_IPGR1_SHIFT;
       tipg |= DEFAULT_82543_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
   }
 
-  E1000_WRITE_REG(&adapter->hw, E1000_TIPG, tipg);
-  E1000_WRITE_REG(&adapter->hw, E1000_TIDV, 0);
+  E1000_WRITE_REG(hw, E1000_TIPG, tipg);
+  E1000_WRITE_REG(hw, E1000_TIDV, 0);
 
-  if (adapter->hw.mac.type >= e1000_82540)
-    E1000_WRITE_REG(&adapter->hw, E1000_TADV, 0);
+  if (hw->mac.type >= e1000_82540)
+    E1000_WRITE_REG(hw, E1000_TADV, 0);
 
-  if ((adapter->hw.mac.type == e1000_82571) || (adapter->hw.mac.type == e1000_82572)) {
-    tarc = E1000_READ_REG(&adapter->hw, E1000_TARC(0));
+  if ((hw->mac.type == e1000_82571) || (hw->mac.type == e1000_82572)) {
+    tarc = E1000_READ_REG(hw, E1000_TARC(0));
     tarc |= TARC_SPEED_MODE_BIT;
-    E1000_WRITE_REG(&adapter->hw, E1000_TARC(0), tarc);
-  } else if (adapter->hw.mac.type == e1000_80003es2lan) {
+    E1000_WRITE_REG(hw, E1000_TARC(0), tarc);
+  } else if (hw->mac.type == e1000_80003es2lan) {
     /* errata: program both queues to unweighted RR */
-    tarc = E1000_READ_REG(&adapter->hw, E1000_TARC(0));
+    tarc = E1000_READ_REG(hw, E1000_TARC(0));
     tarc |= 1;
-    E1000_WRITE_REG(&adapter->hw, E1000_TARC(0), tarc);
-    tarc = E1000_READ_REG(&adapter->hw, E1000_TARC(1));
+    E1000_WRITE_REG(hw, E1000_TARC(0), tarc);
+    tarc = E1000_READ_REG(hw, E1000_TARC(1));
     tarc |= 1;
-    E1000_WRITE_REG(&adapter->hw, E1000_TARC(1), tarc);
-  } else if (adapter->hw.mac.type == e1000_82574) {
-    tarc = E1000_READ_REG(&adapter->hw, E1000_TARC(0));
+    E1000_WRITE_REG(hw, E1000_TARC(1), tarc);
+  } else if (hw->mac.type == e1000_82574) {
+    tarc = E1000_READ_REG(hw, E1000_TARC(0));
     tarc |= TARC_ERRATA_BIT;
-    E1000_WRITE_REG(&adapter->hw, E1000_TARC(0), tarc);
+    E1000_WRITE_REG(hw, E1000_TARC(0), tarc);
   }
 
   /* Program the Transmit Control Register */
-  tctl = E1000_READ_REG(&adapter->hw, E1000_TCTL);
+  tctl = E1000_READ_REG(hw, E1000_TCTL);
   tctl &= ~E1000_TCTL_CT;
   tctl |= (E1000_TCTL_PSP | E1000_TCTL_RTLC | E1000_TCTL_EN |
            (E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT));
 
-  if (adapter->hw.mac.type >= e1000_82571)
+  if (hw->mac.type >= e1000_82571)
     tctl |= E1000_TCTL_MULR;
 
   /* This write will effectively turn on the transmit unit. */
-  E1000_WRITE_REG(&adapter->hw, E1000_TCTL, tctl);
+  E1000_WRITE_REG(hw, E1000_TCTL, tctl);
 
   /* SPT and KBL errata workarounds */
   if (hw->mac.type == e1000_pch_spt) {
@@ -706,9 +931,13 @@ static void em_initialize_transmit_unit(struct adapter* adapter) {
   }
 }
 
-static void em_initialize_receive_unit(struct adapter* adapter) {
-  struct e1000_hw* hw = &adapter->hw;
+template <typename RxDescriptor>
+void Device<RxDescriptor>::InitializeReceiveUnit() {
+  struct e1000_hw* hw = &adapter_->hw;
   u32 rctl, rxcsum, rfctl;
+
+  ZX_ASSERT(rx_ring_.IsEmpty());
+  rx_ring_.Clear();
 
   /*
    * Make sure receives are disabled while setting
@@ -734,8 +963,8 @@ static void em_initialize_receive_unit(struct adapter* adapter) {
   /* Strip the CRC */
   rctl |= E1000_RCTL_SECRC;
 
-  if (adapter->hw.mac.type >= e1000_82540) {
-    E1000_WRITE_REG(&adapter->hw, E1000_RADV, EM_RADV);
+  if (hw->mac.type >= e1000_82540) {
+    E1000_WRITE_REG(hw, E1000_RADV, EM_RADV);
 
     /*
      * Set the interrupt throttling rate. Value is calculated
@@ -743,7 +972,7 @@ static void em_initialize_receive_unit(struct adapter* adapter) {
      */
     E1000_WRITE_REG(hw, E1000_ITR, DEFAULT_ITR);
   }
-  E1000_WRITE_REG(&adapter->hw, E1000_RDTR, EM_RDTR);
+  E1000_WRITE_REG(hw, E1000_RDTR, EM_RDTR);
 
   /* Use extended rx descriptor formats */
   rfctl = E1000_READ_REG(hw, E1000_RFCTL);
@@ -779,9 +1008,8 @@ static void em_initialize_receive_unit(struct adapter* adapter) {
   }
 
   /* Setup the Base and Length of the Rx Descriptor Ring */
-  u64 bus_addr = adapter->rxd_phys;
-  adapter->rx_rd_ptr = 0;
-  E1000_WRITE_REG(hw, E1000_RDLEN(0), ETH_RXBUF_COUNT * sizeof(union e1000_rx_desc_extended));
+  const u64 bus_addr = adapter_->rxd_phys;
+  E1000_WRITE_REG(hw, E1000_RDLEN(0), kRxDepth * sizeof(union e1000_rx_desc_extended));
   E1000_WRITE_REG(hw, E1000_RDBAH(0), (u32)(bus_addr >> 32));
   E1000_WRITE_REG(hw, E1000_RDBAL(0), (u32)bus_addr);
 
@@ -793,24 +1021,23 @@ static void em_initialize_receive_unit(struct adapter* adapter) {
    * settings.
    */
 
-  if (adapter->hw.mac.type == e1000_82574) {
+  if (hw->mac.type == e1000_82574) {
     u32 rxdctl = E1000_READ_REG(hw, E1000_RXDCTL(0));
     rxdctl |= 0x20;    /* PTHRESH */
     rxdctl |= 4 << 8;  /* HTHRESH */
     rxdctl |= 4 << 16; /* WTHRESH */
     rxdctl |= 1 << 24; /* Switch to granularity */
     E1000_WRITE_REG(hw, E1000_RXDCTL(0), rxdctl);
-  } else if (adapter->hw.mac.type >= igb_mac_min) {
+  } else if (hw->mac.type >= igb_mac_min) {
     u32 srrctl = 2048 >> E1000_SRRCTL_BSIZEPKT_SHIFT;
     rctl |= E1000_RCTL_SZ_2048;
 
     /* Setup the Base and Length of the Rx Descriptor Rings */
-    bus_addr = adapter->rxd_phys;
     u32 rxdctl;
 
     srrctl |= E1000_SRRCTL_DESCTYPE_ADV_ONEBUF;
 
-    E1000_WRITE_REG(hw, E1000_RDLEN(0), ETH_RXBUF_COUNT * sizeof(struct e1000_rx_desc));
+    E1000_WRITE_REG(hw, E1000_RDLEN(0), kRxDepth * sizeof(struct e1000_rx_desc));
     E1000_WRITE_REG(hw, E1000_RDBAH(0), (uint32_t)(bus_addr >> 32));
     E1000_WRITE_REG(hw, E1000_RDBAL(0), (uint32_t)bus_addr);
     E1000_WRITE_REG(hw, E1000_SRRCTL(0), srrctl);
@@ -828,270 +1055,427 @@ static void em_initialize_receive_unit(struct adapter* adapter) {
       rxdctl = E1000_READ_REG(hw, E1000_RXDCTL(0));
     } while (!(rxdctl & E1000_RXDCTL_QUEUE_ENABLE));
 
-  } else if (adapter->hw.mac.type >= e1000_pch2lan) {
+  } else if (hw->mac.type >= e1000_pch2lan) {
     e1000_lv_jumbo_workaround_ich8lan(hw, FALSE);
   }
 
   /* Make sure VLAN Filters are off */
   rctl &= ~E1000_RCTL_VFE;
 
-  if (adapter->hw.mac.type < igb_mac_min) {
+  if (hw->mac.type < igb_mac_min) {
     rctl |= E1000_RCTL_SZ_2048;
+    rctl &= ~E1000_RCTL_BSEX;
     /* ensure we clear use DTYPE of 00 here */
     rctl &= ~0x00000C00;
   }
 
   /* Setup the Head and Tail Descriptor Pointers */
   E1000_WRITE_REG(hw, E1000_RDH(0), 0);
-  E1000_WRITE_REG(hw, E1000_RDT(0), ETH_RXBUF_COUNT - 1);
+  E1000_WRITE_REG(hw, E1000_RDT(0), 0);
 
   /* Write out the settings */
   E1000_WRITE_REG(hw, E1000_RCTL, rctl);
-
-  return;
 }
 
-static void em_disable_promisc(struct adapter* adapter) {
-  u32 reg_rctl;
-
-  reg_rctl = E1000_READ_REG(&adapter->hw, E1000_RCTL);
-  reg_rctl &= (~E1000_RCTL_UPE);
-  reg_rctl &= (~E1000_RCTL_SBP);
-  E1000_WRITE_REG(&adapter->hw, E1000_RCTL, reg_rctl);
+template <typename RxDescriptor>
+void Device<RxDescriptor>::EnableInterrupts() {
+  E1000_WRITE_REG(&adapter_->hw, E1000_IMS, IMS_ENABLE_MASK);
+  E1000_WRITE_FLUSH(&adapter_->hw);
 }
 
-static int em_if_set_promisc(struct adapter* adapter, int flags) {
-  u32 reg_rctl;
-
-  em_disable_promisc(adapter);
-
-  reg_rctl = E1000_READ_REG(&adapter->hw, E1000_RCTL);
-
-  if (flags & IFF_PROMISC) {
-    reg_rctl |= (E1000_RCTL_UPE | E1000_RCTL_MPE);
-    E1000_WRITE_REG(&adapter->hw, E1000_RCTL, reg_rctl);
-  } else if (flags & IFF_ALLMULTI) {
-    reg_rctl |= E1000_RCTL_MPE;
-    reg_rctl &= ~E1000_RCTL_UPE;
-    E1000_WRITE_REG(&adapter->hw, E1000_RCTL, reg_rctl);
-  }
-  return (0);
+template <typename RxDescriptor>
+void Device<RxDescriptor>::DisableInterrupts() {
+  // Write all bits in the interrupt mask clear register to disable all interrupts.
+  E1000_WRITE_REG(&adapter_->hw, E1000_IMC, ~0u);
+  E1000_WRITE_FLUSH(&adapter_->hw);
 }
 
-static zx_status_t e1000_bind(void* ctx, zx_device_t* dev) {
-  DEBUGOUT("bind entry");
-
-  auto* adapter = new struct adapter {};
-  if (!adapter) {
-    return ZX_ERR_NO_MEMORY;
+template <typename RxDescriptor>
+zx::result<> Device<RxDescriptor>::AddNetworkDevice() {
+  auto netdev_dispatcher =
+      fdf::UnsynchronizedDispatcher::Create({}, "e1000-netdev", [](fdf_dispatcher_t*) {});
+  if (netdev_dispatcher.is_error()) {
+    FDF_LOG(ERROR, "Failed to create netdev dispatcher: %s", netdev_dispatcher.status_string());
+    return netdev_dispatcher.take_error();
   }
-  auto cleanup = fit::defer([&]() { e1000_release(adapter); });
+  netdev_dispatcher_ = std::move(netdev_dispatcher.value());
 
-  zx_status_t status = ZX_OK;
-  if ((status = e1000_pci_connect_fragment_protocol(dev, "pci", &adapter->osdep.pci)) != ZX_OK) {
-    zxlogf(ERROR, "no pci protocol (%d)", status);
-    return status;
-  }
+  netdriver::Service::InstanceHandler handler(
+      {.network_device_impl = [this](fdf::ServerEnd<netdriver::NetworkDeviceImpl> server_end) {
+        fdf::BindServer(netdev_dispatcher_.get(), std::move(server_end), this);
+      }});
 
-  struct e1000_pci* pci = adapter->osdep.pci;
-
-  status = e1000_pci_set_bus_mastering(pci, true);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "cannot enable bus master %d", status);
-    return status;
-  }
-
-  status = e1000_pci_get_bti(pci, 0, &adapter->btih);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to get BTI");
-    return status;
+  if (zx::result result = outgoing()->template AddService<netdriver::Service>(std::move(handler));
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add network device service to outgoing directory: %s",
+            result.status_string());
+    return result.take_error();
   }
 
-  // Request 1 interrupt of any mode.
-  status = e1000_pci_configure_interrupt_mode(pci, 1, &adapter->irq_mode);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to configure irqs");
-    return status;
+  fidl::Arena arena;
+  std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_->CreateOffers2(arena);
+  offers.push_back(fdf::MakeOffer2<netdriver::Service>(arena, component::kDefaultInstance));
+
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name("e1000")
+                  .offers2(arena, std::move(offers))
+                  .Build();
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (endpoints.is_error()) {
+    FDF_LOG(ERROR, "Failed to create node controller endpoints: %s", endpoints.status_string());
+    return endpoints.take_error();
   }
 
-  status = e1000_pci_map_interrupt(pci, 0, &adapter->irqh);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to map irq");
-    return status;
+  if (fidl::WireResult result =
+          fidl::WireCall(node())->AddChild(args, std::move(endpoints->server), {});
+      !result.ok()) {
+    FDF_LOG(ERROR, "Failed to add network device child: %s", result.FormatDescription().c_str());
+    return zx::error(result.status());
   }
 
-  e1000_identify_hardware(adapter);
-  status = e1000_allocate_pci_resources(adapter);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Allocation of PCI resources failed (%d)", status);
-    return status;
+  controller_.Bind(std::move(endpoints->client), dispatcher());
+
+  return zx::ok();
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::Init(netdriver::wire::NetworkDeviceImplInitRequest* request,
+                                fdf::Arena& arena, InitCompleter::Sync& completer) {
+  adapter_->ifc.Bind(std::move(request->iface), driver_dispatcher()->get());
+
+  auto endpoints = fdf::CreateEndpoints<netdriver::NetworkPort>();
+  if (endpoints.is_error()) {
+    FDF_LOG(ERROR, "Failed to create network port endpoints: %s", endpoints.status_string());
+    completer.buffer(arena).Reply(endpoints.status_value());
+    return;
+  }
+  fdf::BindServer(netdev_dispatcher_.get(), std::move(endpoints->server), this);
+
+  adapter_->ifc.buffer(arena)
+      ->AddPort(kPortId, std::move(endpoints->client))
+      .Then([completer = completer.ToAsync()](
+                fdf::WireUnownedResult<netdriver::NetworkDeviceIfc::AddPort>& result) mutable {
+        fdf::Arena arena(0u);
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Failed to add port: %s", result.FormatDescription().c_str());
+        }
+        completer.buffer(arena).Reply(result.status());
+      });
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::Start(fdf::Arena& arena, StartCompleter::Sync& completer) {
+  e1000_clear_hw_cntrs_base_generic(&adapter_->hw);
+  {
+    std::lock_guard lock(mac_filter_mutex_);
+    SetMacFilterMode();
   }
 
-  if (adapter->hw.mac.type >= igb_mac_min) {
-    adapter->txrx = &igb_txrx;
-  } else if (adapter->hw.mac.type >= em_mac_min) {
-    adapter->txrx = &em_txrx;
-  } else {
-    adapter->txrx = &lem_txrx;
+  /* AMT based hardware can now take control from firmware. */
+  if (adapter_->has_manage && adapter_->has_amt) {
+    em_get_hw_control(adapter_.get());
+    std::lock_guard lock(adapter_->tx_mutex);
+    em_reset(adapter_.get(), tx_ring_);
+    FlushTxQueue();
   }
 
-  struct e1000_hw* hw = &adapter->hw;
+  e1000_power_up_phy(&adapter_->hw);
+  e1000_disable_ulp_lpt_lp(&adapter_->hw, true);
 
-  /*
-  ** For ICH8 and family we need to
-  ** map the flash memory, and this
-  ** must happen after the MAC is
-  ** identified
-  */
-  if ((hw->mac.type == e1000_ich8lan) || (hw->mac.type == e1000_ich9lan) ||
-      (hw->mac.type == e1000_ich10lan) || (hw->mac.type == e1000_pchlan) ||
-      (hw->mac.type == e1000_pch2lan) || (hw->mac.type == e1000_pch_lpt)) {
-    status = e1000_pci_map_bar_buffer(pci, EM_BAR_TYPE_FLASH / 4, ZX_CACHE_POLICY_UNCACHED_DEVICE,
-                                      &adapter->flash_mmio);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Mapping of Flash failed");
-      return status;
+  {
+    std::lock_guard lock(adapter_->tx_mutex);
+    InitializeTransmitUnit();
+  }
+
+  {
+    std::lock_guard lock(adapter_->rx_mutex);
+    FlushRxSpace();
+    InitializeReceiveUnit();
+  }
+
+  EnableInterrupts();
+
+  adapter_->hw.mac.get_link_status = true;
+  UpdateOnlineStatus(false);
+
+  started_ = true;
+  completer.buffer(arena).Reply(ZX_OK);
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
+  started_ = false;
+  DisableInterrupts();
+
+  {
+    std::lock_guard lock(adapter_->rx_mutex);
+    FlushRxSpace();
+  }
+
+  {
+    std::lock_guard lock(adapter_->tx_mutex);
+    FlushTxQueue();
+  }
+
+  if (adapter_->has_manage && adapter_->has_amt) {
+    em_release_hw_control(adapter_.get());
+  }
+
+  completer.buffer(arena).Reply();
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::GetInfo(
+    fdf::Arena& arena,
+    fdf::WireServer<netdriver::NetworkDeviceImpl>::GetInfoCompleter::Sync& completer) {
+  fidl::WireTableBuilder builder = netdriver::wire::DeviceImplInfo::Builder(arena);
+
+  builder.tx_depth(kTxDepth)
+      .rx_depth(kRxDepth)
+      .rx_threshold(kRxDepth / 2)
+      .max_buffer_parts(1)
+      .max_buffer_length(kMaxBufferLength)
+      .buffer_alignment(ZX_PAGE_SIZE / 2)
+      .min_rx_buffer_length(kMinRxBufferLength)
+      .min_tx_buffer_length(kMinTxBufferLength)
+      .tx_head_length(0)
+      .tx_tail_length(0);
+
+  completer.buffer(arena).Reply(builder.Build());
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::QueueTx(netdriver::wire::NetworkDeviceImplQueueTxRequest* request,
+                                   fdf::Arena& arena, QueueTxCompleter::Sync& completer) {
+  std::lock_guard lock(adapter_->tx_mutex);
+
+  if (!started_.load(std::memory_order_relaxed) || !online_.load(std::memory_order_relaxed)) {
+    // Device is either not started or not online, cannot transmit data at this time.
+    CompleteTxTransaction transaction(*adapter_, arena);
+
+    for (const auto& buffer : request->buffers) {
+      transaction.Push(buffer.id, ZX_ERR_UNAVAILABLE);
     }
-    /* This is used in the shared code */
-    // TODO(https://fxbug.dev/42133972): Add MMIO_PTR to cast.
-    hw->flash_address = (uint8_t*)adapter->flash_mmio->get();
-    adapter->osdep.flashbase = (uintptr_t)adapter->flash_mmio->get();
-  }
-  /*
-  ** In the new SPT device flash is not  a
-  ** separate BAR, rather it is also in BAR0,
-  ** so use the same tag and an offset handle for the
-  ** FLASH read/write macros in the shared code.
-  */
-  else if (hw->mac.type >= e1000_pch_spt) {
-    adapter->osdep.flashbase = adapter->osdep.membase + E1000_FLASH_BASE_ADDR;
+    transaction.Commit();
+    return;
   }
 
-  s32 err = e1000_setup_init_funcs(hw, TRUE);
-  if (err) {
-    zxlogf(ERROR, "Setup of Shared code failed, error %d", err);
-    return status;
+  network::SharedAutoLock vmo_lock(&vmo_lock_);
+  for (const auto& buffer : request->buffers) {
+    const netdriver::wire::BufferRegion& region = buffer.data[0];
+
+    const zx_paddr_t physical_addr = GetPhysicalAddress(region);
+
+    const uint32_t next_tail = tx_ring_.Push(buffer.id, physical_addr, region.length);
+
+    // Write the next tail to TDT, it should point one step past the last valid TX descriptor. The
+    // tail returned by tx_ring_.Push matches this behavior.
+    E1000_WRITE_REG(&adapter_->hw, E1000_TDT(0), next_tail);
   }
+}
 
-  e1000_get_bus_info(hw);
+template <typename RxDescriptor>
+void Device<RxDescriptor>::QueueRxSpace(
+    netdriver::wire::NetworkDeviceImplQueueRxSpaceRequest* request, fdf::Arena& arena,
+    QueueRxSpaceCompleter::Sync& completer) {
+  network::SharedAutoLock vmo_lock(&vmo_lock_);
+  std::lock_guard lock(adapter_->rx_mutex);
+  for (const auto& buffer : request->buffers) {
+    const netdriver::wire::BufferRegion& region = buffer.region;
 
-  hw->mac.autoneg = 1;
-  hw->phy.autoneg_wait_to_complete = FALSE;
-  hw->phy.autoneg_advertised = (ADVERTISE_10_HALF | ADVERTISE_10_FULL | ADVERTISE_100_HALF |
-                                ADVERTISE_100_FULL | ADVERTISE_1000_FULL);
+    const zx_paddr_t physical_addr = GetPhysicalAddress(region);
 
-  /* Copper options */
-  if (hw->phy.media_type == e1000_media_type_copper) {
-    hw->phy.mdix = 0;
-    hw->phy.disable_polarity_correction = FALSE;
-    hw->phy.ms_type = e1000_ms_hw_default;
+    const uint32_t previous_tail = rx_ring_.Push(buffer.id, physical_addr);
+
+    // Write the previous tail to RDT, it should point to the last valid RX descriptor. The tail
+    // returned by rx_ring_.Push matches this behavior.
+    E1000_WRITE_REG(&adapter_->hw, E1000_RDT(0), previous_tail);
   }
+}
 
-  /*
-   * This controls when hardware reports transmit completion
-   * status.
-   */
-  hw->mac.report_tx_early = 1;
-
-  /* Check SOL/IDER usage */
-  if (e1000_check_reset_block(hw)) {
-    DEBUGOUT("PHY reset is blocked due to SOL/IDER session.");
+template <typename RxDescriptor>
+void Device<RxDescriptor>::PrepareVmo(netdriver::wire::NetworkDeviceImplPrepareVmoRequest* request,
+                                      fdf::Arena& arena, PrepareVmoCompleter::Sync& completer) {
+  fbl::AutoLock vmo_lock(&vmo_lock_);
+  size_t size;
+  request->vmo.get_size(&size);
+  if (zx_status_t status = vmo_store_->RegisterWithKey(request->id, std::move(request->vmo));
+      status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to register VMO %u: %s", request->id, zx_status_get_string(status));
+    completer.buffer(arena).Reply(status);
+    return;
   }
+  completer.buffer(arena).Reply(ZX_OK);
+}
 
-  /*
-  ** Start from a known state, this is
-  ** important in reading the nvm and
-  ** mac from that.eth_queue_tx
-  */
-  e1000_reset_hw(hw);
-  e1000_power_up_phy(hw);
-
-  /* Make sure we have a good EEPROM before we read from it */
-  if (e1000_validate_nvm_checksum(hw) < 0) {
-    /*
-    ** Some PCI-E parts fail the first check due to
-    ** the link being in sleep state, call it again,
-    ** if it fails a second time its a real issue.
-    */
-    if (e1000_validate_nvm_checksum(hw) < 0) {
-      zxlogf(ERROR, "The EEPROM Checksum Is Not Valid");
-      return ZX_ERR_BAD_STATE;
-    }
+template <typename RxDescriptor>
+void Device<RxDescriptor>::ReleaseVmo(netdriver::wire::NetworkDeviceImplReleaseVmoRequest* request,
+                                      fdf::Arena& arena, ReleaseVmoCompleter::Sync& completer) {
+  fbl::AutoLock vmo_lock(&vmo_lock_);
+  zx::result<zx::vmo> status = vmo_store_->Unregister(request->id);
+  if (status.status_value() != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to unregister VMO %u: %s", request->id, status.status_string());
   }
+  completer.buffer(arena).Reply();
+}
 
-  /* Copy the permanent MAC address out of the EEPROM */
-  if (e1000_read_mac_addr(hw) < 0) {
-    zxlogf(ERROR, "EEPROM read error while reading MAC address");
-    return ZX_ERR_BAD_STATE;
-  }
+template <typename RxDescriptor>
+void Device<RxDescriptor>::SetSnoop(netdriver::wire::NetworkDeviceImplSetSnoopRequest* request,
+                                    fdf::Arena& arena, SetSnoopCompleter::Sync& completer) {
+  // Not supported
+}
 
-  DEBUGOUT("MAC address %02x:%02x:%02x:%02x:%02x:%02x", hw->mac.addr[0], hw->mac.addr[1],
-           hw->mac.addr[2], hw->mac.addr[3], hw->mac.addr[4], hw->mac.addr[5]);
-
-  /* Disable ULP support */
-  e1000_disable_ulp_lpt_lp(hw, TRUE);
-
-  status =
-      io_buffer_init(&adapter->buffer, adapter->btih, ETH_ALLOC, IO_BUFFER_RW | IO_BUFFER_CONTIG);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "cannot alloc io-buffer %d", status);
-    return status;
-  }
-
-  e1000_setup_buffers(adapter, io_buffer_virt(&adapter->buffer), io_buffer_phys(&adapter->buffer));
-
-  /* Prepare transmit descriptors and buffers */
-  em_initialize_transmit_unit(adapter);
-
-  // setup rx ring
-  em_initialize_receive_unit(adapter);
-
-  /* Don't lose promiscuous settings */
-  em_if_set_promisc(adapter, IFF_PROMISC);
-  e1000_clear_hw_cntrs_base_generic(hw);
-
-  adapter->online = e1000_status_online(adapter);
-
-  device_add_args_t args = {
-      .version = DEVICE_ADD_ARGS_VERSION,
-      .name = "e1000",
-      .ctx = adapter,
-      .ops = &e1000_device_ops,
-      .proto_id = ZX_PROTOCOL_ETHERNET_IMPL,
-      .proto_ops = &e1000_ethernet_impl_ops,
+template <typename RxDescriptor>
+void Device<RxDescriptor>::GetInfo(
+    fdf::Arena& arena, fdf::WireServer<netdriver::NetworkPort>::GetInfoCompleter::Sync& completer) {
+  constexpr netdev::wire::FrameType kRxTypes[]{
+      netdev::wire::FrameType::kEthernet,
   };
+  constexpr netdev::wire::FrameTypeSupport kTxTypes[]{{
+      .type = netdev::wire::FrameType::kEthernet,
+      .features = netdev::wire::kFrameFeaturesRaw,
+  }};
 
-  status = device_add(dev, &args, &adapter->zxdev);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "device_add failed: %d", status);
-    return status;
-  }
+  fidl::WireTableBuilder builder = netdev::wire::PortBaseInfo::Builder(arena);
+  builder.port_class(netdev::wire::DeviceClass::kEthernet).tx_types(kTxTypes).rx_types(kRxTypes);
 
-  zx::result dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "e1000_irq_dispatcher",
-      [adapter](fdf_dispatcher_t*) { adapter->irq_dispatcher_shutdown.Signal(); });
-  if (dispatcher.is_error()) {
-    zxlogf(ERROR, "failed to create dispatcher: %s", dispatcher.status_string());
-    return dispatcher.status_value();
-  }
-  adapter->irq_dispatcher = std::move(dispatcher.value());
-
-  async::PostTask(adapter->irq_dispatcher.async_dispatcher(),
-                  [adapter] { e1000_irq_thread(adapter); });
-
-  // enable interrupts
-  u32 ims_mask = IMS_ENABLE_MASK;
-  E1000_WRITE_REG(hw, E1000_IMS, ims_mask);
-
-  cleanup.cancel();
-  DEBUGOUT("online");
-  return ZX_OK;
+  completer.buffer(arena).Reply(builder.Build());
 }
 
-static zx_driver_ops_t e1000_driver_ops = {
-    .version = DRIVER_OPS_VERSION,
-    .bind = e1000_bind,
-};
+template <typename RxDescriptor>
+void Device<RxDescriptor>::GetStatus(fdf::Arena& arena, GetStatusCompleter::Sync& completer) {
+  auto builder = netdev::wire::PortStatus::Builder(arena);
+  builder.mtu(kEthMtu).flags(online_ ? netdev::wire::StatusFlags::kOnline
+                                     : netdev::wire::StatusFlags{});
+
+  completer.buffer(arena).Reply(builder.Build());
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::SetActive(netdriver::wire::NetworkPortSetActiveRequest* request,
+                                     fdf::Arena& arena, SetActiveCompleter::Sync& completer) {
+  // Nothing to do.
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::GetMac(fdf::Arena& arena, GetMacCompleter::Sync& completer) {
+  zx::result endpoints = fdf::CreateEndpoints<netdriver::MacAddr>();
+  if (endpoints.is_error()) {
+    FDF_LOG(ERROR, "Failed to create MacAddr endpoints: %s", endpoints.status_string());
+    completer.Close(endpoints.error_value());
+    return;
+  }
+  fdf::BindServer(netdev_dispatcher_.get(), std::move(endpoints->server), this);
+  completer.buffer(arena).Reply(std::move(endpoints->client));
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::Removed(fdf::Arena& arena, RemovedCompleter::Sync& completer) {
+  // The driver never explicitly removes the port, nothing to do here.
+}
+
+// MacAddr protocol:
+template <typename RxDescriptor>
+void Device<RxDescriptor>::GetAddress(fdf::Arena& arena, GetAddressCompleter::Sync& completer) {
+  fuchsia_net::wire::MacAddress mac;
+  memcpy(mac.octets.data(), adapter_->hw.mac.addr, sizeof(adapter_->hw.mac.addr));
+  completer.buffer(arena).Reply(mac);
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::GetFeatures(fdf::Arena& arena, GetFeaturesCompleter::Sync& completer) {
+  fidl::WireTableBuilder builder = netdriver::wire::Features::Builder(arena);
+
+  builder.multicast_filter_count(kMaxMulticastFilters)
+      .supported_modes(netdriver::wire::SupportedMacFilterMode::kMulticastFilter |
+                       netdriver::wire::SupportedMacFilterMode::kMulticastPromiscuous |
+                       netdriver::wire::SupportedMacFilterMode::kPromiscuous);
+
+  completer.buffer(arena).Reply(builder.Build());
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::SetMode(netdriver::wire::MacAddrSetModeRequest* request,
+                                   fdf::Arena& arena, SetModeCompleter::Sync& completer) {
+  {
+    std::lock_guard lock(mac_filter_mutex_);
+    for (size_t i = 0; i < request->multicast_macs.count(); ++i) {
+      memcpy(&mac_filters_[i * ETH_ALEN], request->multicast_macs[i].octets.data(), ETH_ALEN);
+    }
+    mac_filter_mode_ = request->mode;
+    mac_filters_.resize(request->multicast_macs.count() * ETH_ALEN);
+    SetMacFilterMode();
+  }
+  completer.buffer(arena).Reply();
+}
+
+template <typename RxDescriptor>
+void Device<RxDescriptor>::SetMacFilterMode() {
+  if (adapter_->hw.mac.type == e1000_82542 && adapter_->hw.revision_id == E1000_REVISION_2) {
+    uint32_t workaround_rctl = E1000_READ_REG(&adapter_->hw, E1000_RCTL);
+    if (adapter_->hw.bus.pci_cmd_word & CMD_MEM_WRT_INVALIDATE) {
+      e1000_pci_clear_mwi(&adapter_->hw);
+    }
+    workaround_rctl |= E1000_RCTL_RST;
+    E1000_WRITE_REG(&adapter_->hw, E1000_RCTL, workaround_rctl);
+    msec_delay(5);
+    workaround_rctl = E1000_READ_REG(&adapter_->hw, E1000_RCTL);
+    workaround_rctl &= ~(E1000_RCTL_MPE | E1000_RCTL_UPE | E1000_RCTL_SBP);
+  }
+
+  const uint32_t filter_count = static_cast<uint32_t>(mac_filters_.size() / ETH_ALEN);
+  e1000_update_mc_addr_list(&adapter_->hw, mac_filters_.data(), filter_count);
+
+  // Set all flags disabled, then enabled them as needed depending on the mode.
+  uint32_t reg_rctl = E1000_READ_REG(&adapter_->hw, E1000_RCTL);
+  reg_rctl &= ~(E1000_RCTL_MPE | E1000_RCTL_UPE | E1000_RCTL_SBP);
+
+  switch (mac_filter_mode_) {
+    case netdev::wire::MacFilterMode::kMulticastFilter:
+      // Neither multicast nor unicast promiscuous should be enabled here
+      break;
+    case netdev::wire::MacFilterMode::kMulticastPromiscuous:
+      reg_rctl |= E1000_RCTL_MPE;  // Multicast promiscuous
+      break;
+    case netdev::wire::MacFilterMode::kPromiscuous:
+      reg_rctl |= (E1000_RCTL_MPE | E1000_RCTL_UPE);  // Multicast and unicast promiscuous
+      break;
+    default:
+      // Nothing to do, we already disabled promiscuous mode above.
+      break;
+  }
+
+  E1000_WRITE_REG(&adapter_->hw, E1000_RCTL, reg_rctl);
+
+  if (adapter_->hw.mac.type == e1000_82542 && adapter_->hw.revision_id == E1000_REVISION_2) {
+    uint32_t workaround_rctl = E1000_READ_REG(&adapter_->hw, E1000_RCTL);
+    workaround_rctl &= ~E1000_RCTL_RST;
+    E1000_WRITE_REG(&adapter_->hw, E1000_RCTL, workaround_rctl);
+    msec_delay(5);
+    if (adapter_->hw.bus.pci_cmd_word & CMD_MEM_WRT_INVALIDATE) {
+      e1000_pci_set_mwi(&adapter_->hw);
+    }
+  }
+}
+template <typename RxDescriptor>
+zx_paddr_t Device<RxDescriptor>::GetPhysicalAddress(
+    const fuchsia_hardware_network_driver::wire::BufferRegion& region) {
+  // Get physical address of buffers from region data.
+  VmoStore::StoredVmo* stored_vmo = vmo_store_->GetVmo(region.vmo);
+  ZX_ASSERT_MSG(stored_vmo != nullptr, "invalid VMO id %u", region.vmo);
+
+  fzl::PinnedVmo::Region phy_region;
+  size_t actual_regions = 0;
+  zx_status_t status =
+      stored_vmo->GetPinnedRegions(region.offset, region.length, &phy_region, 1, &actual_regions);
+  ZX_ASSERT_MSG(status == ZX_OK, "failed to retrieve pinned region %s (actual=%zu)",
+                zx_status_get_string(status), actual_regions);
+
+  return phy_region.phys_addr;
+}
+
+}  // namespace e1000
 
 // clang-format off
-ZIRCON_DRIVER(e1000, e1000_driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(::e1000::Driver);

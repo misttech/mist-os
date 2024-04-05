@@ -32,35 +32,64 @@
 
 ******************************************************************************/
 
-#ifndef _E1000_82571_H_
-#define _E1000_82571_H_
+#include "e1000_api.h"
 
-#define ID_LED_RESERVED_F746	0xF746
-#define ID_LED_DEFAULT_82573	((ID_LED_DEF1_DEF2 << 12) | \
-				 (ID_LED_OFF1_ON2  <<  8) | \
-				 (ID_LED_DEF1_DEF2 <<  4) | \
-				 (ID_LED_DEF1_DEF2))
+/*
+ * NOTE: the following routines using the e1000 
+ * 	naming style are provided to the shared
+ *	code but are OS specific
+ */
 
-#define E1000_GCR_L1_ACT_WITHOUT_L0S_RX	0x08000000
-#define AN_RETRY_COUNT		5 /* Autoneg Retry Count value */
+void
+e1000_write_pci_cfg(struct e1000_hw *hw, u32 reg, u16 *value)
+{
+	pci_write_config(((struct e1000_osdep *)hw->back)->dev, reg, *value, 2);
+}
 
-/* Intr Throttling - RW */
-#define E1000_EITR_82574(_n)	(0x000E8 + (0x4 * (_n)))
+void
+e1000_read_pci_cfg(struct e1000_hw *hw, u32 reg, u16 *value)
+{
+	*value = pci_read_config(((struct e1000_osdep *)hw->back)->dev, reg, 2);
+}
 
-#define E1000_EIAC_82574	0x000DC /* Ext. Interrupt Auto Clear - RW */
-#define E1000_EIAC_MASK_82574	0x01F00000
+void
+e1000_pci_set_mwi(struct e1000_hw *hw)
+{
+	pci_write_config(((struct e1000_osdep *)hw->back)->dev, PCIR_COMMAND,
+	    (hw->bus.pci_cmd_word | CMD_MEM_WRT_INVALIDATE), 2);
+}
 
-#define E1000_IVAR_INT_ALLOC_VALID	0x8
+void
+e1000_pci_clear_mwi(struct e1000_hw *hw)
+{
+	pci_write_config(((struct e1000_osdep *)hw->back)->dev, PCIR_COMMAND,
+	    (hw->bus.pci_cmd_word & ~CMD_MEM_WRT_INVALIDATE), 2);
+}
 
-/* Manageability Operation Mode mask */
-#define E1000_NVM_INIT_CTRL2_MNGM	0x6000
+/*
+ * Read the PCI Express capabilities
+ */
+int32_t
+e1000_read_pcie_cap_reg(struct e1000_hw *hw, u32 reg, u16 *value)
+{
+	device_t dev = ((struct e1000_osdep *)hw->back)->dev;
+	u32	offset;
 
-#define E1000_BASE1000T_STATUS		10
-#define E1000_IDLE_ERROR_COUNT_MASK	0xFF
-#define E1000_RECEIVE_ERROR_COUNTER	21
-#define E1000_RECEIVE_ERROR_MAX		0xFFFF
-bool e1000_check_phy_82574(struct e1000_hw *hw);
-bool e1000_get_laa_state_82571(struct e1000_hw *hw);
-void e1000_set_laa_state_82571(struct e1000_hw *hw, bool state);
+	pci_find_cap(dev, PCIY_EXPRESS, &offset);
+	*value = pci_read_config(dev, offset + reg, 2);
+	return (E1000_SUCCESS);
+}
 
-#endif
+/*
+ * Write the PCI Express capabilities
+ */
+int32_t
+e1000_write_pcie_cap_reg(struct e1000_hw *hw, u32 reg, u16 *value)
+{
+	device_t dev = ((struct e1000_osdep *)hw->back)->dev;
+	u32	offset;
+
+	pci_find_cap(dev, PCIY_EXPRESS, &offset);
+	pci_write_config(dev, offset + reg, *value, 2);
+	return (E1000_SUCCESS);
+}

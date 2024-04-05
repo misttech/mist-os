@@ -1087,6 +1087,7 @@ config("Wno-implicit-fallthrough") {
   visibility = [
     "//src/lib/fxl:third_party",
     "//third_party/rust_crates/compat/brotli",
+    "//zircon/third_party/dev/ethernet/e1000:e1000_third_party",
     "//zircon/third_party/uapp/dash",
     "//zircon/third_party/ulib/boringssl",
     "//zircon/third_party/ulib/lz4",
