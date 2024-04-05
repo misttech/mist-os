@@ -405,29 +405,6 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
     }
   }
 
-  for (const auto& [pid, samples] : sampler_->GetSamples()) {
-    if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::kReset, socket_)) {
-      completer.Close(ZX_ERR_IO);
-      return;
-    }
-    auto process_modules = modules->process_contexts[pid];
-    for (const profiler::Module& mod : process_modules) {
-      if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatModule(mod), socket_)) {
-        completer.Close(ZX_ERR_IO);
-        return;
-      }
-    }
-    for (const Sample& sample : samples) {
-      if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatSample(sample),
-                                       socket_)) {
-        completer.Close(ZX_ERR_IO);
-        return;
-      }
-    }
-  }
-
-  socket_.reset();
-
   std::vector<zx::ticks> inspecting_durations = sampler_->SamplingDurations();
   fuchsia_cpu_profiler::SessionStopResponse stats;
   stats.samples_collected() = inspecting_durations.size();
@@ -453,8 +430,33 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
     stats.min_sample_time() = inspecting_durations.front() / ticks_per_us;
     stats.max_sample_time() = inspecting_durations.back() / ticks_per_us;
   }
-  Reset();
+  // Allow the caller to move on before writing to the socket. This way, if the caller is
+  // synchronous, they can start reading from the socket without worrying about deadlocking due to a
+  // full socket.
   completer.Reply(std::move(stats));
+
+  for (const auto& [pid, samples] : sampler_->GetSamples()) {
+    if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::kReset, socket_)) {
+      completer.Close(ZX_ERR_IO);
+      return;
+    }
+    auto process_modules = modules->process_contexts[pid];
+    for (const profiler::Module& mod : process_modules) {
+      if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatModule(mod), socket_)) {
+        completer.Close(ZX_ERR_IO);
+        return;
+      }
+    }
+    for (const Sample& sample : samples) {
+      if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatSample(sample),
+                                       socket_)) {
+        completer.Close(ZX_ERR_IO);
+        return;
+      }
+    }
+  }
+
+  Reset();
 }
 
 void profiler::ProfilerControllerImpl::Reset(ResetCompleter::Sync& completer) {
