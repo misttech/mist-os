@@ -419,8 +419,8 @@ const PaperShapeCacheEntry& PaperShapeCache::GetShapeMesh(const Hash& shape_hash
   //      planes, because we know they will all pass.
   size_t num_unculled_clip_planes = num_clip_planes;
   plane3* unculled_clip_planes = ESCHER_ALLOCA(plane3, num_clip_planes);
-  if (auto bbox_was_completely_clipped = CullPlanesAgainstBoundingBox(
-          bounding_box, clip_planes, unculled_clip_planes, &num_unculled_clip_planes)) {
+  if (CullPlanesAgainstBoundingBox(bounding_box, clip_planes, unculled_clip_planes,
+                                   &num_unculled_clip_planes)) {
     // Cache a null MeshPtr, so that a subsequent lookup won't have to do
     // the CPU work of testing planes against the bounding box.
     ++cache_hit_count_;
